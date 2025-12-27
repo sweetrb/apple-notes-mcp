@@ -20,6 +20,18 @@ The AI assistant communicates with this server, which then uses AppleScript to i
 
 ## Quick Start
 
+### Using Claude Code (Easiest)
+
+Just ask Claude Code to install it for you:
+
+```
+Install the apple-notes-mcp MCP server so you can help me manage my Apple Notes
+```
+
+Claude will handle the installation and configuration automatically.
+
+### Manual Installation
+
 **1. Install the server:**
 ```bash
 npm install -g apple-notes-mcp
