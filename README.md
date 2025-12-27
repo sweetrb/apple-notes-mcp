@@ -506,7 +506,10 @@ npm run format   # Format code
 
 ## Author
 
-**Rob Sweet**
+**Rob Sweet** - President, [Superior Technologies Research](https://www.superiortech.io)
+
+A software consulting, contracting, and development company.
+
 - Email: rob@superiortech.io
 - GitHub: [@sweetrb](https://github.com/sweetrb)
 
