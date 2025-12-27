@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Apple Notes MCP Server
  *
