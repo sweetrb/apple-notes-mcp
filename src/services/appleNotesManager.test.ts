@@ -43,17 +43,16 @@ describe("escapeForAppleScript", () => {
     });
   });
 
-  describe("single quote escaping (shell safety)", () => {
-    it("escapes single quotes for shell embedding", () => {
-      // Single quotes in: osascript -e 'tell app...'
-      // Need to become: '\'' (end quote, escaped quote, start quote)
+  describe("single quote handling", () => {
+    it("preserves single quotes (no escaping needed in AppleScript double-quoted strings)", () => {
+      // Single quotes don't need escaping inside AppleScript double-quoted strings
       const result = escapeForAppleScript("it's working");
-      expect(result).toBe("it'\\''s working");
+      expect(result).toBe("it's working");
     });
 
     it("handles multiple single quotes", () => {
       const result = escapeForAppleScript("Rob's mom's note");
-      expect(result).toBe("Rob'\\''s mom'\\''s note");
+      expect(result).toBe("Rob's mom's note");
     });
   });
 
@@ -66,7 +65,7 @@ describe("escapeForAppleScript", () => {
 
     it("handles mixed quotes", () => {
       const result = escapeForAppleScript('He said "it\'s fine"');
-      expect(result).toBe("He said \\\"it'\\''s fine\\\"");
+      expect(result).toBe('He said \\"it\'s fine\\"');
     });
   });
 
@@ -91,7 +90,7 @@ describe("escapeForAppleScript", () => {
     it("handles real-world note content", () => {
       const content = 'John\'s "Meeting Notes"\n- Item 1\n- Item 2';
       const result = escapeForAppleScript(content);
-      expect(result).toBe("John'\\''s \\\"Meeting Notes\\\"<br>- Item 1<br>- Item 2");
+      expect(result).toBe('John\'s \\"Meeting Notes\\"<br>- Item 1<br>- Item 2');
     });
   });
 
@@ -112,9 +111,9 @@ describe("escapeForAppleScript", () => {
     });
 
     it("handles backslashes", () => {
-      // Backslashes are escaped for AppleScript (\ becomes \\)
+      // Backslashes are HTML-encoded to avoid AppleScript escaping issues
       const result = escapeForAppleScript("path\\to\\file");
-      expect(result).toBe("path\\\\to\\\\file");
+      expect(result).toBe("path&#92;to&#92;file");
     });
 
     it("handles ampersands", () => {
@@ -124,17 +123,16 @@ describe("escapeForAppleScript", () => {
     });
 
     it("handles angle brackets (HTML-like content)", () => {
-      // Single quotes become '\'' (shell escape pattern)
-      // Ampersands in attributes would be encoded
+      // Single quotes pass through unchanged
       const result = escapeForAppleScript("<script>alert('xss')</script>");
-      expect(result).toBe("<script>alert('\\''xss'\\'')</script>");
+      expect(result).toBe("<script>alert('xss')</script>");
     });
   });
 
   describe("boundary conditions", () => {
     it("handles very short strings", () => {
       expect(escapeForAppleScript("a")).toBe("a");
-      expect(escapeForAppleScript("'")).toBe("'\\''");
+      expect(escapeForAppleScript("'")).toBe("'");
       expect(escapeForAppleScript('"')).toBe('\\"');
     });
 
@@ -143,10 +141,9 @@ describe("escapeForAppleScript", () => {
     });
 
     it("handles multiple consecutive special characters", () => {
-      // Three single quotes become three '\'' sequences
-      // Three double quotes become three \" sequences
+      // Single quotes pass through, double quotes are escaped
       const result = escapeForAppleScript("'''\"\"\"");
-      expect(result).toBe("'\\'''\\'''\\''\\\"\\\"\\\"");
+      expect(result).toBe("'''\\\"\\\"\\\"");
     });
   });
 });

@@ -51,26 +51,27 @@ export function escapeForAppleScript(text: string): string {
     return "";
   }
 
-  // Step 1: Escape backslashes first (AppleScript escape character)
-  // Must be done before other escapes that add backslashes
-  let escaped = text.replace(/\\/g, "\\\\");
+  // Content goes inside AppleScript double-quoted strings: body:"content here"
+  // Within double-quoted AppleScript strings, we need to escape:
+  // 1. Backslashes (\ → \\) - AppleScript escape character
+  // 2. Double quotes (" → \") - String delimiter
+  // Single quotes do NOT need escaping in double-quoted AppleScript strings.
 
-  // Step 2: Escape single quotes for shell embedding
-  // When we run: osascript -e 'tell app...'
-  // Any single quotes in the script need special handling
-  // Pattern: ' becomes '\'' (end quote, escaped quote, begin quote)
-  escaped = escaped.replace(/'/g, "'\\''");
+  // Step 1: Encode HTML ampersands FIRST (before adding any HTML entities)
+  let escaped = text.replace(/&/g, "&amp;");
+
+  // Step 2: Encode backslashes as HTML entities
+  // This avoids AppleScript escaping issues since Notes stores HTML
+  // Must happen AFTER ampersand encoding (so &#92; doesn't become &amp;#92;)
+  // and BEFORE double-quote escaping (so \" doesn't become &#92;")
+  escaped = escaped.replace(/\\/g, "&#92;");
 
   // Step 3: Escape double quotes for AppleScript strings
-  // AppleScript uses: "hello \"quoted\" world"
+  // The backslash in \" is for AppleScript, not content, so it's added AFTER
+  // backslash encoding to avoid being HTML-encoded
   escaped = escaped.replace(/"/g, '\\"');
 
-  // Step 4: Encode HTML special characters for Notes.app
-  // Apple Notes stores content as HTML, so & must be encoded
-  // BEFORE we add any HTML tags like <br>
-  escaped = escaped.replace(/&/g, "&amp;");
-
-  // Step 5: Convert control characters to HTML for Notes.app
+  // Step 4: Convert control characters to HTML for Notes.app
   // - Newlines (\n) to <br> tags
   // - Tabs (\t) to <br> tags (better than &nbsp; for readability)
   escaped = escaped.replace(/\n/g, "<br>");
