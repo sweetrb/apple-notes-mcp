@@ -471,6 +471,29 @@ If installed from source, use this configuration:
 | No rich formatting | Content is HTML; complex formatting may not render |
 | Title matching | Most operations require exact title matches |
 
+### Backslash Escaping (Important for AI Agents)
+
+When sending content containing backslashes (`\`) to this MCP server, **you must escape them as `\\`** in the JSON parameters.
+
+**Why:** The MCP protocol uses JSON for parameter passing. In JSON, a single backslash is an escape character. To include a literal backslash in content, it must be escaped as `\\`.
+
+**Example - Shell command with escaped path:**
+```json
+{
+  "title": "Install Script",
+  "content": "cp ~/Library/Mobile\\\\ Documents/file.txt ~/.config/"
+}
+```
+
+The `\\\\` in JSON becomes `\\` in the actual string, which represents a single `\` in the note.
+
+**Common patterns requiring escaping:**
+- Shell escaped spaces: `Mobile\ Documents` → `Mobile\\\\ Documents` in JSON
+- Windows paths: `C:\Users\` → `C:\\\\Users\\\\` in JSON
+- Regex patterns: `\d+` → `\\\\d+` in JSON
+
+**If you see errors** when creating/updating notes with backslashes, double-check that backslashes are properly escaped in the JSON payload.
+
 ---
 
 ## Troubleshooting
@@ -489,6 +512,11 @@ If installed from source, use this configuration:
 - Note titles must match exactly (case-sensitive)
 - Check if the note is in a different account
 - Use `list-notes` to see available notes
+
+### Note creation/update fails silently with backslashes
+- Content containing `\` characters requires JSON escaping
+- Use `\\` to represent each literal backslash
+- See "Backslash Escaping" section under Known Limitations
 
 ---
 
