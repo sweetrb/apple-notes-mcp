@@ -1,13 +1,9 @@
 {
   "name": "apple-notes",
   "version": "1.1.1",
-  "description": "Manage Apple Notes through natural language - create, search, read, update, delete, and organize notes and folders",
+  "description": "Manage Apple Notes through natural language - create, search, read, update, delete, and organize notes and folders (macOS only)",
   "author": {
     "name": "Rob Sweet",
     "email": "rob@superiortech.io"
-  },
-  "repository": "https://github.com/sweetrb/apple-notes-mcp",
-  "license": "MIT",
-  "keywords": ["apple-notes", "mcp", "notes", "macos", "productivity"],
-  "os": ["darwin"]
+  }
 }
