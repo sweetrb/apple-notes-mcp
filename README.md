@@ -30,6 +30,17 @@ Install the apple-notes-mcp MCP server so you can help me manage my Apple Notes
 
 Claude will handle the installation and configuration automatically.
 
+### Using the Plugin Marketplace
+
+Install as a Claude Code plugin for automatic configuration and enhanced AI behavior:
+
+```bash
+/plugin marketplace add sweetrb/apple-notes-mcp
+/plugin install apple-notes
+```
+
+This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
+
 ### Manual Installation
 
 **1. Install the server:**
