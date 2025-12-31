@@ -6,6 +6,11 @@ This file provides guidance for AI agents (Claude, etc.) when using this MCP ser
 
 This MCP server enables AI assistants to interact with Apple Notes on macOS via AppleScript. All operations are local - no data leaves the user's machine.
 
+## Related Documentation
+
+- **[TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md)** - Deep technical research on Apple Notes internals, database structure, protobuf format, and alternative access methods
+- **[TODO.md](./TODO.md)** - Prioritized improvement roadmap with stability fixes and new features
+
 ## Critical: Backslash Escaping
 
 **When sending content with backslashes to any tool, you MUST escape them.**
@@ -44,14 +49,38 @@ content: "cp ~/Library/Mobile\ Documents/file.txt ~/dest/"
 
 ## Tool Usage Tips
 
+### Using IDs for Reliability (Recommended)
+
+All note operations support an optional `id` parameter. **Using IDs is more reliable than titles** because:
+- IDs are unique across all accounts
+- Titles can be duplicated
+- No issues with special characters
+
+**Recommended workflow:**
+1. Use `search-notes` or `create-note` to get the note's ID
+2. Use the ID for subsequent operations (`get-note-content`, `update-note`, `delete-note`, `move-note`)
+
+```
+# Search returns IDs
+search-notes query="Meeting"
+→ "Meeting Notes (Work) [id: x-coredata://ABC/ICNote/p123]"
+
+# Use ID for reliable operations
+get-note-content id="x-coredata://ABC/ICNote/p123"
+update-note id="x-coredata://ABC/ICNote/p123" newContent="Updated"
+delete-note id="x-coredata://ABC/ICNote/p123"
+```
+
 ### create-note / update-note
 - Always escape backslashes in content (see above)
 - Newlines can be sent as `\n` (this is a valid JSON escape)
 - The title becomes the first line of the note
+- `create-note` returns the new note's ID for subsequent operations
 
 ### search-notes
 - Set `searchContent: true` to search note body, not just titles
 - Searches are case-insensitive
+- Results include note IDs for reliable subsequent operations
 
 ### list-notes
 - Returns note titles only, not content
@@ -60,11 +89,13 @@ content: "cp ~/Library/Mobile\ Documents/file.txt ~/dest/"
 ### move-note
 - Internally copies then deletes the original
 - If delete fails, note exists in both locations (still returns success)
+- Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### Multi-account
 - Default account is iCloud
 - Use `list-accounts` to see available accounts
 - Pass `account` parameter to target specific account
+- When using `id`, account is not needed (IDs are globally unique)
 
 ## Error Handling
 
