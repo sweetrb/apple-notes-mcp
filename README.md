@@ -113,7 +113,7 @@ Creates a new note in Apple Notes.
 }
 ```
 
-**Returns:** Confirmation message with note title, or error if creation failed.
+**Returns:** Confirmation message with note title and ID. Save the ID for subsequent operations like `update-note`, `delete-note`, etc.
 
 ---
 
@@ -142,7 +142,7 @@ Searches for notes by title or content.
 }
 ```
 
-**Returns:** List of matching note titles, or message if no matches found.
+**Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc.
 
 ---
 
@@ -152,10 +152,20 @@ Retrieves the full content of a specific note.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `title` | string | Yes | Exact title of the note to retrieve |
-| `account` | string | No | Account containing the note (defaults to iCloud) |
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Note title (use `id` instead when available) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
 
-**Example:**
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended as it's unique and avoids issues with duplicate titles.
+
+**Example - Using ID (recommended):**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456"
+}
+```
+
+**Example - Using title:**
 ```json
 {
   "title": "Shopping List"
@@ -215,10 +225,21 @@ Updates an existing note's content and/or title.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `title` | string | Yes | Current title of the note to update |
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Current title of the note to update (use `id` instead when available) |
 | `newTitle` | string | No | New title (if changing the title) |
 | `newContent` | string | Yes | New content for the note body |
-| `account` | string | No | Account containing the note (defaults to iCloud) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+
+**Example - Using ID (recommended):**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "newContent": "Updated content here"
+}
+```
 
 **Example - Update content only:**
 ```json
@@ -247,10 +268,20 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `title` | string | Yes | Exact title of the note to delete |
-| `account` | string | No | Account containing the note (defaults to iCloud) |
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Exact title of the note to delete (use `id` instead when available) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
 
-**Example:**
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+
+**Example - Using ID (recommended):**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456"
+}
+```
+
+**Example - Using title:**
 ```json
 {
   "title": "Old Draft"
@@ -267,11 +298,22 @@ Moves a note to a different folder.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `title` | string | Yes | Title of the note to move |
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Title of the note to move (use `id` instead when available) |
 | `folder` | string | Yes | Name of the destination folder |
-| `account` | string | No | Account containing the note (defaults to iCloud) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
 
-**Example:**
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+
+**Example - Using ID (recommended):**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "folder": "Archive"
+}
+```
+
+**Example - Using title:**
 ```json
 {
   "title": "Completed Task",
@@ -443,8 +485,8 @@ npm install -g apple-notes-mcp
 ### From Source
 
 ```bash
-git clone https://github.com/sweetrb/mcp-apple-notes.git
-cd mcp-apple-notes
+git clone https://github.com/sweetrb/apple-notes-mcp.git
+cd apple-notes-mcp
 npm install
 npm run build
 ```
@@ -455,7 +497,7 @@ If installed from source, use this configuration:
   "mcpServers": {
     "apple-notes": {
       "command": "node",
-      "args": ["/path/to/mcp-apple-notes/build/index.js"]
+      "args": ["/path/to/apple-notes-mcp/build/index.js"]
     }
   }
 }
@@ -536,7 +578,7 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 ```bash
 npm install      # Install dependencies
 npm run build    # Compile TypeScript
-npm test         # Run test suite (121 tests)
+npm test         # Run test suite (123 tests)
 npm run lint     # Check code style
 npm run format   # Format code
 ```
