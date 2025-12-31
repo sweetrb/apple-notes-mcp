@@ -34,7 +34,7 @@ import { AppleNotesManager } from "@/services/appleNotesManager.js";
  */
 const server = new McpServer({
   name: "apple-notes",
-  version: "1.1.0",
+  version: "1.2.0",
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes",
 });
 
@@ -136,7 +136,7 @@ server.tool(
       );
     }
 
-    return successResponse(`Note created: "${note.title}"`);
+    return successResponse(`Note created: "${note.title}" [id: ${note.id}]`);
   }, "Error creating note")
 );
 
@@ -157,15 +157,16 @@ server.tool(
       return successResponse(`No notes found matching "${query}" in ${searchType}`);
     }
 
-    // Format each note with folder info, highlighting Recently Deleted
+    // Format each note with ID and folder info, highlighting Recently Deleted
     const noteList = notes
       .map((n) => {
+        const idSuffix = n.id ? ` [id: ${n.id}]` : "";
         if (n.folder === "Recently Deleted") {
-          return `  - ${n.title} [DELETED]`;
+          return `  - ${n.title} [DELETED]${idSuffix}`;
         } else if (n.folder) {
-          return `  - ${n.title} (${n.folder})`;
+          return `  - ${n.title} (${n.folder})${idSuffix}`;
         }
-        return `  - ${n.title}`;
+        return `  - ${n.title}${idSuffix}`;
       })
       .join("\n");
 
@@ -177,10 +178,30 @@ server.tool(
 
 server.tool(
   "get-note-content",
-  noteTitleSchema,
-  withErrorHandling(({ title, account }) => {
-    const content = notesManager.getNoteContent(title, account);
+  {
+    id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+    title: z.string().optional().describe("Note title (use id instead when available)"),
+    account: z
+      .string()
+      .optional()
+      .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+  },
+  withErrorHandling(({ id, title, account }) => {
+    // Prefer ID-based lookup if provided
+    if (id) {
+      const content = notesManager.getNoteContentById(id);
+      if (!content) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      return successResponse(content);
+    }
 
+    // Fall back to title-based lookup
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const content = notesManager.getNoteContent(title, account);
     if (!content) {
       return errorResponse(`Note "${title}" not found`);
     }
@@ -249,14 +270,32 @@ server.tool(
 server.tool(
   "update-note",
   {
-    title: z.string().min(1, "Current note title is required"),
+    id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+    title: z.string().optional().describe("Current note title (use id instead when available)"),
     newTitle: z.string().optional().describe("New title for the note"),
     newContent: z.string().min(1, "New content is required"),
-    account: z.string().optional().describe("Account containing the note"),
+    account: z
+      .string()
+      .optional()
+      .describe("Account containing the note (ignored if id is provided)"),
   },
-  withErrorHandling(({ title, newTitle, newContent, account }) => {
-    const success = notesManager.updateNote(title, newTitle, newContent, account);
+  withErrorHandling(({ id, title, newTitle, newContent, account }) => {
+    // Prefer ID-based update if provided
+    if (id) {
+      const success = notesManager.updateNoteById(id, newTitle, newContent);
+      if (!success) {
+        return errorResponse(`Failed to update note with ID "${id}". Note may not exist.`);
+      }
+      const displayTitle = newTitle || "(title preserved)";
+      return successResponse(`Note updated: "${displayTitle}"`);
+    }
 
+    // Fall back to title-based update
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const success = notesManager.updateNote(title, newTitle, newContent, account);
     if (!success) {
       return errorResponse(`Failed to update note "${title}". Note may not exist.`);
     }
@@ -270,10 +309,30 @@ server.tool(
 
 server.tool(
   "delete-note",
-  noteTitleSchema,
-  withErrorHandling(({ title, account }) => {
-    const success = notesManager.deleteNote(title, account);
+  {
+    id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+    title: z.string().optional().describe("Note title (use id instead when available)"),
+    account: z
+      .string()
+      .optional()
+      .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+  },
+  withErrorHandling(({ id, title, account }) => {
+    // Prefer ID-based deletion if provided
+    if (id) {
+      const success = notesManager.deleteNoteById(id);
+      if (!success) {
+        return errorResponse(`Failed to delete note with ID "${id}". Note may not exist.`);
+      }
+      return successResponse(`Note deleted (by ID)`);
+    }
 
+    // Fall back to title-based deletion
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const success = notesManager.deleteNote(title, account);
     if (!success) {
       return errorResponse(`Failed to delete note "${title}". Note may not exist.`);
     }
@@ -287,13 +346,29 @@ server.tool(
 server.tool(
   "move-note",
   {
-    title: z.string().min(1, "Note title is required"),
+    id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+    title: z.string().optional().describe("Note title (use id instead when available)"),
     folder: z.string().min(1, "Destination folder is required"),
-    account: z.string().optional().describe("Account containing the note"),
+    account: z.string().optional().describe("Account containing the note/folder"),
   },
-  withErrorHandling(({ title, folder, account }) => {
-    const success = notesManager.moveNote(title, folder, account);
+  withErrorHandling(({ id, title, folder, account }) => {
+    // Prefer ID-based move if provided
+    if (id) {
+      const success = notesManager.moveNoteById(id, folder, account);
+      if (!success) {
+        return errorResponse(
+          `Failed to move note with ID "${id}" to folder "${folder}". Note or folder may not exist.`
+        );
+      }
+      return successResponse(`Note moved to "${folder}" (by ID)`);
+    }
 
+    // Fall back to title-based move
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const success = notesManager.moveNote(title, folder, account);
     if (!success) {
       return errorResponse(
         `Failed to move note "${title}" to folder "${folder}". Note or folder may not exist.`

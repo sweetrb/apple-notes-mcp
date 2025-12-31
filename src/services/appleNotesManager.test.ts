@@ -296,17 +296,20 @@ describe("AppleNotesManager", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
         output:
-          "Meeting Notes|||Work|||ITEM|||Project Plan|||Notes|||ITEM|||Weekly Review|||Archive",
+          "Meeting Notes|||x-coredata://ABC/ICNote/p1|||Work|||ITEM|||Project Plan|||x-coredata://ABC/ICNote/p2|||Notes|||ITEM|||Weekly Review|||x-coredata://ABC/ICNote/p3|||Archive",
       });
 
       const results = manager.searchNotes("notes");
 
       expect(results).toHaveLength(3);
       expect(results[0].title).toBe("Meeting Notes");
+      expect(results[0].id).toBe("x-coredata://ABC/ICNote/p1");
       expect(results[0].folder).toBe("Work");
       expect(results[1].title).toBe("Project Plan");
+      expect(results[1].id).toBe("x-coredata://ABC/ICNote/p2");
       expect(results[1].folder).toBe("Notes");
       expect(results[2].title).toBe("Weekly Review");
+      expect(results[2].id).toBe("x-coredata://ABC/ICNote/p3");
       expect(results[2].folder).toBe("Archive");
     });
 
@@ -336,7 +339,7 @@ describe("AppleNotesManager", () => {
     it("searches content when searchContent is true", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "Note with keyword|||Notes",
+        output: "Note with keyword|||x-coredata://ABC/ICNote/p1|||Notes",
       });
 
       manager.searchNotes("project alpha", true);
@@ -349,7 +352,7 @@ describe("AppleNotesManager", () => {
     it("searches titles when searchContent is false", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "Project Alpha Notes|||Notes",
+        output: "Project Alpha Notes|||x-coredata://ABC/ICNote/p1|||Notes",
       });
 
       manager.searchNotes("Project Alpha", false);
@@ -362,15 +365,18 @@ describe("AppleNotesManager", () => {
     it("identifies notes in Recently Deleted folder", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "Old Note|||Recently Deleted|||ITEM|||Active Note|||Notes",
+        output:
+          "Old Note|||x-coredata://ABC/ICNote/p1|||Recently Deleted|||ITEM|||Active Note|||x-coredata://ABC/ICNote/p2|||Notes",
       });
 
       const results = manager.searchNotes("note");
 
       expect(results).toHaveLength(2);
       expect(results[0].title).toBe("Old Note");
+      expect(results[0].id).toBe("x-coredata://ABC/ICNote/p1");
       expect(results[0].folder).toBe("Recently Deleted");
       expect(results[1].title).toBe("Active Note");
+      expect(results[1].id).toBe("x-coredata://ABC/ICNote/p2");
       expect(results[1].folder).toBe("Notes");
     });
 
@@ -800,8 +806,13 @@ describe("AppleNotesManager", () => {
 
   describe("moveNote", () => {
     it("returns true when move completes successfully", () => {
-      // Mock sequence: getNoteContent -> createNote -> deleteNote
+      // Mock sequence: getNoteDetails -> getNoteContent -> createNote -> deleteNote
       mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output:
+            "My Note, x-coredata://ABC/ICNote/p123, date Monday January 1 2024, date Monday January 1 2024, false, false",
+        })
         .mockReturnValueOnce({
           success: true,
           output: "<div>Note Title</div><div>Content</div>",
@@ -818,10 +829,10 @@ describe("AppleNotesManager", () => {
       const result = manager.moveNote("My Note", "Archive");
 
       expect(result).toBe(true);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(3);
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(4);
     });
 
-    it("returns false when source note cannot be read", () => {
+    it("returns false when source note cannot be found", () => {
       mockExecuteAppleScript.mockReturnValueOnce({
         success: false,
         output: "",
@@ -831,11 +842,16 @@ describe("AppleNotesManager", () => {
       const result = manager.moveNote("Missing Note", "Archive");
 
       expect(result).toBe(false);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1); // Only tried to read
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1); // Only tried to get details
     });
 
     it("returns false when copy to destination fails", () => {
       mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output:
+            "My Note, x-coredata://ABC/ICNote/p123, date Monday January 1 2024, date Monday January 1 2024, false, false",
+        })
         .mockReturnValueOnce({
           success: true,
           output: "<div>Content</div>",
@@ -849,12 +865,17 @@ describe("AppleNotesManager", () => {
       const result = manager.moveNote("My Note", "Nonexistent Folder");
 
       expect(result).toBe(false);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2); // Read + failed create
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(3); // Details + Read + failed create
     });
 
     it("returns true even if delete fails (note exists in new location)", () => {
       // This is partial success - note was copied but original couldn't be deleted
       mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output:
+            "My Note, x-coredata://ABC/ICNote/p123, date Monday January 1 2024, date Monday January 1 2024, false, false",
+        })
         .mockReturnValueOnce({
           success: true,
           output: "<div>Content</div>",

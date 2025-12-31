@@ -307,15 +307,22 @@ export class AppleNotesManager {
 
     // Build the AppleScript command
     // Notes.app uses 'name' for the title and 'body' for content
+    // We capture the ID of the newly created note
     let createCommand: string;
 
     if (folder) {
       // Create note in specific folder
       const safeFolder = escapeForAppleScript(folder);
-      createCommand = `make new note at folder "${safeFolder}" with properties {name:"${safeTitle}", body:"${safeContent}"}`;
+      createCommand = `
+        set newNote to make new note at folder "${safeFolder}" with properties {name:"${safeTitle}", body:"${safeContent}"}
+        return id of newNote
+      `;
     } else {
       // Create note in default location
-      createCommand = `make new note with properties {name:"${safeTitle}", body:"${safeContent}"}`;
+      createCommand = `
+        set newNote to make new note with properties {name:"${safeTitle}", body:"${safeContent}"}
+        return id of newNote
+      `;
     }
 
     // Execute the script
@@ -327,11 +334,13 @@ export class AppleNotesManager {
       return null;
     }
 
-    // Return a Note object representing the created note
-    // Note: We use a timestamp as ID since we can't easily get the real ID
+    // Extract the CoreData ID from the response
+    const noteId = result.output.trim();
+
+    // Return a Note object representing the created note with real ID
     const now = new Date();
     return {
-      id: Date.now().toString(),
+      id: noteId || Date.now().toString(), // Use real ID, fallback to timestamp
       title,
       content,
       tags,
@@ -372,8 +381,8 @@ export class AppleNotesManager {
       ? `body contains "${safeQuery}"`
       : `name contains "${safeQuery}"`;
 
-    // Get names and folder for each matching note
-    // We use a repeat loop to get both properties, separated by a delimiter
+    // Get names, IDs, and folder for each matching note
+    // We use a repeat loop to get all properties, separated by a delimiter
     // Note: Some notes may have inaccessible containers, so we wrap in try/on error
     const searchCommand = `
       set matchingNotes to notes where ${whereClause}
@@ -381,12 +390,14 @@ export class AppleNotesManager {
       repeat with n in matchingNotes
         try
           set noteName to name of n
+          set noteId to id of n
           set noteFolder to name of container of n
-          set end of resultList to noteName & "|||" & noteFolder
+          set end of resultList to noteName & "|||" & noteId & "|||" & noteFolder
         on error
           try
             set noteName to name of n
-            set end of resultList to noteName & "|||" & "Notes"
+            set noteId to id of n
+            set end of resultList to noteName & "|||" & noteId & "|||" & "Notes"
           end try
         end try
       end repeat
@@ -406,15 +417,15 @@ export class AppleNotesManager {
       return [];
     }
 
-    // Parse the delimited output: "name|||folder|||ITEM|||name|||folder..."
+    // Parse the delimited output: "name|||id|||folder|||ITEM|||name|||id|||folder..."
     const items = result.output.split("|||ITEM|||");
 
     const notes: Note[] = [];
     for (const item of items) {
-      const [title, folder] = item.split("|||");
+      const [title, id, folder] = item.split("|||");
       if (!title?.trim()) continue;
       notes.push({
-        id: Date.now().toString(),
+        id: id?.trim() || Date.now().toString(), // Use real ID, fallback to timestamp
         title: title.trim(),
         content: "", // Not fetched in search
         tags: [] as string[],
@@ -453,6 +464,29 @@ export class AppleNotesManager {
 
     if (!result.success) {
       console.error(`Failed to get content of note "${title}":`, result.error);
+      return "";
+    }
+
+    return result.output;
+  }
+
+  /**
+   * Retrieves the HTML content of a note by its CoreData ID.
+   *
+   * This is more reliable than getNoteContent() because IDs are unique
+   * across all accounts, while titles can be duplicated.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns HTML content of the note, or empty string if not found
+   */
+  getNoteContentById(id: string): string {
+    // Note IDs work at the application level, not scoped to account
+    const getCommand = `get body of note id "${id}"`;
+    const script = buildAppLevelScript(getCommand);
+    const result = executeAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed to get content of note with ID "${id}":`, result.error);
       return "";
     }
 
@@ -613,6 +647,28 @@ export class AppleNotesManager {
   }
 
   /**
+   * Deletes a note by its CoreData ID.
+   *
+   * This is more reliable than deleteNote() because IDs are unique
+   * across all accounts, while titles can be duplicated.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns true if deletion succeeded, false otherwise
+   */
+  deleteNoteById(id: string): boolean {
+    const deleteCommand = `delete note id "${id}"`;
+    const script = buildAppLevelScript(deleteCommand);
+    const result = executeAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed to delete note with ID "${id}":`, result.error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Updates an existing note's content and optionally its title.
    *
    * Apple Notes derives the title from the first line of the body,
@@ -648,6 +704,47 @@ export class AppleNotesManager {
 
     if (!result.success) {
       console.error(`Failed to update note "${title}":`, result.error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Updates an existing note by its CoreData ID.
+   *
+   * This is more reliable than updateNote() because IDs are unique,
+   * while titles can be duplicated.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param newTitle - New title (optional, keeps existing if not provided)
+   * @param newContent - New content for the note body
+   * @returns true if update succeeded, false otherwise
+   */
+  updateNoteById(id: string, newTitle: string | undefined, newContent: string): boolean {
+    // First get the current title if newTitle is not provided
+    let effectiveTitle = newTitle;
+    if (!effectiveTitle) {
+      const note = this.getNoteById(id);
+      if (!note) {
+        console.error(`Cannot update note: note with ID "${id}" not found`);
+        return false;
+      }
+      effectiveTitle = note.title;
+    }
+
+    const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
+    const safeContent = escapeForAppleScript(newContent);
+
+    // Apple Notes uses HTML body; first <div> becomes the title
+    const fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
+
+    const updateCommand = `set body of note id "${id}" to "${fullBody}"`;
+    const script = buildAppLevelScript(updateCommand);
+    const result = executeAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed to update note with ID "${id}":`, result.error);
       return false;
     }
 
@@ -793,7 +890,15 @@ export class AppleNotesManager {
   moveNote(title: string, destinationFolder: string, account?: string): boolean {
     const targetAccount = this.resolveAccount(account);
 
-    // Step 1: Retrieve the original note's content
+    // Step 1: Get the original note's ID first (before creating a copy with the same title)
+    const originalNote = this.getNoteDetails(title, targetAccount);
+
+    if (!originalNote) {
+      console.error(`Cannot move note "${title}": note not found`);
+      return false;
+    }
+
+    // Step 2: Retrieve the original note's content
     const originalContent = this.getNoteContent(title, targetAccount);
 
     if (!originalContent) {
@@ -801,7 +906,7 @@ export class AppleNotesManager {
       return false;
     }
 
-    // Step 2: Create a copy in the destination folder
+    // Step 3: Create a copy in the destination folder
     // We need to escape the HTML content for AppleScript embedding
     const safeFolder = escapeForAppleScript(destinationFolder);
     const safeContent = originalContent.replace(/"/g, '\\"').replace(/'/g, "'\\''");
@@ -818,16 +923,70 @@ export class AppleNotesManager {
       return false;
     }
 
-    // Step 3: Delete the original (only after successful copy)
-    const deleteSuccess = this.deleteNote(title, targetAccount);
+    // Step 4: Delete the original by ID (not by title, since there are now two notes with the same title)
+    const deleteCommand = `delete note id "${originalNote.id}"`;
+    const deleteScript = buildAppLevelScript(deleteCommand);
+    const deleteResult = executeAppleScript(deleteScript);
 
-    if (!deleteSuccess) {
+    if (!deleteResult.success) {
       // The note was copied successfully but we couldn't delete the original.
       // This is still a partial success - the note exists in the new location.
       console.error(
-        `Note "${title}" was copied to "${destinationFolder}" but original could not be deleted`
+        `Note "${title}" was copied to "${destinationFolder}" but original could not be deleted:`,
+        deleteResult.error
       );
       return true;
+    }
+
+    return true;
+  }
+
+  /**
+   * Moves a note to a different folder by its CoreData ID.
+   *
+   * This is more reliable than moveNote() because IDs are unique,
+   * while titles can be duplicated.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param destinationFolder - Name of the folder to move to
+   * @param account - Account containing the destination folder (defaults to iCloud)
+   * @returns true if move succeeded (or copy succeeded but delete failed)
+   */
+  moveNoteById(id: string, destinationFolder: string, account?: string): boolean {
+    const targetAccount = this.resolveAccount(account);
+
+    // Step 1: Retrieve the original note's content by ID
+    const originalContent = this.getNoteContentById(id);
+
+    if (!originalContent) {
+      console.error(`Cannot move note: note with ID "${id}" not found`);
+      return false;
+    }
+
+    // Step 2: Create a copy in the destination folder
+    const safeFolder = escapeForAppleScript(destinationFolder);
+    const safeContent = originalContent.replace(/"/g, '\\"').replace(/'/g, "'\\''");
+
+    const createCommand = `make new note at folder "${safeFolder}" with properties {body:"${safeContent}"}`;
+    const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
+    const copyResult = executeAppleScript(script);
+
+    if (!copyResult.success) {
+      console.error(`Cannot move note: failed to create in destination folder:`, copyResult.error);
+      return false;
+    }
+
+    // Step 3: Delete the original by ID
+    const deleteCommand = `delete note id "${id}"`;
+    const deleteScript = buildAppLevelScript(deleteCommand);
+    const deleteResult = executeAppleScript(deleteScript);
+
+    if (!deleteResult.success) {
+      console.error(
+        `Note was copied to "${destinationFolder}" but original could not be deleted:`,
+        deleteResult.error
+      );
+      return true; // Partial success - note exists in new location
     }
 
     return true;
