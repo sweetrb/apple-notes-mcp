@@ -1179,4 +1179,108 @@ describe("AppleNotesManager", () => {
       expect(stats.accounts[1].name).toBe("Gmail");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Attachment Listing
+  // ---------------------------------------------------------------------------
+
+  describe("listAttachmentsById", () => {
+    it("returns attachments for a note", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output:
+          "x-coredata://ABC/ICAttachment/p1|||photo.jpg|||public.jpegITEMx-coredata://ABC/ICAttachment/p2|||document.pdf|||com.adobe.pdfITEM",
+      });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(attachments).toHaveLength(2);
+      expect(attachments[0]).toEqual({
+        id: "x-coredata://ABC/ICAttachment/p1",
+        name: "photo.jpg",
+        contentType: "public.jpeg",
+      });
+      expect(attachments[1]).toEqual({
+        id: "x-coredata://ABC/ICAttachment/p2",
+        name: "document.pdf",
+        contentType: "com.adobe.pdf",
+      });
+    });
+
+    it("returns empty array when note has no attachments", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(attachments).toEqual([]);
+    });
+
+    it("returns empty array on error", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: false,
+        output: "",
+        error: "Note not found",
+      });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p999");
+
+      expect(attachments).toEqual([]);
+    });
+
+    it("generates correct AppleScript for ID lookup", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('note id "x-coredata://ABC/ICNote/p123"')
+      );
+    });
+  });
+
+  describe("listAttachments", () => {
+    it("returns attachments for a note by title", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "attach-id|||image.png|||public.pngITEM",
+      });
+
+      const attachments = manager.listAttachments("My Note");
+
+      expect(attachments).toHaveLength(1);
+      expect(attachments[0]).toEqual({
+        id: "attach-id",
+        name: "image.png",
+        contentType: "public.png",
+      });
+    });
+
+    it("uses specified account", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      manager.listAttachments("My Note", "Gmail");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('account "Gmail"')
+      );
+    });
+
+    it("defaults to iCloud account", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      manager.listAttachments("My Note");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('account "iCloud"')
+      );
+    });
+
+    it("returns empty array when note has no attachments", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      const attachments = manager.listAttachments("Empty Note");
+
+      expect(attachments).toEqual([]);
+    });
+  });
 });

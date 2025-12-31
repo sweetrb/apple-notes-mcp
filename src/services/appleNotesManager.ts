@@ -24,6 +24,7 @@ import type {
   NotesStats,
   AccountStats,
   FolderStats,
+  Attachment,
 } from "@/types.js";
 import { executeAppleScript } from "@/utils/applescript.js";
 
@@ -1312,5 +1313,128 @@ export class AppleNotesManager {
     }
 
     return { last24h, last7d, last30d };
+  }
+
+  // ===========================================================================
+  // Attachments
+  // ===========================================================================
+
+  /**
+   * Lists attachments for a note by its ID.
+   *
+   * Returns metadata about each attachment including name and content type.
+   * Note: The position within the note cannot be determined via AppleScript.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Array of Attachment objects, or empty array if none found
+   *
+   * @example
+   * ```typescript
+   * const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+   * attachments.forEach(a => console.log(`${a.name}: ${a.contentType}`));
+   * ```
+   */
+  listAttachmentsById(id: string): Attachment[] {
+    const safeId = escapeForAppleScript(id);
+
+    const script = `
+      tell application "Notes"
+        set theNote to note id "${safeId}"
+        set attachmentList to {}
+        repeat with a in attachments of theNote
+          set attachId to id of a
+          set attachName to name of a
+          set attachType to content identifier of a
+          set end of attachmentList to attachId & "|||" & attachName & "|||" & attachType
+        end repeat
+        set output to ""
+        repeat with item in attachmentList
+          set output to output & item & "ITEM"
+        end repeat
+        return output
+      end tell
+    `;
+
+    const result = executeAppleScript(script);
+    if (!result.success || !result.output) {
+      if (result.error) {
+        console.error(`Failed to list attachments for note ID "${id}":`, result.error);
+      }
+      return [];
+    }
+
+    // Parse the results
+    const attachments: Attachment[] = [];
+    const items = result.output.split("ITEM").filter((s) => s.trim());
+
+    for (const item of items) {
+      const parts = item.split("|||");
+      if (parts.length >= 3) {
+        attachments.push({
+          id: parts[0].trim(),
+          name: parts[1].trim(),
+          contentType: parts[2].trim(),
+        });
+      }
+    }
+
+    return attachments;
+  }
+
+  /**
+   * Lists attachments for a note by its title.
+   *
+   * @param title - Title of the note
+   * @param account - Account containing the note (defaults to iCloud)
+   * @returns Array of Attachment objects, or empty array if none found
+   */
+  listAttachments(title: string, account?: string): Attachment[] {
+    const targetAccount = this.resolveAccount(account);
+    const safeTitle = escapeForAppleScript(title);
+
+    const script = `
+      tell application "Notes"
+        tell account "${targetAccount}"
+          set theNote to note "${safeTitle}"
+          set attachmentList to {}
+          repeat with a in attachments of theNote
+            set attachId to id of a
+            set attachName to name of a
+            set attachType to content identifier of a
+            set end of attachmentList to attachId & "|||" & attachName & "|||" & attachType
+          end repeat
+          set output to ""
+          repeat with item in attachmentList
+            set output to output & item & "ITEM"
+          end repeat
+          return output
+        end tell
+      end tell
+    `;
+
+    const result = executeAppleScript(script);
+    if (!result.success || !result.output) {
+      if (result.error) {
+        console.error(`Failed to list attachments for note "${title}":`, result.error);
+      }
+      return [];
+    }
+
+    // Parse the results
+    const attachments: Attachment[] = [];
+    const items = result.output.split("ITEM").filter((s) => s.trim());
+
+    for (const item of items) {
+      const parts = item.split("|||");
+      if (parts.length >= 3) {
+        attachments.push({
+          id: parts[0].trim(),
+          name: parts[1].trim(),
+          contentType: parts[2].trim(),
+        });
+      }
+    }
+
+    return attachments;
   }
 }

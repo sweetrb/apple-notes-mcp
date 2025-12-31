@@ -462,6 +462,36 @@ export interface HealthCheckResult {
 }
 
 // =============================================================================
+// Attachments
+// =============================================================================
+
+/**
+ * Represents an attachment in a note.
+ *
+ * Attachments can be images, files, or other media embedded in a note.
+ * Note: The exact position within the note cannot be determined via AppleScript.
+ *
+ * @example
+ * ```typescript
+ * const attachment: Attachment = {
+ *   id: "x-coredata://ABC/ICAttachment/p1",
+ *   name: "photo.jpg",
+ *   contentType: "public.jpeg"
+ * };
+ * ```
+ */
+export interface Attachment {
+  /** Unique identifier for the attachment */
+  id: string;
+
+  /** Filename of the attachment */
+  name: string;
+
+  /** UTI (Uniform Type Identifier) of the attachment, e.g., "public.jpeg" */
+  contentType: string;
+}
+
+// =============================================================================
 // Notes Statistics
 // =============================================================================
 

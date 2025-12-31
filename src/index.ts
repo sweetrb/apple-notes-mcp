@@ -619,6 +619,59 @@ server.tool(
   }, "Error getting notes statistics")
 );
 
+// --- list-attachments ---
+
+server.tool(
+  "list-attachments",
+  {
+    id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+    title: z.string().optional().describe("Note title (use id instead when available)"),
+    account: z
+      .string()
+      .optional()
+      .describe("Account containing the note (ignored if id is provided)"),
+  },
+  withErrorHandling(({ id, title, account }) => {
+    // Prefer ID-based lookup if provided
+    if (id) {
+      const note = notesManager.getNoteById(id);
+      if (!note) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      const attachments = notesManager.listAttachmentsById(id);
+      if (attachments.length === 0) {
+        return successResponse(`Note "${note.title}" has no attachments`);
+      }
+      const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
+      return successResponse(
+        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`
+      );
+    }
+
+    // Fall back to title-based lookup
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+
+    const attachments = notesManager.listAttachments(title, account);
+    if (attachments.length === 0) {
+      return successResponse(`Note "${title}" has no attachments`);
+    }
+
+    const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
+    return successResponse(
+      `Found ${attachments.length} attachment(s) in "${title}":\n${attachmentList}`
+    );
+  }, "Error listing attachments")
+);
+
 // =============================================================================
 // Server Startup
 // =============================================================================
