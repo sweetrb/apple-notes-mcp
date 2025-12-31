@@ -237,13 +237,21 @@ Based on technical research into Apple Notes internals and analysis of other imp
 
 ---
 
-## Quick Wins (Can Implement Now)
+## Quick Wins (Completed ✓)
 
-1. [ ] Add timeout to AppleScript executor
-2. [ ] Check password-protected before content operations
-3. [ ] Improve error message mapping
-4. [ ] Add `folder` filter to search-notes
-5. [ ] Add health-check tool
+1. [x] Add timeout to AppleScript executor (v1.2.4)
+2. [x] Check password-protected before content operations (v1.2.4)
+3. [x] Improve error message mapping (v1.2.7)
+4. [x] Add `folder` filter to search-notes (v1.2.5)
+5. [x] Add health-check tool (v1.2.6)
+6. [x] Retry logic for transient failures (v1.2.7)
+7. [x] Validate note existence before destructive ops (v1.2.8)
+8. [x] Note statistics tool (v1.2.9)
+9. [x] Verbose logging mode (v1.2.10)
+10. [x] Attachment listing tool (v1.2.11)
+11. [x] Batch operations (v1.2.12)
+12. [x] Database snapshot/export (v1.2.13)
+13. [x] Markdown export tool (v1.2.14)
 
 ---
 
