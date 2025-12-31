@@ -34,7 +34,7 @@ import { AppleNotesManager } from "@/services/appleNotesManager.js";
  */
 const server = new McpServer({
   name: "apple-notes",
-  version: "1.2.6",
+  version: "1.2.7",
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes",
 });
 

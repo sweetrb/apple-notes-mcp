@@ -250,4 +250,96 @@ describe("executeAppleScript", () => {
       expect(result.error).toContain("timed out after 60 seconds");
     });
   });
+
+  describe("retry logic", () => {
+    it("does not retry by default (maxRetries=1)", () => {
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Notes.app is not responding");
+      });
+
+      executeAppleScript("test");
+
+      // Only one attempt with default settings
+      expect(mockExecSync).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries on transient errors when maxRetries > 1", () => {
+      let callCount = 0;
+      mockExecSync.mockImplementation(() => {
+        callCount++;
+        if (callCount < 3) {
+          throw new Error("Notes.app is not responding");
+        }
+        return "success";
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      expect(result.success).toBe(true);
+      expect(result.output).toBe("success");
+      expect(mockExecSync).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not retry on non-transient errors", () => {
+      mockExecSync.mockImplementation(() => {
+        throw new Error('Can\'t get note "Missing"');
+      });
+
+      executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      // Should not retry for "note not found" errors
+      expect(mockExecSync).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries on timeout errors", () => {
+      let callCount = 0;
+      mockExecSync.mockImplementation(() => {
+        callCount++;
+        if (callCount < 2) {
+          const timeoutError = new Error("SIGTERM") as Error & {
+            killed: boolean;
+            signal: string;
+          };
+          timeoutError.killed = true;
+          timeoutError.signal = "SIGTERM";
+          throw timeoutError;
+        }
+        return "success after retry";
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      expect(result.success).toBe(true);
+      expect(result.output).toBe("success after retry");
+      expect(mockExecSync).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on 'connection invalid' errors", () => {
+      let callCount = 0;
+      mockExecSync.mockImplementation(() => {
+        callCount++;
+        if (callCount < 2) {
+          throw new Error("connection is invalid");
+        }
+        return "recovered";
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      expect(result.success).toBe(true);
+      expect(mockExecSync).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns last error after all retries exhausted", () => {
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Notes.app is not responding");
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not responding");
+      expect(mockExecSync).toHaveBeenCalledTimes(3);
+    });
+  });
 });

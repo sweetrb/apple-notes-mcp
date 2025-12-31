@@ -210,6 +210,32 @@ export interface AppleScriptOptions {
    * - Complex searches on large collections: 60000
    */
   timeoutMs?: number;
+
+  /**
+   * Maximum number of retry attempts for transient failures.
+   *
+   * When set to a value > 1, the executor will retry on transient
+   * errors (timeout, "not responding") with exponential backoff.
+   * Defaults to 1 (no retries).
+   *
+   * Recommended values:
+   * - Simple operations: 1 (no retry)
+   * - Critical operations: 3
+   */
+  maxRetries?: number;
+
+  /**
+   * Initial delay between retries in milliseconds.
+   *
+   * Uses exponential backoff: delay doubles after each attempt.
+   * Defaults to 1000 (1 second).
+   *
+   * With default settings and maxRetries=3:
+   * - Attempt 1: immediate
+   * - Attempt 2: 1s delay
+   * - Attempt 3: 2s delay
+   */
+  retryDelayMs?: number;
 }
 
 /**

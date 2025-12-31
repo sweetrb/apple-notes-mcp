@@ -578,7 +578,7 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 ```bash
 npm install      # Install dependencies
 npm run build    # Compile TypeScript
-npm test         # Run test suite (142 tests)
+npm test         # Run test suite (148 tests)
 npm run lint     # Check code style
 npm run format   # Format code
 ```

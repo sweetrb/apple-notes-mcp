@@ -18,6 +18,14 @@ import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
+ * Default retry configuration.
+ * - 1 attempt means no retries (default behavior)
+ * - Use maxRetries: 3 for exponential backoff with 1s/2s delays
+ */
+const DEFAULT_MAX_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 1000;
+
+/**
  * Escapes a string for safe inclusion in a shell command.
  *
  * When passing AppleScript to osascript via shell, we need to handle
@@ -53,6 +61,41 @@ function isTimeoutError(error: unknown): boolean {
     return execError.killed === true || execError.signal === "SIGTERM";
   }
   return false;
+}
+
+/**
+ * Error patterns that indicate transient failures worth retrying.
+ * These typically occur when Notes.app is syncing or temporarily busy.
+ */
+const RETRYABLE_ERROR_PATTERNS = [
+  /timed? out/i,
+  /not responding/i,
+  /connection.*invalid/i,
+  /lost connection/i,
+  /busy/i,
+];
+
+/**
+ * Checks if an error message indicates a transient failure that should be retried.
+ *
+ * @param errorMessage - The error message to check
+ * @returns True if this error is worth retrying
+ */
+function isRetryableError(errorMessage: string): boolean {
+  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
+}
+
+/**
+ * Synchronous sleep using a busy wait.
+ * Used between retry attempts for exponential backoff.
+ *
+ * @param ms - Milliseconds to sleep
+ */
+function sleep(ms: number): void {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // Busy wait - necessary for synchronous operation
+  }
 }
 
 /**
@@ -200,6 +243,9 @@ export function executeAppleScript(
   options: AppleScriptOptions = {}
 ): AppleScriptResult {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+
   // Validate input - empty scripts are likely programmer errors
   if (!script || !script.trim()) {
     return {
@@ -220,54 +266,73 @@ export function executeAppleScript(
   // single quotes within the script itself
   const command = `osascript -e '${preparedScript}'`;
 
-  try {
-    // Execute synchronously - MCP tools are inherently synchronous
-    // and Apple Notes operations are fast enough that async isn't needed
-    const output = execSync(command, {
-      encoding: "utf8",
-      timeout: timeoutMs,
-      // Capture stderr separately to get error details
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+  let lastError: AppleScriptResult | null = null;
 
-    return {
-      success: true,
-      output: output.trim(),
-    };
-  } catch (error: unknown) {
-    // execSync throws on non-zero exit codes
-    // The error object contains stderr output with AppleScript error details
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Execute synchronously - MCP tools are inherently synchronous
+      // and Apple Notes operations are fast enough that async isn't needed
+      const output = execSync(command, {
+        encoding: "utf8",
+        timeout: timeoutMs,
+        // Capture stderr separately to get error details
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
-    // Check for timeout first - provide specific message
-    if (isTimeoutError(error)) {
-      const timeoutSecs = Math.round(timeoutMs / 1000);
-      const errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;
-      console.error(`AppleScript timeout: ${errorMessage}`);
       return {
+        success: true,
+        output: output.trim(),
+      };
+    } catch (error: unknown) {
+      // execSync throws on non-zero exit codes
+      // The error object contains stderr output with AppleScript error details
+
+      let errorMessage: string;
+      let isTimeout = false;
+
+      // Check for timeout first - provide specific message
+      if (isTimeoutError(error)) {
+        isTimeout = true;
+        const timeoutSecs = Math.round(timeoutMs / 1000);
+        errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;
+      } else if (error instanceof Error) {
+        // Node's ExecException includes stderr in the message
+        errorMessage = parseErrorMessage(error.message);
+      } else if (typeof error === "string") {
+        errorMessage = parseErrorMessage(error);
+      } else {
+        errorMessage = "AppleScript execution failed with unknown error";
+      }
+
+      lastError = {
         success: false,
         output: "",
         error: errorMessage,
       };
+
+      // Check if we should retry
+      const canRetry = isTimeout || isRetryableError(errorMessage);
+      const hasAttemptsLeft = attempt < maxRetries;
+
+      if (canRetry && hasAttemptsLeft) {
+        const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+        console.error(
+          `AppleScript retry: Attempt ${attempt}/${maxRetries} failed with "${errorMessage}". Retrying in ${delayMs}ms...`
+        );
+        sleep(delayMs);
+        // Continue to next attempt
+      } else {
+        // Log final error and return
+        if (isTimeout) {
+          console.error(`AppleScript timeout: ${errorMessage}`);
+        } else {
+          console.error(`AppleScript error: ${errorMessage}`);
+        }
+        return lastError!;
+      }
     }
-
-    let errorMessage: string;
-
-    if (error instanceof Error) {
-      // Node's ExecException includes stderr in the message
-      errorMessage = parseErrorMessage(error.message);
-    } else if (typeof error === "string") {
-      errorMessage = parseErrorMessage(error);
-    } else {
-      errorMessage = "AppleScript execution failed with unknown error";
-    }
-
-    // Log for debugging (MCP servers typically run in terminal)
-    console.error(`AppleScript error: ${errorMessage}`);
-
-    return {
-      success: false,
-      output: "",
-      error: errorMessage,
-    };
   }
+
+  // Return the last error (all retries exhausted - shouldn't reach here normally)
+  return lastError!;
 }
