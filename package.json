@@ -40,11 +40,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sweetrb/mcp-apple-notes.git"
+    "url": "git+https://github.com/sweetrb/apple-notes-mcp.git"
   },
-  "homepage": "https://github.com/sweetrb/mcp-apple-notes#readme",
+  "homepage": "https://github.com/sweetrb/apple-notes-mcp#readme",
   "bugs": {
-    "url": "https://github.com/sweetrb/mcp-apple-notes/issues"
+    "url": "https://github.com/sweetrb/apple-notes-mcp/issues"
   },
   "engines": {
     "node": ">=20.0.0"
