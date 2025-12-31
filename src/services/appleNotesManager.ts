@@ -374,13 +374,21 @@ export class AppleNotesManager {
 
     // Get names and folder for each matching note
     // We use a repeat loop to get both properties, separated by a delimiter
+    // Note: Some notes may have inaccessible containers, so we wrap in try/on error
     const searchCommand = `
       set matchingNotes to notes where ${whereClause}
       set resultList to {}
       repeat with n in matchingNotes
-        set noteName to name of n
-        set noteFolder to name of container of n
-        set end of resultList to noteName & "|||" & noteFolder
+        try
+          set noteName to name of n
+          set noteFolder to name of container of n
+          set end of resultList to noteName & "|||" & noteFolder
+        on error
+          try
+            set noteName to name of n
+            set end of resultList to noteName & "|||" & "Notes"
+          end try
+        end try
       end repeat
       set AppleScript's text item delimiters to "|||ITEM|||"
       return resultList as text
