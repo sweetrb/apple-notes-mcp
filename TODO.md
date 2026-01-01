@@ -259,6 +259,9 @@ Based on technical research into Apple Notes internals and analysis of other imp
 14. [x] JXA Alternative research (v1.2.15) - NOT recommended, 7.6x slower than AppleScript
 15. [x] iCloud Sync Awareness (v1.2.15) - detect sync, warn, verify
 16. [x] Collaboration Features (v1.2.16) - detect shared notes, warn on modify/delete
+17. [x] Security fix: command injection in moveNote (v1.2.17)
+18. [x] Code quality: sync status caching, shared helpers, export types (v1.2.17)
+19. [x] Developer experience: ESLint flat config, pre-commit hooks, coverage thresholds (v1.2.17)
 
 ---
 

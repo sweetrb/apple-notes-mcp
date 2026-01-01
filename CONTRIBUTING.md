@@ -101,7 +101,7 @@ When adding a new MCP tool:
 
 ## AppleScript Guidelines
 
-- Always escape user input using `formatContent()`
+- Always escape user input using `escapeForAppleScript()` for plain text or `escapeHtmlForAppleScript()` for HTML content
 - Handle errors gracefully (return null/false instead of throwing)
 - Log errors with `console.error()` for debugging
 - Test on actual macOS when possible
