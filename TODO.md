@@ -143,16 +143,16 @@ Based on technical research into Apple Notes internals and analysis of other imp
 
 ---
 
-### 3.3 Implement JXA Alternative
+### 3.3 ~~Implement JXA Alternative~~ ✓ Evaluated - Not Recommended
 **Problem**: AppleScript string escaping is complex and error-prone.
 
-**Solution**:
-- Evaluate JavaScript for Automation (JXA) as alternative
-- May have better Unicode handling
-- Same underlying OSA architecture, so similar limitations
-- Could simplify escaping logic
+**Evaluation Result**: JXA is **7.6x slower** than AppleScript due to client-side filtering.
+- Search operations: 4+ seconds vs ~300ms in AppleScript
+- Simple operations: comparable performance
+- Escaping is simpler but not enough to justify performance penalty
+- See [JXA_RESEARCH.md](./docs/JXA_RESEARCH.md) for full analysis
 
-**Files**: `src/utils/applescript.ts` (new `executeJXA` function)
+**Decision**: Keep AppleScript as primary executor. JXA utilities available in `src/utils/jxa.ts` for specific use cases.
 
 ---
 
@@ -252,6 +252,7 @@ Based on technical research into Apple Notes internals and analysis of other imp
 11. [x] Batch operations (v1.2.12)
 12. [x] Database snapshot/export (v1.2.13)
 13. [x] Markdown export tool (v1.2.14)
+14. [x] JXA Alternative research (v1.2.15) - NOT recommended, 7.6x slower than AppleScript
 
 ---
 
