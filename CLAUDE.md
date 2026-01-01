@@ -97,6 +97,18 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - Pass `account` parameter to target specific account
 - When using `id`, account is not needed (IDs are globally unique)
 
+## Sync and Collaboration Awareness
+
+### iCloud Sync
+- Use `get-sync-status` to check if sync is in progress
+- `search-notes`, `list-notes`, and `list-folders` will warn if sync is active
+- If you get incomplete results, wait a moment and retry
+
+### Shared Notes
+- Use `list-shared-notes` to find notes shared with collaborators
+- `update-note` and `delete-note` will warn when modifying shared notes
+- Changes to shared notes are immediately visible to all collaborators
+
 ## Error Handling
 
 | Error | Likely Cause |
@@ -105,6 +117,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 | "Note not found" | Title doesn't match exactly (case-sensitive) |
 | Silent failure | Backslash not escaped in content |
 | "Permission denied" | macOS automation permission needed |
+| "iCloud sync in progress" | Wait and retry - results may be incomplete |
 
 ## Testing Your Understanding
 

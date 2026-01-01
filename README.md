@@ -85,6 +85,12 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Move Notes** | Organize notes into folders |
 | **Folder Management** | Create, list, and delete folders |
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account |
+| **Batch Operations** | Delete or move multiple notes at once |
+| **Export** | Export all notes as JSON or get individual notes as Markdown |
+| **Attachments** | List attachments in notes |
+| **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
+| **Collaboration** | Detect shared notes, warn before modifying |
+| **Diagnostics** | Health check, sync status, and statistics tools |
 
 ---
 
@@ -428,6 +434,116 @@ Lists all configured Notes accounts.
 
 ---
 
+### Batch Operations
+
+#### `batch-delete-notes`
+
+Deletes multiple notes at once by ID.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ids` | string[] | Yes | Array of note IDs to delete |
+
+**Returns:** Summary of successes and failures.
+
+---
+
+#### `batch-move-notes`
+
+Moves multiple notes to a folder.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ids` | string[] | Yes | Array of note IDs to move |
+| `folder` | string | Yes | Destination folder name |
+| `account` | string | No | Account containing the folder |
+
+**Returns:** Summary of successes and failures.
+
+---
+
+### Export Operations
+
+#### `export-notes-json`
+
+Exports all notes as a JSON structure.
+
+**Parameters:** None
+
+**Returns:** Complete JSON export with all accounts, folders, and notes including metadata.
+
+---
+
+#### `get-note-markdown`
+
+Gets a note's content as Markdown instead of HTML.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | Note ID (preferred) |
+| `title` | string | No | Note title |
+| `account` | string | No | Account containing the note |
+
+**Returns:** Note content converted to Markdown format.
+
+---
+
+#### `list-attachments`
+
+Lists attachments in a note.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | Note ID (preferred) |
+| `title` | string | No | Note title |
+| `account` | string | No | Account containing the note |
+
+**Returns:** List of attachments with names and content types.
+
+---
+
+### Diagnostics
+
+#### `health-check`
+
+Verifies Notes.app connectivity and permissions.
+
+**Parameters:** None
+
+**Returns:** Status of all health checks (app installed, permissions, account access).
+
+---
+
+#### `get-notes-stats`
+
+Gets comprehensive statistics about your notes.
+
+**Parameters:** None
+
+**Returns:** Total counts, per-account breakdown, folder statistics, and recently modified counts.
+
+---
+
+#### `get-sync-status`
+
+Checks iCloud sync status.
+
+**Parameters:** None
+
+**Returns:** Whether sync is active, pending uploads, and last activity time.
+
+---
+
+#### `list-shared-notes`
+
+Lists all notes shared with collaborators.
+
+**Parameters:** None
+
+**Returns:** List of shared notes with warnings about collaboration.
+
+---
+
 ## Usage Patterns
 
 ### Basic Workflow
@@ -578,7 +694,7 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 ```bash
 npm install      # Install dependencies
 npm run build    # Compile TypeScript
-npm test         # Run test suite (174 tests)
+npm test         # Run test suite (206 tests)
 npm run lint     # Check code style
 npm run format   # Format code
 ```
