@@ -20,11 +20,16 @@
  * @see https://modelcontextprotocol.io
  */
 
+import { createRequire } from "module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
+
+// Read version from package.json to keep it in sync
+const require = createRequire(import.meta.url);
+const { version } = require("../../package.json") as { version: string };
 
 // =============================================================================
 // Server Initialization
@@ -35,7 +40,7 @@ import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
  */
 const server = new McpServer({
   name: "apple-notes",
-  version: "1.2.10",
+  version,
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes",
 });
 
