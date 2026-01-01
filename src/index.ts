@@ -24,11 +24,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
-import {
-  getSyncStatus,
-  getSyncStatusSummary,
-  withSyncAwarenessSync,
-} from "@/utils/syncDetection.js";
+import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 
 // =============================================================================
 // Server Initialization
@@ -160,7 +156,6 @@ server.tool(
     const {
       result: notes,
       syncBefore,
-      syncAfter,
       syncInterference,
     } = withSyncAwarenessSync("search-notes", () =>
       notesManager.searchNotes(query, searchContent, account, folder)
