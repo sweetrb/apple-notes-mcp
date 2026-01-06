@@ -29,7 +29,7 @@ import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
-const { version } = require("../../package.json") as { version: string };
+const { version } = require("../package.json") as { version: string };
 
 // =============================================================================
 // Server Initialization
