@@ -717,3 +717,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Related Projects
+
+- [apple-mail-mcp](https://github.com/sweetrb/apple-mail-mcp) - MCP server for Apple Mail
