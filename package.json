@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude",
   "type": "module",
   "main": "build/index.js",
@@ -26,7 +26,7 @@
     "format:check": "prettier --check src",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run lint && npm run test && npm run build",
-    "prepare": "husky"
+    "prepare": "husky && npm run build"
   },
   "keywords": [
     "mcp",
