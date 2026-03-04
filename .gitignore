@@ -26,3 +26,4 @@ Thumbs.db
 # npm package files
 *.tgz
 .claude/
+.worktrees/
