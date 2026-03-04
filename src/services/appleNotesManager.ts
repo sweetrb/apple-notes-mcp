@@ -814,12 +814,15 @@ export class AppleNotesManager {
    * so updating content also allows title changes. If newTitle is
    * not provided, the original title is preserved.
    *
+   * When format is 'html', newTitle is ignored — the caller must include
+   * the title in the HTML content.
+   *
    * Note: Password-protected notes will fail with an AppleScript error.
    * Callers should check for password protection beforehand using
    * getNoteDetails() or isNotePasswordProtected().
    *
    * @param title - Current title of the note to update
-   * @param newTitle - New title (optional, keeps existing if not provided)
+   * @param newTitle - New title (optional, keeps existing if not provided; ignored in html format)
    * @param newContent - New content for the note body
    * @param account - Account containing the note (defaults to iCloud)
    * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
@@ -865,12 +868,15 @@ export class AppleNotesManager {
    * This is more reliable than updateNote() because IDs are unique,
    * while titles can be duplicated.
    *
+   * When format is 'html', newTitle is ignored — the caller must include
+   * the title in the HTML content.
+   *
    * Note: Password-protected notes will fail with an AppleScript error.
    * Callers should check for password protection beforehand using
    * getNoteById() or isNotePasswordProtectedById().
    *
    * @param id - CoreData URL identifier for the note
-   * @param newTitle - New title (optional, keeps existing if not provided)
+   * @param newTitle - New title (optional, keeps existing if not provided; ignored in html format)
    * @param newContent - New content for the note body
    * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise

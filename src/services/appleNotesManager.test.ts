@@ -875,7 +875,9 @@ describe("AppleNotesManager", () => {
         output: "",
       });
 
-      const htmlContent = "<h1>Title</h1><h2>Section</h2><div>Body</div>";
+      // Use content with &amp; — if escapeForAppleScript were accidentally used,
+      // the & in &amp; would become &amp;amp;, causing this assertion to fail.
+      const htmlContent = "<h1>Title</h1><div>A &amp; B</div>";
       const result = manager.updateNote("Old Title", undefined, htmlContent, undefined, "html");
 
       expect(result).toBe(true);
@@ -917,6 +919,47 @@ describe("AppleNotesManager", () => {
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
         expect.stringContaining("<div>My Title</div><div>Plain content</div>")
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Note Update by ID
+  // ---------------------------------------------------------------------------
+
+  describe("updateNoteById", () => {
+    it("uses HTML content directly without div wrapping in HTML mode", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const htmlContent = "<h1>My Title</h1><div>A &amp; B</div>";
+      const result = manager.updateNoteById("x-coredata://abc/123", undefined, htmlContent, "html");
+
+      expect(result).toBe(true);
+      // HTML mode: content passed directly, no <div> wrapper
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining(`to "${htmlContent}"`)
+      );
+      // Should NOT contain the div-wrapped title pattern
+      expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
+        expect.stringContaining("<div>My Title</div>")
+      );
+    });
+
+    it("does not call getNoteById in HTML mode (skips lookup optimization)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const htmlContent = "<h1>Title</h1><div>Body</div>";
+      manager.updateNoteById("x-coredata://abc/456", undefined, htmlContent, "html");
+
+      // In HTML mode, getNoteById should NOT be called (it would trigger
+      // an additional executeAppleScript call). Only one call should happen:
+      // the update itself.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
     });
   });
 
