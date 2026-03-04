@@ -427,10 +427,11 @@ export class AppleNotesManager {
    * to the account's default location.
    *
    * @param title - Display title for the note
-   * @param content - Body content (plain text, will be HTML-escaped)
+   * @param content - Body content (plain text that will be HTML-escaped, or raw HTML when format is "html")
    * @param tags - Optional tags (stored in returned object, not used by Notes.app)
    * @param folder - Optional folder name to create the note in
    * @param account - Account to use (defaults to iCloud)
+   * @param format - Content format: "plaintext" escapes and wraps in div tags (default), "html" uses content as-is
    * @returns Created Note object with metadata, or null on failure
    *
    * @example
@@ -443,6 +444,10 @@ export class AppleNotesManager {
    *
    * // Create in a different account
    * const gmail = manager.createNote("Draft", "...", [], undefined, "Gmail");
+   *
+   * // Create with HTML formatting
+   * const html = manager.createNote("Report", "<h1>Report</h1><p>Details here</p>",
+   *   [], undefined, undefined, "html");
    * ```
    */
   createNote(
