@@ -332,6 +332,59 @@ describe("AppleNotesManager", () => {
 
       expect(result?.tags).toEqual(["work", "urgent"]);
     });
+
+    it("uses escapeHtmlForAppleScript when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p200",
+      });
+
+      const htmlContent = "<h2>Heading</h2><div>Body text</div>";
+      const result = manager.createNote("HTML Note", htmlContent, [], undefined, undefined, "html");
+
+      expect(result).not.toBeNull();
+      // HTML tags should NOT be entity-encoded — they should pass through to AppleScript
+      // escapeHtmlForAppleScript only escapes \ and ", not HTML tags
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("<h2>Heading</h2><div>Body text</div>")
+      );
+    });
+
+    it("uses escapeForAppleScript when format is plaintext (default)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p201",
+      });
+
+      const result = manager.createNote("Plain Note", "Simple text with\nnewline");
+
+      expect(result).not.toBeNull();
+      // Default plaintext: newlines become <br>
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("Simple text with<br>newline")
+      );
+    });
+
+    it("escapes double quotes in html format for AppleScript safety", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p202",
+      });
+
+      manager.createNote(
+        "Quote Test",
+        '<div class="test">Content</div>',
+        [],
+        undefined,
+        undefined,
+        "html"
+      );
+
+      // Double quotes must be escaped for AppleScript string embedding
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('<div class=\\"test\\">Content</div>')
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------

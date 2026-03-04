@@ -450,13 +450,15 @@ export class AppleNotesManager {
     content: string,
     tags: string[] = [],
     folder?: string,
-    account?: string
+    account?: string,
+    format: "plaintext" | "html" = "plaintext"
   ): Note | null {
     const targetAccount = this.resolveAccount(account);
 
     // Escape content for AppleScript embedding
     const safeTitle = escapeForAppleScript(title);
-    const safeContent = escapeForAppleScript(content);
+    const safeContent =
+      format === "html" ? escapeHtmlForAppleScript(content) : escapeForAppleScript(content);
 
     // Build the AppleScript command
     // Notes.app uses 'name' for the title and 'body' for content
