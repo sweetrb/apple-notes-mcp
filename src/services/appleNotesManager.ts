@@ -822,24 +822,30 @@ export class AppleNotesManager {
    * @param newTitle - New title (optional, keeps existing if not provided)
    * @param newContent - New content for the note body
    * @param account - Account containing the note (defaults to iCloud)
+   * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise
    */
   updateNote(
     title: string,
     newTitle: string | undefined,
     newContent: string,
-    account?: string
+    account?: string,
+    format: "plaintext" | "html" = "plaintext"
   ): boolean {
     const targetAccount = this.resolveAccount(account);
     const safeCurrentTitle = escapeForAppleScript(title);
 
-    // Determine the effective title (new or keep existing)
-    const effectiveTitle = newTitle || title;
-    const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
-    const safeContent = escapeForAppleScript(newContent);
-
-    // Apple Notes uses HTML body; first <div> becomes the title
-    const fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
+    let fullBody: string;
+    if (format === "html") {
+      // HTML mode: content is the complete body, escaped only for AppleScript string
+      fullBody = escapeHtmlForAppleScript(newContent);
+    } else {
+      // Plaintext mode: wrap title + content in <div> tags (existing behavior)
+      const effectiveTitle = newTitle || title;
+      const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
+      const safeContent = escapeForAppleScript(newContent);
+      fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
+    }
 
     const updateCommand = `set body of note "${safeCurrentTitle}" to "${fullBody}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, updateCommand);
@@ -866,25 +872,36 @@ export class AppleNotesManager {
    * @param id - CoreData URL identifier for the note
    * @param newTitle - New title (optional, keeps existing if not provided)
    * @param newContent - New content for the note body
+   * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise
    */
-  updateNoteById(id: string, newTitle: string | undefined, newContent: string): boolean {
-    // Get the note to retrieve current title if newTitle not provided
-    let effectiveTitle = newTitle;
-    if (!effectiveTitle) {
-      const note = this.getNoteById(id);
-      if (!note) {
-        console.error(`Cannot update note: note with ID "${id}" not found`);
-        return false;
+  updateNoteById(
+    id: string,
+    newTitle: string | undefined,
+    newContent: string,
+    format: "plaintext" | "html" = "plaintext"
+  ): boolean {
+    let fullBody: string;
+    if (format === "html") {
+      // HTML mode: content is the complete body, escaped only for AppleScript string
+      fullBody = escapeHtmlForAppleScript(newContent);
+    } else {
+      // Plaintext mode: wrap title + content in <div> tags (existing behavior)
+      // Get the note to retrieve current title if newTitle not provided
+      let effectiveTitle = newTitle;
+      if (!effectiveTitle) {
+        const note = this.getNoteById(id);
+        if (!note) {
+          console.error(`Cannot update note: note with ID "${id}" not found`);
+          return false;
+        }
+        effectiveTitle = note.title;
       }
-      effectiveTitle = note.title;
+
+      const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
+      const safeContent = escapeForAppleScript(newContent);
+      fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
     }
-
-    const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
-    const safeContent = escapeForAppleScript(newContent);
-
-    // Apple Notes uses HTML body; first <div> becomes the title
-    const fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
 
     const updateCommand = `set body of note id "${id}" to "${fullBody}"`;
     const script = buildAppLevelScript(updateCommand);

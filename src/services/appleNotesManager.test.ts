@@ -868,6 +868,56 @@ describe("AppleNotesManager", () => {
         expect.stringContaining("<div>Brand New Title</div>")
       );
     });
+
+    it("uses HTML content directly when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const htmlContent = "<h1>Title</h1><h2>Section</h2><div>Body</div>";
+      const result = manager.updateNote("Old Title", undefined, htmlContent, undefined, "html");
+
+      expect(result).toBe(true);
+      // In HTML mode: content is used as-is, no <div> wrapper added
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining(`to "${htmlContent}"`)
+      );
+    });
+
+    it("does not wrap HTML content in div tags when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      manager.updateNote(
+        "Old Title",
+        undefined,
+        "<h1>My Title</h1><div>Content</div>",
+        undefined,
+        "html"
+      );
+
+      // Should NOT contain the <div>Old Title</div> wrapper
+      expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
+        expect.stringContaining("<div>Old Title</div>")
+      );
+    });
+
+    it("still wraps in div tags when format is plaintext (default)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      manager.updateNote("My Title", undefined, "Plain content");
+
+      // Default behavior: should have <div> wrapper
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("<div>My Title</div><div>Plain content</div>")
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
