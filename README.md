@@ -109,6 +109,7 @@ Creates a new note in Apple Notes.
 | `title` | string | Yes | The title of the note (becomes first line) |
 | `content` | string | Yes | The body content of the note |
 | `tags` | string[] | No | Tags for organization (stored in metadata) |
+| `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content is used as raw HTML for rich formatting |
 
 **Example:**
 ```json
@@ -116,6 +117,15 @@ Creates a new note in Apple Notes.
   "title": "Meeting Notes",
   "content": "Discussed Q4 roadmap and budget allocation",
   "tags": ["work", "meetings"]
+}
+```
+
+**Example - HTML formatting:**
+```json
+{
+  "title": "Status Report",
+  "content": "<h1>Status Report</h1><h2>Summary</h2><p>All tasks <b>on track</b>.</p><ul><li>Feature A: complete</li><li>Feature B: in progress</li></ul>",
+  "format": "html"
 }
 ```
 
@@ -233,9 +243,10 @@ Updates an existing note's content and/or title.
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Current title of the note to update (use `id` instead when available) |
-| `newTitle` | string | No | New title (if changing the title) |
+| `newTitle` | string | No | New title (if changing the title; ignored when `format` is `"html"`) |
 | `newContent` | string | Yes | New content for the note body |
 | `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
@@ -261,6 +272,15 @@ Updates an existing note's content and/or title.
   "title": "Draft",
   "newTitle": "Final Version",
   "newContent": "This is the completed document."
+}
+```
+
+**Example - Update with HTML formatting:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "newContent": "<h1>Updated Report</h1><p>New findings with <b>bold</b> emphasis.</p><pre><code>console.log('hello');</code></pre>",
+  "format": "html"
 }
 ```
 
@@ -637,7 +657,7 @@ If installed from source, use this configuration:
 | macOS only | Apple Notes and AppleScript are macOS-specific |
 | No attachment content | Attachments can be listed but not downloaded via AppleScript |
 | No pinned notes | Pin status is not exposed via AppleScript |
-| No rich formatting | Content is HTML; complex formatting may not render |
+| Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
 
 ### Backslash Escaping (Important for AI Agents)

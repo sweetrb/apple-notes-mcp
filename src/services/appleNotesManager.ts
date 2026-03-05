@@ -427,10 +427,11 @@ export class AppleNotesManager {
    * to the account's default location.
    *
    * @param title - Display title for the note
-   * @param content - Body content (plain text, will be HTML-escaped)
+   * @param content - Body content (plain text that will be HTML-escaped, or raw HTML when format is "html")
    * @param tags - Optional tags (stored in returned object, not used by Notes.app)
    * @param folder - Optional folder name to create the note in
    * @param account - Account to use (defaults to iCloud)
+   * @param format - Content format: "plaintext" escapes and wraps in div tags (default), "html" uses content as-is
    * @returns Created Note object with metadata, or null on failure
    *
    * @example
@@ -443,6 +444,10 @@ export class AppleNotesManager {
    *
    * // Create in a different account
    * const gmail = manager.createNote("Draft", "...", [], undefined, "Gmail");
+   *
+   * // Create with HTML formatting
+   * const html = manager.createNote("Report", "<h1>Report</h1><p>Details here</p>",
+   *   [], undefined, undefined, "html");
    * ```
    */
   createNote(
@@ -450,13 +455,15 @@ export class AppleNotesManager {
     content: string,
     tags: string[] = [],
     folder?: string,
-    account?: string
+    account?: string,
+    format: "plaintext" | "html" = "plaintext"
   ): Note | null {
     const targetAccount = this.resolveAccount(account);
 
     // Escape content for AppleScript embedding
     const safeTitle = escapeForAppleScript(title);
-    const safeContent = escapeForAppleScript(content);
+    const safeContent =
+      format === "html" ? escapeHtmlForAppleScript(content) : escapeForAppleScript(content);
 
     // Build the AppleScript command
     // Notes.app uses 'name' for the title and 'body' for content
@@ -812,32 +819,41 @@ export class AppleNotesManager {
    * so updating content also allows title changes. If newTitle is
    * not provided, the original title is preserved.
    *
+   * When format is 'html', newTitle is ignored — the caller must include
+   * the title in the HTML content.
+   *
    * Note: Password-protected notes will fail with an AppleScript error.
    * Callers should check for password protection beforehand using
    * getNoteDetails() or isNotePasswordProtected().
    *
    * @param title - Current title of the note to update
-   * @param newTitle - New title (optional, keeps existing if not provided)
+   * @param newTitle - New title (optional, keeps existing if not provided; ignored in html format)
    * @param newContent - New content for the note body
    * @param account - Account containing the note (defaults to iCloud)
+   * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise
    */
   updateNote(
     title: string,
     newTitle: string | undefined,
     newContent: string,
-    account?: string
+    account?: string,
+    format: "plaintext" | "html" = "plaintext"
   ): boolean {
     const targetAccount = this.resolveAccount(account);
     const safeCurrentTitle = escapeForAppleScript(title);
 
-    // Determine the effective title (new or keep existing)
-    const effectiveTitle = newTitle || title;
-    const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
-    const safeContent = escapeForAppleScript(newContent);
-
-    // Apple Notes uses HTML body; first <div> becomes the title
-    const fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
+    let fullBody: string;
+    if (format === "html") {
+      // HTML mode: content is the complete body, escaped only for AppleScript string
+      fullBody = escapeHtmlForAppleScript(newContent);
+    } else {
+      // Plaintext mode: wrap title + content in <div> tags (existing behavior)
+      const effectiveTitle = newTitle || title;
+      const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
+      const safeContent = escapeForAppleScript(newContent);
+      fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
+    }
 
     const updateCommand = `set body of note "${safeCurrentTitle}" to "${fullBody}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, updateCommand);
@@ -857,32 +873,46 @@ export class AppleNotesManager {
    * This is more reliable than updateNote() because IDs are unique,
    * while titles can be duplicated.
    *
+   * When format is 'html', newTitle is ignored — the caller must include
+   * the title in the HTML content.
+   *
    * Note: Password-protected notes will fail with an AppleScript error.
    * Callers should check for password protection beforehand using
    * getNoteById() or isNotePasswordProtectedById().
    *
    * @param id - CoreData URL identifier for the note
-   * @param newTitle - New title (optional, keeps existing if not provided)
+   * @param newTitle - New title (optional, keeps existing if not provided; ignored in html format)
    * @param newContent - New content for the note body
+   * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise
    */
-  updateNoteById(id: string, newTitle: string | undefined, newContent: string): boolean {
-    // Get the note to retrieve current title if newTitle not provided
-    let effectiveTitle = newTitle;
-    if (!effectiveTitle) {
-      const note = this.getNoteById(id);
-      if (!note) {
-        console.error(`Cannot update note: note with ID "${id}" not found`);
-        return false;
+  updateNoteById(
+    id: string,
+    newTitle: string | undefined,
+    newContent: string,
+    format: "plaintext" | "html" = "plaintext"
+  ): boolean {
+    let fullBody: string;
+    if (format === "html") {
+      // HTML mode: content is the complete body, escaped only for AppleScript string
+      fullBody = escapeHtmlForAppleScript(newContent);
+    } else {
+      // Plaintext mode: wrap title + content in <div> tags (existing behavior)
+      // Get the note to retrieve current title if newTitle not provided
+      let effectiveTitle = newTitle;
+      if (!effectiveTitle) {
+        const note = this.getNoteById(id);
+        if (!note) {
+          console.error(`Cannot update note: note with ID "${id}" not found`);
+          return false;
+        }
+        effectiveTitle = note.title;
       }
-      effectiveTitle = note.title;
+
+      const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
+      const safeContent = escapeForAppleScript(newContent);
+      fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
     }
-
-    const safeEffectiveTitle = escapeForAppleScript(effectiveTitle);
-    const safeContent = escapeForAppleScript(newContent);
-
-    // Apple Notes uses HTML body; first <div> becomes the title
-    const fullBody = `<div>${safeEffectiveTitle}</div><div>${safeContent}</div>`;
 
     const updateCommand = `set body of note id "${id}" to "${fullBody}"`;
     const script = buildAppLevelScript(updateCommand);

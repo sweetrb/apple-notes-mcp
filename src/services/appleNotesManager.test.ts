@@ -332,6 +332,59 @@ describe("AppleNotesManager", () => {
 
       expect(result?.tags).toEqual(["work", "urgent"]);
     });
+
+    it("uses escapeHtmlForAppleScript when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p200",
+      });
+
+      const htmlContent = "<h2>Heading</h2><div>Body text</div>";
+      const result = manager.createNote("HTML Note", htmlContent, [], undefined, undefined, "html");
+
+      expect(result).not.toBeNull();
+      // HTML tags should NOT be entity-encoded — they should pass through to AppleScript
+      // escapeHtmlForAppleScript only escapes \ and ", not HTML tags
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("<h2>Heading</h2><div>Body text</div>")
+      );
+    });
+
+    it("uses escapeForAppleScript when format is plaintext (default)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p201",
+      });
+
+      const result = manager.createNote("Plain Note", "Simple text with\nnewline");
+
+      expect(result).not.toBeNull();
+      // Default plaintext: newlines become <br>
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("Simple text with<br>newline")
+      );
+    });
+
+    it("escapes double quotes in html format for AppleScript safety", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p202",
+      });
+
+      manager.createNote(
+        "Quote Test",
+        '<div class="test">Content</div>',
+        [],
+        undefined,
+        undefined,
+        "html"
+      );
+
+      // Double quotes must be escaped for AppleScript string embedding
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('<div class=\\"test\\">Content</div>')
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -814,6 +867,99 @@ describe("AppleNotesManager", () => {
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
         expect.stringContaining("<div>Brand New Title</div>")
       );
+    });
+
+    it("uses HTML content directly when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      // Use content with &amp; — if escapeForAppleScript were accidentally used,
+      // the & in &amp; would become &amp;amp;, causing this assertion to fail.
+      const htmlContent = "<h1>Title</h1><div>A &amp; B</div>";
+      const result = manager.updateNote("Old Title", undefined, htmlContent, undefined, "html");
+
+      expect(result).toBe(true);
+      // In HTML mode: content is used as-is, no <div> wrapper added
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining(`to "${htmlContent}"`)
+      );
+    });
+
+    it("does not wrap HTML content in div tags when format is html", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      manager.updateNote(
+        "Old Title",
+        undefined,
+        "<h1>My Title</h1><div>Content</div>",
+        undefined,
+        "html"
+      );
+
+      // Should NOT contain the <div>Old Title</div> wrapper
+      expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
+        expect.stringContaining("<div>Old Title</div>")
+      );
+    });
+
+    it("still wraps in div tags when format is plaintext (default)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      manager.updateNote("My Title", undefined, "Plain content");
+
+      // Default behavior: should have <div> wrapper
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("<div>My Title</div><div>Plain content</div>")
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Note Update by ID
+  // ---------------------------------------------------------------------------
+
+  describe("updateNoteById", () => {
+    it("uses HTML content directly without div wrapping in HTML mode", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const htmlContent = "<h1>My Title</h1><div>A &amp; B</div>";
+      const result = manager.updateNoteById("x-coredata://abc/123", undefined, htmlContent, "html");
+
+      expect(result).toBe(true);
+      // HTML mode: content passed directly, no <div> wrapper
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining(`to "${htmlContent}"`)
+      );
+      // Should NOT contain the div-wrapped title pattern
+      expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
+        expect.stringContaining("<div>My Title</div>")
+      );
+    });
+
+    it("does not call getNoteById in HTML mode (skips lookup optimization)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const htmlContent = "<h1>Title</h1><div>Body</div>";
+      manager.updateNoteById("x-coredata://abc/456", undefined, htmlContent, "html");
+
+      // In HTML mode, getNoteById should NOT be called (it would trigger
+      // an additional executeAppleScript call). Only one call should happen:
+      // the update itself.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -131,10 +131,15 @@ server.tool(
   {
     title: z.string().min(1, "Title is required"),
     content: z.string().min(1, "Content is required"),
+    format: z
+      .enum(["plaintext", "html"])
+      .optional()
+      .default("plaintext")
+      .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
     tags: z.array(z.string()).optional().describe("Tags for organization"),
   },
-  withErrorHandling(({ title, content, tags = [] }) => {
-    const note = notesManager.createNote(title, content, tags);
+  withErrorHandling(({ title, content, format = "plaintext", tags = [] }) => {
+    const note = notesManager.createNote(title, content, tags, undefined, undefined, format);
 
     if (!note) {
       return errorResponse(
@@ -325,12 +330,17 @@ server.tool(
     title: z.string().optional().describe("Current note title (use id instead when available)"),
     newTitle: z.string().optional().describe("New title for the note"),
     newContent: z.string().min(1, "New content is required"),
+    format: z
+      .enum(["plaintext", "html"])
+      .optional()
+      .default("plaintext")
+      .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
     account: z
       .string()
       .optional()
       .describe("Account containing the note (ignored if id is provided)"),
   },
-  withErrorHandling(({ id, title, newTitle, newContent, account }) => {
+  withErrorHandling(({ id, title, newTitle, newContent, format = "plaintext", account }) => {
     // Prefer ID-based update if provided
     if (id) {
       // Check for password protection first for better error message
@@ -343,7 +353,7 @@ server.tool(
           `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
         );
       }
-      const success = notesManager.updateNoteById(id, newTitle, newContent);
+      const success = notesManager.updateNoteById(id, newTitle, newContent, format);
       if (!success) {
         return errorResponse(`Failed to update note "${note.title}"`);
       }
@@ -373,7 +383,7 @@ server.tool(
       );
     }
 
-    const success = notesManager.updateNote(title, newTitle, newContent, account);
+    const success = notesManager.updateNote(title, newTitle, newContent, account, format);
     if (!success) {
       return errorResponse(`Failed to update note "${title}"`);
     }
