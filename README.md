@@ -86,6 +86,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Folder Management** | Create, list, and delete folders |
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account |
 | **Batch Operations** | Delete or move multiple notes at once |
+| **Checklist State** | Read checklist done/undone state directly from the Notes database |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
 | **Attachments** | List attachments in notes |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
@@ -496,7 +497,7 @@ Exports all notes as a JSON structure.
 
 #### `get-note-markdown`
 
-Gets a note's content as Markdown instead of HTML.
+Gets a note's content as Markdown instead of HTML. If the note contains checklists and Full Disk Access is granted, checklist items are automatically annotated with `[x]` (done) or `[ ]` (undone).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -504,7 +505,35 @@ Gets a note's content as Markdown instead of HTML.
 | `title` | string | No | Note title |
 | `account` | string | No | Account containing the note |
 
-**Returns:** Note content converted to Markdown format.
+**Returns:** Note content converted to Markdown format. Checklist items include `[x]`/`[ ]` prefixes when database access is available.
+
+---
+
+#### `get-checklist-state`
+
+Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access-for-checklist-features)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+
+**Example:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456"
+}
+```
+
+**Returns:** Checklist items with done/undone state and progress count:
+```
+Checklist for "Shopping List" (2/4 done):
+[x] Buy milk
+[x] Get bread
+[ ] Pick up laundry
+[ ] Call dentist
+```
 
 ---
 
@@ -641,6 +670,30 @@ If installed from source, use this configuration:
 
 ---
 
+## Full Disk Access for Checklist Features
+
+The `get-checklist-state` tool and checklist annotations in `get-note-markdown` read directly from the Apple Notes SQLite database. This requires **Full Disk Access** for the process running the MCP server.
+
+### How to Grant Full Disk Access
+
+1. Open **System Settings** (or System Preferences on older macOS)
+2. Go to **Privacy & Security > Full Disk Access**
+3. Click the **+** button
+4. Add the application that hosts the MCP server:
+   - **Claude Desktop**: Add `/Applications/Claude.app`
+   - **Terminal**: Add `/Applications/Utilities/Terminal.app`
+   - **VS Code**: Add `/Applications/Visual Studio Code.app`
+   - **iTerm**: Add `/Applications/iTerm.app`
+5. Restart the application after granting access
+
+### Without Full Disk Access
+
+All other tools work normally without Full Disk Access. Only checklist state features are affected:
+- `get-checklist-state` will return an error explaining that database access is needed
+- `get-note-markdown` will return plain list items without `[x]`/`[ ]` annotations (graceful fallback)
+
+---
+
 ## Security and Privacy
 
 - **Local only** - All operations happen locally via AppleScript. No data is sent to external servers.
@@ -659,6 +712,7 @@ If installed from source, use this configuration:
 | No pinned notes | Pin status is not exposed via AppleScript |
 | Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
+| Checklist state | Requires Full Disk Access to read done/undone state from the database |
 
 ### Backslash Escaping (Important for AI Agents)
 
