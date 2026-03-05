@@ -26,7 +26,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
-import { getChecklistItems } from "@/utils/checklistParser.js";
+import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
@@ -728,7 +728,13 @@ server.tool(
       })
       .join("\n");
 
-    return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}`);
+    // Check Full Disk Access for checklist features
+    const fdaAvailable = hasFullDiskAccess();
+    const fdaLine = fdaAvailable
+      ? "  ✓ full_disk_access: Granted (checklist features available)"
+      : "  ⓘ full_disk_access: Not granted (optional — needed for get-checklist-state and checklist annotations in get-note-markdown). Grant in System Settings > Privacy & Security > Full Disk Access.";
+
+    return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}\n${fdaLine}`);
   }, "Error running health check")
 );
 
@@ -966,18 +972,18 @@ server.tool(
       );
     }
 
-    const items = getChecklistItems(id);
-    if (!items) {
-      return errorResponse(
-        `No checklist items found in "${note.title}". The note may not contain checklists, or the Notes database may not be accessible (Full Disk Access required).`
-      );
+    const result = getChecklistItems(id);
+    if (!result.items) {
+      return errorResponse(result.message || "Failed to read checklist state.");
     }
 
-    const summary = items.map((item) => `${item.done ? "[x]" : "[ ]"} ${item.text}`).join("\n");
-    const checked = items.filter((i) => i.done).length;
+    const summary = result.items
+      .map((item) => `${item.done ? "[x]" : "[ ]"} ${item.text}`)
+      .join("\n");
+    const checked = result.items.filter((i) => i.done).length;
 
     return successResponse(
-      `Checklist for "${note.title}" (${checked}/${items.length} done):\n${summary}`
+      `Checklist for "${note.title}" (${checked}/${result.items.length} done):\n${summary}`
     );
   }, "Error reading checklist state")
 );

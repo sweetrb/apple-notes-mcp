@@ -108,16 +108,18 @@ describe("getChecklistItems", () => {
     vi.clearAllMocks();
   });
 
-  it("returns null for invalid note ID format", () => {
+  it("returns error for invalid note ID format", () => {
     const result = getChecklistItems("invalid-id");
-    expect(result).toBeNull();
+    expect(result.items).toBeNull();
+    expect(result.error).toBe("invalid_id");
   });
 
-  it("returns null when database query returns empty", () => {
+  it("returns no_checklists when database query returns empty", () => {
     mockExecSync.mockReturnValue("" as never);
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p123");
-    expect(result).toBeNull();
+    expect(result.items).toBeNull();
+    expect(result.error).toBe("no_checklists");
   });
 
   it("parses checklist with mixed done/undone items", () => {
@@ -135,11 +137,12 @@ describe("getChecklistItems", () => {
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p123");
 
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(3);
-    expect(result![0]).toEqual({ text: "Buy milk", done: true });
-    expect(result![1]).toEqual({ text: "Walk dog", done: false });
-    expect(result![2]).toEqual({ text: "Send email", done: true });
+    expect(result.items).not.toBeNull();
+    expect(result.items).toHaveLength(3);
+    expect(result.items![0]).toEqual({ text: "Buy milk", done: true });
+    expect(result.items![1]).toEqual({ text: "Walk dog", done: false });
+    expect(result.items![2]).toEqual({ text: "Send email", done: true });
+    expect(result.error).toBeUndefined();
   });
 
   it("parses checklist with all items unchecked", () => {
@@ -156,9 +159,9 @@ describe("getChecklistItems", () => {
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p456");
 
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result!.every((i) => !i.done)).toBe(true);
+    expect(result.items).not.toBeNull();
+    expect(result.items).toHaveLength(2);
+    expect(result.items!.every((i) => !i.done)).toBe(true);
   });
 
   it("parses checklist with all items checked", () => {
@@ -175,9 +178,9 @@ describe("getChecklistItems", () => {
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p789");
 
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result!.every((i) => i.done)).toBe(true);
+    expect(result.items).not.toBeNull();
+    expect(result.items).toHaveLength(2);
+    expect(result.items!.every((i) => i.done)).toBe(true);
   });
 
   it("returns null when note has no checklist items", () => {
@@ -214,7 +217,8 @@ describe("getChecklistItems", () => {
     mockExecSync.mockReturnValue((hex + "\n") as never);
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p100");
-    expect(result).toBeNull();
+    expect(result.items).toBeNull();
+    expect(result.error).toBe("no_checklists");
   });
 
   it("returns null when sqlite3 command fails", () => {
@@ -223,15 +227,28 @@ describe("getChecklistItems", () => {
     });
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p123");
-    expect(result).toBeNull();
+    expect(result.items).toBeNull();
   });
 
-  it("returns null for non-gzip data", () => {
+  it("returns no_fda error when authorization is denied", () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error("unable to open database: authorization denied");
+    });
+
+    const result = getChecklistItems("x-coredata://ABC/ICNote/p123");
+    expect(result.items).toBeNull();
+    expect(result.error).toBe("no_fda");
+    expect(result.message).toContain("Full Disk Access");
+    expect(result.message).toContain("System Settings");
+  });
+
+  it("returns parse_error for non-gzip data", () => {
     // Return valid hex that isn't gzip
     mockExecSync.mockReturnValue("DEADBEEF\n" as never);
 
     const result = getChecklistItems("x-coredata://ABC/ICNote/p123");
-    expect(result).toBeNull();
+    expect(result.items).toBeNull();
+    expect(result.error).toBe("parse_error");
   });
 
   it("extracts correct primary key from note ID", () => {

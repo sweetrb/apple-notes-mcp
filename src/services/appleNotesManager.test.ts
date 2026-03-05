@@ -27,7 +27,7 @@ vi.mock("@/utils/applescript.js", () => ({
 
 // Mock the checklist parser to avoid SQLite access during tests
 vi.mock("@/utils/checklistParser.js", () => ({
-  getChecklistItems: vi.fn(),
+  getChecklistItems: vi.fn().mockReturnValue({ items: null }),
 }));
 
 import { executeAppleScript } from "@/utils/applescript.js";
@@ -1789,11 +1789,13 @@ describe("AppleNotesManager", () => {
         success: true,
         output: "<ul><li>Buy milk</li><li>Walk dog</li><li>Send email</li></ul>",
       });
-      mockGetChecklistItems.mockReturnValueOnce([
-        { text: "Buy milk", done: true },
-        { text: "Walk dog", done: false },
-        { text: "Send email", done: true },
-      ]);
+      mockGetChecklistItems.mockReturnValueOnce({
+        items: [
+          { text: "Buy milk", done: true },
+          { text: "Walk dog", done: false },
+          { text: "Send email", done: true },
+        ],
+      });
 
       const markdown = manager.getNoteMarkdownById("x-coredata://ABC/ICNote/p123");
 
@@ -1807,7 +1809,11 @@ describe("AppleNotesManager", () => {
         success: true,
         output: "<ul><li>Item 1</li><li>Item 2</li></ul>",
       });
-      mockGetChecklistItems.mockReturnValueOnce(null);
+      mockGetChecklistItems.mockReturnValueOnce({
+        items: null,
+        error: "no_fda",
+        message: "Full Disk Access required",
+      });
 
       const markdown = manager.getNoteMarkdownById("x-coredata://ABC/ICNote/p456");
 
