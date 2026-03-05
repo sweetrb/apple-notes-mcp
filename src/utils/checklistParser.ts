@@ -27,6 +27,7 @@
 
 import { execSync } from "child_process";
 import * as zlib from "zlib";
+import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import {
@@ -57,6 +58,38 @@ export interface ChecklistItem {
 }
 
 /**
+ * Result from getChecklistItems with specific error classification.
+ */
+export interface ChecklistResult {
+  /** Checklist items, or null on failure */
+  items: ChecklistItem[] | null;
+  /** Error type for actionable messaging */
+  error?: "no_fda" | "no_checklists" | "invalid_id" | "parse_error";
+  /** Human-readable error message */
+  message?: string;
+}
+
+/**
+ * Checks whether the NoteStore database is accessible (Full Disk Access).
+ *
+ * @returns true if the database file exists and can be read
+ */
+export function hasFullDiskAccess(): boolean {
+  try {
+    if (!fs.existsSync(NOTES_DB_PATH)) return false;
+    // Try to open the database with a simple query
+    execSync(`sqlite3 -readonly "${NOTES_DB_PATH}" "SELECT 1;"`, {
+      encoding: "utf8",
+      timeout: 3000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Queries the NoteStore SQLite database for a note's raw ZDATA blob.
  *
  * Uses the note's CoreData identifier to find the corresponding protobuf data.
@@ -64,14 +97,14 @@ export interface ChecklistItem {
  *   x-coredata://DEVICE-UUID/ICNote/pXXXX → pXXXX
  *
  * @param noteId - CoreData URL identifier (e.g., "x-coredata://ABC/ICNote/p123")
- * @returns Base64-encoded ZDATA blob, or null if not found
+ * @returns Object with hex data or error classification
  */
-function queryNoteData(noteId: string): string | null {
+function queryNoteData(noteId: string): { hex: string | null; error?: "no_fda" | "invalid_id" } {
   // Extract the primary key suffix (e.g., "p123" from "x-coredata://ABC/ICNote/p123")
   const pkMatch = noteId.match(/\/p(\d+)$/);
   if (!pkMatch) {
     console.error(`Invalid note ID format: ${noteId}`);
-    return null;
+    return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
 
@@ -86,13 +119,19 @@ function queryNoteData(noteId: string): string | null {
     });
 
     const hex = result.trim();
-    if (!hex) return null;
+    if (!hex) return { hex: null };
 
-    return hex;
+    return { hex };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Failed to query NoteStore database: ${message}`);
-    return null;
+
+    // Detect Full Disk Access denial
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      return { hex: null, error: "no_fda" };
+    }
+
+    return { hex: null };
   }
 }
 
@@ -216,16 +255,38 @@ function parseChecklistFromProtobuf(data: Uint8Array): ChecklistItem[] | null {
  * Requires Full Disk Access to read the Notes database.
  *
  * @param noteId - CoreData URL identifier (e.g., "x-coredata://ABC/ICNote/p123")
- * @returns Array of checklist items with done state, or null if:
- *   - Note has no checklists
- *   - Note ID is invalid
- *   - Database is inaccessible (Full Disk Access not granted)
- *   - Protobuf parsing fails
+ * @returns Structured result with items, error type, and message
  */
-export function getChecklistItems(noteId: string): ChecklistItem[] | null {
+export function getChecklistItems(noteId: string): ChecklistResult {
   // Query the database for raw note data
-  const hexData = queryNoteData(noteId);
-  if (!hexData) return null;
+  const { hex: hexData, error: queryError } = queryNoteData(noteId);
+
+  if (queryError === "invalid_id") {
+    return {
+      items: null,
+      error: "invalid_id",
+      message: `Invalid note ID format: "${noteId}". Expected format: x-coredata://UUID/ICNote/pNNN`,
+    };
+  }
+
+  if (queryError === "no_fda") {
+    return {
+      items: null,
+      error: "no_fda",
+      message:
+        "Full Disk Access is required to read checklist state. " +
+        "Grant access in System Settings > Privacy & Security > Full Disk Access, " +
+        "then add and restart this application.",
+    };
+  }
+
+  if (!hexData) {
+    return {
+      items: null,
+      error: "no_checklists",
+      message: "No data found for this note in the database.",
+    };
+  }
 
   // Convert hex to bytes and decompress
   const compressedData = hexToBytes(hexData);
@@ -234,12 +295,22 @@ export function getChecklistItems(noteId: string): ChecklistItem[] | null {
     decompressed = zlib.gunzipSync(compressedData);
   } catch {
     console.error("Failed to decompress note data — may not be gzip format");
-    return null;
+    return {
+      items: null,
+      error: "parse_error",
+      message: "Failed to decompress note data.",
+    };
   }
 
   // Parse protobuf and extract checklist items
   const items = parseChecklistFromProtobuf(new Uint8Array(decompressed));
-  if (!items || items.length === 0) return null;
+  if (!items || items.length === 0) {
+    return {
+      items: null,
+      error: "no_checklists",
+      message: "This note does not contain any checklist items.",
+    };
+  }
 
-  return items;
+  return { items };
 }

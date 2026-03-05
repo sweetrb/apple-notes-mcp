@@ -1956,9 +1956,9 @@ export class AppleNotesManager {
     // Try to enrich with checklist state (requires note ID)
     const note = this.getNoteDetails(title, account);
     if (note?.id) {
-      const items = getChecklistItems(note.id);
-      if (items) {
-        markdown = this.enrichMarkdownWithChecklists(markdown, items);
+      const result = getChecklistItems(note.id);
+      if (result.items) {
+        markdown = this.enrichMarkdownWithChecklists(markdown, result.items);
       }
     }
 
@@ -1984,9 +1984,9 @@ export class AppleNotesManager {
     let markdown = this.htmlToMarkdown(html);
 
     // Try to enrich with checklist state
-    const items = getChecklistItems(id);
-    if (items) {
-      markdown = this.enrichMarkdownWithChecklists(markdown, items);
+    const result = getChecklistItems(id);
+    if (result.items) {
+      markdown = this.enrichMarkdownWithChecklists(markdown, result.items);
     }
 
     return markdown;
