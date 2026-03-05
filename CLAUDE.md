@@ -108,6 +108,18 @@ This is more reliable than trying to fix the whitespace through updates, as the 
 - If delete fails, note exists in both locations (still returns success)
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
+### get-checklist-state
+- Requires note ID (not title) — use `search-notes` to find the ID first
+- Reads directly from the NoteStore SQLite database (not via AppleScript)
+- Requires Full Disk Access for the MCP host process
+- Returns `null` if note has no checklists or database is inaccessible
+- Works independently of `get-note-content` — use both for full picture
+
+### get-note-markdown (checklist enrichment)
+- Automatically annotates checklist items with `[x]`/`[ ]` when database is accessible
+- Falls back to plain list items if Full Disk Access is not granted (no error)
+- No action needed — enrichment happens transparently
+
 ### Multi-account
 - Default account is iCloud
 - Use `list-accounts` to see available accounts
@@ -135,6 +147,7 @@ This is more reliable than trying to fix the whitespace through updates, as the 
 | Silent failure | Backslash not escaped in content |
 | "Permission denied" | macOS automation permission needed |
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
+| "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
 
 ## Testing Your Understanding
 

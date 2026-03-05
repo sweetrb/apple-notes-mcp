@@ -25,8 +25,16 @@ vi.mock("@/utils/applescript.js", () => ({
   executeAppleScript: vi.fn(),
 }));
 
+// Mock the checklist parser to avoid SQLite access during tests
+vi.mock("@/utils/checklistParser.js", () => ({
+  getChecklistItems: vi.fn(),
+}));
+
 import { executeAppleScript } from "@/utils/applescript.js";
 const mockExecuteAppleScript = vi.mocked(executeAppleScript);
+
+import { getChecklistItems } from "@/utils/checklistParser.js";
+const mockGetChecklistItems = vi.mocked(getChecklistItems);
 
 // =============================================================================
 // Text Escaping Tests
@@ -1774,6 +1782,39 @@ describe("AppleNotesManager", () => {
       const markdown = manager.getNoteMarkdownById("x-coredata://invalid");
 
       expect(markdown).toBe("");
+    });
+
+    it("enriches markdown with checklist state when available", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "<ul><li>Buy milk</li><li>Walk dog</li><li>Send email</li></ul>",
+      });
+      mockGetChecklistItems.mockReturnValueOnce([
+        { text: "Buy milk", done: true },
+        { text: "Walk dog", done: false },
+        { text: "Send email", done: true },
+      ]);
+
+      const markdown = manager.getNoteMarkdownById("x-coredata://ABC/ICNote/p123");
+
+      expect(markdown).toMatch(/-\s+\[x\] Buy milk/);
+      expect(markdown).toMatch(/-\s+\[ \] Walk dog/);
+      expect(markdown).toMatch(/-\s+\[x\] Send email/);
+    });
+
+    it("returns plain markdown when checklist state is unavailable", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "<ul><li>Item 1</li><li>Item 2</li></ul>",
+      });
+      mockGetChecklistItems.mockReturnValueOnce(null);
+
+      const markdown = manager.getNoteMarkdownById("x-coredata://ABC/ICNote/p456");
+
+      expect(markdown).toMatch(/-\s+Item 1/);
+      expect(markdown).toMatch(/-\s+Item 2/);
+      expect(markdown).not.toContain("[x]");
+      expect(markdown).not.toContain("[ ]");
     });
   });
 });

@@ -31,6 +31,7 @@ import type {
   ExportedNote,
 } from "@/types.js";
 import { executeAppleScript } from "@/utils/applescript.js";
+import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import TurndownService from "turndown";
 
 // =============================================================================
@@ -1889,7 +1890,53 @@ export class AppleNotesManager {
   }
 
   /**
+   * Enriches markdown with checklist state from the NoteStore database.
+   *
+   * Apple Notes checklists appear as plain list items in the AppleScript HTML
+   * output. This method reads the protobuf data to get done/undone state and
+   * annotates matching list items with [x] or [ ] prefixes.
+   *
+   * Fails silently (returns original markdown) if the database is inaccessible
+   * or the note has no checklists.
+   *
+   * @param markdown - The base markdown content
+   * @param checklistItems - Checklist items with done state
+   * @returns Markdown with checklist annotations
+   */
+  private enrichMarkdownWithChecklists(markdown: string, checklistItems: ChecklistItem[]): string {
+    if (checklistItems.length === 0) return markdown;
+
+    // Build a map of checklist text → done state
+    const checklistMap = new Map<string, boolean>();
+    for (const item of checklistItems) {
+      checklistMap.set(item.text.trim(), item.done);
+    }
+
+    // Replace matching list items with checkbox syntax
+    const lines = markdown.split("\n");
+    const enriched = lines.map((line) => {
+      // Match markdown list items: "- text" or "* text"
+      const listMatch = line.match(/^(\s*[-*])\s+(.+)$/);
+      if (!listMatch) return line;
+
+      const [, prefix, text] = listMatch;
+      const done = checklistMap.get(text.trim());
+      if (done === undefined) return line;
+
+      // Remove from map so duplicate text lines aren't all converted
+      checklistMap.delete(text.trim());
+      return `${prefix} ${done ? "[x]" : "[ ]"} ${text}`;
+    });
+
+    return enriched.join("\n");
+  }
+
+  /**
    * Gets note content as Markdown by title.
+   *
+   * If the note contains checklists and the NoteStore database is accessible
+   * (Full Disk Access required), checklist items will be annotated with
+   * [x] (done) or [ ] (undone) prefixes.
    *
    * @param title - Exact title of the note
    * @param account - Account containing the note (defaults to iCloud)
@@ -1898,13 +1945,24 @@ export class AppleNotesManager {
    * @example
    * ```typescript
    * const md = manager.getNoteMarkdown("Shopping List");
-   * console.log(md); // "# Shopping List\n\n- Eggs\n- Milk"
+   * console.log(md); // "# Shopping List\n\n- [x] Eggs\n- [ ] Milk"
    * ```
    */
   getNoteMarkdown(title: string, account?: string): string {
     const html = this.getNoteContent(title, account);
     if (!html) return "";
-    return this.htmlToMarkdown(html);
+    let markdown = this.htmlToMarkdown(html);
+
+    // Try to enrich with checklist state (requires note ID)
+    const note = this.getNoteDetails(title, account);
+    if (note?.id) {
+      const items = getChecklistItems(note.id);
+      if (items) {
+        markdown = this.enrichMarkdownWithChecklists(markdown, items);
+      }
+    }
+
+    return markdown;
   }
 
   /**
@@ -1913,12 +1971,24 @@ export class AppleNotesManager {
    * This is more reliable than getNoteMarkdown() because IDs are unique
    * across all accounts, while titles can be duplicated.
    *
+   * If the note contains checklists and the NoteStore database is accessible
+   * (Full Disk Access required), checklist items will be annotated with
+   * [x] (done) or [ ] (undone) prefixes.
+   *
    * @param id - CoreData URL identifier for the note
    * @returns Markdown content, or empty string if not found
    */
   getNoteMarkdownById(id: string): string {
     const html = this.getNoteContentById(id);
     if (!html) return "";
-    return this.htmlToMarkdown(html);
+    let markdown = this.htmlToMarkdown(html);
+
+    // Try to enrich with checklist state
+    const items = getChecklistItems(id);
+    if (items) {
+      markdown = this.enrichMarkdownWithChecklists(markdown, items);
+    }
+
+    return markdown;
   }
 }

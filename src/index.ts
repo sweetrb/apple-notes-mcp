@@ -26,6 +26,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
+import { getChecklistItems } from "@/utils/checklistParser.js";
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
@@ -944,6 +945,41 @@ server.tool(
 
     return successResponse(markdown);
   }, "Error getting note as markdown")
+);
+
+// --- get-checklist-state ---
+
+server.tool(
+  "get-checklist-state",
+  {
+    id: z.string().min(1, "Note ID is required. Use search-notes to find the note ID first."),
+  },
+  withErrorHandling(({ id }) => {
+    // Verify the note exists and is accessible
+    const note = notesManager.getNoteById(id);
+    if (!note) {
+      return errorResponse(`Note with ID "${id}" not found`);
+    }
+    if (note.passwordProtected) {
+      return errorResponse(
+        `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+      );
+    }
+
+    const items = getChecklistItems(id);
+    if (!items) {
+      return errorResponse(
+        `No checklist items found in "${note.title}". The note may not contain checklists, or the Notes database may not be accessible (Full Disk Access required).`
+      );
+    }
+
+    const summary = items.map((item) => `${item.done ? "[x]" : "[ ]"} ${item.text}`).join("\n");
+    const checked = items.filter((i) => i.done).length;
+
+    return successResponse(
+      `Checklist for "${note.title}" (${checked}/${items.length} done):\n${summary}`
+    );
+  }, "Error reading checklist state")
 );
 
 // =============================================================================
