@@ -16,6 +16,7 @@ import {
   AppleNotesManager,
   escapeForAppleScript,
   escapeHtmlForAppleScript,
+  formatAppleScriptDate,
   parseAppleScriptDate,
 } from "./appleNotesManager.js";
 
@@ -257,6 +258,36 @@ describe("parseAppleScriptDate", () => {
       expect(result.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(result.getTime()).toBeLessThanOrEqual(after.getTime());
     });
+  });
+});
+
+// =============================================================================
+// formatAppleScriptDate Tests
+// =============================================================================
+
+describe("formatAppleScriptDate", () => {
+  it("formats a date in AppleScript-compatible format", () => {
+    const date = new Date(2025, 5, 15, 14, 30, 0); // June 15, 2025 2:30 PM
+    const result = formatAppleScriptDate(date);
+    expect(result).toBe("6/15/2025 2:30:00 PM");
+  });
+
+  it("formats midnight as 12:00:00 AM", () => {
+    const date = new Date(2025, 0, 1, 0, 0, 0); // Jan 1, 2025 midnight
+    const result = formatAppleScriptDate(date);
+    expect(result).toBe("1/1/2025 12:00:00 AM");
+  });
+
+  it("formats noon as 12:00:00 PM", () => {
+    const date = new Date(2025, 0, 1, 12, 0, 0); // Jan 1, 2025 noon
+    const result = formatAppleScriptDate(date);
+    expect(result).toBe("1/1/2025 12:00:00 PM");
+  });
+
+  it("pads minutes and seconds", () => {
+    const date = new Date(2025, 11, 25, 9, 5, 3); // Dec 25, 2025 9:05:03 AM
+    const result = formatAppleScriptDate(date);
+    expect(result).toBe("12/25/2025 9:05:03 AM");
   });
 });
 
@@ -525,6 +556,73 @@ describe("AppleNotesManager", () => {
       const script = mockExecuteAppleScript.mock.calls[0][0];
       expect(script).toContain('tell account "Exchange"');
       expect(script).toContain('notes of folder "Projects"');
+    });
+
+    it("adds date filter when modifiedSince is provided", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Recent Note|||x-coredata://ABC/ICNote/p1|||Notes",
+      });
+
+      manager.searchNotes("note", false, undefined, undefined, "2025-06-15");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("modification date >=");
+      expect(script).toContain('name contains "note"');
+    });
+
+    it("combines date filter with content search", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note|||x-coredata://ABC/ICNote/p1|||Notes",
+      });
+
+      manager.searchNotes("keyword", true, undefined, undefined, "2025-01-01");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain('body contains "keyword"');
+      expect(script).toContain("modification date >=");
+    });
+
+    it("ignores invalid modifiedSince date", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note|||x-coredata://ABC/ICNote/p1|||Notes",
+      });
+
+      manager.searchNotes("note", false, undefined, undefined, "not-a-date");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).not.toContain("modification date");
+    });
+
+    it("applies limit to search results", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note 1|||x-coredata://ABC/ICNote/p1|||Notes",
+      });
+
+      manager.searchNotes("note", false, undefined, undefined, undefined, 5);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("(count of resultList) >= 5");
+      expect(script).toContain("exit repeat");
+    });
+
+    it("combines modifiedSince, limit, folder, and content search", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note|||x-coredata://ABC/ICNote/p1|||Work",
+      });
+
+      manager.searchNotes("project", true, "iCloud", "Work", "2025-03-01", 10);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain('body contains "project"');
+      expect(script).toContain("modification date >=");
+      expect(script).toContain('notes of folder "Work"');
+      expect(script).toContain("(count of resultList) >= 10");
+      expect(script).toContain('tell account "iCloud"');
     });
   });
 
@@ -1021,6 +1119,72 @@ describe("AppleNotesManager", () => {
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
         expect.stringContaining('notes of folder "Work"')
       );
+    });
+
+    it("uses repeat loop when modifiedSince is provided", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Recent Note 1|||Recent Note 2",
+      });
+
+      const results = manager.listNotes(undefined, undefined, "2025-06-01");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("modification date");
+      expect(script).toContain("exit repeat");
+      expect(results).toEqual(["Recent Note 1", "Recent Note 2"]);
+    });
+
+    it("uses repeat loop when limit is provided", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note 1|||Note 2|||Note 3",
+      });
+
+      const results = manager.listNotes(undefined, undefined, undefined, 3);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("(count of resultList) >= 3");
+      expect(results).toEqual(["Note 1", "Note 2", "Note 3"]);
+    });
+
+    it("combines folder, modifiedSince, and limit", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Work Note|||Another Work Note",
+      });
+
+      manager.listNotes("iCloud", "Work", "2025-01-01", 10);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain('notes of folder "Work"');
+      expect(script).toContain("modification date");
+      expect(script).toContain("(count of resultList) >= 10");
+    });
+
+    it("returns empty array when modifiedSince yields no results", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      const results = manager.listNotes(undefined, undefined, "2099-01-01");
+
+      expect(results).toEqual([]);
+    });
+
+    it("ignores invalid modifiedSince date and falls back to limit-only", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Note 1|||Note 2",
+      });
+
+      const results = manager.listNotes(undefined, undefined, "not-a-date", 5);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).not.toContain("modification date");
+      expect(script).toContain("(count of resultList) >= 5");
+      expect(results).toEqual(["Note 1", "Note 2"]);
     });
   });
 

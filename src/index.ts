@@ -161,19 +161,28 @@ server.tool(
     searchContent: z.boolean().optional().describe("Search note content instead of titles"),
     account: z.string().optional().describe("Account to search in"),
     folder: z.string().optional().describe("Limit search to a specific folder"),
+    modifiedSince: z
+      .string()
+      .optional()
+      .describe(
+        "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for searching only recent notes in large collections."
+      ),
+    limit: z.number().int().positive().optional().describe("Maximum number of results to return"),
   },
-  withErrorHandling(({ query, searchContent = false, account, folder }) => {
+  withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
     // Use sync-aware wrapper for this read operation
     const {
       result: notes,
       syncBefore,
       syncInterference,
     } = withSyncAwarenessSync("search-notes", () =>
-      notesManager.searchNotes(query, searchContent, account, folder)
+      notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, limit)
     );
 
     const searchType = searchContent ? "content" : "titles";
     const folderInfo = folder ? ` in folder "${folder}"` : "";
+    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+    const limitInfo = limit ? ` (limit: ${limit})` : "";
 
     // Build sync warning if needed
     const syncWarnings: string[] = [];
@@ -187,7 +196,7 @@ server.tool(
 
     if (notes.length === 0) {
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${syncNote}`
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`
       );
     }
 
@@ -205,7 +214,7 @@ server.tool(
       .join("\n");
 
     return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}):\n${noteList}${syncNote}`
+      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`
     );
   }, "Error searching notes")
 );
@@ -513,18 +522,29 @@ server.tool(
   {
     account: z.string().optional().describe("Account to list notes from"),
     folder: z.string().optional().describe("Filter to specific folder"),
+    modifiedSince: z
+      .string()
+      .optional()
+      .describe(
+        "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for listing only recent notes in large collections."
+      ),
+    limit: z.number().int().positive().optional().describe("Maximum number of notes to return"),
   },
-  withErrorHandling(({ account, folder }) => {
+  withErrorHandling(({ account, folder, modifiedSince, limit }) => {
     // Use sync-aware wrapper for this read operation
     const {
       result: notes,
       syncBefore,
       syncInterference,
-    } = withSyncAwarenessSync("list-notes", () => notesManager.listNotes(account, folder));
+    } = withSyncAwarenessSync("list-notes", () =>
+      notesManager.listNotes(account, folder, modifiedSince, limit)
+    );
 
     // Build context string for the response
     const location = folder ? ` in folder "${folder}"` : "";
     const acct = account ? ` (${account})` : "";
+    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+    const limitInfo = limit ? ` (limit: ${limit})` : "";
 
     // Build sync warning if needed
     const syncWarnings: string[] = [];
@@ -537,12 +557,12 @@ server.tool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${syncNote}`);
+      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`);
     }
 
     const noteList = notes.map((t) => `  - ${t}`).join("\n");
     return successResponse(
-      `Found ${notes.length} notes${location}${acct}:\n${noteList}${syncNote}`
+      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`
     );
   }, "Error listing notes")
 );

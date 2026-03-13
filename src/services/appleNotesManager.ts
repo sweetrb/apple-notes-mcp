@@ -178,6 +178,33 @@ export function parseAppleScriptDate(appleScriptDate: string): Date {
 }
 
 /**
+ * Formats a JavaScript Date into a string suitable for AppleScript date comparisons.
+ *
+ * AppleScript can parse dates in the format "MM/DD/YYYY HH:MM:SS AM/PM"
+ * when used with the `date` keyword in comparisons.
+ *
+ * @param date - JavaScript Date object to format
+ * @returns Date string formatted for AppleScript
+ *
+ * @example
+ * formatAppleScriptDate(new Date("2025-06-15T00:00:00"))
+ * // Returns: "6/15/2025 12:00:00 AM"
+ */
+export function formatAppleScriptDate(date: Date): string {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${month}/${day}/${year} ${hours}:${pad(minutes)}:${pad(seconds)} ${ampm}`;
+}
+
+/**
  * Parsed note properties from AppleScript output.
  */
 interface ParsedNoteProperties {
@@ -522,6 +549,8 @@ export class AppleNotesManager {
    * @param searchContent - If true, search note bodies; if false, search titles
    * @param account - Account to search in (defaults to iCloud)
    * @param folder - Optional folder to limit search to
+   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
+   * @param limit - Optional maximum number of results to return (default: no limit)
    * @returns Array of matching notes (with minimal metadata)
    *
    * @example
@@ -534,25 +563,54 @@ export class AppleNotesManager {
    *
    * // Search within a specific folder
    * const workNotes = manager.searchNotes("deadline", false, "iCloud", "Work");
+   *
+   * // Search only recently modified notes
+   * const recentNotes = manager.searchNotes("todo", true, undefined, undefined, "2025-01-01");
+   *
+   * // Search with a result limit
+   * const topResults = manager.searchNotes("project", false, undefined, undefined, undefined, 10);
    * ```
    */
   searchNotes(
     query: string,
     searchContent: boolean = false,
     account?: string,
-    folder?: string
+    folder?: string,
+    modifiedSince?: string,
+    limit?: number
   ): Note[] {
     const targetAccount = this.resolveAccount(account);
     const safeQuery = escapeForAppleScript(query);
 
     // Build the where clause based on search type
     // AppleScript uses 'name' for title and 'body' for content
-    const whereClause = searchContent
-      ? `body contains "${safeQuery}"`
-      : `name contains "${safeQuery}"`;
+    const whereParts: string[] = [];
+
+    if (searchContent) {
+      whereParts.push(`body contains "${safeQuery}"`);
+    } else {
+      whereParts.push(`name contains "${safeQuery}"`);
+    }
+
+    // Add date filter if specified
+    if (modifiedSince) {
+      const date = new Date(modifiedSince);
+      if (!isNaN(date.getTime())) {
+        whereParts.push(`modification date >= date "${formatAppleScriptDate(date)}"`);
+      }
+    }
+
+    const whereClause = whereParts.join(" and ");
 
     // Build the notes source - either all notes or notes in a specific folder
     const notesSource = folder ? `notes of folder "${escapeForAppleScript(folder)}"` : "notes";
+
+    // Build the limit logic for the repeat loop
+    const limitCheck =
+      limit !== undefined && limit > 0
+        ? `
+          if (count of resultList) >= ${limit} then exit repeat`
+        : "";
 
     // Get names, IDs, and folder for each matching note
     // We use a repeat loop to get all properties, separated by a delimiter
@@ -560,7 +618,7 @@ export class AppleNotesManager {
     const searchCommand = `
       set matchingNotes to ${notesSource} where ${whereClause}
       set resultList to {}
-      repeat with n in matchingNotes
+      repeat with n in matchingNotes${limitCheck}
         try
           set noteName to name of n
           set noteId to id of n
@@ -928,16 +986,69 @@ export class AppleNotesManager {
   }
 
   /**
-   * Lists all notes in an account, optionally filtered by folder.
+   * Lists all notes in an account, optionally filtered by folder, date, and limit.
    *
    * @param account - Account to list notes from (defaults to iCloud)
    * @param folder - Optional folder to filter by
+   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
+   * @param limit - Optional maximum number of results to return (default: no limit)
    * @returns Array of note titles
    */
-  listNotes(account?: string, folder?: string): string[] {
+  listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
     const targetAccount = this.resolveAccount(account);
 
-    // Build command based on whether folder filter is specified
+    // When date or limit filters are needed, use a repeat loop for fine-grained control
+    if (modifiedSince || (limit !== undefined && limit > 0)) {
+      const notesSource = folder ? `notes of folder "${escapeForAppleScript(folder)}"` : "notes";
+
+      // Build the date filter condition
+      let dateCondition = "";
+      if (modifiedSince) {
+        const date = new Date(modifiedSince);
+        if (!isNaN(date.getTime())) {
+          dateCondition = `
+            if modification date of n < date "${formatAppleScriptDate(date)}" then
+              -- Notes are sorted by modification date (newest first), so stop early
+              exit repeat
+            end if`;
+        }
+      }
+
+      // Build the limit check
+      const limitCheck =
+        limit !== undefined && limit > 0
+          ? `
+            if (count of resultList) >= ${limit} then exit repeat`
+          : "";
+
+      const listCommand = `
+        set resultList to {}
+        repeat with n in ${notesSource}${limitCheck}${dateCondition}
+          set end of resultList to name of n
+        end repeat
+        set AppleScript's text item delimiters to "|||"
+        return resultList as text
+      `;
+
+      const script = buildAccountScopedScript({ account: targetAccount }, listCommand);
+      const result = executeAppleScript(script);
+
+      if (!result.success) {
+        console.error("Failed to list notes:", result.error);
+        return [];
+      }
+
+      if (!result.output.trim()) {
+        return [];
+      }
+
+      return result.output
+        .split("|||")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    }
+
+    // Simple path: no date or limit filters
     let listCommand: string;
 
     if (folder) {
