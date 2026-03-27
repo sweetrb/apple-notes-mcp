@@ -393,6 +393,65 @@ describe("AppleNotesManager", () => {
         expect.stringContaining('<div class=\\"test\\">Content</div>')
       );
     });
+
+    it("sets title as h1 in body, not as name property", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p203",
+      });
+
+      manager.createNote("My Title", "Body content");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      // Title must appear as h1 in body
+      expect(script).toContain("<h1>My Title</h1>");
+      // name property must NOT be set (causes title duplication in Notes.app)
+      expect(script).not.toContain('name:"My Title"');
+    });
+
+    it("HTML-encodes special chars in title for h1 tag", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p204",
+      });
+
+      manager.createNote("Q&A: <Hello> World", "Content");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("<h1>Q&amp;A: &lt;Hello&gt; World</h1>")
+      );
+    });
+
+    it("HTML-encodes special chars in plaintext content", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p205",
+      });
+
+      manager.createNote("Title", "Price: <10 & >5\nNext line");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(script).toContain("Price: &lt;10 &amp; &gt;5<br>Next line");
+    });
+
+    it("prepends h1 title before html content", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://12345/ICNote/p206",
+      });
+
+      manager.createNote(
+        "Report",
+        "<h2>Section</h2><div>Details</div>",
+        [],
+        undefined,
+        undefined,
+        "html"
+      );
+
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(script).toContain("<h1>Report</h1><h2>Section</h2><div>Details</div>");
+    });
   });
 
   // ---------------------------------------------------------------------------
