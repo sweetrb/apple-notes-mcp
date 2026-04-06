@@ -282,6 +282,55 @@ interface AccountScope {
 }
 
 /**
+ * Splits a folder path on unescaped `/` separators.
+ *
+ * Folder names may contain literal slashes (e.g., "Spain/Portugal 2023").
+ * In path strings these are escaped as `\/`. This function splits only on
+ * unescaped `/` and restores the literal slashes in each segment.
+ *
+ * @param folderPath - Folder path with `/` as hierarchy separator and `\/` for literal slashes
+ * @returns Array of folder name segments
+ */
+export function splitFolderPath(folderPath: string): string[] {
+  // Split on `/` that is NOT preceded by `\`
+  // We use a negative lookbehind to avoid splitting on escaped slashes
+  const parts = folderPath.split(/(?<!\\)\//);
+  // Unescape `\/` → `/` in each segment
+  return parts.map((p) => p.replace(/\\\//g, "/")).filter((p) => p.length > 0);
+}
+
+/**
+ * Escapes literal slashes in a folder name for use in path strings.
+ *
+ * @param name - Raw folder name (may contain `/`)
+ * @returns Folder name with `/` escaped as `\/`
+ */
+function escapeFolderName(name: string): string {
+  return name.replace(/\//g, "\\/");
+}
+
+/**
+ * Builds an AppleScript folder reference from a path string.
+ *
+ * Converts a folder path like "Work/Clients/Omnia" into the nested
+ * AppleScript syntax: `folder "Omnia" of folder "Clients" of folder "Work"`.
+ *
+ * A simple folder name like "Work" returns `folder "Work"`.
+ * Literal slashes in folder names must be escaped as `\/` (e.g., "Travel/Spain\/Portugal").
+ *
+ * @param folderPath - Folder name or slash-separated path (e.g., "Work/Clients")
+ * @returns AppleScript folder reference string
+ */
+export function buildFolderReference(folderPath: string): string {
+  const parts = splitFolderPath(folderPath);
+  // Build inside-out: last part is innermost, first part is outermost
+  return parts
+    .reverse()
+    .map((part) => `folder "${escapeForAppleScript(part)}"`)
+    .join(" of ");
+}
+
+/**
  * Builds an AppleScript command wrapped in account context.
  *
  * Most Notes.app operations need to be scoped to an account:
@@ -512,10 +561,10 @@ export class AppleNotesManager {
     let createCommand: string;
 
     if (folder) {
-      // Create note in specific folder
-      const safeFolder = escapeForAppleScript(folder);
+      // Create note in specific folder (supports nested paths like "Work/Clients")
+      const folderRef = buildFolderReference(folder);
       createCommand = `
-        set newNote to make new note at folder "${safeFolder}" with properties {body:"${safeBody}"}
+        set newNote to make new note at ${folderRef} with properties {body:"${safeBody}"}
         return id of newNote
       `;
     } else {
@@ -619,7 +668,7 @@ export class AppleNotesManager {
     const whereClause = whereParts.join(" and ");
 
     // Build the notes source - either all notes or notes in a specific folder
-    const notesSource = folder ? `notes of folder "${escapeForAppleScript(folder)}"` : "notes";
+    const notesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
 
     // Build the limit logic for the repeat loop
     // Note: The limit only reduces iteration over already-matched results from the whose clause,
@@ -1018,9 +1067,7 @@ export class AppleNotesManager {
 
     // When date or limit filters are needed, use a repeat loop for fine-grained control
     if (modifiedSince || safeLimit !== undefined) {
-      const baseNotesSource = folder
-        ? `notes of folder "${escapeForAppleScript(folder)}"`
-        : "notes";
+      const baseNotesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
 
       // Use whose clause for date filtering (locale-safe, no sort order assumption)
       let dateSetup = "";
@@ -1071,8 +1118,7 @@ export class AppleNotesManager {
     let listCommand: string;
 
     if (folder) {
-      const safeFolder = escapeForAppleScript(folder);
-      listCommand = `get name of notes of folder "${safeFolder}"`;
+      listCommand = `get name of notes of ${buildFolderReference(folder)}`;
     } else {
       listCommand = `get name of notes`;
     }
@@ -1173,16 +1219,38 @@ export class AppleNotesManager {
   // ===========================================================================
 
   /**
-   * Lists all folders in an account.
+   * Lists all folders in an account with full hierarchical paths.
+   *
+   * Each folder's `name` field contains the full path (e.g., "Work/Clients/Omnia")
+   * so that duplicate folder names (e.g., multiple "Archive" folders) are
+   * distinguishable and can be used directly in other operations.
    *
    * @param account - Account to list folders from (defaults to iCloud)
-   * @returns Array of Folder objects
+   * @returns Array of Folder objects with path-based names
    */
   listFolders(account?: string): Folder[] {
     const targetAccount = this.resolveAccount(account);
 
-    // Get folder names (simpler than getting full objects)
-    const listCommand = `get name of folders`;
+    // Get each folder's ID, name, and parent ID in a single AppleScript call.
+    // Each line: "id\tname\tparentId" for subfolders, "id\tname" for top-level.
+    // Using IDs enables correct tree building even with duplicate folder names.
+    const listCommand = `
+      set folderList to ""
+      set allFolders to every folder
+      repeat with f in allFolders
+        set fRef to contents of f
+        set cRef to container of fRef
+        if folderList is not "" then
+          set folderList to folderList & linefeed
+        end if
+        if class of cRef is folder then
+          set folderList to folderList & (id of fRef) & tab & (name of fRef) & tab & (id of cRef)
+        else
+          set folderList to folderList & (id of fRef) & tab & (name of fRef)
+        end if
+      end repeat
+      return folderList
+    `;
     const script = buildAccountScopedScript({ account: targetAccount }, listCommand);
     const result = executeAppleScript(script);
 
@@ -1191,12 +1259,40 @@ export class AppleNotesManager {
       return [];
     }
 
-    // Convert names to Folder objects
-    const names = parseCommaSeparatedList(result.output);
+    if (!result.output.trim()) {
+      return [];
+    }
 
-    return names.map((name) => ({
-      id: "", // Would require additional query to get
-      name,
+    // Parse "id\tname[\tparentId]" lines
+    const entries = result.output.split("\n").map((line) => {
+      const parts = line.split("\t");
+      return {
+        id: (parts[0] || "").trim(),
+        name: (parts[1] || "").trim(),
+        parentId: (parts[2] || "").trim(),
+      };
+    });
+
+    // Build an ID-to-entry map for efficient parent lookups
+    const byId = new Map(entries.map((e) => [e.id, e]));
+
+    // Build full path by walking up the parent chain using unique IDs
+    // Build full path by walking up the parent chain using unique IDs.
+    // Literal slashes in folder names are escaped as `\/` so they don't
+    // collide with the `/` path separator.
+    const buildPath = (entry: { id: string; name: string; parentId: string }): string => {
+      const safeName = escapeFolderName(entry.name);
+      if (!entry.parentId) return safeName;
+      const parent = byId.get(entry.parentId);
+      if (parent) {
+        return buildPath(parent) + "/" + safeName;
+      }
+      return safeName;
+    };
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      name: buildPath(entry),
       account: targetAccount,
     }));
   }
@@ -1242,9 +1338,8 @@ export class AppleNotesManager {
    */
   deleteFolder(name: string, account?: string): boolean {
     const targetAccount = this.resolveAccount(account);
-    const safeName = escapeForAppleScript(name);
 
-    const deleteCommand = `delete folder "${safeName}"`;
+    const deleteCommand = `delete ${buildFolderReference(name)}`;
     const script = buildAccountScopedScript({ account: targetAccount }, deleteCommand);
     const result = executeAppleScript(script);
 
@@ -1294,10 +1389,10 @@ export class AppleNotesManager {
 
     // Step 3: Create a copy in the destination folder
     // Content is already HTML from getNoteContent(), so use escapeHtmlForAppleScript()
-    const safeFolder = escapeForAppleScript(destinationFolder);
+    const folderRef = buildFolderReference(destinationFolder);
     const safeContent = escapeHtmlForAppleScript(originalContent);
 
-    const createCommand = `make new note at folder "${safeFolder}" with properties {body:"${safeContent}"}`;
+    const createCommand = `make new note at ${folderRef} with properties {body:"${safeContent}"}`;
     const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
     const copyResult = executeAppleScript(script);
 
@@ -1351,10 +1446,10 @@ export class AppleNotesManager {
 
     // Step 2: Create a copy in the destination folder
     // Content is already HTML from getNoteContentById(), so use escapeHtmlForAppleScript()
-    const safeFolder = escapeForAppleScript(destinationFolder);
+    const folderRef = buildFolderReference(destinationFolder);
     const safeContent = escapeHtmlForAppleScript(originalContent);
 
-    const createCommand = `make new note at folder "${safeFolder}" with properties {body:"${safeContent}"}`;
+    const createCommand = `make new note at ${folderRef} with properties {body:"${safeContent}"}`;
     const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
     const copyResult = executeAppleScript(script);
 

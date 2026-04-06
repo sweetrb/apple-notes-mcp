@@ -138,9 +138,14 @@ server.tool(
       .default("plaintext")
       .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
     tags: z.array(z.string()).optional().describe("Tags for organization"),
+    folder: z
+      .string()
+      .optional()
+      .describe("Folder to create the note in (supports nested paths like 'Work/Clients')"),
+    account: z.string().optional().describe("Account name (defaults to iCloud)"),
   },
-  withErrorHandling(({ title, content, format = "plaintext", tags = [] }) => {
-    const note = notesManager.createNote(title, content, tags, undefined, undefined, format);
+  withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
+    const note = notesManager.createNote(title, content, tags, folder, account, format);
 
     if (!note) {
       return errorResponse(

@@ -17,6 +17,8 @@ import {
   escapeForAppleScript,
   escapeHtmlForAppleScript,
   buildAppleScriptDateVar,
+  buildFolderReference,
+  splitFolderPath,
   parseAppleScriptDate,
 } from "./appleNotesManager.js";
 
@@ -258,6 +260,58 @@ describe("parseAppleScriptDate", () => {
       expect(result.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(result.getTime()).toBeLessThanOrEqual(after.getTime());
     });
+  });
+});
+
+// =============================================================================
+// buildFolderReference Tests
+// =============================================================================
+
+describe("splitFolderPath", () => {
+  it("splits simple path on /", () => {
+    expect(splitFolderPath("Work/Clients")).toEqual(["Work", "Clients"]);
+  });
+
+  it("returns single segment for a name without /", () => {
+    expect(splitFolderPath("Work")).toEqual(["Work"]);
+  });
+
+  it("preserves escaped slashes in folder names", () => {
+    expect(splitFolderPath("Travel/Spain\\/Portugal 2023")).toEqual([
+      "Travel",
+      "Spain/Portugal 2023",
+    ]);
+  });
+
+  it("handles multiple escaped slashes", () => {
+    expect(splitFolderPath("A\\/B/C\\/D")).toEqual(["A/B", "C/D"]);
+  });
+});
+
+describe("buildFolderReference", () => {
+  it("returns simple folder reference for a single name", () => {
+    expect(buildFolderReference("Work")).toBe('folder "Work"');
+  });
+
+  it("returns nested folder reference for a path", () => {
+    expect(buildFolderReference("Work/Clients")).toBe('folder "Clients" of folder "Work"');
+  });
+
+  it("handles deeply nested paths", () => {
+    expect(buildFolderReference("Work/Clients/Omnia")).toBe(
+      'folder "Omnia" of folder "Clients" of folder "Work"'
+    );
+  });
+
+  it("handles special characters in folder names", () => {
+    const result = buildFolderReference("Food & Drink/🥘 Recipes");
+    expect(result).toContain('folder "🥘 Recipes"');
+    expect(result).toContain('folder "Food &amp; Drink"');
+  });
+
+  it("handles escaped slashes in folder names", () => {
+    const result = buildFolderReference("Travel/Spain\\/Portugal 2023");
+    expect(result).toBe('folder "Spain/Portugal 2023" of folder "Travel"');
   });
 });
 
@@ -1297,10 +1351,10 @@ describe("AppleNotesManager", () => {
   // ---------------------------------------------------------------------------
 
   describe("listFolders", () => {
-    it("returns array of Folder objects", () => {
+    it("returns array of Folder objects with paths", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "Notes, Archive, Work",
+        output: "id1\tNotes\nid2\tArchive\nid3\tWork",
       });
 
       const folders = manager.listFolders();
@@ -1309,12 +1363,54 @@ describe("AppleNotesManager", () => {
       expect(folders[0].name).toBe("Notes");
       expect(folders[1].name).toBe("Archive");
       expect(folders[2].name).toBe("Work");
+      expect(folders[0].id).toBe("id1");
+    });
+
+    it("includes parent folder in path", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "id1\tDev\nid2\tAccessibility\tid1\nid3\tWork\nid4\tClients\tid3",
+      });
+
+      const folders = manager.listFolders();
+
+      expect(folders).toHaveLength(4);
+      expect(folders[0].name).toBe("Dev");
+      expect(folders[1].name).toBe("Dev/Accessibility");
+      expect(folders[2].name).toBe("Work");
+      expect(folders[3].name).toBe("Work/Clients");
+    });
+
+    it("disambiguates duplicate folder names using IDs", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "id1\tFinance\nid2\tArchive\tid1\nid3\tTravel\nid4\tTrips\tid3\nid5\tArchive\tid4",
+      });
+
+      const folders = manager.listFolders();
+
+      expect(folders).toHaveLength(5);
+      expect(folders[1].name).toBe("Finance/Archive");
+      expect(folders[4].name).toBe("Travel/Trips/Archive");
+    });
+
+    it("escapes slashes in folder names", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "id1\tTravel\nid2\tSpain/Portugal 2023\tid1",
+      });
+
+      const folders = manager.listFolders();
+
+      expect(folders).toHaveLength(2);
+      expect(folders[0].name).toBe("Travel");
+      expect(folders[1].name).toBe("Travel/Spain\\/Portugal 2023");
     });
 
     it("includes account in Folder objects", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "Notes",
+        output: "id1\tNotes",
       });
 
       const folders = manager.listFolders("Gmail");
@@ -1592,7 +1688,7 @@ describe("AppleNotesManager", () => {
         // listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud" })
         // listFolders for iCloud
-        .mockReturnValueOnce({ success: true, output: "Notes, Work" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes\nid2\tWork" })
         // listNotes for Notes folder
         .mockReturnValueOnce({ success: true, output: "Note 1, Note 2, Note 3" })
         // listNotes for Work folder
@@ -1613,7 +1709,7 @@ describe("AppleNotesManager", () => {
     it("returns zero counts when no notes exist", () => {
       mockExecuteAppleScript
         .mockReturnValueOnce({ success: true, output: "iCloud" })
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         .mockReturnValueOnce({ success: true, output: "" })
         .mockReturnValueOnce({ success: true, output: "" });
 
@@ -1630,11 +1726,11 @@ describe("AppleNotesManager", () => {
         // listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud, Gmail" })
         // listFolders for iCloud
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes for iCloud/Notes
         .mockReturnValueOnce({ success: true, output: "Note 1" })
         // listFolders for Gmail
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id2\tNotes" })
         // listNotes for Gmail/Notes
         .mockReturnValueOnce({ success: true, output: "Email Note" })
         // getRecentlyModifiedCounts
@@ -1917,7 +2013,7 @@ describe("AppleNotesManager", () => {
         // listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud" })
         // listFolders for iCloud
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes for Notes folder
         .mockReturnValueOnce({ success: true, output: "Test Note" })
         // getNoteDetails
@@ -1950,7 +2046,7 @@ describe("AppleNotesManager", () => {
         // listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud" })
         // listFolders for iCloud
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes for Notes folder
         .mockReturnValueOnce({ success: true, output: "Locked Note" })
         // getNoteDetails (passwordProtected = true)
@@ -1971,7 +2067,7 @@ describe("AppleNotesManager", () => {
         // listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud" })
         // listFolders for iCloud
-        .mockReturnValueOnce({ success: true, output: "Notes" })
+        .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes returns empty
         .mockReturnValueOnce({ success: true, output: "" });
 
