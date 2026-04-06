@@ -1421,10 +1421,19 @@ describe("AppleNotesManager", () => {
 
   describe("createFolder", () => {
     it("returns Folder object on success", () => {
-      mockExecuteAppleScript.mockReturnValue({
-        success: true,
-        output: "folder id x-coredata://ABC123/ICFolder/p456",
-      });
+      mockExecuteAppleScript
+        // Check existence — folder doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create the folder
+        .mockReturnValueOnce({
+          success: true,
+          output: "folder id x-coredata://ABC123/ICFolder/p456",
+        })
+        // Get ID of created folder
+        .mockReturnValueOnce({
+          success: true,
+          output: "folder id x-coredata://ABC123/ICFolder/p456",
+        });
 
       const result = manager.createFolder("New Project");
 
@@ -1433,16 +1442,99 @@ describe("AppleNotesManager", () => {
       expect(result?.id).toBe("x-coredata://ABC123/ICFolder/p456");
     });
 
-    it("returns null on failure", () => {
-      mockExecuteAppleScript.mockReturnValue({
-        success: false,
-        output: "",
-        error: "Folder already exists",
-      });
+    it("returns existing folder without creating duplicate", () => {
+      mockExecuteAppleScript
+        // Check existence — folder already exists
+        .mockReturnValueOnce({
+          success: true,
+          output: "x-coredata://ABC123/ICFolder/p789",
+        })
+        // Get ID of existing folder
+        .mockReturnValueOnce({
+          success: true,
+          output: "folder id x-coredata://ABC123/ICFolder/p789",
+        });
 
       const result = manager.createFolder("Existing Folder");
 
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe("Existing Folder");
+      expect(result?.id).toBe("x-coredata://ABC123/ICFolder/p789");
+      // Should only have 2 calls (check + get ID), no create call
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns null on genuine failure", () => {
+      mockExecuteAppleScript
+        // Check existence — doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create fails
+        .mockReturnValueOnce({
+          success: false,
+          output: "",
+          error: "Permission denied",
+        });
+
+      const result = manager.createFolder("Restricted Folder");
+
       expect(result).toBeNull();
+    });
+
+    it("creates nested folder path", () => {
+      mockExecuteAppleScript
+        // Check "Retro Tech" — doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create "Retro Tech"
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p1" })
+        // Check "Retro Tech/PC" — doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create "PC" inside "Retro Tech"
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p2" })
+        // Check "Retro Tech/PC/CPUs" — doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create "CPUs" inside "Retro Tech/PC"
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p3" })
+        // Get ID of final folder
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p3" });
+
+      const result = manager.createFolder("Retro Tech/PC/CPUs");
+
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe("Retro Tech/PC/CPUs");
+      expect(result?.id).toBe("x-coredata://A/ICFolder/p3");
+
+      // Verify the create commands (calls at index 1, 3, 5)
+      const calls = mockExecuteAppleScript.mock.calls;
+      expect(calls[1][0]).toContain('make new folder with properties {name:"Retro Tech"}');
+      expect(calls[3][0]).toContain(
+        'make new folder at folder "Retro Tech" with properties {name:"PC"}'
+      );
+      expect(calls[5][0]).toContain(
+        'make new folder at folder "PC" of folder "Retro Tech" with properties {name:"CPUs"}'
+      );
+    });
+
+    it("skips existing intermediate folders in nested path", () => {
+      mockExecuteAppleScript
+        // Check "Retro Tech" — exists
+        .mockReturnValueOnce({ success: true, output: "x-coredata://A/ICFolder/p1" })
+        // Check "Retro Tech/PC" — doesn't exist
+        .mockReturnValueOnce({ success: false, output: "", error: "Can't get folder" })
+        // Create "PC" inside "Retro Tech"
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p2" })
+        // Get ID of final folder
+        .mockReturnValueOnce({ success: true, output: "folder id x-coredata://A/ICFolder/p2" });
+
+      const result = manager.createFolder("Retro Tech/PC");
+
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe("Retro Tech/PC");
+      // No create call for "Retro Tech" — only for "PC"
+      const createCalls = mockExecuteAppleScript.mock.calls.filter((c) =>
+        c[0].includes("make new folder")
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(createCalls[0][0]).toContain('name:"PC"');
     });
   });
 

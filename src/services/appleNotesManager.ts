@@ -562,11 +562,11 @@ export class AppleNotesManager {
 
     if (folder) {
       // Create note in specific folder (supports nested paths like "Work/Clients")
+      // Note: We avoid `set newNote` + `return id of newNote` because AppleScript
+      // fails to resolve the note reference in deeply nested folder contexts (-1728).
+      // The implicit return from `make new note` includes the ID which we parse.
       const folderRef = buildFolderReference(folder);
-      createCommand = `
-        set newNote to make new note at ${folderRef} with properties {body:"${safeBody}"}
-        return id of newNote
-      `;
+      createCommand = `make new note at ${folderRef} with properties {body:"${safeBody}"}`;
     } else {
       // Create note in default location
       createCommand = `
@@ -1306,19 +1306,65 @@ export class AppleNotesManager {
    */
   createFolder(name: string, account?: string): Folder | null {
     const targetAccount = this.resolveAccount(account);
-    const safeName = escapeForAppleScript(name);
+    const parts = splitFolderPath(name);
 
-    const createCommand = `make new folder with properties {name:"${safeName}"}`;
-    const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
-    const result = executeAppleScript(script);
-
-    if (!result.success) {
-      console.error(`Failed to create folder "${name}":`, result.error);
+    if (parts.length === 0) {
+      console.error(`Invalid folder name: "${name}"`);
       return null;
     }
 
-    // Extract the folder ID from the response
-    const folderId = extractCoreDataId(result.output, "folder");
+    // Create each segment of the path, checking existence first to avoid duplicates.
+    // For "A/B/C": ensure "A" exists, then "A/B", then "A/B/C".
+    for (let i = 0; i < parts.length; i++) {
+      const currentPath = parts
+        .slice(0, i + 1)
+        .map((p) => escapeFolderName(p))
+        .join("/");
+      const currentRef = buildFolderReference(currentPath);
+
+      // Check if this folder already exists
+      const checkScript = buildAccountScopedScript(
+        { account: targetAccount },
+        `return id of ${currentRef}`
+      );
+      const checkResult = executeAppleScript(checkScript);
+      if (checkResult.success) {
+        // Folder exists, move to next segment
+        continue;
+      }
+
+      // Folder doesn't exist — create it
+      const segmentName = escapeForAppleScript(parts[i]);
+      let createCommand: string;
+
+      if (i === 0) {
+        createCommand = `make new folder with properties {name:"${segmentName}"}`;
+      } else {
+        const parentPath = parts
+          .slice(0, i)
+          .map((p) => escapeFolderName(p))
+          .join("/");
+        const parentRef = buildFolderReference(parentPath);
+        createCommand = `make new folder at ${parentRef} with properties {name:"${segmentName}"}`;
+      }
+
+      const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
+      const result = executeAppleScript(script);
+
+      if (!result.success) {
+        console.error(`Failed to create folder "${name}":`, result.error);
+        return null;
+      }
+    }
+
+    // Get the ID of the final (deepest) folder
+    const fullRef = buildFolderReference(name);
+    const idScript = buildAccountScopedScript(
+      { account: targetAccount },
+      `return id of ${fullRef}`
+    );
+    const idResult = executeAppleScript(idScript);
+    const folderId = idResult.success ? extractCoreDataId(idResult.output, "folder") : "";
 
     return {
       id: folderId,

@@ -615,12 +615,20 @@ server.tool(
 
 server.tool(
   "create-folder",
-  folderNameSchema,
+  {
+    name: z
+      .string()
+      .min(1, "Folder name is required")
+      .describe(
+        'Folder name or nested path separated by "/". E.g., "Retro Tech/PC/CPUs" creates all intermediate folders. Existing segments are skipped.'
+      ),
+    account: z.string().optional().describe("Account name (defaults to iCloud)"),
+  },
   withErrorHandling(({ name, account }) => {
     const folder = notesManager.createFolder(name, account);
 
     if (!folder) {
-      return errorResponse(`Failed to create folder "${name}". It may already exist.`);
+      return errorResponse(`Failed to create folder "${name}".`);
     }
 
     return successResponse(`Folder created: "${folder.name}"`);
