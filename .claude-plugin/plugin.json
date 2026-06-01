@@ -1,9 +1,17 @@
 {
   "name": "apple-notes",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Manage Apple Notes through natural language - create, search, read, update, delete, and organize notes and folders (macOS only)",
   "author": {
     "name": "Rob Sweet",
     "email": "rob@superiortech.io"
+  },
+  "mcpServers": {
+    "apple-notes": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/build/index.js"
+      ]
+    }
   }
 }
