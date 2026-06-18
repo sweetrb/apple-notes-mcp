@@ -66,7 +66,25 @@ jobs:
 
       - name: Publish to npm
         if: steps.check.outputs.skip == 'false'
-        run: npm publish
+        # Tolerate the publish race: a release pushes two commits, so two CI runs
+        # complete and each triggers a publish. The concurrency group serializes
+        # them, but npm's registry read (`npm view`, CDN-cached) lags the write,
+        # so the second run's "already published?" check can still see the old
+        # version, attempt `npm publish`, and get a 403 for the version the first
+        # run just pushed. Treat that specific case as success.
+        run: |
+          if npm publish; then
+            echo "Published."
+          else
+            LOCAL=$(node -p "require('./package.json').version")
+            PUBLISHED=$(npm view apple-notes-mcp version 2>/dev/null || echo "")
+            if [ "$PUBLISHED" = "$LOCAL" ]; then
+              echo "Version $LOCAL is already on npm (published by a concurrent run); treating as success."
+            else
+              echo "::error::npm publish failed and $LOCAL is not on npm."
+              exit 1
+            fi
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
