@@ -124,6 +124,22 @@ export function escapeHtmlForAppleScript(htmlContent: string): string {
   return htmlContent.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+/**
+ * Escapes a plain (non-HTML) string for safe embedding in an AppleScript string literal.
+ *
+ * Use this for folder names, account names, and other metadata that Apple Notes
+ * stores as plain text — NOT for note body content (use escapeForAppleScript instead).
+ * HTML-encoding ampersands here would produce `folder "R&amp;D"`, which Apple Notes
+ * would fail to match against the real folder named "R&D".
+ *
+ * @param text - Plain string (folder name, account name, etc.)
+ * @returns String safe for AppleScript string embedding
+ */
+export function escapePlainStringForAppleScript(text: string): string {
+  if (!text) return "";
+  return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 // =============================================================================
 // Input Validation & Sanitization
 // =============================================================================
@@ -193,7 +209,7 @@ export function sanitizeId(id: string): string {
  */
 function sanitizeAccountName(account: string): string {
   validateLength(account, MAX_ACCOUNT_LENGTH, "Account name");
-  return escapeForAppleScript(account);
+  return escapePlainStringForAppleScript(account);
 }
 
 /**
@@ -407,7 +423,7 @@ export function buildFolderReference(folderPath: string): string {
   // Build inside-out: last part is innermost, first part is outermost
   return parts
     .reverse()
-    .map((part) => `folder "${escapeForAppleScript(part)}"`)
+    .map((part) => `folder "${escapePlainStringForAppleScript(part)}"`)
     .join(" of ");
 }
 

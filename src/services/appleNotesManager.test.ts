@@ -307,7 +307,7 @@ describe("buildFolderReference", () => {
   it("handles special characters in folder names", () => {
     const result = buildFolderReference("Food & Drink/🥘 Recipes");
     expect(result).toContain('folder "🥘 Recipes"');
-    expect(result).toContain('folder "Food &amp; Drink"');
+    expect(result).toContain('folder "Food & Drink"');
   });
 
   it("handles escaped slashes in folder names", () => {
