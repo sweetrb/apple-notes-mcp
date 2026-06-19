@@ -86,12 +86,21 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Folder Management** | Create, list, and delete folders with full hierarchical path support |
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account |
 | **Batch Operations** | Delete or move multiple notes at once |
-| **Checklist State** | Read checklist done/undone state directly from the Notes database |
+| **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
-| **Attachments** | List attachments in notes |
+| **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
-| **Diagnostics** | Health check, sync status, and statistics tools |
+| **Diagnostics** | `health-check` plus a richer `doctor` (reachability, automation permission, accounts, Full Disk Access), sync status, and statistics |
+
+Read/list/get tools also return **structured JSON** (`structuredContent`) alongside the text, so agents can consume results without parsing prose.
+
+### MCP resources & prompts
+
+Resources expose read-only context the client can attach without a tool call:
+`notes://accounts`, `notes://folders`, `notes://stats`, and the
+`notes://note/{id}` template (returns the note as Markdown). Prompts package
+common workflows: `find-note`, `weekly-review`, `new-meeting-note`.
 
 ---
 
@@ -587,6 +596,33 @@ Lists attachments in a note.
 
 ---
 
+#### `save-attachment`
+
+Saves a note attachment to disk.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | CoreData note ID (from `search-notes`/`list-notes`) |
+| `attachmentId` | string | Yes | Attachment ID (from `list-attachments`) |
+| `savePath` | string | Yes | Absolute destination file path. Must be under your home directory, a temp directory, or `/Volumes` |
+
+**Returns:** Confirmation with the saved path, name, and content type (also in `structuredContent`).
+
+---
+
+#### `fetch-attachment`
+
+Returns a note attachment's bytes as base64, without writing to disk (the read counterpart to `save-attachment`).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | CoreData note ID (from `search-notes`/`list-notes`) |
+| `attachmentId` | string | Yes | Attachment ID (from `list-attachments`) |
+
+**Returns:** The attachment name, content type, byte count, and base64 payload in `structuredContent.base64`.
+
+---
+
 ### Diagnostics
 
 #### `health-check`
@@ -596,6 +632,16 @@ Verifies Notes.app connectivity and permissions.
 **Parameters:** None
 
 **Returns:** Status of all health checks (app installed, permissions, account access).
+
+---
+
+#### `doctor`
+
+Run a full setup diagnostic: Notes.app reachability, the Automation permission, configured accounts, and Full Disk Access — each reported as ok / warn / fail with an actionable message. This is the richer counterpart to `health-check`; reach for it first when something isn't working.
+
+**Parameters:** None
+
+**Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](docs/FULL-DISK-ACCESS.md).
 
 ---
 
@@ -730,9 +776,45 @@ The entrypoint is written as:
 
 ---
 
+## Configuration
+
+### Environment variables
+
+All configuration is optional — the server works out of the box. Override behavior with these variables (set them in your MCP client's `env` block, or via the [config file](#configuration-file-when-the-host-strips-env) below):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APPLE_NOTES_MCP_MAX_BUFFER` | `67108864` (64 MB) | Max bytes captured from a single AppleScript invocation. Raise it if a very large export/list is truncated; lower it to cap memory. |
+| `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
+| `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
+
+### Configuration file (when the host strips `env`)
+
+Some host apps (e.g. Claude Desktop) launch the MCP server with a scrubbed
+environment and ignore the `env` block in their server config, so there's no way
+to pass `APPLE_NOTES_MCP_*` settings through it. In that case, put them in a JSON
+file the host doesn't manage — `APPLE_NOTES_MCP_CONFIG_FILE`, or by default
+`~/Library/Application Support/apple-notes-mcp/config.json`:
+
+```json
+{
+  "APPLE_NOTES_MCP_MAX_BUFFER": "134217728",
+  "DEBUG": "1"
+}
+```
+
+The server reads it at startup and merges values into the environment **without
+overriding** anything already set there (so an explicit `env` still wins). This
+is the recommended way to configure the server under Claude Desktop. Apple Notes
+MCP stores no secrets, but as a general rule keep only non-secret config here.
+
+---
+
 ## Full Disk Access for Checklist Features
 
 The `get-checklist-state` tool and checklist annotations in `get-note-markdown` read directly from the Apple Notes SQLite database. This requires **Full Disk Access** for the process running the MCP server.
+
+> 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
 ### How to Grant Full Disk Access
 
@@ -768,12 +850,21 @@ All other tools work normally without Full Disk Access. Only checklist state fea
 | Limitation | Reason |
 |------------|--------|
 | macOS only | Apple Notes and AppleScript are macOS-specific |
-| No attachment content | Attachments can be listed but not downloaded via AppleScript |
-| No pinned notes | Pin status is not exposed via AppleScript |
+| Batch ops run per-note | `batch-delete-notes` / `batch-move-notes` apply each note individually rather than as one bulk operation — AppleScript has no bulk equivalent to IMAP's `UID STORE`/`MOVE`. This is deliberate: it preserves per-note success/failure reporting. ([#26](https://github.com/sweetrb/apple-notes-mcp/issues/26)) |
+| No pinned notes | Pin status is not exposed via AppleScript ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) |
 | Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
-| Checklist state | Requires Full Disk Access to read done/undone state from the database |
+| Checklist state | Requires [Full Disk Access](docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
 | Checklist **creation** | Not supported. AppleScript's `body of note` setter strips `<input type="checkbox">` and ignores any checklist-styling CSS class. Apple Notes stores checklist items as a protobuf paragraph style (`style_type=103`) that AppleScript doesn't expose, and the SQLite database is read-only. See [Creating Checklists](#creating-checklists) below for the workaround. |
+
+### Roadmap
+
+A few capabilities are deliberately deferred to a future release, tracked as open issues:
+
+- **Pinned-note support** ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) — Apple doesn't expose pin status via AppleScript.
+- **Tags / hashtags** ([#29](https://github.com/sweetrb/apple-notes-mcp/issues/29)).
+- **Note links** ([#30](https://github.com/sweetrb/apple-notes-mcp/issues/30)).
+- **Local integration-test suite** ([#31](https://github.com/sweetrb/apple-notes-mcp/issues/31)).
 
 ### Creating Checklists
 

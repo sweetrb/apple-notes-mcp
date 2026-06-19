@@ -28,6 +28,13 @@ import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
+import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
+import { loadFileConfig } from "@/services/fileConfig.js";
+import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
+
+// Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
+// Lets users configure the server when the host app strips the MCP env block.
+loadFileConfig();
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
@@ -56,25 +63,28 @@ const notesManager = new AppleNotesManager();
 // Response Helpers
 // =============================================================================
 
+interface ToolResponse {
+  content: { type: "text"; text: string; [k: string]: unknown }[];
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+  [k: string]: unknown;
+}
+
 /**
- * Creates a successful MCP tool response.
- *
- * @param message - The success message to display
- * @returns Formatted MCP response object
+ * Creates a successful MCP tool response. Pass `structured` to attach typed JSON
+ * (`structuredContent`) alongside the human-readable text so agents can consume
+ * results without parsing prose (#21).
  */
-function successResponse(message: string) {
-  return {
-    content: [{ type: "text" as const, text: message }],
-  };
+function successResponse(message: string, structured?: Record<string, unknown>): ToolResponse {
+  const res: ToolResponse = { content: [{ type: "text" as const, text: message }] };
+  if (structured) res.structuredContent = structured;
+  return res;
 }
 
 /**
  * Creates an error MCP tool response.
- *
- * @param message - The error message to display
- * @returns Formatted MCP error response object
  */
-function errorResponse(message: string) {
+function errorResponse(message: string): ToolResponse {
   return {
     content: [{ type: "text" as const, text: message }],
     isError: true,
@@ -83,16 +93,12 @@ function errorResponse(message: string) {
 
 /**
  * Wraps a tool handler with consistent error handling.
- *
- * @param handler - The async function to execute
- * @param errorPrefix - Prefix for error messages (e.g., "Error creating note")
- * @returns Wrapped handler with try/catch
  */
 function withErrorHandling<T extends Record<string, unknown>>(
-  handler: (params: T) => ReturnType<typeof successResponse>,
+  handler: (params: T) => ToolResponse,
   errorPrefix: string
 ) {
-  return async (params: T) => {
+  return async (params: T): Promise<ToolResponse> => {
     try {
       return handler(params);
     } catch (error) {
@@ -208,7 +214,8 @@ server.tool(
 
     if (notes.length === 0) {
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`,
+        { notes: [], count: 0 }
       );
     }
 
@@ -226,7 +233,8 @@ server.tool(
       .join("\n");
 
     return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`
+      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`,
+      { notes, count: notes.length }
     );
   }, "Error searching notes")
 );
@@ -260,7 +268,7 @@ server.tool(
       if (!content) {
         return errorResponse(`Failed to read content of note "${note.title}"`);
       }
-      return successResponse(content);
+      return successResponse(content, { title: note.title, content });
     }
 
     // Fall back to title-based lookup
@@ -284,7 +292,7 @@ server.tool(
       return errorResponse(`Failed to read content of note "${title}"`);
     }
 
-    return successResponse(content);
+    return successResponse(content, { title, content });
   }, "Error retrieving note content")
 );
 
@@ -312,7 +320,7 @@ server.tool(
       passwordProtected: note.passwordProtected,
     };
 
-    return successResponse(JSON.stringify(metadata, null, 2));
+    return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note")
 );
 
@@ -339,7 +347,7 @@ server.tool(
       account: note.account,
     };
 
-    return successResponse(JSON.stringify(metadata, null, 2));
+    return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note details")
 );
 
@@ -576,12 +584,16 @@ server.tool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`);
+      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`, {
+        notes: [],
+        count: 0,
+      });
     }
 
     const noteList = notes.map((t) => `  - ${t}`).join("\n");
     return successResponse(
-      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`
+      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
+      { notes, count: notes.length }
     );
   }, "Error listing notes")
 );
@@ -617,11 +629,14 @@ server.tool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (folders.length === 0) {
-      return successResponse(`No folders found${acct}${syncNote}`);
+      return successResponse(`No folders found${acct}${syncNote}`, { folders: [], count: 0 });
     }
 
     const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
-    return successResponse(`Found ${folders.length} folders${acct}:\n${folderList}${syncNote}`);
+    return successResponse(`Found ${folders.length} folders${acct}:\n${folderList}${syncNote}`, {
+      folders,
+      count: folders.length,
+    });
   }, "Error listing folders")
 );
 
@@ -680,11 +695,14 @@ server.tool(
     const accounts = notesManager.listAccounts();
 
     if (accounts.length === 0) {
-      return successResponse("No Notes accounts found");
+      return successResponse("No Notes accounts found", { accounts: [], count: 0 });
     }
 
     const accountList = accounts.map((a) => `  - ${a.name}`).join("\n");
-    return successResponse(`Found ${accounts.length} accounts:\n${accountList}`);
+    return successResponse(`Found ${accounts.length} accounts:\n${accountList}`, {
+      accounts,
+      count: accounts.length,
+    });
   }, "Error listing accounts")
 );
 
@@ -701,7 +719,10 @@ server.tool(
     const sharedNotes = notesManager.listSharedNotes();
 
     if (sharedNotes.length === 0) {
-      return successResponse("No shared notes found. You have no notes shared with collaborators.");
+      return successResponse(
+        "No shared notes found. You have no notes shared with collaborators.",
+        { notes: [], count: 0 }
+      );
     }
 
     const noteList = sharedNotes
@@ -713,7 +734,8 @@ server.tool(
 
     return successResponse(
       `Found ${sharedNotes.length} shared note(s):\n${noteList}\n\n` +
-        `⚠️ Changes to shared notes are visible to all collaborators.`
+        `⚠️ Changes to shared notes are visible to all collaborators.`,
+      { notes: sharedNotes, count: sharedNotes.length }
     );
   }, "Error listing shared notes")
 );
@@ -731,7 +753,7 @@ server.tool(
     const status = getSyncStatus();
 
     if (status.error) {
-      return successResponse(`⚠️ Sync status unknown: ${status.error}`);
+      return successResponse(`⚠️ Sync status unknown: ${status.error}`, { ...status });
     }
 
     const lines: string[] = [];
@@ -753,7 +775,7 @@ server.tool(
       lines.push(`  Last activity: ${status.secondsSinceLastChange}s ago`);
     }
 
-    return successResponse(lines.join("\n"));
+    return successResponse(lines.join("\n"), { ...status });
   }, "Error checking sync status")
 );
 
@@ -783,6 +805,19 @@ server.tool(
 
     return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}\n${fdaLine}`);
   }, "Error running health check")
+);
+
+// --- doctor ---
+
+server.tool(
+  "doctor",
+  {},
+  withErrorHandling(() => {
+    // Richer than health-check: Notes.app permission, account state, and Full
+    // Disk Access with actionable messages + structuredContent (#22).
+    const report = runDoctor(notesManager);
+    return successResponse(formatDoctorReport(report), { ...report });
+  }, "Error running doctor")
 );
 
 // --- get-notes-stats ---
@@ -818,7 +853,7 @@ server.tool(
     lines.push(`  Last 7 days: ${stats.recentlyModified.last7d}`);
     lines.push(`  Last 30 days: ${stats.recentlyModified.last30d}`);
 
-    return successResponse(lines.join("\n"));
+    return successResponse(lines.join("\n"), { ...stats });
   }, "Error getting notes statistics")
 );
 
@@ -843,11 +878,15 @@ server.tool(
       }
       const attachments = notesManager.listAttachmentsById(id);
       if (attachments.length === 0) {
-        return successResponse(`Note "${note.title}" has no attachments`);
+        return successResponse(`Note "${note.title}" has no attachments`, {
+          attachments: [],
+          count: 0,
+        });
       }
       const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
       return successResponse(
-        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`
+        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`,
+        { attachments, count: attachments.length }
       );
     }
 
@@ -865,12 +904,13 @@ server.tool(
 
     const attachments = notesManager.listAttachments(title, account);
     if (attachments.length === 0) {
-      return successResponse(`Note "${title}" has no attachments`);
+      return successResponse(`Note "${title}" has no attachments`, { attachments: [], count: 0 });
     }
 
     const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
     return successResponse(
-      `Found ${attachments.length} attachment(s) in "${title}":\n${attachmentList}`
+      `Found ${attachments.length} attachment(s) in "${title}":\n${attachmentList}`,
+      { attachments, count: attachments.length }
     );
   }, "Error listing attachments")
 );
@@ -938,6 +978,57 @@ server.tool(
   }, "Error performing batch move")
 );
 
+// --- save-attachment ---
+
+server.tool(
+  "save-attachment",
+  {
+    noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
+    attachmentId: z
+      .string()
+      .min(1, "attachmentId is required")
+      .describe("Attachment id (from list-attachments)"),
+    savePath: z
+      .string()
+      .min(1, "savePath is required")
+      .describe("Absolute destination file path (must be under home, temp, or /Volumes)"),
+  },
+  withErrorHandling(({ noteId, attachmentId, savePath }) => {
+    const r = notesManager.saveAttachmentById(noteId, attachmentId, savePath);
+    if (!r.success) {
+      return errorResponse(`Failed to save attachment: ${r.error ?? "unknown error"}`);
+    }
+    return successResponse(`Saved "${r.name ?? "attachment"}" to ${r.savedPath}`, {
+      savedPath: r.savedPath,
+      name: r.name,
+      contentType: r.contentType,
+    });
+  }, "Error saving attachment")
+);
+
+// --- fetch-attachment ---
+
+server.tool(
+  "fetch-attachment",
+  {
+    noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
+    attachmentId: z
+      .string()
+      .min(1, "attachmentId is required")
+      .describe("Attachment id (from list-attachments)"),
+  },
+  withErrorHandling(({ noteId, attachmentId }) => {
+    const r = notesManager.getAttachmentBase64ById(noteId, attachmentId);
+    if (!r.success || !r.base64) {
+      return errorResponse(`Failed to fetch attachment: ${r.error ?? "unknown error"}`);
+    }
+    return successResponse(
+      `Fetched "${r.name ?? "attachment"}" (${r.contentType ?? "unknown type"}, ${r.bytes ?? 0} bytes) as base64.`,
+      { name: r.name, contentType: r.contentType, bytes: r.bytes, base64: r.base64 }
+    );
+  }, "Error fetching attachment")
+);
+
 // --- export-notes-json ---
 
 server.tool(
@@ -958,6 +1049,7 @@ server.tool(
           text: JSON.stringify(exportData, null, 2),
         },
       ],
+      structuredContent: { ...exportData },
     };
   }, "Error exporting notes")
 );
@@ -981,7 +1073,7 @@ server.tool(
       if (!markdown) {
         return errorResponse(`Note with ID "${id}" not found or has no content`);
       }
-      return successResponse(markdown);
+      return successResponse(markdown, { markdown });
     }
 
     // Fall back to title-based lookup
@@ -996,7 +1088,7 @@ server.tool(
       );
     }
 
-    return successResponse(markdown);
+    return successResponse(markdown, { markdown });
   }, "Error getting note as markdown")
 );
 
@@ -1030,7 +1122,8 @@ server.tool(
     const checked = result.items.filter((i) => i.done).length;
 
     return successResponse(
-      `Checklist for "${note.title}" (${checked}/${result.items.length} done):\n${summary}`
+      `Checklist for "${note.title}" (${checked}/${result.items.length} done):\n${summary}`,
+      { items: result.items, checked, total: result.items.length }
     );
   }, "Error reading checklist state")
 );
@@ -1045,5 +1138,8 @@ server.tool(
  * The server uses stdio transport for communication with MCP clients.
  * This is the standard transport for CLI-based MCP servers.
  */
+// Register read-only resources and workflow prompts (#23).
+registerResourcesAndPrompts(server, notesManager);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

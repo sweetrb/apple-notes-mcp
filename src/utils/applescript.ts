@@ -18,6 +18,44 @@ import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
+ * Output cap for osascript. Node's execSync defaults to 1 MB, which a large
+ * Notes library (export-notes-json, full-library stat scans, long-note content)
+ * can blow past — execSync then throws ENOBUFS and the failure surfaces as an
+ * empty result. 64 MB headroom, overridable via APPLE_NOTES_MCP_MAX_BUFFER. (#16)
+ */
+const DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+
+function getMaxBuffer(): number {
+  const raw = process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return DEFAULT_MAX_BUFFER_BYTES;
+}
+
+/**
+ * Headroom (ms) between the in-AppleScript `with timeout` and the outer
+ * osascript process timeout. The script-level timeout must fire first so
+ * Notes.app aborts from inside its own AppleScript dispatch — releasing the
+ * event queue — before Node SIGKILLs osascript. Killing osascript alone does
+ * not stop work already dispatched into Notes.app, which is what wedges it for
+ * subsequent calls. (#17)
+ */
+const SCRIPT_TIMEOUT_HEADROOM_MS = 5000;
+
+/**
+ * Wrap a script body in an AppleScript `with timeout` block so an Apple Event
+ * that honors timeouts aborts cleanly rather than holding Notes.app's
+ * single-threaded dispatch open. Set below the process timeout so the in-app
+ * abort wins the race against the outer SIGKILL. (#17)
+ */
+function wrapWithTimeout(script: string, processTimeoutMs: number): string {
+  const seconds = Math.max(1, Math.ceil((processTimeoutMs - SCRIPT_TIMEOUT_HEADROOM_MS) / 1000));
+  return `with timeout of ${seconds} seconds\n${script}\nend timeout`;
+}
+
+/**
  * Default retry configuration.
  * - 1 attempt means no retries (default behavior)
  * - Use maxRetries: 3 for exponential backoff with 1s/2s delays
@@ -297,9 +335,11 @@ export function executeAppleScript(
 
   // Prepare the script:
   // 1. Trim leading/trailing whitespace (cosmetic)
-  // 2. Preserve internal newlines (required for AppleScript syntax)
-  // 3. Escape for shell execution
-  const preparedScript = escapeForShell(script.trim());
+  // 2. Wrap in `with timeout` so Notes.app aborts cleanly from inside its own
+  //    dispatch before the outer process SIGKILL (#17)
+  // 3. Preserve internal newlines (required for AppleScript syntax)
+  // 4. Escape for shell execution
+  const preparedScript = escapeForShell(wrapWithTimeout(script.trim(), timeoutMs));
 
   // Build the osascript command
   // We use single quotes to wrap the script, which is why we escape
@@ -324,6 +364,13 @@ export function executeAppleScript(
       const output = execSync(command, {
         encoding: "utf8",
         timeout: timeoutMs,
+        // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
+        // unresponsive Notes.app can ignore SIGTERM and leak, piling up and
+        // worsening contention. SIGKILL guarantees reaping on timeout. (#17)
+        killSignal: "SIGKILL",
+        // Raise the output cap above Node's 1 MB default so large exports /
+        // long notes aren't truncated into an ENOBUFS failure. (#16)
+        maxBuffer: getMaxBuffer(),
         // Capture stderr separately to get error details
         stdio: ["pipe", "pipe", "pipe"],
       });

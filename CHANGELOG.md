@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-06-19
+
+Maturity release bringing apple-notes-mcp to feature/stability parity with apple-mail-mcp.
+
+### Added
+- **`doctor` tool** — a richer diagnostic than `health-check`: checks Notes.app reachability, the Automation permission, configured accounts, and Full Disk Access, each reported as ok / warn / fail with actionable advice (`structuredContent` carries the raw `{healthy, checks[]}`). (#22)
+- **`save-attachment` tool** — saves a note attachment to disk (`noteId`, `attachmentId`, `savePath`; destination must be under home, a temp dir, or `/Volumes`).
+- **`fetch-attachment` tool** — returns a note attachment's bytes as base64 in `structuredContent` (no disk write).
+- **Structured tool output** — all read/list/get tools (`search-notes`, `get-note-content`, `get-note-by-id`, `get-note-details`, `list-notes`, `list-folders`, `list-accounts`, `list-shared-notes`, `get-sync-status`, `get-notes-stats`, `list-attachments`, `export-notes-json`, `get-note-markdown`, `get-checklist-state`) now return typed JSON (`structuredContent`) alongside the human-readable text so agents can consume results without parsing prose.
+- **MCP resources** — `notes://accounts`, `notes://folders`, `notes://stats`, and a `notes://note/{id}` template (returns the note as Markdown).
+- **MCP prompts** — `find-note`, `weekly-review`, `new-meeting-note`.
+- **File-based config loader** — reads `~/Library/Application Support/apple-notes-mcp/config.json` (override path via `APPLE_NOTES_MCP_CONFIG_FILE`) and merges `APPLE_NOTES_MCP_*` keys into the environment **without** overriding anything already set. This is the recommended way to configure the server under hosts (e.g. Claude Desktop) that spawn it with a scrubbed environment and ignore the MCP `env` block.
+- **`APPLE_NOTES_MCP_MAX_BUFFER` env var** — configures the AppleScript output buffer cap (default 64 MB).
+- **Full Disk Access guide** — new `docs/FULL-DISK-ACCESS.md` explaining why checklist-state features need Full Disk Access and how to grant it, linked from the README. (#32)
+
+### Changed
+- **Hardened AppleScript execution** — `execSync` now uses a 64 MB `maxBuffer` (configurable via `APPLE_NOTES_MCP_MAX_BUFFER`), `killSignal: SIGKILL`, and every script is wrapped in `with timeout` so a hung Apple Event can no longer wedge the process.
+- **Bounded full-library scans** — `get-notes-stats` and recent-activity counts are now counted server-side in AppleScript instead of streaming every note to JS.
+- **Locale-independent dates** — dates returned by the server are now parsed independently of the Mac's locale (previously could be wrong on non-US-locale Macs).
+
+### Fixed
+- **Data corruption from delimiter collisions** — result parsing now uses ASCII control-character delimiters (US `\x1f` / RS `\x1e`) internally instead of `|||` / commas, fixing corruption when note titles or folder names contained those tokens (e.g. a note titled "Groceries, etc.").
+- **Silent empty results** — `read`/`list`/`search`/`stats` tools now surface backend failures as MCP errors instead of returning an empty result that looked like "no data".
+
+### Known limitations / deferred
+- **Batch operations run per-note** — `batch-delete-notes` / `batch-move-notes` apply each note individually (AppleScript has no bulk equivalent to IMAP's `UID STORE`/`MOVE`); this preserves per-note success/failure reporting. (#26)
+- Pinned-note support (#28), tags/hashtags (#29), note links (#30), and a local integration-test suite (#31) are planned for a future release.
+
 ## [1.4.4] - 2026-06-18
 
 ### Fixed

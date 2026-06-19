@@ -5,7 +5,7 @@
  * requiring actual AppleScript execution during testing.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { execSync } from "child_process";
 import { executeAppleScript } from "./applescript.js";
 
@@ -65,6 +65,38 @@ describe("executeAppleScript", () => {
       // Verify the quote was escaped for shell
       const calledCommand = mockExecSync.mock.calls[0][0] as string;
       expect(calledCommand).toContain("Rob'\\''s");
+    });
+  });
+
+  describe("hardened executor (#16/#17)", () => {
+    afterEach(() => {
+      delete process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+    });
+
+    it("wraps the script in `with timeout` so Notes.app aborts cleanly", () => {
+      mockExecSync.mockReturnValue("ok");
+      executeAppleScript("get name of notes", { timeoutMs: 30000 });
+      const cmd = mockExecSync.mock.calls[0][0] as string;
+      expect(cmd).toContain("with timeout of");
+      expect(cmd).toContain("end timeout");
+      // 30s process timeout − 5s headroom = 25s script timeout
+      expect(cmd).toContain("with timeout of 25 seconds");
+    });
+
+    it("passes SIGKILL and a large maxBuffer to execSync", () => {
+      mockExecSync.mockReturnValue("ok");
+      executeAppleScript("get name of notes");
+      const opts = mockExecSync.mock.calls[0][1] as { killSignal?: string; maxBuffer?: number };
+      expect(opts.killSignal).toBe("SIGKILL");
+      expect(opts.maxBuffer).toBe(64 * 1024 * 1024);
+    });
+
+    it("honors APPLE_NOTES_MCP_MAX_BUFFER override", () => {
+      process.env.APPLE_NOTES_MCP_MAX_BUFFER = "1048576";
+      mockExecSync.mockReturnValue("ok");
+      executeAppleScript("get name of notes");
+      const opts = mockExecSync.mock.calls[0][1] as { maxBuffer?: number };
+      expect(opts.maxBuffer).toBe(1048576);
     });
   });
 

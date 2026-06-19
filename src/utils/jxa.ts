@@ -17,6 +17,21 @@
 import { execSync } from "child_process";
 
 /**
+ * Output cap for osascript (JXA). Mirrors the AppleScript executor — Node's 1 MB
+ * default truncates large JXA output into an ENOBUFS failure. 64 MB default,
+ * overridable via APPLE_NOTES_MCP_MAX_BUFFER. (#16)
+ */
+const DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+function getMaxBuffer(): number {
+  const raw = process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return DEFAULT_MAX_BUFFER_BYTES;
+}
+
+/**
  * Result from executing a JXA command.
  */
 export interface JXAResult {
@@ -103,6 +118,8 @@ export function executeJXA(script: string, options: JXAOptions = {}): JXAResult 
     const output = execSync(command, {
       encoding: "utf8",
       timeout: timeoutMs,
+      killSignal: "SIGKILL", // reap a wedged osascript reliably (#17)
+      maxBuffer: getMaxBuffer(), // avoid ENOBUFS truncation on large output (#16)
       stdio: ["pipe", "pipe", "pipe"],
     });
 
