@@ -274,8 +274,22 @@ export function generateFallbackId(): string {
  * // Returns: Date object for Dec 27, 2025 3:44:02 PM
  */
 export function parseAppleScriptDate(appleScriptDate: string): Date {
+  const s = appleScriptDate.trim();
+
+  // Locale-independent numeric form emitted by our producers (#25): "Y-M-D-H-m-s"
+  // built from AppleScript date components, so it never depends on the system's
+  // date-format locale (the old `date as text` form did, silently falling back
+  // to "now" on non-US Macs).
+  const numeric = s.match(/^(\d{1,5})-(\d{1,2})-(\d{1,2})-(\d{1,2})-(\d{1,2})-(\d{1,2})$/);
+  if (numeric) {
+    const [, y, mo, d, h, mi, se] = numeric;
+    const dt = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se));
+    return isNaN(dt.getTime()) ? new Date() : dt;
+  }
+
+  // Legacy en-US verbose form: "date Saturday, December 27, 2025 at 3:44:02 PM".
   // Remove the "date " prefix if present
-  const withoutPrefix = appleScriptDate.replace(/^date\s+/, "");
+  const withoutPrefix = s.replace(/^date\s+/, "");
 
   // Replace " at " with a space for standard date parsing
   // "Saturday, December 27, 2025 at 3:44:02 PM" ->
@@ -316,6 +330,22 @@ export function buildAppleScriptDateVar(date: Date, varName: string = "threshold
     `set day of ${varName} to ${day}`,
     `set time of ${varName} to ${timeInSeconds}`,
   ].join("\n");
+}
+
+/**
+ * Builds a locale-independent AppleScript expression that renders a date variable
+ * as "Y-M-D-H-m-s" from its numeric components (#25), parsed by
+ * {@link parseAppleScriptDate}. Avoids `(someDate as text)`, whose format depends
+ * on the system locale.
+ *
+ * @param v - name of an AppleScript variable already holding a date
+ */
+export function asDatePartsExpr(v: string): string {
+  return (
+    `((year of ${v}) as text) & "-" & ((month of ${v}) as integer as text) & "-" & ` +
+    `((day of ${v}) as text) & "-" & ((hours of ${v}) as text) & "-" & ` +
+    `((minutes of ${v}) as text) & "-" & ((seconds of ${v}) as text)`
+  );
 }
 
 /**
@@ -904,7 +934,9 @@ export class AppleNotesManager {
     // Note IDs work at the application level, not scoped to account
     const getCommand = `
       set n to note id "${safeId}"
-      set noteProps to {name of n, id of n, (creation date of n as text), (modification date of n as text), (shared of n as text), (password protected of n as text)}
+      set cd to creation date of n
+      set md to modification date of n
+      set noteProps to {name of n, id of n, ${asDatePartsExpr("cd")}, ${asDatePartsExpr("md")}, (shared of n as text), (password protected of n as text)}
       set AppleScript's text item delimiters to ${AS_FIELD_SEP}
       return noteProps as text
     `;
@@ -951,7 +983,9 @@ export class AppleNotesManager {
     // Fetch multiple properties at once
     const getCommand = `
       set n to note "${safeTitle}"
-      set noteProps to {name of n, id of n, (creation date of n as text), (modification date of n as text), (shared of n as text), (password protected of n as text)}
+      set cd to creation date of n
+      set md to modification date of n
+      set noteProps to {name of n, id of n, ${asDatePartsExpr("cd")}, ${asDatePartsExpr("md")}, (shared of n as text), (password protected of n as text)}
       set AppleScript's text item delimiters to ${AS_FIELD_SEP}
       return noteProps as text
     `;
@@ -1263,7 +1297,9 @@ export class AppleNotesManager {
         set resultList to {}
         repeat with n in notes
           if shared of n is true then
-            set end of resultList to (name of n) & ${AS_FIELD_SEP} & (id of n) & ${AS_FIELD_SEP} & (creation date of n as text) & ${AS_FIELD_SEP} & (modification date of n as text) & ${AS_FIELD_SEP} & (shared of n as text) & ${AS_FIELD_SEP} & (password protected of n as text)
+            set cd to creation date of n
+            set md to modification date of n
+            set end of resultList to (name of n) & ${AS_FIELD_SEP} & (id of n) & ${AS_FIELD_SEP} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP} & (shared of n as text) & ${AS_FIELD_SEP} & (password protected of n as text)
           end if
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}

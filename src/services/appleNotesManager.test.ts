@@ -248,6 +248,25 @@ describe("parseAppleScriptDate", () => {
     });
   });
 
+  describe("locale-independent numeric format (#25)", () => {
+    it("parses the Y-M-D-H-m-s form emitted by our producers", () => {
+      const result = parseAppleScriptDate("2025-12-27-15-44-2");
+      expect(result.getFullYear()).toBe(2025);
+      expect(result.getMonth()).toBe(11);
+      expect(result.getDate()).toBe(27);
+      expect(result.getHours()).toBe(15);
+      expect(result.getMinutes()).toBe(44);
+      expect(result.getSeconds()).toBe(2);
+    });
+
+    it("handles single-digit components and midnight", () => {
+      const result = parseAppleScriptDate("2025-1-5-0-0-0");
+      expect(result.getMonth()).toBe(0);
+      expect(result.getDate()).toBe(5);
+      expect(result.getHours()).toBe(0);
+    });
+  });
+
   describe("fallback behavior", () => {
     it("returns current date for invalid input", () => {
       const before = new Date();
