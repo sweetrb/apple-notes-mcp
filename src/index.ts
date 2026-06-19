@@ -28,6 +28,7 @@ import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
+import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
@@ -56,25 +57,28 @@ const notesManager = new AppleNotesManager();
 // Response Helpers
 // =============================================================================
 
+interface ToolResponse {
+  content: { type: "text"; text: string; [k: string]: unknown }[];
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+  [k: string]: unknown;
+}
+
 /**
- * Creates a successful MCP tool response.
- *
- * @param message - The success message to display
- * @returns Formatted MCP response object
+ * Creates a successful MCP tool response. Pass `structured` to attach typed JSON
+ * (`structuredContent`) alongside the human-readable text so agents can consume
+ * results without parsing prose (#21).
  */
-function successResponse(message: string) {
-  return {
-    content: [{ type: "text" as const, text: message }],
-  };
+function successResponse(message: string, structured?: Record<string, unknown>): ToolResponse {
+  const res: ToolResponse = { content: [{ type: "text" as const, text: message }] };
+  if (structured) res.structuredContent = structured;
+  return res;
 }
 
 /**
  * Creates an error MCP tool response.
- *
- * @param message - The error message to display
- * @returns Formatted MCP error response object
  */
-function errorResponse(message: string) {
+function errorResponse(message: string): ToolResponse {
   return {
     content: [{ type: "text" as const, text: message }],
     isError: true,
@@ -83,16 +87,12 @@ function errorResponse(message: string) {
 
 /**
  * Wraps a tool handler with consistent error handling.
- *
- * @param handler - The async function to execute
- * @param errorPrefix - Prefix for error messages (e.g., "Error creating note")
- * @returns Wrapped handler with try/catch
  */
 function withErrorHandling<T extends Record<string, unknown>>(
-  handler: (params: T) => ReturnType<typeof successResponse>,
+  handler: (params: T) => ToolResponse,
   errorPrefix: string
 ) {
-  return async (params: T) => {
+  return async (params: T): Promise<ToolResponse> => {
     try {
       return handler(params);
     } catch (error) {
@@ -783,6 +783,19 @@ server.tool(
 
     return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}\n${fdaLine}`);
   }, "Error running health check")
+);
+
+// --- doctor ---
+
+server.tool(
+  "doctor",
+  {},
+  withErrorHandling(() => {
+    // Richer than health-check: Notes.app permission, account state, and Full
+    // Disk Access with actionable messages + structuredContent (#22).
+    const report = runDoctor(notesManager);
+    return successResponse(formatDoctorReport(report), { ...report });
+  }, "Error running doctor")
 );
 
 // --- get-notes-stats ---
