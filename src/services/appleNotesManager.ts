@@ -32,6 +32,14 @@ import type {
 } from "@/types.js";
 import { executeAppleScript } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
+import {
+  assertSafeSavePath,
+  readFileBase64,
+  fileSize,
+  makeTempDir,
+  cleanupTempDir,
+} from "@/utils/attachmentFs.js";
+import { existsSync } from "fs";
 import TurndownService from "turndown";
 
 // =============================================================================
@@ -1995,6 +2003,108 @@ export class AppleNotesManager {
     }
 
     return attachments;
+  }
+
+  /**
+   * Saves a single attachment of a note (identified by attachment id) to a file
+   * on disk via Notes.app's AppleScript `save` (#27).
+   *
+   * @param noteId - CoreData URL identifier for the note
+   * @param attachmentId - id of the attachment (from list-attachments)
+   * @param savePath - absolute destination file path (within home / temp / /Volumes)
+   * @returns { success, savedPath?, name?, contentType?, error? }
+   */
+  saveAttachmentById(
+    noteId: string,
+    attachmentId: string,
+    savePath: string
+  ): { success: boolean; savedPath?: string; name?: string; contentType?: string; error?: string } {
+    let abs: string;
+    try {
+      abs = assertSafeSavePath(savePath);
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    const safeNoteId = sanitizeId(noteId);
+    const safeAttId = escapeForAppleScript(attachmentId);
+    const safePath = escapeForAppleScript(abs);
+
+    const script = `
+      tell application "Notes"
+        set theNote to note id "${safeNoteId}"
+        set theAttachment to missing value
+        repeat with a in attachments of theNote
+          if (id of a as text) is "${safeAttId}" then
+            set theAttachment to a
+            exit repeat
+          end if
+        end repeat
+        if theAttachment is missing value then
+          return "ERR${AS_FIELD_SEP}attachment not found"
+        end if
+        save theAttachment in (POSIX file "${safePath}")
+        return "OK${AS_FIELD_SEP}" & (name of theAttachment) & "${AS_FIELD_SEP}" & (content identifier of theAttachment)
+      end tell
+    `;
+
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      return { success: false, error: result.error ?? "unknown error" };
+    }
+    const parts = (result.output ?? "").trim().split(FIELD_SEP);
+    if (parts[0] !== "OK") {
+      return { success: false, error: parts[1]?.trim() || "attachment not found" };
+    }
+    if (!existsSync(abs) || fileSize(abs) === 0) {
+      return { success: false, error: `Notes reported success but no file was written to ${abs}` };
+    }
+    return {
+      success: true,
+      savedPath: abs,
+      name: parts[1]?.trim(),
+      contentType: parts[2]?.trim(),
+    };
+  }
+
+  /**
+   * Fetches a note attachment as base64 (#27). Exports to a private temp file,
+   * reads it, then deletes the temp copy.
+   *
+   * @param noteId - CoreData URL identifier for the note
+   * @param attachmentId - id of the attachment
+   * @returns { success, name?, contentType?, base64?, bytes?, error? }
+   */
+  getAttachmentBase64ById(
+    noteId: string,
+    attachmentId: string
+  ): {
+    success: boolean;
+    name?: string;
+    contentType?: string;
+    base64?: string;
+    bytes?: number;
+    error?: string;
+  } {
+    const dir = makeTempDir();
+    try {
+      const dest = `${dir}/attachment.bin`;
+      const saved = this.saveAttachmentById(noteId, attachmentId, dest);
+      if (!saved.success || !saved.savedPath) {
+        return { success: false, error: saved.error };
+      }
+      return {
+        success: true,
+        name: saved.name,
+        contentType: saved.contentType,
+        base64: readFileBase64(saved.savedPath),
+        bytes: fileSize(saved.savedPath),
+      };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    } finally {
+      cleanupTempDir(dir);
+    }
   }
 
   // ===========================================================================

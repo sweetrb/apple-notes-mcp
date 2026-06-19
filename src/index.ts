@@ -977,6 +977,57 @@ server.tool(
   }, "Error performing batch move")
 );
 
+// --- save-attachment ---
+
+server.tool(
+  "save-attachment",
+  {
+    noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
+    attachmentId: z
+      .string()
+      .min(1, "attachmentId is required")
+      .describe("Attachment id (from list-attachments)"),
+    savePath: z
+      .string()
+      .min(1, "savePath is required")
+      .describe("Absolute destination file path (must be under home, temp, or /Volumes)"),
+  },
+  withErrorHandling(({ noteId, attachmentId, savePath }) => {
+    const r = notesManager.saveAttachmentById(noteId, attachmentId, savePath);
+    if (!r.success) {
+      return errorResponse(`Failed to save attachment: ${r.error ?? "unknown error"}`);
+    }
+    return successResponse(`Saved "${r.name ?? "attachment"}" to ${r.savedPath}`, {
+      savedPath: r.savedPath,
+      name: r.name,
+      contentType: r.contentType,
+    });
+  }, "Error saving attachment")
+);
+
+// --- fetch-attachment ---
+
+server.tool(
+  "fetch-attachment",
+  {
+    noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
+    attachmentId: z
+      .string()
+      .min(1, "attachmentId is required")
+      .describe("Attachment id (from list-attachments)"),
+  },
+  withErrorHandling(({ noteId, attachmentId }) => {
+    const r = notesManager.getAttachmentBase64ById(noteId, attachmentId);
+    if (!r.success || !r.base64) {
+      return errorResponse(`Failed to fetch attachment: ${r.error ?? "unknown error"}`);
+    }
+    return successResponse(
+      `Fetched "${r.name ?? "attachment"}" (${r.contentType ?? "unknown type"}, ${r.bytes ?? 0} bytes) as base64.`,
+      { name: r.name, contentType: r.contentType, bytes: r.bytes, base64: r.base64 }
+    );
+  }, "Error fetching attachment")
+);
+
 // --- export-notes-json ---
 
 server.tool(
