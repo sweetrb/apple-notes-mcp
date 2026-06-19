@@ -4,7 +4,7 @@
  * These tests verify the JXA executor and compare behavior with AppleScript.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { executeJXA, escapeForJXA, buildNotesJXA } from "./jxa.js";
 
 // Mock execSync to avoid actual osascript calls
@@ -90,6 +90,28 @@ describe("executeJXA", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Cannot find note");
+  });
+
+  describe("hardened executor (#16/#17)", () => {
+    afterEach(() => {
+      delete process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+    });
+
+    it("passes SIGKILL and a large maxBuffer to execSync", () => {
+      mockExecSync.mockReturnValue("ok");
+      executeJXA("JSON.stringify({})");
+      const opts = mockExecSync.mock.calls[0][1] as { killSignal?: string; maxBuffer?: number };
+      expect(opts.killSignal).toBe("SIGKILL");
+      expect(opts.maxBuffer).toBe(64 * 1024 * 1024);
+    });
+
+    it("honors APPLE_NOTES_MCP_MAX_BUFFER override", () => {
+      process.env.APPLE_NOTES_MCP_MAX_BUFFER = "2097152";
+      mockExecSync.mockReturnValue("ok");
+      executeJXA("JSON.stringify({})");
+      const opts = mockExecSync.mock.calls[0][1] as { maxBuffer?: number };
+      expect(opts.maxBuffer).toBe(2097152);
+    });
   });
 
   it("handles timeout errors", () => {
