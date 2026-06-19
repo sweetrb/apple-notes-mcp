@@ -213,7 +213,8 @@ server.tool(
 
     if (notes.length === 0) {
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`,
+        { notes: [], count: 0 }
       );
     }
 
@@ -231,7 +232,8 @@ server.tool(
       .join("\n");
 
     return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`
+      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`,
+      { notes, count: notes.length }
     );
   }, "Error searching notes")
 );
@@ -265,7 +267,7 @@ server.tool(
       if (!content) {
         return errorResponse(`Failed to read content of note "${note.title}"`);
       }
-      return successResponse(content);
+      return successResponse(content, { title: note.title, content });
     }
 
     // Fall back to title-based lookup
@@ -289,7 +291,7 @@ server.tool(
       return errorResponse(`Failed to read content of note "${title}"`);
     }
 
-    return successResponse(content);
+    return successResponse(content, { title, content });
   }, "Error retrieving note content")
 );
 
@@ -317,7 +319,7 @@ server.tool(
       passwordProtected: note.passwordProtected,
     };
 
-    return successResponse(JSON.stringify(metadata, null, 2));
+    return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note")
 );
 
@@ -344,7 +346,7 @@ server.tool(
       account: note.account,
     };
 
-    return successResponse(JSON.stringify(metadata, null, 2));
+    return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note details")
 );
 
@@ -581,12 +583,16 @@ server.tool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`);
+      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`, {
+        notes: [],
+        count: 0,
+      });
     }
 
     const noteList = notes.map((t) => `  - ${t}`).join("\n");
     return successResponse(
-      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`
+      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
+      { notes, count: notes.length }
     );
   }, "Error listing notes")
 );
@@ -622,11 +628,14 @@ server.tool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (folders.length === 0) {
-      return successResponse(`No folders found${acct}${syncNote}`);
+      return successResponse(`No folders found${acct}${syncNote}`, { folders: [], count: 0 });
     }
 
     const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
-    return successResponse(`Found ${folders.length} folders${acct}:\n${folderList}${syncNote}`);
+    return successResponse(`Found ${folders.length} folders${acct}:\n${folderList}${syncNote}`, {
+      folders,
+      count: folders.length,
+    });
   }, "Error listing folders")
 );
 
@@ -685,11 +694,14 @@ server.tool(
     const accounts = notesManager.listAccounts();
 
     if (accounts.length === 0) {
-      return successResponse("No Notes accounts found");
+      return successResponse("No Notes accounts found", { accounts: [], count: 0 });
     }
 
     const accountList = accounts.map((a) => `  - ${a.name}`).join("\n");
-    return successResponse(`Found ${accounts.length} accounts:\n${accountList}`);
+    return successResponse(`Found ${accounts.length} accounts:\n${accountList}`, {
+      accounts,
+      count: accounts.length,
+    });
   }, "Error listing accounts")
 );
 
@@ -706,7 +718,10 @@ server.tool(
     const sharedNotes = notesManager.listSharedNotes();
 
     if (sharedNotes.length === 0) {
-      return successResponse("No shared notes found. You have no notes shared with collaborators.");
+      return successResponse(
+        "No shared notes found. You have no notes shared with collaborators.",
+        { notes: [], count: 0 }
+      );
     }
 
     const noteList = sharedNotes
@@ -718,7 +733,8 @@ server.tool(
 
     return successResponse(
       `Found ${sharedNotes.length} shared note(s):\n${noteList}\n\n` +
-        `⚠️ Changes to shared notes are visible to all collaborators.`
+        `⚠️ Changes to shared notes are visible to all collaborators.`,
+      { notes: sharedNotes, count: sharedNotes.length }
     );
   }, "Error listing shared notes")
 );
@@ -736,7 +752,7 @@ server.tool(
     const status = getSyncStatus();
 
     if (status.error) {
-      return successResponse(`⚠️ Sync status unknown: ${status.error}`);
+      return successResponse(`⚠️ Sync status unknown: ${status.error}`, { ...status });
     }
 
     const lines: string[] = [];
@@ -758,7 +774,7 @@ server.tool(
       lines.push(`  Last activity: ${status.secondsSinceLastChange}s ago`);
     }
 
-    return successResponse(lines.join("\n"));
+    return successResponse(lines.join("\n"), { ...status });
   }, "Error checking sync status")
 );
 
@@ -836,7 +852,7 @@ server.tool(
     lines.push(`  Last 7 days: ${stats.recentlyModified.last7d}`);
     lines.push(`  Last 30 days: ${stats.recentlyModified.last30d}`);
 
-    return successResponse(lines.join("\n"));
+    return successResponse(lines.join("\n"), { ...stats });
   }, "Error getting notes statistics")
 );
 
@@ -861,11 +877,15 @@ server.tool(
       }
       const attachments = notesManager.listAttachmentsById(id);
       if (attachments.length === 0) {
-        return successResponse(`Note "${note.title}" has no attachments`);
+        return successResponse(`Note "${note.title}" has no attachments`, {
+          attachments: [],
+          count: 0,
+        });
       }
       const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
       return successResponse(
-        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`
+        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`,
+        { attachments, count: attachments.length }
       );
     }
 
@@ -883,12 +903,13 @@ server.tool(
 
     const attachments = notesManager.listAttachments(title, account);
     if (attachments.length === 0) {
-      return successResponse(`Note "${title}" has no attachments`);
+      return successResponse(`Note "${title}" has no attachments`, { attachments: [], count: 0 });
     }
 
     const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
     return successResponse(
-      `Found ${attachments.length} attachment(s) in "${title}":\n${attachmentList}`
+      `Found ${attachments.length} attachment(s) in "${title}":\n${attachmentList}`,
+      { attachments, count: attachments.length }
     );
   }, "Error listing attachments")
 );
@@ -976,6 +997,7 @@ server.tool(
           text: JSON.stringify(exportData, null, 2),
         },
       ],
+      structuredContent: { ...exportData },
     };
   }, "Error exporting notes")
 );
@@ -999,7 +1021,7 @@ server.tool(
       if (!markdown) {
         return errorResponse(`Note with ID "${id}" not found or has no content`);
       }
-      return successResponse(markdown);
+      return successResponse(markdown, { markdown });
     }
 
     // Fall back to title-based lookup
@@ -1014,7 +1036,7 @@ server.tool(
       );
     }
 
-    return successResponse(markdown);
+    return successResponse(markdown, { markdown });
   }, "Error getting note as markdown")
 );
 
@@ -1048,7 +1070,8 @@ server.tool(
     const checked = result.items.filter((i) => i.done).length;
 
     return successResponse(
-      `Checklist for "${note.title}" (${checked}/${result.items.length} done):\n${summary}`
+      `Checklist for "${note.title}" (${checked}/${result.items.length} done):\n${summary}`,
+      { items: result.items, checked, total: result.items.length }
     );
   }, "Error reading checklist state")
 );
