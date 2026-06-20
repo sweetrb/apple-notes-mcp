@@ -695,6 +695,22 @@ describe("AppleNotesManager", () => {
       expect(results[1].folder).toBe("Notes");
     });
 
+    it("deduplicates duplicate note IDs returned by Notes.app", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          ["Not uploaded", "x-coredata://ABC/ICNote/p1", "Notes"].join(F),
+          ["Not uploaded", "x-coredata://ABC/ICNote/p1", "Notes"].join(F),
+        ].join(R),
+      });
+
+      const results = manager.searchNotes("Not uploaded");
+
+      expect(results).toHaveLength(1);
+      expect(results[0].title).toBe("Not uploaded");
+      expect(results[0].id).toBe("x-coredata://ABC/ICNote/p1");
+    });
+
     it("scopes search to specified account", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
@@ -1338,7 +1354,11 @@ describe("AppleNotesManager", () => {
     it("returns array of note titles", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Note A", "Note B", "Note C"].join(R),
+        output: [
+          ["Note A", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Note B", "x-coredata://ABC/ICNote/p2"].join(F),
+          ["Note C", "x-coredata://ABC/ICNote/p3"].join(F),
+        ].join(R),
       });
 
       const titles = manager.listNotes();
@@ -1349,12 +1369,33 @@ describe("AppleNotesManager", () => {
     it("filters out empty entries", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Note A", "", "Note B", "", ""].join(R),
+        output: [
+          ["Note A", "x-coredata://ABC/ICNote/p1"].join(F),
+          "",
+          ["Note B", "x-coredata://ABC/ICNote/p2"].join(F),
+          "",
+          "",
+        ].join(R),
       });
 
       const titles = manager.listNotes();
 
       expect(titles).toEqual(["Note A", "Note B"]);
+    });
+
+    it("deduplicates duplicate note IDs while preserving separate notes with the same title", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          ["Same Title", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Same Title", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Same Title", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
+      });
+
+      const titles = manager.listNotes();
+
+      expect(titles).toEqual(["Same Title", "Same Title"]);
     });
 
     it("throws on failure rather than returning empty (#19)", () => {
@@ -1370,7 +1411,10 @@ describe("AppleNotesManager", () => {
     it("filters by folder when specified", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Work Note 1", "Work Note 2"].join(R),
+        output: [
+          ["Work Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Work Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
       });
 
       manager.listNotes("iCloud", "Work");
@@ -1383,7 +1427,10 @@ describe("AppleNotesManager", () => {
     it("uses whose clause when modifiedSince is provided", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Recent Note 1", "Recent Note 2"].join(R),
+        output: [
+          ["Recent Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Recent Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
       });
 
       const results = manager.listNotes(undefined, undefined, "2025-06-15T00:00:00");
@@ -1401,7 +1448,11 @@ describe("AppleNotesManager", () => {
     it("uses repeat loop when limit is provided", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Note 1", "Note 2", "Note 3"].join(R),
+        output: [
+          ["Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
+          ["Note 3", "x-coredata://ABC/ICNote/p3"].join(F),
+        ].join(R),
       });
 
       const results = manager.listNotes(undefined, undefined, undefined, 3);
@@ -1414,7 +1465,10 @@ describe("AppleNotesManager", () => {
     it("combines folder, modifiedSince, and limit", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Work Note", "Another Work Note"].join(R),
+        output: [
+          ["Work Note", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Another Work Note", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
       });
 
       manager.listNotes("iCloud", "Work", "2025-01-01", 10);
@@ -1439,7 +1493,10 @@ describe("AppleNotesManager", () => {
     it("ignores invalid modifiedSince date and falls back to limit-only", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["Note 1", "Note 2"].join(R),
+        output: [
+          ["Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
       });
 
       const results = manager.listNotes(undefined, undefined, "not-a-date", 5);
@@ -1827,7 +1884,13 @@ describe("AppleNotesManager", () => {
         // Check 3: listAccounts
         .mockReturnValueOnce({ success: true, output: "iCloud" })
         // Check 4: listNotes
-        .mockReturnValueOnce({ success: true, output: ["Note 1", "Note 2"].join(R) });
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            ["Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
+            ["Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
+          ].join(R),
+        });
 
       const result = manager.healthCheck();
 
@@ -2286,7 +2349,10 @@ describe("AppleNotesManager", () => {
         // listFolders for iCloud
         .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes for Notes folder
-        .mockReturnValueOnce({ success: true, output: "Test Note" })
+        .mockReturnValueOnce({
+          success: true,
+          output: ["Test Note", "x-coredata://ABC/ICNote/p1"].join(F),
+        })
         // getNoteDetails
         .mockReturnValueOnce({ success: true, output: noteDetailsOutput("Test Note", false) })
         // getNoteContent
@@ -2319,7 +2385,10 @@ describe("AppleNotesManager", () => {
         // listFolders for iCloud
         .mockReturnValueOnce({ success: true, output: "id1\tNotes" })
         // listNotes for Notes folder
-        .mockReturnValueOnce({ success: true, output: "Locked Note" })
+        .mockReturnValueOnce({
+          success: true,
+          output: ["Locked Note", "x-coredata://ABC/ICNote/p1"].join(F),
+        })
         // getNoteDetails (passwordProtected = true)
         .mockReturnValueOnce({ success: true, output: noteDetailsOutput("Locked Note", true) });
       // No getNoteContent call because note is password-protected
