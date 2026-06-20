@@ -2013,6 +2013,67 @@ describe("AppleNotesManager", () => {
       expect(stats.accounts[0].name).toBe("iCloud");
       expect(stats.accounts[1].name).toBe("Gmail");
     });
+
+    it("reports complete coverage when every scope succeeds (#19)", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
+        .mockReturnValueOnce({ success: true, output: ["Notes", "3"].join(F) + R })
+        .mockReturnValueOnce({ success: true, output: ["1", "2", "3"].join(F) });
+
+      const stats = manager.getNotesStats();
+
+      expect(stats.coverage.complete).toBe(true);
+      expect(stats.coverage.warnings).toEqual([]);
+      expect(stats.coverage.covered).toBe(stats.coverage.scanned);
+    });
+
+    it("degrades gracefully when one account fails, with a coverage warning (#19)", () => {
+      mockExecuteAppleScript
+        // listAccounts
+        .mockReturnValueOnce({ success: true, output: ["iCloud", "Gmail"].join(R) })
+        // iCloud folder counts succeed
+        .mockReturnValueOnce({ success: true, output: ["Notes", "4"].join(F) + R })
+        // Gmail folder counts FAIL
+        .mockReturnValueOnce({ success: false, output: "", error: "Gmail account is locked" })
+        // getRecentlyModifiedCounts succeed
+        .mockReturnValueOnce({ success: true, output: ["0", "0", "0"].join(F) });
+
+      const stats = manager.getNotesStats();
+
+      // Healthy account's data is preserved, not discarded
+      expect(stats.totalNotes).toBe(4);
+      expect(stats.accounts).toHaveLength(1);
+      expect(stats.accounts[0].name).toBe("iCloud");
+      // Failure surfaced as a coverage warning
+      expect(stats.coverage.complete).toBe(false);
+      expect(stats.coverage.warnings).toHaveLength(1);
+      expect(stats.coverage.warnings[0].scope).toBe("Gmail");
+      expect(stats.coverage.warnings[0].reason).toContain("locked");
+    });
+
+    it("flags recent-activity failure as a coverage warning, not fake zeros (#19)", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
+        .mockReturnValueOnce({ success: true, output: ["Notes", "5"].join(F) + R })
+        // getRecentlyModifiedCounts FAILS
+        .mockReturnValueOnce({ success: false, output: "", error: "timed out" });
+
+      const stats = manager.getNotesStats();
+
+      expect(stats.totalNotes).toBe(5);
+      expect(stats.recentlyModified.last24h).toBe(0);
+      expect(stats.coverage.complete).toBe(false);
+      expect(stats.coverage.warnings.some((w) => w.scope === "recent-activity")).toBe(true);
+    });
+
+    it("throws when no account can be read at all (#19)", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: ["iCloud", "Gmail"].join(R) })
+        .mockReturnValueOnce({ success: false, output: "", error: "iCloud unreachable" })
+        .mockReturnValueOnce({ success: false, output: "", error: "Gmail unreachable" });
+
+      expect(() => manager.getNotesStats()).toThrow(/Failed to read folder stats for any/);
+    });
   });
 
   // ---------------------------------------------------------------------------

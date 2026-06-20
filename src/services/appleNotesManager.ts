@@ -24,6 +24,7 @@ import type {
   NotesStats,
   AccountStats,
   FolderStats,
+  ScopeWarning,
   Attachment,
   NotesExport,
   ExportedAccount,
@@ -1859,11 +1860,17 @@ export class AppleNotesManager {
   getNotesStats(): NotesStats {
     const accounts = this.listAccounts();
     const accountStats: AccountStats[] = [];
+    const warnings: ScopeWarning[] = [];
     let totalNotes = 0;
 
     // Collect stats per account with ONE bounded script per account (#20/#26):
     // count notes server-side per folder instead of fetching every note's name
     // (unbounded) via a listNotes call per folder (N+1 osascript spawns).
+    //
+    // Per-account failures degrade gracefully (#19): a single unreachable or
+    // locked account is recorded as a coverage warning and skipped, rather than
+    // discarding the stats for every healthy account. Only a total wipeout
+    // (no account readable) is escalated to a thrown error below.
     for (const account of accounts) {
       const countScript = buildAccountScopedScript(
         { account: account.name },
@@ -1877,9 +1884,8 @@ export class AppleNotesManager {
       );
       const res = executeAppleScript(countScript);
       if (!res.success) {
-        throw new Error(
-          `Failed to read folder stats for "${account.name}": ${res.error ?? "unknown error"}`
-        );
+        warnings.push({ scope: account.name, reason: res.error ?? "unknown error" });
+        continue;
       }
 
       const folderStats: FolderStats[] = [];
@@ -1901,13 +1907,38 @@ export class AppleNotesManager {
       });
     }
 
-    // Get recently modified notes counts
-    const recentlyModified = this.getRecentlyModifiedCounts();
+    // If every account failed, there is no data to report — surface the error
+    // (#19) rather than returning a deceptively empty stats object.
+    if (accounts.length > 0 && accountStats.length === 0) {
+      throw new Error(
+        `Failed to read folder stats for any of ${accounts.length} account(s): ${warnings
+          .map((w) => `${w.scope} (${w.reason})`)
+          .join("; ")}`
+      );
+    }
+
+    // Get recently modified notes counts. A failure here is non-fatal — record a
+    // coverage warning and report zeros, flagged as not-covered (#19), instead of
+    // passing off fake zero activity as real.
+    const recent = this.getRecentlyModifiedCounts();
+    if (recent.error) {
+      warnings.push({ scope: "recent-activity", reason: recent.error });
+    }
+
+    // scopes = each account + the recent-activity scan
+    const scanned = accounts.length + 1;
+    const covered = scanned - warnings.length;
 
     return {
       totalNotes,
       accounts: accountStats,
-      recentlyModified,
+      recentlyModified: recent.counts,
+      coverage: {
+        complete: warnings.length === 0,
+        scanned,
+        covered,
+        warnings,
+      },
     };
   }
 
@@ -1915,9 +1946,8 @@ export class AppleNotesManager {
    * Helper to get counts of recently modified notes.
    */
   private getRecentlyModifiedCounts(): {
-    last24h: number;
-    last7d: number;
-    last30d: number;
+    counts: { last24h: number; last7d: number; last30d: number };
+    error?: string;
   } {
     // Count server-side with locale-safe date variables (#20/#25): instead of
     // streaming every note's modification date to JS (unbounded, ENOBUFS-prone,
@@ -1946,8 +1976,13 @@ export class AppleNotesManager {
 
     const result = executeAppleScript(script);
     if (!result.success) {
-      // Surface the failure (#19) rather than reporting fake zero recent activity.
-      throw new Error(`Failed to read recent activity: ${result.error ?? "unknown error"}`);
+      // Non-fatal (#19): report the error to the caller so it becomes a coverage
+      // warning, with zeroed counts, instead of throwing away the whole stats
+      // result or passing off fake zero activity as real.
+      return {
+        counts: { last24h: 0, last7d: 0, last30d: 0 },
+        error: result.error ?? "unknown error",
+      };
     }
 
     const parts = result.output.trim().split(FIELD_SEP);
@@ -1955,7 +1990,9 @@ export class AppleNotesManager {
       const n = parseInt((s ?? "").trim(), 10);
       return Number.isFinite(n) ? n : 0;
     };
-    return { last24h: toInt(parts[0]), last7d: toInt(parts[1]), last30d: toInt(parts[2]) };
+    return {
+      counts: { last24h: toInt(parts[0]), last7d: toInt(parts[1]), last30d: toInt(parts[2]) },
+    };
   }
 
   // ===========================================================================

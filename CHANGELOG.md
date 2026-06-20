@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`get-notes-stats` now reports partial-coverage diagnostics (#19).** A single unreachable or locked account (or a failed recent-activity scan) no longer throws away the whole stats result — the healthy scopes are returned and the failures are surfaced as a `coverage` object (`complete`, `scanned`, `covered`, `warnings[]`) in `structuredContent`, with a "⚠️ Partial results" note in the text. Only a total wipeout (no account readable) still throws, so callers can always tell a genuinely empty library apart from a partial failure.
+
 ### Added
 - **`get-note-content` now surfaces inline hashtags (#29).** The body is parsed for `#hashtag` tokens and they are returned as `hashtags` in `structuredContent`. Parsing matches Notes' own rule (a tag needs at least one letter, so `#123` is ignored) and de-duplicates case-insensitively (`src/utils/hashtags.ts`). Documented that Apple Notes tags are inline hashtags (not a scriptable property), that the `create-note` `tags` param is an app-level pass-through, and that Smart Folders are not scriptable.
 

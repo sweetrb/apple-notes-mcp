@@ -856,6 +856,18 @@ server.tool(
     lines.push(`  Last 7 days: ${stats.recentlyModified.last7d}`);
     lines.push(`  Last 30 days: ${stats.recentlyModified.last30d}`);
 
+    // Partial-coverage diagnostics (#19): if some scopes couldn't be read, say so
+    // explicitly so the numbers above aren't mistaken for a complete picture.
+    if (!stats.coverage.complete) {
+      lines.push(``);
+      lines.push(
+        `⚠️  Partial results: read ${stats.coverage.covered}/${stats.coverage.scanned} scopes. Counts above exclude:`
+      );
+      for (const w of stats.coverage.warnings) {
+        lines.push(`  - ${w.scope}: ${w.reason}`);
+      }
+    }
+
     return successResponse(lines.join("\n"), { ...stats });
   }, "Error getting notes statistics")
 );
