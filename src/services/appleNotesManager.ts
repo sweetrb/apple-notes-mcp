@@ -797,24 +797,26 @@ export class AppleNotesManager {
           if (count of resultList) >= ${safeLimit} then exit repeat`
         : "";
 
-    // Get names, IDs, and folder for each matching note
-    // We use a repeat loop to get all properties, separated by a delimiter
-    // Note: Some notes may have inaccessible containers, so we wrap in try/on error
+    // Get names, IDs, and folder for each matching note.
+    // Notes.app can return the same CoreData note more than once when asking
+    // an account for all notes, so dedupe on note ID before adding results.
     const searchCommand = `
       ${dateSetup}set matchingNotes to ${notesSource} where ${whereClause}
       set resultList to {}
-      repeat with n in matchingNotes${limitCheck}
+      set seenIds to {}
+      repeat with n in matchingNotes
         try
           set noteName to name of n
           set noteId to id of n
-          set noteFolder to name of container of n
-          set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder
-        on error
-          try
-            set noteName to name of n
-            set noteId to id of n
-            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & "Notes"
-          end try
+          if seenIds does not contain noteId then
+            set end of seenIds to noteId
+            try
+              set noteFolder to name of container of n
+            on error
+              set noteFolder to "Notes"
+            end try
+            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder${limitCheck}
+          end if
         end try
       end repeat
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
@@ -837,11 +839,15 @@ export class AppleNotesManager {
     const items = result.output.split(RECORD_SEP);
 
     const notes: Note[] = [];
+    const seenIds = new Set<string>();
     for (const item of items) {
       const [title, id, folder] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
+      const noteId = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId)) continue;
+      seenIds.add(noteId);
       notes.push({
-        id: id?.trim() || generateFallbackId(), // Use real ID, fallback to unique temp ID
+        id: noteId,
         title: title.trim(),
         content: "", // Not fetched in search
         tags: [] as string[],
@@ -1212,7 +1218,8 @@ export class AppleNotesManager {
         }
       }
 
-      // Build the limit check
+      // Build the limit check. Check after appending so deduped results,
+      // rather than duplicate AppleScript references, determine the limit.
       const limitCheck =
         safeLimit !== undefined
           ? `
@@ -1221,8 +1228,16 @@ export class AppleNotesManager {
 
       const listCommand = `
         ${dateSetup}set resultList to {}
-        repeat with n in ${notesSource}${limitCheck}
-          set end of resultList to name of n
+        set seenIds to {}
+        repeat with n in ${notesSource}
+          try
+            set noteName to name of n
+            set noteId to id of n
+            if seenIds does not contain noteId then
+              set end of seenIds to noteId
+              set end of resultList to noteName & ${AS_FIELD_SEP} & noteId${limitCheck}
+            end if
+          end try
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
@@ -1239,17 +1254,35 @@ export class AppleNotesManager {
         return [];
       }
 
-      return result.output
-        .split(RECORD_SEP)
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
+      const seenIds = new Set<string>();
+      const titles: string[] = [];
+      for (const item of result.output.split(RECORD_SEP)) {
+        const [title, id] = item.split(FIELD_SEP);
+        if (!title?.trim()) continue;
+        const noteId = id?.trim() || generateFallbackId();
+        if (seenIds.has(noteId)) continue;
+        seenIds.add(noteId);
+        titles.push(title.trim());
+      }
+      return titles;
     }
 
-    // Simple path: no date or limit filters. Coerce the name list to text with a
-    // control-char record separator so titles containing commas don't split (#18).
+    // Simple path: no date or limit filters. Use a repeat loop so duplicate
+    // CoreData note references can be deduped by ID before returning titles.
     const notesRef = folder ? `notes of ${buildFolderReference(folder)}` : `notes`;
     const listCommand = `
-      set resultList to name of ${notesRef}
+      set resultList to {}
+      set seenIds to {}
+      repeat with n in ${notesRef}
+        try
+          set noteName to name of n
+          set noteId to id of n
+          if seenIds does not contain noteId then
+            set end of seenIds to noteId
+            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId
+          end if
+        end try
+      end repeat
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
       return resultList as text
     `;
@@ -1262,10 +1295,17 @@ export class AppleNotesManager {
     }
     if (!result.output.trim()) return [];
 
-    return result.output
-      .split(RECORD_SEP)
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
+    const seenIds = new Set<string>();
+    const titles: string[] = [];
+    for (const item of result.output.split(RECORD_SEP)) {
+      const [title, id] = item.split(FIELD_SEP);
+      if (!title?.trim()) continue;
+      const noteId = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId)) continue;
+      seenIds.add(noteId);
+      titles.push(title.trim());
+    }
+    return titles;
   }
 
   /**
