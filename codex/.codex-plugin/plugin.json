@@ -1,0 +1,46 @@
+{
+  "name": "apple-notes",
+  "version": "2.0.1",
+  "description": "Manage Apple Notes through natural language - create, search, read, update, delete, organize folders, inspect metadata, run diagnostics, and work with attachments (macOS only).",
+  "author": {
+    "name": "Rob Sweet",
+    "email": "rob@superiortech.io"
+  },
+  "homepage": "https://github.com/sweetrb/apple-notes-mcp#readme",
+  "repository": "https://github.com/sweetrb/apple-notes-mcp",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "apple-notes",
+    "claude",
+    "codex",
+    "macos",
+    "notes"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Apple Notes",
+    "shortDescription": "Create, search, read, update, and organize Apple Notes.",
+    "longDescription": "A macOS-only Apple Notes connector for Codex that uses the apple-notes-mcp server to create, search, read, update, delete, move, and organize notes and folders across Apple Notes accounts, with diagnostics, metadata, checklist, attachment, and export support.",
+    "developerName": "Rob Sweet",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP Servers",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/sweetrb/apple-notes-mcp#readme",
+    "defaultPrompt": [
+      "Create a note called Meeting Notes with this summary.",
+      "Find my notes about budget planning.",
+      "Move my draft notes into the Archive folder."
+    ],
+    "brandColor": "#f59e0b",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png",
+    "screenshots": [
+      "./assets/screenshot.svg"
+    ]
+  }
+}

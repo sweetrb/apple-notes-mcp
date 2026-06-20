@@ -41,6 +41,17 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
+### Using the Codex Marketplace
+
+The same plugin is available for Codex. Add the marketplace and install the plugin:
+
+```bash
+codex plugin marketplace add sweetrb/apple-notes-mcp
+codex plugin add apple-notes@apple-notes-mcp
+```
+
+The Codex plugin runs the published `apple-notes-mcp` server through `npx` and ships the same Apple Notes skill, so behavior matches the Claude Code plugin.
+
 ### Manual Installation
 
 **1. Install the server:**
