@@ -676,6 +676,8 @@ Gets comprehensive statistics about your notes.
 
 **Returns:** Total counts, per-account breakdown, folder statistics, and recently modified counts.
 
+The `structuredContent` also includes a `coverage` object — `{ complete, scanned, covered, warnings[] }`. If `complete` is `false`, one or more accounts (or the recent-activity scan) could not be read and the counts reflect only the scopes that succeeded; the text output adds a "⚠️ Partial results" line. This lets you tell a genuinely empty library apart from a partial failure.
+
 ---
 
 #### `get-sync-status`
