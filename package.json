@@ -1,7 +1,7 @@
 {
   "name": "apple-notes-mcp",
   "version": "2.0.1",
-  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude",
+  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and Codex",
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -25,7 +25,7 @@
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "typecheck": "tsc --noEmit",
-    "version": "node -e \"const p=require('./package.json'); const f='.claude-plugin/plugin.json'; const c=JSON.parse(require('fs').readFileSync(f,'utf8')); c.version=p.version; require('fs').writeFileSync(f,JSON.stringify(c,null,2)+'\\n')\" && git add .claude-plugin/plugin.json",
+    "version": "node scripts/sync-plugin-version.mjs && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json .agents/plugins/marketplace.json codex/.codex-plugin/plugin.json",
     "prepublishOnly": "npm run lint && npm run test && npm run build",
     "prepare": "husky; npm run build"
   },
@@ -33,6 +33,7 @@
     "mcp",
     "apple-notes",
     "claude",
+    "codex",
     "ai",
     "applescript",
     "macos",

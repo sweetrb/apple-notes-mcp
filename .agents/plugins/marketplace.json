@@ -1,0 +1,21 @@
+{
+  "name": "apple-notes-mcp",
+  "interface": {
+    "displayName": "Apple Notes MCP"
+  },
+  "plugins": [
+    {
+      "name": "apple-notes",
+      "version": "2.0.1",
+      "source": {
+        "source": "local",
+        "path": "./codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
