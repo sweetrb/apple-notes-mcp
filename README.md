@@ -113,6 +113,15 @@ Resources expose read-only context the client can attach without a tool call:
 `notes://note/{id}` template (returns the note as Markdown). Prompts package
 common workflows: `find-note`, `weekly-review`, `new-meeting-note`.
 
+### Known limitations
+
+A few Notes UI features are not exposed to AppleScript and therefore cannot be
+supported. See **[docs/APPLESCRIPT-LIMITATIONS.md](docs/APPLESCRIPT-LIMITATIONS.md)**
+for the investigation and verification behind each:
+
+- **Pinned notes** — Notes has no scriptable `pinned` property, so pin state can be neither read nor set.
+- **Note-to-note links** — there is no `applenotes://` deep link or link property; the only stable handle is the `x-coredata://` note id.
+
 ---
 
 ## Tool Reference
