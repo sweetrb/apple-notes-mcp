@@ -2187,55 +2187,27 @@ describe("AppleNotesManager", () => {
   // ---------------------------------------------------------------------------
 
   describe("batchDeleteNotes", () => {
-    // Helper to create getNoteById mock output (matches AppleScript format)
-    const noteByIdOutput = (title: string, passwordProtected = false) =>
-      [
-        title,
-        "x-coredata://ABC/ICNote/p1",
-        "Sunday, January 1, 2025 at 1:00:00 PM",
-        "Sunday, January 1, 2025 at 1:00:00 PM",
-        "false",
-        String(passwordProtected),
-      ].join(F);
+    const ID1 = "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1";
+    const ID2 = "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2";
 
-    it("deletes multiple notes successfully", () => {
-      // For each note: getNoteById (which isNotePasswordProtectedById also calls), deleteNoteById
-      mockExecuteAppleScript
-        // First note: getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        // First note: getNoteById for password check (isNotePasswordProtectedById calls getNoteById)
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        // First note: deleteNoteById
-        .mockReturnValueOnce({ success: true, output: "" })
-        // Second note: getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 2", false) })
-        // Second note: getNoteById for password check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 2", false) })
-        // Second note: deleteNoteById
-        .mockReturnValueOnce({ success: true, output: "" });
+    it("deletes the whole batch in a single osascript spawn (#26)", () => {
+      // One script handles all ids; per-id status tokens joined by RECORD_SEP.
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: ["ok", "ok"].join(R) + R,
+      });
 
-      const results = manager.batchDeleteNotes([
-        "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
-      ]);
+      const results = manager.batchDeleteNotes([ID1, ID2]);
 
+      // Exactly one spawn for N notes, not 3N.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
       expect(results).toHaveLength(2);
-      expect(results[0]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        success: true,
-      });
-      expect(results[1]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
-        success: true,
-      });
+      expect(results[0]).toEqual({ id: ID1, success: true });
+      expect(results[1]).toEqual({ id: ID2, success: true });
     });
 
     it("returns error for non-existent note", () => {
-      mockExecuteAppleScript.mockReturnValueOnce({
-        success: false,
-        output: "",
-        error: "Not found",
-      });
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "missing" + R });
 
       const results = manager.batchDeleteNotes([
         "x-coredata://ABC00000-0000-0000-0000-000000000099/ICNote/p404",
@@ -2249,111 +2221,75 @@ describe("AppleNotesManager", () => {
     });
 
     it("returns error for password-protected note", () => {
-      mockExecuteAppleScript
-        // getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Locked Note", true) })
-        // getNoteById for password check (returns true for passwordProtected)
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Locked Note", true) });
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "pw" + R });
 
-      const results = manager.batchDeleteNotes([
-        "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-      ]);
+      const results = manager.batchDeleteNotes([ID1]);
 
-      expect(results[0]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        success: false,
-        error: "Note is password-protected",
-      });
+      expect(results[0]).toEqual({ id: ID1, success: false, error: "Note is password-protected" });
     });
 
-    it("handles mixed success and failure", () => {
-      mockExecuteAppleScript
-        // First note: success
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        .mockReturnValueOnce({ success: true, output: "" })
-        // Second note: not found
-        .mockReturnValueOnce({ success: false, output: "", error: "Not found" });
-
-      const results = manager.batchDeleteNotes([
-        "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
-      ]);
-
-      expect(results[0]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
+    it("handles mixed success and failure, preserving order", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
         success: true,
+        output: ["ok", "missing"].join(R) + R,
       });
-      expect(results[1]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
+
+      const results = manager.batchDeleteNotes([ID1, ID2]);
+
+      expect(results[0]).toEqual({ id: ID1, success: true });
+      expect(results[1]).toEqual({ id: ID2, success: false, error: "Note not found" });
+    });
+
+    it("fails an invalid id without spawning, isolating it from valid ids", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "ok" + R });
+
+      const results = manager.batchDeleteNotes(["not-a-valid-id", ID1]);
+
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toMatch(/Invalid note ID/);
+      expect(results[1]).toEqual({ id: ID1, success: true });
+    });
+
+    it("fails the whole batch when the single script errors", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
         success: false,
-        error: "Note not found",
+        output: "",
+        error: "Notes.app not responding",
       });
+
+      const results = manager.batchDeleteNotes([ID1, ID2]);
+
+      expect(results.every((r) => r.success === false)).toBe(true);
+      expect(results[0].error).toContain("Notes.app not responding");
+    });
+
+    it("returns [] for an empty batch without spawning", () => {
+      const results = manager.batchDeleteNotes([]);
+      expect(results).toEqual([]);
+      expect(mockExecuteAppleScript).not.toHaveBeenCalled();
     });
   });
 
   describe("batchMoveNotes", () => {
-    // Helper to create getNoteById mock output (matches AppleScript format)
-    const noteByIdOutput = (title: string, passwordProtected = false) =>
-      [
-        title,
-        "x-coredata://ABC/ICNote/p1",
-        "Sunday, January 1, 2025 at 1:00:00 PM",
-        "Sunday, January 1, 2025 at 1:00:00 PM",
-        "false",
-        String(passwordProtected),
-      ].join(F);
+    const ID1 = "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1";
+    const ID2 = "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2";
 
-    it("moves multiple notes successfully", () => {
-      // For each note: getNoteById, getNoteById (password check), getNoteContentById, create, delete
-      mockExecuteAppleScript
-        // First note: getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        // First note: getNoteById for password check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 1", false) })
-        // First note: moveNoteById calls getNoteContentById
-        .mockReturnValueOnce({ success: true, output: "<div>Note 1</div><div>Content</div>" })
-        // First note: createNote in destination
-        .mockReturnValueOnce({ success: true, output: "" })
-        // First note: deleteNoteById (original)
-        .mockReturnValueOnce({ success: true, output: "" })
-        // Second note: getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 2", false) })
-        // Second note: getNoteById for password check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Note 2", false) })
-        // Second note: moveNoteById calls getNoteContentById
-        .mockReturnValueOnce({ success: true, output: "<div>Note 2</div><div>Content</div>" })
-        // Second note: createNote in destination
-        .mockReturnValueOnce({ success: true, output: "" })
-        // Second note: deleteNoteById (original)
-        .mockReturnValueOnce({ success: true, output: "" });
+    it("moves the whole batch in a single osascript spawn (#26)", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: ["ok", "ok"].join(R) + R,
+      });
 
-      const results = manager.batchMoveNotes(
-        [
-          "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-          "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
-        ],
-        "Archive"
-      );
+      const results = manager.batchMoveNotes([ID1, ID2], "Archive");
 
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
       expect(results).toHaveLength(2);
-      expect(results[0]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        success: true,
-      });
-      expect(results[1]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000012/ICNote/p2",
-        success: true,
-      });
+      expect(results[0]).toEqual({ id: ID1, success: true });
+      expect(results[1]).toEqual({ id: ID2, success: true });
     });
 
     it("returns error for non-existent note", () => {
-      // getNoteById fails for existence check
-      mockExecuteAppleScript.mockReturnValueOnce({
-        success: false,
-        output: "",
-        error: "Not found",
-      });
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "missing" + R });
 
       const results = manager.batchMoveNotes(
         ["x-coredata://ABC00000-0000-0000-0000-000000000099/ICNote/p404"],
@@ -2368,22 +2304,23 @@ describe("AppleNotesManager", () => {
     });
 
     it("returns error for password-protected note", () => {
-      mockExecuteAppleScript
-        // getNoteById for existence check
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Locked Note", true) })
-        // getNoteById for password check (returns true for passwordProtected)
-        .mockReturnValueOnce({ success: true, output: noteByIdOutput("Locked Note", true) });
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "pw" + R });
 
-      const results = manager.batchMoveNotes(
-        ["x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1"],
-        "Archive"
-      );
+      const results = manager.batchMoveNotes([ID1], "Archive");
 
-      expect(results[0]).toEqual({
-        id: "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1",
-        success: false,
-        error: "Note is password-protected",
+      expect(results[0]).toEqual({ id: ID1, success: false, error: "Note is password-protected" });
+    });
+
+    it("maps a per-item move failure to 'Move failed'", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: ["ok", "fail"].join(R) + R,
       });
+
+      const results = manager.batchMoveNotes([ID1, ID2], "Archive");
+
+      expect(results[0]).toEqual({ id: ID1, success: true });
+      expect(results[1]).toEqual({ id: ID2, success: false, error: "Move failed" });
     });
   });
 

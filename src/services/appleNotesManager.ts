@@ -2257,31 +2257,112 @@ export class AppleNotesManager {
    * ```
    */
   batchDeleteNotes(ids: string[]): { id: string; success: boolean; error?: string }[] {
-    const results: { id: string; success: boolean; error?: string }[] = [];
+    if (ids.length === 0) return [];
 
-    for (const id of ids) {
-      // First verify the note exists and isn't password protected
-      const note = this.getNoteById(id);
-      if (!note) {
-        results.push(this.createBatchResult(id, false, "Note not found"));
-        continue;
+    // Collapse the whole batch into ONE osascript spawn (#26): a single
+    // app-level script loops over every id, with a per-id `try` so one bad note
+    // can't abort the rest. The old path spawned 3 processes per note
+    // (getNoteById + isNotePasswordProtectedById + deleteNoteById) — i.e. 3N
+    // spawns for N notes. This is one spawn total, with the same per-item
+    // isolation and result semantics.
+    const results: { id: string; success: boolean; error?: string }[] = new Array(ids.length);
+    const runnable: { index: number; safe: string }[] = [];
+
+    ids.forEach((id, i) => {
+      try {
+        runnable.push({ index: i, safe: sanitizeId(id) });
+      } catch (e) {
+        results[i] = this.createBatchResult(
+          id,
+          false,
+          e instanceof Error ? e.message : "Invalid note ID"
+        );
       }
+    });
 
-      if (this.isNotePasswordProtectedById(id)) {
-        results.push(this.createBatchResult(id, false, "Note is password-protected"));
-        continue;
-      }
+    if (runnable.length > 0) {
+      const idList = runnable.map((r) => `"${r.safe}"`).join(", ");
+      const script = buildAppLevelScript(`
+        set out to ""
+        repeat with rawId in {${idList}}
+          set theId to (rawId as text)
+          set noteRef to missing value
+          try
+            set noteRef to note id theId
+          end try
+          if noteRef is missing value then
+            set out to out & "missing" & ${AS_RECORD_SEP}
+          else
+            set isPw to false
+            try
+              set isPw to (password protected of noteRef)
+            end try
+            if isPw then
+              set out to out & "pw" & ${AS_RECORD_SEP}
+            else
+              try
+                delete noteRef
+                set out to out & "ok" & ${AS_RECORD_SEP}
+              on error
+                set out to out & "fail" & ${AS_RECORD_SEP}
+              end try
+            end if
+          end if
+        end repeat
+        return out
+      `);
+      const res = executeAppleScript(script);
 
-      // Attempt deletion
-      const success = this.deleteNoteById(id);
-      if (success) {
-        results.push(this.createBatchResult(id, true));
+      if (!res.success) {
+        // Whole-batch failure (e.g. Notes.app not responding): can't isolate,
+        // so mark every runnable note as failed with the underlying error.
+        for (const r of runnable) {
+          results[r.index] = this.createBatchResult(
+            ids[r.index],
+            false,
+            res.error ?? "Batch delete failed"
+          );
+        }
       } else {
-        results.push(this.createBatchResult(id, false, "Deletion failed"));
+        const statuses = res.output
+          .split(RECORD_SEP)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        runnable.forEach((r, k) => {
+          results[r.index] = this.mapBatchStatus(ids[r.index], statuses[k], "delete");
+        });
       }
     }
 
     return results;
+  }
+
+  /**
+   * Maps a per-item status token emitted by a batch AppleScript loop to a
+   * BatchResult, preserving the human-readable error messages of the original
+   * per-note implementation. See {@link batchDeleteNotes} / {@link batchMoveNotes}.
+   */
+  private mapBatchStatus(
+    id: string,
+    status: string | undefined,
+    op: "delete" | "move"
+  ): { id: string; success: boolean; error?: string } {
+    switch (status) {
+      case "ok":
+        return this.createBatchResult(id, true);
+      case "pw":
+        return this.createBatchResult(id, false, "Note is password-protected");
+      case "missing":
+        return this.createBatchResult(id, false, "Note not found");
+      case "fail":
+        return this.createBatchResult(
+          id,
+          false,
+          op === "delete" ? "Deletion failed" : "Move failed"
+        );
+      default:
+        return this.createBatchResult(id, false, "Unknown error");
+    }
   }
 
   /**
@@ -2308,27 +2389,86 @@ export class AppleNotesManager {
     folder: string,
     account?: string
   ): { id: string; success: boolean; error?: string }[] {
-    const results: { id: string; success: boolean; error?: string }[] = [];
+    if (ids.length === 0) return [];
 
-    for (const id of ids) {
-      // First verify the note exists
-      const note = this.getNoteById(id);
-      if (!note) {
-        results.push(this.createBatchResult(id, false, "Note not found"));
-        continue;
+    // Collapse the whole batch into ONE osascript spawn (#26). The old path
+    // spawned 5+ processes per note (getNoteById + isNotePasswordProtectedById +
+    // moveNoteById's copy-then-delete fan-out). This uses the native `move`
+    // command — which preserves the note's identity and metadata rather than
+    // copy+delete — inside a single app-level loop with per-id `try` isolation.
+    const targetAccount = this.resolveAccount(account);
+    const safeAccount = sanitizeAccountName(targetAccount);
+    // buildFolderReference validates the (single, shared) destination path; a
+    // malformed folder is a precondition error for the whole call, so let it throw.
+    const destFolderRef = `${buildFolderReference(folder)} of account "${safeAccount}"`;
+
+    const results: { id: string; success: boolean; error?: string }[] = new Array(ids.length);
+    const runnable: { index: number; safe: string }[] = [];
+
+    ids.forEach((id, i) => {
+      try {
+        runnable.push({ index: i, safe: sanitizeId(id) });
+      } catch (e) {
+        results[i] = this.createBatchResult(
+          id,
+          false,
+          e instanceof Error ? e.message : "Invalid note ID"
+        );
       }
+    });
 
-      if (this.isNotePasswordProtectedById(id)) {
-        results.push(this.createBatchResult(id, false, "Note is password-protected"));
-        continue;
-      }
+    if (runnable.length > 0) {
+      const idList = runnable.map((r) => `"${r.safe}"`).join(", ");
+      const script = buildAppLevelScript(`
+        set destFolder to ${destFolderRef}
+        set out to ""
+        repeat with rawId in {${idList}}
+          set theId to (rawId as text)
+          set noteRef to missing value
+          try
+            set noteRef to note id theId
+          end try
+          if noteRef is missing value then
+            set out to out & "missing" & ${AS_RECORD_SEP}
+          else
+            set isPw to false
+            try
+              set isPw to (password protected of noteRef)
+            end try
+            if isPw then
+              set out to out & "pw" & ${AS_RECORD_SEP}
+            else
+              try
+                move noteRef to destFolder
+                set out to out & "ok" & ${AS_RECORD_SEP}
+              on error
+                set out to out & "fail" & ${AS_RECORD_SEP}
+              end try
+            end if
+          end if
+        end repeat
+        return out
+      `);
+      const res = executeAppleScript(script);
 
-      // Attempt move using the ID-based method
-      const success = this.moveNoteById(id, folder, account);
-      if (success) {
-        results.push(this.createBatchResult(id, true));
+      if (!res.success) {
+        // Whole-batch failure (e.g. destination folder unresolved, Notes not
+        // responding): can't isolate, so fail every runnable note.
+        for (const r of runnable) {
+          results[r.index] = this.createBatchResult(
+            ids[r.index],
+            false,
+            res.error ?? "Batch move failed"
+          );
+        }
       } else {
-        results.push(this.createBatchResult(id, false, "Move failed"));
+        const statuses = res.output
+          .split(RECORD_SEP)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        runnable.forEach((r, k) => {
+          results[r.index] = this.mapBatchStatus(ids[r.index], statuses[k], "move");
+        });
       }
     }
 
