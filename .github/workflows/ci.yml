@@ -46,3 +46,26 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Integration suite (opt-in, real Notes.app). On CI the runner's Notes.app has
+  # no signed-in account, so the live tests self-skip; the path-safety and
+  # hashtag tests still run, proving the harness loads and the pure paths work.
+  # Locally (with a populated library) the full live create/read/delete cycle runs.
+  integration:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration

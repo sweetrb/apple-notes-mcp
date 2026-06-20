@@ -969,12 +969,20 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 ## Development
 
 ```bash
-npm install      # Install dependencies
-npm run build    # Compile TypeScript
-npm test         # Run test suite (313 tests)
-npm run lint     # Check code style
-npm run format   # Format code
+npm install            # Install dependencies
+npm run build          # Compile TypeScript
+npm test               # Run unit test suite (mocked AppleScript)
+npm run test:integration  # Run integration tests against real Notes.app
+npm run test:all       # Unit + integration
+npm run lint           # Check code style
+npm run format         # Format code
 ```
+
+The integration suite (`test/integration.test.ts`) drives the real
+`AppleNotesManager → AppleScript → Notes.app` stack — creating, reading,
+searching, and deleting throwaway notes. Its live tests self-skip when no
+writable Notes account is available (e.g. CI), so it is safe to run anywhere;
+the pure path-safety and hashtag tests always run.
 
 ---
 

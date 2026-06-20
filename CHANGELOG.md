@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Integration test suite against real Notes.app (#31).** New `test/integration.test.ts` + `vitest.integration.config.ts` exercise the full `AppleNotesManager → AppleScript → Notes.app` stack (create → read → hashtags → search → delete, plus stats coverage), run via `npm run test:integration` / `npm run test:all`. The live tests self-skip when no writable Notes account is available, so the suite is safe on CI; a new `integration` CI job runs it on macOS. Default `npm test` (unit) is unchanged.
+
 ### Changed
 - **Batch delete/move collapsed from N+1 to a single osascript spawn (#26).** `batch-delete-notes` and `batch-move-notes` previously spawned 3–5 `osascript` processes *per note* (existence check + duplicate password check + the mutation, plus copy-then-delete for moves). Each now runs as one app-level script that loops over every id with per-id `try` isolation, so a batch of N notes costs one spawn instead of 3N–5N. Moves use the native `move` command, which preserves note identity and metadata instead of copy-then-delete. Per-item results, ordering, and error messages are unchanged; an invalid id is isolated to its own failed entry without a spawn. Verified end-to-end against real Notes.app.
 - **`get-notes-stats` now reports partial-coverage diagnostics (#19).** A single unreachable or locked account (or a failed recent-activity scan) no longer throws away the whole stats result — the healthy scopes are returned and the failures are surfaced as a `coverage` object (`complete`, `scanned`, `covered`, `warnings[]`) in `structuredContent`, with a "⚠️ Partial results" note in the text. Only a total wipeout (no account readable) still throws, so callers can always tell a genuinely empty library apart from a partial failure.
