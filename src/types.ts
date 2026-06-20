@@ -541,6 +541,38 @@ export interface AccountStats {
  * };
  * ```
  */
+/**
+ * A scope (account, folder set, or activity scan) that could not be read during
+ * a multi-scope operation. Lets callers tell a genuine empty result apart from a
+ * partial failure. See issue #19.
+ */
+export interface ScopeWarning {
+  /** What couldn't be read — an account name, or a label like "recent-activity". */
+  scope: string;
+
+  /** Why it failed (AppleScript error text). */
+  reason: string;
+}
+
+/**
+ * Coverage report for an operation that scans several independent scopes. When
+ * `complete` is false the result is partial: the data for the listed `warnings`
+ * scopes is missing or zeroed, not genuinely empty.
+ */
+export interface Coverage {
+  /** True when every scanned scope was read successfully. */
+  complete: boolean;
+
+  /** Number of scopes attempted. */
+  scanned: number;
+
+  /** Number of scopes successfully read. */
+  covered: number;
+
+  /** Per-scope failures; empty when `complete` is true. */
+  warnings: ScopeWarning[];
+}
+
 export interface NotesStats {
   /** Total number of notes across all accounts */
   totalNotes: number;
@@ -557,6 +589,13 @@ export interface NotesStats {
     /** Notes modified in the last 30 days */
     last30d: number;
   };
+
+  /**
+   * Coverage diagnostics (#19). If `coverage.complete` is false, one or more
+   * accounts (or the recent-activity scan) could not be read, and the numbers
+   * above reflect only the scopes that succeeded.
+   */
+  coverage: Coverage;
 }
 
 // =============================================================================
