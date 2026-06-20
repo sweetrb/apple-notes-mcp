@@ -41,4 +41,28 @@ re-running the probe above.
 
 ## Note-to-note links (#30)
 
-<!-- documented in #30 -->
+**Status: not supported as data; navigation-only.** Apple Notes lets you insert
+a link from one note to another in the UI, but AppleScript exposes no property
+or element for it:
+
+- A `note` has no `URL`, `url`, or `link` property — each raises error `-2753`
+  (undefined). There is no element that enumerates outgoing/incoming links.
+- There is no readable or constructable `applenotes://` / `notes://` deep link.
+  The note's `id` (`x-coredata://…/ICNote/p123`) is the only stable handle, and
+  it is a Core Data URI, not a shareable or clickable link.
+
+The one related capability that *does* work is the `show` command, which reveals
+a note in the Notes UI by id:
+
+```applescript
+tell application "Notes" to show note id "x-coredata://…/ICNote/p123"
+```
+
+This is deliberately **not** wrapped as a tool: it pops the GUI (unhelpful for a
+headless server), and an agent already has the note's content via
+`get-note-content` / `get-note-markdown`. Link relationships between notes
+cannot be read at all, so a "list links in this note" feature is not possible.
+
+**Conclusion:** note-to-note link data is not exposed and cannot be surfaced.
+The `id` field already returned by every read tool is the canonical reference;
+use that to address a specific note.
