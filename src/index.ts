@@ -137,6 +137,7 @@ const folderNameSchema = {
 
 server.tool(
   "create-note",
+  "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id — reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field).",
   {
     title: z.string().min(1, "Title is required"),
     content: z
@@ -175,6 +176,7 @@ server.tool(
 
 server.tool(
   "search-notes",
+  "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id.\nDo not use when: you already have a note id (use get-note-content) or want every note (use list-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.",
   {
     query: z.string().min(1, "Search query is required"),
     searchContent: z.boolean().optional().describe("Search note content instead of titles"),
@@ -244,6 +246,7 @@ server.tool(
 
 server.tool(
   "get-note-content",
+  "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the note's content plus parsed hashtags.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Note title (use id instead when available)"),
@@ -303,6 +306,7 @@ server.tool(
 
 server.tool(
   "get-note-by-id",
+  "Use when: you have a note id and need its metadata only.\nReturns: id, title, created, modified, shared, passwordProtected.\nDo not use when: you need the body text (get-note-content) or only have a title (get-note-details).",
   {
     id: z.string().min(1, "Note ID is required"),
   },
@@ -331,6 +335,7 @@ server.tool(
 
 server.tool(
   "get-note-details",
+  "Use when: you have a note title (not an id) and need its metadata.\nReturns: id, title, created, modified, shared, passwordProtected, account.\nDo not use when: you have an id (get-note-by-id) or need the body text (get-note-content).\nUse the returned id for reliable follow-up operations.",
   noteTitleSchema,
   withErrorHandling(({ title, account }) => {
     const note = notesManager.getNoteDetails(title, account);
@@ -358,6 +363,7 @@ server.tool(
 
 server.tool(
   "update-note",
+  "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text. Edits to shared notes are immediately visible to all collaborators.",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Current note title (use id instead when available)"),
@@ -441,6 +447,7 @@ server.tool(
 
 server.tool(
   "delete-note",
+  "Use when: permanently deleting a single note, by id (preferred) or title.\nReturns: confirmation; warns when the note was shared.\nDo not use when: deleting many notes (batch-delete-notes) or just relocating one (move-note).\nSafety: requires explicit user confirmation before deleting. Prefer search-notes/list-notes first to show the affected note id and title. Deleting a shared note removes collaborator access.",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Note title (use id instead when available)"),
@@ -498,6 +505,7 @@ server.tool(
 
 server.tool(
   "move-note",
+  "Use when: moving one note to a different folder, by id (preferred) or title.\nReturns: confirmation of the note and destination folder.\nDo not use when: moving many notes (batch-move-notes).\nNote: implemented as copy-then-delete; the destination folder must already exist (create-folder).",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Note title (use id instead when available)"),
@@ -549,6 +557,7 @@ server.tool(
 
 server.tool(
   "list-notes",
+  "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: note titles only (no content or ids).\nDo not use when: you need content (get-note-content) or ids for follow-up edits (use search-notes).\nNote: warns if iCloud sync is active and results may be partial.",
   {
     account: z.string().optional().describe("Account to list notes from"),
     folder: z.string().optional().describe("Filter to specific folder"),
@@ -609,6 +618,7 @@ server.tool(
 
 server.tool(
   "list-folders",
+  "Use when: listing all folders, with full nested paths, for an account.\nReturns: folder names/paths.\nDo not use when: listing notes (list-notes).\nNote: warns if iCloud sync is active.",
   {
     account: z.string().optional().describe("Account to list folders from"),
   },
@@ -647,6 +657,7 @@ server.tool(
 
 server.tool(
   "create-folder",
+  "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nDo not use when: creating a note (create-note).",
   {
     name: z
       .string()
@@ -671,6 +682,7 @@ server.tool(
 
 server.tool(
   "delete-folder",
+  "Use when: deleting an existing folder by name or nested path.\nReturns: confirmation.\nDo not use when: deleting a note (delete-note).\nSafety: requires explicit user confirmation. Deletion fails if the folder still contains notes — list or move those notes first.",
   folderNameSchema,
   withErrorHandling(({ name, account }) => {
     const success = notesManager.deleteFolder(name, account);
@@ -693,6 +705,7 @@ server.tool(
 
 server.tool(
   "list-accounts",
+  "Use when: discovering which Notes accounts exist (iCloud, Gmail, Exchange, etc.) before targeting one.\nReturns: account names.\nDo not use when: you already know the account, or are working by note id (ids are account-independent).",
   {},
   withErrorHandling(() => {
     const accounts = notesManager.listAccounts();
@@ -717,6 +730,7 @@ server.tool(
 
 server.tool(
   "list-shared-notes",
+  "Use when: finding notes shared with collaborators.\nReturns: shared notes with title, account, and id.\nDo not use when: searching all notes (search-notes).\nNote: edits or deletes to these notes affect all collaborators.",
   {},
   withErrorHandling(() => {
     const sharedNotes = notesManager.listSharedNotes();
@@ -751,6 +765,7 @@ server.tool(
 
 server.tool(
   "get-sync-status",
+  "Use when: checking whether iCloud sync is in progress before trusting read results.\nReturns: sync active/idle, pending upload count, and seconds since last change.\nDo not use when: you need note data — this is a read-only diagnostics tool.",
   {},
   withErrorHandling(() => {
     const status = getSyncStatus();
@@ -786,6 +801,7 @@ server.tool(
 
 server.tool(
   "health-check",
+  "Use when: a quick check that Notes.app is reachable and (optionally) Full Disk Access is granted for checklist features.\nReturns: pass/fail per check.\nDo not use when: you need detailed, actionable setup diagnostics (use doctor).\nRead-only.",
   {},
   withErrorHandling(() => {
     const result = notesManager.healthCheck();
@@ -814,6 +830,7 @@ server.tool(
 
 server.tool(
   "doctor",
+  "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
   {},
   withErrorHandling(() => {
     // Richer than health-check: Notes.app permission, account state, and Full
@@ -827,6 +844,7 @@ server.tool(
 
 server.tool(
   "get-notes-stats",
+  "Use when: summarizing the library — total notes, per-account/folder counts, and recent activity.\nReturns: aggregate statistics; flags partial coverage when some scopes were unreadable.\nDo not use when: you need individual notes (list-notes/search-notes).\nRead-only.",
   {},
   withErrorHandling(() => {
     const stats = notesManager.getNotesStats();
@@ -876,6 +894,7 @@ server.tool(
 
 server.tool(
   "list-attachments",
+  "Use when: listing the attachments of one note, by id (preferred) or title.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment).\nDo not use when: you want the attachment bytes (fetch-attachment) or a file on disk (save-attachment).",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Note title (use id instead when available)"),
@@ -934,6 +953,7 @@ server.tool(
 
 server.tool(
   "batch-delete-notes",
+  "Use when: permanently deleting multiple notes by id in one call.\nReturns: per-id success/failure counts.\nDo not use when: deleting a single note (delete-note).\nSafety: requires explicit user confirmation; this is destructive and not undoable. Prefer search-notes/list-notes first to confirm the exact ids being deleted.",
   {
     ids: z.array(z.string()).describe("Array of note IDs to delete"),
   },
@@ -963,6 +983,7 @@ server.tool(
 
 server.tool(
   "batch-move-notes",
+  "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts.\nDo not use when: moving a single note (move-note).\nNote: the destination folder must already exist (create-folder).",
   {
     ids: z.array(z.string()).describe("Array of note IDs to move"),
     folder: z.string().describe("Destination folder name"),
@@ -997,6 +1018,7 @@ server.tool(
 
 server.tool(
   "save-attachment",
+  "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes. Get the ids from list-attachments first.",
   {
     noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
     attachmentId: z
@@ -1025,6 +1047,7 @@ server.tool(
 
 server.tool(
   "fetch-attachment",
+  "Use when: retrieving one note attachment's bytes inline as base64 (no file written).\nReturns: name, content type, byte count, and base64 data.\nDo not use when: you want it saved to disk (save-attachment).\nNote: get the ids from list-attachments first.",
   {
     noteId: z.string().min(1, "noteId is required").describe("CoreData note id (from search/list)"),
     attachmentId: z
@@ -1048,6 +1071,7 @@ server.tool(
 
 server.tool(
   "export-notes-json",
+  "Use when: exporting the entire notes library as structured JSON for backup or bulk processing.\nReturns: a summary plus the full JSON of all notes, folders, and accounts.\nDo not use when: you need a single note (get-note-content) — this reads everything and can be large.\nRead-only.",
   {},
   withErrorHandling(() => {
     const exportData = notesManager.exportNotesAsJson();
@@ -1073,6 +1097,7 @@ server.tool(
 
 server.tool(
   "get-note-markdown",
+  "Use when: reading a note as Markdown, with checklist items annotated [x]/[ ] when Full Disk Access is granted.\nReturns: the note's Markdown.\nDo not use when: you need the raw HTML/plaintext body (get-note-content) or only metadata (get-note-details).\nNote: falls back to plain lists (no checkmarks) without Full Disk Access.",
   {
     id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
     title: z.string().optional().describe("Note title (use id instead when available)"),
@@ -1111,6 +1136,7 @@ server.tool(
 
 server.tool(
   "get-checklist-state",
+  "Use when: reading the checked/unchecked state of a note's checklist items, by id.\nReturns: each item's text and done state plus checked/total counts.\nDo not use when: you only have a title (get the id via search-notes first) or want the full body text (get-note-content).\nNote: requires Full Disk Access; reads the NoteStore database directly.",
   {
     id: z.string().min(1, "Note ID is required. Use search-notes to find the note ID first."),
   },
