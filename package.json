@@ -1,7 +1,7 @@
 {
   "name": "apple-notes-mcp",
   "version": "2.1.0",
-  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and Codex",
+  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and other AI assistants",
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
