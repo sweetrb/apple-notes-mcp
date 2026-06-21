@@ -345,6 +345,8 @@ Updates an existing note's content and/or title.
 
 **Returns:** Confirmation message, or error if note not found.
 
+**Note:** `newContent` **replaces the entire note body** — it is not appended. To preserve existing content, read it first (e.g. with `get-note-content`) and include it in `newContent`.
+
 ---
 
 #### `delete-note`
@@ -374,6 +376,8 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 ```
 
 **Returns:** Confirmation message, or error if note not found.
+
+**⚠️ Safety:** Irreversible from the agent's side — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact id(s) being deleted.
 
 ---
 
@@ -504,6 +508,8 @@ Deletes a folder.
 
 **Returns:** Confirmation message, or error if folder not found or not empty.
 
+**⚠️ Safety:** Irreversible — requires explicit user confirmation before calling. Prefer `list-folders` first to confirm the exact folder path being deleted.
+
 ---
 
 ### Account Operations
@@ -534,6 +540,8 @@ Deletes multiple notes at once by ID.
 | `ids` | string[] | Yes | Array of note IDs to delete |
 
 **Returns:** Summary of successes and failures.
+
+**⚠️ Safety:** Irreversible — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact ids being deleted.
 
 ---
 

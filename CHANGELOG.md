@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MCP-visible structured tool descriptions on all 26 tools (#37).** Every tool now registers a description in the `Use when: / Returns: / Do not use when:` shape so agents can pick the right tool without trial and error. The eight write/destructive tools (`create-note`, `update-note`, `delete-note`, `move-note`, `batch-delete-notes`, `batch-move-notes`, `delete-folder`, `save-attachment`) additionally carry explicit `Safety:` wording calling out the confirmation expectation. No tool behavior or parameters changed — descriptions only.
+
 ### Documentation
 - Added `docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md`: why macOS re-prompts for Full Disk Access / Automation when the server runs under an ad-hoc-signed (e.g. Homebrew) Node, and the fix — run it under the official Developer-ID-signed Node so the grant survives Node updates. README and CLAUDE.md now point at it.
 
