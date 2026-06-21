@@ -81,7 +81,7 @@
     "vitest": "^2.0.0"
   },
   "volta": {
-    "node": "22.13.1"
+    "node": "24.17.0"
   },
   "lint-staged": {
     "src/**/*.ts": [
