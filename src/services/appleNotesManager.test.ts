@@ -1588,6 +1588,20 @@ describe("AppleNotesManager", () => {
       expect(folders[1].name).toBe("Travel/Spain\\/Portugal 2023");
     });
 
+    it("parses legacy tab/newline output (backward compat)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "id1\tNotes\nid2\tArchive\tid1",
+      });
+
+      const folders = manager.listFolders();
+
+      expect(folders).toHaveLength(2);
+      expect(folders[0].name).toBe("Notes");
+      expect(folders[1].name).toBe("Notes/Archive");
+      expect(folders[1].shared).toBe(false);
+    });
+
     it("includes account in Folder objects", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
@@ -1885,6 +1899,33 @@ describe("AppleNotesManager", () => {
       expect(accounts[0].defaultFolder).toBe("Notes");
     });
 
+    it("parses legacy plain-name output (backward compat)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["iCloud", "Gmail"].join(R),
+      });
+
+      const accounts = manager.listAccounts();
+
+      expect(accounts).toHaveLength(2);
+      expect(accounts[0]).toEqual({ name: "iCloud" });
+      expect(accounts[1]).toEqual({ name: "Gmail" });
+    });
+
+    it("handles account records with empty fields", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["", "", "", "", ""].join(F),
+      });
+
+      const accounts = manager.listAccounts();
+
+      expect(accounts).toHaveLength(1);
+      expect(accounts[0].name).toBe("");
+      expect(accounts[0].upgraded).toBe(false);
+      expect(accounts[0].defaultFolderId).toBeUndefined();
+    });
+
     it("throws on failure rather than returning empty (#19)", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: false,
@@ -1928,6 +1969,26 @@ describe("AppleNotesManager", () => {
 
       expect(() => manager.getDefaultLocation()).toThrow(/parse default Notes location/);
     });
+
+    it("throws when AppleScript fails", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error: "boom" });
+
+      expect(() => manager.getDefaultLocation()).toThrow(/Failed to get default Notes location/);
+    });
+
+    it("handles empty fields in default location output", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["", "", "", "", "", ""].join(F),
+      });
+
+      const location = manager.getDefaultLocation();
+
+      expect(location.account.name).toBe("");
+      expect(location.account.upgraded).toBe(false);
+      expect(location.folder.id).toBe("");
+      expect(location.folder.shared).toBe(false);
+    });
   });
 
   describe("getSelectedNotes", () => {
@@ -1970,6 +2031,28 @@ describe("AppleNotesManager", () => {
 
       expect(manager.getSelectedNotes()).toEqual([]);
     });
+
+    it("throws when AppleScript fails", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error: "boom" });
+
+      expect(() => manager.getSelectedNotes()).toThrow(/Failed to get selected notes/);
+    });
+
+    it("handles selected notes with empty optional fields", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["", "", "", "", "", "", "", ""].join(F),
+      });
+
+      const notes = manager.getSelectedNotes();
+
+      expect(notes).toHaveLength(1);
+      expect(notes[0].id).toBe("");
+      expect(notes[0].shared).toBe(false);
+      expect(notes[0].passwordProtected).toBe(false);
+      expect(notes[0].folder).toBeUndefined();
+      expect(notes[0].account).toBeUndefined();
+    });
   });
 
   describe("showNoteById", () => {
@@ -1995,6 +2078,12 @@ describe("AppleNotesManager", () => {
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
         expect.stringContaining("separately true")
       );
+    });
+
+    it("returns false when Notes.app rejects the show command", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error: "no such note" });
+
+      expect(manager.showNoteById("x-coredata://ABC/ICNote/p1")).toBe(false);
     });
   });
 
