@@ -1,0 +1,23 @@
+{
+  "name": "apple-notes",
+  "version": "2.1.0",
+  "description": "Manage Apple Notes through natural language - create, search, read, update, delete, organize folders, inspect metadata, run diagnostics, and work with attachments (macOS only).",
+  "author": {
+    "name": "Rob Sweet",
+    "email": "rob@superiortech.io"
+  },
+  "license": "MIT",
+  "category": "productivity",
+  "displayName": "Apple Notes",
+  "homepage": "https://github.com/sweetrb/apple-notes-mcp#readme",
+  "repository": "https://github.com/sweetrb/apple-notes-mcp",
+  "keywords": [
+    "mcp",
+    "apple-notes",
+    "antigravity",
+    "claude",
+    "codex",
+    "macos",
+    "notes"
+  ]
+}
