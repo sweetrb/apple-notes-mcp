@@ -19,6 +19,7 @@ import type {
   Note,
   Folder,
   Account,
+  DefaultLocation,
   HealthCheckResult,
   HealthCheckItem,
   NotesStats,
@@ -1408,25 +1409,23 @@ export class AppleNotesManager {
   listFolders(account?: string): Folder[] {
     const targetAccount = this.resolveAccount(account);
 
-    // Get each folder's ID, name, and parent ID in a single AppleScript call.
-    // Each line: "id\tname\tparentId" for subfolders, "id\tname" for top-level.
+    // Get each folder's ID, name, parent ID, and shared state in a single AppleScript call.
     // Using IDs enables correct tree building even with duplicate folder names.
     const listCommand = `
-      set folderList to ""
+      set folderList to {}
       set allFolders to every folder
       repeat with f in allFolders
         set fRef to contents of f
         set cRef to container of fRef
-        if folderList is not "" then
-          set folderList to folderList & linefeed
-        end if
+        set parentId to ""
         if class of cRef is folder then
-          set folderList to folderList & (id of fRef) & tab & (name of fRef) & tab & (id of cRef)
-        else
-          set folderList to folderList & (id of fRef) & tab & (name of fRef)
+          set parentId to id of cRef
         end if
+        set sharedFlag to shared of fRef as text
+        set end of folderList to (id of fRef) & ${AS_FIELD_SEP} & (name of fRef) & ${AS_FIELD_SEP} & parentId & ${AS_FIELD_SEP} & sharedFlag
       end repeat
-      return folderList
+      set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+      return folderList as text
     `;
     const script = buildAccountScopedScript({ account: targetAccount }, listCommand);
     const result = executeAppleScript(script);
@@ -1439,13 +1438,14 @@ export class AppleNotesManager {
       return [];
     }
 
-    // Parse "id\tname[\tparentId]" lines
-    const entries = result.output.split("\n").map((line) => {
-      const parts = line.split("\t");
+    const recordSeparator = result.output.includes(RECORD_SEP) ? RECORD_SEP : "\n";
+    const entries = result.output.split(recordSeparator).map((line) => {
+      const parts = line.includes(FIELD_SEP) ? line.split(FIELD_SEP) : line.split("\t");
       return {
         id: (parts[0] || "").trim(),
         name: (parts[1] || "").trim(),
         parentId: (parts[2] || "").trim(),
+        shared: (parts[3] || "").trim().toLowerCase() === "true",
       };
     });
 
@@ -1470,6 +1470,7 @@ export class AppleNotesManager {
       id: entry.id,
       name: buildPath(entry),
       account: targetAccount,
+      shared: entry.shared,
     }));
   }
 
@@ -1711,10 +1712,22 @@ export class AppleNotesManager {
    * @returns Array of Account objects
    */
   listAccounts(): Account[] {
-    // Coerce the name list to text with a control-char record separator so an
-    // account name containing a comma can't split into phantom accounts (#18).
+    // Coerce account records to text with control-char delimiters so names
+    // containing commas or tabs can't split into phantom accounts (#18).
     const listCommand = `
-      set resultList to name of accounts
+      set resultList to {}
+      repeat with a in accounts
+        set aRef to contents of a
+        set defaultFolderId to ""
+        set defaultFolderName to ""
+        try
+          set fRef to default folder of aRef
+          set defaultFolderId to id of fRef
+          set defaultFolderName to name of fRef
+        end try
+        set upgradedFlag to upgraded of aRef as text
+        set end of resultList to (id of aRef) & ${AS_FIELD_SEP} & (name of aRef) & ${AS_FIELD_SEP} & upgradedFlag & ${AS_FIELD_SEP} & defaultFolderId & ${AS_FIELD_SEP} & defaultFolderName
+      end repeat
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
       return resultList as text
     `;
@@ -1725,12 +1738,143 @@ export class AppleNotesManager {
       throw new Error(`Failed to list accounts: ${result.error ?? "unknown error"}`);
     }
 
-    const names = result.output
+    return result.output
       .split(RECORD_SEP)
       .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+      .filter((s) => s.length > 0)
+      .map((item) => {
+        const parts = item.split(FIELD_SEP);
+        if (parts.length === 1) {
+          return { name: parts[0].trim() };
+        }
+        return {
+          id: (parts[0] || "").trim(),
+          name: (parts[1] || "").trim(),
+          upgraded: (parts[2] || "").trim().toLowerCase() === "true",
+          defaultFolderId: (parts[3] || "").trim() || undefined,
+          defaultFolder: (parts[4] || "").trim() || undefined,
+        };
+      });
+  }
 
-    return names.map((name) => ({ name }));
+  /**
+   * Gets the default account and folder used by Notes.app for new notes.
+   *
+   * @returns Default account and folder metadata
+   */
+  getDefaultLocation(): DefaultLocation {
+    const command = `
+      set aRef to default account
+      set fRef to default folder of aRef
+      return (id of aRef) & ${AS_FIELD_SEP} & (name of aRef) & ${AS_FIELD_SEP} & (upgraded of aRef as text) & ${AS_FIELD_SEP} & (id of fRef) & ${AS_FIELD_SEP} & (name of fRef) & ${AS_FIELD_SEP} & (shared of fRef as text)
+    `;
+    const result = executeAppleScript(buildAppLevelScript(command));
+
+    if (!result.success) {
+      throw new Error(`Failed to get default Notes location: ${result.error ?? "unknown error"}`);
+    }
+
+    const parts = result.output.split(FIELD_SEP);
+    if (parts.length < 6) {
+      throw new Error(`Failed to parse default Notes location: ${result.output}`);
+    }
+
+    const accountName = (parts[1] || "").trim();
+    return {
+      account: {
+        id: (parts[0] || "").trim(),
+        name: accountName,
+        upgraded: (parts[2] || "").trim().toLowerCase() === "true",
+        defaultFolderId: (parts[3] || "").trim(),
+        defaultFolder: (parts[4] || "").trim(),
+      },
+      folder: {
+        id: (parts[3] || "").trim(),
+        name: (parts[4] || "").trim(),
+        account: accountName,
+        shared: (parts[5] || "").trim().toLowerCase() === "true",
+      },
+    };
+  }
+
+  /**
+   * Lists the currently selected Notes in the Notes.app UI.
+   *
+   * @returns Array of selected notes, or an empty array when nothing is selected
+   */
+  getSelectedNotes(): Note[] {
+    const command = `
+      set selectedNotes to selection
+      set noteList to {}
+      repeat with n in selectedNotes
+        set nRef to contents of n
+        set createdDate to creation date of nRef
+        set modifiedDate to modification date of nRef
+        set createdParts to ${asDatePartsExpr("createdDate")}
+        set modifiedParts to ${asDatePartsExpr("modifiedDate")}
+        set folderName to ""
+        set accountName to ""
+        try
+          set fRef to container of nRef
+          set folderName to name of fRef
+          set aRef to container of fRef
+          set accountName to name of aRef
+        end try
+        set end of noteList to (id of nRef) & ${AS_FIELD_SEP} & (name of nRef) & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & (shared of nRef as text) & ${AS_FIELD_SEP} & (password protected of nRef as text) & ${AS_FIELD_SEP} & folderName & ${AS_FIELD_SEP} & accountName
+      end repeat
+      set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+      return noteList as text
+    `;
+    const result = executeAppleScript(buildAppLevelScript(command));
+
+    if (!result.success) {
+      throw new Error(`Failed to get selected notes: ${result.error ?? "unknown error"}`);
+    }
+
+    if (!result.output.trim()) {
+      return [];
+    }
+
+    return result.output
+      .split(RECORD_SEP)
+      .filter((s) => s.trim())
+      .map((item) => {
+        const parts = item.split(FIELD_SEP);
+        return {
+          id: (parts[0] || "").trim(),
+          title: (parts[1] || "").trim(),
+          content: "",
+          tags: [],
+          created: parseAppleScriptDate((parts[2] || "").trim()),
+          modified: parseAppleScriptDate((parts[3] || "").trim()),
+          shared: (parts[4] || "").trim().toLowerCase() === "true",
+          passwordProtected: (parts[5] || "").trim().toLowerCase() === "true",
+          folder: (parts[6] || "").trim() || undefined,
+          account: (parts[7] || "").trim() || undefined,
+        };
+      });
+  }
+
+  /**
+   * Reveals a note in the Notes.app UI by ID.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param separately - Whether to open the note in a separate window
+   * @returns true if Notes.app accepted the show command
+   */
+  showNoteById(id: string, separately: boolean = false): boolean {
+    const safeId = sanitizeId(id);
+    const separatelyClause = separately ? " separately true" : "";
+    const result = executeAppleScript(
+      buildAppLevelScript(`show note id "${safeId}"${separatelyClause}`)
+    );
+
+    if (!result.success) {
+      console.error(`Failed to show note with ID "${id}":`, result.error);
+      return false;
+    }
+
+    return true;
   }
 
   // ===========================================================================
@@ -2024,8 +2168,17 @@ export class AppleNotesManager {
         repeat with a in attachments of theNote
           set attachId to id of a
           set attachName to name of a
-          set attachType to content identifier of a
-          set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachType
+          set attachContentId to content identifier of a
+          set attachUrl to ""
+          try
+            set attachUrl to URL of a as text
+          end try
+          set createdDate to creation date of a
+          set modifiedDate to modification date of a
+          set createdParts to ${asDatePartsExpr("createdDate")}
+          set modifiedParts to ${asDatePartsExpr("modifiedDate")}
+          set sharedFlag to shared of a as text
+          set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
         end repeat
         set output to ""
         repeat with item in attachmentList
@@ -2054,6 +2207,11 @@ export class AppleNotesManager {
           id: parts[0].trim(),
           name: parts[1].trim(),
           contentType: parts[2].trim(),
+          contentId: parts[2].trim() || undefined,
+          url: parts[3]?.trim() || undefined,
+          created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : undefined,
+          modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : undefined,
+          shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : undefined,
         });
       }
     }
@@ -2076,13 +2234,22 @@ export class AppleNotesManager {
       tell application "Notes"
         tell account "${targetAccount}"
           set theNote to note "${safeTitle}"
-          set attachmentList to {}
-          repeat with a in attachments of theNote
-            set attachId to id of a
-            set attachName to name of a
-            set attachType to content identifier of a
-            set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachType
-          end repeat
+        set attachmentList to {}
+        repeat with a in attachments of theNote
+          set attachId to id of a
+          set attachName to name of a
+          set attachContentId to content identifier of a
+          set attachUrl to ""
+          try
+            set attachUrl to URL of a as text
+          end try
+          set createdDate to creation date of a
+          set modifiedDate to modification date of a
+          set createdParts to ${asDatePartsExpr("createdDate")}
+          set modifiedParts to ${asDatePartsExpr("modifiedDate")}
+          set sharedFlag to shared of a as text
+          set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
+        end repeat
           set output to ""
           repeat with item in attachmentList
             set output to output & item & ${AS_RECORD_SEP}
@@ -2111,6 +2278,11 @@ export class AppleNotesManager {
           id: parts[0].trim(),
           name: parts[1].trim(),
           contentType: parts[2].trim(),
+          contentId: parts[2].trim() || undefined,
+          url: parts[3]?.trim() || undefined,
+          created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : undefined,
+          modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : undefined,
+          shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : undefined,
         });
       }
     }

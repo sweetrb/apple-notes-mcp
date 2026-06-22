@@ -156,6 +156,11 @@ export interface Folder {
    * Name of the account containing the folder.
    */
   account: string;
+
+  /**
+   * Whether the folder is shared with collaborators.
+   */
+  shared?: boolean;
 }
 
 /**
@@ -183,6 +188,37 @@ export interface Account {
    * This matches what appears in Notes.app's sidebar.
    */
   name: string;
+
+  /**
+   * Unique identifier for the account.
+   */
+  id?: string;
+
+  /**
+   * Whether the account has been upgraded to the modern Notes format.
+   */
+  upgraded?: boolean;
+
+  /**
+   * Name of the account's default folder.
+   */
+  defaultFolder?: string;
+
+  /**
+   * Unique identifier for the account's default folder.
+   */
+  defaultFolderId?: string;
+}
+
+/**
+ * The default Notes location for newly created notes.
+ */
+export interface DefaultLocation {
+  /** Default account used by Notes.app */
+  account: Account;
+
+  /** Default folder inside the default account */
+  folder: Folder;
 }
 
 // =============================================================================
@@ -492,6 +528,21 @@ export interface Attachment {
 
   /** UTI (Uniform Type Identifier) of the attachment, e.g., "public.jpeg" */
   contentType: string;
+
+  /** Content-id URL used in the note's HTML body. */
+  contentId?: string;
+
+  /** URL represented by URL/link attachments, when available. */
+  url?: string;
+
+  /** Timestamp when the attachment was created. */
+  created?: Date;
+
+  /** Timestamp when the attachment was last modified. */
+  modified?: Date;
+
+  /** Whether the attachment is shared with collaborators. */
+  shared?: boolean;
 }
 
 // =============================================================================

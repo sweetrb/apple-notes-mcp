@@ -359,6 +359,27 @@ server.tool(
   }, "Error retrieving note details")
 );
 
+// --- show-note ---
+
+server.tool(
+  "show-note",
+  "Use when: the user wants to reveal a known note in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need note content (get-note-content) or metadata (get-note-by-id).\nNote: this opens or focuses the Notes UI.",
+  {
+    id: z.string().min(1, "Note ID is required"),
+    separately: z
+      .boolean()
+      .optional()
+      .describe("Open in a separate note window when supported by Notes.app"),
+  },
+  withErrorHandling(({ id, separately = false }) => {
+    const success = notesManager.showNoteById(id, separately);
+    if (!success) {
+      return errorResponse(`Failed to show note with ID "${id}"`);
+    }
+    return successResponse(`Shown note with ID "${id}" in Notes.app`, { id, separately });
+  }, "Error showing note")
+);
+
 // --- update-note ---
 
 server.tool(
@@ -610,6 +631,26 @@ server.tool(
   }, "Error listing notes")
 );
 
+// --- get-selected-notes ---
+
+server.tool(
+  "get-selected-notes",
+  "Use when: the user asks what note(s) are currently selected in Notes.app.\nReturns: selected note metadata with ids for follow-up operations.\nDo not use when: searching all notes (search-notes) or listing a folder (list-notes).\nNote: reads Notes.app UI selection; it may be empty if Notes is closed or no note is selected.",
+  {},
+  withErrorHandling(() => {
+    const notes = notesManager.getSelectedNotes();
+    if (notes.length === 0) {
+      return successResponse("No notes are currently selected in Notes.app", {
+        notes: [],
+        count: 0,
+      });
+    }
+
+    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
+    return successResponse(`Selected note(s):\n${noteList}`, { notes, count: notes.length });
+  }, "Error getting selected notes")
+);
+
 // =============================================================================
 // Folder Tools
 // =============================================================================
@@ -714,12 +755,33 @@ server.tool(
       return successResponse("No Notes accounts found", { accounts: [], count: 0 });
     }
 
-    const accountList = accounts.map((a) => `  - ${a.name}`).join("\n");
+    const accountList = accounts
+      .map((a) => {
+        const defaultFolder = a.defaultFolder ? ` (default folder: ${a.defaultFolder})` : "";
+        const upgraded = a.upgraded === undefined ? "" : `, upgraded: ${a.upgraded ? "yes" : "no"}`;
+        return `  - ${a.name}${defaultFolder}${upgraded}`;
+      })
+      .join("\n");
     return successResponse(`Found ${accounts.length} accounts:\n${accountList}`, {
       accounts,
       count: accounts.length,
     });
   }, "Error listing accounts")
+);
+
+// --- get-default-location ---
+
+server.tool(
+  "get-default-location",
+  "Use when: discovering where Notes.app will create new notes by default.\nReturns: default account and default folder metadata.\nDo not use when: you already have an explicit account/folder target.",
+  {},
+  withErrorHandling(() => {
+    const location = notesManager.getDefaultLocation();
+    const message =
+      `Default account: ${location.account.name} [id: ${location.account.id}]\n` +
+      `Default folder: ${location.folder.name} [id: ${location.folder.id}]`;
+    return successResponse(message, { ...location });
+  }, "Error getting default Notes location")
 );
 
 // =============================================================================

@@ -1516,7 +1516,11 @@ describe("AppleNotesManager", () => {
     it("returns array of Folder objects with paths", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "id1\tNotes\nid2\tArchive\nid3\tWork",
+        output: [
+          ["id1", "Notes", "", "false"].join(F),
+          ["id2", "Archive", "", "false"].join(F),
+          ["id3", "Work", "", "true"].join(F),
+        ].join(R),
       });
 
       const folders = manager.listFolders();
@@ -1526,12 +1530,18 @@ describe("AppleNotesManager", () => {
       expect(folders[1].name).toBe("Archive");
       expect(folders[2].name).toBe("Work");
       expect(folders[0].id).toBe("id1");
+      expect(folders[2].shared).toBe(true);
     });
 
     it("includes parent folder in path", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "id1\tDev\nid2\tAccessibility\tid1\nid3\tWork\nid4\tClients\tid3",
+        output: [
+          ["id1", "Dev", "", "false"].join(F),
+          ["id2", "Accessibility", "id1", "false"].join(F),
+          ["id3", "Work", "", "false"].join(F),
+          ["id4", "Clients", "id3", "false"].join(F),
+        ].join(R),
       });
 
       const folders = manager.listFolders();
@@ -1546,7 +1556,13 @@ describe("AppleNotesManager", () => {
     it("disambiguates duplicate folder names using IDs", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "id1\tFinance\nid2\tArchive\tid1\nid3\tTravel\nid4\tTrips\tid3\nid5\tArchive\tid4",
+        output: [
+          ["id1", "Finance", "", "false"].join(F),
+          ["id2", "Archive", "id1", "false"].join(F),
+          ["id3", "Travel", "", "false"].join(F),
+          ["id4", "Trips", "id3", "false"].join(F),
+          ["id5", "Archive", "id4", "false"].join(F),
+        ].join(R),
       });
 
       const folders = manager.listFolders();
@@ -1559,7 +1575,10 @@ describe("AppleNotesManager", () => {
     it("escapes slashes in folder names", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "id1\tTravel\nid2\tSpain/Portugal 2023\tid1",
+        output: [
+          ["id1", "Travel", "", "false"].join(F),
+          ["id2", "Spain/Portugal 2023", "id1", "false"].join(F),
+        ].join(R),
       });
 
       const folders = manager.listFolders();
@@ -1572,7 +1591,7 @@ describe("AppleNotesManager", () => {
     it("includes account in Folder objects", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: "id1\tNotes",
+        output: ["id1", "Notes", "", "false"].join(F),
       });
 
       const folders = manager.listFolders("Gmail");
@@ -1848,7 +1867,11 @@ describe("AppleNotesManager", () => {
     it("returns array of Account objects", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
-        output: ["iCloud", "Gmail", "Exchange"].join(R),
+        output: [
+          ["acc1", "iCloud", "true", "folder1", "Notes"].join(F),
+          ["acc2", "Gmail", "false", "folder2", "Inbox"].join(F),
+          ["acc3", "Exchange", "false", "", ""].join(F),
+        ].join(R),
       });
 
       const accounts = manager.listAccounts();
@@ -1857,6 +1880,9 @@ describe("AppleNotesManager", () => {
       expect(accounts[0].name).toBe("iCloud");
       expect(accounts[1].name).toBe("Gmail");
       expect(accounts[2].name).toBe("Exchange");
+      expect(accounts[0].id).toBe("acc1");
+      expect(accounts[0].upgraded).toBe(true);
+      expect(accounts[0].defaultFolder).toBe("Notes");
     });
 
     it("throws on failure rather than returning empty (#19)", () => {
@@ -1867,6 +1893,108 @@ describe("AppleNotesManager", () => {
       });
 
       expect(() => manager.listAccounts()).toThrow(/Notes.app not available/);
+    });
+  });
+
+  describe("getDefaultLocation", () => {
+    it("returns default account and folder metadata", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["acc1", "iCloud", "true", "folder1", "Notes", "false"].join(F),
+      });
+
+      const location = manager.getDefaultLocation();
+
+      expect(location.account).toMatchObject({
+        id: "acc1",
+        name: "iCloud",
+        upgraded: true,
+        defaultFolderId: "folder1",
+        defaultFolder: "Notes",
+      });
+      expect(location.folder).toMatchObject({
+        id: "folder1",
+        name: "Notes",
+        account: "iCloud",
+        shared: false,
+      });
+    });
+
+    it("throws when default location output cannot be parsed", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "bad-output",
+      });
+
+      expect(() => manager.getDefaultLocation()).toThrow(/parse default Notes location/);
+    });
+  });
+
+  describe("getSelectedNotes", () => {
+    it("returns selected note metadata", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          [
+            "x-coredata://ABC/ICNote/p1",
+            "Selected Note",
+            "2026-6-22-14-30-0",
+            "2026-6-22-14-35-0",
+            "false",
+            "false",
+            "Notes",
+            "iCloud",
+          ].join(F),
+        ].join(R),
+      });
+
+      const notes = manager.getSelectedNotes();
+
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toMatchObject({
+        id: "x-coredata://ABC/ICNote/p1",
+        title: "Selected Note",
+        shared: false,
+        passwordProtected: false,
+        folder: "Notes",
+        account: "iCloud",
+      });
+      expect(notes[0].created.getFullYear()).toBe(2026);
+    });
+
+    it("returns an empty array when no note is selected", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      expect(manager.getSelectedNotes()).toEqual([]);
+    });
+  });
+
+  describe("showNoteById", () => {
+    it("shows a note by id", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      expect(manager.showNoteById("x-coredata://ABC/ICNote/p1")).toBe(true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('show note id "x-coredata://ABC/ICNote/p1"')
+      );
+    });
+
+    it("can request a separate window", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "",
+      });
+
+      manager.showNoteById("x-coredata://ABC/ICNote/p1", true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("separately true")
+      );
     });
   });
 
@@ -2093,16 +2221,48 @@ describe("AppleNotesManager", () => {
       const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
 
       expect(attachments).toHaveLength(2);
-      expect(attachments[0]).toEqual({
+      expect(attachments[0]).toMatchObject({
         id: "x-coredata://ABC/ICAttachment/p1",
         name: "photo.jpg",
         contentType: "public.jpeg",
+        contentId: "public.jpeg",
       });
-      expect(attachments[1]).toEqual({
+      expect(attachments[1]).toMatchObject({
         id: "x-coredata://ABC/ICAttachment/p2",
         name: "document.pdf",
         contentType: "com.adobe.pdf",
+        contentId: "com.adobe.pdf",
       });
+    });
+
+    it("parses richer attachment metadata when present", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: [
+          [
+            "x-coredata://ABC/ICAttachment/p1",
+            "site.webloc",
+            "cid:123",
+            "https://example.com",
+            "2026-6-22-10-0-0",
+            "2026-6-22-11-0-0",
+            "true",
+          ].join(F),
+        ].join(R),
+      });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(attachments[0]).toMatchObject({
+        id: "x-coredata://ABC/ICAttachment/p1",
+        name: "site.webloc",
+        contentType: "cid:123",
+        contentId: "cid:123",
+        url: "https://example.com",
+        shared: true,
+      });
+      expect(attachments[0].created?.getFullYear()).toBe(2026);
+      expect(attachments[0].modified?.getHours()).toBe(11);
     });
 
     it("returns empty array when note has no attachments", () => {
@@ -2146,10 +2306,11 @@ describe("AppleNotesManager", () => {
       const attachments = manager.listAttachments("My Note");
 
       expect(attachments).toHaveLength(1);
-      expect(attachments[0]).toEqual({
+      expect(attachments[0]).toMatchObject({
         id: "attach-id",
         name: "image.png",
         contentType: "public.png",
+        contentId: "public.png",
       });
     });
 

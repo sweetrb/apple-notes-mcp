@@ -103,11 +103,12 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Delete Notes** | Remove notes (moves to Recently Deleted) |
 | **Move Notes** | Organize notes into folders (supports nested paths) |
 | **Folder Management** | Create, list, and delete folders with full hierarchical path support |
-| **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account |
+| **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account, including account IDs and default folders |
 | **Batch Operations** | Delete or move multiple notes at once |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
 | **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
+| **Notes.app UI State** | Reveal a note in Notes.app or read the current Notes.app selection |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
 | **Diagnostics** | `health-check` plus a richer `doctor` (reachability, automation permission, accounts, Full Disk Access), sync status, and statistics |
@@ -302,6 +303,19 @@ Retrieves a note using its unique CoreData identifier.
 
 ---
 
+#### `show-note`
+
+Reveals a note in Notes.app using its unique CoreData identifier.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`) |
+| `separately` | boolean | No | Open in a separate note window when supported by Notes.app |
+
+**Returns:** Confirmation that Notes.app accepted the show command.
+
+---
+
 #### `update-note`
 
 Updates an existing note's content and/or title.
@@ -459,6 +473,16 @@ Lists all notes, optionally filtered by folder, date, and limit.
 
 ---
 
+#### `get-selected-notes`
+
+Reads the currently selected note(s) from the Notes.app UI.
+
+**Parameters:** None
+
+**Returns:** Selected note metadata, including IDs for follow-up operations. Returns an empty list when Notes.app has no selected note.
+
+---
+
 ### Folder Operations
 
 #### `list-folders`
@@ -474,7 +498,7 @@ Lists all folders in an account with full hierarchical paths.
 {}
 ```
 
-**Returns:** List of folder paths. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+**Returns:** List of folders with IDs, paths, account names, and shared state. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
 
 ---
 
@@ -533,7 +557,17 @@ Lists all configured Notes accounts.
 {}
 ```
 
-**Returns:** List of account names (e.g., "iCloud", "Gmail", "Exchange").
+**Returns:** List of accounts with names, IDs, upgraded state, and default folder metadata.
+
+---
+
+#### `get-default-location`
+
+Returns the default account and folder Notes.app uses for newly created notes.
+
+**Parameters:** None
+
+**Returns:** Default account and folder metadata, including IDs and shared state.
 
 ---
 
@@ -631,7 +665,7 @@ Lists attachments in a note.
 | `title` | string | No | Note title |
 | `account` | string | No | Account containing the note |
 
-**Returns:** List of attachments with names and content types.
+**Returns:** List of attachments with IDs, names, content identifiers, URLs when available, created/modified dates, and shared state.
 
 ---
 
