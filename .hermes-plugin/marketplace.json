@@ -1,0 +1,40 @@
+{
+  "name": "apple-notes-mcp",
+  "interface": {
+    "displayName": "Apple Notes MCP"
+  },
+  "metadata": {
+    "description": "Apple Notes integration marketplace for Claude Code, Codex, Hermes, and Antigravity.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "apple-notes",
+      "version": "2.1.0",
+      "description": "Manage Apple Notes through natural language - create, search, read, update, delete, organize folders, inspect metadata, run diagnostics, and work with attachments (macOS only).",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "category": "productivity",
+      "displayName": "Apple Notes",
+      "author": {
+        "name": "Rob Sweet",
+        "email": "rob@superiortech.io"
+      },
+      "homepage": "https://github.com/sweetrb/apple-notes-mcp#readme",
+      "repository": "https://github.com/sweetrb/apple-notes-mcp",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "apple-notes",
+        "claude",
+        "codex",
+        "hermes",
+        "macos",
+        "notes"
+      ],
+      "mcpServers": "./.hermes-plugin/mcp.json"
+    }
+  ]
+}
