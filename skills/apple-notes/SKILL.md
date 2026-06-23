@@ -28,6 +28,7 @@ Use this skill when the user:
 | `create-note` | Create a new note with title and content |
 | `search-notes` | Find notes by title or content |
 | `get-note-content` | Read the full content of a note |
+| `get-note-plaintext` | Read a note's body as plain text (no HTML) |
 | `get-note-markdown` | Read note content as Markdown |
 | `get-note-by-id` | Get note metadata by ID |
 | `get-note-details` | Get metadata (created, modified, account) |

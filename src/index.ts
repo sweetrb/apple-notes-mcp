@@ -333,6 +333,69 @@ server.registerTool(
   }, "Error retrieving note content")
 );
 
+// --- get-note-plaintext ---
+
+server.registerTool(
+  "get-note-plaintext",
+  {
+    description:
+      "Use when: reading one note's body as plain text with no HTML, by id (preferred) or title.\nReturns: the note's plaintext exactly as Notes exposes it.\nDo not use when: you need the HTML body (get-note-content) or Markdown with checklist state (get-note-markdown).\nNote: this reads the note's native plaintext property, so it skips the HTML-to-text conversion; password-protected notes must be unlocked in Notes.app first.",
+    inputSchema: {
+      id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
+      title: z.string().optional().describe("Note title (use id instead when available)"),
+      account: z
+        .string()
+        .optional()
+        .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+    },
+    outputSchema: {
+      title: z.string().optional(),
+      plaintext: z.string().optional(),
+    },
+  },
+  withErrorHandling(({ id, title, account }) => {
+    // Prefer ID-based lookup if provided
+    if (id) {
+      const note = notesManager.getNoteById(id);
+      if (!note) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+        );
+      }
+      const plaintext = notesManager.getNotePlaintextById(id);
+      if (!plaintext) {
+        return errorResponse(`Failed to read plaintext of note "${note.title}"`);
+      }
+      return successResponse(plaintext, { title: note.title, plaintext });
+    }
+
+    // Fall back to title-based lookup
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(`Note "${title}" not found`);
+    }
+    if (note.passwordProtected) {
+      return errorResponse(
+        `Note "${title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+      );
+    }
+
+    const plaintext = notesManager.getNotePlaintext(title, account);
+    if (!plaintext) {
+      return errorResponse(`Failed to read plaintext of note "${title}"`);
+    }
+
+    return successResponse(plaintext, { title, plaintext });
+  }, "Error retrieving note plaintext")
+);
+
 // --- get-note-by-id ---
 
 server.registerTool(

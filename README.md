@@ -267,6 +267,22 @@ see [docs/APPLESCRIPT-LIMITATIONS.md](../docs/APPLESCRIPT-LIMITATIONS.md#tags--h
 
 ---
 
+#### `get-note-plaintext`
+
+Retrieves a note's body as plain text, with no HTML markup.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Note title (use `id` instead when available) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+
+**Note:** Either `id` or `title` must be provided. This reads the note's native `plaintext` property, so it skips the HTML-to-text conversion that `get-note-content` plus a Markdown pass would do. Use `get-note-content` when you need the HTML, or `get-note-markdown` when you want Markdown with checklist state.
+
+**Returns:** The plain-text content of the note in `structuredContent.plaintext`, or error if not found.
+
+---
+
 #### `get-note-details`
 
 Retrieves metadata about a note (without full content).

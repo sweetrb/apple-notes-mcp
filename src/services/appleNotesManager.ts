@@ -927,6 +927,60 @@ export class AppleNotesManager {
   }
 
   /**
+   * Retrieves the plain-text content of a note by its exact title.
+   *
+   * Reads the note's `plaintext` property, which Notes derives from the body
+   * with all HTML markup removed. This is the text Notes itself exposes, so it
+   * is more faithful than converting the HTML body and skips the markup
+   * round-trip entirely.
+   *
+   * @param title - Exact title of the note
+   * @param account - Account to search in (defaults to iCloud)
+   * @returns Plain-text content of the note, or empty string if not found
+   */
+  getNotePlaintext(title: string, account?: string): string {
+    const targetAccount = this.resolveAccount(account);
+    const safeTitle = escapePlainStringForAppleScript(title);
+
+    const getCommand = `get plaintext of note "${safeTitle}"`;
+    const script = buildAccountScopedScript({ account: targetAccount }, getCommand);
+    const result = executeAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed to get plaintext of note "${title}":`, result.error);
+      return "";
+    }
+
+    return result.output;
+  }
+
+  /**
+   * Retrieves the plain-text content of a note by its CoreData ID.
+   *
+   * Reads the read-only `plaintext` property (the body with HTML removed). More
+   * reliable than getNotePlaintext() because IDs are unique across accounts.
+   *
+   * Note: Password-protected notes will fail with an AppleScript error. Callers
+   * should check for password protection beforehand using getNoteById().
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Plain-text content of the note, or empty string if not found
+   */
+  getNotePlaintextById(id: string): string {
+    const safeId = sanitizeId(id);
+    const getCommand = `get plaintext of note id "${safeId}"`;
+    const script = buildAppLevelScript(getCommand);
+    const result = executeAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed to get plaintext of note with ID "${id}":`, result.error);
+      return "";
+    }
+
+    return result.output;
+  }
+
+  /**
    * Retrieves a note by its unique CoreData ID.
    *
    * Each note has a unique ID in the format:

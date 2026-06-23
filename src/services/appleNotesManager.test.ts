@@ -877,6 +877,65 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("getNotePlaintext", () => {
+    it("reads the note's plaintext property by title", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "Shopping List\n- Eggs\n- Milk",
+      });
+
+      const text = manager.getNotePlaintext("Shopping List");
+
+      expect(text).toBe("Shopping List\n- Eggs\n- Milk");
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('get plaintext of note "Shopping List"')
+      );
+    });
+
+    it("returns empty string when the note is not found", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: 'Can\'t get note "Missing"',
+      });
+
+      expect(manager.getNotePlaintext("Missing Note")).toBe("");
+    });
+
+    it("uses the specified account", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "Content" });
+
+      manager.getNotePlaintext("My Note", "Gmail");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('tell account "Gmail"')
+      );
+    });
+  });
+
+  describe("getNotePlaintextById", () => {
+    it("reads the note's plaintext property by id at the application level", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "Just the text" });
+
+      const text = manager.getNotePlaintextById("x-coredata://ABC/ICNote/p1");
+
+      expect(text).toBe("Just the text");
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('get plaintext of note id "x-coredata://ABC/ICNote/p1"')
+      );
+    });
+
+    it("returns empty string when Notes.app rejects the read", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error: "no such note" });
+
+      expect(manager.getNotePlaintextById("x-coredata://ABC/ICNote/p1")).toBe("");
+    });
+
+    it("rejects malformed IDs", () => {
+      expect(() => manager.getNotePlaintextById("arbitrary string")).toThrow();
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Password Protection Helpers
   // ---------------------------------------------------------------------------

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`get-note-plaintext` tool.** Reads a note's body as plain text by id or title via the scripting dictionary's read-only `note.plaintext` property, which Notes derives from the body with markup removed. This is more faithful than reading the HTML body and stripping it, and it skips the conversion entirely. `get-note-content` (HTML) and `get-note-markdown` (Markdown with checklist state) are unchanged; this adds a third read shape. Additive — no existing tool changed.
 
 ## [2.3.0] - 2026-06-23
 ### Added
