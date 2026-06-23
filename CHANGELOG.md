@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-06-23
+### Documentation
+- README: added npm-downloads, supported-Node, platform-macOS, and MCP badges next to the existing version/CI/License badges.
+- Synced the Codex marketplace skill (`codex/skills/apple-notes/SKILL.md`) with the canonical `skills/apple-notes/SKILL.md`, which had drifted ~100 lines behind (missing several documented tools and the formatting/safety guidance added in #42).
+
 ## [2.1.2] - 2026-06-22
 ### Added
 - **Additional AppleScript Notes surfaces (#41).** Three new read-only/UI tools — `show-note` (reveal a note in Notes.app by ID), `get-selected-notes` (the current Notes.app selection), and `get-default-location` (the default account/folder for new notes) — plus richer metadata: folder/account `shared` flags, account `upgraded` state and default folder, and attachment `url`/`created`/`modified`/`shared` fields. Output stays backward-compatible with the prior tab/newline AppleScript format. Thanks @oliverames.
