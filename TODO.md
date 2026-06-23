@@ -1,6 +1,6 @@
 # Apple Notes MCP - Improvement Roadmap
 
-*As of v2.1.0*
+*As of v2.1.0. Completion status updated 2026-06-23; see the Status line under each item.*
 
 Based on technical research into Apple Notes internals, the current
 AppleScript dictionary, Notes App Intents metadata, and analysis of other
@@ -21,6 +21,8 @@ implementations, here are remaining improvements.
   dates, and shared state
 
 **Complexity**: Low to medium - AppleScript only, no private database parsing
+
+**Status: Complete.** Every candidate shipped. Reveal a note (`show-note`, #41) and folder, account, or attachment (`show-folder` / `show-account` / `show-attachment`, #44); selected note IDs (`get-selected-notes`, #41); default account and folder (`get-default-location`, #41); account and folder IDs, upgrade, and shared state (#41); and richer attachment metadata (#41). Bonus: `get-note-plaintext` (#46) wraps the sdef `plaintext` property.
 
 ---
 
@@ -63,6 +65,8 @@ permission handling, packaging, and integration tests
   move to folder, append checklist item, append plain text, attach a file.
 - Still GUI-only under every approach (drop from scope): prepend, Markdown body
   writes, checklist toggle, tables, note-to-note links, URL attachments.
+
+**Status: Researched, deferred (2026-06).** The bridge only adds pin/unpin and tag writes, and it requires an active GUI session plus a one-time manual Shortcut install, so it was deferred rather than built. Revisit if pin and tag writes become worth that setup cost.
 
 ---
 
@@ -114,6 +118,8 @@ dimensions, participants, transcripts) remain the harder, later tier. `ZISPINNED
 closes the read half of the "pinned notes" known limitation; the write half needs the
 Shortcuts bridge above.
 
+**Status: Partially shipped (#48, BETA).** `get-note-metadata` reads the scalar columns above (pinned, checklist flags, trash and recovery, smart-folder query, snippets, password hint), read-only via `sqlite3 -readonly` with column feature-detection. The protobuf and archived-data tier (OCR, summary text, attachment dimensions, participants, transcripts) is still open.
+
 ---
 
 ### Formatting and Note-Body Safety
@@ -132,6 +138,8 @@ overwrite embedded objects if callers treat updates like append operations.
   safe normalized output unnecessarily
 
 **Complexity**: Low - documentation, tests, and tool-description improvements
+
+**Status: Complete.** Safe-HTML patterns and attachment-safe-update guidance shipped in the bundled skill (#42). The `list-attachments`-before-replace warning is wired into the `update-note` description and README, and Notes-normalized-HTML regression fixtures were added (#45). The `create-note` h1 and `update-note` full-body-replace warnings were already in place.
 
 ---
 
