@@ -25,7 +25,7 @@ jobs:
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -99,6 +99,21 @@ jobs:
               echo "::error::npm publish failed and $LOCAL is not on npm."
               exit 1
             fi
+          fi
+
+      - name: Create GitHub Release (keep Releases in sync with npm)
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; nothing to do."
+          else
+            NOTES=$(awk -v v="## [$VERSION]" 'index($0,v)==1{p=1;next} p&&/^## \[/{exit} p' CHANGELOG.md)
+            [ -z "$NOTES" ] && NOTES="Published to npm as v$VERSION."
+            gh release create "v$VERSION" --target "$(git rev-parse HEAD)" --title "v$VERSION" --notes "$NOTES" \
+              || echo "::warning::Failed to create GitHub Release v$VERSION (npm publish still succeeded)"
           fi
 
       - name: Skip publish (version already published)
