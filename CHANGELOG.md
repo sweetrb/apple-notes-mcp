@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Documentation
+- **Apple Notes skill: four added techniques.** Ported field-tested guidance into `skills/apple-notes/SKILL.md` (and the Codex mirror): (1) use `get-note-plaintext` as the quickest way to verify rendered text when stored HTML looks off; (2) do not use decorative separators (horizontal rules, repeated dashes, box-drawing) between sections, since they render inconsistently; (3) treat a `stdout maxBuffer length exceeded` error as an attachment-risk signal alongside the existing ones; (4) an optional technique for taking full control of the title HTML without a duplicate sidebar line (create with a styled `<h1>` then `update-note` with `newTitle: " "`), documented with its CoreData-id-resolution caveat and flagged as advanced, not the default.
 
 ## [2.4.0] - 2026-06-23
 ### Added

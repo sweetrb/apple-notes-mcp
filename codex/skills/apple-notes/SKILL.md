@@ -89,6 +89,8 @@ Action: Use create-note with title="Shopping List" and formatted content
 
 For structured notes, pass `format="html"` and use simple Apple Notes-friendly HTML. The server automatically prepends the `title` as an `<h1>` in both plaintext and HTML modes, so do not include the same `<h1>` title in `content` when creating a note.
 
+**Optional: full control of the title without a duplicate line.** The default approach (pass only `title`, let the server add the `<h1>`) is simplest and is what most notes need. If you instead want to control the title's HTML yourself and find the metadata title rendering as a small duplicate line above your styled `<h1>`, you can put the styled `<h1>Title</h1>` in `content`, then immediately `update-note` on the returned id with `newTitle: " "` (a single space) and the same HTML. Notes then uses the first body line as the sidebar title. Caveat: after blanking the metadata title this way, the note's CoreData id can stop resolving for follow-up calls, so address the note by its display title afterward. Prefer the default title-only approach unless you specifically need this.
+
 ### Finding Notes
 
 When the user wants to find notes:
@@ -155,6 +157,7 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
 - Escape literal `&`, `<`, and `>` in user content as `&amp;`, `&lt;`, and `&gt;`.
 - Avoid nested lists when possible. Apple Notes can flatten or misplace nested list markup.
 - Use bare URLs when updating existing notes if anchor tags are stripped by Notes on save.
+- Do not use decorative separators between sections (horizontal rules, repeated dashes, or box-drawing characters). They render inconsistently in Notes; use an empty `<div><br></div>` spacer instead.
 
 Do not use CDATA sections. They can render literally in Apple Notes.
 
@@ -163,7 +166,7 @@ Do not use CDATA sections. They can render literally in Apple Notes.
 Before updating an existing note, check whether it contains attachments when the user mentions or the note likely includes images, PDFs, scans, audio, files, or other embedded objects.
 
 - Use `list-attachments` before rewriting attachment-risk notes.
-- Treat empty body output, very large content, or attachment listings as a warning that a full-body update may remove embedded objects.
+- Treat empty body output, very large content, a `stdout maxBuffer length exceeded` error, or a non-empty `list-attachments` result as a warning that a full-body update may remove embedded objects.
 - If preserving attachments matters, create a new formatted note instead of overwriting the existing one, or save/fetch the attachments first and explain the limitation to the user.
 
 ## Formatting Limits
@@ -195,6 +198,8 @@ If the user specifically requires those features, create all API-supported conte
 ## Verification
 
 `get-note-content` returns Apple Notes' stored HTML, which may differ from the original HTML while still rendering correctly. Use `get-note-markdown`, `get-note-content`, or a quick reread of the note after create/update to verify the title, line breaks, list spacing, and important content. Do not rewrite normalized HTML just because Notes transformed tags such as headings or monostyled text.
+
+When the stored HTML looks suspicious, `get-note-plaintext` is the quickest check: it returns the note's plain-text body (what Notes itself shows) with no markup, so you can confirm the title, line breaks, and text survived without reading through normalized HTML.
 
 ## Error Handling
 
