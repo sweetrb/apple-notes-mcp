@@ -46,12 +46,14 @@ Use this skill when the user:
 | `list-folders` | List all folders in an account |
 | `create-folder` | Create a new folder |
 | `delete-folder` | Delete an empty folder |
+| `show-folder` | Reveal a folder in the Notes.app UI by ID |
 
 ### Account Operations
 
 | Tool | Purpose |
 |------|---------|
 | `list-accounts` | List configured accounts (iCloud, Gmail, etc.) |
+| `show-account` | Reveal an account in the Notes.app UI by ID |
 
 ### Attachments, Checklists, Collaboration, and Diagnostics
 
@@ -60,6 +62,7 @@ Use this skill when the user:
 | `list-attachments` | List attachments in a note |
 | `save-attachment` | Save an attachment to disk |
 | `fetch-attachment` | Fetch attachment bytes as base64 |
+| `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |

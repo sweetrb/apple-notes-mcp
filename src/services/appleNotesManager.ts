@@ -1877,6 +1877,107 @@ export class AppleNotesManager {
     return true;
   }
 
+  /**
+   * Reveals a folder in the Notes.app UI by its id.
+   *
+   * Wraps the Notes `show` command, which the scripting dictionary exposes for
+   * folders as well as notes. This opens or focuses the Notes UI on the folder.
+   *
+   * @param id - CoreData identifier for the folder (from list-folders)
+   * @param separately - Open in a separate window when supported by Notes.app
+   * @returns true if Notes.app accepted the show command, false otherwise
+   */
+  showFolderById(id: string, separately: boolean = false): boolean {
+    const safeId = sanitizeId(id);
+    const separatelyClause = separately ? " separately true" : "";
+    const result = executeAppleScript(
+      buildAppLevelScript(`show folder id "${safeId}"${separatelyClause}`)
+    );
+
+    if (!result.success) {
+      console.error(`Failed to show folder with ID "${id}":`, result.error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Reveals an account in the Notes.app UI by its id.
+   *
+   * Wraps the Notes `show` command, which the scripting dictionary exposes for
+   * accounts as well as notes. This opens or focuses the Notes UI on the account.
+   *
+   * @param id - CoreData identifier for the account (from list-accounts)
+   * @param separately - Open in a separate window when supported by Notes.app
+   * @returns true if Notes.app accepted the show command, false otherwise
+   */
+  showAccountById(id: string, separately: boolean = false): boolean {
+    const safeId = sanitizeId(id);
+    const separatelyClause = separately ? " separately true" : "";
+    const result = executeAppleScript(
+      buildAppLevelScript(`show account id "${safeId}"${separatelyClause}`)
+    );
+
+    if (!result.success) {
+      console.error(`Failed to show account with ID "${id}":`, result.error);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Reveals an attachment in the Notes.app UI.
+   *
+   * Attachments are elements of a note, so they cannot be referenced at the
+   * application level by id alone. This resolves the attachment within its note
+   * (the same lookup used by save-attachment) and then runs the Notes `show`
+   * command on it, opening or focusing the Notes UI on the attachment.
+   *
+   * @param noteId - CoreData identifier for the note containing the attachment
+   * @param attachmentId - id of the attachment (from list-attachments)
+   * @param separately - Open in a separate window when supported by Notes.app
+   * @returns true if Notes.app revealed the attachment, false otherwise
+   */
+  showAttachmentById(noteId: string, attachmentId: string, separately: boolean = false): boolean {
+    const safeNoteId = sanitizeId(noteId);
+    const safeAttId = escapePlainStringForAppleScript(attachmentId);
+    const separatelyClause = separately ? " separately true" : "";
+
+    const script = `
+      tell application "Notes"
+        set theNote to note id "${safeNoteId}"
+        set theAttachment to missing value
+        repeat with a in attachments of theNote
+          if (id of a as text) is "${safeAttId}" then
+            set theAttachment to a
+            exit repeat
+          end if
+        end repeat
+        if theAttachment is missing value then
+          return "ERR${AS_FIELD_SEP}attachment not found"
+        end if
+        show theAttachment${separatelyClause}
+        return "OK"
+      end tell
+    `;
+
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      console.error(
+        `Failed to show attachment "${attachmentId}" on note "${noteId}":`,
+        result.error
+      );
+      return false;
+    }
+    if ((result.output ?? "").trim().startsWith("ERR")) {
+      console.error(`Attachment "${attachmentId}" not found on note "${noteId}"`);
+      return false;
+    }
+    return true;
+  }
+
   // ===========================================================================
   // Health Check
   // ===========================================================================

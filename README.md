@@ -551,6 +551,19 @@ Deletes a folder.
 
 ---
 
+#### `show-folder`
+
+Reveals a folder in Notes.app using its unique CoreData identifier.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | The folder's CoreData identifier (from `list-folders`) |
+| `separately` | boolean | No | Open in a separate window when supported by Notes.app |
+
+**Returns:** Confirmation that Notes.app accepted the show command.
+
+---
+
 ### Account Operations
 
 #### `list-accounts`
@@ -575,6 +588,19 @@ Returns the default account and folder Notes.app uses for newly created notes.
 **Parameters:** None
 
 **Returns:** Default account and folder metadata, including IDs and shared state.
+
+---
+
+#### `show-account`
+
+Reveals an account in Notes.app using its unique CoreData identifier.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | The account's CoreData identifier (from `list-accounts`) |
+| `separately` | boolean | No | Open in a separate window when supported by Notes.app |
+
+**Returns:** Confirmation that Notes.app accepted the show command.
 
 ---
 
@@ -700,6 +726,20 @@ Returns a note attachment's bytes as base64, without writing to disk (the read c
 | `attachmentId` | string | Yes | Attachment ID (from `list-attachments`) |
 
 **Returns:** The attachment name, content type, byte count, and base64 payload in `structuredContent.base64`.
+
+---
+
+#### `show-attachment`
+
+Reveals one note attachment in Notes.app. Attachments are elements of a note, so this takes both the note id and the attachment id (the same pair used by `save-attachment` / `fetch-attachment`).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | CoreData note ID (from `search-notes`/`list-notes`) |
+| `attachmentId` | string | Yes | Attachment ID (from `list-attachments`) |
+| `separately` | boolean | No | Open in a separate window when supported by Notes.app |
+
+**Returns:** Confirmation that Notes.app revealed the attachment.
 
 ---
 

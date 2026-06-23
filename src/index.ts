@@ -441,6 +441,62 @@ server.registerTool(
   }, "Error showing note")
 );
 
+// --- show-folder ---
+
+server.registerTool(
+  "show-folder",
+  {
+    description:
+      "Use when: the user wants to reveal a known folder in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the folder list (list-folders).\nNote: this opens or focuses the Notes UI. Get the id from list-folders.",
+    inputSchema: {
+      id: z.string().min(1, "Folder ID is required"),
+      separately: z
+        .boolean()
+        .optional()
+        .describe("Open in a separate window when supported by Notes.app"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      separately: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(({ id, separately = false }) => {
+    const success = notesManager.showFolderById(id, separately);
+    if (!success) {
+      return errorResponse(`Failed to show folder with ID "${id}"`);
+    }
+    return successResponse(`Shown folder with ID "${id}" in Notes.app`, { id, separately });
+  }, "Error showing folder")
+);
+
+// --- show-account ---
+
+server.registerTool(
+  "show-account",
+  {
+    description:
+      "Use when: the user wants to reveal a known account in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the account list (list-accounts).\nNote: this opens or focuses the Notes UI. Get the id from list-accounts.",
+    inputSchema: {
+      id: z.string().min(1, "Account ID is required"),
+      separately: z
+        .boolean()
+        .optional()
+        .describe("Open in a separate window when supported by Notes.app"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      separately: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(({ id, separately = false }) => {
+    const success = notesManager.showAccountById(id, separately);
+    if (!success) {
+      return errorResponse(`Failed to show account with ID "${id}"`);
+    }
+    return successResponse(`Shown account with ID "${id}" in Notes.app`, { id, separately });
+  }, "Error showing account")
+);
+
 // --- update-note ---
 
 server.registerTool(
@@ -1404,6 +1460,46 @@ server.registerTool(
       { name: r.name, contentType: r.contentType, bytes: r.bytes, base64: r.base64 }
     );
   }, "Error fetching attachment")
+);
+
+// --- show-attachment ---
+
+server.registerTool(
+  "show-attachment",
+  {
+    description:
+      "Use when: the user wants to reveal one note attachment in Notes.app.\nReturns: confirmation that Notes.app revealed the attachment.\nDo not use when: you want the bytes (fetch-attachment) or a file on disk (save-attachment).\nNote: this opens or focuses the Notes UI. Get the ids from list-attachments first.",
+    inputSchema: {
+      noteId: z
+        .string()
+        .min(1, "noteId is required")
+        .describe("CoreData note id (from search/list)"),
+      attachmentId: z
+        .string()
+        .min(1, "attachmentId is required")
+        .describe("Attachment id (from list-attachments)"),
+      separately: z
+        .boolean()
+        .optional()
+        .describe("Open in a separate window when supported by Notes.app"),
+    },
+    outputSchema: {
+      noteId: z.string().optional(),
+      attachmentId: z.string().optional(),
+      separately: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(({ noteId, attachmentId, separately = false }) => {
+    const success = notesManager.showAttachmentById(noteId, attachmentId, separately);
+    if (!success) {
+      return errorResponse(`Failed to show attachment "${attachmentId}" on note "${noteId}"`);
+    }
+    return successResponse(`Shown attachment "${attachmentId}" in Notes.app`, {
+      noteId,
+      attachmentId,
+      separately,
+    });
+  }, "Error showing attachment")
 );
 
 // --- export-notes-json ---

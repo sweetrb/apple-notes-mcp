@@ -2087,6 +2087,106 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("showFolderById", () => {
+    it("shows a folder by id", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      expect(manager.showFolderById("x-coredata://ABC/ICFolder/p1")).toBe(true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('show folder id "x-coredata://ABC/ICFolder/p1"')
+      );
+    });
+
+    it("can request a separate window", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.showFolderById("x-coredata://ABC/ICFolder/p1", true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("separately true")
+      );
+    });
+
+    it("returns false when Notes.app rejects the show command", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: "no such folder",
+      });
+
+      expect(manager.showFolderById("x-coredata://ABC/ICFolder/p1")).toBe(false);
+    });
+  });
+
+  describe("showAccountById", () => {
+    it("shows an account by id", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      expect(manager.showAccountById("x-coredata://ABC/ICAccount/p1")).toBe(true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining('show account id "x-coredata://ABC/ICAccount/p1"')
+      );
+    });
+
+    it("can request a separate window", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.showAccountById("x-coredata://ABC/ICAccount/p1", true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("separately true")
+      );
+    });
+
+    it("returns false when Notes.app rejects the show command", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: "no such account",
+      });
+
+      expect(manager.showAccountById("x-coredata://ABC/ICAccount/p1")).toBe(false);
+    });
+  });
+
+  describe("showAttachmentById", () => {
+    it("resolves the attachment within its note and shows it", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "OK" });
+
+      expect(manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "att-123")).toBe(true);
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(script).toContain('set theNote to note id "x-coredata://ABC/ICNote/p1"');
+      expect(script).toContain('is "att-123"');
+      expect(script).toContain("show theAttachment");
+    });
+
+    it("can request a separate window", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "OK" });
+
+      manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "att-123", true);
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
+        expect.stringContaining("separately true")
+      );
+    });
+
+    it("returns false when the attachment is not found on the note", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: `ERR${F}attachment not found`,
+      });
+
+      expect(manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "missing")).toBe(false);
+    });
+
+    it("returns false when Notes.app rejects the show command", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: "no such note",
+      });
+
+      expect(manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "att-123")).toBe(false);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Health Check
   // ---------------------------------------------------------------------------

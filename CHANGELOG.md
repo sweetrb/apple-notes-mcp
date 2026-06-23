@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Reveal folders, accounts, and attachments in Notes.app.** Three new tools extend the existing `show-note` to the rest of the objects the Notes scripting dictionary's `show` command accepts: `show-folder` (by folder id), `show-account` (by account id), and `show-attachment` (by note id + attachment id, since attachments are note-scoped). Each takes an optional `separately` flag, mirroring `show-note`. This closes the "show or reveal a note, folder, account, or attachment" surface gap from the roadmap; everything is additive AppleScript, and no existing tool changed.
 
 ## [2.3.0] - 2026-06-23
 ### Added
