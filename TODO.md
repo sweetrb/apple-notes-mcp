@@ -52,6 +52,18 @@ needs a reliable bridge before these can become tools.
 **Complexity**: High - requires feature detection, macOS-version gating,
 permission handling, packaging, and integration tests
 
+**Feasibility (researched 2026-06, verified against macOS 27 + Apple docs; see [TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md#app-intents-and-the-shortcuts-bridge))**:
+- The "native Swift helper that invokes App Intents directly" approach is not
+  possible. App Intents are system-invoked and app-local; there is no public API to
+  `perform()` another app's intents. A helper could only fall back to AppleScript.
+- The only working route is a user-installed wrapper Shortcut run via
+  `shortcuts run "<name>"`. It needs an active GUI login session (no SSH or launchd),
+  a one-time manual install, and is plain-text only. This is a BETA, opt-in path.
+- Reachable through that bridge: pin / unpin, add / remove / create / delete tags,
+  move to folder, append checklist item, append plain text, attach a file.
+- Still GUI-only under every approach (drop from scope): prepend, Markdown body
+  writes, checklist toggle, tables, note-to-note links, URL attachments.
+
 ---
 
 ### Hybrid SQLite + AppleScript Approach
@@ -90,6 +102,17 @@ files before reading; never write to the live Notes store.
 
 **Complexity**: Medium to high - schema differs across macOS releases and some
 fields require protobuf or archived-data parsing
+
+**Verified (2026-06, macOS 27 / Notes 4.13; see [TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md#read-only-metadata-columns-verified-macos-27--notes-413))**:
+The highest-value fields are plain scalar columns on `ZICCLOUDSYNCINGOBJECT` and need no
+protobuf decoding: `ZISPINNED` (pinned), `ZHASCHECKLIST` / `ZHASCHECKLISTINPROGRESS`,
+`ZISRECOVERINGFROMTRASH` (trash state), `ZSMARTFOLDERQUERYJSON` (smart-folder query),
+`ZSNIPPET` / `ZWIDGETSNIPPET`, and `ZPASSWORDHINT`. These are the low-risk first
+increment; the existing checklist reader already supplies the copy-DB and Full Disk
+Access scaffolding. The protobuf or archived-data fields (OCR, summary text, attachment
+dimensions, participants, transcripts) remain the harder, later tier. `ZISPINNED` also
+closes the read half of the "pinned notes" known limitation; the write half needs the
+Shortcuts bridge above.
 
 ---
 

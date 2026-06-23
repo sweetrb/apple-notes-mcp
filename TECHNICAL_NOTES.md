@@ -130,6 +130,29 @@ for pk, data, title in cursor:
 - **Quit Notes**: For consistent reads, quit Notes.app first
 - **Full Disk Access**: Required to access the Group Containers path
 
+### Read-Only Metadata Columns (verified macOS 27 / Notes 4.13)
+
+Most useful note metadata lives as plain scalar columns on `ZICCLOUDSYNCINGOBJECT`, so
+it can be read with an ordinary `SELECT` and needs no protobuf decoding, unlike the
+`ZICNOTEDATA.ZDATA` body blob. The columns below were confirmed against a live store on
+macOS 27.0 (Notes 4.13). Column names and availability shift between OS releases, so
+treat them as version-specific and feature-detect with `PRAGMA table_info` before use.
+
+| Column | Exposes | Why it matters |
+|--------|---------|----------------|
+| `ZISPINNED` | Pinned state (boolean) | AppleScript has no `pinned` property, so this is the only read path for pin state |
+| `ZHASCHECKLIST`, `ZHASCHECKLISTINPROGRESS` | Whether a note has a checklist, and whether any item is still unchecked | Cheap flags without decoding the body |
+| `ZISRECOVERINGFROMTRASH` | Trash / recovery state | Distinguishes a recently deleted note |
+| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | Smart Folders are otherwise not scriptable |
+| `ZSNIPPET`, `ZWIDGETSNIPPET` | Preview snippet text | Fast preview without reading the full body |
+| `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
+| `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
+
+Reading these is safe under the existing rules: copy the three database files first, open
+the copy read-only, and never touch the live store. Writing any of these values directly
+is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
+To *change* pin state or tags, use the Shortcuts bridge (below), not a SQL `UPDATE`.
+
 ---
 
 ## Protobuf Data Format
@@ -226,6 +249,87 @@ Can export notes to HTML/Markdown using built-in actions, but limited programmat
 
 ---
 
+## App Intents and the Shortcuts Bridge
+
+Apple Notes ships App Intents (the `Metadata.appintents` bundle is present inside
+`Notes.app` on macOS 27), which raises an obvious question: can the server call them to
+do the things AppleScript cannot, such as pinning, tagging, or appending a checklist item?
+This was researched in June 2026 and verified against the live `shortcuts` CLI on macOS 27
+and Apple's developer documentation.
+
+### There is no cross-app App Intent invocation
+
+App Intents are a one-way, app-to-system contract. An app *exposes* its actions through an
+`AppIntent`'s `perform()` method, and the **system** (Siri, Spotlight, Shortcuts, Apple
+Intelligence) is the only caller. There is no public API to enumerate, reference, or
+`perform()` another app's intents from your own process. A native Swift helper therefore
+cannot invoke Notes' App Intents directly; it could only drive Notes through the same
+AppleScript the server already uses, with a worse permissions story. This is consistent
+with Apple's `AppIntent` documentation and the SiriKit donation model, where
+`INInteraction.donate()` only informs Siri and does not execute anything.
+
+### The only route is `shortcuts run` against a user-installed Shortcut
+
+The `shortcuts` CLI runs a *named, already-installed* Shortcut
+(`shortcuts run "<name>" -i <input> -o <output>`). It cannot run a `.shortcut` from a file
+path, and it cannot invoke an App Intent directly, so each capability has to be wrapped in
+a Shortcut the user installs once. There is no headless import: adding a `.shortcut` always
+needs a GUI confirmation click (`shortcuts sign` only changes which prompt appears).
+
+The constraints that make this a BETA, opt-in path rather than a default:
+
+- **Needs an active GUI login session.** `shortcuts run` drives the Shortcuts app and is
+  not documented to work at the login window, over plain SSH, or from a `launchd`
+  background agent. Only `shortcuts list` is fully GUI-free.
+- **One-time manual install** of each wrapper Shortcut.
+- **Plain text only.** Notes actions take rich text or attachments only through their
+  interactive compose sheet, which defeats automation.
+- **Coarse results.** Exit code 0 or 1 with output on stdout; no structured error surface.
+
+### What a Shortcuts bridge can and cannot add
+
+| Reachable through a wrapper Shortcut | Not exposed as any action (GUI only) |
+|--------------------------------------|--------------------------------------|
+| Pin / unpin a note | Prepend to a body |
+| Add / remove / create / delete tags | Toggle a checklist item done/undone |
+| Move to folder; create / delete folder | Insert a table or import CSV |
+| Append a checklist item | Insert a note-to-note link |
+| Append plain text to a body | Rich text / Markdown body writes |
+| Attach a file | Attach a URL / link |
+| Find notes (plain-text result) | Get a note's full contents |
+
+### macOS version gating
+
+Apple's "What's new in Shortcuts" pages omit Notes actions, so per-version attributions
+come from secondary sources and should be feature-detected at runtime rather than gated on
+`sw_vers`:
+
+- **Long-standing (macOS 13 and earlier):** Create Note, Append to Note, Find Notes, Show
+  Note / Folder, Rename Folder.
+- **Sequoia 15:** Pin Notes, Delete Notes, Move to Folder, Create / Delete Folder, and the
+  tag actions (Add / Remove / Create / Delete Tag).
+- **Tahoe 26:** Add File, Append Checklist Item (secondary-sourced; verify at runtime).
+
+### Packaging note
+
+If a native helper is ever shipped for the AppleScript path, the packaging is light:
+`npm install` does not set the quarantine xattr, ad-hoc signing is enough to run (and is
+mandatory on Apple Silicon), and notarization is optional for an npm-delivered CLI. But
+TCC attributes the Automation prompt to the host app (the MCP client), not the helper, so a
+compiled helper is no better than the in-process AppleScript on permissions and is not
+worth the complexity.
+
+### Verdict
+
+Keep AppleScript as the primary engine. If write coverage for pin and tags is wanted, add
+a BETA, opt-in Shortcuts bridge scoped to the reachable actions above, with the
+GUI-session constraint documented loudly and runtime feature detection instead of version
+gating. Do not invest in a Swift App Intents helper; it cannot do the cross-app thing that
+would justify it. Rich-body manipulation, prepend, checklist toggling, tables, and note
+links stay GUI-only under every known approach.
+
+---
+
 ## Known Issues & Limitations
 
 ### macOS Sequoia/Sonoma (2024)
@@ -311,6 +415,11 @@ When creating notes via AppleScript, setting both the `name` property and the `b
 - [Late Night Software - Exporting Notes Attachments](https://forum.latenightsw.com/t/exporting-apple-notes-attachments/766)
 - [Clutterstack - Getting Notes Out of Apple Notes](https://clutterstack.com/posts/2024-09-27-applenotes)
 
+### App Intents & Shortcuts Bridge (2026 research)
+- Apple Developer - [AppIntent](https://developer.apple.com/documentation/appintents/appintent) and [App Intents overview](https://developer.apple.com/documentation/appintents): `perform()` is system-invoked; no cross-app call path.
+- Apple Support - [Run shortcuts from the command line](https://support.apple.com/guide/shortcuts-mac/run-shortcuts-from-the-command-line-apd455c82f02/mac), cross-checked against the live `shortcuts --help` on macOS 27: `run` takes a named shortcut, not a file path or an intent.
+- Shortcuts action catalogs - [matthewcassinelli.com action library](https://matthewcassinelli.com/actions/) and MacStories Shortcuts coverage for the per-action Notes capability list and macOS-version debuts (secondary; feature-detect at runtime).
+
 ---
 
-*Last updated: December 2024*
+*Last updated: 2026-06-23 (added App Intents bridge feasibility and live-verified read-only SQLite metadata columns)*
