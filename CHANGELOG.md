@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Regression fixtures for Notes-normalized HTML to Markdown.** `src/services/__fixtures__/notesNormalizedHtml.ts` captures representative Apple Notes-normalized bodies (div-wrapped paragraphs, `<div><br></div>` spacer rows, headings, native lists, inline emphasis, `<tt>` code spans) alongside the Markdown `getNoteMarkdown` currently produces, and `notesHtmlMarkdown.test.ts` locks it in. These characterization tests pin two existing quirks so future changes are deliberate: a `<div><br></div>` spacer leaves a stray two-space line (the Markdown-side fingerprint of the whitespace-accumulation behavior), and `<tt>` is dropped so code styling does not round-trip.
+
+### Changed
+- **`update-note` now warns about attachments in its tool description.** A full-body replace can drop embedded files, images, scans, PDFs, or audio, so the description (and the README `update-note` section) now tells callers to run `list-attachments` first when a note may hold them. The skill already carried this guidance; this brings the MCP-visible tool description in line. Description and docs only — no behavior change.
 
 ## [2.3.0] - 2026-06-23
 ### Added

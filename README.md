@@ -376,6 +376,8 @@ Updates an existing note's content and/or title.
 
 **Note:** `newContent` **replaces the entire note body** — it is not appended. To preserve existing content, read it first (e.g. with `get-note-content`) and include it in `newContent`.
 
+**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
+
 ---
 
 #### `delete-note`

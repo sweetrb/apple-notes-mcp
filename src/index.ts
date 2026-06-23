@@ -447,7 +447,7 @@ server.registerTool(
   "update-note",
   {
     description:
-      "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text. Edits to shared notes are immediately visible to all collaborators.",
+      "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
     inputSchema: {
       id: z.string().optional().describe("Note ID (preferred - more reliable than title)"),
       title: z.string().optional().describe("Current note title (use id instead when available)"),
