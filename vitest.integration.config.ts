@@ -10,6 +10,11 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts"],
     testTimeout: 120_000,
+    // vitest 3 enforces a separate hookTimeout (default 10s). The integration
+    // suite's beforeAll probes Notes.app via AppleScript, which hangs ~25s on a
+    // headless CI runner (no Notes account) before erroring and self-skipping —
+    // so the hook needs the same generous budget as the tests.
+    hookTimeout: 120_000,
   },
   resolve: {
     alias: {
