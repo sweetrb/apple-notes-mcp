@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.5.0] - 2026-06-24
 ### Added
 - **`get-note-metadata` tool (BETA).** Reads note metadata AppleScript cannot expose — pinned state (`ZISPINNED`), checklist flags, trash/recovery state, preview snippet, and password hint — by querying plain scalar columns on `ZICCLOUDSYNCINGOBJECT` in the NoteStore database. No protobuf decoding (these are not the body blob), opened read-only via `execFileSync` (no shell), with Full Disk Access required. The reader feature-detects columns with `PRAGMA table_info`, so it degrades gracefully as the schema changes across macOS versions, and it resolves trashed notes AppleScript can no longer find. Marked BETA because the private schema is version-dependent. This makes pinned state **readable** for the first time (it remains unsettable); see the updated "Known limitations" note in the README.
 
