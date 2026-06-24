@@ -88,7 +88,7 @@ jobs:
         # version, attempt `npm publish`, and get a 403 for the version the first
         # run just pushed. Treat that specific case as success.
         run: |
-          if npm publish; then
+          if npm publish --provenance; then
             echo "Published."
           else
             LOCAL=$(node -p "require('./package.json').version")
