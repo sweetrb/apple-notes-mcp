@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`get-note-metadata` tool (BETA).** Reads note metadata AppleScript cannot expose — pinned state (`ZISPINNED`), checklist flags, trash/recovery state, preview snippet, and password hint — by querying plain scalar columns on `ZICCLOUDSYNCINGOBJECT` in the NoteStore database. No protobuf decoding (these are not the body blob), opened read-only via `execFileSync` (no shell), with Full Disk Access required. The reader feature-detects columns with `PRAGMA table_info`, so it degrades gracefully as the schema changes across macOS versions, and it resolves trashed notes AppleScript can no longer find. Marked BETA because the private schema is version-dependent. This makes pinned state **readable** for the first time (it remains unsettable); see the updated "Known limitations" note in the README.
+
 ### Documentation
 - **Apple Notes skill: four added techniques.** Ported field-tested guidance into `skills/apple-notes/SKILL.md` (and the Codex mirror): (1) use `get-note-plaintext` as the quickest way to verify rendered text when stored HTML looks off; (2) do not use decorative separators (horizontal rules, repeated dashes, box-drawing) between sections, since they render inconsistently; (3) treat a `stdout maxBuffer length exceeded` error as an attachment-risk signal alongside the existing ones; (4) an optional technique for taking full control of the title HTML without a duplicate sidebar line (create with a styled `<h1>` then `update-note` with `newTitle: " "`), documented with its CoreData-id-resolution caveat and flagged as advanced, not the default.
 

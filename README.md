@@ -135,7 +135,7 @@ A few Notes UI features are not exposed to AppleScript and therefore cannot be
 supported. See **[docs/APPLESCRIPT-LIMITATIONS.md](docs/APPLESCRIPT-LIMITATIONS.md)**
 for the investigation and verification behind each:
 
-- **Pinned notes** — Notes has no scriptable `pinned` property, so pin state can be neither read nor set.
+- **Pinned notes** — Notes has no scriptable `pinned` property via AppleScript. Pin state can now be **read** with the BETA `get-note-metadata` tool (from the NoteStore database), but it still cannot be **set** programmatically.
 - **Note-to-note links** — there is no `applenotes://` deep link or link property; the only stable handle is the `x-coredata://` note id.
 
 ---
@@ -703,6 +703,22 @@ Checklist for "Shopping List" (2/4 done):
 [ ] Pick up laundry
 [ ] Call dentist
 ```
+
+---
+
+#### `get-note-metadata` (BETA)
+
+Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQLite database directly: pinned state, checklist flags, trash/recovery state, the preview snippet, and the password hint. The available fields vary by macOS version.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access-for-checklist-features)).
+
+**BETA:** the NoteStore schema changes between macOS releases, so some fields can be absent on older or newer systems. The database is only ever read, never written.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+
+**Returns:** A metadata object in `structuredContent` holding any of `pinned`, `hasChecklist`, `hasChecklistInProgress`, `recoveringFromTrash`, `passwordProtected`, `passwordHint`, `snippet`, `widgetSnippet`, and `smartFolderQuery`. Unlike most read tools, it also resolves trashed notes that AppleScript can no longer find.
 
 ---
 

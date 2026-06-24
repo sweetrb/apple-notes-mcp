@@ -27,6 +27,7 @@ import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
+import { getNoteMetadata } from "@/utils/noteMetadata.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
@@ -1688,6 +1689,46 @@ server.registerTool(
       { items: result.items, checked, total: result.items.length }
     );
   }, "Error reading checklist state")
+);
+
+// --- get-note-metadata (BETA) ---
+
+server.registerTool(
+  "get-note-metadata",
+  {
+    description:
+      "[BETA] Use when: reading note metadata AppleScript cannot expose — pinned state, checklist flags, trash/recovery state, preview snippet, password hint — by id.\nReturns: a metadata object; fields vary by macOS version and are omitted when unavailable.\nDo not use when: you need the body (get-note-content) or per-item checklist state (get-checklist-state).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. BETA — the database schema changes between macOS releases, so some fields may be absent. Works on trashed notes that AppleScript can no longer resolve.",
+    inputSchema: {
+      id: z.string().min(1, "Note ID is required. Use search-notes to find the note ID first."),
+    },
+    outputSchema: {
+      pinned: z.boolean().optional(),
+      hasChecklist: z.boolean().optional(),
+      hasChecklistInProgress: z.boolean().optional(),
+      recoveringFromTrash: z.boolean().optional(),
+      passwordProtected: z.boolean().optional(),
+      passwordHint: z.string().optional(),
+      snippet: z.string().optional(),
+      widgetSnippet: z.string().optional(),
+      smartFolderQuery: z.string().optional(),
+    },
+  },
+  withErrorHandling(({ id }) => {
+    // No AppleScript existence pre-check: reading straight from the database lets
+    // this resolve trashed/recovering notes that `note id ...` can no longer find.
+    const { metadata, message } = getNoteMetadata(id);
+    if (!metadata) {
+      return errorResponse(message || `Failed to read metadata for note "${id}"`);
+    }
+
+    const keys = Object.keys(metadata);
+    const summary =
+      keys.length === 0
+        ? `No additional metadata is available for note "${id}" on this macOS version.`
+        : keys.map((k) => `${k}: ${String((metadata as Record<string, unknown>)[k])}`).join("\n");
+
+    return successResponse(summary, metadata as Record<string, unknown>);
+  }, "Error reading note metadata")
 );
 
 // =============================================================================
