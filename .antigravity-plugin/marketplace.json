@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "apple-notes",
-      "version": "2.5.4",
+      "version": "2.5.5",
       "description": "Manage Apple Notes through natural language - create, search, read, update, delete, organize folders, inspect metadata, run diagnostics, and work with attachments (macOS only).",
       "source": {
         "source": "local",

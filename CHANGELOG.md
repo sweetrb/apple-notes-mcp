@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.5] - 2026-06-26
+### Changed
+- **Release tooling: publish now uses `pnpm publish` over OIDC trusted publishing** (Phase 2 of the npm→pnpm migration), replacing `npm publish`. Still tokenless (no `NPM_TOKEN`) with provenance attestation; the npm trusted-publisher config is keyed to the repo + workflow file, not the CLI, so it is unaffected. **No runtime or library changes** — the published package is byte-for-byte equivalent to 2.5.4; this release exists to validate the pnpm publish pipeline.
+
 ## [2.5.4] - 2026-06-25
 ### Security
 - **Hardened `htmlToPlaintext` tag stripping (note export).** The HTML-tag strip now loops until the string stabilizes instead of running a single regex pass, so overlapping angle brackets (e.g. `<<i>>`) can no longer leave residue. Clears the open CodeQL `js/incomplete-multi-character-sanitization` (high) on the export helper. It is export-only formatting (not an injection sink), but this keeps the security scan clean.

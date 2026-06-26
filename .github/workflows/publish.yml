@@ -41,20 +41,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
 
-      # Phase 1 of the pnpm migration keeps `npm publish` as the release command
-      # (pnpm handles install/build/test); Phase 2 switches this to `pnpm publish`.
-      - name: Upgrade npm (OIDC trusted publishing needs npm >= 11.5.1)
-        # Retry: the global install hits the live registry and has flaked on
-        # transient ECONNRESET, aborting releases. Try up to 3 times.
-        run: |
-          for i in 1 2 3; do
-            npm install -g npm@latest && exit 0
-            echo "npm upgrade attempt $i failed; retrying in 5s…" >&2
-            sleep 5
-          done
-          echo "::error::npm upgrade failed after 3 attempts" >&2
-          exit 1
-
       - name: Check if version is already published
         id: check
         run: |
@@ -84,16 +70,22 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: pnpm run build
 
-      - name: Publish to npm
+      - name: Publish to npm (pnpm + OIDC trusted publishing)
         if: steps.check.outputs.skip == 'false'
-        # Tolerate the publish race: a release pushes two commits, so two CI runs
-        # complete and each triggers a publish. The concurrency group serializes
-        # them, but npm's registry read (`npm view`, CDN-cached) lags the write,
-        # so the second run's "already published?" check can still see the old
-        # version, attempt `npm publish`, and get a 403 for the version the first
-        # run just pushed. Treat that specific case as success.
+        # Phase 2: publish via `pnpm publish` over OIDC trusted publishing
+        # (tokenless — no NPM_TOKEN). pnpm 11 supports npm's OIDC flow; the npm
+        # trusted-publisher config is keyed to repo + workflow file, not the CLI,
+        # so it still matches after the npm→pnpm switch. `--provenance` emits the
+        # attestation; `--no-git-checks` because CI publishes from a clean but
+        # detached checkout (pnpm otherwise refuses to publish off a branch).
+        # Tolerate the publish race: a release lands two pushes on main, so two CI
+        # runs complete and each triggers a publish. The concurrency group
+        # serializes them, but the registry read (`npm view`, CDN-cached) lags the
+        # write, so the second run can still see the old version, attempt to
+        # publish, and get a 403 for the version the first run just pushed. Treat
+        # that specific case as success.
         run: |
-          if npm publish --provenance; then
+          if pnpm publish --provenance --no-git-checks; then
             echo "Published."
           else
             LOCAL=$(node -p "require('./package.json').version")
@@ -101,7 +93,7 @@ jobs:
             if [ "$PUBLISHED" = "$LOCAL" ]; then
               echo "Version $LOCAL is already on npm (published by a concurrent run); treating as success."
             else
-              echo "::error::npm publish failed and $LOCAL is not on npm."
+              echo "::error::pnpm publish failed and $LOCAL is not on npm."
               exit 1
             fi
           fi
