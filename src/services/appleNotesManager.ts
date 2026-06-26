@@ -2829,12 +2829,24 @@ export class AppleNotesManager {
    * Simple HTML to plaintext conversion for export.
    */
   private htmlToPlaintext(html: string): string {
+    // Convert block/line breaks to newlines first.
+    let text = html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/p>/gi, "\n");
+
+    // Strip any remaining tags, looping until the string stabilizes. A single
+    // pass can leave residue when removing one tag re-forms another (e.g.
+    // "<<i>>"), so we repeat until there are no more matches — the recognized
+    // fix for CodeQL js/incomplete-multi-character-sanitization.
+    let prev: string;
+    do {
+      prev = text;
+      text = text.replace(/<[^>]*>/g, "");
+    } while (text !== prev);
+
     return (
-      html
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/div>/gi, "\n")
-        .replace(/<\/p>/gi, "\n")
-        .replace(/<[^>]+>/g, "")
+      text
         .replace(/&nbsp;/g, " ")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
