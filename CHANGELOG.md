@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.4] - 2026-06-25
+### Security
+- **Hardened `htmlToPlaintext` tag stripping (note export).** The HTML-tag strip now loops until the string stabilizes instead of running a single regex pass, so overlapping angle brackets (e.g. `<<i>>`) can no longer leave residue. Clears the open CodeQL `js/incomplete-multi-character-sanitization` (high) on the export helper. It is export-only formatting (not an injection sink), but this keeps the security scan clean.
+
 ## [2.5.3] - 2026-06-25
 ### Fixed
 - Added a process-level uncaughtException/unhandledRejection safety net so a stray error or a broken stdout pipe (EPIPE) on client disconnect can no longer crash the long-lived server; EPIPE now exits cleanly.

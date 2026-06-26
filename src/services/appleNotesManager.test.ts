@@ -3116,4 +3116,12 @@ describe("htmlToPlaintext (export helper)", () => {
     expect(toPlaintext("a<br><br><br><br>b")).toBe("a\n\nb");
     expect(toPlaintext("  <div>x</div>  ")).toBe("x");
   });
+
+  it("strips nested/overlapping tags without leaving a tag (iterated strip)", () => {
+    // A single pass can leave residue when removing one tag re-forms another;
+    // the loop keeps stripping until no <...> remains.
+    expect(toPlaintext("a<<i>>b")).not.toMatch(/<[^>]*>/);
+    expect(toPlaintext("<x<y>z>")).not.toMatch(/<[^>]*>/);
+    expect(toPlaintext("plain <b>text</b> here")).toBe("plain text here");
+  });
 });
