@@ -1,2 +1,8 @@
+# Single-package repo (no workspace packages). This file records pnpm's
+# build-script approvals, which pnpm 11 reads only from here (the package.json
+# "pnpm" field and .npmrc are no longer read, and the v10 onlyBuiltDependencies
+# array was replaced by the allowBuilds map). esbuild — a transitive vite/vitest
+# dev dependency — ships a postinstall; approving it keeps `pnpm install` from
+# failing with ERR_PNPM_IGNORED_BUILDS.
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
