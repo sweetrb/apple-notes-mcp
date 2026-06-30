@@ -1,0 +1,63 @@
+name: version-guard
+
+# Fail any PR to main that changes SHIPPED CODE (src/** non-test, requirements.txt)
+# without bumping package.json's version. Docs-only and test-only PRs are exempt.
+# Rationale: publish.yml only runs `pnpm publish` when the version differs from npm,
+# so an un-bumped code change would silently never release. This makes the bump
+# mandatory. The guard file itself lives in .github/ (doesn't ship), so it needs no bump.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  require-version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a version bump when shipped code changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
+          echo "Changed files:"; printf '%s\n' "$changed" | sed 's/^/  /'
+
+          # Shipped-code paths: TS/JS sources and python sidecars under src/ (minus
+          # tests/mocks), plus the python dependency manifest. build/ is generated.
+          code="$(printf '%s\n' "$changed" \
+            | grep -E '^(src/.*|requirements\.txt)$' \
+            | grep -vE '(\.test\.ts$|\.spec\.ts$|/__tests__/|/__mocks__/)' || true)"
+
+          if [ -z "$code" ]; then
+            echo "::notice::No shipped-code changes — version bump not required."
+            exit 0
+          fi
+          echo "Shipped-code changes detected:"; printf '%s\n' "$code" | sed 's/^/  /'
+
+          oldv="$(git show "${BASE_SHA}:package.json" \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
+          newv="$(node -e 'console.log(require("./package.json").version)')"
+          echo "package.json version: base=${oldv}  head=${newv}"
+
+          if [ "$oldv" = "$newv" ]; then
+            echo "::error::Shipped code changed but package.json version is unchanged (${oldv}). Bump it at least a patch:  pnpm version patch --no-git-tag-version  (and add a CHANGELOG entry)."
+            exit 1
+          fi
+
+          # Guard against a typo'd downgrade — require the new version to be greater.
+          OLDV="$oldv" NEWV="$newv" node -e '
+            const a = process.env.OLDV.split(".").map(Number);
+            const b = process.env.NEWV.split(".").map(Number);
+            const cmp = (b[0]-a[0]) || (b[1]-a[1]) || (b[2]-a[2]);
+            if (cmp > 0) { console.log("Version bumped " + process.env.OLDV + " -> " + process.env.NEWV + "."); process.exit(0); }
+            console.error("::error::package.json version went " + process.env.OLDV + " -> " + process.env.NEWV + " (not an increase). Bump it forward.");
+            process.exit(1);
+          '
