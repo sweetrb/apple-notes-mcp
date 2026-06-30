@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.6] - 2026-06-30
+### Fixed
+- **`move-note` no longer drops attachments or resets note identity (data-loss fix).** The single-note `move-note` was implemented as copy-then-delete: it rebuilt the note from its body HTML in the destination folder and deleted the original, silently discarding every embedded attachment (files, images, PDFs, scans, audio) and resetting the note's creation date and id. It now uses Notes.app's native `move` command — the same one `batch-move-notes` already used — which relocates the note in place, preserving its id, creation date, and all attachments. The destination-folder-must-exist behavior is unchanged. Tests updated to assert the native `move` path (no `make new note`).
+
+### Added
+- **Configurable cap on inline attachment fetch size.** `fetch-attachment` exports an attachment to a temp file and base64-encodes it into the response via `readFileSync`, which previously had no upper bound (`APPLE_NOTES_MCP_MAX_BUFFER` does not apply to `readFileSync`), so a multi-GB attachment could exhaust memory. A size check now runs **before** the read and rejects oversized attachments with a clear error pointing at `save-attachment`. Default 25 MB, overridable via the new `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` env var (documented in the README). Temp-dir cleanup is preserved.
+
+### Changed
+- **All MCP string/array inputs now have upper bounds.** Every Zod input field previously used only `.min(1)`; sane `.max(...)` caps were added to string fields (query, id, title, content, folder, account, savePath, attachmentId, tags entries, etc.) and array caps (`.max(500)`) to the unbounded `ids` arrays in `batch-delete-notes` / `batch-move-notes`. Limits mirror the bounds the manager already enforced internally. Oversized input is now rejected at the schema boundary with a clear message.
+- **`syncDetection` SQLite access converted to `execFileSync`** (argv array, no shell), matching the sibling `checklistParser` / `noteMetadata` callers. The interpolated values were not user-controlled, so this is consistency hardening, not a fix for an exploitable bug.
+- **Graceful shutdown on SIGINT/SIGTERM and stdin EOF.** Added signal and stdin `end`/`close` handlers that exit cleanly, alongside the existing `uncaughtException`/`unhandledRejection` net. This server holds no persistent resources, so the impact is low; it brings shutdown behavior in line with the sibling apple-mail server.
+
+### Docs
+- **`create-note` `tags`: documented as returned-only.** The `tags` parameter was accepted but never written to Notes.app (Apple Notes tags can't be set via AppleScript). Its description now states that values are echoed back in the response but not applied to the note, and points to in-body `#hashtags` as the way to create real tags. The parameter is still accepted (not dropped) to avoid breaking existing callers.
+- **`move-note` tool description** no longer claims a copy-then-delete implementation or warns about attachment loss; it now states the note is relocated in place via the native move.
+
 ## [2.5.5] - 2026-06-26
 ### Changed
 - **Release tooling: publish now uses `pnpm publish` over OIDC trusted publishing** (Phase 2 of the npm→pnpm migration), replacing `npm publish`. Still tokenless (no `NPM_TOKEN`) with provenance attestation; the npm trusted-publisher config is keyed to the repo + workflow file, not the CLI, so it is unaffected. **No runtime or library changes** — the published package is byte-for-byte equivalent to 2.5.4; this release exists to validate the pnpm publish pipeline.

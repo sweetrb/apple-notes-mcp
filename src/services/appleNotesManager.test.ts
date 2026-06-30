@@ -1834,37 +1834,41 @@ describe("AppleNotesManager", () => {
   // ---------------------------------------------------------------------------
 
   describe("moveNote", () => {
-    it("returns true when move completes successfully", () => {
-      // Mock sequence: getNoteDetails -> getNoteContent -> createNote -> deleteNote
+    // The note-details lookup output reused by the title-based move tests.
+    const detailsOutput = [
+      "My Note",
+      "x-coredata://ABC/ICNote/p123",
+      "Monday, January 1, 2024 at 12:00:00 PM",
+      "Monday, January 1, 2024 at 12:00:00 PM",
+      "false",
+      "false",
+    ].join(F);
+
+    it("returns true when the native move completes successfully", () => {
+      // Mock sequence: getNoteDetails (resolve id) -> native move
       mockExecuteAppleScript
-        .mockReturnValueOnce({
-          success: true,
-          output: [
-            "My Note",
-            "x-coredata://ABC/ICNote/p123",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "false",
-            "false",
-          ].join(F),
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "<div>Note Title</div><div>Content</div>",
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "note id x-coredata://...",
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "",
-        });
+        .mockReturnValueOnce({ success: true, output: detailsOutput })
+        .mockReturnValueOnce({ success: true, output: "" });
 
       const result = manager.moveNote("My Note", "Archive");
 
       expect(result).toBe(true);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(4);
+      // No copy-then-delete: just the details lookup + a single native `move`.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses the native AppleScript `move` command (preserves attachments/identity)", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: detailsOutput })
+        .mockReturnValueOnce({ success: true, output: "" });
+
+      manager.moveNote("My Note", "Archive");
+
+      // The second call is the move; assert it issues a native `move ... to` and
+      // does NOT rebuild the note via `make new note` (the old lossy path).
+      const moveScript = mockExecuteAppleScript.mock.calls[1][0] as string;
+      expect(moveScript).toContain("move noteRef to destFolder");
+      expect(moveScript).not.toContain("make new note");
     });
 
     it("returns false when source note cannot be found", () => {
@@ -1880,23 +1884,9 @@ describe("AppleNotesManager", () => {
       expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1); // Only tried to get details
     });
 
-    it("returns false when copy to destination fails", () => {
+    it("returns false when the move fails (e.g. destination folder missing)", () => {
       mockExecuteAppleScript
-        .mockReturnValueOnce({
-          success: true,
-          output: [
-            "My Note",
-            "x-coredata://ABC/ICNote/p123",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "false",
-            "false",
-          ].join(F),
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "<div>Content</div>",
-        })
+        .mockReturnValueOnce({ success: true, output: detailsOutput })
         .mockReturnValueOnce({
           success: false,
           output: "",
@@ -1906,41 +1896,35 @@ describe("AppleNotesManager", () => {
       const result = manager.moveNote("My Note", "Nonexistent Folder");
 
       expect(result).toBe(false);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(3); // Details + Read + failed create
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2); // Details + failed move
+    });
+  });
+
+  describe("moveNoteById", () => {
+    it("returns true when the native move succeeds", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      const result = manager.moveNoteById("x-coredata://ABC/ICNote/p123", "Archive");
+
+      expect(result).toBe(true);
+      // Single native `move` — no getNoteContentById/create/delete fan-out.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+      const moveScript = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(moveScript).toContain("move noteRef to destFolder");
+      expect(moveScript).not.toContain("make new note");
     });
 
-    it("returns true even if delete fails (note exists in new location)", () => {
-      // This is partial success - note was copied but original couldn't be deleted
-      mockExecuteAppleScript
-        .mockReturnValueOnce({
-          success: true,
-          output: [
-            "My Note",
-            "x-coredata://ABC/ICNote/p123",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "Monday, January 1, 2024 at 12:00:00 PM",
-            "false",
-            "false",
-          ].join(F),
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "<div>Content</div>",
-        })
-        .mockReturnValueOnce({
-          success: true,
-          output: "note id x-coredata://...",
-        })
-        .mockReturnValueOnce({
-          success: false,
-          output: "",
-          error: "Cannot delete original",
-        });
+    it("returns false when the move fails", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: false,
+        output: "",
+        error: "Folder not found",
+      });
 
-      const result = manager.moveNote("My Note", "Archive");
+      const result = manager.moveNoteById("x-coredata://ABC/ICNote/p123", "Nonexistent");
 
-      // Should still return true because the note exists in the destination
-      expect(result).toBe(true);
+      expect(result).toBe(false);
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
     });
   });
 

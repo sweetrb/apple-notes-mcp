@@ -5,6 +5,8 @@ import { join } from "path";
 import {
   assertSafeSavePath,
   readFileBase64,
+  readFileBase64Capped,
+  maxAttachmentBytes,
   fileSize,
   makeTempDir,
   cleanupTempDir,
@@ -59,5 +61,33 @@ describe("base64 / size / temp helpers (#27)", () => {
     cleanupTempDir(dir);
     expect(existsSync(dir)).toBe(false);
     expect(() => cleanupTempDir(dir)).not.toThrow();
+  });
+});
+
+describe("readFileBase64Capped / maxAttachmentBytes (size guard)", () => {
+  it("reads files at or under the cap", () => {
+    const dir = mkdtempSync(join(tmpdir(), "anatt-"));
+    dirs.push(dir);
+    const f = join(dir, "ok.bin");
+    writeFileSync(f, Buffer.from("hello"));
+    expect(readFileBase64Capped(f, 1024)).toBe(Buffer.from("hello").toString("base64"));
+  });
+
+  it("throws (without reading) when the file exceeds the cap", () => {
+    const dir = mkdtempSync(join(tmpdir(), "anatt-"));
+    dirs.push(dir);
+    const f = join(dir, "big.bin");
+    writeFileSync(f, Buffer.alloc(2048));
+    expect(() => readFileBase64Capped(f, 1024)).toThrow(/exceeding the 1024-byte fetch limit/);
+  });
+
+  it("maxAttachmentBytes honors APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES and falls back to a sane default", () => {
+    expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "12345" })).toBe(12345);
+    // Invalid / non-positive values fall back to the default (25 MB).
+    expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "0" })).toBe(25 * 1024 * 1024);
+    expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "nope" })).toBe(
+      25 * 1024 * 1024
+    );
+    expect(maxAttachmentBytes({})).toBe(25 * 1024 * 1024);
   });
 });

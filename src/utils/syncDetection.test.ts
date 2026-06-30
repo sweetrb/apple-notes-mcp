@@ -16,7 +16,7 @@ import {
 
 // Mock child_process
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
 // Mock fs
@@ -25,10 +25,10 @@ vi.mock("fs", () => ({
   statSync: vi.fn(),
 }));
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 
-const mockExecSync = vi.mocked(execSync);
+const mockExecSync = vi.mocked(execFileSync);
 const mockExistsSync = vi.mocked(fs.existsSync);
 const mockStatSync = vi.mocked(fs.statSync);
 

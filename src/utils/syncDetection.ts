@@ -12,7 +12,7 @@
  * @module utils/syncDetection
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -126,11 +126,18 @@ export function getSyncStatus(useCache = true): SyncStatus {
       AND ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL;
     `;
 
-    const result = execSync(`sqlite3 -readonly "${NOTES_DB_PATH}" "${query.replace(/\n/g, " ")}"`, {
-      encoding: "utf8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    // Use execFileSync (argv array, no shell) to match the sibling sqlite callers
+    // (checklistParser.ts, noteMetadata.ts). The values here aren't user-controlled,
+    // but argv form avoids shell quoting/interpolation entirely.
+    const result = execFileSync(
+      "sqlite3",
+      ["-readonly", NOTES_DB_PATH, query.replace(/\n/g, " ")],
+      {
+        encoding: "utf8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
 
     status.pendingUpload = parseInt(result.trim(), 10) || 0;
 

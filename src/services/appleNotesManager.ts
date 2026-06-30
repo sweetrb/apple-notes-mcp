@@ -36,7 +36,7 @@ import { executeAppleScript } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import {
   assertSafeSavePath,
-  readFileBase64,
+  readFileBase64Capped,
   fileSize,
   makeTempDir,
   cleanupTempDir,
@@ -1629,26 +1629,27 @@ export class AppleNotesManager {
   }
 
   /**
-   * Moves a note to a different folder.
+   * Moves a note to a different folder, looked up by title.
    *
-   * Since AppleScript doesn't support direct note moves, this operation:
-   * 1. Retrieves the source note's content
-   * 2. Creates a new note with that content in the destination folder
-   * 3. Deletes the original note (only if copy succeeded)
+   * Uses Notes.app's native `move` command (the same one `batchMoveNotes`
+   * uses), which relocates the note in place — preserving its identity, id,
+   * creation date, AND all embedded attachments (files/images/PDFs/scans/audio).
+   * The previous copy-then-delete implementation rebuilt the note from its body
+   * HTML, which silently dropped attachments and reset the note's identity.
    *
-   * This ensures the note is never lost - if the copy fails, the
-   * original remains untouched. If only the delete fails, the note
-   * exists in the new location (success is still returned).
+   * The note is resolved to its id first (titles can be duplicated), then moved
+   * by id so the title-based and id-based paths share the same native move.
    *
    * @param title - Title of the note to move
-   * @param destinationFolder - Name of the folder to move to
+   * @param destinationFolder - Name of the folder to move to (must already exist)
    * @param account - Account containing the note (defaults to iCloud)
-   * @returns true if move succeeded (or copy succeeded but delete failed)
+   * @returns true if the move succeeded, false otherwise
    */
   moveNote(title: string, destinationFolder: string, account?: string): boolean {
     const targetAccount = this.resolveAccount(account);
 
-    // Step 1: Get the original note's ID first (before creating a copy with the same title)
+    // Resolve the note's id first (titles can be duplicated), then delegate to
+    // the id-based native move so both paths preserve attachments + identity.
     const originalNote = this.getNoteDetails(title, targetAccount);
 
     if (!originalNote) {
@@ -1656,98 +1657,45 @@ export class AppleNotesManager {
       return false;
     }
 
-    // Step 2: Retrieve the original note's content
-    const originalContent = this.getNoteContent(title, targetAccount);
-
-    if (!originalContent) {
-      console.error(`Cannot move note "${title}": failed to retrieve content`);
-      return false;
-    }
-
-    // Step 3: Create a copy in the destination folder
-    // Content is already HTML from getNoteContent(), so use escapeHtmlForAppleScript()
-    const folderRef = buildFolderReference(destinationFolder);
-    const safeContent = escapeHtmlForAppleScript(originalContent);
-
-    const createCommand = `make new note at ${folderRef} with properties {body:"${safeContent}"}`;
-    const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
-    const copyResult = executeAppleScript(script);
-
-    if (!copyResult.success) {
-      console.error(
-        `Cannot move note "${title}": failed to create in destination folder:`,
-        copyResult.error
-      );
-      return false;
-    }
-
-    // Step 4: Delete the original by ID (not by title, since there are now two notes with the same title)
-    const safeOrigId = sanitizeId(originalNote.id);
-    const deleteCommand = `delete note id "${safeOrigId}"`;
-    const deleteScript = buildAppLevelScript(deleteCommand);
-    const deleteResult = executeAppleScript(deleteScript);
-
-    if (!deleteResult.success) {
-      // The note was copied successfully but we couldn't delete the original.
-      // This is still a partial success - the note exists in the new location.
-      console.error(
-        `Note "${title}" was copied to "${destinationFolder}" but original could not be deleted:`,
-        deleteResult.error
-      );
-      return true;
-    }
-
-    return true;
+    return this.moveNoteById(originalNote.id, destinationFolder, targetAccount);
   }
 
   /**
    * Moves a note to a different folder by its CoreData ID.
    *
-   * This is more reliable than moveNote() because IDs are unique,
-   * while titles can be duplicated.
+   * Uses Notes.app's native `move <noteRef> to <destFolder>` command — the same
+   * one `batchMoveNotes` uses — which relocates the note in place, preserving its
+   * id, creation date, and all embedded attachments. (The old copy-then-delete
+   * approach rebuilt the note from body HTML and silently lost attachments.)
    *
    * @param id - CoreData URL identifier for the note
-   * @param destinationFolder - Name of the folder to move to
+   * @param destinationFolder - Name of the folder to move to (must already exist)
    * @param account - Account containing the destination folder (defaults to iCloud)
-   * @returns true if move succeeded (or copy succeeded but delete failed)
+   * @returns true if the move succeeded, false otherwise
    */
   moveNoteById(id: string, destinationFolder: string, account?: string): boolean {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeId(id);
+    const safeAccount = sanitizeAccountName(targetAccount);
+    // buildFolderReference validates the destination path; a malformed folder is
+    // a precondition error, so let it throw. The destination folder must already
+    // exist — Notes.app's `move` does not create it.
+    const destFolderRef = `${buildFolderReference(destinationFolder)} of account "${safeAccount}"`;
 
-    // Step 1: Retrieve the original note's content by ID
-    const originalContent = this.getNoteContentById(id);
+    const moveCommand = `
+      set destFolder to ${destFolderRef}
+      set noteRef to note id "${safeId}"
+      move noteRef to destFolder
+    `;
+    const script = buildAppLevelScript(moveCommand);
+    const result = executeAppleScript(script);
 
-    if (!originalContent) {
-      console.error(`Cannot move note: note with ID "${id}" not found`);
-      return false;
-    }
-
-    // Step 2: Create a copy in the destination folder
-    // Content is already HTML from getNoteContentById(), so use escapeHtmlForAppleScript()
-    const folderRef = buildFolderReference(destinationFolder);
-    const safeContent = escapeHtmlForAppleScript(originalContent);
-
-    const createCommand = `make new note at ${folderRef} with properties {body:"${safeContent}"}`;
-    const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
-    const copyResult = executeAppleScript(script);
-
-    if (!copyResult.success) {
-      console.error(`Cannot move note: failed to create in destination folder:`, copyResult.error);
-      return false;
-    }
-
-    // Step 3: Delete the original by ID
-    const deleteCommand = `delete note id "${safeId}"`;
-    const deleteScript = buildAppLevelScript(deleteCommand);
-    const deleteResult = executeAppleScript(deleteScript);
-
-    if (!deleteResult.success) {
+    if (!result.success) {
       console.error(
-        `Note was copied to "${destinationFolder}" but original could not be deleted:`,
-        deleteResult.error
+        `Cannot move note to "${destinationFolder}" (folder may not exist):`,
+        result.error
       );
-      return true; // Partial success - note exists in new location
+      return false;
     }
 
     return true;
@@ -2534,11 +2482,15 @@ export class AppleNotesManager {
       if (!saved.success || !saved.savedPath) {
         return { success: false, error: saved.error };
       }
+      // readFileBase64Capped checks the file size BEFORE reading and throws if it
+      // exceeds APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES — the throw is caught below
+      // and the temp dir is still cleaned up in `finally`.
+      const base64 = readFileBase64Capped(saved.savedPath);
       return {
         success: true,
         name: saved.name,
         contentType: saved.contentType,
-        base64: readFileBase64(saved.savedPath),
+        base64,
         bytes: fileSize(saved.savedPath),
       };
     } catch (e) {
