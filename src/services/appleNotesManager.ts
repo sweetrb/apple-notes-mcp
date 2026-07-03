@@ -704,8 +704,13 @@ export class AppleNotesManager {
       return null;
     }
 
-    // Extract the CoreData ID from the response
-    const noteId = result.output.trim();
+    // Extract the CoreData ID from the response.
+    // AppleScript's `id of newNote` yields an object specifier of the form
+    // "note id x-coredata://<uuid>/ICNote/pN" — with a literal "note id " prefix.
+    // Strip that prefix so we return the bare x-coredata:// URL that the id
+    // validator and downstream tools (get-note-content, update-note) accept.
+    const rawOutput = result.output.trim();
+    const noteId = extractCoreDataId(rawOutput, "note") || rawOutput;
 
     // Return a Note object representing the created note with real ID
     const now = new Date();

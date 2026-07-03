@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.7] - 2026-07-03
+### Fixed
+- **`create-note` now returns a usable note id.** `create-note` returned the raw AppleScript object specifier (`note id x-coredata://<uuid>/ICNote/pN`) — including a literal `note id ` prefix — as the note's `id`. Downstream tools rejected it: `get-note-content id=<that>` failed with `Invalid note ID format: … Expected CoreData URL (x-coredata://...) or temp ID.` The returned specifier is now run through `extractCoreDataId`, so `create-note` returns the bare `x-coredata://` URL that the id validator and all consumers (`get-note-content`, `update-note`, etc.) accept and can round-trip.
+- **CI `format:check` restored to green.** `src/index.ts` and `src/utils/attachmentFs.test.ts` had drifted from Prettier style (unformatted code merged via dependabot PR #63), failing the `format:check` CI gate. Reformatted with `prettier --write`.
+
 ## [2.5.6] - 2026-06-30
 ### Fixed
 - **`move-note` no longer drops attachments or resets note identity (data-loss fix).** The single-note `move-note` was implemented as copy-then-delete: it rebuilt the note from its body HTML in the destination folder and deleted the original, silently discarding every embedded attachment (files, images, PDFs, scans, audio) and resetting the note's creation date and id. It now uses Notes.app's native `move` command — the same one `batch-move-notes` already used — which relocates the note in place, preserving its id, creation date, and all attachments. The destination-folder-must-exist behavior is unchanged. Tests updated to assert the native `move` path (no `make new note`).
