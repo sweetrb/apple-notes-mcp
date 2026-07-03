@@ -424,6 +424,39 @@ describe("AppleNotesManager", () => {
       expect(result?.account).toBe("iCloud"); // Default account
     });
 
+    it("strips the 'note id ' prefix from the returned id (#create-note-id)", () => {
+      // AppleScript's `id of newNote` yields an object specifier with a literal
+      // "note id " prefix. The returned id must be the bare x-coredata:// URL so
+      // downstream tools (get-note-content, update-note) accept it.
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://ABC-DEF/ICNote/p42",
+      });
+
+      const result = manager.createNote("Prefixed", "Body");
+
+      expect(result?.id).toBe("x-coredata://ABC-DEF/ICNote/p42");
+      expect(result?.id).not.toMatch(/^note id /);
+    });
+
+    it("returned id round-trips through get-note-content and update-note (#create-note-id)", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "note id x-coredata://ABC-DEF/ICNote/p99",
+      });
+      const created = manager.createNote("Roundtrip", "Body");
+      const id = created?.id as string;
+      expect(id).toBe("x-coredata://ABC-DEF/ICNote/p99");
+
+      // Reading back by the returned id must not throw "Invalid note ID format".
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "Body text" });
+      expect(() => manager.getNoteContentById(id)).not.toThrow();
+
+      // Updating by the returned id must not throw either.
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+      expect(() => manager.updateNoteById(id, undefined, "New body")).not.toThrow();
+    });
+
     it("returns null when AppleScript fails", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: false,

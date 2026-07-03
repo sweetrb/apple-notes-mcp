@@ -84,7 +84,9 @@ describe("readFileBase64Capped / maxAttachmentBytes (size guard)", () => {
   it("maxAttachmentBytes honors APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES and falls back to a sane default", () => {
     expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "12345" })).toBe(12345);
     // Invalid / non-positive values fall back to the default (25 MB).
-    expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "0" })).toBe(25 * 1024 * 1024);
+    expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "0" })).toBe(
+      25 * 1024 * 1024
+    );
     expect(maxAttachmentBytes({ APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES: "nope" })).toBe(
       25 * 1024 * 1024
     );

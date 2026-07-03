@@ -1503,10 +1503,7 @@ server.registerTool(
     description:
       "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts.\nDo not use when: moving a single note (move-note).\nNote: the destination folder must already exist (create-folder).",
     inputSchema: {
-      ids: z
-        .array(z.string().max(MAX.ID))
-        .max(MAX.BATCH_IDS)
-        .describe("Array of note IDs to move"),
+      ids: z.array(z.string().max(MAX.ID)).max(MAX.BATCH_IDS).describe("Array of note IDs to move"),
       folder: z.string().max(MAX.FOLDER).describe("Destination folder name"),
       account: z
         .string()
