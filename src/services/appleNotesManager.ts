@@ -351,6 +351,18 @@ export function asDatePartsExpr(v: string): string {
 }
 
 /**
+ * Normalizes an optional AppleScript text field: trims it and converts the
+ * literal "missing value" (what `URL of a as text` yields when the property is
+ * unset) to undefined, so callers never see the sentinel string as data.
+ *
+ * @param field - raw field text from the AppleScript record, if any
+ */
+function normalizeAppleScriptText(field: string | undefined): string | undefined {
+  const trimmed = field?.trim();
+  return trimmed && trimmed !== "missing value" ? trimmed : undefined;
+}
+
+/**
  * Parsed note properties from AppleScript output.
  */
 interface ParsedNoteProperties {
@@ -2289,8 +2301,8 @@ export class AppleNotesManager {
           set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
         end repeat
         set output to ""
-        repeat with item in attachmentList
-          set output to output & item & ${AS_RECORD_SEP}
+        repeat with recordItem in attachmentList
+          set output to output & recordItem & ${AS_RECORD_SEP}
         end repeat
         return output
       end tell
@@ -2316,7 +2328,7 @@ export class AppleNotesManager {
           name: parts[1].trim(),
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || undefined,
-          url: parts[3]?.trim() || undefined,
+          url: normalizeAppleScriptText(parts[3]),
           created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : undefined,
           modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : undefined,
           shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : undefined,
@@ -2360,8 +2372,8 @@ export class AppleNotesManager {
           set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
         end repeat
           set output to ""
-          repeat with item in attachmentList
-            set output to output & item & ${AS_RECORD_SEP}
+          repeat with recordItem in attachmentList
+            set output to output & recordItem & ${AS_RECORD_SEP}
           end repeat
           return output
         end tell
@@ -2388,7 +2400,7 @@ export class AppleNotesManager {
           name: parts[1].trim(),
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || undefined,
-          url: parts[3]?.trim() || undefined,
+          url: normalizeAppleScriptText(parts[3]),
           created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : undefined,
           modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : undefined,
           shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : undefined,

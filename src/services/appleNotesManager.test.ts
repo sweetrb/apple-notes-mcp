@@ -2571,6 +2571,42 @@ describe("AppleNotesManager", () => {
         expect.stringContaining('note id "x-coredata://ABC/ICNote/p123"')
       );
     });
+
+    it("does not use the reserved word `item` as a repeat loop variable", () => {
+      // Regression: `repeat with item in ...` fails to COMPILE ("Expected
+      // variable name or property but found class name", -2741), so every
+      // list-attachments call errored and surfaced as an empty array.
+      mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
+
+      manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(script).not.toMatch(/repeat with item\b/);
+      expect(script).toContain("repeat with recordItem in attachmentList");
+    });
+
+    it("normalizes a 'missing value' URL to undefined", () => {
+      // `URL of a as text` renders as the literal string "missing value" for
+      // attachments without a URL (most images); that sentinel must not leak
+      // into the parsed url field.
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: [
+          "x-coredata://ABC/ICAttachment/p1",
+          "photo.png",
+          "cid:abc",
+          "missing value",
+          "2026-7-5-22-7-39",
+          "2026-7-5-22-7-39",
+          "false",
+        ].join(F),
+      });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(attachments).toHaveLength(1);
+      expect(attachments[0].url).toBeUndefined();
+    });
   });
 
   describe("listAttachments", () => {

@@ -39282,6 +39282,10 @@ function buildAppleScriptDateVar(date3, varName = "thresholdDate") {
 function asDatePartsExpr(v) {
   return `((year of ${v}) as text) & "-" & ((month of ${v}) as integer as text) & "-" & ((day of ${v}) as text) & "-" & ((hours of ${v}) as text) & "-" & ((minutes of ${v}) as text) & "-" & ((seconds of ${v}) as text)`;
 }
+function normalizeAppleScriptText(field) {
+  const trimmed = field?.trim();
+  return trimmed && trimmed !== "missing value" ? trimmed : void 0;
+}
 function parseNotePropertiesOutput(output) {
   const parts = output.split(FIELD_SEP);
   if (parts.length < 6) {
@@ -40737,8 +40741,8 @@ var AppleNotesManager = class {
           set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
         end repeat
         set output to ""
-        repeat with item in attachmentList
-          set output to output & item & ${AS_RECORD_SEP}
+        repeat with recordItem in attachmentList
+          set output to output & recordItem & ${AS_RECORD_SEP}
         end repeat
         return output
       end tell
@@ -40760,7 +40764,7 @@ var AppleNotesManager = class {
           name: parts[1].trim(),
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || void 0,
-          url: parts[3]?.trim() || void 0,
+          url: normalizeAppleScriptText(parts[3]),
           created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : void 0,
           modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : void 0,
           shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : void 0
@@ -40801,8 +40805,8 @@ var AppleNotesManager = class {
           set end of attachmentList to attachId & ${AS_FIELD_SEP} & attachName & ${AS_FIELD_SEP} & attachContentId & ${AS_FIELD_SEP} & attachUrl & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts & ${AS_FIELD_SEP} & sharedFlag
         end repeat
           set output to ""
-          repeat with item in attachmentList
-            set output to output & item & ${AS_RECORD_SEP}
+          repeat with recordItem in attachmentList
+            set output to output & recordItem & ${AS_RECORD_SEP}
           end repeat
           return output
         end tell
@@ -40825,7 +40829,7 @@ var AppleNotesManager = class {
           name: parts[1].trim(),
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || void 0,
-          url: parts[3]?.trim() || void 0,
+          url: normalizeAppleScriptText(parts[3]),
           created: parts[4] ? parseAppleScriptDate(parts[4].trim()) : void 0,
           modified: parts[5] ? parseAppleScriptDate(parts[5].trim()) : void 0,
           shared: parts[6] ? parts[6].trim().toLowerCase() === "true" : void 0
