@@ -11,7 +11,7 @@
     {
       "name": "apple-notes",
       "description": "Manage Apple Notes through natural language - create, search, read, update, delete, and organize notes and folders",
-      "version": "2.5.7",
+      "version": "2.5.8",
       "author": {
         "name": "Rob Sweet",
         "email": "rob@superiortech.io"

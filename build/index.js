@@ -38659,13 +38659,16 @@ var StdioServerTransport = class {
 import { execSync, spawnSync } from "child_process";
 var DEFAULT_TIMEOUT_MS = 3e4;
 var DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
-function getMaxBuffer() {
-  const raw = process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+function envPositiveNumber(name) {
+  const raw = process.env[name];
   if (raw !== void 0) {
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  return DEFAULT_MAX_BUFFER_BYTES;
+  return void 0;
+}
+function getMaxBuffer() {
+  return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
 }
 var SCRIPT_TIMEOUT_HEADROOM_MS = 5e3;
 function wrapWithTimeout(script, processTimeoutMs) {
@@ -38674,7 +38677,7 @@ function wrapWithTimeout(script, processTimeoutMs) {
 ${script}
 end timeout`;
 }
-var DEFAULT_MAX_RETRIES = 1;
+var DEFAULT_MAX_RETRIES = 2;
 var DEFAULT_RETRY_DELAY_MS = 1e3;
 var isDebugEnabled = () => {
   const debug = process.env.DEBUG;
@@ -38799,9 +38802,9 @@ function parseErrorMessage(errorOutput) {
   return coreError.trim() || "Unknown AppleScript error";
 }
 function executeAppleScript(script, options = {}) {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const timeoutMs = options.timeoutMs ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
+  const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
   if (!script || !script.trim()) {
     return {
       success: false,
@@ -41550,6 +41553,7 @@ function parseHashtags(body) {
 }
 
 // src/tools/doctor.ts
+import { spawnSync as spawnSync2 } from "child_process";
 function runDoctor(manager) {
   const checks = [];
   const hc = manager.healthCheck();
@@ -41580,8 +41584,39 @@ function runDoctor(manager) {
     status: fda ? "ok" : "warn",
     detail: fda ? "granted \u2014 checklist features available" : "not granted \u2014 get-checklist-state and checklist annotations in get-note-markdown won't work. Grant in System Settings > Privacy & Security > Full Disk Access."
   });
+  checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
   return { healthy, checks };
+}
+function checkNodeRuntimeSignature() {
+  const name = "Node runtime signature";
+  try {
+    const r = spawnSync2("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
+    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    if (r.error || !out.trim()) {
+      return {
+        name,
+        status: "warn",
+        detail: `could not inspect ${process.execPath} with codesign`
+      };
+    }
+    const adhoc = /^Signature=adhoc$/m.test(out) || /^TeamIdentifier=not set$/m.test(out);
+    if (adhoc) {
+      return {
+        name,
+        status: "warn",
+        detail: `${process.execPath} is ad-hoc signed (no Team ID). macOS revokes its Automation and Full Disk Access grants every time the binary changes (e.g. every brew upgrade), which looks like random permission loss. Fix: run the server with a Developer-ID-signed Node at a stable path \u2014 see docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md.`
+      };
+    }
+    const team = /^TeamIdentifier=(.+)$/m.exec(out)?.[1];
+    return {
+      name,
+      status: "ok",
+      detail: `${process.execPath} has a stable signature${team ? ` (Team ID ${team})` : ""} \u2014 TCC grants persist across updates`
+    };
+  } catch (e) {
+    return { name, status: "warn", detail: `could not inspect node signature: ${String(e)}` };
+  }
 }
 function formatDoctorReport(r) {
   const icon = (s) => s === "ok" ? "\u2705" : s === "warn" ? "\u26A0\uFE0F " : "\u274C";

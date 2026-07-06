@@ -13,7 +13,9 @@ import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 /**
  * Default execution timeout for AppleScript commands in milliseconds.
  * 30 seconds is sufficient for most operations, including complex
- * searches on large note collections. Can be overridden per-call.
+ * searches on large note collections. Can be overridden per-call, or
+ * process-wide via APPLE_NOTES_MCP_TIMEOUT_MS for very large libraries
+ * where full-library scans legitimately exceed 30s.
  */
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -25,13 +27,22 @@ const DEFAULT_TIMEOUT_MS = 30000;
  */
 const DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 
-function getMaxBuffer(): number {
-  const raw = process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+/**
+ * Read a positive number from an environment variable, or undefined when the
+ * variable is unset or not a valid positive number. Shared by the reliability
+ * knobs (max buffer, timeout, retries) so they all validate the same way.
+ */
+function envPositiveNumber(name: string): number | undefined {
+  const raw = process.env[name];
   if (raw !== undefined) {
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  return DEFAULT_MAX_BUFFER_BYTES;
+  return undefined;
+}
+
+function getMaxBuffer(): number {
+  return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
 }
 
 /**
@@ -57,10 +68,16 @@ function wrapWithTimeout(script: string, processTimeoutMs: number): string {
 
 /**
  * Default retry configuration.
- * - 1 attempt means no retries (default behavior)
- * - Use maxRetries: 3 for exponential backoff with 1s/2s delays
+ * - maxRetries is the TOTAL number of attempts; 1 means no retries.
+ * - The default is 2 (one retry after a 1s delay), applied only to transient
+ *   failures (Notes.app busy / not responding / lost connection / timeout) —
+ *   non-transient errors like "note not found" never retry. Override per call
+ *   via options, or process-wide via APPLE_NOTES_MCP_MAX_RETRIES and
+ *   APPLE_NOTES_MCP_RETRY_DELAY_MS (set APPLE_NOTES_MCP_MAX_RETRIES=1 to
+ *   restore the old fail-fast behavior). Delays back off exponentially
+ *   (1s/2s/4s... by default).
  */
-const DEFAULT_MAX_RETRIES = 1;
+const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 1000;
 
 /**
@@ -320,9 +337,15 @@ export function executeAppleScript(
   script: string,
   options: AppleScriptOptions = {}
 ): AppleScriptResult {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  // Per-call options win; then process-wide env knobs; then built-in defaults.
+  const timeoutMs =
+    options.timeoutMs ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries =
+    options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
+  const retryDelayMs =
+    options.retryDelayMs ??
+    envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ??
+    DEFAULT_RETRY_DELAY_MS;
 
   // Validate input - empty scripts are likely programmer errors
   if (!script || !script.trim()) {

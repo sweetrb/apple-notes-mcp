@@ -944,6 +944,9 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_BUFFER` | `67108864` (64 MB) | Max bytes captured from a single AppleScript invocation. Raise it if a very large export/list is truncated; lower it to cap memory. |
 | `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` | `26214400` (25 MB) | Max size of an attachment that [`fetch-attachment`](#fetch-attachment) will base64-encode inline. Larger attachments are rejected with an error pointing at [`save-attachment`](#save-attachment) (which streams to disk and has no such limit). Raise it to fetch bigger attachments inline; lower it to cap memory. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
+| `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Per-call AppleScript timeout. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
+| `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Total attempts for an AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection / timeout). `2` means one retry; set `1` to fail fast with no retries. Non-transient errors (e.g. "note not found") never retry. |
+| `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
 ### Configuration file (when the host strips `env`)
