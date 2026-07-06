@@ -282,18 +282,73 @@ describe("executeAppleScript", () => {
 
       expect(result.error).toContain("timed out after 60 seconds");
     });
+
+    it("honors APPLE_NOTES_MCP_TIMEOUT_MS when no per-call timeout is given", () => {
+      vi.stubEnv("APPLE_NOTES_MCP_TIMEOUT_MS", "45000");
+      const timeoutError = new Error("Command failed: SIGTERM") as Error & {
+        killed: boolean;
+        signal: string;
+      };
+      timeoutError.killed = true;
+      timeoutError.signal = "SIGTERM";
+
+      mockExecSync.mockImplementation(() => {
+        throw timeoutError;
+      });
+
+      const result = executeAppleScript("test");
+
+      expect(result.error).toContain("timed out after 45 seconds");
+      vi.unstubAllEnvs();
+    });
   });
 
   describe("retry logic", () => {
-    it("does not retry by default (maxRetries=1)", () => {
+    it("retries transient errors once by default (maxRetries=2)", () => {
       mockExecSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
       executeAppleScript("test");
 
-      // Only one attempt with default settings
+      // Two attempts with default settings: the initial call plus one retry
+      expect(mockExecSync).toHaveBeenCalledTimes(2);
+    });
+
+    it("APPLE_NOTES_MCP_MAX_RETRIES=1 restores fail-fast behavior", () => {
+      vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "1");
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Notes.app is not responding");
+      });
+
+      executeAppleScript("test");
+
       expect(mockExecSync).toHaveBeenCalledTimes(1);
+      vi.unstubAllEnvs();
+    });
+
+    it("per-call options override the env knobs", () => {
+      vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "5");
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Notes.app is not responding");
+      });
+
+      executeAppleScript("test", { maxRetries: 1 });
+
+      expect(mockExecSync).toHaveBeenCalledTimes(1);
+      vi.unstubAllEnvs();
+    });
+
+    it("ignores an invalid APPLE_NOTES_MCP_MAX_RETRIES and uses the default", () => {
+      vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "banana");
+      mockExecSync.mockImplementation(() => {
+        throw new Error("Notes.app is not responding");
+      });
+
+      executeAppleScript("test");
+
+      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      vi.unstubAllEnvs();
     });
 
     it("retries on transient errors when maxRetries > 1", () => {
