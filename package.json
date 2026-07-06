@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=build/index.js",
+    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=build/index.js --banner:js=\"import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);\"",
     "start": "node build/index.js",
     "dev": "tsc --watch",
     "test": "vitest run",
