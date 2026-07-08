@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Timeouts were never actually detected in production.** `isTimeoutError` in both executors checked `killed === true || signal === "SIGTERM"`, which is the error shape of the *async* `exec` API. A timed-out `execSync`/`execFileSync` call throws the underlying spawnSync error instead: `code: "ETIMEDOUT"` with `signal` set to the configured kill signal (`SIGKILL`, per #17). So a real timeout fell through to generic error parsing (surfacing as the raw `spawnSync /bin/sh ETIMEDOUT`) and, because the retry gate keys off timeout detection and `ETIMEDOUT` does not match the `/timed? out/i` transient pattern, **timeouts were never retried** despite the retry-on-timeout behavior shipped in #70. The mocked unit tests passed because their fake errors used the async shape; the detection now checks `ETIMEDOUT`/`SIGKILL` first (keeping the old checks as a fallback), the tests use the real error shape, and the fix was verified against a live forced timeout.
+
+### Security
+- **AppleScript and JXA no longer pass through `/bin/sh`.** Both executors composed `osascript -e '<script>'` as a shell string for `execSync`, making single-quote escaping the only barrier between note content and arbitrary shell execution, and capping script size at the kernel's argv limit (a sufficiently large generated script — big note bodies — would fail with E2BIG). They now call `execFileSync("osascript", ["-"], ...)` with the script delivered over stdin: no shell is involved at all, so the shell-injection class of bug is structurally impossible, script size is unbounded, and each call saves a `/bin/sh` fork. The retry sleep also no longer forks a `sleep` subprocess per attempt; it blocks in-process via `Atomics.wait`.
 
 ## [2.5.9] - 2026-07-08
 ### Fixed

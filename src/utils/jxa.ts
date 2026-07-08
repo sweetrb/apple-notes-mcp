@@ -14,7 +14,7 @@
  * @module utils/jxa
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 /**
  * Output cap for osascript (JXA). Mirrors the AppleScript executor — Node's 1 MB
@@ -71,12 +71,19 @@ export function escapeForJXA(str: string): string {
 }
 
 /**
- * Checks if an error is a timeout error.
+ * Checks if an error is a timeout error. A timed-out sync exec call throws
+ * with code "ETIMEDOUT" and the configured killSignal (SIGKILL, per #17);
+ * the killed/SIGTERM checks are kept as a fallback for the async exec shape.
  */
 function isTimeoutError(error: unknown): boolean {
   if (error instanceof Error) {
-    const execError = error as Error & { killed?: boolean; signal?: string };
-    return execError.killed === true || execError.signal === "SIGTERM";
+    const execError = error as Error & { code?: string; killed?: boolean; signal?: string };
+    return (
+      execError.code === "ETIMEDOUT" ||
+      execError.killed === true ||
+      execError.signal === "SIGKILL" ||
+      execError.signal === "SIGTERM"
+    );
   }
   return false;
 }
@@ -109,18 +116,16 @@ export function executeJXA(script: string, options: JXAOptions = {}): JXAResult 
     };
   }
 
-  // Escape the script for shell embedding
-  // We use single quotes to wrap, so escape single quotes within
-  const escapedScript = script.trim().replace(/'/g, "'\\''");
-  const command = `osascript -l JavaScript -e '${escapedScript}'`;
-
   try {
-    const output = execSync(command, {
+    // osascript is invoked directly (no /bin/sh) and reads the script from
+    // stdin, so no shell escaping is needed and script size isn't bounded by
+    // the kernel's argv limit.
+    const output = execFileSync("osascript", ["-l", "JavaScript", "-"], {
+      input: script.trim(),
       encoding: "utf8",
       timeout: timeoutMs,
       killSignal: "SIGKILL", // reap a wedged osascript reliably (#17)
       maxBuffer: getMaxBuffer(), // avoid ENOBUFS truncation on large output (#16)
-      stdio: ["pipe", "pipe", "pipe"],
     });
 
     return {

@@ -38656,7 +38656,7 @@ var StdioServerTransport = class {
 };
 
 // src/utils/applescript.ts
-import { execSync, spawnSync } from "child_process";
+import { execFileSync } from "child_process";
 var DEFAULT_TIMEOUT_MS = 3e4;
 var DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 function envPositiveNumber(name) {
@@ -38693,13 +38693,10 @@ function debugLog(message, data) {
     console.error(`[DEBUG ${timestamp}] ${message}`);
   }
 }
-function escapeForShell(script) {
-  return script.replace(/'/g, "'\\''");
-}
 function isTimeoutError(error2) {
   if (error2 instanceof Error) {
     const execError = error2;
-    return execError.killed === true || execError.signal === "SIGTERM";
+    return execError.code === "ETIMEDOUT" || execError.killed === true || execError.signal === "SIGKILL" || execError.signal === "SIGTERM";
   }
   return false;
 }
@@ -38714,13 +38711,7 @@ function isRetryableError(errorMessage) {
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
 }
 function sleep(ms) {
-  const seconds = ms / 1e3;
-  const result = spawnSync("sleep", [seconds.toString()], { stdio: "ignore" });
-  if (result.error) {
-    const end = Date.now() + ms;
-    while (Date.now() < end) {
-    }
-  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 var ERROR_MAPPINGS = [
   // Permission errors
@@ -38812,8 +38803,7 @@ function executeAppleScript(script, options = {}) {
       error: "Cannot execute empty AppleScript"
     };
   }
-  const preparedScript = escapeForShell(wrapWithTimeout(script.trim(), timeoutMs));
-  const command = `osascript -e '${preparedScript}'`;
+  const preparedScript = wrapWithTimeout(script.trim(), timeoutMs);
   debugLog("Executing AppleScript", {
     scriptPreview: script.trim().substring(0, 200) + (script.length > 200 ? "..." : ""),
     timeout: timeoutMs,
@@ -38824,7 +38814,8 @@ function executeAppleScript(script, options = {}) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const attemptStart = Date.now();
     try {
-      const output = execSync(command, {
+      const output = execFileSync("osascript", ["-"], {
+        input: preparedScript,
         encoding: "utf8",
         timeout: timeoutMs,
         // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
@@ -38833,9 +38824,7 @@ function executeAppleScript(script, options = {}) {
         killSignal: "SIGKILL",
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
-        maxBuffer: getMaxBuffer(),
-        // Capture stderr separately to get error details
-        stdio: ["pipe", "pipe", "pipe"]
+        maxBuffer: getMaxBuffer()
       });
       const duration3 = Date.now() - attemptStart;
       debugLog("AppleScript succeeded", {
@@ -38901,7 +38890,7 @@ function executeAppleScript(script, options = {}) {
 }
 
 // src/utils/checklistParser.ts
-import { execFileSync } from "child_process";
+import { execFileSync as execFileSync2 } from "child_process";
 import * as zlib from "zlib";
 import * as fs from "fs";
 import * as path from "path";
@@ -38995,7 +38984,7 @@ var NOTES_DB_PATH = path.join(
 function hasFullDiskAccess() {
   try {
     if (!fs.existsSync(NOTES_DB_PATH)) return false;
-    execFileSync("sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
+    execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
       encoding: "utf8",
       timeout: 3e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -39014,7 +39003,7 @@ function queryNoteData(noteId) {
   const pk = pkMatch[1];
   const query = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
   try {
-    const result = execFileSync("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
+    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -41366,7 +41355,7 @@ var AppleNotesManager = class {
 };
 
 // src/utils/syncDetection.ts
-import { execFileSync as execFileSync2 } from "child_process";
+import { execFileSync as execFileSync3 } from "child_process";
 import * as fs2 from "fs";
 import * as path2 from "path";
 import * as os2 from "os";
@@ -41407,7 +41396,7 @@ function getSyncStatus(useCache = true) {
       WHERE ZCURRENTLOCALVERSION > ZLATESTVERSIONSYNCEDTOCLOUD
       AND ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL;
     `;
-    const result = execFileSync2(
+    const result = execFileSync3(
       "sqlite3",
       ["-readonly", NOTES_DB_PATH2, query.replace(/\n/g, " ")],
       {
@@ -41466,7 +41455,7 @@ function withSyncAwarenessSync(operation, fn) {
 }
 
 // src/utils/noteMetadata.ts
-import { execFileSync as execFileSync3 } from "child_process";
+import { execFileSync as execFileSync4 } from "child_process";
 import * as fs3 from "fs";
 import * as path3 from "path";
 import * as os3 from "os";
@@ -41487,7 +41476,7 @@ var COLUMN_MAP = [
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
 function runSqlite(query) {
-  return execFileSync3("sqlite3", ["-readonly", NOTES_DB_PATH3, query], {
+  return execFileSync4("sqlite3", ["-readonly", NOTES_DB_PATH3, query], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -41626,7 +41615,7 @@ function strippedImagesWarning(stripped) {
 }
 
 // src/tools/doctor.ts
-import { spawnSync as spawnSync2 } from "child_process";
+import { spawnSync } from "child_process";
 function runDoctor(manager) {
   const checks = [];
   const hc = manager.healthCheck();
@@ -41664,7 +41653,7 @@ function runDoctor(manager) {
 function checkNodeRuntimeSignature() {
   const name = "Node runtime signature";
   try {
-    const r = spawnSync2("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
+    const r = spawnSync("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
     const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
     if (r.error || !out.trim()) {
       return {

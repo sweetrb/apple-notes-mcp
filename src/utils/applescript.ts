@@ -7,7 +7,7 @@
  * @module utils/applescript
  */
 
-import { execSync, spawnSync } from "child_process";
+import { execFileSync } from "child_process";
 import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 
 /**
@@ -108,39 +108,26 @@ function debugLog(message: string, data?: unknown): void {
 }
 
 /**
- * Escapes a string for safe inclusion in a shell command.
+ * Checks if an error is a timeout error from a sync child_process call.
  *
- * When passing AppleScript to osascript via shell, we need to handle
- * the interaction between shell quoting and AppleScript string literals.
- * This function escapes single quotes since we wrap the script in single quotes.
- *
- * @param script - The raw AppleScript code
- * @returns Shell-safe version of the script
- *
- * @example
- * // Input: tell app "Notes" to get note "Rob's Note"
- * // Output: tell app "Notes" to get note "Rob'\''s Note"
- */
-function escapeForShell(script: string): string {
-  // Replace single quotes with: end quote, escaped quote, start quote
-  // This is the standard shell escaping pattern for single-quoted strings
-  return script.replace(/'/g, "'\\''");
-}
-
-/**
- * Checks if an error is a timeout error from execSync.
- *
- * Node.js throws errors with specific properties when a child process
- * is killed due to timeout.
+ * A timed-out execFileSync/execSync throws the underlying spawnSync error:
+ * `code` is "ETIMEDOUT" and `signal` is the configured killSignal (SIGKILL
+ * here, per #17). There is no `killed: true` on the sync API's error — that
+ * shape belongs to async exec — but it is kept as a fallback so any caller
+ * that wraps this with the async API still gets timeout semantics.
  *
  * @param error - The caught error object
  * @returns True if this was a timeout error
  */
 function isTimeoutError(error: unknown): boolean {
   if (error instanceof Error) {
-    const execError = error as Error & { killed?: boolean; signal?: string };
-    // execSync kills the process with SIGTERM on timeout
-    return execError.killed === true || execError.signal === "SIGTERM";
+    const execError = error as Error & { code?: string; killed?: boolean; signal?: string };
+    return (
+      execError.code === "ETIMEDOUT" ||
+      execError.killed === true ||
+      execError.signal === "SIGKILL" ||
+      execError.signal === "SIGTERM"
+    );
   }
   return false;
 }
@@ -168,29 +155,17 @@ function isRetryableError(errorMessage: string): boolean {
 }
 
 /**
- * Synchronous sleep using the system's sleep command.
- * Used between retry attempts for exponential backoff.
+ * Synchronous sleep between retry attempts, without spawning a subprocess.
  *
- * This is more efficient than a busy-wait loop as it doesn't
- * consume CPU cycles during the delay.
- *
- * Uses spawnSync instead of execSync to avoid interference with
- * execSync mocks in tests.
+ * Atomics.wait blocks the thread until the timeout expires (the int32 never
+ * changes, so the wait always runs to its timeout). It consumes no CPU while
+ * waiting and, unlike the previous `spawnSync("sleep", ...)`, costs no
+ * process fork per retry and cannot fail into a busy-wait.
  *
  * @param ms - Milliseconds to sleep
  */
 function sleep(ms: number): void {
-  // Use system sleep command with fractional seconds support
-  // This avoids CPU-spinning busy wait while keeping the code synchronous
-  const seconds = ms / 1000;
-  const result = spawnSync("sleep", [seconds.toString()], { stdio: "ignore" });
-  if (result.error) {
-    // Fallback to busy-wait if sleep command fails (shouldn't happen on macOS)
-    const end = Date.now() + ms;
-    while (Date.now() < end) {
-      // Busy wait fallback
-    }
-  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 /**
@@ -303,7 +278,7 @@ function parseErrorMessage(errorOutput: string): string {
  * Executes an AppleScript command and returns a structured result.
  *
  * This function serves as the bridge between TypeScript and macOS AppleScript.
- * It handles the complexity of shell escaping, execution, and error handling
+ * It handles the complexity of execution and error handling
  * so that calling code can work with clean TypeScript interfaces.
  *
  * The script is executed synchronously via the `osascript` command-line tool.
@@ -361,13 +336,9 @@ export function executeAppleScript(
   // 2. Wrap in `with timeout` so Notes.app aborts cleanly from inside its own
   //    dispatch before the outer process SIGKILL (#17)
   // 3. Preserve internal newlines (required for AppleScript syntax)
-  // 4. Escape for shell execution
-  const preparedScript = escapeForShell(wrapWithTimeout(script.trim(), timeoutMs));
-
-  // Build the osascript command
-  // We use single quotes to wrap the script, which is why we escape
-  // single quotes within the script itself
-  const command = `osascript -e '${preparedScript}'`;
+  // The script is fed to `osascript -` over stdin, so no shell and no shell
+  // escaping are involved, and script size is not bounded by ARG_MAX.
+  const preparedScript = wrapWithTimeout(script.trim(), timeoutMs);
 
   // Debug: Log the script being executed
   debugLog("Executing AppleScript", {
@@ -383,8 +354,13 @@ export function executeAppleScript(
     const attemptStart = Date.now();
     try {
       // Execute synchronously - MCP tools are inherently synchronous
-      // and Apple Notes operations are fast enough that async isn't needed
-      const output = execSync(command, {
+      // and Apple Notes operations are fast enough that async isn't needed.
+      // osascript is invoked directly (no /bin/sh in between) and reads the
+      // script from stdin: a shell-escaping bug can never become shell
+      // execution, and a huge generated script (large note bodies) can't
+      // blow the kernel's argv size limit the old `-e '<script>'` form had.
+      const output = execFileSync("osascript", ["-"], {
+        input: preparedScript,
         encoding: "utf8",
         timeout: timeoutMs,
         // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
@@ -394,8 +370,6 @@ export function executeAppleScript(
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
         maxBuffer: getMaxBuffer(),
-        // Capture stderr separately to get error details
-        stdio: ["pipe", "pipe", "pipe"],
       });
 
       const duration = Date.now() - attemptStart;

@@ -1,21 +1,45 @@
 /**
  * Tests for AppleScript execution utilities
  *
- * These tests mock the child_process.execSync function to avoid
+ * These tests mock the child_process.execFileSync function to avoid
  * requiring actual AppleScript execution during testing.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { executeAppleScript } from "./applescript.js";
 
 // Mock the child_process module
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
-  spawnSync: vi.fn(() => ({ error: null })), // Mock sleep to return immediately
+  execFileSync: vi.fn(),
 }));
 
-const mockExecSync = vi.mocked(execSync);
+const mockExecFileSync = vi.mocked(execFileSync);
+
+/** The script passed to osascript over stdin on the given call. */
+function scriptInput(call = 0): string {
+  return (mockExecFileSync.mock.calls[call][2] as { input: string }).input;
+}
+
+/** The options object passed to execFileSync on the given call. */
+function execOptions(call = 0): Record<string, unknown> {
+  return mockExecFileSync.mock.calls[call][2] as Record<string, unknown>;
+}
+
+/**
+ * Build an error shaped like a real sync-exec timeout: spawnSync surfaces
+ * ETIMEDOUT with the configured killSignal (SIGKILL here), and there is no
+ * `killed` flag on the sync API's error.
+ */
+function makeTimeoutError(): Error {
+  const err = new Error("spawnSync osascript ETIMEDOUT") as Error & {
+    code: string;
+    signal: string;
+  };
+  err.code = "ETIMEDOUT";
+  err.signal = "SIGKILL";
+  return err;
+}
 
 describe("executeAppleScript", () => {
   beforeEach(() => {
@@ -25,7 +49,7 @@ describe("executeAppleScript", () => {
   describe("successful execution", () => {
     it("returns success result with trimmed output", () => {
       // Arrange: Mock a successful AppleScript execution
-      mockExecSync.mockReturnValue("  Note Title  \n");
+      mockExecFileSync.mockReturnValue("  Note Title  \n");
 
       // Act: Execute a simple script
       const result = executeAppleScript('tell app "Notes" to get name of note 1');
@@ -37,7 +61,7 @@ describe("executeAppleScript", () => {
     });
 
     it("preserves newlines within the script for AppleScript syntax", () => {
-      mockExecSync.mockReturnValue("success");
+      mockExecFileSync.mockReturnValue("success");
 
       // Multi-line AppleScript with tell blocks
       const script = `
@@ -51,20 +75,22 @@ describe("executeAppleScript", () => {
       executeAppleScript(script);
 
       // Verify the script was passed with newlines preserved
-      const calledCommand = mockExecSync.mock.calls[0][0] as string;
-      expect(calledCommand).toContain("tell application");
-      expect(calledCommand).toContain("end tell");
+      expect(scriptInput()).toContain("tell application");
+      expect(scriptInput()).toContain("end tell");
     });
 
-    it("escapes single quotes in the script for shell safety", () => {
-      mockExecSync.mockReturnValue("content");
+    it("invokes osascript directly with the script on stdin (no shell)", () => {
+      mockExecFileSync.mockReturnValue("content");
 
       // Script containing a single quote (e.g., in a note title)
       executeAppleScript('get note "Rob\'s Notes"');
 
-      // Verify the quote was escaped for shell
-      const calledCommand = mockExecSync.mock.calls[0][0] as string;
-      expect(calledCommand).toContain("Rob'\\''s");
+      // osascript is called directly with "-" (read script from stdin)
+      expect(mockExecFileSync.mock.calls[0][0]).toBe("osascript");
+      expect(mockExecFileSync.mock.calls[0][1]).toEqual(["-"]);
+      // The script goes over stdin verbatim: no shell, so no shell escaping
+      expect(scriptInput()).toContain("Rob's Notes");
+      expect(scriptInput()).not.toContain("'\\''");
     });
   });
 
@@ -74,36 +100,35 @@ describe("executeAppleScript", () => {
     });
 
     it("wraps the script in `with timeout` so Notes.app aborts cleanly", () => {
-      mockExecSync.mockReturnValue("ok");
+      mockExecFileSync.mockReturnValue("ok");
       executeAppleScript("get name of notes", { timeoutMs: 30000 });
-      const cmd = mockExecSync.mock.calls[0][0] as string;
-      expect(cmd).toContain("with timeout of");
-      expect(cmd).toContain("end timeout");
+      const script = scriptInput();
+      expect(script).toContain("with timeout of");
+      expect(script).toContain("end timeout");
       // 30s process timeout − 5s headroom = 25s script timeout
-      expect(cmd).toContain("with timeout of 25 seconds");
+      expect(script).toContain("with timeout of 25 seconds");
     });
 
-    it("passes SIGKILL and a large maxBuffer to execSync", () => {
-      mockExecSync.mockReturnValue("ok");
+    it("passes SIGKILL and a large maxBuffer to execFileSync", () => {
+      mockExecFileSync.mockReturnValue("ok");
       executeAppleScript("get name of notes");
-      const opts = mockExecSync.mock.calls[0][1] as { killSignal?: string; maxBuffer?: number };
+      const opts = execOptions();
       expect(opts.killSignal).toBe("SIGKILL");
       expect(opts.maxBuffer).toBe(64 * 1024 * 1024);
     });
 
     it("honors APPLE_NOTES_MCP_MAX_BUFFER override", () => {
       process.env.APPLE_NOTES_MCP_MAX_BUFFER = "1048576";
-      mockExecSync.mockReturnValue("ok");
+      mockExecFileSync.mockReturnValue("ok");
       executeAppleScript("get name of notes");
-      const opts = mockExecSync.mock.calls[0][1] as { maxBuffer?: number };
-      expect(opts.maxBuffer).toBe(1048576);
+      expect(execOptions().maxBuffer).toBe(1048576);
     });
   });
 
   describe("error handling", () => {
     it("returns error result when execution fails", () => {
       // Arrange: Mock an AppleScript execution failure
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("execution error: Can't get note. (-1728)");
       });
 
@@ -117,7 +142,7 @@ describe("executeAppleScript", () => {
     });
 
     it("parses execution error messages cleanly", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("execution error: Note not found (-1728)");
       });
 
@@ -128,7 +153,7 @@ describe("executeAppleScript", () => {
     });
 
     it("handles 'not found' error patterns with user-friendly message", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error('Can\'t get note "Missing".');
       });
 
@@ -140,7 +165,7 @@ describe("executeAppleScript", () => {
     });
 
     it("provides helpful message for permission errors", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("execution error: Not authorized to send Apple events (-1743)");
       });
 
@@ -151,7 +176,7 @@ describe("executeAppleScript", () => {
     });
 
     it("provides helpful message for folder not found", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error('Can\'t get folder "Work".');
       });
 
@@ -163,7 +188,7 @@ describe("executeAppleScript", () => {
     });
 
     it("provides helpful message for account not found", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error('Can\'t get account "Gmail".');
       });
 
@@ -175,7 +200,7 @@ describe("executeAppleScript", () => {
     });
 
     it("handles non-Error exceptions gracefully", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw "string error"; // Some code throws strings
       });
 
@@ -186,7 +211,7 @@ describe("executeAppleScript", () => {
     });
 
     it("handles unknown error types", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw { weird: "object" }; // Unusual but possible
       });
 
@@ -203,7 +228,7 @@ describe("executeAppleScript", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Cannot execute empty AppleScript");
-      expect(mockExecSync).not.toHaveBeenCalled();
+      expect(mockExecFileSync).not.toHaveBeenCalled();
     });
 
     it("returns error for whitespace-only script", () => {
@@ -211,62 +236,51 @@ describe("executeAppleScript", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Cannot execute empty AppleScript");
-      expect(mockExecSync).not.toHaveBeenCalled();
+      expect(mockExecFileSync).not.toHaveBeenCalled();
     });
   });
 
   describe("execution options", () => {
     it("uses default 30 second timeout", () => {
-      mockExecSync.mockReturnValue("ok");
+      mockExecFileSync.mockReturnValue("ok");
 
       executeAppleScript("test");
 
-      const options = mockExecSync.mock.calls[0][1] as { timeout: number };
-      expect(options.timeout).toBe(30000); // 30 second default timeout
+      expect(execOptions().timeout).toBe(30000); // 30 second default timeout
     });
 
     it("allows custom timeout via options", () => {
-      mockExecSync.mockReturnValue("ok");
+      mockExecFileSync.mockReturnValue("ok");
 
       executeAppleScript("test", { timeoutMs: 60000 });
 
-      const options = mockExecSync.mock.calls[0][1] as { timeout: number };
-      expect(options.timeout).toBe(60000); // Custom timeout
+      expect(execOptions().timeout).toBe(60000); // Custom timeout
     });
 
     it("uses UTF-8 encoding for output", () => {
-      mockExecSync.mockReturnValue("日本語テスト");
+      mockExecFileSync.mockReturnValue("日本語テスト");
 
       const result = executeAppleScript("test");
 
       expect(result.output).toBe("日本語テスト");
-      const options = mockExecSync.mock.calls[0][1] as { encoding: string };
-      expect(options.encoding).toBe("utf8");
+      expect(execOptions().encoding).toBe("utf8");
     });
   });
 
   describe("timeout handling", () => {
-    it("returns specific error message on timeout", () => {
-      // Simulate a timeout error (Node.js sets killed=true and signal=SIGTERM)
-      const timeoutError = new Error("Command failed: SIGTERM") as Error & {
-        killed: boolean;
-        signal: string;
-      };
-      timeoutError.killed = true;
-      timeoutError.signal = "SIGTERM";
-
-      mockExecSync.mockImplementation(() => {
-        throw timeoutError;
+    it("detects a real sync-exec timeout (ETIMEDOUT + SIGKILL, no killed flag)", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw makeTimeoutError();
       });
 
-      const result = executeAppleScript("test");
+      const result = executeAppleScript("test", { maxRetries: 1 });
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("timed out after 30 seconds");
       expect(result.error).toContain("Notes.app may be unresponsive");
     });
 
-    it("includes custom timeout value in error message", () => {
+    it("still detects the async-exec timeout shape (killed=true, SIGTERM)", () => {
       const timeoutError = new Error("Command failed: SIGTERM") as Error & {
         killed: boolean;
         signal: string;
@@ -274,29 +288,33 @@ describe("executeAppleScript", () => {
       timeoutError.killed = true;
       timeoutError.signal = "SIGTERM";
 
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw timeoutError;
       });
 
-      const result = executeAppleScript("test", { timeoutMs: 60000 });
+      const result = executeAppleScript("test", { maxRetries: 1 });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("timed out after 30 seconds");
+    });
+
+    it("includes custom timeout value in error message", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw makeTimeoutError();
+      });
+
+      const result = executeAppleScript("test", { timeoutMs: 60000, maxRetries: 1 });
 
       expect(result.error).toContain("timed out after 60 seconds");
     });
 
     it("honors APPLE_NOTES_MCP_TIMEOUT_MS when no per-call timeout is given", () => {
       vi.stubEnv("APPLE_NOTES_MCP_TIMEOUT_MS", "45000");
-      const timeoutError = new Error("Command failed: SIGTERM") as Error & {
-        killed: boolean;
-        signal: string;
-      };
-      timeoutError.killed = true;
-      timeoutError.signal = "SIGTERM";
-
-      mockExecSync.mockImplementation(() => {
-        throw timeoutError;
+      mockExecFileSync.mockImplementation(() => {
+        throw makeTimeoutError();
       });
 
-      const result = executeAppleScript("test");
+      const result = executeAppleScript("test", { maxRetries: 1 });
 
       expect(result.error).toContain("timed out after 45 seconds");
       vi.unstubAllEnvs();
@@ -305,55 +323,58 @@ describe("executeAppleScript", () => {
 
   describe("retry logic", () => {
     it("retries transient errors once by default (maxRetries=2)", () => {
-      mockExecSync.mockImplementation(() => {
+      vi.stubEnv("APPLE_NOTES_MCP_RETRY_DELAY_MS", "1");
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
       executeAppleScript("test");
 
       // Two attempts with default settings: the initial call plus one retry
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+      vi.unstubAllEnvs();
     });
 
     it("APPLE_NOTES_MCP_MAX_RETRIES=1 restores fail-fast behavior", () => {
       vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "1");
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
       executeAppleScript("test");
 
-      expect(mockExecSync).toHaveBeenCalledTimes(1);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
       vi.unstubAllEnvs();
     });
 
     it("per-call options override the env knobs", () => {
       vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "5");
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
       executeAppleScript("test", { maxRetries: 1 });
 
-      expect(mockExecSync).toHaveBeenCalledTimes(1);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
       vi.unstubAllEnvs();
     });
 
     it("ignores an invalid APPLE_NOTES_MCP_MAX_RETRIES and uses the default", () => {
       vi.stubEnv("APPLE_NOTES_MCP_MAX_RETRIES", "banana");
-      mockExecSync.mockImplementation(() => {
+      vi.stubEnv("APPLE_NOTES_MCP_RETRY_DELAY_MS", "1");
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
       executeAppleScript("test");
 
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
       vi.unstubAllEnvs();
     });
 
     it("retries on transient errors when maxRetries > 1", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 3) {
           throw new Error("Notes.app is not responding");
@@ -365,32 +386,26 @@ describe("executeAppleScript", () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toBe("success");
-      expect(mockExecSync).toHaveBeenCalledTimes(3);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(3);
     });
 
     it("does not retry on non-transient errors", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error('Can\'t get note "Missing"');
       });
 
       executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
 
       // Should not retry for "note not found" errors
-      expect(mockExecSync).toHaveBeenCalledTimes(1);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
     });
 
     it("retries on timeout errors", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
-          const timeoutError = new Error("SIGTERM") as Error & {
-            killed: boolean;
-            signal: string;
-          };
-          timeoutError.killed = true;
-          timeoutError.signal = "SIGTERM";
-          throw timeoutError;
+          throw makeTimeoutError();
         }
         return "success after retry";
       });
@@ -399,12 +414,12 @@ describe("executeAppleScript", () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toBe("success after retry");
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
     it("retries on 'connection invalid' errors", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
           throw new Error("connection is invalid");
@@ -415,11 +430,11 @@ describe("executeAppleScript", () => {
       const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
 
       expect(result.success).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
     it("returns last error after all retries exhausted", () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         throw new Error("Notes.app is not responding");
       });
 
@@ -427,12 +442,12 @@ describe("executeAppleScript", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("not responding");
-      expect(mockExecSync).toHaveBeenCalledTimes(3);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(3);
     });
 
     it("retries on 'timed out' errors", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
           throw new Error("operation timed out");
@@ -443,12 +458,12 @@ describe("executeAppleScript", () => {
       const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
 
       expect(result.success).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
     it("retries on 'lost connection' errors", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
           throw new Error("lost connection to Notes.app");
@@ -459,12 +474,12 @@ describe("executeAppleScript", () => {
       const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
 
       expect(result.success).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
     it("retries on 'busy' errors", () => {
       let callCount = 0;
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
           throw new Error("Notes.app is busy");
@@ -475,14 +490,14 @@ describe("executeAppleScript", () => {
       const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
 
       expect(result.success).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledTimes(2);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
     it("uses exponential backoff between retries", () => {
       let execCallCount = 0;
 
       // Fails first 3 times, succeeds on 4th attempt
-      mockExecSync.mockImplementation(() => {
+      mockExecFileSync.mockImplementation(() => {
         execCallCount++;
         if (execCallCount <= 3) {
           throw new Error("Notes.app is not responding");
@@ -490,11 +505,11 @@ describe("executeAppleScript", () => {
         return "success";
       });
 
-      // With retryDelayMs=100, delays should be: 100ms, 200ms, 400ms
-      const result = executeAppleScript("test", { maxRetries: 4, retryDelayMs: 100 });
+      // With retryDelayMs=1, delays should be: 1ms, 2ms, 4ms
+      const result = executeAppleScript("test", { maxRetries: 4, retryDelayMs: 1 });
 
       expect(result.success).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledTimes(4);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(4);
     });
   });
 });

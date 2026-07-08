@@ -7,13 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { executeJXA, escapeForJXA, buildNotesJXA } from "./jxa.js";
 
-// Mock execSync to avoid actual osascript calls
+// Mock execFileSync to avoid actual osascript calls
 vi.mock("child_process", () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
-import { execSync } from "child_process";
-const mockExecSync = vi.mocked(execSync);
+import { execFileSync } from "child_process";
+const mockExecFileSync = vi.mocked(execFileSync);
 
 describe("escapeForJXA", () => {
   beforeEach(() => {
@@ -69,20 +69,21 @@ describe("executeJXA", () => {
   });
 
   it("executes JXA script via osascript", () => {
-    mockExecSync.mockReturnValue("test output\n");
+    mockExecFileSync.mockReturnValue("test output\n");
 
     const result = executeJXA("JSON.stringify({test: true})");
 
     expect(result.success).toBe(true);
     expect(result.output).toBe("test output");
-    expect(mockExecSync).toHaveBeenCalledWith(
-      expect.stringContaining("-l JavaScript"),
-      expect.any(Object)
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "osascript",
+      ["-l", "JavaScript", "-"],
+      expect.objectContaining({ input: "JSON.stringify({test: true})" })
     );
   });
 
   it("handles execution errors", () => {
-    mockExecSync.mockImplementation(() => {
+    mockExecFileSync.mockImplementation(() => {
       throw new Error("Error: Cannot find note");
     });
 
@@ -97,27 +98,31 @@ describe("executeJXA", () => {
       delete process.env.APPLE_NOTES_MCP_MAX_BUFFER;
     });
 
-    it("passes SIGKILL and a large maxBuffer to execSync", () => {
-      mockExecSync.mockReturnValue("ok");
+    it("passes SIGKILL and a large maxBuffer to execFileSync", () => {
+      mockExecFileSync.mockReturnValue("ok");
       executeJXA("JSON.stringify({})");
-      const opts = mockExecSync.mock.calls[0][1] as { killSignal?: string; maxBuffer?: number };
+      const opts = mockExecFileSync.mock.calls[0][2] as { killSignal?: string; maxBuffer?: number };
       expect(opts.killSignal).toBe("SIGKILL");
       expect(opts.maxBuffer).toBe(64 * 1024 * 1024);
     });
 
     it("honors APPLE_NOTES_MCP_MAX_BUFFER override", () => {
       process.env.APPLE_NOTES_MCP_MAX_BUFFER = "2097152";
-      mockExecSync.mockReturnValue("ok");
+      mockExecFileSync.mockReturnValue("ok");
       executeJXA("JSON.stringify({})");
-      const opts = mockExecSync.mock.calls[0][1] as { maxBuffer?: number };
+      const opts = mockExecFileSync.mock.calls[0][2] as { maxBuffer?: number };
       expect(opts.maxBuffer).toBe(2097152);
     });
   });
 
-  it("handles timeout errors", () => {
-    const error = new Error("Command failed") as Error & { killed: boolean };
-    error.killed = true;
-    mockExecSync.mockImplementation(() => {
+  it("handles timeout errors (ETIMEDOUT + SIGKILL, the real sync-exec shape)", () => {
+    const error = new Error("spawnSync osascript ETIMEDOUT") as Error & {
+      code: string;
+      signal: string;
+    };
+    error.code = "ETIMEDOUT";
+    error.signal = "SIGKILL";
+    mockExecFileSync.mockImplementation(() => {
       throw error;
     });
 
