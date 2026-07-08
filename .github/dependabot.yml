@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Only propose a version once it is >= 7 days old, so a bump never trips CI's
+    # supply-chain minimum-release-age gate on a freshly-published release.
+    cooldown:
+      default-days: 7
     # Group all non-major npm updates into a single PR; major bumps are
     # breaking and handled deliberately (not auto-opened).
     groups:
@@ -13,10 +17,16 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Prettier bumps reformat the whole codebase, so an auto-opened bump always
+      # fails `format:check` (dependabot can't run `prettier --write`). Upgrade
+      # prettier deliberately with a reformat pass instead.
+      - dependency-name: "prettier"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]
