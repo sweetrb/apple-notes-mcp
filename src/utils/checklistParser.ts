@@ -38,6 +38,7 @@ import {
   stringValue,
   embeddedMessage,
 } from "@/utils/protobuf.js";
+import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 
 /** Style type value for checklist items in Apple Notes protobuf format. */
 const CHECKLIST_STYLE_TYPE = 103;
@@ -275,8 +276,9 @@ export function getChecklistItems(noteId: string): ChecklistResult {
       error: "no_fda",
       message:
         "Full Disk Access is required to read checklist state. " +
-        "Grant access in System Settings > Privacy & Security > Full Disk Access, " +
-        "then add and restart this application.",
+        "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
+        "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+        `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`,
     };
   }
 

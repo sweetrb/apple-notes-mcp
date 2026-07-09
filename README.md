@@ -12,7 +12,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that e
 [![MCP](https://img.shields.io/badge/MCP-server-blue)](https://modelcontextprotocol.io)
 
 <p align="center">
-  <img src="codex/assets/screenshot.png" alt="Apple Notes MCP — create, search, and organize Apple Notes from Codex, Claude, and other AI assistants" width="680">
+  <img src="https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/codex/assets/screenshot.png" alt="Apple Notes MCP — create, search, and organize Apple Notes from Codex, Claude, and other AI assistants" width="680">
 </p>
 
 ## What is This?
@@ -39,6 +39,12 @@ Install the sweetrb/apple-notes-mcp MCP server so you can help me manage my Appl
 
 Claude will handle the installation and configuration automatically.
 
+Or register it yourself with one deterministic command:
+
+```bash
+claude mcp add apple-notes -s user -- npx -y apple-notes-mcp
+```
+
 ### Using the Plugin Marketplace
 
 Install as a Claude Code plugin for automatic configuration and enhanced AI behavior:
@@ -49,6 +55,8 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 ```
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
+
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the checklist-state and note-metadata features; see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). Everything else works without it.
 
 ### Using the Codex Marketplace
 
@@ -65,14 +73,14 @@ The Codex plugin runs the published `apple-notes-mcp` server through `npx` and s
 
 Configuration for two more hosts is included — each registers the same `apple-notes` MCP server (`npx -y apple-notes-mcp`):
 
-- **[Hermes Agent](https://hermes-agent.nousresearch.com/)** (NousResearch) — Hermes has no plugin/marketplace drop-in. Add the server with `hermes mcp add apple-notes --command npx --args -y apple-notes-mcp`, or merge [`.hermes-plugin/config.yaml`](.hermes-plugin/config.yaml) into `~/.hermes/config.yaml`. Details: [`.hermes-plugin/README.md`](.hermes-plugin/README.md).
-- **[Antigravity](https://antigravity.google/)** (Google) — add the server entry from [`.antigravity-plugin/mcp_config.json`](.antigravity-plugin/mcp_config.json) to `~/.gemini/config/mcp_config.json` (or via Antigravity's MCP settings).
+- **[Hermes Agent](https://hermes-agent.nousresearch.com/)** (NousResearch) — Hermes has no plugin/marketplace drop-in. Add the server with `hermes mcp add apple-notes --command npx --args -y apple-notes-mcp`, or merge [`.hermes-plugin/config.yaml`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.hermes-plugin/config.yaml) into `~/.hermes/config.yaml`. Details: [`.hermes-plugin/README.md`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.hermes-plugin/README.md).
+- **[Antigravity](https://antigravity.google/)** (Google) — add the server entry from [`.antigravity-plugin/mcp_config.json`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.antigravity-plugin/mcp_config.json) to `~/.gemini/config/mcp_config.json` (or via Antigravity's MCP settings).
 
-### Manual Installation
+### Using Claude Desktop
 
 **1. Install the server:**
 ```bash
-npm install -g github:sweetrb/apple-notes-mcp
+npm install -g apple-notes-mcp
 ```
 
 **2. Add to Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -81,7 +89,7 @@ npm install -g github:sweetrb/apple-notes-mcp
   "mcpServers": {
     "apple-notes": {
       "command": "npx",
-      "args": ["apple-notes-mcp"]
+      "args": ["-y", "apple-notes-mcp"]
     }
   }
 }
@@ -133,7 +141,7 @@ common workflows: `find-note`, `weekly-review`, `new-meeting-note`.
 ### Known limitations
 
 A few Notes UI features are not exposed to AppleScript and therefore cannot be
-supported. See **[docs/APPLESCRIPT-LIMITATIONS.md](docs/APPLESCRIPT-LIMITATIONS.md)**
+supported. See **[docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md)**
 for the investigation and verification behind each:
 
 - **Pinned notes** — Notes has no scriptable `pinned` property via AppleScript. Pin state can now be **read** with the BETA `get-note-metadata` tool (from the NoteStore database), but it still cannot be **set** programmatically.
@@ -155,17 +163,16 @@ Creates a new note in Apple Notes.
 |-----------|------|----------|-------------|
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
 | `content` | string | Yes | The body content of the note (do not repeat the title here) |
-| `tags` | string[] | No | Tags for organization (stored in metadata) |
+| `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags) |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. Defaults to account root |
 | `account` | string | No | Account name (defaults to iCloud) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. In both formats, the title is automatically prepended as `<h1>`. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities |
 
-**Example:**
+**Example (tagged with inline hashtags):**
 ```json
 {
   "title": "Meeting Notes",
-  "content": "Discussed Q4 roadmap and budget allocation",
-  "tags": ["work", "meetings"]
+  "content": "Discussed Q4 roadmap and budget allocation\n\n#work #meetings"
 }
 ```
 
@@ -264,7 +271,7 @@ Retrieves the full content of a specific note.
 **Returns:** The HTML content of the note, or error if not found. The
 `structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
 from the body. Apple Notes tags are inline hashtags, not a scriptable property;
-see [docs/APPLESCRIPT-LIMITATIONS.md](../docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
+see [docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
 
 ---
 
@@ -393,7 +400,7 @@ Updates an existing note's content and/or title.
 
 **Note:** `newContent` **replaces the entire note body** — it is not appended. To preserve existing content, read it first (e.g. with `get-note-content`) and include it in `newContent`.
 
-**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
+**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](https://github.com/sweetrb/apple-notes-mcp/blob/main/skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
 
 ---
 
@@ -459,8 +466,6 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 ```
 
 **Returns:** Confirmation message, or error if note or folder not found.
-
-**Note:** This operation copies the note to the new folder then deletes the original. If the delete fails, the note will exist in both locations.
 
 ---
 
@@ -796,7 +801,7 @@ Run a full setup diagnostic: Notes.app reachability, the Automation permission, 
 
 **Parameters:** None
 
-**Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](docs/FULL-DISK-ACCESS.md).
+**Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).
 
 ---
 
@@ -891,7 +896,7 @@ AI: [calls create-note with title="Acme Corp", content="...", folder="Work/Clien
 ### npm (Recommended)
 
 ```bash
-npm install -g github:sweetrb/apple-notes-mcp
+npm install -g apple-notes-mcp
 ```
 
 ### From Source
@@ -901,7 +906,9 @@ git clone https://github.com/sweetrb/apple-notes-mcp.git
 cd apple-notes-mcp
 ```
 
-The repo ships a prebuilt, dependency-free `build/index.js`, so a bare clone runs with nothing but Node installed. `npm install` and `npm run build` are only needed when you change the source.
+The repo ships a prebuilt, dependency-free `build/index.js`, so a bare clone runs with nothing but Node installed. `pnpm install` and `pnpm run build` are only needed when you change the source (development uses [pnpm](https://pnpm.io/), not npm).
+
+You can also install straight from the git repo with `npm install -g github:sweetrb/apple-notes-mcp` (building from source requires pnpm), but the published npm package above is the recommended path.
 
 If installed from source, use this configuration:
 ```json
@@ -976,7 +983,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 The `get-checklist-state` tool and checklist annotations in `get-note-markdown` read directly from the Apple Notes SQLite database. This requires **Full Disk Access** for the process running the MCP server.
 
-> 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
+> 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
 ### How to Grant Full Disk Access
 
@@ -1016,7 +1023,7 @@ All other tools work normally without Full Disk Access. Only checklist state fea
 | No pinned notes | Pin status is not exposed via AppleScript ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) |
 | Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
-| Checklist state | Requires [Full Disk Access](docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
+| Checklist state | Requires [Full Disk Access](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
 | Checklist **creation** | Not supported. AppleScript's `body of note` setter strips `<input type="checkbox">` and ignores any checklist-styling CSS class. Apple Notes stores checklist items as a protobuf paragraph style (`style_type=103`) that AppleScript doesn't expose, and the SQLite database is read-only. See [Creating Checklists](#creating-checklists) below for the workaround. |
 
 ### Roadmap
@@ -1084,7 +1091,7 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 
 ### "Permission denied"
 - macOS needs automation permission
-- Go to System Preferences > Privacy & Security > Automation
+- Go to System Settings > Privacy & Security > Automation
 - Ensure your terminal/Claude has permission to control Notes
 
 ### "Note not found"
@@ -1097,9 +1104,14 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 - Use `\\` to represent each literal backslash
 - See "Backslash Escaping" section under Known Limitations
 
+### Notes accumulate blank lines after repeated updates
+- Repeatedly updating a note (especially with HTML content) can accumulate whitespace artifacts — `<div><br></div>` tags that persist between sections even after you remove them from your content
+- Apple Notes' internal HTML processing preserves empty divs from previous edits, so the gaps are baked into the note's internal representation and cannot be fixed through further updates
+- Fix: delete the note with `delete-note` and create a fresh one with `create-note`
+
 ### `apple-notes` server fails to connect when run from a clone
 - Launch `claude` from **inside the repo directory** so `CLAUDE_PROJECT_DIR` resolves to the repo root (the bare `.` fallback is unreliable — it points at the launching process's working directory)
-- If you've been editing the source, rerun `npm run build` — the entrypoint is `${CLAUDE_PROJECT_DIR:-.}/build/index.js`, and the committed bundle only reflects your changes after a rebuild
+- If you've been editing the source, rerun `pnpm run build` — the entrypoint is `${CLAUDE_PROJECT_DIR:-.}/build/index.js`, and the committed bundle only reflects your changes after a rebuild
 - Run `claude mcp list` to check for a conflicting `apple-notes` entry at another scope (project-scope outranks user-scope, but local-scope outranks project-scope)
 - Approve the pending project-scope server when Claude Code prompts you
 
@@ -1107,14 +1119,16 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 
 ## Development
 
+Development uses [pnpm](https://pnpm.io/) (see `packageManager` in `package.json`):
+
 ```bash
-npm install            # Install dependencies
-npm run build          # Typecheck, then bundle src/index.ts into build/index.js (esbuild)
-npm test               # Run unit test suite (mocked AppleScript)
-npm run test:integration  # Run integration tests against real Notes.app
-npm run test:all       # Unit + integration
-npm run lint           # Check code style
-npm run format         # Format code
+pnpm install            # Install dependencies
+pnpm run build          # Typecheck, then bundle src/index.ts into build/index.js (esbuild)
+pnpm test               # Run unit test suite (mocked AppleScript)
+pnpm run test:integration  # Run integration tests against real Notes.app
+pnpm run test:all       # Unit + integration
+pnpm run lint           # Check code style
+pnpm run format         # Format code
 ```
 
 The integration suite (`test/integration.test.ts`) drives the real
@@ -1136,11 +1150,11 @@ A software consulting, contracting, and development company.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](https://github.com/sweetrb/apple-notes-mcp/blob/main/LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/CONTRIBUTING.md) for guidelines.
 
 ## Related Projects
 
@@ -1152,4 +1166,4 @@ Part of a family of macOS MCP servers:
 
 ## Recurring macOS permission prompts
 
-If macOS keeps re-prompting for Full Disk Access or Automation for `node` (often after a `brew upgrade`), see [docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md](docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md) — the fix is to run this server under the official, Developer-ID-signed Node so the grant survives Node updates.
+If macOS keeps re-prompting for Full Disk Access or Automation for `node` (often after a `brew upgrade`), the cause is almost always an **ad-hoc-signed Node** (typically Homebrew's): its code signature (cdhash) changes on every update, so macOS TCC treats each new build as a brand-new binary and silently drops the grants you already made. The fix is to run this server under an official, **Developer-ID-signed Node at a stable path** — its signing identity stays the same across updates, so you grant the permission once and it persists. The `doctor` tool detects the ad-hoc-signature case and the full walkthrough is in [docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md).

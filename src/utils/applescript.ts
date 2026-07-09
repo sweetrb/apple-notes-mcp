@@ -177,7 +177,7 @@ const ERROR_MAPPINGS: Array<{ pattern: RegExp; message: string }> = [
   {
     pattern: /not authorized|not permitted|access.*denied/i,
     message:
-      "Permission denied. Grant automation access in System Preferences > Privacy & Security > Automation.",
+      "Permission denied. Grant automation access in System Settings > Privacy & Security > Automation.",
   },
   // Application not running
   {

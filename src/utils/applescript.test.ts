@@ -172,7 +172,7 @@ describe("executeAppleScript", () => {
       const result = executeAppleScript("test");
 
       expect(result.error).toContain("Permission denied");
-      expect(result.error).toContain("System Preferences");
+      expect(result.error).toContain("System Settings");
     });
 
     it("provides helpful message for folder not found", () => {

@@ -24,6 +24,7 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 
 const NOTES_DB_PATH = path.join(
   os.homedir(),
@@ -32,8 +33,9 @@ const NOTES_DB_PATH = path.join(
 
 const FDA_MESSAGE =
   "Full Disk Access is required to read note metadata. " +
-  "Grant access in System Settings > Privacy & Security > Full Disk Access, " +
-  "then add and restart this application.";
+  "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
+  "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+  `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
 
 /**
  * Read-only metadata for a single note. Every field is optional: a field is

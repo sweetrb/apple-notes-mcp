@@ -2037,7 +2037,7 @@ export class AppleNotesManager {
       });
     } else {
       const errorHint = appCheck.error?.includes("not authorized")
-        ? " (check Automation permissions in System Preferences)"
+        ? " (check Automation permissions in System Settings > Privacy & Security > Automation)"
         : "";
       checks.push({
         name: "notes_app",
@@ -2063,7 +2063,7 @@ export class AppleNotesManager {
         name: "permissions",
         passed: !isPermError,
         message: isPermError
-          ? "AppleScript permissions denied. Grant access in System Preferences > Privacy & Security > Automation"
+          ? "AppleScript permissions denied. Grant access in System Settings > Privacy & Security > Automation"
           : `Permission check returned: ${permCheck.error}`,
       });
       if (isPermError) {

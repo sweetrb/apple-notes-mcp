@@ -144,8 +144,8 @@ This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move
 - Use `limit` to cap the number of notes returned
 
 ### move-note
-- Internally copies then deletes the original
-- If delete fails, note exists in both locations (still returns success)
+- Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
+- The destination folder must already exist (create it first with `create-folder`)
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### get-checklist-state

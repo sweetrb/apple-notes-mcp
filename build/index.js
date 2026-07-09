@@ -38717,7 +38717,7 @@ var ERROR_MAPPINGS = [
   // Permission errors
   {
     pattern: /not authorized|not permitted|access.*denied/i,
-    message: "Permission denied. Grant automation access in System Preferences > Privacy & Security > Automation."
+    message: "Permission denied. Grant automation access in System Settings > Privacy & Security > Automation."
   },
   // Application not running
   {
@@ -38975,6 +38975,10 @@ function embeddedMessage(field) {
   return decodeMessage(bytes);
 }
 
+// src/utils/docsUrls.ts
+var FULL_DISK_ACCESS_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md";
+var NODE_RUNTIME_TCC_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md";
+
 // src/utils/checklistParser.ts
 var CHECKLIST_STYLE_TYPE = 103;
 var NOTES_DB_PATH = path.join(
@@ -39095,7 +39099,7 @@ function getChecklistItems(noteId) {
     return {
       items: null,
       error: "no_fda",
-      message: "Full Disk Access is required to read checklist state. Grant access in System Settings > Privacy & Security > Full Disk Access, then add and restart this application."
+      message: `Full Disk Access is required to read checklist state. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`
     };
   }
   if (!hexData) {
@@ -40529,7 +40533,7 @@ var AppleNotesManager = class {
         message: "Notes.app is accessible"
       });
     } else {
-      const errorHint = appCheck.error?.includes("not authorized") ? " (check Automation permissions in System Preferences)" : "";
+      const errorHint = appCheck.error?.includes("not authorized") ? " (check Automation permissions in System Settings > Privacy & Security > Automation)" : "";
       checks.push({
         name: "notes_app",
         passed: false,
@@ -40549,7 +40553,7 @@ var AppleNotesManager = class {
       checks.push({
         name: "permissions",
         passed: !isPermError,
-        message: isPermError ? "AppleScript permissions denied. Grant access in System Preferences > Privacy & Security > Automation" : `Permission check returned: ${permCheck.error}`
+        message: isPermError ? "AppleScript permissions denied. Grant access in System Settings > Privacy & Security > Automation" : `Permission check returned: ${permCheck.error}`
       });
       if (isPermError) {
         return { healthy: false, checks };
@@ -41463,7 +41467,7 @@ var NOTES_DB_PATH3 = path3.join(
   os3.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var FDA_MESSAGE = "Full Disk Access is required to read note metadata. Grant access in System Settings > Privacy & Security > Full Disk Access, then add and restart this application.";
+var FDA_MESSAGE = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var COLUMN_MAP = [
   { key: "pinned", column: "ZISPINNED", type: "bool" },
   { key: "hasChecklist", column: "ZHASCHECKLIST", type: "bool" },
@@ -41644,7 +41648,7 @@ function runDoctor(manager) {
   checks.push({
     name: "Full Disk Access",
     status: fda ? "ok" : "warn",
-    detail: fda ? "granted \u2014 checklist features available" : "not granted \u2014 get-checklist-state and checklist annotations in get-note-markdown won't work. Grant in System Settings > Privacy & Security > Full Disk Access."
+    detail: fda ? "granted \u2014 checklist features available" : `not granted \u2014 get-checklist-state and checklist annotations in get-note-markdown won't work. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
   });
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
@@ -41667,7 +41671,7 @@ function checkNodeRuntimeSignature() {
       return {
         name,
         status: "warn",
-        detail: `${process.execPath} is ad-hoc signed (no Team ID). macOS revokes its Automation and Full Disk Access grants every time the binary changes (e.g. every brew upgrade), which looks like random permission loss. Fix: run the server with a Developer-ID-signed Node at a stable path \u2014 see docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md.`
+        detail: `${process.execPath} is ad-hoc signed (no Team ID). macOS revokes its Automation and Full Disk Access grants every time the binary changes (e.g. every brew upgrade), which looks like random permission loss. Fix: run the server with a Developer-ID-signed Node at a stable path \u2014 see ${NODE_RUNTIME_TCC_GUIDE_URL}`
       };
     }
     const team = /^TeamIdentifier=(.+)$/m.exec(out)?.[1];
@@ -42671,7 +42675,7 @@ server.registerTool(
       return `  ${icon} ${c.name}: ${c.message}`;
     }).join("\n");
     const fdaAvailable = hasFullDiskAccess();
-    const fdaLine = fdaAvailable ? "  \u2713 full_disk_access: Granted (checklist features available)" : "  \u24D8 full_disk_access: Not granted (optional \u2014 needed for get-checklist-state and checklist annotations in get-note-markdown). Grant in System Settings > Privacy & Security > Full Disk Access.";
+    const fdaLine = fdaAvailable ? "  \u2713 full_disk_access: Granted (checklist features available)" : `  \u24D8 full_disk_access: Not granted (optional \u2014 needed for get-checklist-state and checklist annotations in get-note-markdown). In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
     return successResponse(`${statusIcon} ${statusText}
 
 ${checkLines}

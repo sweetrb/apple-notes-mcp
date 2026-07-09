@@ -11,6 +11,7 @@
 import { spawnSync } from "child_process";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
+import { FULL_DISK_ACCESS_GUIDE_URL, NODE_RUNTIME_TCC_GUIDE_URL } from "@/utils/docsUrls.js";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 export interface DoctorCheck {
@@ -62,7 +63,10 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
     status: fda ? "ok" : "warn",
     detail: fda
       ? "granted — checklist features available"
-      : "not granted — get-checklist-state and checklist annotations in get-note-markdown won't work. Grant in System Settings > Privacy & Security > Full Disk Access.",
+      : "not granted — get-checklist-state and checklist annotations in get-note-markdown won't work. " +
+        "In System Settings > Privacy & Security > Full Disk Access, grant access to the app that " +
+        "launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it " +
+        `and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`,
   });
 
   // 4. Node runtime code signature. An ad-hoc signed Node (typically Homebrew's)
@@ -102,7 +106,7 @@ export function checkNodeRuntimeSignature(): DoctorCheck {
           `${process.execPath} is ad-hoc signed (no Team ID). macOS revokes its Automation and ` +
           `Full Disk Access grants every time the binary changes (e.g. every brew upgrade), which ` +
           `looks like random permission loss. Fix: run the server with a Developer-ID-signed Node ` +
-          `at a stable path — see docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md.`,
+          `at a stable path — see ${NODE_RUNTIME_TCC_GUIDE_URL}`,
       };
     }
     const team = /^TeamIdentifier=(.+)$/m.exec(out)?.[1];

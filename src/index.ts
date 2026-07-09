@@ -32,6 +32,7 @@ import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
+import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 
@@ -1294,7 +1295,10 @@ server.registerTool(
     const fdaAvailable = hasFullDiskAccess();
     const fdaLine = fdaAvailable
       ? "  ✓ full_disk_access: Granted (checklist features available)"
-      : "  ⓘ full_disk_access: Not granted (optional — needed for get-checklist-state and checklist annotations in get-note-markdown). Grant in System Settings > Privacy & Security > Full Disk Access.";
+      : "  ⓘ full_disk_access: Not granted (optional — needed for get-checklist-state and checklist annotations in get-note-markdown). " +
+        "In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server " +
+        "(Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. " +
+        `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
 
     return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}\n${fdaLine}`, {
       healthy: result.healthy,
