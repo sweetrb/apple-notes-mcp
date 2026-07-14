@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.12] - 2026-07-13
+### Fixed
+- **`get-sync-status` no longer reports orphaned Core Data rows as pending uploads.** The detector counted every `ZICCLOUDSTATE` version gap, including historical rows whose Notes syncing object no longer exists. It now requires a matching live `ZICCLOUDSYNCINGOBJECT` reference before treating a row as pending, preventing a permanent false active-sync warning while preserving detection for live unsynced objects.
+
 ## [2.5.11] - 2026-07-09
 ### Changed
 - **Setup errors are now actionable for end users** (end-user docs audit). Every Full Disk Access failure message (`get-checklist-state`, `get-note-metadata`, `health-check`, `doctor`) now says exactly what to do — grant Full Disk Access to the app that launches the server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it — and links the absolute [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md) URL instead of a repo-relative path that no-clone (npm / marketplace) installs can't resolve. The `doctor` ad-hoc-Node warning likewise links the absolute [Node runtime / TCC guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md). The shared URLs live in a new `src/utils/docsUrls.ts`. Automation-permission errors now point at **System Settings** > Privacy & Security > Automation (macOS renamed System Preferences in Ventura).

@@ -118,12 +118,18 @@ export function getSyncStatus(useCache = true): SyncStatus {
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
     }
 
-    // Query for pending sync changes
+    // Query for pending sync changes. Core Data can retain orphaned cloud-state
+    // rows after their syncing objects are gone, so count only states still
+    // referenced by a live ZICCLOUDSYNCINGOBJECT row.
     // Use a read-only connection and timeout to avoid blocking
     const query = `
-      SELECT COUNT(*) FROM ZICCLOUDSTATE
-      WHERE ZCURRENTLOCALVERSION > ZLATESTVERSIONSYNCEDTOCLOUD
-      AND ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL;
+      SELECT COUNT(*) FROM ZICCLOUDSTATE state
+      WHERE state.ZCURRENTLOCALVERSION > state.ZLATESTVERSIONSYNCEDTOCLOUD
+      AND state.ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM ZICCLOUDSYNCINGOBJECT object
+        WHERE object.ZCLOUDSTATE = state.Z_PK
+      );
     `;
 
     // Use execFileSync (argv array, no shell) to match the sibling sqlite callers

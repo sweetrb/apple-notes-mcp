@@ -62,6 +62,25 @@ describe("getSyncStatus", () => {
     expect(status.warning).toBeUndefined();
   });
 
+  it("counts only cloud state rows referenced by live syncing objects", () => {
+    mockExistsSync.mockReturnValue(true);
+    mockStatSync.mockReturnValue({
+      mtimeMs: Date.now() - 60000,
+    } as fs.Stats);
+    mockExecSync.mockReturnValue("0\n");
+
+    getSyncStatus();
+
+    const sqliteArgs = mockExecSync.mock.calls[0]?.[1];
+    expect(sqliteArgs).toEqual(
+      expect.arrayContaining([expect.stringContaining("ZICCLOUDSYNCINGOBJECT")])
+    );
+    expect(sqliteArgs).toEqual(expect.arrayContaining([expect.stringContaining("ZCLOUDSTATE")]));
+    expect(sqliteArgs).toEqual(
+      expect.arrayContaining([expect.stringContaining("object.ZCLOUDSTATE = state.Z_PK")])
+    );
+  });
+
   it("detects pending uploads", () => {
     mockExistsSync.mockReturnValue(true);
     mockStatSync.mockReturnValue({

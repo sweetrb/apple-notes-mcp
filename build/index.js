@@ -41396,9 +41396,13 @@ function getSyncStatus(useCache = true) {
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
     }
     const query = `
-      SELECT COUNT(*) FROM ZICCLOUDSTATE
-      WHERE ZCURRENTLOCALVERSION > ZLATESTVERSIONSYNCEDTOCLOUD
-      AND ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL;
+      SELECT COUNT(*) FROM ZICCLOUDSTATE state
+      WHERE state.ZCURRENTLOCALVERSION > state.ZLATESTVERSIONSYNCEDTOCLOUD
+      AND state.ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM ZICCLOUDSYNCINGOBJECT object
+        WHERE object.ZCLOUDSTATE = state.Z_PK
+      );
     `;
     const result = execFileSync3(
       "sqlite3",
