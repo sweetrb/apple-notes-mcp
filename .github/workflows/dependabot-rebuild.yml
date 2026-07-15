@@ -1,0 +1,230 @@
+name: dependabot-rebuild
+
+# Dependabot bumps package.json / pnpm-lock.yaml but never rebuilds the
+# committed esbuild bundle (build/index.js), so any bump that changes the
+# bundle — a runtime dep (inlined into the bundle) or a toolchain dep
+# (esbuild/typescript) that changes the emitted bytes — leaves build/ stale
+# and fails CI's "Verify committed build/ matches source" step. This workflow
+# rebuilds the bundle on Dependabot PRs and pushes the result back to the PR
+# branch.
+#
+# Design notes:
+#   * A push made with GITHUB_TOKEN only creates pull_request runs in a held,
+#     approval-required state ("Approve workflows to run" — they never run on
+#     their own), so after pushing, the required checks (ci.yml,
+#     version-guard.yml) are re-dispatched on the branch via workflow_dispatch
+#     — the documented exception that always creates real runs. Without that,
+#     the required checks would sit "Expected" forever on the new head and
+#     auto-merge would stall. The held runs remain as a cosmetic banner on the
+#     PR; approving them is harmless (this workflow's own held run no-ops via
+#     the HEAD guard below — that guard is load-bearing, not decorative).
+#   * Two jobs so the write-capable token is never in scope while
+#     dependency-selected code executes: `rebuild` runs pnpm install/build
+#     with a read-only, non-persisted token and hands the bundle over as an
+#     artifact; `push` (which runs no dependency code) commits, pushes,
+#     re-dispatches.
+#   * The rebuild commit message carries "[dependabot skip]" so Dependabot
+#     keeps maintaining the PR — it force-pushes over the rebuild commit on
+#     its next update, which retriggers this workflow (a stable loop).
+#   * Known limitation: a release landing on main while a rebuilt Dependabot
+#     PR is open usually conflicts on build/index.js. The standard reset is
+#     commenting "@dependabot recreate" on the PR; prefer merging Dependabot
+#     PRs before cutting releases.
+#
+# Recovery: if a run dies after the push but before the re-dispatch (required
+# checks stuck on "Expected"), manually dispatch THIS workflow on the PR
+# branch — it rebuilds (a no-op push when the bytes already match) and always
+# re-dispatches the checks. Dispatching on main only reports bundle drift;
+# the push job refuses protected main.
+
+on:
+  pull_request:
+    branches: [main]
+    # Only npm bumps can change the bundle; github-actions bumps touch only
+    # .github/** and are skipped entirely by this filter.
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+  # Manual path: test the workflow, fix a stale bundle on a topic branch, or
+  # recover a PR whose checks were never re-dispatched (see above).
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  # Used by both the commit and the HEAD guard — keep them in lockstep.
+  REBUILD_SUBJECT: "chore(build): rebuild committed bundle for dependency bump [dependabot skip]"
+
+concurrency:
+  group: dependabot-rebuild-${{ github.head_ref || github.ref_name }}
+  # Never cancel a run that may be mid-push; a superseding run queues instead.
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    # Executes dependency-selected code (pnpm install + build), so this job
+    # gets a READ-ONLY, non-persisted token. macos-latest + Node 22 mirror
+    # CI's verify environment (the bundle bytes are platform-independent —
+    # the verify step already relies on that across local dev pushes and the
+    # 22/24 CI matrix — this is just consistency).
+    runs-on: macos-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'dependabot[bot]' }}
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      built_from: ${{ steps.head.outputs.sha }}
+    steps:
+      - name: Checkout PR head branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+
+      - name: Record built-from SHA
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if HEAD is already this workflow's own rebuild commit
+        # pull_request runs only (e.g. a human approved the held runs created
+        # by our own push): rebuilding the bot's own commit is a guaranteed
+        # no-op. Manual dispatch deliberately bypasses this so it can force a
+        # rebuild or re-dispatch checks after a partial failure.
+        if: github.event_name == 'pull_request'
+        id: guard
+        run: |
+          if [ "$(git log -1 --pretty=%ae)" = "41898282+github-actions[bot]@users.noreply.github.com" ] \
+            && [ "$(git log -1 --pretty=%s)" = "$REBUILD_SUBJECT" ]; then
+            echo "HEAD is the bot's own rebuild commit — nothing to rebuild."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.guard.outputs.skip != 'true'
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild bundle
+        # The install's `prepare` script already built once; this re-run is a
+        # cheap idempotent belt-and-suspenders (and self-documenting).
+        if: steps.guard.outputs.skip != 'true'
+        run: pnpm run build
+
+      - name: Detect bundle drift
+        if: steps.guard.outputs.skip != 'true'
+        id: diff
+        run: |
+          # A build emitting files the .gitignore re-includes don't cover
+          # (e.g. sourcemaps after an esbuild flag change) would ship in
+          # neither git nor this rebuild — fail loudly instead.
+          if git status --porcelain --ignored -- build/ | grep '^!!'; then
+            echo "::error::build emitted files not covered by the .gitignore re-includes — update .gitignore and this workflow."
+            exit 1
+          fi
+          if git diff --quiet -- build/; then
+            echo "Bundle unchanged — nothing to do."
+          else
+            git --no-pager diff --stat -- build/
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload rebuilt bundle
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rebuilt-bundle
+          path: build/
+
+  push:
+    # Runs no dependency code — this is the only job with a write token.
+    # Fires when the bundle changed, and on every manual dispatch (so a
+    # dispatch can re-run the required checks even with nothing to push).
+    runs-on: ubuntu-latest
+    needs: rebuild
+    if: ${{ (needs.rebuild.outputs.changed == 'true' || github.event_name == 'workflow_dispatch') && (github.head_ref || github.ref_name) != 'main' }}
+    permissions:
+      contents: write # push the rebuilt bundle to the PR branch
+      actions: write # re-dispatch ci.yml / version-guard.yml on the new head
+    steps:
+      - name: Checkout PR head branch
+        if: needs.rebuild.outputs.changed == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Abort if the branch moved since the rebuild
+        if: needs.rebuild.outputs.changed == 'true'
+        env:
+          BUILT_FROM: ${{ needs.rebuild.outputs.built_from }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$BUILT_FROM" ]; then
+            echo "::error::Branch advanced past ${BUILT_FROM} during the rebuild — superseded; the run for the new head takes over."
+            exit 1
+          fi
+
+      - name: Require re-dispatchable checks on this branch (pre-push)
+        # A branch cut before ci.yml/version-guard.yml gained workflow_dispatch
+        # cannot have its required checks re-run after our push (the dispatch
+        # 422s) — fail BEFORE pushing so the PR isn't left check-less.
+        if: needs.rebuild.outputs.changed == 'true' && github.event_name == 'pull_request'
+        run: |
+          for wf in ci.yml version-guard.yml; do
+            if ! git show "HEAD:.github/workflows/$wf" | grep -q 'workflow_dispatch'; then
+              echo "::error::${wf} on this branch predates the dispatchable-CI change. Comment '@dependabot recreate' on the PR to re-cut the branch from main."
+              exit 1
+            fi
+          done
+
+      - name: Download rebuilt bundle
+        if: needs.rebuild.outputs.changed == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rebuilt-bundle
+          path: build/
+
+      - name: Commit and push the rebuilt bundle
+        if: needs.rebuild.outputs.changed == 'true'
+        id: commitpush
+        env:
+          BUILT_FROM: ${{ needs.rebuild.outputs.built_from }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- build/
+          # "[dependabot skip]" lets Dependabot keep rebasing/updating the PR
+          # (it force-pushes over this commit, retriggering this workflow).
+          git commit --no-verify -m "$REBUILD_SUBJECT"
+          REF="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if ! git push --no-verify origin "HEAD:${REF}"; then
+            git fetch --quiet origin "$REF"
+            if [ "$(git rev-parse "origin/${REF}")" != "$BUILT_FROM" ]; then
+              echo "::notice::Superseded — the branch moved during the rebuild; the run for the new head takes over."
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::Push failed but the branch has not moved — investigate."
+            exit 1
+          fi
+
+      - name: Re-dispatch required checks on the new head
+        if: steps.commitpush.outputs.superseded != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REF="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          for wf in ci.yml version-guard.yml; do
+            if ! gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$REF"; then
+              echo "::error::Failed to dispatch ${wf} on ${REF} — required checks are stuck 'Expected' on the new head. If the branch predates the dispatchable-CI change, comment '@dependabot recreate' on the PR; otherwise re-run this workflow manually (workflow_dispatch on ${REF})."
+              exit 1
+            fi
+          done
