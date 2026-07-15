@@ -1,14 +1,24 @@
 name: version-guard
 
-# Fail any PR to main that changes SHIPPED CODE (src/** non-test, requirements.txt)
-# without bumping package.json's version. Docs-only and test-only PRs are exempt.
-# Rationale: publish.yml only runs `pnpm publish` when the version differs from npm,
-# so an un-bumped code change would silently never release. This makes the bump
-# mandatory. The guard file itself lives in .github/ (doesn't ship), so it needs no bump.
+# Fail any PR to main that changes SHIPPED CODE without bumping package.json's
+# version. Shipped code = src/** (non-test), requirements.txt, and the RUNTIME
+# `dependencies` map in package.json — runtime deps are inlined into the
+# committed esbuild bundle, so bumping one changes shipped bytes too (rule
+# added 2026-07-15 alongside dependabot-rebuild.yml; previously a merged
+# runtime-dep bump silently never reached npm). Docs-only, test-only, dev-dep
+# and github-actions bumps stay exempt. Rationale: publish.yml only runs
+# `pnpm publish` when the version differs from npm, so an un-bumped code
+# change would silently never release. This makes the bump mandatory. The
+# guard file itself lives in .github/ (doesn't ship), so it needs no bump.
 
 on:
   pull_request:
     branches: [main]
+  # Re-dispatched by dependabot-rebuild.yml after it pushes a rebuilt bundle
+  # to a Dependabot PR branch: a GITHUB_TOKEN push only creates held,
+  # approval-required pull_request runs, so this required check has to be
+  # re-run via dispatch to complete on the new head.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,7 +27,7 @@ jobs:
   require-version-bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -27,6 +37,17 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+
+          # Under workflow_dispatch there is no PR context — fall back to the
+          # fork point from origin/main (same semantics as the PR's triple-dot
+          # diff). Fetch main explicitly so merge-base cannot depend on
+          # checkout side effects.
+          if [ -z "${BASE_SHA}" ]; then
+            git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+            BASE_SHA="$(git merge-base origin/main HEAD)"
+            HEAD_SHA="$(git rev-parse HEAD)"
+          fi
+
           changed="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
           echo "Changed files:"; printf '%s\n' "$changed" | sed 's/^/  /'
 
@@ -36,11 +57,28 @@ jobs:
             | grep -E '^(src/.*|requirements\.txt)$' \
             | grep -vE '(\.test\.ts$|\.spec\.ts$|/__tests__/|/__mocks__/)' || true)"
 
-          if [ -z "$code" ]; then
+          # Runtime deps are shipped code too: they are inlined into the
+          # committed bundle. Compare only the `dependencies` map —
+          # devDependencies stay exempt so dev-dep automerge is unaffected.
+          deps_changed=""
+          if printf '%s\n' "$changed" | grep -qx 'package.json'; then
+            old_deps="$(git show "${BASE_SHA}:package.json" | jq -cS '.dependencies // {}')"
+            new_deps="$(git show "${HEAD_SHA}:package.json" | jq -cS '.dependencies // {}')"
+            if [ "$old_deps" != "$new_deps" ]; then
+              deps_changed=1
+              echo "Runtime dependencies changed:"
+              echo "  base: $old_deps"
+              echo "  head: $new_deps"
+            fi
+          fi
+
+          if [ -z "$code" ] && [ -z "$deps_changed" ]; then
             echo "::notice::No shipped-code changes — version bump not required."
             exit 0
           fi
-          echo "Shipped-code changes detected:"; printf '%s\n' "$code" | sed 's/^/  /'
+          if [ -n "$code" ]; then
+            echo "Shipped-code changes detected:"; printf '%s\n' "$code" | sed 's/^/  /'
+          fi
 
           oldv="$(git show "${BASE_SHA}:package.json" \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
@@ -48,7 +86,11 @@ jobs:
           echo "package.json version: base=${oldv}  head=${newv}"
 
           if [ "$oldv" = "$newv" ]; then
-            echo "::error::Shipped code changed but package.json version is unchanged (${oldv}). Bump it at least a patch:  pnpm version patch --no-git-tag-version  (and add a CHANGELOG entry)."
+            if [ -n "$deps_changed" ]; then
+              echo "::error::Runtime dependencies changed (the shipped bundle changes) but package.json version is unchanged (${oldv}). Bump at least a patch + add a CHANGELOG entry so publish.yml actually ships the dependency update:  pnpm version patch --no-git-tag-version"
+            else
+              echo "::error::Shipped code changed but package.json version is unchanged (${oldv}). Bump it at least a patch:  pnpm version patch --no-git-tag-version  (and add a CHANGELOG entry)."
+            fi
             exit 1
           fi
 
