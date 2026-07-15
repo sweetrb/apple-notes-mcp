@@ -6,7 +6,13 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __commonJS = (cb, mod) => function __require2() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   } catch (e) {
@@ -24161,14 +24167,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join5(output, replacement);
+        return join6(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join5(output, rule.append(self.options));
+          output = join6(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24180,7 +24186,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join5(output, replacement) {
+    function join6(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -39200,6 +39206,8 @@ function cleanupTempDir(dir) {
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
 import { existsSync as existsSync3 } from "fs";
+import { homedir as homedir3 } from "os";
+import { join as join2 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(ASCII character 31)";
@@ -39341,6 +39349,30 @@ function buildAppLevelScript(command) {
       ${command}
     end tell
   `;
+}
+function getNoteLinkFromDB(coreDataId) {
+  const match = coreDataId.match(/\/p(\d+)$/);
+  if (!match) return null;
+  const pk = parseInt(match[1], 10);
+  const dbPath = join2(
+    homedir3(),
+    "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+  );
+  if (!existsSync3(dbPath)) return null;
+  try {
+    const { DatabaseSync } = __require("node:sqlite");
+    const db = new DatabaseSync(dbPath);
+    try {
+      const row = db.prepare("SELECT ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ?").get(pk);
+      const identifier = row?.ZIDENTIFIER;
+      return identifier ? `notes://showNote?identifier=${identifier}` : null;
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error("getNoteLinkFromDB: failed to query Notes database:", err);
+    return null;
+  }
 }
 function extractCoreDataId(output, prefix) {
   const pattern = new RegExp(`${prefix} id ([^\\s]+)`);
@@ -40409,9 +40441,12 @@ var AppleNotesManager = class {
   /**
    * Returns the notes:// deep-link URL for a note by its CoreData ID.
    *
-   * Uses the AppleScript `note link` property (available macOS 12+) which
-   * returns the same URL that Notes.app copies via "Copy Note Link".
-   * Tapping this URL on iOS or macOS opens the note directly in Notes.app.
+   * Primary path: queries the Notes SQLite database for ZIDENTIFIER, which
+   * is the UUID used in the notes://showNote?identifier= URL scheme. This
+   * is more reliable than the AppleScript `note link` property, which is
+   * absent from the Notes SDEF on macOS 26+.
+   *
+   * Fallback: AppleScript `note link` property (macOS 12–15).
    *
    * @param id - CoreData URL identifier for the note
    * @returns notes://showNote?identifier=<uuid> string, or null on failure
@@ -40420,15 +40455,17 @@ var AppleNotesManager = class {
     const note = this.getNoteById(id);
     if (!note) return null;
     if (note.passwordProtected) return null;
+    const sqliteLink = getNoteLinkFromDB(id);
+    if (sqliteLink) return sqliteLink;
     const safeId = sanitizeId(id);
     const result = executeAppleScript(
       buildAppLevelScript(`return note link of (note id "${safeId}")`)
     );
-    if (!result.success || !result.output.trim()) {
-      console.error(`Failed to get note link for ID "${id}":`, result.error);
-      return null;
+    if (result.success && result.output.trim()) {
+      return result.output.trim();
     }
-    return result.output.trim();
+    console.error(`Failed to get note link for ID "${id}":`, result.error);
+    return null;
   }
   /**
    * Returns the notes:// deep-link URL for a note by title.
@@ -41733,12 +41770,12 @@ function formatDoctorReport(r) {
 
 // src/services/fileConfig.ts
 import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join4 } from "path";
-import { homedir as homedir5 } from "os";
+import { join as join5 } from "path";
+import { homedir as homedir6 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join4(homedir5(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join5(homedir6(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   const applied = [];
@@ -42233,9 +42270,7 @@ server.registerTool(
       );
     }
     if (note.passwordProtected) {
-      return errorResponse(
-        `Note "${title}" is password-protected. Unlock it in Notes.app first.`
-      );
+      return errorResponse(`Note "${title}" is password-protected. Unlock it in Notes.app first.`);
     }
     const url = notesManager.getNoteLink(title, account);
     if (!url) {

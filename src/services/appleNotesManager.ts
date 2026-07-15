@@ -43,6 +43,8 @@ import {
   ensureParentDir,
 } from "@/utils/attachmentFs.js";
 import { existsSync } from "fs";
+import { homedir } from "os";
+import { join } from "path";
 import TurndownService from "turndown";
 
 // =============================================================================
@@ -526,6 +528,53 @@ function buildAppLevelScript(command: string): string {
       ${command}
     end tell
   `;
+}
+
+/**
+ * Queries the local Notes SQLite database for the sync identifier of a note,
+ * then returns the notes://showNote?identifier=<uuid> deep-link URL.
+ *
+ * The Notes SDEF on macOS 26+ does not expose a `note link` AppleScript
+ * property, so we fall back to reading ZIDENTIFIER from the CoreData store
+ * directly. ZIDENTIFIER has been stable in ZICCLOUDSYNCINGOBJECT since
+ * macOS 10.11 and is the same UUID that the `notes://` URL scheme uses.
+ *
+ * The CoreData URL encodes the SQLite primary key as the numeric suffix after
+ * `p` (e.g. `x-coredata://uuid/ICNote/p50338` → Z_PK = 50338).
+ *
+ * @param coreDataId - CoreData URL from getNoteById (e.g. x-coredata://…/p123)
+ * @returns notes://showNote?identifier=<uuid> or null on any failure
+ */
+function getNoteLinkFromDB(coreDataId: string): string | null {
+  const match = coreDataId.match(/\/p(\d+)$/);
+  if (!match) return null;
+  const pk = parseInt(match[1], 10);
+
+  const dbPath = join(homedir(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  if (!existsSync(dbPath)) return null;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { DatabaseSync } = require("node:sqlite") as {
+      DatabaseSync: new (path: string) => {
+        prepare(sql: string): { get(...args: unknown[]): Record<string, unknown> | undefined };
+        close(): void;
+      };
+    };
+    const db = new DatabaseSync(dbPath);
+    try {
+      const row = db
+        .prepare("SELECT ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ?")
+        .get(pk);
+      const identifier = row?.ZIDENTIFIER as string | undefined;
+      return identifier ? `notes://showNote?identifier=${identifier}` : null;
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error("getNoteLinkFromDB: failed to query Notes database:", err);
+    return null;
+  }
 }
 
 // =============================================================================
@@ -1900,9 +1949,12 @@ export class AppleNotesManager {
   /**
    * Returns the notes:// deep-link URL for a note by its CoreData ID.
    *
-   * Uses the AppleScript `note link` property (available macOS 12+) which
-   * returns the same URL that Notes.app copies via "Copy Note Link".
-   * Tapping this URL on iOS or macOS opens the note directly in Notes.app.
+   * Primary path: queries the Notes SQLite database for ZIDENTIFIER, which
+   * is the UUID used in the notes://showNote?identifier= URL scheme. This
+   * is more reliable than the AppleScript `note link` property, which is
+   * absent from the Notes SDEF on macOS 26+.
+   *
+   * Fallback: AppleScript `note link` property (macOS 12–15).
    *
    * @param id - CoreData URL identifier for the note
    * @returns notes://showNote?identifier=<uuid> string, or null on failure
@@ -1911,15 +1963,22 @@ export class AppleNotesManager {
     const note = this.getNoteById(id);
     if (!note) return null;
     if (note.passwordProtected) return null;
+
+    // Primary: SQLite lookup — works on all macOS versions
+    const sqliteLink = getNoteLinkFromDB(id);
+    if (sqliteLink) return sqliteLink;
+
+    // Fallback: AppleScript 'note link' (present on macOS 12–15)
     const safeId = sanitizeId(id);
     const result = executeAppleScript(
       buildAppLevelScript(`return note link of (note id "${safeId}")`)
     );
-    if (!result.success || !result.output.trim()) {
-      console.error(`Failed to get note link for ID "${id}":`, result.error);
-      return null;
+    if (result.success && result.output.trim()) {
+      return result.output.trim();
     }
-    return result.output.trim();
+
+    console.error(`Failed to get note link for ID "${id}":`, result.error);
+    return null;
   }
 
   /**
