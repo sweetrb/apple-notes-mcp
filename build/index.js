@@ -42270,6 +42270,85 @@ server.registerTool(
   }, "Error updating note")
 );
 server.registerTool(
+  "append-to-note",
+  {
+    description: "Use when: adding content to an existing note without replacing it, by id (preferred) or title.\nReturns: confirmation with the note id and title.\nDo not use when: creating a new note (create-note) or replacing the entire body (update-note).\nSafety: reads the existing body first, concatenates, then writes back. Run list-attachments first if the note may hold embedded files \u2014 a full-body rewrite can drop attachments.",
+    inputSchema: {
+      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
+      content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
+      position: external_exports.enum(["after", "before"]).optional().default("after").describe("Where to insert: 'after' appends to the end (default), 'before' prepends to the start"),
+      separator: external_exports.string().max(20).optional().default("\n\n").describe("String placed between existing content and new content (default: two newlines)"),
+      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
+    },
+    outputSchema: {
+      ok: external_exports.boolean().optional(),
+      id: external_exports.string().optional(),
+      title: external_exports.string().optional(),
+      shared: external_exports.boolean().optional()
+    }
+  },
+  withErrorHandling(({ id, title, content, position = "after", separator = "\n\n", format = "plaintext", account }) => {
+    if (id) {
+      const note2 = notesManager.getNoteById(id);
+      if (!note2) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note2.passwordProtected) {
+        return errorResponse(
+          `Note "${note2.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+        );
+      }
+      const existing2 = format === "html" ? notesManager.getNoteContentById(id) : notesManager.getNotePlaintextById(id);
+      if (existing2 === null || existing2 === void 0) {
+        return errorResponse(`Failed to read content of note "${note2.title}"`);
+      }
+      const combined2 = position === "before" ? `${content}${separator}${existing2}` : `${existing2}${separator}${content}`;
+      const success2 = notesManager.updateNoteById(id, void 0, combined2, format);
+      if (!success2) {
+        return errorResponse(`Failed to append to note "${note2.title}"`);
+      }
+      const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+      return successResponse(`Note appended: "${note2.title}"${sharedWarning2}`, {
+        ok: true,
+        id,
+        title: note2.title,
+        shared: note2.shared ?? false
+      });
+    }
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+    if (note.passwordProtected) {
+      return errorResponse(
+        `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+      );
+    }
+    const existing = format === "html" ? notesManager.getNoteContent(title, account) : notesManager.getNotePlaintext(title, account);
+    if (existing === null || existing === void 0) {
+      return errorResponse(`Failed to read content of note "${title}"`);
+    }
+    const combined = position === "before" ? `${content}${separator}${existing}` : `${existing}${separator}${content}`;
+    const success = notesManager.updateNote(title, void 0, combined, account, format);
+    if (!success) {
+      return errorResponse(`Failed to append to note "${title}"`);
+    }
+    const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+    return successResponse(`Note appended: "${title}"${sharedWarning}`, {
+      ok: true,
+      title,
+      shared: note.shared ?? false
+    });
+  }, "Error appending to note")
+);
+server.registerTool(
   "delete-note",
   {
     description: "Use when: permanently deleting a single note, by id (preferred) or title.\nReturns: confirmation; warns when the note was shared.\nDo not use when: deleting many notes (batch-delete-notes) or just relocating one (move-note).\nSafety: requires explicit user confirmation before deleting. Prefer search-notes/list-notes first to show the affected note id and title. Deleting a shared note removes collaborator access.",

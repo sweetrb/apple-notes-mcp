@@ -740,6 +740,149 @@ server.registerTool(
   }, "Error updating note")
 );
 
+// --- append-to-note ---
+
+server.registerTool(
+  "append-to-note",
+  {
+    description:
+      "Use when: adding content to an existing note without replacing it, by id (preferred) or title.\nReturns: confirmation with the note id and title.\nDo not use when: creating a new note (create-note) or replacing the entire body (update-note).\nSafety: reads the existing body first, concatenates, then writes back. Run list-attachments first if the note may hold embedded files — a full-body rewrite can drop attachments.",
+    inputSchema: {
+      id: z
+        .string()
+        .max(MAX.ID)
+        .optional()
+        .describe("Note ID (preferred - more reliable than title)"),
+      title: z
+        .string()
+        .max(MAX.TITLE)
+        .optional()
+        .describe("Note title (use id instead when available)"),
+      content: z
+        .string()
+        .min(1, "Content to append is required")
+        .max(MAX.CONTENT)
+        .describe("Text to append to the note body"),
+      position: z
+        .enum(["after", "before"])
+        .optional()
+        .default("after")
+        .describe(
+          "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+        ),
+      separator: z
+        .string()
+        .max(20)
+        .optional()
+        .default("\n\n")
+        .describe("String placed between existing content and new content (default: two newlines)"),
+      format: z
+        .enum(["plaintext", "html"])
+        .optional()
+        .default("plaintext")
+        .describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account containing the note (ignored if id is provided)"),
+    },
+    outputSchema: {
+      ok: z.boolean().optional(),
+      id: z.string().optional(),
+      title: z.string().optional(),
+      shared: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(
+    ({
+      id,
+      title,
+      content,
+      position = "after",
+      separator = "\n\n",
+      format = "plaintext",
+      account,
+    }) => {
+      if (id) {
+        const note = notesManager.getNoteById(id);
+        if (!note) {
+          return errorResponse(`Note with ID "${id}" not found`);
+        }
+        if (note.passwordProtected) {
+          return errorResponse(
+            `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+          );
+        }
+        const existing =
+          format === "html"
+            ? notesManager.getNoteContentById(id)
+            : notesManager.getNotePlaintextById(id);
+        if (existing === null || existing === undefined) {
+          return errorResponse(`Failed to read content of note "${note.title}"`);
+        }
+        const combined =
+          position === "before"
+            ? `${content}${separator}${existing}`
+            : `${existing}${separator}${content}`;
+        const success = notesManager.updateNoteById(id, undefined, combined, format);
+        if (!success) {
+          return errorResponse(`Failed to append to note "${note.title}"`);
+        }
+        const sharedWarning = note.shared
+          ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
+          : "";
+        return successResponse(`Note appended: "${note.title}"${sharedWarning}`, {
+          ok: true,
+          id,
+          title: note.title,
+          shared: note.shared ?? false,
+        });
+      }
+
+      if (!title) {
+        return errorResponse("Either 'id' or 'title' is required");
+      }
+
+      const note = notesManager.getNoteDetails(title, account);
+      if (!note) {
+        return errorResponse(
+          `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+        );
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+        );
+      }
+      const existing =
+        format === "html"
+          ? notesManager.getNoteContent(title, account)
+          : notesManager.getNotePlaintext(title, account);
+      if (existing === null || existing === undefined) {
+        return errorResponse(`Failed to read content of note "${title}"`);
+      }
+      const combined =
+        position === "before"
+          ? `${content}${separator}${existing}`
+          : `${existing}${separator}${content}`;
+      const success = notesManager.updateNote(title, undefined, combined, account, format);
+      if (!success) {
+        return errorResponse(`Failed to append to note "${title}"`);
+      }
+      const sharedWarning = note.shared
+        ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
+        : "";
+      return successResponse(`Note appended: "${title}"${sharedWarning}`, {
+        ok: true,
+        title,
+        shared: note.shared ?? false,
+      });
+    },
+    "Error appending to note"
+  )
+);
+
 // --- delete-note ---
 
 server.registerTool(
