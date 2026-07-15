@@ -572,6 +572,79 @@ server.registerTool(
   }, "Error showing note")
 );
 
+// --- get-note-link ---
+
+server.registerTool(
+  "get-note-link",
+  {
+    description:
+      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: requires macOS 12+; returns an error on older systems.",
+    inputSchema: {
+      id: z
+        .string()
+        .max(MAX.ID)
+        .optional()
+        .describe("Note ID (preferred - more reliable than title)"),
+      title: z
+        .string()
+        .max(MAX.TITLE)
+        .optional()
+        .describe("Note title (use id instead when available)"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account containing the note (ignored if id is provided)"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      title: z.string().optional(),
+      url: z.string().optional(),
+    },
+  },
+  withErrorHandling(({ id, title, account }) => {
+    if (id) {
+      const note = notesManager.getNoteById(id);
+      if (!note) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${note.title}" is password-protected. Unlock it in Notes.app first.`
+        );
+      }
+      const url = notesManager.getNoteLinkById(id);
+      if (!url) {
+        return errorResponse(
+          `Failed to get note link for "${note.title}". The note link property requires macOS 12 or later.`
+        );
+      }
+      return successResponse(`Note link: ${url}`, { id, title: note.title, url });
+    }
+
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+    if (note.passwordProtected) {
+      return errorResponse(`Note "${title}" is password-protected. Unlock it in Notes.app first.`);
+    }
+    const url = notesManager.getNoteLink(title, account);
+    if (!url) {
+      return errorResponse(
+        `Failed to get note link for "${title}". The note link property requires macOS 12 or later.`
+      );
+    }
+    return successResponse(`Note link: ${url}`, { title, url });
+  }, "Error getting note link")
+);
+
 // --- show-folder ---
 
 server.registerTool(

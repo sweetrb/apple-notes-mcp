@@ -1898,6 +1898,44 @@ export class AppleNotesManager {
   }
 
   /**
+   * Returns the notes:// deep-link URL for a note by its CoreData ID.
+   *
+   * Uses the AppleScript `note link` property (available macOS 12+) which
+   * returns the same URL that Notes.app copies via "Copy Note Link".
+   * Tapping this URL on iOS or macOS opens the note directly in Notes.app.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLinkById(id: string): string | null {
+    const note = this.getNoteById(id);
+    if (!note) return null;
+    if (note.passwordProtected) return null;
+    const safeId = sanitizeId(id);
+    const result = executeAppleScript(
+      buildAppLevelScript(`return note link of (note id "${safeId}")`)
+    );
+    if (!result.success || !result.output.trim()) {
+      console.error(`Failed to get note link for ID "${id}":`, result.error);
+      return null;
+    }
+    return result.output.trim();
+  }
+
+  /**
+   * Returns the notes:// deep-link URL for a note by title.
+   *
+   * @param title - Exact note title
+   * @param account - Account to search in (defaults to iCloud)
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLink(title: string, account?: string): string | null {
+    const note = this.getNoteDetails(title, account);
+    if (!note) return null;
+    return this.getNoteLinkById(note.id);
+  }
+
+  /**
    * Reveals a folder in the Notes.app UI by its id.
    *
    * Wraps the Notes `show` command, which the scripting dictionary exposes for

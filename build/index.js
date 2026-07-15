@@ -40407,6 +40407,42 @@ var AppleNotesManager = class {
     return true;
   }
   /**
+   * Returns the notes:// deep-link URL for a note by its CoreData ID.
+   *
+   * Uses the AppleScript `note link` property (available macOS 12+) which
+   * returns the same URL that Notes.app copies via "Copy Note Link".
+   * Tapping this URL on iOS or macOS opens the note directly in Notes.app.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLinkById(id) {
+    const note = this.getNoteById(id);
+    if (!note) return null;
+    if (note.passwordProtected) return null;
+    const safeId = sanitizeId(id);
+    const result = executeAppleScript(
+      buildAppLevelScript(`return note link of (note id "${safeId}")`)
+    );
+    if (!result.success || !result.output.trim()) {
+      console.error(`Failed to get note link for ID "${id}":`, result.error);
+      return null;
+    }
+    return result.output.trim();
+  }
+  /**
+   * Returns the notes:// deep-link URL for a note by title.
+   *
+   * @param title - Exact note title
+   * @param account - Account to search in (defaults to iCloud)
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLink(title, account) {
+    const note = this.getNoteDetails(title, account);
+    if (!note) return null;
+    return this.getNoteLinkById(note.id);
+  }
+  /**
    * Reveals a folder in the Notes.app UI by its id.
    *
    * Wraps the Notes `show` command, which the scripting dictionary exposes for
@@ -42154,6 +42190,63 @@ server.registerTool(
   }, "Error showing note")
 );
 server.registerTool(
+  "get-note-link",
+  {
+    description: "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: requires macOS 12+; returns an error on older systems.",
+    inputSchema: {
+      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      title: external_exports.string().optional(),
+      url: external_exports.string().optional()
+    }
+  },
+  withErrorHandling(({ id, title, account }) => {
+    if (id) {
+      const note2 = notesManager.getNoteById(id);
+      if (!note2) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note2.passwordProtected) {
+        return errorResponse(
+          `Note "${note2.title}" is password-protected. Unlock it in Notes.app first.`
+        );
+      }
+      const url2 = notesManager.getNoteLinkById(id);
+      if (!url2) {
+        return errorResponse(
+          `Failed to get note link for "${note2.title}". The note link property requires macOS 12 or later.`
+        );
+      }
+      return successResponse(`Note link: ${url2}`, { id, title: note2.title, url: url2 });
+    }
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+    if (note.passwordProtected) {
+      return errorResponse(
+        `Note "${title}" is password-protected. Unlock it in Notes.app first.`
+      );
+    }
+    const url = notesManager.getNoteLink(title, account);
+    if (!url) {
+      return errorResponse(
+        `Failed to get note link for "${title}". The note link property requires macOS 12 or later.`
+      );
+    }
+    return successResponse(`Note link: ${url}`, { title, url });
+  }, "Error getting note link")
+);
+server.registerTool(
   "show-folder",
   {
     description: "Use when: the user wants to reveal a known folder in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the folder list (list-folders).\nNote: this opens or focuses the Notes UI. Get the id from list-folders.",
@@ -42277,7 +42370,9 @@ server.registerTool(
       id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
-      position: external_exports.enum(["after", "before"]).optional().default("after").describe("Where to insert: 'after' appends to the end (default), 'before' prepends to the start"),
+      position: external_exports.enum(["after", "before"]).optional().default("after").describe(
+        "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+      ),
       separator: external_exports.string().max(20).optional().default("\n\n").describe("String placed between existing content and new content (default: two newlines)"),
       format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
@@ -42289,64 +42384,75 @@ server.registerTool(
       shared: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, title, content, position = "after", separator = "\n\n", format = "plaintext", account }) => {
-    if (id) {
-      const note2 = notesManager.getNoteById(id);
-      if (!note2) {
-        return errorResponse(`Note with ID "${id}" not found`);
+  withErrorHandling(
+    ({
+      id,
+      title,
+      content,
+      position = "after",
+      separator = "\n\n",
+      format = "plaintext",
+      account
+    }) => {
+      if (id) {
+        const note2 = notesManager.getNoteById(id);
+        if (!note2) {
+          return errorResponse(`Note with ID "${id}" not found`);
+        }
+        if (note2.passwordProtected) {
+          return errorResponse(
+            `Note "${note2.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+          );
+        }
+        const existing2 = format === "html" ? notesManager.getNoteContentById(id) : notesManager.getNotePlaintextById(id);
+        if (existing2 === null || existing2 === void 0) {
+          return errorResponse(`Failed to read content of note "${note2.title}"`);
+        }
+        const combined2 = position === "before" ? `${content}${separator}${existing2}` : `${existing2}${separator}${content}`;
+        const success2 = notesManager.updateNoteById(id, void 0, combined2, format);
+        if (!success2) {
+          return errorResponse(`Failed to append to note "${note2.title}"`);
+        }
+        const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+        return successResponse(`Note appended: "${note2.title}"${sharedWarning2}`, {
+          ok: true,
+          id,
+          title: note2.title,
+          shared: note2.shared ?? false
+        });
       }
-      if (note2.passwordProtected) {
+      if (!title) {
+        return errorResponse("Either 'id' or 'title' is required");
+      }
+      const note = notesManager.getNoteDetails(title, account);
+      if (!note) {
         return errorResponse(
-          `Note "${note2.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+          `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
         );
       }
-      const existing2 = format === "html" ? notesManager.getNoteContentById(id) : notesManager.getNotePlaintextById(id);
-      if (existing2 === null || existing2 === void 0) {
-        return errorResponse(`Failed to read content of note "${note2.title}"`);
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+        );
       }
-      const combined2 = position === "before" ? `${content}${separator}${existing2}` : `${existing2}${separator}${content}`;
-      const success2 = notesManager.updateNoteById(id, void 0, combined2, format);
-      if (!success2) {
-        return errorResponse(`Failed to append to note "${note2.title}"`);
+      const existing = format === "html" ? notesManager.getNoteContent(title, account) : notesManager.getNotePlaintext(title, account);
+      if (existing === null || existing === void 0) {
+        return errorResponse(`Failed to read content of note "${title}"`);
       }
-      const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
-      return successResponse(`Note appended: "${note2.title}"${sharedWarning2}`, {
+      const combined = position === "before" ? `${content}${separator}${existing}` : `${existing}${separator}${content}`;
+      const success = notesManager.updateNote(title, void 0, combined, account, format);
+      if (!success) {
+        return errorResponse(`Failed to append to note "${title}"`);
+      }
+      const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+      return successResponse(`Note appended: "${title}"${sharedWarning}`, {
         ok: true,
-        id,
-        title: note2.title,
-        shared: note2.shared ?? false
+        title,
+        shared: note.shared ?? false
       });
-    }
-    if (!title) {
-      return errorResponse("Either 'id' or 'title' is required");
-    }
-    const note = notesManager.getNoteDetails(title, account);
-    if (!note) {
-      return errorResponse(
-        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
-      );
-    }
-    if (note.passwordProtected) {
-      return errorResponse(
-        `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
-      );
-    }
-    const existing = format === "html" ? notesManager.getNoteContent(title, account) : notesManager.getNotePlaintext(title, account);
-    if (existing === null || existing === void 0) {
-      return errorResponse(`Failed to read content of note "${title}"`);
-    }
-    const combined = position === "before" ? `${content}${separator}${existing}` : `${existing}${separator}${content}`;
-    const success = notesManager.updateNote(title, void 0, combined, account, format);
-    if (!success) {
-      return errorResponse(`Failed to append to note "${title}"`);
-    }
-    const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
-    return successResponse(`Note appended: "${title}"${sharedWarning}`, {
-      ok: true,
-      title,
-      shared: note.shared ?? false
-    });
-  }, "Error appending to note")
+    },
+    "Error appending to note"
+  )
 );
 server.registerTool(
   "delete-note",
