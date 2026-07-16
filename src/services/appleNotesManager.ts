@@ -556,12 +556,15 @@ function getNoteLinkFromDB(coreDataId: string): string | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { DatabaseSync } = require("node:sqlite") as {
-      DatabaseSync: new (path: string) => {
+      DatabaseSync: new (
+        path: string,
+        options?: { readOnly?: boolean }
+      ) => {
         prepare(sql: string): { get(...args: unknown[]): Record<string, unknown> | undefined };
         close(): void;
       };
     };
-    const db = new DatabaseSync(dbPath);
+    const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const row = db
         .prepare("SELECT ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ?")

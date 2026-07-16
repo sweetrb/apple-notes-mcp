@@ -469,6 +469,71 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 
 ---
 
+#### `append-to-note`
+
+Appends or prepends content to an existing note without replacing it. Always reads and writes as HTML, preserving all existing rich formatting.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Note title (use `id` instead when available) |
+| `content` | string | Yes | Text to append to the note body |
+| `position` | string | No | `"after"` (default) appends to the end; `"before"` prepends to the start |
+| `separator` | string | No | String placed between existing content and new content (default: two newlines → `<div><br></div>` in HTML) |
+| `format` | string | No | Format of the content being appended: `"plaintext"` (default) or `"html"` |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+
+**Example - Append plaintext:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "content": "New item added today"
+}
+```
+
+**Example - Prepend HTML:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "content": "<div><b>Status:</b> done</div>",
+  "format": "html",
+  "position": "before"
+}
+```
+
+**Returns:** Confirmation with note id and title. Warns when the note is shared with collaborators.
+
+**⚠️ Safety:** Reads the existing body first, concatenates, then writes back. Run `list-attachments` first if the note may hold embedded files — a full-body rewrite can drop attachments.
+
+---
+
+#### `get-note-link`
+
+Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The URL opens the note in Notes.app on iOS and macOS and can be stored in Reminders tasks or shared links.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | Note ID (preferred - more reliable than title) |
+| `title` | string | No | Note title (use `id` instead when available) |
+| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+
+**Note:** Either `id` or `title` must be provided. Using `id` is recommended. Password-protected notes cannot be linked.
+
+**Example:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456"
+}
+```
+
+**Returns:** `notes://showNote?identifier=<uuid>` URL string, plus the note id and title.
+
+**Note:** Requires Full Disk Access for the app that launches the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
+
+---
+
 #### `list-notes`
 
 Lists all notes, optionally filtered by folder, date, and limit.

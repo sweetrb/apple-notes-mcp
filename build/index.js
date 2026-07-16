@@ -39354,14 +39354,11 @@ function getNoteLinkFromDB(coreDataId) {
   const match = coreDataId.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath = join2(
-    homedir3(),
-    "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
-  );
+  const dbPath = join2(homedir3(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
   if (!existsSync3(dbPath)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
-    const db = new DatabaseSync(dbPath);
+    const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const row = db.prepare("SELECT ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ?").get(pk);
       const identifier = row?.ZIDENTIFIER;
@@ -42255,7 +42252,7 @@ server.registerTool(
       const url2 = notesManager.getNoteLinkById(id);
       if (!url2) {
         return errorResponse(
-          `Failed to get note link for "${note2.title}". The note link property requires macOS 12 or later.`
+          `Failed to get note link for "${note2.title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
         );
       }
       return successResponse(`Note link: ${url2}`, { id, title: note2.title, url: url2 });
@@ -42275,7 +42272,7 @@ server.registerTool(
     const url = notesManager.getNoteLink(title, account);
     if (!url) {
       return errorResponse(
-        `Failed to get note link for "${title}". The note link property requires macOS 12 or later.`
+        `Failed to get note link for "${title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
       );
     }
     return successResponse(`Note link: ${url}`, { title, url });
@@ -42429,6 +42426,19 @@ server.registerTool(
       format = "plaintext",
       account
     }) => {
+      const contentToHtml = (text) => {
+        if (format === "html") return text;
+        return text.split("\n").map((line) => {
+          const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<div>${escaped || "<br>"}</div>`;
+        }).join("");
+      };
+      const separatorToHtml = (sep2) => {
+        if (format === "html") return sep2;
+        if (sep2 === "\n\n") return "<div><br></div>";
+        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div>${escaped}</div>`;
+      };
       if (id) {
         const note2 = notesManager.getNoteById(id);
         if (!note2) {
@@ -42439,12 +42449,17 @@ server.registerTool(
             `Note "${note2.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
           );
         }
-        const existing2 = format === "html" ? notesManager.getNoteContentById(id) : notesManager.getNotePlaintextById(id);
-        if (existing2 === null || existing2 === void 0) {
+        const existingHtml2 = notesManager.getNoteContentById(id);
+        if (existingHtml2 === null || existingHtml2 === void 0) {
           return errorResponse(`Failed to read content of note "${note2.title}"`);
         }
-        const combined2 = position === "before" ? `${content}${separator}${existing2}` : `${existing2}${separator}${content}`;
-        const success2 = notesManager.updateNoteById(id, void 0, combined2, format);
+        const firstDivEnd2 = existingHtml2.indexOf("</div>");
+        const titleDiv2 = firstDivEnd2 !== -1 ? existingHtml2.slice(0, firstDivEnd2 + 6) : "";
+        const bodyHtml2 = firstDivEnd2 !== -1 ? existingHtml2.slice(firstDivEnd2 + 6) : existingHtml2;
+        const newBlock2 = contentToHtml(content);
+        const sepHtml2 = separatorToHtml(separator);
+        const combinedBody2 = position === "before" ? titleDiv2 + newBlock2 + sepHtml2 + bodyHtml2 : titleDiv2 + bodyHtml2 + sepHtml2 + newBlock2;
+        const success2 = notesManager.updateNoteById(id, void 0, combinedBody2, "html");
         if (!success2) {
           return errorResponse(`Failed to append to note "${note2.title}"`);
         }
@@ -42470,12 +42485,17 @@ server.registerTool(
           `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
         );
       }
-      const existing = format === "html" ? notesManager.getNoteContent(title, account) : notesManager.getNotePlaintext(title, account);
-      if (existing === null || existing === void 0) {
+      const existingHtml = notesManager.getNoteContent(title, account);
+      if (existingHtml === null || existingHtml === void 0) {
         return errorResponse(`Failed to read content of note "${title}"`);
       }
-      const combined = position === "before" ? `${content}${separator}${existing}` : `${existing}${separator}${content}`;
-      const success = notesManager.updateNote(title, void 0, combined, account, format);
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const newBlock = contentToHtml(content);
+      const sepHtml = separatorToHtml(separator);
+      const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
+      const success = notesManager.updateNote(title, void 0, combinedBody, account, "html");
       if (!success) {
         return errorResponse(`Failed to append to note "${title}"`);
       }

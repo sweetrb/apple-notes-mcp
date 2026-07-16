@@ -616,7 +616,7 @@ server.registerTool(
       const url = notesManager.getNoteLinkById(id);
       if (!url) {
         return errorResponse(
-          `Failed to get note link for "${note.title}". The note link property requires macOS 12 or later.`
+          `Failed to get note link for "${note.title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
         );
       }
       return successResponse(`Note link: ${url}`, { id, title: note.title, url });
@@ -638,7 +638,7 @@ server.registerTool(
     const url = notesManager.getNoteLink(title, account);
     if (!url) {
       return errorResponse(
-        `Failed to get note link for "${title}". The note link property requires macOS 12 or later.`
+        `Failed to get note link for "${title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
       );
     }
     return successResponse(`Note link: ${url}`, { title, url });
@@ -877,6 +877,32 @@ server.registerTool(
       format = "plaintext",
       account,
     }) => {
+      // Helper: convert new content to HTML block(s) and separator to HTML.
+      // Notes stores its body as HTML; reading plaintext and writing back as
+      // plaintext would destroy <b>/<i>/etc. formatting and duplicate the
+      // title (plaintext includes the title as the first line, and the
+      // plaintext write path prepends it again).  We always read as HTML,
+      // split off the title <div>, convert the new content to HTML if needed,
+      // and write back as HTML.
+      const contentToHtml = (text: string): string => {
+        if (format === "html") return text;
+        // Plaintext: each line becomes a <div> (empty lines become <div><br></div>)
+        return text
+          .split("\n")
+          .map((line) => {
+            const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return `<div>${escaped || "<br>"}</div>`;
+          })
+          .join("");
+      };
+      const separatorToHtml = (sep: string): string => {
+        if (format === "html") return sep;
+        if (sep === "\n\n") return "<div><br></div>";
+        // Arbitrary plaintext separator: escape and wrap
+        const escaped = sep.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div>${escaped}</div>`;
+      };
+
       if (id) {
         const note = notesManager.getNoteById(id);
         if (!note) {
@@ -887,18 +913,23 @@ server.registerTool(
             `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
           );
         }
-        const existing =
-          format === "html"
-            ? notesManager.getNoteContentById(id)
-            : notesManager.getNotePlaintextById(id);
-        if (existing === null || existing === undefined) {
+        // Always read as HTML to avoid destroying rich formatting
+        const existingHtml = notesManager.getNoteContentById(id);
+        if (existingHtml === null || existingHtml === undefined) {
           return errorResponse(`Failed to read content of note "${note.title}"`);
         }
-        const combined =
+        // The title is stored as the first <div> of the body. Separate it so we
+        // never duplicate it when writing back.
+        const firstDivEnd = existingHtml.indexOf("</div>");
+        const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+        const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+        const newBlock = contentToHtml(content);
+        const sepHtml = separatorToHtml(separator);
+        const combinedBody =
           position === "before"
-            ? `${content}${separator}${existing}`
-            : `${existing}${separator}${content}`;
-        const success = notesManager.updateNoteById(id, undefined, combined, format);
+            ? titleDiv + newBlock + sepHtml + bodyHtml
+            : titleDiv + bodyHtml + sepHtml + newBlock;
+        const success = notesManager.updateNoteById(id, undefined, combinedBody, "html");
         if (!success) {
           return errorResponse(`Failed to append to note "${note.title}"`);
         }
@@ -928,18 +959,22 @@ server.registerTool(
           `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
         );
       }
-      const existing =
-        format === "html"
-          ? notesManager.getNoteContent(title, account)
-          : notesManager.getNotePlaintext(title, account);
-      if (existing === null || existing === undefined) {
+      // Always read as HTML to avoid destroying rich formatting
+      const existingHtml = notesManager.getNoteContent(title, account);
+      if (existingHtml === null || existingHtml === undefined) {
         return errorResponse(`Failed to read content of note "${title}"`);
       }
-      const combined =
+      // Separate the title <div> from the body
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const newBlock = contentToHtml(content);
+      const sepHtml = separatorToHtml(separator);
+      const combinedBody =
         position === "before"
-          ? `${content}${separator}${existing}`
-          : `${existing}${separator}${content}`;
-      const success = notesManager.updateNote(title, undefined, combined, account, format);
+          ? titleDiv + newBlock + sepHtml + bodyHtml
+          : titleDiv + bodyHtml + sepHtml + newBlock;
+      const success = notesManager.updateNote(title, undefined, combinedBody, account, "html");
       if (!success) {
         return errorResponse(`Failed to append to note "${title}"`);
       }
