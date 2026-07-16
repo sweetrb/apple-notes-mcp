@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-07-16
+### Added
+- **`append-to-note`**: Appends or prepends content to an existing note by id or title, preserving all existing rich HTML formatting (bold, italic, etc.). Always reads and writes as HTML, splitting the title `<div>` from body to prevent title duplication. Supports `position` (`"after"` / `"before"`), `separator`, and `format` (`"plaintext"` / `"html"`) parameters.
+- **`get-note-link`**: Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note by id or title. Primary path queries the Notes SQLite database for `ZIDENTIFIER` (works on all macOS versions including macOS 26+); falls back to the AppleScript `note link` property on macOS 12–15. Skips password-protected notes.
+
 ## [2.5.12] - 2026-07-13
 ### Fixed
 - **`get-sync-status` no longer reports orphaned Core Data rows as pending uploads.** The detector counted every `ZICCLOUDSTATE` version gap, including historical rows whose Notes syncing object no longer exists. It now requires a matching live `ZICCLOUDSYNCINGOBJECT` reference before treating a row as pending, preventing a permanent false active-sync warning while preserving detection for live unsynced objects.

@@ -6,7 +6,13 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __commonJS = (cb, mod) => function __require2() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   } catch (e) {
@@ -24161,14 +24167,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join5(output, replacement);
+        return join6(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join5(output, rule.append(self.options));
+          output = join6(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24180,7 +24186,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join5(output, replacement) {
+    function join6(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -39200,6 +39206,8 @@ function cleanupTempDir(dir) {
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
 import { existsSync as existsSync3 } from "fs";
+import { homedir as homedir3 } from "os";
+import { join as join2 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(ASCII character 31)";
@@ -39341,6 +39349,27 @@ function buildAppLevelScript(command) {
       ${command}
     end tell
   `;
+}
+function getNoteLinkFromDB(coreDataId) {
+  const match = coreDataId.match(/\/p(\d+)$/);
+  if (!match) return null;
+  const pk = parseInt(match[1], 10);
+  const dbPath = join2(homedir3(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  if (!existsSync3(dbPath)) return null;
+  try {
+    const { DatabaseSync } = __require("node:sqlite");
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const row = db.prepare("SELECT ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ?").get(pk);
+      const identifier = row?.ZIDENTIFIER;
+      return identifier ? `notes://showNote?identifier=${identifier}` : null;
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error("getNoteLinkFromDB: failed to query Notes database:", err);
+    return null;
+  }
 }
 function extractCoreDataId(output, prefix) {
   const pattern = new RegExp(`${prefix} id ([^\\s]+)`);
@@ -40405,6 +40434,47 @@ var AppleNotesManager = class {
       return false;
     }
     return true;
+  }
+  /**
+   * Returns the notes:// deep-link URL for a note by its CoreData ID.
+   *
+   * Primary path: queries the Notes SQLite database for ZIDENTIFIER, which
+   * is the UUID used in the notes://showNote?identifier= URL scheme. This
+   * is more reliable than the AppleScript `note link` property, which is
+   * absent from the Notes SDEF on macOS 26+.
+   *
+   * Fallback: AppleScript `note link` property (macOS 12–15).
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLinkById(id) {
+    const note = this.getNoteById(id);
+    if (!note) return null;
+    if (note.passwordProtected) return null;
+    const sqliteLink = getNoteLinkFromDB(id);
+    if (sqliteLink) return sqliteLink;
+    const safeId = sanitizeId(id);
+    const result = executeAppleScript(
+      buildAppLevelScript(`return note link of (note id "${safeId}")`)
+    );
+    if (result.success && result.output.trim()) {
+      return result.output.trim();
+    }
+    console.error(`Failed to get note link for ID "${id}":`, result.error);
+    return null;
+  }
+  /**
+   * Returns the notes:// deep-link URL for a note by title.
+   *
+   * @param title - Exact note title
+   * @param account - Account to search in (defaults to iCloud)
+   * @returns notes://showNote?identifier=<uuid> string, or null on failure
+   */
+  getNoteLink(title, account) {
+    const note = this.getNoteDetails(title, account);
+    if (!note) return null;
+    return this.getNoteLinkById(note.id);
   }
   /**
    * Reveals a folder in the Notes.app UI by its id.
@@ -41697,12 +41767,12 @@ function formatDoctorReport(r) {
 
 // src/services/fileConfig.ts
 import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join4 } from "path";
-import { homedir as homedir5 } from "os";
+import { join as join5 } from "path";
+import { homedir as homedir6 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join4(homedir5(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join5(homedir6(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   const applied = [];
@@ -42154,6 +42224,61 @@ server.registerTool(
   }, "Error showing note")
 );
 server.registerTool(
+  "get-note-link",
+  {
+    description: "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: requires macOS 12+; returns an error on older systems.",
+    inputSchema: {
+      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      title: external_exports.string().optional(),
+      url: external_exports.string().optional()
+    }
+  },
+  withErrorHandling(({ id, title, account }) => {
+    if (id) {
+      const note2 = notesManager.getNoteById(id);
+      if (!note2) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note2.passwordProtected) {
+        return errorResponse(
+          `Note "${note2.title}" is password-protected. Unlock it in Notes.app first.`
+        );
+      }
+      const url2 = notesManager.getNoteLinkById(id);
+      if (!url2) {
+        return errorResponse(
+          `Failed to get note link for "${note2.title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
+        );
+      }
+      return successResponse(`Note link: ${url2}`, { id, title: note2.title, url: url2 });
+    }
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+    if (note.passwordProtected) {
+      return errorResponse(`Note "${title}" is password-protected. Unlock it in Notes.app first.`);
+    }
+    const url = notesManager.getNoteLink(title, account);
+    if (!url) {
+      return errorResponse(
+        `Failed to get note link for "${title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
+      );
+    }
+    return successResponse(`Note link: ${url}`, { title, url });
+  }, "Error getting note link")
+);
+server.registerTool(
   "show-folder",
   {
     description: "Use when: the user wants to reveal a known folder in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the folder list (list-folders).\nNote: this opens or focuses the Notes UI. Get the id from list-folders.",
@@ -42268,6 +42393,121 @@ server.registerTool(
       shared: note.shared ?? false
     });
   }, "Error updating note")
+);
+server.registerTool(
+  "append-to-note",
+  {
+    description: "Use when: adding content to an existing note without replacing it, by id (preferred) or title.\nReturns: confirmation with the note id and title.\nDo not use when: creating a new note (create-note) or replacing the entire body (update-note).\nSafety: reads the existing body first, concatenates, then writes back. Run list-attachments first if the note may hold embedded files \u2014 a full-body rewrite can drop attachments.",
+    inputSchema: {
+      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
+      content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
+      position: external_exports.enum(["after", "before"]).optional().default("after").describe(
+        "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+      ),
+      separator: external_exports.string().max(20).optional().default("\n\n").describe("String placed between existing content and new content (default: two newlines)"),
+      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
+    },
+    outputSchema: {
+      ok: external_exports.boolean().optional(),
+      id: external_exports.string().optional(),
+      title: external_exports.string().optional(),
+      shared: external_exports.boolean().optional()
+    }
+  },
+  withErrorHandling(
+    ({
+      id,
+      title,
+      content,
+      position = "after",
+      separator = "\n\n",
+      format = "plaintext",
+      account
+    }) => {
+      const contentToHtml = (text) => {
+        if (format === "html") return text;
+        return text.split("\n").map((line) => {
+          const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<div>${escaped || "<br>"}</div>`;
+        }).join("");
+      };
+      const separatorToHtml = (sep2) => {
+        if (format === "html") return sep2;
+        if (sep2 === "\n\n") return "<div><br></div>";
+        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div>${escaped}</div>`;
+      };
+      if (id) {
+        const note2 = notesManager.getNoteById(id);
+        if (!note2) {
+          return errorResponse(`Note with ID "${id}" not found`);
+        }
+        if (note2.passwordProtected) {
+          return errorResponse(
+            `Note "${note2.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+          );
+        }
+        const existingHtml2 = notesManager.getNoteContentById(id);
+        if (existingHtml2 === null || existingHtml2 === void 0) {
+          return errorResponse(`Failed to read content of note "${note2.title}"`);
+        }
+        const firstDivEnd2 = existingHtml2.indexOf("</div>");
+        const titleDiv2 = firstDivEnd2 !== -1 ? existingHtml2.slice(0, firstDivEnd2 + 6) : "";
+        const bodyHtml2 = firstDivEnd2 !== -1 ? existingHtml2.slice(firstDivEnd2 + 6) : existingHtml2;
+        const newBlock2 = contentToHtml(content);
+        const sepHtml2 = separatorToHtml(separator);
+        const combinedBody2 = position === "before" ? titleDiv2 + newBlock2 + sepHtml2 + bodyHtml2 : titleDiv2 + bodyHtml2 + sepHtml2 + newBlock2;
+        const success2 = notesManager.updateNoteById(id, void 0, combinedBody2, "html");
+        if (!success2) {
+          return errorResponse(`Failed to append to note "${note2.title}"`);
+        }
+        const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+        return successResponse(`Note appended: "${note2.title}"${sharedWarning2}`, {
+          ok: true,
+          id,
+          title: note2.title,
+          shared: note2.shared ?? false
+        });
+      }
+      if (!title) {
+        return errorResponse("Either 'id' or 'title' is required");
+      }
+      const note = notesManager.getNoteDetails(title, account);
+      if (!note) {
+        return errorResponse(
+          `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+        );
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+        );
+      }
+      const existingHtml = notesManager.getNoteContent(title, account);
+      if (existingHtml === null || existingHtml === void 0) {
+        return errorResponse(`Failed to read content of note "${title}"`);
+      }
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const newBlock = contentToHtml(content);
+      const sepHtml = separatorToHtml(separator);
+      const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
+      const success = notesManager.updateNote(title, void 0, combinedBody, account, "html");
+      if (!success) {
+        return errorResponse(`Failed to append to note "${title}"`);
+      }
+      const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
+      return successResponse(`Note appended: "${title}"${sharedWarning}`, {
+        ok: true,
+        title,
+        shared: note.shared ?? false
+      });
+    },
+    "Error appending to note"
+  )
 );
 server.registerTool(
   "delete-note",

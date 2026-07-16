@@ -3129,6 +3129,97 @@ describe("AppleNotesManager", () => {
       }).toThrow("Invalid note ID format");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // getNoteLinkById
+  // ---------------------------------------------------------------------------
+
+  describe("getNoteLinkById", () => {
+    const VALID_ID = "x-coredata://ABC123/ICNote/p50338";
+
+    it("returns null immediately for a password-protected note without calling executeAppleScript for the link", () => {
+      // First call: getNoteById (returns a protected note)
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: [
+          "Locked Note",
+          VALID_ID,
+          "2025-12-27-15-0-0",
+          "2025-12-27-15-0-0",
+          "false",
+          "true", // passwordProtected = true
+        ].join(F),
+      });
+
+      const result = manager.getNoteLinkById(VALID_ID);
+
+      expect(result).toBeNull();
+      // The link-fetching AppleScript (note link property) must NOT be called
+      // — the function should bail out after the password check.
+      const calls = mockExecuteAppleScript.mock.calls;
+      // Only one call: getNoteById
+      expect(calls).toHaveLength(1);
+    });
+
+    it("returns null when the note is not found", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: false,
+        output: "",
+        error: "Can't get note id",
+      });
+
+      const result = manager.getNoteLinkById(VALID_ID);
+
+      expect(result).toBeNull();
+    });
+
+    it("returns a notes:// URL for a valid, non-protected note", () => {
+      // getNoteById returns a non-protected note
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: [
+          "My Note",
+          VALID_ID,
+          "2025-12-27-15-0-0",
+          "2025-12-27-15-0-0",
+          "false",
+          "false",
+        ].join(F),
+      });
+      // SQLite path (getNoteLinkFromDB) may succeed (if the Notes DB is
+      // accessible on the test machine) or fail and fall through to the
+      // AppleScript fallback.  Mock the AppleScript fallback so it can
+      // return a URL in the fallback-path case.
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "notes://showNote?identifier=ABCD-1234-5678",
+      });
+
+      const result = manager.getNoteLinkById(VALID_ID);
+
+      // Either the SQLite path or the AppleScript fallback should return
+      // a notes:// URL — either form is acceptable.
+      expect(result).not.toBeNull();
+      expect(result).toMatch(/^notes:\/\/showNote\?identifier=/);
+    });
+  });
+});
+
+describe("getNoteLinkFromDB — CoreData PK parsing", () => {
+  // getNoteLinkFromDB is module-private, but we can verify the PK extraction
+  // logic indirectly by checking that getNoteLinkById passes the right primary
+  // key to the database query.  We test the regex rule by covering the
+  // CoreData ID formats the function must handle.
+
+  it("sanitizeId accepts the x-coredata URL used by getNoteLinkById", () => {
+    // If sanitizeId throws, getNoteLinkById would not even reach the DB call.
+    // This assertion confirms the ID format is considered valid.
+    expect(() => sanitizeId("x-coredata://ABC123/ICNote/p50338")).not.toThrow();
+  });
+
+  it("sanitizeId rejects IDs without a /p<digits> suffix", () => {
+    expect(() => sanitizeId("x-coredata://ABC123/ICNote/pXXX")).toThrow("Invalid note ID format");
+  });
 });
 
 describe("htmlToPlaintext (export helper)", () => {

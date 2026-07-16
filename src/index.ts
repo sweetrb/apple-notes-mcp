@@ -572,6 +572,79 @@ server.registerTool(
   }, "Error showing note")
 );
 
+// --- get-note-link ---
+
+server.registerTool(
+  "get-note-link",
+  {
+    description:
+      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: requires macOS 12+; returns an error on older systems.",
+    inputSchema: {
+      id: z
+        .string()
+        .max(MAX.ID)
+        .optional()
+        .describe("Note ID (preferred - more reliable than title)"),
+      title: z
+        .string()
+        .max(MAX.TITLE)
+        .optional()
+        .describe("Note title (use id instead when available)"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account containing the note (ignored if id is provided)"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      title: z.string().optional(),
+      url: z.string().optional(),
+    },
+  },
+  withErrorHandling(({ id, title, account }) => {
+    if (id) {
+      const note = notesManager.getNoteById(id);
+      if (!note) {
+        return errorResponse(`Note with ID "${id}" not found`);
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${note.title}" is password-protected. Unlock it in Notes.app first.`
+        );
+      }
+      const url = notesManager.getNoteLinkById(id);
+      if (!url) {
+        return errorResponse(
+          `Failed to get note link for "${note.title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+        );
+      }
+      return successResponse(`Note link: ${url}`, { id, title: note.title, url });
+    }
+
+    if (!title) {
+      return errorResponse("Either 'id' or 'title' is required");
+    }
+
+    const note = notesManager.getNoteDetails(title, account);
+    if (!note) {
+      return errorResponse(
+        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+      );
+    }
+    if (note.passwordProtected) {
+      return errorResponse(`Note "${title}" is password-protected. Unlock it in Notes.app first.`);
+    }
+    const url = notesManager.getNoteLink(title, account);
+    if (!url) {
+      return errorResponse(
+        `Failed to get note link for "${title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+      );
+    }
+    return successResponse(`Note link: ${url}`, { title, url });
+  }, "Error getting note link")
+);
+
 // --- show-folder ---
 
 server.registerTool(
@@ -738,6 +811,184 @@ server.registerTool(
       shared: note.shared ?? false,
     });
   }, "Error updating note")
+);
+
+// --- append-to-note ---
+
+server.registerTool(
+  "append-to-note",
+  {
+    description:
+      "Use when: adding content to an existing note without replacing it, by id (preferred) or title.\nReturns: confirmation with the note id and title.\nDo not use when: creating a new note (create-note) or replacing the entire body (update-note).\nSafety: reads the existing body first, concatenates, then writes back. Run list-attachments first if the note may hold embedded files — a full-body rewrite can drop attachments.",
+    inputSchema: {
+      id: z
+        .string()
+        .max(MAX.ID)
+        .optional()
+        .describe("Note ID (preferred - more reliable than title)"),
+      title: z
+        .string()
+        .max(MAX.TITLE)
+        .optional()
+        .describe("Note title (use id instead when available)"),
+      content: z
+        .string()
+        .min(1, "Content to append is required")
+        .max(MAX.CONTENT)
+        .describe("Text to append to the note body"),
+      position: z
+        .enum(["after", "before"])
+        .optional()
+        .default("after")
+        .describe(
+          "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+        ),
+      separator: z
+        .string()
+        .max(20)
+        .optional()
+        .default("\n\n")
+        .describe("String placed between existing content and new content (default: two newlines)"),
+      format: z
+        .enum(["plaintext", "html"])
+        .optional()
+        .default("plaintext")
+        .describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account containing the note (ignored if id is provided)"),
+    },
+    outputSchema: {
+      ok: z.boolean().optional(),
+      id: z.string().optional(),
+      title: z.string().optional(),
+      shared: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(
+    ({
+      id,
+      title,
+      content,
+      position = "after",
+      separator = "\n\n",
+      format = "plaintext",
+      account,
+    }) => {
+      // Helper: convert new content to HTML block(s) and separator to HTML.
+      // Notes stores its body as HTML; reading plaintext and writing back as
+      // plaintext would destroy <b>/<i>/etc. formatting and duplicate the
+      // title (plaintext includes the title as the first line, and the
+      // plaintext write path prepends it again).  We always read as HTML,
+      // split off the title <div>, convert the new content to HTML if needed,
+      // and write back as HTML.
+      const contentToHtml = (text: string): string => {
+        if (format === "html") return text;
+        // Plaintext: each line becomes a <div> (empty lines become <div><br></div>)
+        return text
+          .split("\n")
+          .map((line) => {
+            const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return `<div>${escaped || "<br>"}</div>`;
+          })
+          .join("");
+      };
+      const separatorToHtml = (sep: string): string => {
+        if (format === "html") return sep;
+        if (sep === "\n\n") return "<div><br></div>";
+        // Arbitrary plaintext separator: escape and wrap
+        const escaped = sep.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div>${escaped}</div>`;
+      };
+
+      if (id) {
+        const note = notesManager.getNoteById(id);
+        if (!note) {
+          return errorResponse(`Note with ID "${id}" not found`);
+        }
+        if (note.passwordProtected) {
+          return errorResponse(
+            `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+          );
+        }
+        // Always read as HTML to avoid destroying rich formatting
+        const existingHtml = notesManager.getNoteContentById(id);
+        if (existingHtml === null || existingHtml === undefined) {
+          return errorResponse(`Failed to read content of note "${note.title}"`);
+        }
+        // The title is stored as the first <div> of the body. Separate it so we
+        // never duplicate it when writing back.
+        const firstDivEnd = existingHtml.indexOf("</div>");
+        const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+        const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+        const newBlock = contentToHtml(content);
+        const sepHtml = separatorToHtml(separator);
+        const combinedBody =
+          position === "before"
+            ? titleDiv + newBlock + sepHtml + bodyHtml
+            : titleDiv + bodyHtml + sepHtml + newBlock;
+        const success = notesManager.updateNoteById(id, undefined, combinedBody, "html");
+        if (!success) {
+          return errorResponse(`Failed to append to note "${note.title}"`);
+        }
+        const sharedWarning = note.shared
+          ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
+          : "";
+        return successResponse(`Note appended: "${note.title}"${sharedWarning}`, {
+          ok: true,
+          id,
+          title: note.title,
+          shared: note.shared ?? false,
+        });
+      }
+
+      if (!title) {
+        return errorResponse("Either 'id' or 'title' is required");
+      }
+
+      const note = notesManager.getNoteDetails(title, account);
+      if (!note) {
+        return errorResponse(
+          `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+        );
+      }
+      if (note.passwordProtected) {
+        return errorResponse(
+          `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
+        );
+      }
+      // Always read as HTML to avoid destroying rich formatting
+      const existingHtml = notesManager.getNoteContent(title, account);
+      if (existingHtml === null || existingHtml === undefined) {
+        return errorResponse(`Failed to read content of note "${title}"`);
+      }
+      // Separate the title <div> from the body
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const newBlock = contentToHtml(content);
+      const sepHtml = separatorToHtml(separator);
+      const combinedBody =
+        position === "before"
+          ? titleDiv + newBlock + sepHtml + bodyHtml
+          : titleDiv + bodyHtml + sepHtml + newBlock;
+      const success = notesManager.updateNote(title, undefined, combinedBody, account, "html");
+      if (!success) {
+        return errorResponse(`Failed to append to note "${title}"`);
+      }
+      const sharedWarning = note.shared
+        ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
+        : "";
+      return successResponse(`Note appended: "${title}"${sharedWarning}`, {
+        ok: true,
+        title,
+        shared: note.shared ?? false,
+      });
+    },
+    "Error appending to note"
+  )
 );
 
 // --- delete-note ---

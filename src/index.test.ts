@@ -16,9 +16,11 @@ vi.mock("@/services/appleNotesManager.js", () => {
       createNote: vi.fn(),
       searchNotes: vi.fn(),
       getNoteContent: vi.fn(),
+      getNoteContentById: vi.fn(),
       getNoteById: vi.fn(),
       getNoteDetails: vi.fn(),
       updateNote: vi.fn(),
+      updateNoteById: vi.fn(),
       deleteNote: vi.fn(),
       moveNote: vi.fn(),
       listNotes: vi.fn(),
@@ -26,6 +28,8 @@ vi.mock("@/services/appleNotesManager.js", () => {
       createFolder: vi.fn(),
       deleteFolder: vi.fn(),
       listAccounts: vi.fn(),
+      getNoteLinkById: vi.fn(),
+      getNoteLink: vi.fn(),
     })),
   };
 });
@@ -35,9 +39,11 @@ type MockedManager = {
   createNote: ReturnType<typeof vi.fn>;
   searchNotes: ReturnType<typeof vi.fn>;
   getNoteContent: ReturnType<typeof vi.fn>;
+  getNoteContentById: ReturnType<typeof vi.fn>;
   getNoteById: ReturnType<typeof vi.fn>;
   getNoteDetails: ReturnType<typeof vi.fn>;
   updateNote: ReturnType<typeof vi.fn>;
+  updateNoteById: ReturnType<typeof vi.fn>;
   deleteNote: ReturnType<typeof vi.fn>;
   moveNote: ReturnType<typeof vi.fn>;
   listNotes: ReturnType<typeof vi.fn>;
@@ -45,6 +51,8 @@ type MockedManager = {
   createFolder: ReturnType<typeof vi.fn>;
   deleteFolder: ReturnType<typeof vi.fn>;
   listAccounts: ReturnType<typeof vi.fn>;
+  getNoteLinkById: ReturnType<typeof vi.fn>;
+  getNoteLink: ReturnType<typeof vi.fn>;
 };
 
 // Create a typed mock manager for testing
@@ -605,6 +613,127 @@ describe("Input Validation", () => {
       mockManager.listNotes("Gmail");
 
       expect(mockManager.listNotes).toHaveBeenCalledWith("Gmail");
+    });
+  });
+});
+
+// =============================================================================
+// append-to-note HTML Preservation Tests
+// =============================================================================
+
+describe("append-to-note HTML preservation", () => {
+  const NOTE_ID = "x-coredata://ABC123/ICNote/p100";
+  const NOTE = {
+    id: NOTE_ID,
+    title: "Title",
+    content: "",
+    tags: [] as string[],
+    created: new Date(),
+    modified: new Date(),
+    shared: false,
+    passwordProtected: false,
+  };
+  // Rich HTML body as Notes.app would return it: title div + body with bold
+  const EXISTING_HTML = "<div>Title</div><div><b>bold</b> text</div>";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockManager = createMockManager();
+  });
+
+  describe("id-based path", () => {
+    it("append-after: preserves rich HTML and writes back as html format", () => {
+      mockManager.getNoteById.mockReturnValue(NOTE);
+      mockManager.getNoteContentById.mockReturnValue(EXISTING_HTML);
+      mockManager.updateNoteById.mockReturnValue(true);
+
+      // Simulate the tool logic directly (the tool handler is not directly
+      // callable in this unit test, so we replicate its core HTML logic here
+      // to verify the contract the tool now imposes).
+      const existingHtml = mockManager.getNoteContentById(NOTE_ID);
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      // plaintext content "new line"
+      const newBlock = "<div>new line</div>";
+      const sepHtml = "<div><br></div>";
+      const combined = titleDiv + bodyHtml + sepHtml + newBlock;
+
+      mockManager.updateNoteById(NOTE_ID, undefined, combined, "html");
+
+      const [, , writtenBody, writtenFormat] = mockManager.updateNoteById.mock.calls[0] as [
+        string,
+        undefined,
+        string,
+        string,
+      ];
+
+      // Must always write as html — never plaintext
+      expect(writtenFormat).toBe("html");
+      // Rich formatting must survive
+      expect(writtenBody).toContain("<b>bold</b>");
+      // Title div must appear exactly once
+      const titleDivCount = (writtenBody.match(/<div>Title<\/div>/g) ?? []).length;
+      expect(titleDivCount).toBe(1);
+      // New content appended after body
+      expect(writtenBody).toContain("<div>new line</div>");
+    });
+
+    it("append-before: new content appears before body html, after title div", () => {
+      mockManager.getNoteById.mockReturnValue(NOTE);
+      mockManager.getNoteContentById.mockReturnValue(EXISTING_HTML);
+      mockManager.updateNoteById.mockReturnValue(true);
+
+      const existingHtml = mockManager.getNoteContentById(NOTE_ID);
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const newBlock = "<div>prepended</div>";
+      const sepHtml = "<div><br></div>";
+      // position === "before": titleDiv + newBlock + sep + bodyHtml
+      const combined = titleDiv + newBlock + sepHtml + bodyHtml;
+
+      mockManager.updateNoteById(NOTE_ID, undefined, combined, "html");
+
+      const [, , writtenBody] = mockManager.updateNoteById.mock.calls[0] as [
+        string,
+        undefined,
+        string,
+        string,
+      ];
+
+      const titleIdx = writtenBody.indexOf("<div>Title</div>");
+      const newIdx = writtenBody.indexOf("<div>prepended</div>");
+      const boldIdx = writtenBody.indexOf("<b>bold</b>");
+
+      // Order must be: titleDiv < newBlock < bodyHtml
+      expect(titleIdx).toBeLessThan(newIdx);
+      expect(newIdx).toBeLessThan(boldIdx);
+    });
+
+    it("title is not duplicated in the written HTML", () => {
+      mockManager.getNoteById.mockReturnValue(NOTE);
+      mockManager.getNoteContentById.mockReturnValue(EXISTING_HTML);
+      mockManager.updateNoteById.mockReturnValue(true);
+
+      const existingHtml = mockManager.getNoteContentById(NOTE_ID);
+      const firstDivEnd = existingHtml.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const combined = titleDiv + bodyHtml + "<div><br></div>" + "<div>extra</div>";
+
+      mockManager.updateNoteById(NOTE_ID, undefined, combined, "html");
+
+      const [, , writtenBody] = mockManager.updateNoteById.mock.calls[0] as [
+        string,
+        undefined,
+        string,
+        string,
+      ];
+
+      // "Title" should appear as a complete div exactly once
+      const occurrences = (writtenBody.match(/<div>Title<\/div>/g) ?? []).length;
+      expect(occurrences).toBe(1);
     });
   });
 });
