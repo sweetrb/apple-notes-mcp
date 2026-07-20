@@ -41770,8 +41770,13 @@ function decodeHtmlEntities(text) {
   return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex) => decodeCodePoint(match, hex, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
 }
 function firstVisibleHtmlLine(html) {
-  let text = html.replace(NON_RENDERED_BLOCK_RE, "").replace(BREAK_RE, "\n").replace(BLOCK_END_RE, "\n");
+  let text = html;
   let previous;
+  do {
+    previous = text;
+    text = text.replace(NON_RENDERED_BLOCK_RE, "");
+  } while (text !== previous);
+  text = text.replace(BREAK_RE, "\n").replace(BLOCK_END_RE, "\n");
   do {
     previous = text;
     text = text.replace(TAG_RE, "");

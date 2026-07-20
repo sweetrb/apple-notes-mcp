@@ -29,13 +29,18 @@ function decodeHtmlEntities(text: string): string {
 }
 
 function firstVisibleHtmlLine(html: string): string | undefined {
-  let text = html
-    .replace(NON_RENDERED_BLOCK_RE, "")
-    .replace(BREAK_RE, "\n")
-    .replace(BLOCK_END_RE, "\n");
+  let text = html;
+
+  // Repeat until stable so removing one non-rendered block cannot expose another.
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(NON_RENDERED_BLOCK_RE, "");
+  } while (text !== previous);
+
+  text = text.replace(BREAK_RE, "\n").replace(BLOCK_END_RE, "\n");
 
   // Repeat until stable so malformed nested markup cannot leave tag residue.
-  let previous: string;
   do {
     previous = text;
     text = text.replace(TAG_RE, "");

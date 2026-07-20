@@ -53,4 +53,15 @@ describe("resolveUpdateResponseTitle", () => {
       resolveUpdateResponseTitle("Old title", undefined, "html", "<h1>A<<b>>title</h1>")
     ).not.toMatch(/<[^>]*>/);
   });
+
+  it("ignores script and style contents before resolving the visible title", () => {
+    expect(
+      resolveUpdateResponseTitle(
+        "Old title",
+        undefined,
+        "html",
+        "<script>Hidden</script><style>Also hidden</style><h1>Actual title</h1>"
+      )
+    ).toBe("Actual title");
+  });
 });
