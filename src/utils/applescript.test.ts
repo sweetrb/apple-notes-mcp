@@ -493,6 +493,37 @@ describe("executeAppleScript", () => {
       expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
+    it("retries on mid-listing mutation errors raised by bulk list count guards (#86)", () => {
+      let callCount = 0;
+      mockExecFileSync.mockImplementation(() => {
+        callCount++;
+        if (callCount < 2) {
+          // Exact shape osascript emits for `error "Notes changed during listing"`.
+          throw new Error("120:150: execution error: Notes changed during listing (-2700)");
+        }
+        return "recovered";
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 3, retryDelayMs: 1 });
+
+      expect(result.success).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+    });
+
+    it("maps exhausted mutation retries to a friendly, still-retryable message (#86)", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error("120:150: execution error: Notes changed during listing (-2700)");
+      });
+
+      const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+      expect(result.success).toBe(false);
+      // Retried to exhaustion — the pattern must match the mapped message too.
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+      expect(result.error).toContain("changed during listing");
+      expect(result.error).toContain("iCloud sync");
+    });
+
     it("uses exponential backoff between retries", () => {
       let execCallCount = 0;
 

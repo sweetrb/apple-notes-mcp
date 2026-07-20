@@ -27,6 +27,7 @@ import {
 // This prevents actual osascript calls during testing
 vi.mock("@/utils/applescript.js", () => ({
   executeAppleScript: vi.fn(),
+  BULK_LIST_MUTATION_ERROR: "Notes changed during listing",
 }));
 
 // Mock the checklist parser to avoid SQLite access during tests
@@ -378,6 +379,23 @@ describe("buildAppleScriptDateVar", () => {
     const result = buildAppleScriptDateVar(date);
     // 9*3600 + 5*60 + 3 = 32703
     expect(result).toContain("set time of thresholdDate to 32703");
+  });
+
+  it("resets day to 1 before month to prevent month rollover (#86)", () => {
+    // AppleScript rolls invalid intermediate dates: with `current date` on the
+    // 31st, setting month to June yields July 1 before day is ever assigned.
+    // Day must be pinned to 1 before the year/month assignments.
+    const date = new Date(2025, 5, 15, 0, 0, 0); // June 15, 2025
+    const result = buildAppleScriptDateVar(date);
+    const lines = result.split("\n");
+    const dayResetIdx = lines.indexOf("set day of thresholdDate to 1");
+    const yearIdx = lines.indexOf("set year of thresholdDate to 2025");
+    const monthIdx = lines.indexOf("set month of thresholdDate to 6");
+    const dayIdx = lines.indexOf("set day of thresholdDate to 15");
+    expect(dayResetIdx).toBeGreaterThan(-1);
+    expect(dayResetIdx).toBeLessThan(yearIdx);
+    expect(yearIdx).toBeLessThan(monthIdx);
+    expect(monthIdx).toBeLessThan(dayIdx);
   });
 });
 
@@ -1551,23 +1569,127 @@ describe("AppleNotesManager", () => {
       expect(results).toEqual(["Recent Note 1", "Recent Note 2"]);
     });
 
-    it("bulk-fetches and applies limit in JS when limit is provided", () => {
+    it("slices the AppleScript fetch to the limit and returns a totalCount header", () => {
+      // Sliced response: totalCount header record, then limit records.
       mockExecuteAppleScript.mockReturnValue({
         success: true,
         output: [
+          "10",
           ["Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
           ["Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
           ["Note 3", "x-coredata://ABC/ICNote/p3"].join(F),
-          ["Note 4", "x-coredata://ABC/ICNote/p4"].join(F),
         ].join(R),
       });
 
       const results = manager.listNotes(undefined, undefined, undefined, 3);
 
+      // One sliced call satisfies the limit — no full-fetch fallback.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain("set noteNames to name of notes");
-      expect(script).toContain("set noteIds to id of notes");
+      expect(script).toContain("set totalCount to count of notes");
+      expect(script).toContain("set fetchCount to 3");
+      expect(script).toContain("set noteNames to name of (notes 1 thru fetchCount)");
+      expect(script).toContain("set noteIds to id of (notes 1 thru fetchCount)");
       expect(results).toEqual(["Note 1", "Note 2", "Note 3"]);
+    });
+
+    it("returns short slice without fallback when the library is smaller than the limit", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["2", ["Note 1", "p1"].join(F), ["Note 2", "p2"].join(F)].join(R),
+      });
+
+      const results = manager.listNotes(undefined, undefined, undefined, 5);
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+      expect(results).toEqual(["Note 1", "Note 2"]);
+    });
+
+    it("falls back to a full fetch when dedup leaves the slice short of the limit", () => {
+      // Slice of 3 contains a duplicated id -> only 2 uniques, but 10 total
+      // notes exist, so later uniques may have been hidden by the duplicate.
+      mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            "10",
+            ["Note 1", "p1"].join(F),
+            ["Note 1 dup", "p1"].join(F),
+            ["Note 2", "p2"].join(F),
+          ].join(R),
+        })
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            ["Note 1", "p1"].join(F),
+            ["Note 2", "p2"].join(F),
+            ["Note 3", "p3"].join(F),
+            ["Note 4", "p4"].join(F),
+          ].join(R),
+        });
+
+      const results = manager.listNotes(undefined, undefined, undefined, 3);
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+      // Fallback is the unsliced full fetch.
+      const fallbackScript = mockExecuteAppleScript.mock.calls[1][0];
+      expect(fallbackScript).not.toContain("thru fetchCount");
+      expect(fallbackScript).toContain("set noteNames to name of notes");
+      expect(results).toEqual(["Note 1", "Note 2", "Note 3"]);
+    });
+
+    it("falls back to a full fetch when the slice header is malformed", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          // No totalCount header — should not be trusted as a sliced response.
+          output: [["Note 1", "p1"].join(F), ["Note 2", "p2"].join(F)].join(R),
+        })
+        .mockReturnValueOnce({
+          success: true,
+          output: [["Note 1", "p1"].join(F), ["Note 2", "p2"].join(F)].join(R),
+        });
+
+      const results = manager.listNotes(undefined, undefined, undefined, 5);
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+      expect(results).toEqual(["Note 1", "Note 2"]);
+    });
+
+    it("returns empty from an empty sliced library without fallback", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: `0${R}` });
+
+      const results = manager.listNotes(undefined, undefined, undefined, 3);
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+      expect(results).toEqual([]);
+    });
+
+    it("guards every bulk list against mid-listing library mutation", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      // Unfiltered full fetch: names/ids count guard.
+      manager.listNotes();
+      const fullScript = mockExecuteAppleScript.mock.calls[0][0];
+      expect(fullScript).toContain(
+        'if (count of noteIds) is not (count of noteNames) then error "Notes changed during listing"'
+      );
+
+      // Date-filtered fetch adds the dates count guard.
+      manager.listNotes(undefined, undefined, "2025-06-15T00:00:00");
+      const dateScript = mockExecuteAppleScript.mock.calls[1][0];
+      expect(dateScript).toContain(
+        'if (count of noteDates) is not (count of noteNames) then error "Notes changed during listing"'
+      );
+
+      // Sliced fetch guards and remaps a shrink between count and fetch.
+      manager.listNotes(undefined, undefined, undefined, 3);
+      const sliceScript = mockExecuteAppleScript.mock.calls[2][0];
+      expect(sliceScript).toContain(
+        'if (count of noteIds) is not (count of noteNames) then error "Notes changed during listing"'
+      );
+      expect(sliceScript).toContain('error "Notes changed during listing"');
+      expect(sliceScript).toContain("on error");
     });
 
     it("combines folder, modifiedSince, and limit", () => {
@@ -1602,6 +1724,7 @@ describe("AppleNotesManager", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
         output: [
+          "2",
           ["Note 1", "x-coredata://ABC/ICNote/p1"].join(F),
           ["Note 2", "x-coredata://ABC/ICNote/p2"].join(F),
         ].join(R),
@@ -1609,9 +1732,10 @@ describe("AppleNotesManager", () => {
 
       const results = manager.listNotes(undefined, undefined, "not-a-date", 5);
 
+      // Invalid date means no date filter, so the limit-only slice path runs.
       const script = mockExecuteAppleScript.mock.calls[0][0];
       expect(script).not.toContain("thresholdDate");
-      expect(script).toContain("set noteNames to name of notes");
+      expect(script).toContain("set noteNames to name of (notes 1 thru fetchCount)");
       expect(results).toEqual(["Note 1", "Note 2"]);
     });
   });

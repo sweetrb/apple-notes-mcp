@@ -133,6 +133,14 @@ function isTimeoutError(error: unknown): boolean {
 }
 
 /**
+ * Error text raised from generated bulk-list scripts when the Notes collection
+ * changed between whole-list Apple Events (#86). The phrase "changed during
+ * listing" is matched by RETRYABLE_ERROR_PATTERNS and ERROR_MAPPINGS below —
+ * keep all three in sync so the error stays retryable after friendly mapping.
+ */
+export const BULK_LIST_MUTATION_ERROR = "Notes changed during listing";
+
+/**
  * Error patterns that indicate transient failures worth retrying.
  * These typically occur when Notes.app is syncing or temporarily busy.
  */
@@ -142,6 +150,7 @@ const RETRYABLE_ERROR_PATTERNS = [
   /connection.*invalid/i,
   /lost connection/i,
   /busy/i,
+  /changed during listing/i,
 ];
 
 /**
@@ -223,6 +232,15 @@ const ERROR_MAPPINGS: Array<{ pattern: RegExp; message: string }> = [
   {
     pattern: /password protected|locked note/i,
     message: "Note is password-protected. Unlock it in Notes.app first.",
+  },
+  // Mid-listing library mutation detected by a bulk-list count guard (#86).
+  // The message must keep the phrase "changed during listing" so
+  // RETRYABLE_ERROR_PATTERNS still matches it after this mapping.
+  {
+    pattern: /changed during listing/i,
+    message:
+      "Notes changed during listing (an iCloud sync may have landed mid-read). " +
+      "The operation is retried automatically; run it again if this persists.",
   },
   // Syntax/script errors (usually programming bugs)
   {

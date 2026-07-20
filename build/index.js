@@ -40,9 +40,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/code.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/code.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -194,9 +194,9 @@ var require_code = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/scope.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
@@ -339,9 +339,9 @@ var require_scope = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
@@ -1059,9 +1059,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/util.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/util.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/util.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
@@ -1226,9 +1226,9 @@ var require_util = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/names.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/names.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/names.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1265,9 +1265,9 @@ var require_names = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/errors.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/errors.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/errors.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
@@ -1387,9 +1387,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/boolSchema.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
@@ -1438,9 +1438,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/rules.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/rules.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/rules.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
@@ -1469,9 +1469,9 @@ var require_rules = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/applicability.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
@@ -1492,9 +1492,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/dataType.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
@@ -1676,9 +1676,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/defaults.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
@@ -1713,9 +1713,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/code.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/code.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
@@ -1846,9 +1846,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/keyword.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
@@ -1964,9 +1964,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/subschema.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
@@ -2047,9 +2047,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal/index.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal/index.js"(exports, module) {
     "use strict";
     module.exports = function equal(a, b) {
       if (a === b) return true;
@@ -2082,9 +2082,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse/index.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2170,9 +2170,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/resolve.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/resolve.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
@@ -2326,9 +2326,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
@@ -2834,9 +2834,9 @@ var require_validate = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/validation_error.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/validation_error.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2850,9 +2850,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/ref_error.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/ref_error.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2867,9 +2867,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/compile/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
@@ -3091,9 +3091,9 @@ var require_compile = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/data.json
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/data.json"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/data.json"(exports, module) {
     module.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3110,9 +3110,9 @@ var require_data = __commonJS({
   }
 });
 
-// node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/utils.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/utils.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3423,9 +3423,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/schemes.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/schemes.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3633,9 +3633,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/index.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/fast-uri@3.1.2/node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3919,9 +3919,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/uri.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/uri.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3930,9 +3930,9 @@ var require_uri = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/core.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/core.js
 var require_core = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/core.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/core.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
@@ -4541,9 +4541,9 @@ var require_core = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/id.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
@@ -4556,9 +4556,9 @@ var require_id = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/ref.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
@@ -4678,9 +4678,9 @@ var require_ref = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4699,9 +4699,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4731,9 +4731,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4759,9 +4759,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/ucs2length.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4785,9 +4785,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4817,9 +4817,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/pattern.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4854,9 +4854,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4883,9 +4883,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/required.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4965,9 +4965,9 @@ var require_required = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4994,9 +4994,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/equal.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/equal.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -5005,9 +5005,9 @@ var require_equal = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -5072,9 +5072,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/const.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5101,9 +5101,9 @@ var require_const = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/enum.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5150,9 +5150,9 @@ var require_enum = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5188,9 +5188,9 @@ var require_validation = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
@@ -5241,9 +5241,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
@@ -5298,9 +5298,9 @@ var require_items = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5315,9 +5315,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5350,9 +5350,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/contains.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5444,9 +5444,9 @@ var require_contains = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
@@ -5538,9 +5538,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5581,9 +5581,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5687,9 +5687,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/properties.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5745,9 +5745,9 @@ var require_properties = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5819,9 +5819,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/not.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5850,9 +5850,9 @@ var require_not = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5867,9 +5867,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5925,9 +5925,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5952,9 +5952,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/if.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6021,9 +6021,9 @@ var require_if = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -6039,9 +6039,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -6087,9 +6087,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/format.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6177,9 +6177,9 @@ var require_format = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6188,9 +6188,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/metadata.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
@@ -6211,9 +6211,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/draft7.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6233,9 +6233,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/types.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
@@ -6247,9 +6247,9 @@ var require_types = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6352,9 +6352,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/json-schema-draft-07.json
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
     module.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6509,9 +6509,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/ajv.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/ajv.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/ajv.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
@@ -6579,9 +6579,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/formats.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/formats.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/formats.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -6782,9 +6782,9 @@ var require_formats = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/limit.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/limit.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/limit.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
@@ -6854,9 +6854,9 @@ var require_limit = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/index.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6896,9 +6896,9 @@ var require_dist = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Event.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Event.js
 var require_Event = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Event.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Event.js"(exports, module) {
     "use strict";
     module.exports = Event;
     Event.CAPTURING_PHASE = 1;
@@ -6953,9 +6953,9 @@ var require_Event = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/UIEvent.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/UIEvent.js
 var require_UIEvent = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/UIEvent.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/UIEvent.js"(exports, module) {
     "use strict";
     var Event = require_Event();
     module.exports = UIEvent;
@@ -6975,9 +6975,9 @@ var require_UIEvent = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MouseEvent.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MouseEvent.js
 var require_MouseEvent = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MouseEvent.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MouseEvent.js"(exports, module) {
     "use strict";
     var UIEvent = require_UIEvent();
     module.exports = MouseEvent;
@@ -7036,9 +7036,9 @@ var require_MouseEvent = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMException.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMException.js
 var require_DOMException = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMException.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMException.js"(exports, module) {
     "use strict";
     module.exports = DOMException;
     var INDEX_SIZE_ERR = 1;
@@ -7173,16 +7173,16 @@ var require_DOMException = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/config.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/config.js
 var require_config = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/config.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/config.js"(exports) {
     exports.isApiWritable = !globalThis.__domino_frozen__;
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/utils.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/utils.js
 var require_utils2 = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/utils.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/utils.js"(exports) {
     "use strict";
     var DOMException = require_DOMException();
     var ERR = DOMException;
@@ -7295,9 +7295,9 @@ var require_utils2 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/EventTarget.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/EventTarget.js
 var require_EventTarget = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/EventTarget.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/EventTarget.js"(exports, module) {
     "use strict";
     var Event = require_Event();
     var MouseEvent = require_MouseEvent();
@@ -7541,9 +7541,9 @@ var require_EventTarget = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/LinkedList.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/LinkedList.js
 var require_LinkedList = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/LinkedList.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/LinkedList.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     var LinkedList = module.exports = {
@@ -7591,9 +7591,9 @@ var require_LinkedList = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeUtils.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeUtils.js
 var require_NodeUtils = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeUtils.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeUtils.js"(exports, module) {
     "use strict";
     module.exports = {
       // NOTE: The `serializeOne()` function used to live on the `Node.prototype`
@@ -7791,9 +7791,9 @@ var require_NodeUtils = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Node.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Node.js
 var require_Node = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Node.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Node.js"(exports, module) {
     "use strict";
     module.exports = Node;
     var EventTarget = require_EventTarget();
@@ -8391,9 +8391,9 @@ var require_Node = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es6.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es6.js
 var require_NodeList_es6 = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es6.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es6.js"(exports, module) {
     "use strict";
     module.exports = class NodeList extends Array {
       constructor(a) {
@@ -8411,9 +8411,9 @@ var require_NodeList_es6 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es5.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es5.js
 var require_NodeList_es5 = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es5.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.es5.js"(exports, module) {
     "use strict";
     function item(i) {
       return this[i] || null;
@@ -8427,9 +8427,9 @@ var require_NodeList_es5 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.js
 var require_NodeList = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeList.js"(exports, module) {
     "use strict";
     var NodeList;
     try {
@@ -8441,9 +8441,9 @@ var require_NodeList = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ContainerNode.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ContainerNode.js
 var require_ContainerNode = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ContainerNode.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ContainerNode.js"(exports, module) {
     "use strict";
     module.exports = ContainerNode;
     var Node = require_Node();
@@ -8512,9 +8512,9 @@ var require_ContainerNode = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/xmlnames.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/xmlnames.js
 var require_xmlnames = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/xmlnames.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/xmlnames.js"(exports) {
     "use strict";
     exports.isValidName = isValidName;
     exports.isValidQName = isValidQName;
@@ -8556,9 +8556,9 @@ var require_xmlnames = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/attributes.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/attributes.js
 var require_attributes = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/attributes.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/attributes.js"(exports) {
     "use strict";
     var utils = require_utils2();
     exports.property = function(attr) {
@@ -8688,9 +8688,9 @@ var require_attributes = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/FilteredElementList.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/FilteredElementList.js
 var require_FilteredElementList = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/FilteredElementList.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/FilteredElementList.js"(exports, module) {
     "use strict";
     module.exports = FilteredElementList;
     var Node = require_Node();
@@ -8760,9 +8760,9 @@ var require_FilteredElementList = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMTokenList.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMTokenList.js
 var require_DOMTokenList = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMTokenList.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMTokenList.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     module.exports = DOMTokenList;
@@ -8926,9 +8926,9 @@ var require_DOMTokenList = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/select.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/select.js
 var require_select = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/select.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/select.js"(exports, module) {
     "use strict";
     var window2 = Object.create(null, {
       location: { get: function() {
@@ -9660,9 +9660,9 @@ var require_select = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ChildNode.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ChildNode.js
 var require_ChildNode = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ChildNode.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ChildNode.js"(exports, module) {
     "use strict";
     var Node = require_Node();
     var LinkedList = require_LinkedList();
@@ -9761,9 +9761,9 @@ var require_ChildNode = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NonDocumentTypeChildNode.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NonDocumentTypeChildNode.js
 var require_NonDocumentTypeChildNode = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NonDocumentTypeChildNode.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NonDocumentTypeChildNode.js"(exports, module) {
     "use strict";
     var Node = require_Node();
     var NonDocumentTypeChildNode = {
@@ -9788,9 +9788,9 @@ var require_NonDocumentTypeChildNode = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NamedNodeMap.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NamedNodeMap.js
 var require_NamedNodeMap = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NamedNodeMap.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NamedNodeMap.js"(exports, module) {
     "use strict";
     module.exports = NamedNodeMap;
     var utils = require_utils2();
@@ -9828,9 +9828,9 @@ var require_NamedNodeMap = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Element.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Element.js
 var require_Element = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Element.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Element.js"(exports, module) {
     "use strict";
     module.exports = Element;
     var xml = require_xmlnames();
@@ -10864,9 +10864,9 @@ var require_Element = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Leaf.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Leaf.js
 var require_Leaf = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Leaf.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Leaf.js"(exports, module) {
     "use strict";
     module.exports = Leaf;
     var Node = require_Node();
@@ -10905,9 +10905,9 @@ var require_Leaf = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CharacterData.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CharacterData.js
 var require_CharacterData = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CharacterData.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CharacterData.js"(exports, module) {
     "use strict";
     module.exports = CharacterData;
     var Leaf = require_Leaf();
@@ -11016,9 +11016,9 @@ var require_CharacterData = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Text.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Text.js
 var require_Text = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Text.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Text.js"(exports, module) {
     "use strict";
     module.exports = Text;
     var utils = require_utils2();
@@ -11092,9 +11092,9 @@ var require_Text = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Comment.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Comment.js
 var require_Comment = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Comment.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Comment.js"(exports, module) {
     "use strict";
     module.exports = Comment;
     var Node = require_Node();
@@ -11139,9 +11139,9 @@ var require_Comment = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentFragment.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentFragment.js
 var require_DocumentFragment = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentFragment.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentFragment.js"(exports, module) {
     "use strict";
     module.exports = DocumentFragment;
     var Node = require_Node();
@@ -11204,9 +11204,9 @@ var require_DocumentFragment = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ProcessingInstruction.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ProcessingInstruction.js
 var require_ProcessingInstruction = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ProcessingInstruction.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/ProcessingInstruction.js"(exports, module) {
     "use strict";
     module.exports = ProcessingInstruction;
     var Node = require_Node();
@@ -11256,9 +11256,9 @@ var require_ProcessingInstruction = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeFilter.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeFilter.js
 var require_NodeFilter = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeFilter.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeFilter.js"(exports, module) {
     "use strict";
     var NodeFilter = {
       // Constants for acceptNode()
@@ -11289,9 +11289,9 @@ var require_NodeFilter = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeTraversal.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeTraversal.js
 var require_NodeTraversal = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeTraversal.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeTraversal.js"(exports, module) {
     "use strict";
     var NodeTraversal = module.exports = {
       nextSkippingChildren,
@@ -11356,9 +11356,9 @@ var require_NodeTraversal = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/TreeWalker.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/TreeWalker.js
 var require_TreeWalker = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/TreeWalker.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/TreeWalker.js"(exports, module) {
     "use strict";
     module.exports = TreeWalker;
     var Node = require_Node();
@@ -11637,9 +11637,9 @@ var require_TreeWalker = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeIterator.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeIterator.js
 var require_NodeIterator = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeIterator.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NodeIterator.js"(exports, module) {
     "use strict";
     module.exports = NodeIterator;
     var NodeFilter = require_NodeFilter();
@@ -11809,9 +11809,9 @@ var require_NodeIterator = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URL.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URL.js
 var require_URL = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URL.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URL.js"(exports, module) {
     "use strict";
     module.exports = URL2;
     function URL2(url) {
@@ -11975,9 +11975,9 @@ var require_URL = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CustomEvent.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CustomEvent.js
 var require_CustomEvent = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CustomEvent.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CustomEvent.js"(exports, module) {
     "use strict";
     module.exports = CustomEvent;
     var Event = require_Event();
@@ -11990,9 +11990,9 @@ var require_CustomEvent = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/events.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/events.js
 var require_events = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/events.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/events.js"(exports, module) {
     "use strict";
     module.exports = {
       Event: require_Event(),
@@ -12003,9 +12003,9 @@ var require_events = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/style_parser.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/style_parser.js
 var require_style_parser = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/style_parser.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/style_parser.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.hyphenate = exports.parse = void 0;
@@ -12073,9 +12073,9 @@ var require_style_parser = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CSSStyleDeclaration.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CSSStyleDeclaration.js
 var require_CSSStyleDeclaration = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CSSStyleDeclaration.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/CSSStyleDeclaration.js"(exports, module) {
     "use strict";
     var { parse: parse3 } = require_style_parser();
     module.exports = function(elt) {
@@ -12257,9 +12257,9 @@ var require_CSSStyleDeclaration = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URLUtils.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URLUtils.js
 var require_URLUtils = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URLUtils.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/URLUtils.js"(exports, module) {
     "use strict";
     var URL2 = require_URL();
     module.exports = URLUtils;
@@ -12504,9 +12504,9 @@ var require_URLUtils = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/defineElement.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/defineElement.js
 var require_defineElement = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/defineElement.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/defineElement.js"(exports, module) {
     "use strict";
     var attributes = require_attributes();
     var isApiWritable = require_config().isApiWritable;
@@ -12568,9 +12568,9 @@ var require_defineElement = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/htmlelts.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/htmlelts.js
 var require_htmlelts = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/htmlelts.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/htmlelts.js"(exports) {
     "use strict";
     var Node = require_Node();
     var Element = require_Element();
@@ -14123,9 +14123,9 @@ var require_htmlelts = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/svg.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/svg.js
 var require_svg = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/svg.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/svg.js"(exports) {
     "use strict";
     var Element = require_Element();
     var defineElement = require_defineElement();
@@ -14252,9 +14252,9 @@ var require_svg = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MutationConstants.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MutationConstants.js
 var require_MutationConstants = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MutationConstants.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/MutationConstants.js"(exports, module) {
     "use strict";
     module.exports = {
       VALUE: 1,
@@ -14273,9 +14273,9 @@ var require_MutationConstants = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Document.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Document.js
 var require_Document = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Document.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Document.js"(exports, module) {
     "use strict";
     module.exports = Document;
     var Node = require_Node();
@@ -15017,9 +15017,9 @@ var require_Document = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentType.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentType.js
 var require_DocumentType = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentType.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DocumentType.js"(exports, module) {
     "use strict";
     module.exports = DocumentType;
     var Node = require_Node();
@@ -15056,9 +15056,9 @@ var require_DocumentType = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/HTMLParser.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/HTMLParser.js
 var require_HTMLParser = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/HTMLParser.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/HTMLParser.js"(exports, module) {
     "use strict";
     module.exports = HTMLParser;
     var Document = require_Document();
@@ -23218,9 +23218,9 @@ var require_HTMLParser = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMImplementation.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMImplementation.js
 var require_DOMImplementation = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMImplementation.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/DOMImplementation.js"(exports, module) {
     "use strict";
     module.exports = DOMImplementation;
     var Document = require_Document();
@@ -23297,9 +23297,9 @@ var require_DOMImplementation = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Location.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Location.js
 var require_Location = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Location.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Location.js"(exports, module) {
     "use strict";
     var URL2 = require_URL();
     var URLUtils = require_URLUtils();
@@ -23337,9 +23337,9 @@ var require_Location = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NavigatorID.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NavigatorID.js
 var require_NavigatorID = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NavigatorID.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/NavigatorID.js"(exports, module) {
     "use strict";
     var NavigatorID = Object.create(null, {
       appCodeName: { value: "Mozilla" },
@@ -23359,9 +23359,9 @@ var require_NavigatorID = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/WindowTimers.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/WindowTimers.js
 var require_WindowTimers = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/WindowTimers.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/WindowTimers.js"(exports, module) {
     "use strict";
     var WindowTimers = {
       setTimeout,
@@ -23373,9 +23373,9 @@ var require_WindowTimers = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/impl.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/impl.js
 var require_impl = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/impl.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/impl.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
     exports = module.exports = {
@@ -23404,9 +23404,9 @@ var require_impl = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Window.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Window.js
 var require_Window = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Window.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/Window.js"(exports, module) {
     "use strict";
     var DOMImplementation = require_DOMImplementation();
     var EventTarget = require_EventTarget();
@@ -23472,9 +23472,9 @@ var require_Window = __commonJS({
   }
 });
 
-// node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/index.js
 var require_lib = __commonJS({
-  "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/index.js"(exports) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/index.js"(exports) {
     "use strict";
     var DOMImplementation = require_DOMImplementation();
     var HTMLParser = require_HTMLParser();
@@ -23555,9 +23555,9 @@ var require_lib = __commonJS({
   }
 });
 
-// node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js
 var require_turndown_cjs = __commonJS({
-  "node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js"(exports, module) {
+  "../../myrepos/apple-notes-mcp/node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js"(exports, module) {
     "use strict";
     function extend2(destination) {
       for (var i = 1; i < arguments.length; i++) {
@@ -24203,7 +24203,7 @@ var require_turndown_cjs = __commonJS({
 // src/index.ts
 import { createRequire } from "module";
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -24315,7 +24315,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/util.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -24449,7 +24449,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/ZodError.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -24567,7 +24567,7 @@ ZodError.create = (issues) => {
   return error2;
 };
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/locales/en.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -24670,7 +24670,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/errors.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -24679,7 +24679,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path: path4, errorMaps, issueData } = params;
   const fullPath = [...path4, ...issueData.path || []];
@@ -24789,14 +24789,14 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/errorUtil.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
   constructor(parent, value, path4, key) {
     this._cachedPath = [];
@@ -28244,7 +28244,7 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/core.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/core.js
 var NEVER2 = Object.freeze({
   status: "aborted"
 });
@@ -28303,7 +28303,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/util.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -28824,7 +28824,7 @@ var Class = class {
   }
 };
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/errors.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -28899,7 +28899,7 @@ function formatError(error2, _mapper) {
   return fieldErrors;
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/parse.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -28951,7 +28951,7 @@ var _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/regexes.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][^\s-]{8,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -29009,7 +29009,7 @@ var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/checks.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {});
@@ -29394,7 +29394,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/doc.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -29430,14 +29430,14 @@ var Doc = class {
   }
 };
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/versions.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 0,
   patch: 0
 };
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/schemas.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {});
@@ -30675,7 +30675,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/locales/en.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/locales/en.js
 var parsedType = (data) => {
   const t = typeof data;
   switch (t) {
@@ -30793,7 +30793,7 @@ function en_default2() {
   };
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/registries.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/registries.js
 var $ZodRegistry = class {
   constructor() {
     this._map = /* @__PURE__ */ new Map();
@@ -30841,7 +30841,7 @@ function registry() {
 }
 var globalRegistry = /* @__PURE__ */ registry();
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/api.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -31280,7 +31280,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/to-json-schema.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/to-json-schema.js
 var JSONSchemaGenerator = class {
   constructor(params) {
     this.counter = 0;
@@ -32047,7 +32047,7 @@ function isTransforming(_schema, _ctx) {
   throw new Error(`Unknown schema type: ${def.type}`);
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/mini/schemas.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/mini/schemas.js
 var ZodMiniType = /* @__PURE__ */ $constructor("ZodMiniType", (inst, def) => {
   if (!inst._zod)
     throw new Error("Uninitialized schema in ZodMiniType.");
@@ -32093,7 +32093,7 @@ function object(shape, params) {
   return new ZodMiniObject(def);
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -32237,7 +32237,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/iso.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/iso.js
 var iso_exports2 = {};
 __export(iso_exports2, {
   ZodISODate: () => ZodISODate,
@@ -32278,7 +32278,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/errors.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -32312,13 +32312,13 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/parse.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
 var safeParseAsync3 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/schemas.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/schemas.js
 var ZodType2 = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   inst.def = def;
@@ -32929,10 +32929,10 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/external.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/classic/external.js
 config(en_default2());
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
@@ -34463,12 +34463,12 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/Options.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = /* @__PURE__ */ Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
@@ -34502,7 +34502,7 @@ var getDefaultOptions = (options) => typeof options === "string" ? {
   ...options
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/Refs.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/Refs.js
 var getRefs = (options) => {
   const _options = getDefaultOptions(options);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -34523,7 +34523,7 @@ var getRefs = (options) => {
   };
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/errorMessages.js
 function addErrorMessage(res, key, errorMessage, refs) {
   if (!refs?.errorMessages)
     return;
@@ -34539,7 +34539,7 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
   addErrorMessage(res, key, errorMessage, refs);
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
 var getRelativePath = (pathA, pathB) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
@@ -34549,7 +34549,7 @@ var getRelativePath = (pathA, pathB) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
 function parseAnyDef(refs) {
   if (refs.target !== "openAi") {
     return {};
@@ -34565,7 +34565,7 @@ function parseAnyDef(refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/array.js
 function parseArrayDef(def, refs) {
   const res = {
     type: "array"
@@ -34589,7 +34589,7 @@ function parseArrayDef(def, refs) {
   return res;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
 function parseBigintDef(def, refs) {
   const res = {
     type: "integer",
@@ -34635,24 +34635,24 @@ function parseBigintDef(def, refs) {
   return res;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
 function parseBooleanDef() {
   return {
     type: "boolean"
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
 function parseBrandedDef(_def, refs) {
   return parseDef(_def.type._def, refs);
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
 var parseCatchDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/date.js
 function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
@@ -34711,7 +34711,7 @@ var integerDateParser = (def, refs) => {
   return res;
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/default.js
 function parseDefaultDef(_def, refs) {
   return {
     ...parseDef(_def.innerType._def, refs),
@@ -34719,12 +34719,12 @@ function parseDefaultDef(_def, refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
 function parseEffectsDef(_def, refs) {
   return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : parseAnyDef(refs);
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
 function parseEnumDef(def) {
   return {
     type: "string",
@@ -34732,7 +34732,7 @@ function parseEnumDef(def) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
 var isJsonSchema7AllOfType = (type) => {
   if ("type" in type && type.type === "string")
     return false;
@@ -34774,7 +34774,7 @@ function parseIntersectionDef(def, refs) {
   } : void 0;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
 function parseLiteralDef(def, refs) {
   const parsedType2 = typeof def.value;
   if (parsedType2 !== "bigint" && parsedType2 !== "number" && parsedType2 !== "boolean" && parsedType2 !== "string") {
@@ -34794,7 +34794,7 @@ function parseLiteralDef(def, refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
 var emojiRegex2 = void 0;
 var zodPatterns = {
   /**
@@ -35119,7 +35119,7 @@ function stringifyRegExpWithFlags(regex, refs) {
   return pattern;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
 function parseRecordDef(def, refs) {
   if (refs.target === "openAi") {
     console.warn("Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.");
@@ -35171,7 +35171,7 @@ function parseRecordDef(def, refs) {
   return schema;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/map.js
 function parseMapDef(def, refs) {
   if (refs.mapStrategy === "record") {
     return parseRecordDef(def, refs);
@@ -35196,7 +35196,7 @@ function parseMapDef(def, refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
 function parseNativeEnumDef(def) {
   const object3 = def.values;
   const actualKeys = Object.keys(def.values).filter((key) => {
@@ -35210,7 +35210,7 @@ function parseNativeEnumDef(def) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/never.js
 function parseNeverDef(refs) {
   return refs.target === "openAi" ? void 0 : {
     not: parseAnyDef({
@@ -35220,7 +35220,7 @@ function parseNeverDef(refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/null.js
 function parseNullDef(refs) {
   return refs.target === "openApi3" ? {
     enum: ["null"],
@@ -35230,7 +35230,7 @@ function parseNullDef(refs) {
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/union.js
 var primitiveMappings = {
   ZodString: "string",
   ZodNumber: "number",
@@ -35298,7 +35298,7 @@ var asAnyOf = (def, refs) => {
   return anyOf.length ? { anyOf } : void 0;
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
 function parseNullableDef(def, refs) {
   if (["ZodString", "ZodNumber", "ZodBigInt", "ZodBoolean", "ZodNull"].includes(def.innerType._def.typeName) && (!def.innerType._def.checks || !def.innerType._def.checks.length)) {
     if (refs.target === "openApi3") {
@@ -35330,7 +35330,7 @@ function parseNullableDef(def, refs) {
   return base && { anyOf: [base, { type: "null" }] };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/number.js
 function parseNumberDef(def, refs) {
   const res = {
     type: "number"
@@ -35379,7 +35379,7 @@ function parseNumberDef(def, refs) {
   return res;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/object.js
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
   const result = {
@@ -35449,7 +35449,7 @@ function safeIsOptional(schema) {
   }
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
 var parseOptionalDef = (def, refs) => {
   if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
     return parseDef(def.innerType._def, refs);
@@ -35468,7 +35468,7 @@ var parseOptionalDef = (def, refs) => {
   } : parseAnyDef(refs);
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
 var parsePipelineDef = (def, refs) => {
   if (refs.pipeStrategy === "input") {
     return parseDef(def.in._def, refs);
@@ -35488,12 +35488,12 @@ var parsePipelineDef = (def, refs) => {
   };
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
 function parsePromiseDef(def, refs) {
   return parseDef(def.type._def, refs);
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/set.js
 function parseSetDef(def, refs) {
   const items = parseDef(def.valueType._def, {
     ...refs,
@@ -35513,7 +35513,7 @@ function parseSetDef(def, refs) {
   return schema;
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
 function parseTupleDef(def, refs) {
   if (def.rest) {
     return {
@@ -35541,24 +35541,24 @@ function parseTupleDef(def, refs) {
   }
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
 function parseUndefinedDef(refs) {
   return {
     not: parseAnyDef(refs)
   };
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
 function parseUnknownDef(refs) {
   return parseAnyDef(refs);
 }
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
 var parseReadonlyDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/selectParser.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/selectParser.js
 var selectParser = (def, typeName, refs) => {
   switch (typeName) {
     case ZodFirstPartyTypeKind.ZodString:
@@ -35634,7 +35634,7 @@ var selectParser = (def, typeName, refs) => {
   }
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parseDef.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parseDef.js
 function parseDef(def, refs, forceResolution = false) {
   const seenItem = refs.seen.get(def);
   if (refs.override) {
@@ -35690,7 +35690,7 @@ var addMeta = (def, refs, jsonSchema) => {
   return jsonSchema;
 };
 
-// node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
 var zodToJsonSchema = (schema, options) => {
   const refs = getRefs(options);
   let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name2, schema2]) => ({
@@ -35752,7 +35752,7 @@ var zodToJsonSchema = (schema, options) => {
   return combined;
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function mapMiniTarget(t) {
   if (!t)
     return "draft-7";
@@ -35794,7 +35794,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -36748,7 +36748,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -36816,7 +36816,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -37029,7 +37029,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -37064,7 +37064,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -37444,7 +37444,7 @@ var Server = class extends Protocol {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
 var COMPLETABLE_SYMBOL = /* @__PURE__ */ Symbol.for("mcp.completable");
 function isCompletable(schema) {
   return !!schema && typeof schema === "object" && COMPLETABLE_SYMBOL in schema;
@@ -37458,7 +37458,7 @@ var McpZodTypeKind;
   McpZodTypeKind2["Completable"] = "McpCompletable";
 })(McpZodTypeKind || (McpZodTypeKind = {}));
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/uriTemplate.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/uriTemplate.js
 var MAX_TEMPLATE_LENGTH = 1e6;
 var MAX_VARIABLE_LENGTH = 1e6;
 var MAX_TEMPLATE_EXPRESSIONS = 1e4;
@@ -37680,7 +37680,7 @@ var UriTemplate = class _UriTemplate {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
 var TOOL_NAME_REGEX = /^[A-Za-z0-9._-]{1,128}$/;
 function validateToolName(name) {
   const warnings = [];
@@ -37738,7 +37738,7 @@ function validateAndWarnToolName(name) {
   return result.isValid;
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
 var ExperimentalMcpServerTasks = class {
   constructor(_mcpServer) {
     this._mcpServer = _mcpServer;
@@ -37753,7 +37753,7 @@ var ExperimentalMcpServerTasks = class {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 var McpServer = class {
   constructor(serverInfo, options) {
     this._registeredResources = {};
@@ -38569,10 +38569,10 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -38600,7 +38600,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../myrepos/apple-notes-mcp/node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = process2.stdin, _stdout = process2.stdout) {
     this._stdin = _stdin;
@@ -38706,12 +38706,14 @@ function isTimeoutError(error2) {
   }
   return false;
 }
+var BULK_LIST_MUTATION_ERROR = "Notes changed during listing";
 var RETRYABLE_ERROR_PATTERNS = [
   /timed? out/i,
   /not responding/i,
   /connection.*invalid/i,
   /lost connection/i,
-  /busy/i
+  /busy/i,
+  /changed during listing/i
 ];
 function isRetryableError(errorMessage) {
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
@@ -38769,6 +38771,13 @@ var ERROR_MAPPINGS = [
   {
     pattern: /password protected|locked note/i,
     message: "Note is password-protected. Unlock it in Notes.app first."
+  },
+  // Mid-listing library mutation detected by a bulk-list count guard (#86).
+  // The message must keep the phrase "changed during listing" so
+  // RETRYABLE_ERROR_PATTERNS still matches it after this mapping.
+  {
+    pattern: /changed during listing/i,
+    message: "Notes changed during listing (an iCloud sync may have landed mid-read). The operation is retried automatically; run it again if this persists."
   },
   // Syntax/script errors (usually programming bugs)
   {
@@ -39284,6 +39293,12 @@ function buildAppleScriptDateVar(date3, varName = "thresholdDate") {
   const timeInSeconds = date3.getHours() * 3600 + date3.getMinutes() * 60 + date3.getSeconds();
   return [
     `set ${varName} to current date`,
+    // Reset day to 1 BEFORE assigning month: AppleScript date components roll
+    // over, so setting month to (say) June while the variable still holds the
+    // 31st inherited from `current date` produces July 1 (June 31 doesn't
+    // exist), and the day assignment below then lands in the wrong month.
+    // Day 1 exists in every month, so year/month can never roll over. (#86)
+    `set day of ${varName} to 1`,
     `set year of ${varName} to ${year}`,
     `set month of ${varName} to ${month}`,
     `set day of ${varName} to ${day}`,
@@ -39918,6 +39933,94 @@ var AppleNotesManager = class {
     return true;
   }
   /**
+   * Builds the AppleScript body for a bulk note listing.
+   *
+   * Names, ids, and (when date-filtering) modification dates are fetched as
+   * whole-list Apple Events instead of two events per note; per-note round
+   * trips scale linearly and push large libraries past client tool timeouts
+   * (#86). The lists are separate snapshots of a live, syncing collection, so
+   * every script guards that they are the same length before zipping them by
+   * index — a mid-listing mutation would otherwise silently mispair names and
+   * ids (grow) or read past the end of a list (shrink). On mismatch the
+   * script raises BULK_LIST_MUTATION_ERROR, which executeAppleScript treats
+   * as retryable, re-running the whole script on a fresh snapshot.
+   *
+   * @param folderRef - Optional AppleScript folder reference to scope to
+   * @param dateSetup - AppleScript defining thresholdDate; enables date filtering
+   * @param sliceLimit - Fetch only the first N notes (mutually exclusive with
+   *   dateSetup: a date filter must scan every note's date). The script then
+   *   returns the total note count as a leading record so the caller can
+   *   detect a dedup shortfall and fall back to a full fetch.
+   */
+  buildBulkListCommand(opts) {
+    const { folderRef, dateSetup, sliceLimit } = opts;
+    const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const countGuard = (listVar) => `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
+    if (sliceLimit !== void 0) {
+      const slicedSource = folderRef ? `(notes 1 thru fetchCount of ${folderRef})` : `(notes 1 thru fetchCount)`;
+      return `
+        set totalCount to count of ${fullSource}
+        set fetchCount to ${sliceLimit}
+        if fetchCount > totalCount then set fetchCount to totalCount
+        set resultList to {}
+        if fetchCount > 0 then
+          try
+            set noteNames to name of ${slicedSource}
+            set noteIds to id of ${slicedSource}
+          on error
+            error "${BULK_LIST_MUTATION_ERROR}"
+          end try
+          ${countGuard("noteIds")}
+          repeat with i from 1 to count of noteNames
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
+          end repeat
+        end if
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+      `;
+    }
+    const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
+        ` : "";
+    const dateCountGuard = dateSetup ? `${countGuard("noteDates")}
+        ` : "";
+    const dateGuardOpen = dateSetup ? `if (item i of noteDates) >= thresholdDate then
+            ` : "";
+    const dateGuardClose = dateSetup ? `
+          end if` : "";
+    return `
+        ${dateSetup ?? ""}set noteNames to name of ${fullSource}
+        set noteIds to id of ${fullSource}
+        ${dateFetch}${countGuard("noteIds")}
+        ${dateCountGuard}set resultList to {}
+        repeat with i from 1 to count of noteNames
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
+        end repeat
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return resultList as text
+      `;
+  }
+  /**
+   * Parses bulk listing output into deduplicated note titles.
+   *
+   * Duplicate CoreData references are deduped by id; the limit is applied
+   * after dedup so duplicates never count against it.
+   */
+  parseBulkListOutput(output, safeLimit) {
+    if (!output.trim()) return [];
+    const seenIds = /* @__PURE__ */ new Set();
+    const titles = [];
+    for (const item of output.split(RECORD_SEP)) {
+      const [title, id] = item.split(FIELD_SEP);
+      if (!title?.trim()) continue;
+      const noteId = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId)) continue;
+      seenIds.add(noteId);
+      titles.push(title.trim());
+      if (safeLimit !== void 0 && titles.length >= safeLimit) break;
+    }
+    return titles;
+  }
+  /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
    *
    * @param account - Account to list notes from (defaults to iCloud)
@@ -39929,83 +40032,41 @@ var AppleNotesManager = class {
   listNotes(account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
-    if (modifiedSince || safeLimit !== void 0) {
-      const baseNotesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
-      let dateSetup = "";
-      let hasDateFilter = false;
-      if (modifiedSince) {
-        const date3 = new Date(modifiedSince);
-        if (!isNaN(date3.getTime())) {
-          dateSetup = buildAppleScriptDateVar(date3) + "\n";
-          hasDateFilter = true;
-        }
+    const folderRef = folder ? buildFolderReference(folder) : void 0;
+    let dateSetup;
+    if (modifiedSince) {
+      const date3 = new Date(modifiedSince);
+      if (!isNaN(date3.getTime())) {
+        dateSetup = buildAppleScriptDateVar(date3) + "\n";
       }
-      const notesSource = baseNotesSource;
-      const dateFetch = hasDateFilter ? `set noteDates to modification date of ${notesSource}
-        ` : "";
-      const dateGuardOpen = hasDateFilter ? `if (item i of noteDates) >= thresholdDate then
-            ` : "";
-      const dateGuardClose = hasDateFilter ? `
-          end if` : "";
-      const listCommand2 = `
-        ${dateSetup}set noteNames to name of ${notesSource}
-        set noteIds to id of ${notesSource}
-        ${dateFetch}set resultList to {}
-        repeat with i from 1 to count of noteNames
-          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
-        end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
-      `;
-      const script2 = buildAccountScopedScript({ account: targetAccount }, listCommand2);
+    }
+    if (safeLimit !== void 0 && !dateSetup) {
+      const script2 = buildAccountScopedScript(
+        { account: targetAccount },
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+      );
       const result2 = executeAppleScript(script2);
       if (!result2.success) {
         throw new Error(`Failed to list notes: ${result2.error ?? "unknown error"}`);
       }
-      if (!result2.output.trim()) {
-        return [];
+      const sepIdx = result2.output.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? result2.output : result2.output.slice(0, sepIdx);
+      const totalCount = Number.parseInt(header.trim(), 10);
+      const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
+      const titles = this.parseBulkListOutput(records, safeLimit);
+      if (!Number.isNaN(totalCount) && (titles.length >= safeLimit || totalCount <= safeLimit)) {
+        return titles;
       }
-      const seenIds2 = /* @__PURE__ */ new Set();
-      const titles2 = [];
-      for (const item of result2.output.split(RECORD_SEP)) {
-        const [title, id] = item.split(FIELD_SEP);
-        if (!title?.trim()) continue;
-        const noteId = id?.trim() || generateFallbackId();
-        if (seenIds2.has(noteId)) continue;
-        seenIds2.add(noteId);
-        titles2.push(title.trim());
-        if (safeLimit !== void 0 && titles2.length >= safeLimit) break;
-      }
-      return titles2;
     }
-    const notesRef = folder ? `notes of ${buildFolderReference(folder)}` : `notes`;
-    const listCommand = `
-      set noteNames to name of ${notesRef}
-      set noteIds to id of ${notesRef}
-      set resultList to {}
-      repeat with i from 1 to count of noteNames
-        set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
-      end repeat
-      set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-      return resultList as text
-    `;
-    const script = buildAccountScopedScript({ account: targetAccount }, listCommand);
+    const script = buildAccountScopedScript(
+      { account: targetAccount },
+      this.buildBulkListCommand({ folderRef, dateSetup })
+    );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    if (!result.output.trim()) return [];
-    const seenIds = /* @__PURE__ */ new Set();
-    const titles = [];
-    for (const item of result.output.split(RECORD_SEP)) {
-      const [title, id] = item.split(FIELD_SEP);
-      if (!title?.trim()) continue;
-      const noteId = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId)) continue;
-      seenIds.add(noteId);
-      titles.push(title.trim());
-    }
-    return titles;
+    return this.parseBulkListOutput(result.output, safeLimit);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
