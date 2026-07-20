@@ -38706,12 +38706,14 @@ function isTimeoutError(error2) {
   }
   return false;
 }
+var BULK_LIST_MUTATION_ERROR = "Notes changed during listing";
 var RETRYABLE_ERROR_PATTERNS = [
   /timed? out/i,
   /not responding/i,
   /connection.*invalid/i,
   /lost connection/i,
-  /busy/i
+  /busy/i,
+  /changed during listing/i
 ];
 function isRetryableError(errorMessage) {
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
@@ -38769,6 +38771,13 @@ var ERROR_MAPPINGS = [
   {
     pattern: /password protected|locked note/i,
     message: "Note is password-protected. Unlock it in Notes.app first."
+  },
+  // Mid-listing library mutation detected by a bulk-list count guard (#86).
+  // The message must keep the phrase "changed during listing" so
+  // RETRYABLE_ERROR_PATTERNS still matches it after this mapping.
+  {
+    pattern: /changed during listing/i,
+    message: "Notes changed during listing (an iCloud sync may have landed mid-read). The operation is retried automatically; run it again if this persists."
   },
   // Syntax/script errors (usually programming bugs)
   {
@@ -39284,6 +39293,12 @@ function buildAppleScriptDateVar(date3, varName = "thresholdDate") {
   const timeInSeconds = date3.getHours() * 3600 + date3.getMinutes() * 60 + date3.getSeconds();
   return [
     `set ${varName} to current date`,
+    // Reset day to 1 BEFORE assigning month: AppleScript date components roll
+    // over, so setting month to (say) June while the variable still holds the
+    // 31st inherited from `current date` produces July 1 (June 31 doesn't
+    // exist), and the day assignment below then lands in the wrong month.
+    // Day 1 exists in every month, so year/month can never roll over. (#86)
+    `set day of ${varName} to 1`,
     `set year of ${varName} to ${year}`,
     `set month of ${varName} to ${month}`,
     `set day of ${varName} to ${day}`,
@@ -39918,6 +39933,101 @@ var AppleNotesManager = class {
     return true;
   }
   /**
+   * Builds the AppleScript body for a bulk note listing.
+   *
+   * Names, ids, and (when date-filtering) modification dates are fetched as
+   * whole-list Apple Events instead of two events per note; per-note round
+   * trips scale linearly and push large libraries past client tool timeouts
+   * (#86). The lists are separate snapshots of a live, syncing collection, so
+   * every script guards that they are the same length before zipping them by
+   * index — a mid-listing mutation would otherwise silently mispair names and
+   * ids (grow) or read past the end of a list (shrink). On mismatch the
+   * script raises BULK_LIST_MUTATION_ERROR, which executeAppleScript treats
+   * as retryable, re-running the whole script on a fresh snapshot. A length
+   * check cannot see an exactly-offsetting delete+create landing in the
+   * milliseconds between two fetches; that residual window is accepted —
+   * closing it would cost an extra whole-list fetch per listing.
+   *
+   * @param folderRef - Optional AppleScript folder reference to scope to
+   * @param dateSetup - AppleScript defining thresholdDate; enables date filtering
+   * @param sliceLimit - Fetch only the first N notes (mutually exclusive with
+   *   dateSetup: a date filter must scan every note's date). The script then
+   *   returns the total note count as a leading record so the caller can
+   *   detect a dedup shortfall and fall back to a full fetch.
+   */
+  buildBulkListCommand(opts) {
+    const { folderRef, dateSetup, sliceLimit } = opts;
+    const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const countGuard = (listVar) => `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
+    if (sliceLimit !== void 0) {
+      const slicedSource = folderRef ? `(notes 1 thru fetchCount of ${folderRef})` : `(notes 1 thru fetchCount)`;
+      return `
+        set totalCount to count of ${fullSource}
+        set fetchCount to ${sliceLimit}
+        if fetchCount > totalCount then set fetchCount to totalCount
+        set resultList to {}
+        if fetchCount > 0 then
+          try
+            set noteNames to name of ${slicedSource}
+            set noteIds to id of ${slicedSource}
+          on error errMsg number errNum
+            if errNum is -1719 or errNum is -1728 then
+              error "${BULK_LIST_MUTATION_ERROR}"
+            else
+              error errMsg number errNum
+            end if
+          end try
+          ${countGuard("noteIds")}
+          repeat with i from 1 to count of noteNames
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
+          end repeat
+        end if
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+      `;
+    }
+    const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
+        ` : "";
+    const dateCountGuard = dateSetup ? `${countGuard("noteDates")}
+        ` : "";
+    const dateGuardOpen = dateSetup ? `if (item i of noteDates) >= thresholdDate then
+            ` : "";
+    const dateGuardClose = dateSetup ? `
+          end if` : "";
+    return `
+        ${dateSetup ?? ""}set noteNames to name of ${fullSource}
+        set noteIds to id of ${fullSource}
+        ${dateFetch}${countGuard("noteIds")}
+        ${dateCountGuard}set resultList to {}
+        repeat with i from 1 to count of noteNames
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
+        end repeat
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return resultList as text
+      `;
+  }
+  /**
+   * Parses bulk listing output into deduplicated note titles.
+   *
+   * Duplicate CoreData references are deduped by id; the limit is applied
+   * after dedup so duplicates never count against it.
+   */
+  parseBulkListOutput(output, safeLimit) {
+    if (!output.trim()) return [];
+    const seenIds = /* @__PURE__ */ new Set();
+    const titles = [];
+    for (const item of output.split(RECORD_SEP)) {
+      const [title, id] = item.split(FIELD_SEP);
+      if (!title?.trim()) continue;
+      const noteId = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId)) continue;
+      seenIds.add(noteId);
+      titles.push(title.trim());
+      if (safeLimit !== void 0 && titles.length >= safeLimit) break;
+    }
+    return titles;
+  }
+  /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
    *
    * @param account - Account to list notes from (defaults to iCloud)
@@ -39929,89 +40039,41 @@ var AppleNotesManager = class {
   listNotes(account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
-    if (modifiedSince || safeLimit !== void 0) {
-      const baseNotesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
-      let dateSetup = "";
-      let notesSource = baseNotesSource;
-      if (modifiedSince) {
-        const date3 = new Date(modifiedSince);
-        if (!isNaN(date3.getTime())) {
-          dateSetup = buildAppleScriptDateVar(date3) + "\n";
-          notesSource = `(${baseNotesSource} whose modification date >= thresholdDate)`;
-        }
+    const folderRef = folder ? buildFolderReference(folder) : void 0;
+    let dateSetup;
+    if (modifiedSince) {
+      const date3 = new Date(modifiedSince);
+      if (!isNaN(date3.getTime())) {
+        dateSetup = buildAppleScriptDateVar(date3) + "\n";
       }
-      const limitCheck = safeLimit !== void 0 ? `
-            if (count of resultList) >= ${safeLimit} then exit repeat` : "";
-      const listCommand2 = `
-        ${dateSetup}set resultList to {}
-        set seenIds to {}
-        repeat with n in ${notesSource}
-          try
-            set noteName to name of n
-            set noteId to id of n
-            if seenIds does not contain noteId then
-              set end of seenIds to noteId
-              set end of resultList to noteName & ${AS_FIELD_SEP} & noteId${limitCheck}
-            end if
-          end try
-        end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
-      `;
-      const script2 = buildAccountScopedScript({ account: targetAccount }, listCommand2);
+    }
+    if (safeLimit !== void 0 && !dateSetup) {
+      const script2 = buildAccountScopedScript(
+        { account: targetAccount },
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+      );
       const result2 = executeAppleScript(script2);
       if (!result2.success) {
         throw new Error(`Failed to list notes: ${result2.error ?? "unknown error"}`);
       }
-      if (!result2.output.trim()) {
-        return [];
+      const sepIdx = result2.output.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? result2.output : result2.output.slice(0, sepIdx);
+      const totalCount = Number.parseInt(header.trim(), 10);
+      const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
+      const titles = this.parseBulkListOutput(records, safeLimit);
+      if (!Number.isNaN(totalCount) && (titles.length >= safeLimit || totalCount <= safeLimit)) {
+        return titles;
       }
-      const seenIds2 = /* @__PURE__ */ new Set();
-      const titles2 = [];
-      for (const item of result2.output.split(RECORD_SEP)) {
-        const [title, id] = item.split(FIELD_SEP);
-        if (!title?.trim()) continue;
-        const noteId = id?.trim() || generateFallbackId();
-        if (seenIds2.has(noteId)) continue;
-        seenIds2.add(noteId);
-        titles2.push(title.trim());
-      }
-      return titles2;
     }
-    const notesRef = folder ? `notes of ${buildFolderReference(folder)}` : `notes`;
-    const listCommand = `
-      set resultList to {}
-      set seenIds to {}
-      repeat with n in ${notesRef}
-        try
-          set noteName to name of n
-          set noteId to id of n
-          if seenIds does not contain noteId then
-            set end of seenIds to noteId
-            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId
-          end if
-        end try
-      end repeat
-      set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-      return resultList as text
-    `;
-    const script = buildAccountScopedScript({ account: targetAccount }, listCommand);
+    const script = buildAccountScopedScript(
+      { account: targetAccount },
+      this.buildBulkListCommand({ folderRef, dateSetup })
+    );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    if (!result.output.trim()) return [];
-    const seenIds = /* @__PURE__ */ new Set();
-    const titles = [];
-    for (const item of result.output.split(RECORD_SEP)) {
-      const [title, id] = item.split(FIELD_SEP);
-      if (!title?.trim()) continue;
-      const noteId = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId)) continue;
-      seenIds.add(noteId);
-      titles.push(title.trim());
-    }
-    return titles;
+    return this.parseBulkListOutput(result.output, safeLimit);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
