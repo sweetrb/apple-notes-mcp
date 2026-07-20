@@ -56,6 +56,13 @@ function getMaxBuffer(): number {
 const SCRIPT_TIMEOUT_HEADROOM_MS = 5000;
 
 /**
+ * Smallest remaining budget worth starting a retry with. Matches the one-second
+ * floor `wrapWithTimeout` applies to the in-script `with timeout`; below it the
+ * in-script guard would outlast the process timeout it is supposed to precede.
+ */
+const MIN_ATTEMPT_BUDGET_MS = 1000;
+
+/**
  * Wrap a script body in an AppleScript `with timeout` block so an Apple Event
  * that honors timeouts aborts cleanly rather than holding Notes.app's
  * single-threaded dispatch open. Set below the process timeout so the in-app
@@ -349,15 +356,6 @@ export function executeAppleScript(
     };
   }
 
-  // Prepare the script:
-  // 1. Trim leading/trailing whitespace (cosmetic)
-  // 2. Wrap in `with timeout` so Notes.app aborts cleanly from inside its own
-  //    dispatch before the outer process SIGKILL (#17)
-  // 3. Preserve internal newlines (required for AppleScript syntax)
-  // The script is fed to `osascript -` over stdin, so no shell and no shell
-  // escaping are involved, and script size is not bounded by ARG_MAX.
-  const preparedScript = wrapWithTimeout(script.trim(), timeoutMs);
-
   // Debug: Log the script being executed
   debugLog("Executing AppleScript", {
     scriptPreview: script.trim().substring(0, 200) + (script.length > 200 ? "..." : ""),
@@ -367,8 +365,14 @@ export function executeAppleScript(
 
   let lastError: AppleScriptResult | null = null;
   const startTime = Date.now();
+  const deadline = startTime + timeoutMs;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // timeoutMs is the budget for the complete operation, not for each retry.
+    // Giving every attempt a fresh timeout let the default two-attempt path run
+    // for roughly 61 seconds, beyond the 60-second limit used by MCP clients.
+    const attemptTimeoutMs = Math.max(1, deadline - Date.now());
+    const preparedScript = wrapWithTimeout(script.trim(), attemptTimeoutMs);
     const attemptStart = Date.now();
     try {
       // Execute synchronously - MCP tools are inherently synchronous
@@ -380,7 +384,7 @@ export function executeAppleScript(
       const output = execFileSync("osascript", ["-"], {
         input: preparedScript,
         encoding: "utf8",
-        timeout: timeoutMs,
+        timeout: attemptTimeoutMs,
         // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
         // unresponsive Notes.app can ignore SIGTERM and leak, piling up and
         // worsening contention. SIGKILL guarantees reaping on timeout. (#17)
@@ -446,9 +450,20 @@ export function executeAppleScript(
       // Check if we should retry
       const canRetry = isTimeout || isRetryableError(errorMessage);
       const hasAttemptsLeft = attempt < maxRetries;
+      const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      // Require enough budget left for a *meaningful* attempt, not merely a
+      // nonzero one. wrapWithTimeout floors the in-script `with timeout` at one
+      // second, so a retry starting with less than that remaining inverts the
+      // intended ordering: the in-script guard exists to abort inside Notes.app's
+      // own dispatch before Node SIGKILLs osascript (killing osascript does not
+      // stop work already handed to Notes.app). Before this guard,
+      // `{ timeoutMs: 1100, retryDelayMs: 1000 }` gave attempt 2 a 90 ms process
+      // timeout wrapped in `with timeout of 1 seconds` — process kill first,
+      // headroom defeated. Reachable on defaults whenever a transient failure
+      // lands with 1-2s of budget left.
+      const hasTimeForRetry = Date.now() + delayMs + MIN_ATTEMPT_BUDGET_MS < deadline;
 
-      if (canRetry && hasAttemptsLeft) {
-        const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      if (canRetry && hasAttemptsLeft && hasTimeForRetry) {
         console.error(
           `AppleScript retry: Attempt ${attempt}/${maxRetries} failed with "${errorMessage}". Retrying in ${delayMs}ms...`
         );

@@ -37,6 +37,7 @@ vi.mock("@/utils/checklistParser.js", () => ({
 
 import { executeAppleScript } from "@/utils/applescript.js";
 const mockExecuteAppleScript = vi.mocked(executeAppleScript);
+const NO_RETRY_OPTIONS = { maxRetries: 1 };
 
 import { getChecklistItems } from "@/utils/checklistParser.js";
 const mockGetChecklistItems = vi.mocked(getChecklistItems);
@@ -428,6 +429,18 @@ describe("AppleNotesManager", () => {
   // ---------------------------------------------------------------------------
 
   describe("createNote", () => {
+    it("does not retry creation after an ambiguous timeout", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: "Operation timed out after 30 seconds",
+      });
+
+      manager.createNote("One copy", "Body");
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledWith(expect.any(String), { maxRetries: 1 });
+    });
+
     it("returns Note object on successful creation", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
@@ -497,7 +510,8 @@ describe("AppleNotesManager", () => {
 
       expect(result?.account).toBe("Gmail");
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('tell account "Gmail"'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -510,7 +524,8 @@ describe("AppleNotesManager", () => {
       manager.createNote("Work Note", "Content", [], "Work Projects");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('at folder "Work Projects"')
+        expect.stringContaining('at folder "Work Projects"'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -538,7 +553,8 @@ describe("AppleNotesManager", () => {
       // HTML tags should NOT be entity-encoded — they should pass through to AppleScript
       // escapeHtmlForAppleScript only escapes \ and ", not HTML tags
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("<h2>Heading</h2><div>Body text</div>")
+        expect.stringContaining("<h2>Heading</h2><div>Body text</div>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -553,7 +569,8 @@ describe("AppleNotesManager", () => {
       expect(result).not.toBeNull();
       // Default plaintext: newlines become <br>
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("Simple text with<br>newline")
+        expect.stringContaining("Simple text with<br>newline"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -574,7 +591,8 @@ describe("AppleNotesManager", () => {
 
       // Double quotes must be escaped for AppleScript string embedding
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('<div class=\\"test\\">Content</div>')
+        expect.stringContaining('<div class=\\"test\\">Content</div>'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -602,7 +620,8 @@ describe("AppleNotesManager", () => {
       manager.createNote("Q&A: <Hello> World", "Content");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("<h1>Q&amp;A: &lt;Hello&gt; World</h1>")
+        expect.stringContaining("<h1>Q&amp;A: &lt;Hello&gt; World</h1>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -1327,7 +1346,8 @@ describe("AppleNotesManager", () => {
       manager.deleteNote("Draft", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('tell account "Gmail"'),
+        NO_RETRY_OPTIONS
       );
     });
   });
@@ -1370,7 +1390,8 @@ describe("AppleNotesManager", () => {
 
       // The generated body should use the original title
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("<div>Keep This Title</div>")
+        expect.stringContaining("<div>Keep This Title</div>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -1383,7 +1404,8 @@ describe("AppleNotesManager", () => {
       manager.updateNote("Old Title", "Brand New Title", "Content");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("<div>Brand New Title</div>")
+        expect.stringContaining("<div>Brand New Title</div>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -1401,7 +1423,8 @@ describe("AppleNotesManager", () => {
       expect(result).toBe(true);
       // In HTML mode: content is used as-is, no <div> wrapper added
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining(`to "${htmlContent}"`)
+        expect.stringContaining(`to "${htmlContent}"`),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -1421,7 +1444,8 @@ describe("AppleNotesManager", () => {
 
       // Should NOT contain the <div>Old Title</div> wrapper
       expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
-        expect.stringContaining("<div>Old Title</div>")
+        expect.stringContaining("<div>Old Title</div>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -1435,7 +1459,8 @@ describe("AppleNotesManager", () => {
 
       // Default behavior: should have <div> wrapper
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("<div>My Title</div><div>Plain content</div>")
+        expect.stringContaining("<div>My Title</div><div>Plain content</div>"),
+        NO_RETRY_OPTIONS
       );
     });
   });
@@ -1462,11 +1487,13 @@ describe("AppleNotesManager", () => {
       expect(result).toBe(true);
       // HTML mode: content passed directly, no <div> wrapper
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining(`to "${htmlContent}"`)
+        expect.stringContaining(`to "${htmlContent}"`),
+        NO_RETRY_OPTIONS
       );
       // Should NOT contain the div-wrapped title pattern
       expect(mockExecuteAppleScript).not.toHaveBeenCalledWith(
-        expect.stringContaining("<div>My Title</div>")
+        expect.stringContaining("<div>My Title</div>"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2308,7 +2335,8 @@ describe("AppleNotesManager", () => {
 
       expect(manager.showNoteById("x-coredata://ABC/ICNote/p1")).toBe(true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('show note id "x-coredata://ABC/ICNote/p1"')
+        expect.stringContaining('show note id "x-coredata://ABC/ICNote/p1"'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2320,7 +2348,8 @@ describe("AppleNotesManager", () => {
 
       manager.showNoteById("x-coredata://ABC/ICNote/p1", true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("separately true")
+        expect.stringContaining("separately true"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2337,7 +2366,8 @@ describe("AppleNotesManager", () => {
 
       expect(manager.showFolderById("x-coredata://ABC/ICFolder/p1")).toBe(true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('show folder id "x-coredata://ABC/ICFolder/p1"')
+        expect.stringContaining('show folder id "x-coredata://ABC/ICFolder/p1"'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2346,7 +2376,8 @@ describe("AppleNotesManager", () => {
 
       manager.showFolderById("x-coredata://ABC/ICFolder/p1", true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("separately true")
+        expect.stringContaining("separately true"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2367,7 +2398,8 @@ describe("AppleNotesManager", () => {
 
       expect(manager.showAccountById("x-coredata://ABC/ICAccount/p1")).toBe(true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('show account id "x-coredata://ABC/ICAccount/p1"')
+        expect.stringContaining('show account id "x-coredata://ABC/ICAccount/p1"'),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2376,7 +2408,8 @@ describe("AppleNotesManager", () => {
 
       manager.showAccountById("x-coredata://ABC/ICAccount/p1", true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("separately true")
+        expect.stringContaining("separately true"),
+        NO_RETRY_OPTIONS
       );
     });
 
@@ -2407,7 +2440,8 @@ describe("AppleNotesManager", () => {
 
       manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "att-123", true);
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining("separately true")
+        expect.stringContaining("separately true"),
+        NO_RETRY_OPTIONS
       );
     });
 

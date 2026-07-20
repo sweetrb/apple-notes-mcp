@@ -238,9 +238,10 @@ export interface DefaultLocation {
  */
 export interface AppleScriptOptions {
   /**
-   * Maximum execution time in milliseconds.
+   * Maximum execution time in milliseconds for the complete operation,
+   * including retries and retry delays.
    *
-   * If the script takes longer than this, execution is aborted
+   * If the operation takes longer than this, execution is aborted
    * and an error is returned. Defaults to 30000 (30 seconds).
    *
    * Recommended values:
@@ -255,11 +256,11 @@ export interface AppleScriptOptions {
    *
    * When set to a value > 1, the executor will retry on transient
    * errors (timeout, "not responding") with exponential backoff.
-   * Defaults to 1 (no retries).
+   * Defaults to 2 (one retry).
    *
-   * Recommended values:
-   * - Simple operations: 1 (no retry)
-   * - Critical operations: 3
+   * Mutation safety:
+   * Mutating operations override this to 1 because a timed-out write may have
+   * completed in Notes.app before the response was lost.
    */
   maxRetries?: number;
 
