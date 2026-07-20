@@ -64,4 +64,24 @@ describe("resolveUpdateResponseTitle", () => {
       )
     ).toBe("Actual title");
   });
+
+  it("treats an unclosed style block as running to end of input, like a browser", () => {
+    // Truncated/pasted HTML routinely loses the closing tag. Without an
+    // end-of-input branch the block is left in place and its CSS becomes the
+    // reported title.
+    expect(
+      resolveUpdateResponseTitle("Old title", undefined, "html", "<style>h1{color:red}Actual title")
+    ).toBe("Old title");
+  });
+
+  it("resolves many unclosed blocks in linear time", () => {
+    // Regression guard for quadratic backtracking: each unclosed block used to
+    // scan to end-of-input, fail, and backtrack, then the fixpoint loop
+    // repeated it. 844 KB took ~1s before; the ceiling on accepted content is
+    // 5 MiB. A generous bound keeps this from being timing-flaky in CI.
+    const html = "<div>Real title</div>" + "<script>x".repeat(8000);
+    const started = Date.now();
+    expect(resolveUpdateResponseTitle("Old title", undefined, "html", html)).toBe("Real title");
+    expect(Date.now() - started).toBeLessThan(500);
+  });
 });

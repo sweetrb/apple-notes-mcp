@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.4] - 2026-07-20
+
 ### Fixed
 - **`update-note` no longer reports an ignored `newTitle` as the note's title for HTML updates.** In `format: "html"` mode, Apple Notes derives the visible title from the first line of `newContent` and the manager intentionally ignores `newTitle`, but the tool response still echoed `newTitle` as though it had been applied. The response now reports the first visible HTML line (falling back to the known current title when the body has no text), and the live tool schema explicitly tells callers to put the visible title first in `newContent`.
+- Stripping `<script>`/`<style>` blocks while deriving that title is now linear rather than quadratic in document size. The pattern had no end-of-input alternative, so every *unclosed* `<script`/`<style>` scanned to EOF, failed, and backtracked — and the fixpoint loop repeated that. Measured on inputs of many unclosed blocks: 211 KB 63 ms, 422 KB 247 ms, 844 KB 1039 ms (quadratic), against a 5 MiB accepted-content ceiling. Now 0–2 ms across the same inputs. Unclosed blocks are also now consumed to end-of-input, which is what browsers do and prevents a truncated leading `<style>` from contributing its CSS to the reported title.
+
+## [2.6.3] - 2026-07-20
+
+### Fixed
+- **`search-notes` now returns each result's real creation and modification timestamps.** Search results previously filled both fields with the current time, making unrelated notes appear to have been created and modified when the search ran. The search AppleScript now emits locale-independent date components for each match and the manager parses those values into the structured response.
+- Each date read in the search loop is individually guarded with an `on error` fallback, matching the adjacent folder-name read. Without it a note whose `creation date`/`modification date` property throws would be dropped from the results entirely — and, because its ID was already recorded for deduplication, any later reference to that note would be suppressed too. The fallback degrades to the previous behaviour (current time) for that one field instead.
 
 ## [2.6.2] - 2026-07-20
 ### Changed

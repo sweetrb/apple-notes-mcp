@@ -875,7 +875,7 @@ export class AppleNotesManager {
           if (count of resultList) >= ${safeLimit} then exit repeat`
         : "";
 
-    // Get names, IDs, and folder for each matching note.
+    // Get names, IDs, folder, and real timestamps for each matching note.
     // Notes.app can return the same CoreData note more than once when asking
     // an account for all notes, so dedupe on note ID before adding results.
     const searchCommand = `
@@ -889,11 +889,23 @@ export class AppleNotesManager {
           if seenIds does not contain noteId then
             set end of seenIds to noteId
             try
+              set noteCreated to creation date of n
+              set createdParts to ${asDatePartsExpr("noteCreated")}
+            on error
+              set createdParts to ""
+            end try
+            try
+              set noteModified to modification date of n
+              set modifiedParts to ${asDatePartsExpr("noteModified")}
+            on error
+              set modifiedParts to ""
+            end try
+            try
               set noteFolder to name of container of n
             on error
               set noteFolder to "Notes"
             end try
-            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder${limitCheck}
+            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder & ${AS_FIELD_SEP} & createdParts & ${AS_FIELD_SEP} & modifiedParts${limitCheck}
           end if
         end try
       end repeat
@@ -919,7 +931,7 @@ export class AppleNotesManager {
     const notes: Note[] = [];
     const seenIds = new Set<string>();
     for (const item of items) {
-      const [title, id, folder] = item.split(FIELD_SEP);
+      const [title, id, folder, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
@@ -929,8 +941,8 @@ export class AppleNotesManager {
         title: title.trim(),
         content: "", // Not fetched in search
         tags: [] as string[],
-        created: new Date(),
-        modified: new Date(),
+        created: parseAppleScriptDate(created ?? ""),
+        modified: parseAppleScriptDate(modified ?? ""),
         folder: folder?.trim(),
         account: targetAccount,
       });

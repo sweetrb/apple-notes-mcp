@@ -1,7 +1,16 @@
 const BLOCK_END_RE = /<\/(?:div|h[1-6]|p|li)>/gi;
 const BREAK_RE = /<br\s*\/?\s*>/gi;
 const TAG_RE = /<[^>]*>/g;
-const NON_RENDERED_BLOCK_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi;
+// The `(?:<\/\1>|$)` alternative is load-bearing for performance, not just
+// tidiness. Without the `$` branch an *unclosed* `<script`/`<style>` makes the
+// lazy quantifier scan to end-of-input, fail, and backtrack — repeated for
+// every such tag, and then repeated again by the fixpoint loop below. Measured
+// on inputs made of many unclosed blocks: 211 KB 63 ms, 422 KB 247 ms, 844 KB
+// 1039 ms (quadratic), against a MAX.CONTENT ceiling of 5 MiB. With the `$`
+// branch the same inputs take 0–2 ms. Consuming an unclosed block to
+// end-of-input also matches how browsers treat one, and stops a truncated
+// leading `<style>` from donating its CSS to the derived title.
+const NON_RENDERED_BLOCK_RE = /<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
 
 function decodeHtmlEntities(text: string): string {
   const decodeCodePoint = (match: string, value: string, radix: number): string => {
