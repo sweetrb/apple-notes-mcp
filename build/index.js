@@ -38818,7 +38818,6 @@ function executeAppleScript(script, options = {}) {
       error: "Cannot execute empty AppleScript"
     };
   }
-  const preparedScript = wrapWithTimeout(script.trim(), timeoutMs);
   debugLog("Executing AppleScript", {
     scriptPreview: script.trim().substring(0, 200) + (script.length > 200 ? "..." : ""),
     timeout: timeoutMs,
@@ -38826,13 +38825,16 @@ function executeAppleScript(script, options = {}) {
   });
   let lastError = null;
   const startTime = Date.now();
+  const deadline = startTime + timeoutMs;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const attemptTimeoutMs = Math.max(1, deadline - Date.now());
+    const preparedScript = wrapWithTimeout(script.trim(), attemptTimeoutMs);
     const attemptStart = Date.now();
     try {
       const output = execFileSync("osascript", ["-"], {
         input: preparedScript,
         encoding: "utf8",
-        timeout: timeoutMs,
+        timeout: attemptTimeoutMs,
         // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
         // unresponsive Notes.app can ignore SIGTERM and leak, piling up and
         // worsening contention. SIGKILL guarantees reaping on timeout. (#17)
@@ -38885,8 +38887,9 @@ function executeAppleScript(script, options = {}) {
       };
       const canRetry = isTimeout || isRetryableError(errorMessage);
       const hasAttemptsLeft = attempt < maxRetries;
-      if (canRetry && hasAttemptsLeft) {
-        const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      const hasTimeForRetry = Date.now() + delayMs < deadline;
+      if (canRetry && hasAttemptsLeft && hasTimeForRetry) {
         console.error(
           `AppleScript retry: Attempt ${attempt}/${maxRetries} failed with "${errorMessage}". Retrying in ${delayMs}ms...`
         );
@@ -39221,6 +39224,9 @@ var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(ASCII character 31)";
 var AS_RECORD_SEP = "(ASCII character 30)";
+function executeMutationAppleScript(script) {
+  return executeAppleScript(script, { maxRetries: 1 });
+}
 function escapeForAppleScript(text) {
   if (!text) {
     return "";
@@ -39481,7 +39487,7 @@ var AppleNotesManager = class {
       `;
     }
     const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
@@ -39812,7 +39818,7 @@ var AppleNotesManager = class {
     const safeTitle = escapePlainStringForAppleScript(title);
     const deleteCommand = `delete note "${safeTitle}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, deleteCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to delete note "${title}":`, result.error);
       return false;
@@ -39832,7 +39838,7 @@ var AppleNotesManager = class {
     const safeId = sanitizeId(id);
     const deleteCommand = `delete note id "${safeId}"`;
     const script = buildAppLevelScript(deleteCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to delete note with ID "${id}":`, result.error);
       return false;
@@ -39876,7 +39882,7 @@ var AppleNotesManager = class {
     }
     const updateCommand = `set body of note "${safeCurrentTitle}" to "${fullBody}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, updateCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to update note "${title}":`, result.error);
       return false;
@@ -39925,7 +39931,7 @@ var AppleNotesManager = class {
     const safeId = sanitizeId(id);
     const updateCommand = `set body of note id "${safeId}" to "${fullBody}"`;
     const script = buildAppLevelScript(updateCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to update note with ID "${id}":`, result.error);
       return false;
@@ -40244,7 +40250,7 @@ var AppleNotesManager = class {
         createCommand = `make new folder at ${parentRef} with properties {name:"${segmentName}"}`;
       }
       const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
-      const result = executeAppleScript(script);
+      const result = executeMutationAppleScript(script);
       if (!result.success) {
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
@@ -40276,7 +40282,7 @@ var AppleNotesManager = class {
     const targetAccount = this.resolveAccount(account);
     const deleteCommand = `delete ${buildFolderReference(name)}`;
     const script = buildAccountScopedScript({ account: targetAccount }, deleteCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed to delete folder "${name}":`, result.error);
       return false;
@@ -40333,7 +40339,7 @@ var AppleNotesManager = class {
       move noteRef to destFolder
     `;
     const script = buildAppLevelScript(moveCommand);
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
@@ -40488,7 +40494,7 @@ var AppleNotesManager = class {
   showNoteById(id, separately = false) {
     const safeId = sanitizeId(id);
     const separatelyClause = separately ? " separately true" : "";
-    const result = executeAppleScript(
+    const result = executeMutationAppleScript(
       buildAppLevelScript(`show note id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
@@ -40551,7 +40557,7 @@ var AppleNotesManager = class {
   showFolderById(id, separately = false) {
     const safeId = sanitizeId(id);
     const separatelyClause = separately ? " separately true" : "";
-    const result = executeAppleScript(
+    const result = executeMutationAppleScript(
       buildAppLevelScript(`show folder id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
@@ -40573,7 +40579,7 @@ var AppleNotesManager = class {
   showAccountById(id, separately = false) {
     const safeId = sanitizeId(id);
     const separatelyClause = separately ? " separately true" : "";
-    const result = executeAppleScript(
+    const result = executeMutationAppleScript(
       buildAppLevelScript(`show account id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
@@ -40616,7 +40622,7 @@ var AppleNotesManager = class {
         return "OK"
       end tell
     `;
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(
         `Failed to show attachment "${attachmentId}" on note "${noteId}":`,
@@ -41018,7 +41024,7 @@ var AppleNotesManager = class {
         return "OK" & ${AS_FIELD_SEP} & (name of theAttachment) & ${AS_FIELD_SEP} & (content identifier of theAttachment)
       end tell
     `;
-    const result = executeAppleScript(script);
+    const result = executeMutationAppleScript(script);
     if (!result.success) {
       return { success: false, error: result.error ?? "unknown error" };
     }
@@ -41152,7 +41158,7 @@ var AppleNotesManager = class {
         end repeat
         return out
       `);
-      const res = executeAppleScript(script);
+      const res = executeMutationAppleScript(script);
       if (!res.success) {
         for (const r of runnable) {
           results[r.index] = this.createBatchResult(
@@ -41262,7 +41268,7 @@ var AppleNotesManager = class {
         end repeat
         return out
       `);
-      const res = executeAppleScript(script);
+      const res = executeMutationAppleScript(script);
       if (!res.success) {
         for (const r of runnable) {
           results[r.index] = this.createBatchResult(

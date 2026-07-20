@@ -349,15 +349,6 @@ export function executeAppleScript(
     };
   }
 
-  // Prepare the script:
-  // 1. Trim leading/trailing whitespace (cosmetic)
-  // 2. Wrap in `with timeout` so Notes.app aborts cleanly from inside its own
-  //    dispatch before the outer process SIGKILL (#17)
-  // 3. Preserve internal newlines (required for AppleScript syntax)
-  // The script is fed to `osascript -` over stdin, so no shell and no shell
-  // escaping are involved, and script size is not bounded by ARG_MAX.
-  const preparedScript = wrapWithTimeout(script.trim(), timeoutMs);
-
   // Debug: Log the script being executed
   debugLog("Executing AppleScript", {
     scriptPreview: script.trim().substring(0, 200) + (script.length > 200 ? "..." : ""),
@@ -367,8 +358,14 @@ export function executeAppleScript(
 
   let lastError: AppleScriptResult | null = null;
   const startTime = Date.now();
+  const deadline = startTime + timeoutMs;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // timeoutMs is the budget for the complete operation, not for each retry.
+    // Giving every attempt a fresh timeout let the default two-attempt path run
+    // for roughly 61 seconds, beyond the 60-second limit used by MCP clients.
+    const attemptTimeoutMs = Math.max(1, deadline - Date.now());
+    const preparedScript = wrapWithTimeout(script.trim(), attemptTimeoutMs);
     const attemptStart = Date.now();
     try {
       // Execute synchronously - MCP tools are inherently synchronous
@@ -380,7 +377,7 @@ export function executeAppleScript(
       const output = execFileSync("osascript", ["-"], {
         input: preparedScript,
         encoding: "utf8",
-        timeout: timeoutMs,
+        timeout: attemptTimeoutMs,
         // SIGKILL (not the default SIGTERM): a wedged osascript blocked on an
         // unresponsive Notes.app can ignore SIGTERM and leak, piling up and
         // worsening contention. SIGKILL guarantees reaping on timeout. (#17)
@@ -446,9 +443,10 @@ export function executeAppleScript(
       // Check if we should retry
       const canRetry = isTimeout || isRetryableError(errorMessage);
       const hasAttemptsLeft = attempt < maxRetries;
+      const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      const hasTimeForRetry = Date.now() + delayMs < deadline;
 
-      if (canRetry && hasAttemptsLeft) {
-        const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
+      if (canRetry && hasAttemptsLeft && hasTimeForRetry) {
         console.error(
           `AppleScript retry: Attempt ${attempt}/${maxRetries} failed with "${errorMessage}". Retrying in ${delayMs}ms...`
         );

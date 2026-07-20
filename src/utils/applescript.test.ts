@@ -322,6 +322,31 @@ describe("executeAppleScript", () => {
   });
 
   describe("retry logic", () => {
+    it("treats timeoutMs as a total deadline across retries", () => {
+      let now = 0;
+      let callCount = 0;
+      const dateNow = vi.spyOn(Date, "now").mockImplementation(() => now);
+      mockExecFileSync.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          now += 26000;
+          throw makeTimeoutError();
+        }
+        return "recovered";
+      });
+
+      const result = executeAppleScript("test", {
+        timeoutMs: 30000,
+        maxRetries: 2,
+        retryDelayMs: 1,
+      });
+      dateNow.mockRestore();
+
+      expect(result.success).toBe(true);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+      expect(execOptions(1).timeout).toBe(4000);
+    });
+
     it("retries transient errors once by default (maxRetries=2)", () => {
       vi.stubEnv("APPLE_NOTES_MCP_RETRY_DELAY_MS", "1");
       mockExecFileSync.mockImplementation(() => {

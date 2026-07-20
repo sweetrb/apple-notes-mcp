@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **AppleScript retry attempts now share one timeout budget.** The configured 30-second timeout was applied independently to each attempt, so the default retry path could run for about 61 seconds and outlive a client's 60-second tool call. Retries now use only the time remaining in the original operation budget.
+- **Mutating AppleScripts no longer retry after ambiguous timeouts.** Notes.app can apply a create, update, delete, move, folder, attachment-save, or UI-show action before `osascript` loses the response. Replaying the action could create duplicate notes or misreport a completed mutation, so those operations now run once while read-only calls retain transient retries.
+
 ## [2.6.2] - 2026-07-20
 ### Changed
 - CI/release hardening: `version-guard` now treats the committed `build/` bundle as shipped bytes (closing the lockfile-only and devDep silent-never-publish vectors) with an npm version-collision check; `publish.yml` gained a daily self-healing watchdog, manual dispatch, exact-version skip, CI-validated-commit checkout, and GitHub-Release self-heal; Dependabot bundle rebuilds now auto-bump a patch version; CI boots the committed bundle standalone on Node 20 every run; the bundle is now built with `--target=node20`, making the `engines.node >= 20` claim enforced at build time.
