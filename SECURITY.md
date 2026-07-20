@@ -30,4 +30,4 @@ This MCP server:
 - Does not store credentials or passwords
 - Cannot access password-protected notes
 
-The server requires macOS automation permissions to function. These permissions are managed by macOS and can be revoked at any time in System Preferences > Privacy & Security > Automation.
+The server requires macOS automation permissions to function. These permissions are managed by macOS and can be revoked at any time in System Settings > Privacy & Security > Automation.
