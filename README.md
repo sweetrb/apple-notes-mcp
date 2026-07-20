@@ -362,6 +362,8 @@ Updates an existing note's content and/or title.
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
+**Returns:** Confirmation with the note's visible title and, for ID-based updates, its ID. For HTML updates, the title comes from the first rendered line of `newContent`, matching Notes.app. The response also warns if the note is shared.
+
 **Example - Using ID (recommended):**
 ```json
 {
@@ -1018,7 +1020,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
-| `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Total attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection / timeout). `2` means one retry; set `1` to fail fast with no retries. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
+| `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 

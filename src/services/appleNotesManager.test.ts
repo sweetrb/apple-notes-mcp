@@ -710,6 +710,29 @@ describe("AppleNotesManager", () => {
       expect(results[2].folder).toBe("Archive");
     });
 
+    it("returns actual creation and modification timestamps", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          "Meeting Notes",
+          "x-coredata://ABC/ICNote/p1",
+          "Work",
+          "2024-2-3-10-11-12",
+          "2025-6-7-13-14-15",
+        ].join(F),
+      });
+
+      const [result] = manager.searchNotes("meeting");
+
+      expect(result.created).toEqual(new Date(2024, 1, 3, 10, 11, 12));
+      expect(result.modified).toEqual(new Date(2025, 5, 7, 13, 14, 15));
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("set noteCreated to creation date of n");
+      expect(script).toContain("set noteModified to modification date of n");
+      expect(script).toContain("year of noteCreated");
+      expect(script).toContain("year of noteModified");
+    });
+
     it("returns empty array when no matches found", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
@@ -873,7 +896,7 @@ describe("AppleNotesManager", () => {
       manager.searchNotes("note", false, undefined, undefined, "not-a-date");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).not.toContain("modification date");
+      expect(script).not.toContain("modification date >= thresholdDate");
     });
 
     it("applies limit to search results", () => {

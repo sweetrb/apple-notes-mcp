@@ -56,6 +56,13 @@ function getMaxBuffer(): number {
 const SCRIPT_TIMEOUT_HEADROOM_MS = 5000;
 
 /**
+ * Smallest remaining budget worth starting a retry with. Matches the one-second
+ * floor `wrapWithTimeout` applies to the in-script `with timeout`; below it the
+ * in-script guard would outlast the process timeout it is supposed to precede.
+ */
+const MIN_ATTEMPT_BUDGET_MS = 1000;
+
+/**
  * Wrap a script body in an AppleScript `with timeout` block so an Apple Event
  * that honors timeouts aborts cleanly rather than holding Notes.app's
  * single-threaded dispatch open. Set below the process timeout so the in-app
@@ -444,7 +451,17 @@ export function executeAppleScript(
       const canRetry = isTimeout || isRetryableError(errorMessage);
       const hasAttemptsLeft = attempt < maxRetries;
       const delayMs = retryDelayMs * Math.pow(2, attempt - 1);
-      const hasTimeForRetry = Date.now() + delayMs < deadline;
+      // Require enough budget left for a *meaningful* attempt, not merely a
+      // nonzero one. wrapWithTimeout floors the in-script `with timeout` at one
+      // second, so a retry starting with less than that remaining inverts the
+      // intended ordering: the in-script guard exists to abort inside Notes.app's
+      // own dispatch before Node SIGKILLs osascript (killing osascript does not
+      // stop work already handed to Notes.app). Before this guard,
+      // `{ timeoutMs: 1100, retryDelayMs: 1000 }` gave attempt 2 a 90 ms process
+      // timeout wrapped in `with timeout of 1 seconds` — process kill first,
+      // headroom defeated. Reachable on defaults whenever a transient failure
+      // lands with 1-2s of budget left.
+      const hasTimeForRetry = Date.now() + delayMs + MIN_ATTEMPT_BUDGET_MS < deadline;
 
       if (canRetry && hasAttemptsLeft && hasTimeForRetry) {
         console.error(

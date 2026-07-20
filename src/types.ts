@@ -244,7 +244,7 @@ export interface AppleScriptOptions {
    * If the operation takes longer than this, execution is aborted
    * and an error is returned. Defaults to 30000 (30 seconds).
    *
-   * Mutation safety:
+   * Recommended values:
    * - Simple queries (get single note): 10000
    * - List operations: 30000
    * - Complex searches on large collections: 60000
@@ -258,7 +258,7 @@ export interface AppleScriptOptions {
    * errors (timeout, "not responding") with exponential backoff.
    * Defaults to 2 (one retry).
    *
-   * Recommended values:
+   * Mutation safety:
    * Mutating operations override this to 1 because a timed-out write may have
    * completed in Notes.app before the response was lost.
    */

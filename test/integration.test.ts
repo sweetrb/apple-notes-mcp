@@ -133,7 +133,13 @@ describe("live Notes.app operations", { timeout: 120_000 }, () => {
 
     try {
       const hits = mgr.searchNotes(marker, false, liveAccount!);
-      expect(hits.some((n) => n.title.includes(marker))).toBe(true);
+      const hit = hits.find((n) => n.title.includes(marker));
+      expect(hit).toBeDefined();
+
+      const details = mgr.getNoteById(hit!.id);
+      expect(details).not.toBeNull();
+      expect(hit!.created).toEqual(details!.created);
+      expect(hit!.modified).toEqual(details!.modified);
     } finally {
       expect(mgr.deleteNoteById(created!.id)).toBe(true);
     }

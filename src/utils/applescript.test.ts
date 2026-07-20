@@ -347,6 +347,30 @@ describe("executeAppleScript", () => {
       expect(execOptions(1).timeout).toBe(4000);
     });
 
+    it("skips a retry that would start with under a second of budget left", () => {
+      // wrapWithTimeout floors the in-script `with timeout` at one second, so a
+      // retry with less than that remaining would be wrapped in a 1s in-script
+      // guard while its process timeout is far shorter — inverting the ordering
+      // the headroom exists to guarantee. Previously this retried with a 90ms
+      // process timeout inside `with timeout of 1 seconds`.
+      let now = 0;
+      const dateNow = vi.spyOn(Date, "now").mockImplementation(() => now);
+      mockExecFileSync.mockImplementation(() => {
+        now += 10;
+        throw new Error("Notes.app is not responding");
+      });
+
+      const result = executeAppleScript("test", {
+        timeoutMs: 1100,
+        maxRetries: 2,
+        retryDelayMs: 1000,
+      });
+      dateNow.mockRestore();
+
+      expect(result.success).toBe(false);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
+    });
+
     it("retries transient errors once by default (maxRetries=2)", () => {
       vi.stubEnv("APPLE_NOTES_MCP_RETRY_DELAY_MS", "1");
       mockExecFileSync.mockImplementation(() => {
