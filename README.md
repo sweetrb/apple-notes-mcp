@@ -362,6 +362,8 @@ Updates an existing note's content and/or title.
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
+**Returns:** Confirmation with the note's visible title and, for ID-based updates, its ID. For HTML updates, the title comes from the first rendered line of `newContent`, matching Notes.app. The response also warns if the note is shared.
+
 **Example - Using ID (recommended):**
 ```json
 {

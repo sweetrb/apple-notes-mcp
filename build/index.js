@@ -41754,6 +41754,38 @@ function strippedImagesWarning(stripped) {
   )} decoded) exceeded the per-image inline cap and ${stripped.strippedCount === 1 ? "was" : "were"} replaced with placeholders so the response stays within MCP message limits. The images are still in the note: use list-attachments with save-attachment or fetch-attachment to export them, or raise APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES.`;
 }
 
+// src/utils/noteTitle.ts
+function decodeNumericEntity(match, value, radix) {
+  const codePoint = Number.parseInt(value, radix);
+  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 1114111) {
+    return match;
+  }
+  return String.fromCodePoint(codePoint);
+}
+function decodeHtmlEntities(value) {
+  return value.replace(/&nbsp;/gi, " ").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&#(\d+);/g, (match, decimal) => decodeNumericEntity(match, decimal, 10)).replace(/&#x([\da-f]+);/gi, (match, hex) => decodeNumericEntity(match, hex, 16)).replace(/&amp;/gi, "&");
+}
+function firstRenderedHtmlLine(html) {
+  let text = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(?:div|p|h[1-6]|li)>/gi, "\n");
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== previous);
+  return decodeHtmlEntities(text).split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+}
+function resolveUpdatedNoteTitle({
+  currentTitle,
+  newTitle,
+  newContent,
+  format
+}) {
+  if (format === "html") {
+    return firstRenderedHtmlLine(newContent) ?? currentTitle;
+  }
+  return newTitle || currentTitle;
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 function runDoctor(manager) {
@@ -42385,7 +42417,7 @@ server.registerTool(
 server.registerTool(
   "update-note",
   {
-    description: "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body \u2014 it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
+    description: "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation with the note's visible title; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body \u2014 it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
     inputSchema: {
       id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Current note title (use id instead when available)"),
@@ -42418,7 +42450,12 @@ server.registerTool(
       if (!success2) {
         return errorResponse(`Failed to update note "${note2.title}"`);
       }
-      const displayTitle = newTitle || note2.title;
+      const displayTitle = resolveUpdatedNoteTitle({
+        currentTitle: note2.title,
+        newTitle,
+        newContent,
+        format
+      });
       const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
       const checklistWarning2 = detectChecklistAttempt(newContent) ?? "";
       return successResponse(`Note updated: "${displayTitle}"${sharedWarning2}${checklistWarning2}`, {
@@ -42446,7 +42483,12 @@ server.registerTool(
     if (!success) {
       return errorResponse(`Failed to update note "${title}"`);
     }
-    const finalTitle = newTitle || title;
+    const finalTitle = resolveUpdatedNoteTitle({
+      currentTitle: note.title,
+      newTitle,
+      newContent,
+      format
+    });
     const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
     const checklistWarning = detectChecklistAttempt(newContent) ?? "";
     return successResponse(`Note updated: "${finalTitle}"${sharedWarning}${checklistWarning}`, {

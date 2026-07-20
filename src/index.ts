@@ -31,6 +31,7 @@ import { getNoteMetadata } from "@/utils/noteMetadata.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
+import { resolveUpdatedNoteTitle } from "@/utils/noteTitle.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
@@ -707,7 +708,7 @@ server.registerTool(
   "update-note",
   {
     description:
-      "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
+      "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation with the note's visible title; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
     inputSchema: {
       id: z
         .string()
@@ -762,7 +763,12 @@ server.registerTool(
       if (!success) {
         return errorResponse(`Failed to update note "${note.title}"`);
       }
-      const displayTitle = newTitle || note.title;
+      const displayTitle = resolveUpdatedNoteTitle({
+        currentTitle: note.title,
+        newTitle,
+        newContent,
+        format,
+      });
       // Add collaboration warning if note is shared
       const sharedWarning = note.shared
         ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
@@ -799,7 +805,12 @@ server.registerTool(
       return errorResponse(`Failed to update note "${title}"`);
     }
 
-    const finalTitle = newTitle || title;
+    const finalTitle = resolveUpdatedNoteTitle({
+      currentTitle: note.title,
+      newTitle,
+      newContent,
+      format,
+    });
     // Add collaboration warning if note is shared
     const sharedWarning = note.shared
       ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
