@@ -205,9 +205,10 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 ## Error Handling
 
 - **"Note not found"**: Use search-notes to find similar titles
-- **"Permission denied"**: User needs to grant automation permission in System Preferences
+- **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
 - **Attachment-risk update**: Use list-attachments and avoid full-body updates unless the user accepts that embedded objects may be lost
+- **Notes accumulate blank lines after repeated updates**: Apple Notes' internal HTML processing preserves empty `<div><br></div>` artifacts from previous edits, and they persist even when you update with clean content. Fix: delete the note with delete-note and create a fresh one with create-note — the artifacts are baked into the note's internal representation, so this is more reliable than trying to fix the whitespace through updates
 
 ## Examples
 

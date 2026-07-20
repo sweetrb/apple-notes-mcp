@@ -97,7 +97,7 @@ When adding a new MCP tool:
 2. **Implement the method** in `src/services/appleNotesManager.ts`
 3. **Add type definitions** in `src/types.ts`
 4. **Write tests** in `src/services/appleNotesManager.test.ts`
-5. **Update documentation** in README.md and CHANGELOG.md
+5. **Update documentation** in README.md and CHANGELOG.md. If the skill guidance changed, edit `skills/apple-notes/SKILL.md` (the canonical copy) and run `pnpm run sync:skills` — the `codex/` and `.antigravity-plugin/` copies are generated from it and CI fails if they drift
 
 ## AppleScript Guidelines
 

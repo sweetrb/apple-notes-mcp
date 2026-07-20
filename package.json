@@ -29,6 +29,7 @@
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "typecheck": "tsc --noEmit",
+    "sync:skills": "node scripts/sync-skills.mjs",
     "version": "node scripts/sync-plugin-version.mjs && git add .claude-plugin .agents/plugins codex .hermes-plugin .antigravity-plugin",
     "prepublishOnly": "pnpm run lint && pnpm test && pnpm run build",
     "prepare": "husky; pnpm run build"

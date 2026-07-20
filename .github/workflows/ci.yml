@@ -44,6 +44,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Root skills/ is canonical; codex/skills/ and .antigravity-plugin/skills/
+      # are generated copies. Fails when they drift (fix: pnpm run sync:skills).
+      - name: Verify skill copies match skills/
+        run: node scripts/sync-skills.mjs --check
+
       - name: Run linter
         run: pnpm run lint
 
