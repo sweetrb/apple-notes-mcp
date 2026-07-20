@@ -1333,26 +1333,36 @@ export class AppleNotesManager {
     if (modifiedSince || safeLimit !== undefined) {
       const baseNotesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
 
-      // Use whose clause for date filtering (locale-safe, no sort order assumption)
+      // Date filtering compares bulk-fetched modification dates in a local
+      // loop instead of a whose clause: Notes evaluates whose filters
+      // per-note server-side, which is as slow as per-note Apple Events.
       let dateSetup = "";
-      let notesSource = baseNotesSource;
+      let hasDateFilter = false;
       if (modifiedSince) {
         const date = new Date(modifiedSince);
         if (!isNaN(date.getTime())) {
           dateSetup = buildAppleScriptDateVar(date) + "\n";
-          notesSource = `(${baseNotesSource} whose modification date >= thresholdDate)`;
+          hasDateFilter = true;
         }
       }
+      const notesSource = baseNotesSource;
 
       // Bulk-fetch names and ids as two whole-list Apple Events instead of two
       // events per note; per-note round trips scale linearly and push large
       // libraries past client tool timeouts. Dedup and limit stay in JS. (#17)
+      const dateFetch = hasDateFilter
+        ? `set noteDates to modification date of ${notesSource}\n        `
+        : "";
+      const dateGuardOpen = hasDateFilter
+        ? `if (item i of noteDates) >= thresholdDate then\n            `
+        : "";
+      const dateGuardClose = hasDateFilter ? `\n          end if` : "";
       const listCommand = `
         ${dateSetup}set noteNames to name of ${notesSource}
         set noteIds to id of ${notesSource}
-        set resultList to {}
+        ${dateFetch}set resultList to {}
         repeat with i from 1 to count of noteNames
-          set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text

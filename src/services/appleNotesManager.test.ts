@@ -1528,7 +1528,7 @@ describe("AppleNotesManager", () => {
       );
     });
 
-    it("uses whose clause when modifiedSince is provided", () => {
+    it("filters by bulk-fetched modification dates when modifiedSince is provided", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
         output: [
@@ -1540,12 +1540,14 @@ describe("AppleNotesManager", () => {
       const results = manager.listNotes(undefined, undefined, "2025-06-15T00:00:00");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      // Locale-safe: uses variable setup + whose clause (no sort order assumption)
+      // Locale-safe: variable setup + local comparison over bulk-fetched
+      // dates (whose clauses evaluate per-note server-side and are slow)
       expect(script).toContain("set thresholdDate to current date");
       expect(script).toContain("set year of thresholdDate to 2025");
       expect(script).toContain("set month of thresholdDate to 6");
       expect(script).toContain("set day of thresholdDate to 15");
-      expect(script).toContain("whose modification date >= thresholdDate");
+      expect(script).toContain("set noteDates to modification date of notes");
+      expect(script).toContain("if (item i of noteDates) >= thresholdDate then");
       expect(results).toEqual(["Recent Note 1", "Recent Note 2"]);
     });
 
@@ -1580,9 +1582,9 @@ describe("AppleNotesManager", () => {
       manager.listNotes("iCloud", "Work", "2025-01-01", 10);
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain("whose modification date >= thresholdDate");
       expect(script).toContain('notes of folder "Work"');
-      expect(script).toContain("set noteNames to name of (notes of folder");
+      expect(script).toContain('set noteDates to modification date of notes of folder "Work"');
+      expect(script).toContain('set noteNames to name of notes of folder "Work"');
     });
 
     it("returns empty array when modifiedSince yields no results", () => {

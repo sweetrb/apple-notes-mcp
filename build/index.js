@@ -39932,28 +39932,27 @@ var AppleNotesManager = class {
     if (modifiedSince || safeLimit !== void 0) {
       const baseNotesSource = folder ? `notes of ${buildFolderReference(folder)}` : "notes";
       let dateSetup = "";
-      let notesSource = baseNotesSource;
+      let hasDateFilter = false;
       if (modifiedSince) {
         const date3 = new Date(modifiedSince);
         if (!isNaN(date3.getTime())) {
           dateSetup = buildAppleScriptDateVar(date3) + "\n";
-          notesSource = `(${baseNotesSource} whose modification date >= thresholdDate)`;
+          hasDateFilter = true;
         }
       }
-      const limitCheck = safeLimit !== void 0 ? `
-            if (count of resultList) >= ${safeLimit} then exit repeat` : "";
+      const notesSource = baseNotesSource;
+      const dateFetch = hasDateFilter ? `set noteDates to modification date of ${notesSource}
+        ` : "";
+      const dateGuardOpen = hasDateFilter ? `if (item i of noteDates) >= thresholdDate then
+            ` : "";
+      const dateGuardClose = hasDateFilter ? `
+          end if` : "";
       const listCommand2 = `
-        ${dateSetup}set resultList to {}
-        set seenIds to {}
-        repeat with n in ${notesSource}
-          try
-            set noteName to name of n
-            set noteId to id of n
-            if seenIds does not contain noteId then
-              set end of seenIds to noteId
-              set end of resultList to noteName & ${AS_FIELD_SEP} & noteId${limitCheck}
-            end if
-          end try
+        ${dateSetup}set noteNames to name of ${notesSource}
+        set noteIds to id of ${notesSource}
+        ${dateFetch}set resultList to {}
+        repeat with i from 1 to count of noteNames
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
@@ -39975,22 +39974,17 @@ var AppleNotesManager = class {
         if (seenIds2.has(noteId)) continue;
         seenIds2.add(noteId);
         titles2.push(title.trim());
+        if (safeLimit !== void 0 && titles2.length >= safeLimit) break;
       }
       return titles2;
     }
     const notesRef = folder ? `notes of ${buildFolderReference(folder)}` : `notes`;
     const listCommand = `
+      set noteNames to name of ${notesRef}
+      set noteIds to id of ${notesRef}
       set resultList to {}
-      set seenIds to {}
-      repeat with n in ${notesRef}
-        try
-          set noteName to name of n
-          set noteId to id of n
-          if seenIds does not contain noteId then
-            set end of seenIds to noteId
-            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId
-          end if
-        end try
+      repeat with i from 1 to count of noteNames
+        set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
       end repeat
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
       return resultList as text
