@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.4] - 2026-07-20
+
+### Fixed
+- **`update-note` no longer reports an ignored `newTitle` as the note's title for HTML updates.** In `format: "html"` mode, Apple Notes derives the visible title from the first line of `newContent` and the manager intentionally ignores `newTitle`, but the tool response still echoed `newTitle` as though it had been applied. The response now reports the first visible HTML line (falling back to the known current title when the body has no text), and the live tool schema explicitly tells callers to put the visible title first in `newContent`.
+- Stripping `<script>`/`<style>` blocks while deriving that title is now linear rather than quadratic in document size. The pattern had no end-of-input alternative, so every *unclosed* `<script`/`<style>` scanned to EOF, failed, and backtracked — and the fixpoint loop repeated that. Measured on inputs of many unclosed blocks: 211 KB 63 ms, 422 KB 247 ms, 844 KB 1039 ms (quadratic), against a 5 MiB accepted-content ceiling. Now 0–2 ms across the same inputs. Unclosed blocks are also now consumed to end-of-input, which is what browsers do and prevents a truncated leading `<style>` from contributing its CSS to the reported title.
+
 ## [2.6.3] - 2026-07-20
 
 ### Fixed

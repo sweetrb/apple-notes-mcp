@@ -31,6 +31,7 @@ import { getNoteMetadata } from "@/utils/noteMetadata.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
+import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
@@ -719,7 +720,13 @@ server.registerTool(
         .max(MAX.TITLE)
         .optional()
         .describe("Current note title (use id instead when available)"),
-      newTitle: z.string().max(MAX.TITLE).optional().describe("New title for the note"),
+      newTitle: z
+        .string()
+        .max(MAX.TITLE)
+        .optional()
+        .describe(
+          "New title for plaintext updates. Ignored when format is 'html'; include the visible title as the first line of newContent instead."
+        ),
       newContent: z
         .string()
         .min(1, "New content is required")
@@ -762,7 +769,7 @@ server.registerTool(
       if (!success) {
         return errorResponse(`Failed to update note "${note.title}"`);
       }
-      const displayTitle = newTitle || note.title;
+      const displayTitle = resolveUpdateResponseTitle(note.title, newTitle, format, newContent);
       // Add collaboration warning if note is shared
       const sharedWarning = note.shared
         ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
@@ -799,7 +806,7 @@ server.registerTool(
       return errorResponse(`Failed to update note "${title}"`);
     }
 
-    const finalTitle = newTitle || title;
+    const finalTitle = resolveUpdateResponseTitle(note.title, newTitle, format, newContent);
     // Add collaboration warning if note is shared
     const sharedWarning = note.shared
       ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
