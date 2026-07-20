@@ -41754,6 +41754,12 @@ function strippedImagesWarning(stripped) {
   )} decoded) exceeded the per-image inline cap and ${stripped.strippedCount === 1 ? "was" : "were"} replaced with placeholders so the response stays within MCP message limits. The images are still in the note: use list-attachments with save-attachment or fetch-attachment to export them, or raise APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES.`;
 }
 
+// src/utils/updateResponseTitle.ts
+function resolveUpdateResponseTitle(currentTitle, newTitle, format) {
+  if (format === "html") return currentTitle;
+  return newTitle || currentTitle;
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 function runDoctor(manager) {
@@ -42389,7 +42395,9 @@ server.registerTool(
     inputSchema: {
       id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Current note title (use id instead when available)"),
-      newTitle: external_exports.string().max(MAX.TITLE).optional().describe("New title for the note"),
+      newTitle: external_exports.string().max(MAX.TITLE).optional().describe(
+        "New title for plaintext updates. Ignored when format is 'html'; include the visible title as the first line of newContent instead."
+      ),
       newContent: external_exports.string().min(1, "New content is required").max(MAX.CONTENT).describe(
         "New note body. AppleScript cannot produce true Apple Notes checklists; checkbox inputs and `- [ ]` markdown do not render as checkable items. Use a plain list and convert in Notes.app with \u21E7\u2318L."
       ),
@@ -42418,7 +42426,7 @@ server.registerTool(
       if (!success2) {
         return errorResponse(`Failed to update note "${note2.title}"`);
       }
-      const displayTitle = newTitle || note2.title;
+      const displayTitle = resolveUpdateResponseTitle(note2.title, newTitle, format);
       const sharedWarning2 = note2.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
       const checklistWarning2 = detectChecklistAttempt(newContent) ?? "";
       return successResponse(`Note updated: "${displayTitle}"${sharedWarning2}${checklistWarning2}`, {
@@ -42446,7 +42454,7 @@ server.registerTool(
     if (!success) {
       return errorResponse(`Failed to update note "${title}"`);
     }
-    const finalTitle = newTitle || title;
+    const finalTitle = resolveUpdateResponseTitle(note.title, newTitle, format);
     const sharedWarning = note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes will be visible to them." : "";
     const checklistWarning = detectChecklistAttempt(newContent) ?? "";
     return successResponse(`Note updated: "${finalTitle}"${sharedWarning}${checklistWarning}`, {
