@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.3] - 2026-07-20
+
+### Fixed
+- **`search-notes` now returns each result's real creation and modification timestamps.** Search results previously filled both fields with the current time, making unrelated notes appear to have been created and modified when the search ran. The search AppleScript now emits locale-independent date components for each match and the manager parses those values into the structured response.
+- Each date read in the search loop is individually guarded with an `on error` fallback, matching the adjacent folder-name read. Without it a note whose `creation date`/`modification date` property throws would be dropped from the results entirely — and, because its ID was already recorded for deduplication, any later reference to that note would be suppressed too. The fallback degrades to the previous behaviour (current time) for that one field instead.
+
 ## [2.6.2] - 2026-07-20
 ### Changed
 - CI/release hardening: `version-guard` now treats the committed `build/` bundle as shipped bytes (closing the lockfile-only and devDep silent-never-publish vectors) with an npm version-collision check; `publish.yml` gained a daily self-healing watchdog, manual dispatch, exact-version skip, CI-validated-commit checkout, and GitHub-Release self-heal; Dependabot bundle rebuilds now auto-bump a patch version; CI boots the committed bundle standalone on Node 20 every run; the bundle is now built with `--target=node20`, making the `engines.node >= 20` claim enforced at build time.
