@@ -39943,7 +39943,10 @@ var AppleNotesManager = class {
    * index — a mid-listing mutation would otherwise silently mispair names and
    * ids (grow) or read past the end of a list (shrink). On mismatch the
    * script raises BULK_LIST_MUTATION_ERROR, which executeAppleScript treats
-   * as retryable, re-running the whole script on a fresh snapshot.
+   * as retryable, re-running the whole script on a fresh snapshot. A length
+   * check cannot see an exactly-offsetting delete+create landing in the
+   * milliseconds between two fetches; that residual window is accepted —
+   * closing it would cost an extra whole-list fetch per listing.
    *
    * @param folderRef - Optional AppleScript folder reference to scope to
    * @param dateSetup - AppleScript defining thresholdDate; enables date filtering
@@ -39967,8 +39970,12 @@ var AppleNotesManager = class {
           try
             set noteNames to name of ${slicedSource}
             set noteIds to id of ${slicedSource}
-          on error
-            error "${BULK_LIST_MUTATION_ERROR}"
+          on error errMsg number errNum
+            if errNum is -1719 or errNum is -1728 then
+              error "${BULK_LIST_MUTATION_ERROR}"
+            else
+              error errMsg number errNum
+            end if
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames

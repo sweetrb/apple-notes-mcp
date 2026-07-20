@@ -1333,7 +1333,10 @@ export class AppleNotesManager {
    * index — a mid-listing mutation would otherwise silently mispair names and
    * ids (grow) or read past the end of a list (shrink). On mismatch the
    * script raises BULK_LIST_MUTATION_ERROR, which executeAppleScript treats
-   * as retryable, re-running the whole script on a fresh snapshot.
+   * as retryable, re-running the whole script on a fresh snapshot. A length
+   * check cannot see an exactly-offsetting delete+create landing in the
+   * milliseconds between two fetches; that residual window is accepted —
+   * closing it would cost an extra whole-list fetch per listing.
    *
    * @param folderRef - Optional AppleScript folder reference to scope to
    * @param dateSetup - AppleScript defining thresholdDate; enables date filtering
@@ -1356,8 +1359,11 @@ export class AppleNotesManager {
       // Bounded, unfiltered listing: fetch only the first sliceLimit notes so
       // small limits stay O(limit) instead of O(library). The slice range is
       // clamped to the live count, but the collection can still shrink between
-      // the count and the fetch — that raises inside the try and is remapped
-      // to the retryable mutation error. (#86)
+      // the count and the fetch — Notes then raises -1719 "Invalid index"
+      // (empirically; -1728 "no such object" guards the same class), which is
+      // remapped to the retryable mutation error. Every other error number
+      // (AppleEvent timeout -1712, lost connection, permissions) is rethrown
+      // unchanged so its honest message and mapping survive. (#86)
       const slicedSource = folderRef
         ? `(notes 1 thru fetchCount of ${folderRef})`
         : `(notes 1 thru fetchCount)`;
@@ -1370,8 +1376,12 @@ export class AppleNotesManager {
           try
             set noteNames to name of ${slicedSource}
             set noteIds to id of ${slicedSource}
-          on error
-            error "${BULK_LIST_MUTATION_ERROR}"
+          on error errMsg number errNum
+            if errNum is -1719 or errNum is -1728 then
+              error "${BULK_LIST_MUTATION_ERROR}"
+            else
+              error errMsg number errNum
+            end if
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames

@@ -1682,14 +1682,19 @@ describe("AppleNotesManager", () => {
         'if (count of noteDates) is not (count of noteNames) then error "Notes changed during listing"'
       );
 
-      // Sliced fetch guards and remaps a shrink between count and fetch.
+      // Sliced fetch guards and remaps a shrink between count and fetch —
+      // but ONLY the out-of-range error numbers. Timeouts (-1712), lost
+      // connection, and permission errors must be rethrown unchanged so
+      // their honest messages and remedies survive.
       manager.listNotes(undefined, undefined, undefined, 3);
       const sliceScript = mockExecuteAppleScript.mock.calls[2][0];
       expect(sliceScript).toContain(
         'if (count of noteIds) is not (count of noteNames) then error "Notes changed during listing"'
       );
+      expect(sliceScript).toContain("on error errMsg number errNum");
+      expect(sliceScript).toContain("if errNum is -1719 or errNum is -1728 then");
       expect(sliceScript).toContain('error "Notes changed during listing"');
-      expect(sliceScript).toContain("on error");
+      expect(sliceScript).toContain("error errMsg number errNum");
     });
 
     it("combines folder, modifiedSince, and limit", () => {
