@@ -39565,12 +39565,14 @@ var AppleNotesManager = class {
           set noteId to id of n
           if seenIds does not contain noteId then
             set end of seenIds to noteId
+            set noteCreated to creation date of n
+            set noteModified to modification date of n
             try
               set noteFolder to name of container of n
             on error
               set noteFolder to "Notes"
             end try
-            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder${limitCheck}
+            set end of resultList to noteName & ${AS_FIELD_SEP} & noteId & ${AS_FIELD_SEP} & noteFolder & ${AS_FIELD_SEP} & ${asDatePartsExpr("noteCreated")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("noteModified")}${limitCheck}
           end if
         end try
       end repeat
@@ -39589,7 +39591,7 @@ var AppleNotesManager = class {
     const notes = [];
     const seenIds = /* @__PURE__ */ new Set();
     for (const item of items) {
-      const [title, id, folder2] = item.split(FIELD_SEP);
+      const [title, id, folder2, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
@@ -39600,8 +39602,8 @@ var AppleNotesManager = class {
         content: "",
         // Not fetched in search
         tags: [],
-        created: /* @__PURE__ */ new Date(),
-        modified: /* @__PURE__ */ new Date(),
+        created: parseAppleScriptDate(created ?? ""),
+        modified: parseAppleScriptDate(modified ?? ""),
         folder: folder2?.trim(),
         account: targetAccount
       });
