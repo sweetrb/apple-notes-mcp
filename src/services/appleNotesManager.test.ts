@@ -713,6 +713,20 @@ describe("AppleNotesManager", () => {
       expect(results[2].folder).toBe("Archive");
     });
 
+    it("dereferences the note container before reading its folder name", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["Meeting Notes", "x-coredata://ABC/ICNote/p1", "Work"].join(F),
+      });
+
+      manager.searchNotes("meeting");
+
+      const script = mockExecuteAppleScript.mock.calls[0][0] as string;
+      expect(script).toContain("set noteContainer to container of n");
+      expect(script).toContain("set noteFolder to name of noteContainer");
+      expect(script).not.toContain("set noteFolder to name of container of n");
+    });
+
     it("returns actual creation and modification timestamps", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,

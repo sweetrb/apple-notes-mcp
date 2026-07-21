@@ -39585,7 +39585,8 @@ var AppleNotesManager = class {
               set modifiedParts to ""
             end try
             try
-              set noteFolder to name of container of n
+              set noteContainer to container of n
+              set noteFolder to name of noteContainer
             on error
               set noteFolder to "Notes"
             end try

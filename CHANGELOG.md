@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.8] - 2026-07-21
+
+### Fixed
+- **`search-notes` now reports the note's actual folder instead of falling back to `Notes`.** Notes.app does not resolve `name of container of n` as one chained AppleScript expression, so the lookup threw and every result used the fallback even when the note was in a nested folder or Recently Deleted. The script now captures the container first, then reads its name.
+
 ## [2.6.7] - 2026-07-21
 
 ### Fixed
