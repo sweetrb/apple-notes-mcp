@@ -12,6 +12,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   AppleNotesManager,
   escapeForAppleScript,
@@ -2910,6 +2913,30 @@ describe("AppleNotesManager", () => {
 
       expect(attachments[0].name).not.toBe("missing value");
       expect(attachments[0].name).toBe("cid:abc");
+    });
+
+    it("leaves an unnamed saved attachment's name undefined rather than the sentinel", () => {
+      // save-attachment/fetch-attachment render `r.name ?? "attachment"`, and `??`
+      // does not catch the literal string -- so this must be undefined, not passed
+      // through, or the response reads `Saved "missing value" to ...`.
+      // AppleScript is mocked, so stand in for the file Notes would have written
+      // (the manager verifies a non-empty file landed before reporting success).
+      const dest = join(tmpdir(), `apple-notes-mcp-test-${process.pid}.bin`);
+      writeFileSync(dest, "x");
+      try {
+        mockExecuteAppleScript.mockReturnValueOnce({
+          success: true,
+          output: `OK${F}missing value${F}missing value`,
+        });
+
+        const saved = manager.saveAttachmentById("x-coredata://ABC/ICNote/p1", "att-1", dest);
+
+        expect(saved.success).toBe(true);
+        expect(saved.name).toBeUndefined();
+        expect(saved.contentType).toBeUndefined();
+      } finally {
+        rmSync(dest, { force: true });
+      }
     });
   });
 

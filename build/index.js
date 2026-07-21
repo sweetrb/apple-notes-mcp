@@ -41099,8 +41099,11 @@ var AppleNotesManager = class {
     return {
       success: true,
       savedPath: abs,
-      name: parts[1]?.trim(),
-      contentType: parts[2]?.trim()
+      // Unnamed attachments render as the AppleScript sentinel here too; leaving it
+      // undefined lets save-attachment/fetch-attachment fall back to "attachment"
+      // rather than reporting `Saved "missing value"`.
+      name: normalizeAppleScriptText(parts[1]),
+      contentType: normalizeAppleScriptText(parts[2])
     };
   }
   /**
