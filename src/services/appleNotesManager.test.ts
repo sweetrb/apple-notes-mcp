@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -2921,7 +2921,10 @@ describe("AppleNotesManager", () => {
       // through, or the response reads `Saved "missing value" to ...`.
       // AppleScript is mocked, so stand in for the file Notes would have written
       // (the manager verifies a non-empty file landed before reporting success).
-      const dest = join(tmpdir(), `apple-notes-mcp-test-${process.pid}.bin`);
+      // mkdtemp, not a predictable name in the shared temp dir: a guessable path
+      // there is a symlink-race vector (CodeQL js/insecure-temporary-file).
+      const dir = mkdtempSync(join(tmpdir(), "apple-notes-mcp-test-"));
+      const dest = join(dir, "attachment.bin");
       writeFileSync(dest, "x");
       try {
         mockExecuteAppleScript.mockReturnValueOnce({
@@ -2935,7 +2938,7 @@ describe("AppleNotesManager", () => {
         expect(saved.name).toBeUndefined();
         expect(saved.contentType).toBeUndefined();
       } finally {
-        rmSync(dest, { force: true });
+        rmSync(dir, { recursive: true, force: true });
       }
     });
   });
