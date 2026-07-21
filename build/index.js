@@ -40622,12 +40622,9 @@ var AppleNotesManager = class {
       tell application "Notes"
         set theNote to note id "${safeNoteId}"
         set theAttachment to missing value
-        repeat with a in attachments of theNote
-          if (id of a as text) is "${safeAttId}" then
-            set theAttachment to a
-            exit repeat
-          end if
-        end repeat
+        try
+          set theAttachment to attachment id "${safeAttId}" of theNote
+        end try
         if theAttachment is missing value then
           return "ERR" & ${AS_FIELD_SEP} & "attachment not found"
         end if
@@ -40934,7 +40931,10 @@ var AppleNotesManager = class {
       if (parts.length >= 3) {
         attachments.push({
           id: parts[0].trim(),
-          name: parts[1].trim(),
+          // Unnamed attachments render `name` as the AppleScript sentinel; surfacing
+          // the literal "missing value" as a filename is worse than saying nothing,
+          // and `name` is a required string, so fall back to the content identifier.
+          name: normalizeAppleScriptText(parts[1]) ?? normalizeAppleScriptText(parts[2]) ?? "",
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || void 0,
           url: normalizeAppleScriptText(parts[3]),
@@ -41018,7 +41018,10 @@ var AppleNotesManager = class {
       if (parts.length >= 3) {
         attachments.push({
           id: parts[0].trim(),
-          name: parts[1].trim(),
+          // Unnamed attachments render `name` as the AppleScript sentinel; surfacing
+          // the literal "missing value" as a filename is worse than saying nothing,
+          // and `name` is a required string, so fall back to the content identifier.
+          name: normalizeAppleScriptText(parts[1]) ?? normalizeAppleScriptText(parts[2]) ?? "",
           contentType: parts[2].trim(),
           contentId: parts[2].trim() || void 0,
           url: normalizeAppleScriptText(parts[3]),
@@ -41054,12 +41057,9 @@ var AppleNotesManager = class {
       tell application "Notes"
         set theNote to note id "${safeNoteId}"
         set theAttachment to missing value
-        repeat with a in attachments of theNote
-          if (id of a as text) is "${safeAttId}" then
-            set theAttachment to a
-            exit repeat
-          end if
-        end repeat
+        try
+          set theAttachment to attachment id "${safeAttId}" of theNote
+        end try
         if theAttachment is missing value then
           return "ERR" & ${AS_FIELD_SEP} & "attachment not found"
         end if

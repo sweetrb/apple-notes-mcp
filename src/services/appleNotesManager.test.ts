@@ -2431,7 +2431,10 @@ describe("AppleNotesManager", () => {
       expect(manager.showAttachmentById("x-coredata://ABC/ICNote/p1", "att-123")).toBe(true);
       const script = mockExecuteAppleScript.mock.calls[0][0] as string;
       expect(script).toContain('set theNote to note id "x-coredata://ABC/ICNote/p1"');
-      expect(script).toContain('is "att-123"');
+      // Addressed directly rather than scanned for: one Apple Event instead of up
+      // to N, and still scoped to theNote (a foreign id resolves to missing value).
+      expect(script).toContain('set theAttachment to attachment id "att-123" of theNote');
+      expect(script).not.toContain("repeat with a in attachments of theNote");
       expect(script).toContain("show theAttachment");
     });
 
@@ -2884,6 +2887,29 @@ describe("AppleNotesManager", () => {
       mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
 
       expect(manager.listAttachmentsById("x-coredata://ABC/ICNote/p123")).toEqual([]);
+    });
+
+    it("does not surface the literal 'missing value' as an attachment name", () => {
+      // Notes leaves `name` unset on some attachments; `name of a as text` then
+      // renders the AppleScript sentinel, which previously reached callers as a
+      // filename (`- missing value (cid:abc)`).
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: [
+          "x-coredata://ABC/ICAttachment/p1",
+          "missing value",
+          "cid:abc",
+          "missing value",
+          "2026-7-5-22-7-39",
+          "2026-7-5-22-7-39",
+          "false",
+        ].join(F),
+      });
+
+      const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
+
+      expect(attachments[0].name).not.toBe("missing value");
+      expect(attachments[0].name).toBe("cid:abc");
     });
   });
 

@@ -516,7 +516,7 @@ export interface HealthCheckResult {
  * const attachment: Attachment = {
  *   id: "x-coredata://ABC/ICAttachment/p1",
  *   name: "photo.jpg",
- *   contentType: "public.jpeg"
+ *   contentType: "cid:1A2B3C@icloud.apple.com"
  * };
  * ```
  */
@@ -524,10 +524,19 @@ export interface Attachment {
   /** Unique identifier for the attachment */
   id: string;
 
-  /** Filename of the attachment */
+  /**
+   * Filename of the attachment. Empty when Notes reports no name and no content
+   * identifier is available — never the literal string "missing value".
+   */
   name: string;
 
-  /** UTI (Uniform Type Identifier) of the attachment, e.g., "public.jpeg" */
+  /**
+   * Content identifier of the attachment, e.g. "cid:1A2B3C@icloud.apple.com".
+   *
+   * Despite the field name this is NOT a UTI — Notes' AppleScript dictionary
+   * exposes no MIME type or UTI for attachments, so this mirrors {@link contentId}.
+   * Kept for backwards compatibility with existing consumers.
+   */
   contentType: string;
 
   /** Content-id URL used in the note's HTML body. */
