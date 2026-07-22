@@ -32,6 +32,7 @@ import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
 import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
+import { resolveSearchLimit, describeSearchLimit } from "@/utils/searchLimit.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
@@ -245,7 +246,14 @@ server.registerTool(
         .describe(
           "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for searching only recent notes in large collections."
         ),
-      limit: z.number().int().positive().optional().describe("Maximum number of results to return"),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          "Maximum number of results to return. Defaults to 50 — a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
+        ),
     },
     outputSchema: {
       notes: z.array(z.object({}).passthrough()).optional(),
@@ -253,19 +261,30 @@ server.registerTool(
     },
   },
   withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
+    // Default the result cap so a broad query returns useful results instead of a
+    // timeout error: search-notes reads several properties per match via AppleScript
+    // (~200ms/note), so an unbounded search over hundreds of matches exceeds the 30s
+    // budget (#100). The applied cap is disclosed below so truncation is visible.
+    const effectiveLimit = resolveSearchLimit(limit);
+    const limitWasDefault = limit === undefined;
+
     // Use sync-aware wrapper for this read operation
     const {
       result: notes,
       syncBefore,
       syncInterference,
     } = withSyncAwarenessSync("search-notes", () =>
-      notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, limit)
+      notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, effectiveLimit)
     );
 
     const searchType = searchContent ? "content" : "titles";
     const folderInfo = folder ? ` in folder "${folder}"` : "";
     const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const limitInfo = limit ? ` (limit: ${limit})` : "";
+    const { info: limitInfo, truncationNote } = describeSearchLimit(
+      effectiveLimit,
+      limitWasDefault,
+      notes.length
+    );
 
     // Build sync warning if needed
     const syncWarnings: string[] = [];
@@ -298,7 +317,7 @@ server.registerTool(
       .join("\n");
 
     return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${syncNote}`,
+      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${syncNote}`,
       { notes, count: notes.length }
     );
   }, "Error searching notes")

@@ -134,7 +134,7 @@ This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move
 - Searches are case-insensitive
 - Results include note IDs for reliable subsequent operations
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes — useful for large collections
-- Use `limit` to cap the number of results returned
+- Use `limit` to cap the number of results returned. **`limit` defaults to 50** — a broad query (e.g. a single common letter) reads several properties per match via AppleScript, so an unbounded search over hundreds of matches times out; the default keeps it useful. The response discloses the applied limit and warns when results were truncated — pass a higher `limit`, or narrow with `folder`/`modifiedSince`, to see more.
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 
 ### list-notes

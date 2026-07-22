@@ -211,7 +211,7 @@ Searches for notes by title or content.
 | `account` | string | No | Account to search in (defaults to iCloud) |
 | `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
-| `limit` | number | No | Maximum number of results to return |
+| `limit` | number | No | Maximum number of results to return. **Defaults to 50** — a broad query reads several properties per match via AppleScript (~200ms/note), so an unbounded search over hundreds of matches can exceed Notes' 30s timeout and return an error instead of results. Pass a higher value to see more; the applied limit (and whether it truncated the results) is disclosed in the response. |
 
 **Example - Search titles:**
 ```json

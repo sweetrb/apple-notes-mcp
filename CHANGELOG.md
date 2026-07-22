@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.9] - 2026-07-22
+
+### Changed
+- **`search-notes` now defaults `limit` to 50 instead of returning everything.** A broad query reads several properties per match via AppleScript (~200ms/note on an iCloud library), so an unbounded search over hundreds of matches — e.g. `"a"` matching 256 titles on a 340-note library — exceeded Notes' 30s timeout and returned an *error* rather than any results (#100). The tool now caps at 50 by default; the summary line discloses the applied limit (`(limit: 50, default)`) and, when the result hits the cap, appends a hint that there may be more and how to widen it (higher `limit`, or `folder`/`modifiedSince`). Callers that pass an explicit `limit` are unaffected. This is a public contract change: an unqualified `search-notes` now returns at most 50 matches instead of all of them.
+
 ## [2.6.8] - 2026-07-21
 
 ### Fixed

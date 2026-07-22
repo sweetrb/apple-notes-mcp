@@ -41849,6 +41849,22 @@ function resolveUpdateResponseTitle(currentTitle, newTitle, format, newContent) 
   return newTitle || currentTitle;
 }
 
+// src/utils/searchLimit.ts
+var DEFAULT_SEARCH_LIMIT = 50;
+function resolveSearchLimit(limit) {
+  if (limit !== void 0 && Number.isFinite(limit) && limit > 0) {
+    return Math.floor(limit);
+  }
+  return DEFAULT_SEARCH_LIMIT;
+}
+function describeSearchLimit(effectiveLimit, wasDefault, resultCount) {
+  const info = ` (limit: ${effectiveLimit}${wasDefault ? ", default" : ""})`;
+  const truncationNote = resultCount >= effectiveLimit ? `
+
+\u2139\uFE0F Showing the first ${effectiveLimit}${wasDefault ? " (default limit)" : ""}; there may be more. Narrow the query, filter with \`folder\`/\`modifiedSince\`, or pass a higher \`limit\` to see additional matches.` : "";
+  return { info, truncationNote };
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 function runDoctor(manager) {
@@ -42130,7 +42146,9 @@ server.registerTool(
       modifiedSince: external_exports.string().max(64).optional().describe(
         "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for searching only recent notes in large collections."
       ),
-      limit: external_exports.number().int().positive().optional().describe("Maximum number of results to return")
+      limit: external_exports.number().int().positive().optional().describe(
+        "Maximum number of results to return. Defaults to 50 \u2014 a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
+      )
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
@@ -42138,18 +42156,24 @@ server.registerTool(
     }
   },
   withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
+    const effectiveLimit = resolveSearchLimit(limit);
+    const limitWasDefault = limit === void 0;
     const {
       result: notes,
       syncBefore,
       syncInterference
     } = withSyncAwarenessSync(
       "search-notes",
-      () => notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, limit)
+      () => notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, effectiveLimit)
     );
     const searchType = searchContent ? "content" : "titles";
     const folderInfo = folder ? ` in folder "${folder}"` : "";
     const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const limitInfo = limit ? ` (limit: ${limit})` : "";
+    const { info: limitInfo, truncationNote } = describeSearchLimit(
+      effectiveLimit,
+      limitWasDefault,
+      notes.length
+    );
     const syncWarnings = [];
     if (syncBefore.syncDetected) {
       syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
@@ -42177,7 +42201,7 @@ ${syncWarnings.join(" ")}` : "";
     }).join("\n");
     return successResponse(
       `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${syncNote}`,
+${noteList}${truncationNote}${syncNote}`,
       { notes, count: notes.length }
     );
   }, "Error searching notes")
