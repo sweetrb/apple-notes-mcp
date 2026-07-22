@@ -45,11 +45,12 @@ jobs:
   publish:
     runs-on: macos-latest
     if: >
-      (github.event_name == 'release') ||
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
-        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
+      github.repository_owner == 'sweetrb' &&
+      ((github.event_name == 'release') ||
+       (github.event_name == 'workflow_dispatch') ||
+       (github.event_name == 'schedule') ||
+       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+         (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
     permissions:
       id-token: write
       contents: write
