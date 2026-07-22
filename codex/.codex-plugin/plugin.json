@@ -1,6 +1,6 @@
 {
   "name": "apple-notes",
-  "version": "2.6.9",
+  "version": "2.6.10",
   "description": "Manage Apple Notes through natural language - create, search, read, update, delete, organize folders, inspect metadata, run diagnostics, and work with attachments (macOS only).",
   "author": {
     "name": "Rob Sweet",

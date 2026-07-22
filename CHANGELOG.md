@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Override the MCP SDK's transitive `@hono/node-server` and `fast-uri` dependencies to patched releases. This clears the path-traversal advisory in Hono's static file serving and the host-confusion advisories in `fast-uri` while the SDK's own dependency ranges still resolve vulnerable versions.
+
 ## [2.6.9] - 2026-07-22
 
 ### Changed

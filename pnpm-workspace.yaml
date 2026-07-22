@@ -10,3 +10,10 @@ allowBuilds:
 # Pin pnpm 11's supply-chain minimum-release-age default explicitly (1440 min = 1 day)
 # so it is documented and stable across pnpm upgrades. See https://pnpm.io/supply-chain-security.
 minimumReleaseAge: 1440
+
+# The MCP SDK currently caps these transitive dependencies below their first
+# fully patched releases. Keep the overrides until the SDK's ranges move past
+# these security fixes.
+overrides:
+  "@hono/node-server": 2.0.10
+  fast-uri: 3.1.4

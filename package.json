@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.6.9",
+  "version": "2.6.10",
   "packageManager": "pnpm@11.9.0",
   "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and other AI assistants",
   "type": "module",
