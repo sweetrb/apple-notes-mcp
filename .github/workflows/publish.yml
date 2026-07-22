@@ -45,7 +45,7 @@ jobs:
   publish:
     runs-on: macos-latest
     if: >
-      github.repository == 'sweetrb/apple-notes-mcp' &&
+      github.repository_owner == 'sweetrb' &&
       ((github.event_name == 'release') ||
        (github.event_name == 'workflow_dispatch') ||
        (github.event_name == 'schedule') ||
