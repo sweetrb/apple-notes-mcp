@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Dependabot auto-bump silently stopped staging its own changes.** `dependabot-rebuild.yml`'s bump step writes the patch version, syncs the plugin manifests and prepends a CHANGELOG entry, then staged them with `git add package.json CHANGELOG.md build .claude-plugin .agents codex .hermes-plugin .antigravity-plugin`. Once `.hermes-plugin/` was removed that pathspec matched nothing, and `git add` is all-or-nothing — it exited 128 and staged **none** of the others, with `2>/dev/null || true` hiding the failure. The following step re-adds only `build/`, so a Dependabot PR would have committed a rebuilt bundle with no version bump and no changelog entry, failing `require-version-bump` and blocking the automation that is meant to run without a human. Dropped the stale path, and dropped the error suppression so a future missing path fails loudly instead of silently skipping the bump.
+
 ### Removed
 - **`.hermes-plugin/` packaging docs** (`README.md`, `config.yaml`). Hermes Agent has no plugin/marketplace drop-in, so a directory of manifest-looking files was easy to misread as an installable package. The setup it documented is not lost — the `hermes mcp add` command, the `~/.hermes/config.yaml` `mcp_servers:` snippet, and the restart note now live inline in the README's "Other Hosts" section. Matches apple-mail-mcp#116, keeping multi-host packaging parity across the four Apple MCP servers. No effect on the published package: `.hermes-plugin/` was never in `package.json` `files[]`.
 

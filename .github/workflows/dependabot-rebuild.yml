@@ -240,7 +240,7 @@ jobs:
             fs.writeFileSync("CHANGELOG.md", cl.slice(0, at) + "\n\n" + entry + "\n" + rest);
             console.log("Prepended CHANGELOG entry for " + v);
           '
-          git add package.json CHANGELOG.md build .claude-plugin .agents codex .hermes-plugin .antigravity-plugin 2>/dev/null || true
+          git add package.json CHANGELOG.md build .claude-plugin .agents codex .antigravity-plugin
 
       - name: Commit and push the rebuilt bundle
         if: needs.rebuild.outputs.changed == 'true'
