@@ -1,8 +1,7 @@
 // Root skills/ is the canonical copy; the per-surface duplicates
 // (codex/skills/, .antigravity-plugin/skills/) are generated from it and must
 // never be edited directly. (.agents/plugins/marketplace.json sources ./codex,
-// and .hermes-plugin carries no skill copy — syncing codex covers every other
-// surface.)
+// so syncing codex covers every other surface.)
 //
 //   node scripts/sync-skills.mjs          overwrite the copies from skills/
 //   node scripts/sync-skills.mjs --check  exit 1 on any drift (CI gate)
