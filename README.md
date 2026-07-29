@@ -71,9 +71,24 @@ The Codex plugin runs the published `apple-notes-mcp` server through `npx` and s
 
 ### Other Hosts (Hermes, Antigravity)
 
-Configuration for two more hosts is included — each registers the same `apple-notes` MCP server (`npx -y apple-notes-mcp`):
+Two more hosts can run the same `apple-notes` MCP server (`npx -y apple-notes-mcp`):
 
-- **[Hermes Agent](https://hermes-agent.nousresearch.com/)** (NousResearch) — Hermes has no plugin/marketplace drop-in. Add the server with `hermes mcp add apple-notes --command npx --args -y apple-notes-mcp`, or merge [`.hermes-plugin/config.yaml`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.hermes-plugin/config.yaml) into `~/.hermes/config.yaml`. Details: [`.hermes-plugin/README.md`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.hermes-plugin/README.md).
+- **[Hermes Agent](https://hermes-agent.nousresearch.com/)** (NousResearch) — Hermes has no plugin/marketplace drop-in, so there is nothing in this repo to install from. Register the server with the CLI:
+
+  ```bash
+  hermes mcp add apple-notes --command npx --args -y apple-notes-mcp
+  ```
+
+  Or add it to `~/.hermes/config.yaml` by hand:
+
+  ```yaml
+  mcp_servers:
+    apple-notes:
+      command: npx
+      args: ["-y", "apple-notes-mcp"]
+  ```
+
+  Restart your Hermes session afterward so the tools load.
 - **[Antigravity](https://antigravity.google/)** (Google) — add the server entry from [`.antigravity-plugin/mcp_config.json`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.antigravity-plugin/mcp_config.json) to `~/.gemini/config/mcp_config.json` (or via Antigravity's MCP settings).
 
 ### Using Claude Desktop
