@@ -2,13 +2,13 @@ name: version-guard
 
 # Fail any PR to main that changes SHIPPED BYTES without bumping package.json's
 # version. Shipped bytes = the committed esbuild bundle under build/** (it IS
-# what npm and marketplace users run), plus src/** (non-test) and
-# requirements.txt as first-cause detectors with better error messages, plus
-# the RUNTIME `dependencies` map in package.json. build/** was added
-# 2026-07-20: it subsumes every cause that changes what users receive — direct
-# deps, lockfile-only transitive bumps, and esbuild codegen changes — none of
-# which the src/deps detectors could see (a lockfile-only runtime-dep bump
-# merged un-bumped on 2026-07-15 and sat unshipped for two days).
+# what npm and marketplace users run), plus the files package.json `files[]`
+# ships verbatim (requirements.txt and the src/**/*.py sidecars), plus the
+# RUNTIME `dependencies` map in package.json. build/** was added 2026-07-20:
+# it subsumes every cause that changes what users receive — direct deps,
+# lockfile-only transitive bumps, and esbuild codegen changes — none of which
+# the src/deps detectors could see (a lockfile-only runtime-dep bump merged
+# un-bumped on 2026-07-15 and sat unshipped for two days).
 # Docs-only, test-only, and github-actions changes stay exempt; byte-neutral
 # devDependency bumps stay exempt because they leave build/ untouched.
 # Rationale: publish.yml only publishes when the version is absent from npm,
@@ -16,6 +16,21 @@ name: version-guard
 # makes the bump mandatory; dependabot-rebuild.yml auto-bumps bot PRs whose
 # rebuilt bundle changed, so Dependabot automation keeps flowing.
 # The guard file itself lives in .github/ (doesn't ship), so it needs no bump.
+#
+# TypeScript under src/ is a FIRST-CAUSE DETECTOR, not a shipped file: it
+# reaches users only after esbuild inlines it into build/index.js. So it only
+# implies a bump when build/** changed too — a src/**/*.ts edit that leaves the
+# committed bundle byte-identical (comments, formatting, types) ships nothing
+# and owes no version. That is safe because ci.yml's "Verify committed build/
+# matches source" step rebuilds and requires `git diff --quiet build/`, and it
+# runs in the `test` job whose `test (22)`/`test (24)` contexts are REQUIRED by
+# branch protection — so at merge time an unchanged build/ provably matches
+# src/. Keep that step and its required contexts, or this exemption loses its
+# proof (conformance-check.sh asserts both).
+# Everything else under src/ (the .py sidecars, which package.json ships
+# verbatim rather than bundling) stays an unconditional detector, and the rule
+# is written fail-safe: only `.ts` is treated as bundle-only, so any new file
+# type added under src/ defaults to requiring a bump.
 
 on:
   pull_request:
@@ -57,12 +72,29 @@ jobs:
           changed="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
           echo "Changed files:"; printf '%s\n' "$changed" | sed 's/^/  /'
 
-          # Shipped bytes: the committed bundle itself (build/**), plus source
-          # and the python dependency manifest (minus tests/mocks) as
-          # first-cause detectors.
-          code="$(printf '%s\n' "$changed" \
-            | grep -E '^(src/.*|requirements\.txt|build/.*)$' \
+          # Files that ARE shipped bytes: the committed bundle itself, plus
+          # everything package.json ships verbatim (requirements.txt and the
+          # non-.ts sources — i.e. the python sidecars). Anything new under
+          # src/ that is not .ts lands here too, which is the fail-safe side.
+          ships="$(printf '%s\n' "$changed" \
+            | grep -E '^(build/.*|requirements\.txt|src/.*)$' \
+            | grep -vE '^src/.*\.ts$' \
+            | grep -vE '(/__tests__/|/__mocks__/)' || true)"
+
+          # TypeScript sources reach users only through the bundle, so they
+          # imply a bump only when the bundle actually moved. Listed alongside
+          # build/** purely for a better error message.
+          ts="$(printf '%s\n' "$changed" \
+            | grep -E '^src/.*\.ts$' \
             | grep -vE '(\.test\.ts$|\.spec\.ts$|/__tests__/|/__mocks__/)' || true)"
+          bundle_changed="$(printf '%s\n' "$changed" | grep -E '^build/' || true)"
+
+          code="$ships"
+          if [ -n "$ts" ] && [ -n "$bundle_changed" ]; then
+            code="$(printf '%s\n%s' "$ships" "$ts" | grep -v '^$' || true)"
+          elif [ -n "$ts" ]; then
+            echo "::notice::src/ TypeScript changed but the committed bundle is byte-identical — nothing ships, so no version bump is required. (ci.yml's build-verify step proves build/ matches src/.)"
+          fi
 
           # Runtime deps are shipped code too: they are inlined into the
           # committed bundle. Compare only the `dependencies` map —
@@ -122,7 +154,7 @@ jobs:
             if [ -n "$deps_changed" ]; then
               echo "::error::Runtime dependencies changed (the shipped bundle changes) but package.json version is unchanged (${oldv}). Bump at least a patch + add a CHANGELOG entry so publish.yml actually ships the dependency update:  pnpm version patch --no-git-tag-version"
             else
-              echo "::error::Shipped bytes changed (src/, requirements.txt, or the committed build/ bundle) but package.json version is unchanged (${oldv}). Bump it at least a patch:  pnpm version patch --no-git-tag-version  (and add a CHANGELOG entry)."
+              echo "::error::Shipped bytes changed (the committed build/ bundle, requirements.txt, or a verbatim-shipped src/ file) but package.json version is unchanged (${oldv}). Bump it at least a patch:  pnpm version patch --no-git-tag-version  (and add a CHANGELOG entry)."
             fi
             exit 1
           fi
