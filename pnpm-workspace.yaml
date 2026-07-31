@@ -16,4 +16,21 @@ minimumReleaseAge: 1440
 # these security fixes.
 overrides:
   "@hono/node-server": 2.0.10
+  # GHSA-mh99-v99m-4gvg / CVE-2026-14257 (high): unbounded brace expansion.
+  # Dev toolchain only -- brace-expansion is not in the shipped bundle -- but
+  # three separate majors are reachable here (eslint -> minimatch@3 -> v1,
+  # minimatch@9 -> v2, minimatch@10 -> v5), so each is floored independently
+  # on its own complete release.
+  #
+  # The advisory's first-patched versions (1.1.17 / 2.1.3 / 5.0.8) are NOT
+  # sufficient: they bound the accumulator in combine() but never thread
+  # maxLength into expandSequence(), leaving the sequence path ({1..N},
+  # {a..z..k}) capped only by item count. 1.1.18 / 2.1.4 / 5.0.9 add it.
+  #
+  # The bounds must be two-sided. A bare "<5.0.9" also matches 1.1.18 and
+  # 2.1.4 under semver, and would force minimatch 3's CommonJS path onto the
+  # v5 ESM API ("expand is not a function").
+  "brace-expansion@>=1.0.0 <1.1.18": 1.1.18
+  "brace-expansion@>=2.0.0 <2.1.4": 2.1.4
+  "brace-expansion@>=5.0.0 <5.0.9": 5.0.9
   fast-uri: 3.1.4
