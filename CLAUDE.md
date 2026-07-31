@@ -130,7 +130,7 @@ This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
 ### search-notes
-- Set `searchContent: true` to search note body, not just titles
+- Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive
 - Results include note IDs for reliable subsequent operations
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes — useful for large collections

@@ -41871,6 +41871,14 @@ function describeSearchLimit(effectiveLimit, wasDefault, resultCount) {
   return { info, truncationNote };
 }
 
+// src/utils/searchScope.ts
+function describeSearchScope(searchContent, resultCount) {
+  if (searchContent || resultCount > 0) {
+    return "";
+  }
+  return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 function runDoctor(manager) {
@@ -42191,8 +42199,9 @@ server.registerTool(
 
 ${syncWarnings.join(" ")}` : "";
     if (notes.length === 0) {
+      const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`,
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
         { notes: [], count: 0 }
       );
     }

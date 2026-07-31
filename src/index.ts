@@ -33,6 +33,7 @@ import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
 import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
 import { resolveSearchLimit, describeSearchLimit } from "@/utils/searchLimit.js";
+import { describeSearchScope } from "@/utils/searchScope.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
@@ -297,8 +298,12 @@ server.registerTool(
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
 
     if (notes.length === 0) {
+      // Disclose a title-only search on the empty result: bodies were never read, so a
+      // bare `{"notes":[],"count":0}` reads as "no such note exists" for a term that may
+      // appear in dozens of note bodies.
+      const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${syncNote}`,
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
         { notes: [], count: 0 }
       );
     }
