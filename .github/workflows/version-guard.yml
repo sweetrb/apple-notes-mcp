@@ -16,6 +16,9 @@ name: version-guard
 # makes the bump mandatory; dependabot-rebuild.yml auto-bumps bot PRs whose
 # rebuilt bundle changed, so Dependabot automation keeps flowing.
 # The guard file itself lives in .github/ (doesn't ship), so it needs no bump.
+# A bump must also be DOCUMENTED: when the version changes, CHANGELOG.md has to
+# carry a matching "## [X.Y.Z]" heading, so release notes can't be stranded
+# under "## [Unreleased]" and silently orphaned once the release ships.
 #
 # TypeScript under src/ is a FIRST-CAUSE DETECTOR, not a shipped file: it
 # reaches users only after esbuild inlines it into build/index.js. So it only
@@ -140,6 +143,22 @@ jobs:
               exit 1
             fi
             echo "${PKG}@${newv} is unclaimed on npm."
+
+            # …and require CHANGELOG.md to document it under a REAL version
+            # heading. An entry parked under "## [Unreleased]" is orphaned the
+            # moment the release ships: nothing in the release path renames
+            # that section (the `version` lifecycle script only syncs the
+            # plugin manifests), so the published version ends up undocumented
+            # while its notes sit under a heading claiming they are unreleased.
+            # apple-notes-mcp shipped 2.6.10 and 2.6.11 exactly that way before
+            # this check existed. dependabot-rebuild.yml already inserts a real
+            # heading, so bot PRs pass unchanged.
+            esc="$(printf '%s' "${newv}" | sed 's/\./\\./g')"
+            if ! grep -qE "^## \[${esc}\]" CHANGELOG.md; then
+              echo "::error::package.json bumped to ${newv} but CHANGELOG.md has no '## [${newv}]' heading. Move this release's notes out of '## [Unreleased]' and file them under '## [${newv}] - $(date -u +%Y-%m-%d)'. Keep an empty '## [Unreleased]' at the top — dependabot-rebuild.yml hard-fails without that marker."
+              exit 1
+            fi
+            echo "CHANGELOG.md documents ${newv}."
           fi
 
           if [ -z "$code" ] && [ -z "$deps_changed" ]; then
