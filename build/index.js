@@ -40033,7 +40033,7 @@ var AppleNotesManager = class {
       `;
   }
   /**
-   * Parses bulk listing output into deduplicated note titles.
+   * Parses bulk listing output into deduplicated (title, id) pairs.
    *
    * Duplicate CoreData references are deduped by id; the limit is applied
    * after dedup so duplicates never count against it.
@@ -40041,17 +40041,31 @@ var AppleNotesManager = class {
   parseBulkListOutput(output, safeLimit) {
     if (!output.trim()) return [];
     const seenIds = /* @__PURE__ */ new Set();
-    const titles = [];
+    const refs = [];
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
       seenIds.add(noteId);
-      titles.push(title.trim());
-      if (safeLimit !== void 0 && titles.length >= safeLimit) break;
+      refs.push({ title: title.trim(), id: noteId });
+      if (safeLimit !== void 0 && refs.length >= safeLimit) break;
     }
-    return titles;
+    return refs;
+  }
+  /**
+   * Lists all notes in an account/folder as (title, id) pairs, unfiltered
+   * and unlimited. Used internally where the id is needed to avoid
+   * re-resolving identity by (possibly duplicated) title — see exportNotesAsJson.
+   */
+  listNoteRefs(account, folder) {
+    const folderRef = folder ? buildFolderReference(folder) : void 0;
+    const script = buildAccountScopedScript({ account }, this.buildBulkListCommand({ folderRef }));
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
+    }
+    return this.parseBulkListOutput(result.output);
   }
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
@@ -40086,9 +40100,9 @@ var AppleNotesManager = class {
       const header = sepIdx === -1 ? result2.output : result2.output.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
       const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
-      const titles = this.parseBulkListOutput(records, safeLimit);
-      if (!Number.isNaN(totalCount) && (titles.length >= safeLimit || totalCount <= safeLimit)) {
-        return titles;
+      const refs = this.parseBulkListOutput(records, safeLimit);
+      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
+        return refs.map((ref) => ref.title);
       }
     }
     const script = buildAccountScopedScript(
@@ -40099,7 +40113,7 @@ var AppleNotesManager = class {
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    return this.parseBulkListOutput(result.output, safeLimit).map((ref) => ref.title);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
@@ -41416,13 +41430,14 @@ var AppleNotesManager = class {
           name: folder.name,
           notes: []
         };
-        const noteTitles = this.listNotes(account.name, folder.name);
-        for (const title of noteTitles) {
-          const note = this.getNoteDetails(title, account.name);
+        const noteRefs = this.listNoteRefs(account.name, folder.name);
+        for (const ref of noteRefs) {
+          const note = this.getNoteById(ref.id);
           if (!note) continue;
+          note.account = account.name;
           let content = "";
           if (!note.passwordProtected) {
-            content = this.getNoteContent(title, account.name);
+            content = this.getNoteContentById(ref.id);
           }
           folderData.notes.push(this.exportNote(note, content));
           exportData.summary.totalNotes++;

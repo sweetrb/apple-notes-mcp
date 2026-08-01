@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [2.6.12] - 2026-08-01
+
+### Fixed
+- **`export-notes-json` no longer silently drops and duplicates notes that share an exact title.** `exportNotesAsJson` listed each folder's note titles, then re-fetched each note a second time by title via `getNoteDetails(title, account)` / `getNoteContent(title, account)`. AppleScript's `note "<name>"` specifier is a named-element reference that resolves ambiguous names deterministically to one particular match, so every iteration for a title with N duplicates re-fetched the *same* underlying note N times — the id-based dedup one call earlier (`parseBulkListOutput`, which correctly dedups by id) had already proven there were N distinct notes, but titles are all that survived into the export loop. The result: one note repeated N times in the export with identical id and content, and the other N−1 real notes silently absent, with no error, warning, or count mismatch (`totalNotes` just counts loop iterations, which was still internally consistent). The fix threads the ids already produced by the bulk listing straight through the loop and re-fetches by id (`getNoteById` / `getNoteContentById`) instead of by title — the same identity-safe pattern `search-notes` and `deleteNoteById` already use, since ids are unique application-wide and titles are not. (#115)
+
+## [2.6.11] - 2026-07-31
+
 ### Removed
 - **`.hermes-plugin/` packaging docs** (`README.md`, `config.yaml`). Hermes Agent has no plugin/marketplace drop-in, so a directory of manifest-looking files was easy to misread as an installable package. The setup it documented is not lost — the `hermes mcp add` command, the `~/.hermes/config.yaml` `mcp_servers:` snippet, and the restart note now live inline in the README's "Other Hosts" section. Matches apple-mail-mcp#116, keeping multi-host packaging parity across the four Apple MCP servers. No effect on the published package: `.hermes-plugin/` was never in `package.json` `files[]`.
 
@@ -11,6 +18,10 @@
 
 ### Security
 - **Floored all three dev-only `brace-expansion` majors on their complete fixes for GHSA-mh99-v99m-4gvg / CVE-2026-14257 (high)** — `1.1.16` → `1.1.18`, `2.1.3` → `2.1.4`, and both `5.0.7` and `5.0.8` → `5.0.9`. Three separate majors are reachable through the dev toolchain (`eslint` → `minimatch@3` on v1, `minimatch@9` on v2, `minimatch@10` on v5), and they are not API-compatible — minimatch 3 requires the v1 CommonJS API, so a single floor spanning them fails with `expand is not a function`. Each major therefore carries its own **two-sided** floor; the bounds must be two-sided because a bare `<5.0.9` also matches `1.1.18` and `2.1.4` under semver and would drag the CommonJS path onto the v5 ESM API. The advisory's own first-patched versions (`1.1.17` / `2.1.3` / `5.0.8`) are **not sufficient**: they bound the accumulator in `combine` but never thread `maxLength` into `expandSequence`, so the sequence path (`{1..N}`, `{a..z..k}`) stays capped only by item count and a padded sequence still materialises ~100,000 intermediate strings before the outer bound truncates (measured 4,606 ms / 176 MB RSS on `1.1.17` vs 9 ms / 61 MB on `1.1.18`, identical final output). Two of the four paths resolved here (`1.1.16`, `5.0.7`) were below even the advisory's floor. Adopted only after every release cleared this repo's 24-hour `minimumReleaseAge` gate, with no `minimumReleaseAgeExclude` carve-out and no audit suppression — `pnpm audit` will keep reporting the advisory until GitHub's metadata (which still lists `5.0.8` as first-patched, and so marks the entire v1 line vulnerable under semver) catches up. Dev toolchain only: `brace-expansion` is not in the shipped bundle, so the published package is unaffected, the committed bundle is byte-identical, and no version bump is owed. Matches apple-mail-mcp#123 — thanks to @jjoanna2-debug for the original finding.
+
+## [2.6.10] - 2026-07-22
+
+### Security
 - Override the MCP SDK's transitive `@hono/node-server` and `fast-uri` dependencies to patched releases. This clears the path-traversal advisory in Hono's static file serving and the host-confusion advisories in `fast-uri` while the SDK's own dependency ranges still resolve vulnerable versions.
 
 ## [2.6.9] - 2026-07-22

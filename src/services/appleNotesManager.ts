@@ -1443,25 +1443,40 @@ export class AppleNotesManager {
   }
 
   /**
-   * Parses bulk listing output into deduplicated note titles.
+   * Parses bulk listing output into deduplicated (title, id) pairs.
    *
    * Duplicate CoreData references are deduped by id; the limit is applied
    * after dedup so duplicates never count against it.
    */
-  private parseBulkListOutput(output: string, safeLimit?: number): string[] {
+  private parseBulkListOutput(output: string, safeLimit?: number): { title: string; id: string }[] {
     if (!output.trim()) return [];
     const seenIds = new Set<string>();
-    const titles: string[] = [];
+    const refs: { title: string; id: string }[] = [];
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
       seenIds.add(noteId);
-      titles.push(title.trim());
-      if (safeLimit !== undefined && titles.length >= safeLimit) break;
+      refs.push({ title: title.trim(), id: noteId });
+      if (safeLimit !== undefined && refs.length >= safeLimit) break;
     }
-    return titles;
+    return refs;
+  }
+
+  /**
+   * Lists all notes in an account/folder as (title, id) pairs, unfiltered
+   * and unlimited. Used internally where the id is needed to avoid
+   * re-resolving identity by (possibly duplicated) title — see exportNotesAsJson.
+   */
+  private listNoteRefs(account: string, folder?: string): { title: string; id: string }[] {
+    const folderRef = folder ? buildFolderReference(folder) : undefined;
+    const script = buildAccountScopedScript({ account }, this.buildBulkListCommand({ folderRef }));
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
+    }
+    return this.parseBulkListOutput(result.output);
   }
 
   /**
@@ -1503,10 +1518,10 @@ export class AppleNotesManager {
       const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
       const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
-      const titles = this.parseBulkListOutput(records, safeLimit);
+      const refs = this.parseBulkListOutput(records, safeLimit);
       // A malformed header (NaN) also falls through to the full fetch.
-      if (!Number.isNaN(totalCount) && (titles.length >= safeLimit || totalCount <= safeLimit)) {
-        return titles;
+      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
+        return refs.map((ref) => ref.title);
       }
     }
 
@@ -1518,7 +1533,7 @@ export class AppleNotesManager {
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    return this.parseBulkListOutput(result.output, safeLimit).map((ref) => ref.title);
   }
 
   /**
@@ -3128,18 +3143,23 @@ export class AppleNotesManager {
           notes: [],
         };
 
-        // Get all note titles in this folder
-        const noteTitles = this.listNotes(account.name, folder.name);
+        // Get all (title, id) pairs in this folder. Re-fetching by id below
+        // (instead of by title) avoids AppleScript's ambiguous `note "<name>"`
+        // resolution silently collapsing notes that share an exact title.
+        const noteRefs = this.listNoteRefs(account.name, folder.name);
 
-        for (const title of noteTitles) {
-          // Get note details
-          const note = this.getNoteDetails(title, account.name);
+        for (const ref of noteRefs) {
+          const note = this.getNoteById(ref.id);
           if (!note) continue;
+          // getNoteById() doesn't scope to an account (ids are already unique
+          // application-wide), so set it explicitly to match the account
+          // being exported — mirrors what getNoteDetails() used to populate.
+          note.account = account.name;
 
           // Skip password-protected notes' content but include metadata
           let content = "";
           if (!note.passwordProtected) {
-            content = this.getNoteContent(title, account.name);
+            content = this.getNoteContentById(ref.id);
           }
 
           folderData.notes.push(this.exportNote(note, content));

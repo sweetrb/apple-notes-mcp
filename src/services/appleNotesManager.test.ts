@@ -3237,6 +3237,57 @@ describe("AppleNotesManager", () => {
 
       expect(result.summary.totalNotes).toBe(0);
     });
+
+    it("exports both notes when two notes share an exact title", () => {
+      const idA = "x-coredata://ABC/ICNote/p1";
+      const idB = "x-coredata://ABC/ICNote/p2";
+      const title = "Duplicate Title";
+
+      const detailsFor = (id: string) =>
+        [
+          title,
+          id,
+          "Sunday, January 1, 2025 at 1:00:00 PM",
+          "Sunday, January 1, 2025 at 1:00:00 PM",
+          "false",
+          "false",
+        ].join(F);
+      const contentFor = (id: string) =>
+        id === idA ? "<div>Content A</div>" : "<div>Content B</div>";
+
+      let callIndex = 0;
+      mockExecuteAppleScript.mockImplementation((script: string) => {
+        callIndex++;
+        if (callIndex === 1) return { success: true, output: "iCloud" }; // listAccounts
+        if (callIndex === 2) return { success: true, output: "id1\tNotes" }; // listFolders
+        if (callIndex === 3) {
+          // Bulk listNotes fetch: two distinct notes, same title, different ids.
+          return { success: true, output: [title + F + idA, title + F + idB].join(R) };
+        }
+        // Any later lookup keyed by id resolves to the real, distinct note.
+        // A lookup keyed only by (ambiguous, duplicated) title mirrors real
+        // AppleScript's `note "<name>"` behavior: it deterministically
+        // resolves to the same one note every time, regardless of which
+        // iteration is asking.
+        const idMatch = script.match(/note id "([^"]+)"/);
+        const targetId = idMatch ? idMatch[1] : idA;
+        if (script.includes("get body of note")) {
+          return { success: true, output: contentFor(targetId) };
+        }
+        return { success: true, output: detailsFor(targetId) };
+      });
+
+      const result = manager.exportNotesAsJson() as {
+        summary: { totalNotes: number };
+        accounts: { folders: { notes: { id: string; content: string }[] }[] }[];
+      };
+
+      const notes = result.accounts[0].folders[0].notes;
+      expect(result.summary.totalNotes).toBe(2);
+      expect(notes.map((n) => n.id).sort()).toEqual([idA, idB].sort());
+      expect(notes.find((n) => n.id === idA)?.content).toBe(contentFor(idA));
+      expect(notes.find((n) => n.id === idB)?.content).toBe(contentFor(idB));
+    });
   });
 
   // ---------------------------------------------------------------------------
