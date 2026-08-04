@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the checklist-state and note-metadata features; see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). Everything else works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 ### Using the Codex Marketplace
 
@@ -153,14 +153,15 @@ Resources expose read-only context the client can attach without a tool call:
 `notes://note/{id}` template (returns the note as Markdown). Prompts package
 common workflows: `find-note`, `weekly-review`, `new-meeting-note`.
 
-### Known limitations
+### AppleScript limitations
 
-A few Notes UI features are not exposed to AppleScript and therefore cannot be
-supported. See **[docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md)**
+A few Notes UI features are not exposed to AppleScript. Some are recovered by
+reading Notes' own database instead; the rest genuinely cannot be supported. See
+**[docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md)**
 for the investigation and verification behind each:
 
 - **Pinned notes** — Notes has no scriptable `pinned` property via AppleScript. Pin state can now be **read** with the BETA `get-note-metadata` tool (from the NoteStore database), but it still cannot be **set** programmatically.
-- **Note-to-note links** — there is no `applenotes://` deep link or link property; the only stable handle is the `x-coredata://` note id.
+- **Note-to-note links** — AppleScript exposes no link property or link element, so link *relationships* between notes cannot be read, and a link cannot be inserted into a note body. A shareable `notes://showNote?identifier=<uuid>` deep link **is** available via [`get-note-link`](#get-note-link).
 
 ---
 
@@ -179,8 +180,8 @@ Creates a new note in Apple Notes.
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
 | `content` | string | Yes | The body content of the note (do not repeat the title here) |
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags) |
-| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. Defaults to account root |
-| `account` | string | No | Account name (defaults to iCloud) |
+| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
+| `account` | string | No | Account name (defaults to iCloud). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. In both formats, the title is automatically prepended as `<h1>`. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities |
 
 **Example (tagged with inline hashtags):**
@@ -287,6 +288,16 @@ Retrieves the full content of a specific note.
 `structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
 from the body. Apple Notes tags are inline hashtags, not a scriptable property;
 see [docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
+
+**⚠️ The returned body can be lossy — do not write it back verbatim.** Inline
+base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
+256 KB) are replaced with `[inline image omitted: …]` text placeholders so an
+image-heavy note cannot blow the MCP message limit. `structuredContent` reports
+this as `strippedImages` (count) and `truncated` (boolean). When either is set,
+passing this body to [`update-note`](#update-note) would replace the real images
+with the placeholder text — use [`append-to-note`](#append-to-note) for
+additions, or export the images with `save-attachment` / `fetch-attachment`
+first.
 
 ---
 
@@ -415,7 +426,7 @@ Updates an existing note's content and/or title.
 
 **Returns:** Confirmation message, or error if note not found.
 
-**Note:** `newContent` **replaces the entire note body** — it is not appended. To preserve existing content, read it first (e.g. with `get-note-content`) and include it in `newContent`.
+**Note:** `newContent` **replaces the entire note body** — it is not appended. To add to a note, prefer [`append-to-note`](#append-to-note), which does the read-and-concatenate for you and always round-trips the body as HTML. If you do read-modify-write by hand, note that `get-note-content` replaces oversized inline images with text placeholders (see [`get-note-content`](#get-note-content)) — writing that body back bakes the placeholders in.
 
 **Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](https://github.com/sweetrb/apple-notes-mcp/blob/main/skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
 
@@ -617,11 +628,11 @@ Lists all folders in an account with full hierarchical paths.
 
 #### `create-folder`
 
-Creates a new folder.
+Creates a new folder, including a whole nested hierarchy in one call.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | Yes | Name for the new folder |
+| `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped |
 | `account` | string | No | Account to create folder in (defaults to iCloud) |
 
 **Example:**
@@ -631,7 +642,14 @@ Creates a new folder.
 }
 ```
 
-**Returns:** Confirmation message, or error if folder already exists.
+**Example - Create a nested hierarchy:**
+```json
+{
+  "name": "Work/Clients/Omnia"
+}
+```
+
+**Returns:** Confirmation message. The call is **idempotent** — an already-existing folder (or path segment) is skipped rather than treated as an error, so it is safe to call before every `create-note` that targets a folder.
 
 ---
 
@@ -718,7 +736,7 @@ Deletes multiple notes at once by ID.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `ids` | string[] | Yes | Array of note IDs to delete |
+| `ids` | string[] | Yes | Array of note IDs to delete (max 500 per request) |
 
 **Returns:** Summary of successes and failures.
 
@@ -732,8 +750,8 @@ Moves multiple notes to a folder.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `ids` | string[] | Yes | Array of note IDs to move |
-| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
+| `ids` | string[] | Yes | Array of note IDs to move (max 500 per request) |
+| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder) |
 | `account` | string | No | Account containing the folder |
 
 **Returns:** Summary of successes and failures.
@@ -770,7 +788,7 @@ Gets a note's content as Markdown instead of HTML. If the note contains checklis
 
 Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
 
-**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access-for-checklist-features)).
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -798,7 +816,7 @@ Checklist for "Shopping List" (2/4 done):
 
 Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQLite database directly: pinned state, checklist flags, trash/recovery state, the preview snippet, and the password hint. The available fields vary by macOS version.
 
-**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access-for-checklist-features)).
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
 
 **BETA:** the NoteStore schema changes between macOS releases, so some fields can be absent on older or newer systems. The database is only ever read, never written.
 
@@ -1063,9 +1081,9 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ---
 
-## Full Disk Access for Checklist Features
+## Full Disk Access
 
-The `get-checklist-state` tool and checklist annotations in `get-note-markdown` read directly from the Apple Notes SQLite database. This requires **Full Disk Access** for the process running the MCP server.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -1083,9 +1101,12 @@ The `get-checklist-state` tool and checklist annotations in `get-note-markdown` 
 
 ### Without Full Disk Access
 
-All other tools work normally without Full Disk Access. Only checklist state features are affected:
-- `get-checklist-state` will return an error explaining that database access is needed
-- `get-note-markdown` will return plain list items without `[x]`/`[ ]` annotations (graceful fallback)
+Every tool that does not read the Notes database works normally without Full Disk Access — that is the whole AppleScript surface (create, read, search, update, move, delete, folders, accounts, attachments, stats, export). The database-backed tools degrade like this:
+- `get-checklist-state` returns an error explaining that database access is needed
+- `get-note-metadata` returns the same kind of error — it has no non-database path
+- `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
+- `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
+- `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
 
 ---
 
@@ -1104,20 +1125,11 @@ All other tools work normally without Full Disk Access. Only checklist state fea
 |------------|--------|
 | macOS only | Apple Notes and AppleScript are macOS-specific |
 | Batch ops run per-note | `batch-delete-notes` / `batch-move-notes` apply each note individually rather than as one bulk operation — AppleScript has no bulk equivalent to IMAP's `UID STORE`/`MOVE`. This is deliberate: it preserves per-note success/failure reporting. ([#26](https://github.com/sweetrb/apple-notes-mcp/issues/26)) |
-| No pinned notes | Pin status is not exposed via AppleScript ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) |
+| Pinned notes are read-only | AppleScript exposes no `pinned` property. Pin state is readable via the BETA `get-note-metadata` tool (NoteStore database, needs Full Disk Access) but cannot be set ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) |
 | Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
 | Checklist state | Requires [Full Disk Access](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
 | Checklist **creation** | Not supported. AppleScript's `body of note` setter strips `<input type="checkbox">` and ignores any checklist-styling CSS class. Apple Notes stores checklist items as a protobuf paragraph style (`style_type=103`) that AppleScript doesn't expose, and the SQLite database is read-only. See [Creating Checklists](#creating-checklists) below for the workaround. |
-
-### Roadmap
-
-A few capabilities are deliberately deferred to a future release, tracked as open issues:
-
-- **Pinned-note support** ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) — Apple doesn't expose pin status via AppleScript.
-- **Tags / hashtags** ([#29](https://github.com/sweetrb/apple-notes-mcp/issues/29)).
-- **Note links** ([#30](https://github.com/sweetrb/apple-notes-mcp/issues/30)).
-- **Local integration-test suite** ([#31](https://github.com/sweetrb/apple-notes-mcp/issues/31)).
 
 ### Creating Checklists
 

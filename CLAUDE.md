@@ -71,12 +71,16 @@ update-note id="x-coredata://ABC/ICNote/p123" newContent="Updated"
 delete-note id="x-coredata://ABC/ICNote/p123"
 ```
 
-### create-note / update-note
+### create-note / update-note / append-to-note
 - Always escape backslashes in content (see above)
 - Newlines can be sent as `\n` (this is a valid JSON escape)
 - **Title handling:** The `title` parameter is automatically prepended as `<h1>` in the note body. Do NOT include the title in the `content` parameter, or it will appear twice.
 - **HTML format:** When using `format: "html"`, do NOT include a `<h1>` tag in `content` — the title is prepended automatically as `<h1>`.
 - `create-note` returns the new note's ID for subsequent operations
+- **`create-note`'s `folder` must already exist.** It does not create the folder — call `create-folder` first (it is idempotent, so calling it unconditionally is fine). Passing a folder Notes doesn't have fails with a generic "check that Notes.app is configured and accessible" message, which is misleading: Notes.app is fine, the folder isn't there. The same applies to a misspelled `account`.
+- **To add to a note, use `append-to-note`, not `update-note`.** `update-note` replaces the whole body; `append-to-note` takes `content` plus `position` (`"after"` default / `"before"` to prepend), `separator`, and `format`, does the read-and-concatenate itself, and always round-trips the body as HTML so existing rich formatting survives.
+- **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
+- Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
 ### Checklist Creation Is Not Supported
 
@@ -125,7 +129,9 @@ All folder operations support hierarchical paths using `/` as a separator:
 - `"Work/Clients/Omnia"` — deeply nested path
 - `"Travel/Spain\/Portugal 2023"` — literal slash in folder name escaped as `\/`
 
-This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move-note`, `delete-folder`.
+This works in: `create-note` (folder param), `create-folder`, `search-notes`, `list-notes`, `move-note`, `batch-move-notes`, `delete-folder`.
+
+`create-folder` is the one that *creates* a hierarchy: pass it a whole path and every missing segment is created, existing ones skipped. It is idempotent — an already-existing folder is not an error — so call it before any `create-note` / `move-note` / `batch-move-notes` that targets a folder you have not confirmed exists.
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
@@ -152,8 +158,23 @@ This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move
 - Requires note ID (not title) — use `search-notes` to find the ID first
 - Reads directly from the NoteStore SQLite database (not via AppleScript)
 - Requires Full Disk Access for the MCP host process
-- Returns `null` if note has no checklists or database is inaccessible
+- **There is no `null` result.** A successful call returns `items` / `checked` / `total`; every other outcome is an MCP **error response** (`isError: true`), including the routine "this note simply has no checklist". Distinguish them by the message text:
+  - `"This note does not contain any checklist items."` — the note parsed fine and has none. Not a failure; report it as an empty checklist.
+  - `"No data found for this note in the database."` — no row for that note (e.g. not yet synced to the local store).
+  - `"Full Disk Access is required to read checklist state. …"` — permission, not data.
+  - `"Invalid note ID format: …"` — the id isn't an `x-coredata://…/ICNote/pNNN` URL.
+  - `"Failed to decompress note data."` — the stored blob wasn't parseable.
+  - Plus note-not-found and password-protected errors raised before the database is touched.
 - Works independently of `get-note-content` — use both for full picture
+
+### Batch operations
+- `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
+- `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.
+
+### get-note-link
+- Returns the shareable `notes://showNote?identifier=<uuid>` deep link — use this, not the `x-coredata://` id, whenever a link is meant to be handed to a person, stored in a Reminders task, or opened on iOS
+- Primary path reads `ZIDENTIFIER` from the NoteStore database, so it needs Full Disk Access; on macOS 12–15 it can fall back to the AppleScript `note link` property, which macOS 26+ no longer exposes
+- Password-protected notes cannot be linked
 
 ### get-note-markdown (checklist enrichment)
 - Automatically annotates checklist items with `[x]`/`[ ]` when database is accessible

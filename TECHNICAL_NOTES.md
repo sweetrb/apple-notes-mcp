@@ -288,15 +288,22 @@ The constraints that make this a BETA, opt-in path rather than a default:
 
 ### What a Shortcuts bridge can and cannot add
 
-| Reachable through a wrapper Shortcut | Not exposed as any action (GUI only) |
+| Reachable through a wrapper Shortcut | Not exposed as a Shortcuts action |
 |--------------------------------------|--------------------------------------|
-| Pin / unpin a note | Prepend to a body |
+| Pin / unpin a note | Prepend to a body ¹ |
 | Add / remove / create / delete tags | Toggle a checklist item done/undone |
 | Move to folder; create / delete folder | Insert a table or import CSV |
 | Append a checklist item | Insert a note-to-note link |
 | Append plain text to a body | Rich text / Markdown body writes |
 | Attach a file | Attach a URL / link |
 | Find notes (plain-text result) | Get a note's full contents |
+
+The right-hand column is scoped to the **Shortcuts** inventory — Notes ships no
+action for these. It does not mean the capability is unreachable altogether.
+
+¹ Prepend needs no bridge: `append-to-note` (2.6.0) does it over plain
+AppleScript with `position: "before"`, by reading the body, splicing the new
+block in after the title `<div>`, and writing the whole body back.
 
 ### macOS version gating
 
@@ -325,8 +332,23 @@ Keep AppleScript as the primary engine. If write coverage for pin and tags is wa
 a BETA, opt-in Shortcuts bridge scoped to the reachable actions above, with the
 GUI-session constraint documented loudly and runtime feature detection instead of version
 gating. Do not invest in a Swift App Intents helper; it cannot do the cross-app thing that
-would justify it. Rich-body manipulation, prepend, checklist toggling, tables, and note
-links stay GUI-only under every known approach.
+would justify it. Markdown-interpreted body writes, checklist toggling, tables, and
+*inserting* note-to-note links stay GUI-only under every known approach.
+
+**Update (2026-07, apple-notes-mcp 2.6.0).** Two items on that GUI-only list turned out
+not to need a bridge at all, and the verdict above is narrowed accordingly:
+
+- **Prepend** ships as `append-to-note` with `position: "before"`, over plain AppleScript.
+  It reads the existing HTML body, splices the new block in after the title `<div>`, and
+  writes the body back — a full-body rewrite, not an in-place edit, so the
+  attachment caveat still applies. Rich HTML *is* preserved on that round trip, so
+  "rich-body manipulation" was too broad; what remains unavailable is having Notes
+  interpret Markdown on write.
+- **Reading a note-to-note link** ships as `get-note-link`, which returns the
+  `notes://showNote?identifier=<uuid>` deep link (primary path: `ZIDENTIFIER` read
+  read-only from `NoteStore.sqlite`, needs Full Disk Access; AppleScript `note link`
+  fallback on macOS 12–15). Inserting a link into a body, and enumerating the links
+  already in one, remain unavailable.
 
 ---
 

@@ -32,12 +32,16 @@ Use this skill when the user:
 | `get-note-markdown` | Read note content as Markdown |
 | `get-note-by-id` | Get note metadata by ID |
 | `get-note-details` | Get metadata (created, modified, account) |
-| `update-note` | Modify a note's title or content |
+| `get-note-link` | Get the shareable `notes://showNote?identifier=…` deep link for a note |
+| `update-note` | Replace a note's title and/or body |
+| `append-to-note` | Add content to a note without replacing it (`position: "after"` / `"before"`) |
 | `delete-note` | Remove a note (moves to Recently Deleted) |
-| `batch-delete-notes` | Delete multiple notes by ID |
+| `batch-delete-notes` | Delete multiple notes by ID (max 500 per call) |
 | `move-note` | Move a note to a different folder |
-| `batch-move-notes` | Move multiple notes by ID |
+| `batch-move-notes` | Move multiple notes by ID (max 500 per call) |
 | `list-notes` | List all notes or notes in a folder |
+| `show-note` | Reveal a note in the Notes.app UI by ID |
+| `get-selected-notes` | Read the notes currently selected in Notes.app |
 | `export-notes-json` | Export all accounts, folders, and notes as JSON |
 
 ### Folder Operations
@@ -54,6 +58,7 @@ Use this skill when the user:
 | Tool | Purpose |
 |------|---------|
 | `list-accounts` | List configured accounts (iCloud, Gmail, etc.) |
+| `get-default-location` | Read the default account and folder used for new notes |
 | `show-account` | Reveal an account in the Notes.app UI by ID |
 
 ### Attachments, Checklists, Collaboration, and Diagnostics
@@ -119,18 +124,36 @@ When search results include an ID, prefer that ID for all follow-up reads, edits
 
 ### Updating Notes
 
-When the user wants to modify a note:
+**Adding to a note — use `append-to-note`.** It takes the new `content` plus an
+optional `position` (`"after"` is the default and appends; `"before"` prepends),
+`separator`, and `format` (`"plaintext"` / `"html"`), and does the read-and-splice
+itself, always round-tripping the body as HTML so existing rich formatting
+survives. Do not hand-roll read-then-`update-note` for an addition.
 
 ```
 User: "Add milk to my shopping list"
 Action:
 1. Use search-notes if needed to get the note ID
-2. Use get-note-content or get-note-markdown to read current content
-3. Use list-attachments if the note may contain files, scans, images, audio, or PDFs
-4. Use update-note by ID with the complete updated body
+2. Use list-attachments if the note may contain files, scans, images, audio, or PDFs
+3. Use append-to-note by ID with content="Milk"
+```
+
+**Replacing a note — use `update-note`.** Only reach for it when the body really
+is being rewritten:
+
+```
+User: "Rewrite my project brief with this new version"
+Action:
+1. Use search-notes if needed to get the note ID
+2. Use list-attachments if the note may contain files, scans, images, audio, or PDFs
+3. Use update-note by ID with the complete new body
 ```
 
 `update-note` replaces the entire note body. It is not an append operation. If `format="html"`, `newTitle` is ignored and the first element in `newContent` becomes the visible title.
+
+**If you must read-modify-write by hand, do not write `get-note-content`'s body back verbatim.** For image-heavy notes that body is lossy: inline base64 images over the configured cap (default 256 KB each) come back as `[inline image omitted: …]` text placeholders, reported as `strippedImages` / `truncated` in `structuredContent` and as a warning appended to the text. Sending that body to `update-note` replaces the real images with the placeholder text. Use `append-to-note` for additions, or export the images with `save-attachment` / `fetch-attachment` first.
+
+Both `append-to-note` and `update-note` rewrite the full body, so neither is attachment-safe — see [Attachment-Safe Updates](#attachment-safe-updates) below.
 
 ### Organizing Notes
 
@@ -145,6 +168,24 @@ Action: Use move-note with the note title and folder="Archive"
 User: "Create a Work folder"
 Action: Use create-folder with name="Work"
 ```
+
+`create-folder` takes a whole nested path (`name="Work/Clients/Omnia"`) and creates every missing segment, skipping ones that already exist — so it is idempotent and safe to call unconditionally. Do call it first: `create-note`, `move-note`, and `batch-move-notes` all require the destination folder to already exist, and `create-note` reports a missing folder with a generic "check that Notes.app is configured and accessible" message that looks like a permissions problem but is not.
+
+### Sharing and Revealing Notes
+
+```
+User: "Send me a link to that note"
+Action: Use get-note-link with the note ID → notes://showNote?identifier=<uuid>
+```
+
+Hand out that deep link, not the `x-coredata://` id — the link opens the note in Notes.app on macOS and iOS and can be pasted into a Reminders task or a message. It needs Full Disk Access for the app that launches the server (it reads the note's identifier from the Notes database; macOS 12–15 has an AppleScript fallback), and password-protected notes cannot be linked.
+
+```
+User: "Open that note for me" / "What note am I looking at?"
+Action: show-note by ID to reveal it in Notes.app; get-selected-notes to read the current selection
+```
+
+`show-note`, `show-folder`, `show-account`, and `show-attachment` activate the Notes.app GUI, so they only do something useful on a Mac with an active desktop session.
 
 ## Formatting Guidance
 

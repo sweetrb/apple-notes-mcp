@@ -42,6 +42,7 @@ import {
   cleanupTempDir,
   ensureParentDir,
 } from "@/utils/attachmentFs.js";
+import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -2262,7 +2263,7 @@ export class AppleNotesManager {
         name: "permissions",
         passed: !isPermError,
         message: isPermError
-          ? "AppleScript permissions denied. Grant access in System Settings > Privacy & Security > Automation"
+          ? `AppleScript permissions denied. ${AUTOMATION_REMEDIATION}`
           : `Permission check returned: ${permCheck.error}`,
       });
       if (isPermError) {

@@ -11,29 +11,33 @@ of code already hardened in apple-mail. Line numbers are against `main` @ `bb677
 
 ## Resolution status
 
+All seventeen findings are closed; issues #16–#32 are all closed on GitHub. The
+body below is kept as the dated 1.4.4 snapshot that motivated the 2.0 line — it
+describes the code as it was on 2026-06-19, **not** as it is today.
+
 | # | Finding | Tier | Issue | Status |
 |---|---------|------|-------|--------|
-| H1 | `execSync` has no `maxBuffer` cap | High | [#16](https://github.com/sweetrb/apple-notes-mcp/issues/16) | Open |
-| H2 | No `with timeout` + SIGTERM wedges Notes.app | High | [#17](https://github.com/sweetrb/apple-notes-mcp/issues/17) | Open |
-| H3 | Printable `\|\|\|` / comma delimiters collide with user content | High | [#18](https://github.com/sweetrb/apple-notes-mcp/issues/18) | Open |
-| H4 | Swallowed failures return `[]`/`null`/`0` | High | [#19](https://github.com/sweetrb/apple-notes-mcp/issues/19) | Open |
-| H5 | Unbounded full-library scans, no partial-result signal | High | [#20](https://github.com/sweetrb/apple-notes-mcp/issues/20) | Open |
-| M1 | No `structuredContent` on any tool | Medium | [#21](https://github.com/sweetrb/apple-notes-mcp/issues/21) | Open |
-| M2 | No `doctor` tool (incl. Full Disk Access check) | Medium | [#22](https://github.com/sweetrb/apple-notes-mcp/issues/22) | Open |
-| M3 | No MCP resources or prompts | Medium | [#23](https://github.com/sweetrb/apple-notes-mcp/issues/23) | Open |
-| M4 | No file-based config loader | Medium | [#24](https://github.com/sweetrb/apple-notes-mcp/issues/24) | Open |
-| M5 | Locale-fragile date parsing | Medium | [#25](https://github.com/sweetrb/apple-notes-mcp/issues/25) | Open |
-| M6 | Batch ops are N+1 osascript fan-out | Medium | [#26](https://github.com/sweetrb/apple-notes-mcp/issues/26) | Open |
-| M7 | No `save-attachment` / `fetch-attachment` | Medium | [#27](https://github.com/sweetrb/apple-notes-mcp/issues/27) | Open |
-| L1 | Pinned notes not exposed | Low | [#28](https://github.com/sweetrb/apple-notes-mcp/issues/28) | Open |
-| L2 | Tags/hashtags not surfaced | Low | [#29](https://github.com/sweetrb/apple-notes-mcp/issues/29) | Open |
-| L3 | Note-to-note links not supported | Low | [#30](https://github.com/sweetrb/apple-notes-mcp/issues/30) | Open |
-| L5 | No integration test suite | Low | [#31](https://github.com/sweetrb/apple-notes-mcp/issues/31) | Open |
-| L6 | Full Disk Access guide + commit this audit | Low | [#32](https://github.com/sweetrb/apple-notes-mcp/issues/32) | Open |
+| H1 | `execSync` has no `maxBuffer` cap | High | [#16](https://github.com/sweetrb/apple-notes-mcp/issues/16) | Shipped 2.0.0 (64 MB default, `APPLE_NOTES_MCP_MAX_BUFFER`) |
+| H2 | No `with timeout` + SIGTERM wedges Notes.app | High | [#17](https://github.com/sweetrb/apple-notes-mcp/issues/17) | Shipped 2.0.0 (`with timeout` wrap + `killSignal: SIGKILL`) |
+| H3 | Printable `\|\|\|` / comma delimiters collide with user content | High | [#18](https://github.com/sweetrb/apple-notes-mcp/issues/18) | Shipped 2.0.0 (ASCII `\x1f` / `\x1e` delimiters) |
+| H4 | Swallowed failures return `[]`/`null`/`0` | High | [#19](https://github.com/sweetrb/apple-notes-mcp/issues/19) | Shipped 2.0.0 (failures surface as MCP errors) + 2.1.0 (`get-notes-stats` partial-coverage reporting) |
+| H5 | Unbounded full-library scans, no partial-result signal | High | [#20](https://github.com/sweetrb/apple-notes-mcp/issues/20) | Shipped 2.0.0 (server-side counting) |
+| M1 | No `structuredContent` on any tool | Medium | [#21](https://github.com/sweetrb/apple-notes-mcp/issues/21) | Shipped 2.0.0, completed 2.2.0 (all tools) and 2.3.0 (`outputSchema` on all tools) |
+| M2 | No `doctor` tool (incl. Full Disk Access check) | Medium | [#22](https://github.com/sweetrb/apple-notes-mcp/issues/22) | Shipped 2.0.0 |
+| M3 | No MCP resources or prompts | Medium | [#23](https://github.com/sweetrb/apple-notes-mcp/issues/23) | Shipped 2.0.0 |
+| M4 | No file-based config loader | Medium | [#24](https://github.com/sweetrb/apple-notes-mcp/issues/24) | Shipped 2.0.0 |
+| M5 | Locale-fragile date parsing | Medium | [#25](https://github.com/sweetrb/apple-notes-mcp/issues/25) | Shipped 2.0.0 |
+| M6 | Batch ops are N+1 osascript fan-out | Medium | [#26](https://github.com/sweetrb/apple-notes-mcp/issues/26) | Shipped 2.1.0 (one osascript spawn per batch; explicitly deferred in 2.0.0) |
+| M7 | No `save-attachment` / `fetch-attachment` | Medium | [#27](https://github.com/sweetrb/apple-notes-mcp/issues/27) | Shipped 2.0.0 |
+| L1 | Pinned notes not exposed | Low | [#28](https://github.com/sweetrb/apple-notes-mcp/issues/28) | Partial — AppleScript infeasibility documented 2.1.0 ([APPLESCRIPT-LIMITATIONS](./APPLESCRIPT-LIMITATIONS.md)); pin state made **readable** in 2.5.0 via the BETA `get-note-metadata` NoteStore path. Setting is still unsupported |
+| L2 | Tags/hashtags not surfaced | Low | [#29](https://github.com/sweetrb/apple-notes-mcp/issues/29) | Shipped 2.1.0, read-only — `get-note-content` parses inline `#hashtags`; `create-note`'s `tags` param stays a cosmetic pass-through |
+| L3 | Note-to-note links not supported | Low | [#30](https://github.com/sweetrb/apple-notes-mcp/issues/30) | Partial — closed 2.1.0 as documented-infeasible, then superseded in 2.6.0 by `get-note-link` (`notes://showNote?identifier=<uuid>`). Reading link *relationships*, and inserting a link, remain infeasible |
+| L5 | No integration test suite | Low | [#31](https://github.com/sweetrb/apple-notes-mcp/issues/31) | Shipped 2.1.0 (`test/integration.test.ts` + the required `integration` CI job) |
+| L6 | Full Disk Access guide + commit this audit | Low | [#32](https://github.com/sweetrb/apple-notes-mcp/issues/32) | Shipped 2.0.0 ([FULL-DISK-ACCESS.md](./FULL-DISK-ACCESS.md)) |
 
-Target release for the fixes: **2.0.0** (full parity with apple-mail), built on a
-long-lived `v2` branch, one item at a time with tests, then full regression +
-docs + merge.
+The fixes landed across the 2.0.0–2.6.x line rather than in a single release;
+per-item detail is in [CHANGELOG.md](../CHANGELOG.md). This document is retained
+as a historical record and is not a live backlog.
 
 ---
 
