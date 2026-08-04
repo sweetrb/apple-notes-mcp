@@ -1,10 +1,12 @@
 # AppleScript Limitations
 
 Apple Notes is automated through its AppleScript dictionary. A few features that
-exist in the Notes UI are simply **not exposed to AppleScript**, so this MCP
-server cannot read or write them no matter how the script is written. This page
-documents what was investigated, how it was verified, and the conclusion, so the
-limitation isn't re-investigated every release.
+exist in the Notes UI are simply **not exposed to AppleScript**, so no script can
+read or write them. Where this server recovers one of them anyway, it does so by
+reading Notes' private `NoteStore.sqlite` store **read-only** — which needs
+[Full Disk Access](./FULL-DISK-ACCESS.md). Each section below says which case it
+is. This page documents what was investigated, how it was verified, and the
+conclusion, so the limitation isn't re-investigated every release.
 
 The full set of properties Notes exposes on a `note` is:
 
@@ -17,9 +19,9 @@ shared, body, id, name, plaintext
 
 ## Pinned notes (#28)
 
-**Status: not feasible via AppleScript.** The Notes UI lets you pin a note to
-the top of a folder, but the `note` class has no `pinned` property. Asking for
-it raises error `-1700`:
+**Status: not feasible via AppleScript; readable via the NoteStore database.**
+The Notes UI lets you pin a note to the top of a folder, but the `note` class
+has no `pinned` property. Asking for it raises error `-1700`:
 
 ```applescript
 tell application "Notes"
@@ -31,41 +33,61 @@ end tell
 There is no alternative property, element, or command (`pin`, `pinned`,
 `favorite`, …) in the dictionary. Pinned state lives only in Notes' private
 Core Data store (`NoteStore.sqlite`), which is not part of the scriptable
-surface. Reading it would require parsing the SQLite store directly — brittle
-across macOS releases and outside what an AppleScript-based server should do —
-and there is no supported way to *set* it at all.
+surface, and there is no supported way to *set* it at all.
 
-**Conclusion:** pinned read/write is not supported and will not be added while
-Notes lacks a scriptable property. If a future macOS exposes one, revisit by
-re-running the probe above.
+Reading it, however, did turn out to be worth doing. Since 2.5.0 the BETA
+`get-note-metadata` tool queries `ZISPINNED` on `ZICCLOUDSYNCINGOBJECT` in that
+store, opened **read-only**, feature-detecting each column with
+`PRAGMA table_info` so it degrades instead of breaking when the private schema
+changes across macOS releases. It requires
+[Full Disk Access](./FULL-DISK-ACCESS.md) and is marked BETA precisely because
+the schema is version-dependent.
+
+**Conclusion:** pin state is **readable** (BETA, from the NoteStore database,
+Full Disk Access required) but **not settable** — and setting will not be added
+while Notes lacks a scriptable property. If a future macOS exposes one, revisit
+by re-running the probe above.
 
 ## Note-to-note links (#30)
 
-**Status: not supported as data; navigation-only.** Apple Notes lets you insert
-a link from one note to another in the UI, but AppleScript exposes no property
-or element for it:
+**Status: link *relationships* are not exposed; a shareable deep link is.**
+Apple Notes lets you insert a link from one note to another in the UI, but
+AppleScript exposes no property or element for that relationship:
 
 - A `note` has no `URL`, `url`, or `link` property — each raises error `-2753`
   (undefined). There is no element that enumerates outgoing/incoming links.
-- There is no readable or constructable `applenotes://` / `notes://` deep link.
-  The note's `id` (`x-coredata://…/ICNote/p123`) is the only stable handle, and
-  it is a Core Data URI, not a shareable or clickable link.
+- Nothing in the dictionary inserts a link into a note's body.
 
-The one related capability that *does* work is the `show` command, which reveals
-a note in the Notes UI by id:
+A shareable deep link to a note *is* available, and has been since 2.6.0:
+`get-note-link` returns a `notes://showNote?identifier=<uuid>` URL that opens
+the note in Notes.app on macOS and iOS.
+
+- **Primary path — the NoteStore database.** The UUID in that URL is
+  `ZIDENTIFIER` on `ZICCLOUDSYNCINGOBJECT`, read **read-only** from
+  `NoteStore.sqlite`. This works on every macOS version but needs
+  [Full Disk Access](./FULL-DISK-ACCESS.md).
+- **Fallback — AppleScript.** On macOS 12–15 the Notes dictionary does expose a
+  two-word `note link` property, used when the database read fails. It is absent
+  from the Notes SDEF on macOS 26+, which is why the database is the primary
+  path. (`note link` is a different term from the `URL` / `url` / `link` names
+  probed above, which genuinely do not exist.)
+- Password-protected notes return no link.
+
+The `show` command reveals an object in the Notes UI by id:
 
 ```applescript
 tell application "Notes" to show note id "x-coredata://…/ICNote/p123"
 ```
 
-This is deliberately **not** wrapped as a tool: it pops the GUI (unhelpful for a
-headless server), and an agent already has the note's content via
-`get-note-content` / `get-note-markdown`. Link relationships between notes
-cannot be read at all, so a "list links in this note" feature is not possible.
+It **is** wrapped, as `show-note`, `show-folder`, `show-account`, and
+`show-attachment`. Those tools activate the Notes.app GUI, so they only do
+something useful on a machine with an active desktop session; to read a note's
+content, use `get-note-content` / `get-note-markdown` instead.
 
-**Conclusion:** note-to-note link data is not exposed and cannot be surfaced.
-The `id` field already returned by every read tool is the canonical reference;
-use that to address a specific note.
+**Conclusion:** link relationships between notes cannot be read, so a "list
+links in this note" feature is not possible, and links cannot be inserted into a
+body. To hand a note to a person or another app, use `get-note-link`; to address
+a note in a follow-up tool call, use the `id` returned by every read tool.
 
 ## Tags / hashtags (#29)
 

@@ -171,7 +171,7 @@ server.registerTool(
   "create-note",
   {
     description:
-      "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id — reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field).",
+      "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id — reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist — create-folder first (it is idempotent), since this tool does not create it.",
     inputSchema: {
       title: z.string().min(1, "Title is required").max(MAX.TITLE),
       content: z
@@ -197,8 +197,16 @@ server.registerTool(
         .string()
         .max(MAX.FOLDER)
         .optional()
-        .describe("Folder to create the note in (supports nested paths like 'Work/Clients')"),
-      account: z.string().max(MAX.ACCOUNT).optional().describe("Account name (defaults to iCloud)"),
+        .describe(
+          "Folder to create the note in (supports nested paths like 'Work/Clients'). The folder must already exist — this tool does not create it; call create-folder first, which is idempotent and creates intermediate segments."
+        ),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe(
+          "Account name (defaults to iCloud). Must be an account Notes.app already has configured — see list-accounts."
+        ),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -212,8 +220,16 @@ server.registerTool(
     const note = notesManager.createNote(title, content, tags, folder, account, format);
 
     if (!note) {
+      // The overwhelmingly common cause is a folder or account Notes doesn't
+      // have — createNote addresses them directly and never creates them — so
+      // name that before sending the caller on a permissions hunt.
+      const target = folder
+        ? ` Most often the folder "${folder}" does not exist: run list-folders to check, then create-folder to create it (it is idempotent and creates intermediate segments).`
+        : account
+          ? ` Most often the account "${account}" is not configured in Notes.app: run list-accounts to check the exact name.`
+          : "";
       return errorResponse(
-        `Failed to create note "${title}". Check that Notes.app is configured and accessible.`
+        `Failed to create note "${title}".${target} Otherwise check that Notes.app is running and this server has Automation access (run the doctor tool).`
       );
     }
 
@@ -334,7 +350,7 @@ server.registerTool(
   "get-note-content",
   {
     description:
-      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the note's content plus parsed hashtags.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.",
+      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the note's content plus parsed hashtags, and strippedImages/truncated when the body was capped.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true — do NOT write it back with update-note or the real images are replaced by that text. Use append-to-note to add content, or export the images with save-attachment / fetch-attachment first.",
     inputSchema: {
       id: z
         .string()
@@ -356,6 +372,10 @@ server.registerTool(
       title: z.string().optional(),
       content: z.string().optional(),
       hashtags: z.array(z.string()).optional(),
+      /** Number of oversized inline images replaced with text placeholders. */
+      strippedImages: z.number().optional(),
+      /** True when content is lossy — see strippedImages. Never write a truncated body back. */
+      truncated: z.boolean().optional(),
     },
   },
   withErrorHandling(({ id, title, account }) => {
@@ -385,6 +405,8 @@ server.registerTool(
         title: note.title,
         content,
         hashtags,
+        strippedImages: stripped.strippedCount,
+        truncated: stripped.strippedCount > 0,
       });
     }
 
@@ -413,7 +435,13 @@ server.registerTool(
     const content = stripped.html;
     const hashtags = parseHashtags(content);
     const warning = strippedImagesWarning(stripped);
-    return successResponse(warning ? content + warning : content, { title, content, hashtags });
+    return successResponse(warning ? content + warning : content, {
+      title,
+      content,
+      hashtags,
+      strippedImages: stripped.strippedCount,
+      truncated: stripped.strippedCount > 0,
+    });
   }, "Error retrieving note content")
 );
 
@@ -603,7 +631,7 @@ server.registerTool(
   "get-note-link",
   {
     description:
-      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: requires macOS 12+; returns an error on older systems.",
+      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the app that launches this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
       id: z
         .string()
@@ -1573,11 +1601,13 @@ server.registerTool(
       })
       .join("\n");
 
-    // Check Full Disk Access for checklist features
+    // Check Full Disk Access — needed by every tool that reads NoteStore.sqlite.
     const fdaAvailable = hasFullDiskAccess();
     const fdaLine = fdaAvailable
-      ? "  ✓ full_disk_access: Granted (checklist features available)"
-      : "  ⓘ full_disk_access: Not granted (optional — needed for get-checklist-state and checklist annotations in get-note-markdown). " +
+      ? "  ✓ full_disk_access: Granted (Notes database readable — checklist state, note metadata, note links, sync detail)"
+      : "  ⓘ full_disk_access: Not granted — get-checklist-state, get-note-metadata, and the checklist annotations in " +
+        "get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); " +
+        "get-sync-status cannot see pending uploads. The rest of the server is pure AppleScript and is unaffected. " +
         "In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server " +
         "(Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. " +
         `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
@@ -1756,7 +1786,7 @@ server.registerTool(
       ids: z
         .array(z.string().max(MAX.ID))
         .max(MAX.BATCH_IDS)
-        .describe("Array of note IDs to delete"),
+        .describe(`Array of note IDs to delete (max ${MAX.BATCH_IDS} per request)`),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1802,8 +1832,16 @@ server.registerTool(
     description:
       "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts.\nDo not use when: moving a single note (move-note).\nNote: the destination folder must already exist (create-folder).",
     inputSchema: {
-      ids: z.array(z.string().max(MAX.ID)).max(MAX.BATCH_IDS).describe("Array of note IDs to move"),
-      folder: z.string().max(MAX.FOLDER).describe("Destination folder name"),
+      ids: z
+        .array(z.string().max(MAX.ID))
+        .max(MAX.BATCH_IDS)
+        .describe(`Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`),
+      folder: z
+        .string()
+        .max(MAX.FOLDER)
+        .describe(
+          'Destination folder name or nested path (e.g. "Work/Clients"). Must already exist — create-folder first.'
+        ),
       account: z
         .string()
         .max(MAX.ACCOUNT)

@@ -1,6 +1,6 @@
 # Apple Notes MCP - Improvement Roadmap
 
-*As of v2.1.0. Completion status updated 2026-06-23; see the Status line under each item.*
+*As of v2.6.12. Completion status updated 2026-08-03; see the Status line under each item.*
 
 Based on technical research into Apple Notes internals, the current
 AppleScript dictionary, Notes App Intents metadata, and analysis of other
@@ -33,7 +33,11 @@ shortcuts but does not directly invoke arbitrary App Intents, so the MCP server
 needs a reliable bridge before these can become tools.
 
 **Candidate features**:
-- Append or prepend to a note without replacing the full body
+- Append or prepend to a note without replacing the full body — *partly shipped:
+  `append-to-note` (2.6.0) does append and prepend over plain AppleScript
+  (`position: "after" | "before"`), but by reading the body, concatenating, and
+  writing the whole thing back. A true in-place edit that cannot disturb
+  embedded attachments is still unbuilt.*
 - Interpret appended content as Markdown
 - Create real checklist items and check/uncheck/toggle existing checklist items
 - Create, add, remove, open, and delete real Notes tags
@@ -63,10 +67,19 @@ permission handling, packaging, and integration tests
   a one-time manual install, and is plain-text only. This is a BETA, opt-in path.
 - Reachable through that bridge: pin / unpin, add / remove / create / delete tags,
   move to folder, append checklist item, append plain text, attach a file.
-- Still GUI-only under every approach (drop from scope): prepend, Markdown body
-  writes, checklist toggle, tables, note-to-note links, URL attachments.
+- Still GUI-only under every approach (drop from scope): Markdown body writes,
+  checklist toggle, tables, note-to-note links, URL attachments.
 
-**Status: Researched, deferred (2026-06).** The bridge only adds pin/unpin and tag writes, and it requires an active GUI session plus a one-time manual Shortcut install, so it was deferred rather than built. Revisit if pin and tag writes become worth that setup cost.
+**Status: Researched, deferred (2026-06); partly overtaken (2026-07).** The bridge
+only adds pin/unpin and tag writes, and it requires an active GUI session plus a
+one-time manual Shortcut install, so it was deferred rather than built. Revisit if
+pin and tag writes become worth that setup cost. Two items have since been
+delivered without any bridge: **prepend** shipped in 2.6.0 as `append-to-note`
+with `position: "before"`, over ordinary AppleScript (it rewrites the full body,
+so it is not the in-place edit App Intents would give), and a **note-to-note
+link** can at least be *produced* — `get-note-link` (2.6.0) returns the
+`notes://showNote?identifier=<uuid>` deep link, though inserting one into a body
+is still GUI-only.
 
 ---
 

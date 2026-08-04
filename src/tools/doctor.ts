@@ -56,14 +56,21 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
     });
   }
 
-  // 3. Full Disk Access — required for checklist state + checklist annotations.
+  // 3. Full Disk Access — required by every tool that reads NoteStore.sqlite:
+  // get-checklist-state, get-note-markdown's checklist annotations,
+  // get-note-metadata, get-note-link's primary path, and get-sync-status'
+  // database half. Enumerate them so a user who doesn't use checklists doesn't
+  // read the warning as irrelevant and skip the grant.
   const fda = hasFullDiskAccess();
   checks.push({
     name: "Full Disk Access",
     status: fda ? "ok" : "warn",
     detail: fda
-      ? "granted — checklist features available"
-      : "not granted — get-checklist-state and checklist annotations in get-note-markdown won't work. " +
+      ? "granted — the Notes database is readable (checklist state, note metadata, note links, sync detail)"
+      : "not granted — get-checklist-state, get-note-metadata, and the checklist annotations in " +
+        "get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to " +
+        "AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else " +
+        "is pure AppleScript and is unaffected. " +
         "In System Settings > Privacy & Security > Full Disk Access, grant access to the app that " +
         "launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it " +
         `and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`,

@@ -9,6 +9,7 @@
 
 import { execFileSync } from "child_process";
 import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
+import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 
 /**
  * Default execution timeout for AppleScript commands in milliseconds.
@@ -192,8 +193,7 @@ const ERROR_MAPPINGS: Array<{ pattern: RegExp; message: string }> = [
   // Permission errors
   {
     pattern: /not authorized|not permitted|access.*denied/i,
-    message:
-      "Permission denied. Grant automation access in System Settings > Privacy & Security > Automation.",
+    message: `Permission denied. ${AUTOMATION_REMEDIATION}`,
   },
   // Application not running
   {

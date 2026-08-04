@@ -97,6 +97,8 @@ export function strippedImagesWarning(stripped: StrippedContent): string | null 
     )} decoded) exceeded the per-image inline cap and ${
       stripped.strippedCount === 1 ? "was" : "were"
     } replaced with placeholders so the response stays within MCP message limits. ` +
+    "This body is therefore lossy — do NOT write it back with update-note, or the real " +
+    "images are replaced by the placeholder text; use append-to-note to add content. " +
     "The images are still in the note: use list-attachments with save-attachment or " +
     "fetch-attachment to export them, or raise APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES."
   );
