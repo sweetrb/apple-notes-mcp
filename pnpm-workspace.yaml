@@ -33,4 +33,28 @@ overrides:
   "brace-expansion@>=1.0.0 <1.1.18": 1.1.18
   "brace-expansion@>=2.0.0 <2.1.4": 2.1.4
   "brace-expansion@>=5.0.0 <5.0.9": 5.0.9
-  fast-uri: 3.1.4
+  # ⚠️ These are FLOORS, not pins. `fast-uri: 3.1.4` (exact) was written here as a
+  # security floor and then became a CEILING: when GHSA-7p8r-x3mc-p8w7 (high, host
+  # confusion via a backslash authority introducer) landed with a 3.1.5 fix, the
+  # exact pin held the tree on the vulnerable 3.1.4 and the advisory could never
+  # clear. Use a caret range so patch fixes flow in on their own while staying
+  # inside the major the parent's API expects. fast-uri IS in the shipped bundle
+  # (via @modelcontextprotocol/sdk -> ajv), so this one ships.
+  fast-uri: ^3.1.5
+  # GHSA-mwp4-54f8-5fhr (high, leading-zero octets decoded as decimal -> SSRF /
+  # trust-boundary bypass) plus GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg.
+  # Reached via @modelcontextprotocol/sdk -> express-rate-limit, which caps
+  # ip-address at 10.2.0. Not in the shipped bundle (0 references in
+  # build/index.js), but floored anyway so the SDK cannot reintroduce it.
+  ip-address: ^10.3.1
+  # GHSA-fxqj-rqcc-2cmp (moderate): incomplete fix of GHSA-6g55-p6wh-862q.
+  # Dev-only (vitest -> vite -> postcss); not in the shipped bundle.
+  postcss: ^8.5.23
+  # ⏳ GHSA-8j4g-w8fx-2239 (hono, moderate — ReDoS in the CORS middleware) is NOT
+  # floored here yet on purpose: hono@4.12.34 was published 2026-08-03T02:36:40Z
+  # and is still inside this repo's 24h `minimumReleaseAge` supply-chain gate, so
+  # `^4.12.34` fails the install with ERR_PNPM_NO_MATURE_MATCHING_VERSION. No
+  # `minimumReleaseAgeExclude` carve-out — the gate is the point. hono is reached
+  # via @hono/node-server -> @modelcontextprotocol/sdk and is NOT in the esbuild
+  # bundle (0 references in build/index.js), so nothing vulnerable ships
+  # meanwhile. Add `hono: ^4.12.34` once the release clears the gate.
