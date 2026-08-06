@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [2.6.16] - 2026-08-06
+
+### Fixed
+- **Every tool advertised an output schema that rejected undeclared keys, discarding otherwise-correct results.** The MCP **client** validates a result's `structuredContent` against the JSON Schema the server *advertised*, not against the server's own zod object — and a bare zod raw shape renders as `additionalProperties: false`. So any field a handler emits that its schema doesn't enumerate is a hard client-side `-32602 … data must NOT have additional properties`, throwing away a payload the handler computed correctly. The server never notices, because zod's own parse silently *strips* unknown keys instead of failing, which is exactly why the `registerTool`/`outputSchema` migration's "all fields optional, no `.strict()`" read as permissive: it covered optionality, not undeclared keys. All **36 tools** in this repo were advertising `additionalProperties: false`. Every tool now registers through a wrapper applying `.passthrough()`, advertising `additionalProperties: true` — the contract that migration intended. Found while fixing the same defect in the sibling apple-mail-mcp (sweetrb/apple-mail-mcp#135), where it was not latent: it broke `get-mail-stats` on every call for anyone with IMAP configured.
+
+### Added
+- **The outputSchema contract test now asserts that every tool tolerates undeclared keys.** The existing checks — every tool has an `outputSchema`, none requires a field — could not see this class, because they inspect the advertised schema and round-trip only the diagnostic tools; a tool whose payload carries an undeclared key passes CI and fails in the user's client. The suite now fails any tool advertising `additionalProperties: false`, so this cannot silently return.
+
 ## [2.6.15] - 2026-08-05
 ### Changed
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
