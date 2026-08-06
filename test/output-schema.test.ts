@@ -65,6 +65,33 @@ describe("outputSchema contract (real server over stdio)", () => {
     ).toEqual([]);
   });
 
+  it("every outputSchema tolerates undeclared keys (additionalProperties !== false)", async () => {
+    // The CLIENT validates structuredContent against the ADVERTISED JSON Schema
+    // (client/index.js -> "Structured content does not match the tool's output
+    // schema"), so `additionalProperties: false` makes any field the schema
+    // didn't enumerate a hard -32602 that discards an otherwise-correct result.
+    // The server never notices, because zod's own parse strips unknown keys
+    // instead of failing — so nothing but this assertion catches it. A bare zod
+    // raw shape renders as additionalProperties:false; registerTool() in
+    // src/index.ts wraps every shape in .passthrough() to prevent that.
+    // Not hypothetical: this took down get-mail-stats in the sibling
+    // apple-mail-mcp (sweetrb/apple-mail-mcp#135).
+    const { tools } = await client.listTools();
+    const offenders = tools
+      .filter(
+        (t) =>
+          (t.outputSchema as { additionalProperties?: unknown } | undefined)
+            ?.additionalProperties === false
+      )
+      .map((t) => t.name);
+    expect(
+      offenders,
+      `outputSchemas must tolerate undeclared keys — these advertise ` +
+        `additionalProperties:false, so any field they don't enumerate is rejected ` +
+        `client-side and the whole result is lost: ${offenders.join(", ")}`
+    ).toEqual([]);
+  });
+
   it("diagnostic tools' real output validates against their outputSchema (when reachable)", async () => {
     // The SDK throws an "Output validation error" McpError when a success
     // result's structuredContent is missing or fails its schema — the only

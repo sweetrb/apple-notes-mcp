@@ -21,7 +21,12 @@
  */
 
 import { createRequire } from "module";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  type RegisteredTool,
+  type ToolCallback,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
@@ -167,7 +172,52 @@ const folderNameSchema = {
 
 // --- create-note ---
 
-server.registerTool(
+/**
+ * Register a tool, advertising its `outputSchema` as PERMISSIVE.
+ *
+ * The MCP **client** validates a result's `structuredContent` against the JSON
+ * Schema the server advertised — not against the server's own zod object. A
+ * bare zod raw shape renders as `additionalProperties: false`, so a payload
+ * carrying any field the schema didn't enumerate is rejected client-side with
+ * `-32602 … data must NOT have additional properties`, discarding a result the
+ * handler produced correctly. The server never sees it, because zod's own parse
+ * silently *strips* unknown keys rather than failing — which is why the
+ * registerTool/outputSchema migration's "all fields optional, no `.strict()`"
+ * was believed to be permissive. It covered optionality; it did not cover
+ * undeclared keys.
+ *
+ * `.passthrough()` advertises `additionalProperties: true`, which is the
+ * contract that migration intended: a declared field documents the shape, an
+ * undeclared one is carried through instead of nuking the whole result. This is
+ * not hypothetical — it took down `get-mail-stats` in the sibling
+ * apple-mail-mcp (sweetrb/apple-mail-mcp#135), where every tool was likewise
+ * advertising `additionalProperties: false` and the one tool whose payload
+ * carried an undeclared key failed on every call. Enforced for every tool here
+ * by the outputSchema contract test.
+ */
+function registerTool<
+  OutputArgs extends z.ZodRawShape,
+  InputArgs extends undefined | z.ZodRawShape = undefined,
+>(
+  name: string,
+  config: {
+    title?: string;
+    description?: string;
+    inputSchema?: InputArgs;
+    outputSchema?: OutputArgs;
+    annotations?: ToolAnnotations;
+  },
+  cb: ToolCallback<InputArgs>
+): RegisteredTool {
+  const { outputSchema, ...rest } = config;
+  return server.registerTool(
+    name,
+    outputSchema ? { ...rest, outputSchema: z.object(outputSchema).passthrough() } : rest,
+    cb
+  );
+}
+
+registerTool(
   "create-note",
   {
     description:
@@ -246,7 +296,7 @@ server.registerTool(
 
 // --- search-notes ---
 
-server.registerTool(
+registerTool(
   "search-notes",
   {
     description:
@@ -346,7 +396,7 @@ server.registerTool(
 
 // --- get-note-content ---
 
-server.registerTool(
+registerTool(
   "get-note-content",
   {
     description:
@@ -447,7 +497,7 @@ server.registerTool(
 
 // --- get-note-plaintext ---
 
-server.registerTool(
+registerTool(
   "get-note-plaintext",
   {
     description:
@@ -519,7 +569,7 @@ server.registerTool(
 
 // --- get-note-by-id ---
 
-server.registerTool(
+registerTool(
   "get-note-by-id",
   {
     description:
@@ -559,7 +609,7 @@ server.registerTool(
 
 // --- get-note-details ---
 
-server.registerTool(
+registerTool(
   "get-note-details",
   {
     description:
@@ -599,7 +649,7 @@ server.registerTool(
 
 // --- show-note ---
 
-server.registerTool(
+registerTool(
   "show-note",
   {
     description:
@@ -627,7 +677,7 @@ server.registerTool(
 
 // --- get-note-link ---
 
-server.registerTool(
+registerTool(
   "get-note-link",
   {
     description:
@@ -700,7 +750,7 @@ server.registerTool(
 
 // --- show-folder ---
 
-server.registerTool(
+registerTool(
   "show-folder",
   {
     description:
@@ -728,7 +778,7 @@ server.registerTool(
 
 // --- show-account ---
 
-server.registerTool(
+registerTool(
   "show-account",
   {
     description:
@@ -756,7 +806,7 @@ server.registerTool(
 
 // --- update-note ---
 
-server.registerTool(
+registerTool(
   "update-note",
   {
     description:
@@ -874,7 +924,7 @@ server.registerTool(
 
 // --- append-to-note ---
 
-server.registerTool(
+registerTool(
   "append-to-note",
   {
     description:
@@ -1052,7 +1102,7 @@ server.registerTool(
 
 // --- delete-note ---
 
-server.registerTool(
+registerTool(
   "delete-note",
   {
     description:
@@ -1137,7 +1187,7 @@ server.registerTool(
 
 // --- move-note ---
 
-server.registerTool(
+registerTool(
   "move-note",
   {
     description:
@@ -1219,7 +1269,7 @@ server.registerTool(
 
 // --- list-notes ---
 
-server.registerTool(
+registerTool(
   "list-notes",
   {
     description:
@@ -1284,7 +1334,7 @@ server.registerTool(
 
 // --- get-selected-notes ---
 
-server.registerTool(
+registerTool(
   "get-selected-notes",
   {
     description:
@@ -1315,7 +1365,7 @@ server.registerTool(
 
 // --- list-folders ---
 
-server.registerTool(
+registerTool(
   "list-folders",
   {
     description:
@@ -1361,7 +1411,7 @@ server.registerTool(
 
 // --- create-folder ---
 
-server.registerTool(
+registerTool(
   "create-folder",
   {
     description:
@@ -1397,7 +1447,7 @@ server.registerTool(
 
 // --- delete-folder ---
 
-server.registerTool(
+registerTool(
   "delete-folder",
   {
     description:
@@ -1427,7 +1477,7 @@ server.registerTool(
 
 // --- list-accounts ---
 
-server.registerTool(
+registerTool(
   "list-accounts",
   {
     description:
@@ -1461,7 +1511,7 @@ server.registerTool(
 
 // --- get-default-location ---
 
-server.registerTool(
+registerTool(
   "get-default-location",
   {
     description:
@@ -1487,7 +1537,7 @@ server.registerTool(
 
 // --- list-shared-notes ---
 
-server.registerTool(
+registerTool(
   "list-shared-notes",
   {
     description:
@@ -1529,7 +1579,7 @@ server.registerTool(
 
 // --- get-sync-status ---
 
-server.registerTool(
+registerTool(
   "get-sync-status",
   {
     description:
@@ -1576,7 +1626,7 @@ server.registerTool(
 
 // --- health-check ---
 
-server.registerTool(
+registerTool(
   "health-check",
   {
     description:
@@ -1622,7 +1672,7 @@ server.registerTool(
 
 // --- doctor ---
 
-server.registerTool(
+registerTool(
   "doctor",
   {
     description:
@@ -1643,7 +1693,7 @@ server.registerTool(
 
 // --- get-notes-stats ---
 
-server.registerTool(
+registerTool(
   "get-notes-stats",
   {
     description:
@@ -1702,7 +1752,7 @@ server.registerTool(
 
 // --- list-attachments ---
 
-server.registerTool(
+registerTool(
   "list-attachments",
   {
     description:
@@ -1777,7 +1827,7 @@ server.registerTool(
 
 // --- batch-delete-notes ---
 
-server.registerTool(
+registerTool(
   "batch-delete-notes",
   {
     description:
@@ -1826,7 +1876,7 @@ server.registerTool(
 
 // --- batch-move-notes ---
 
-server.registerTool(
+registerTool(
   "batch-move-notes",
   {
     description:
@@ -1888,7 +1938,7 @@ server.registerTool(
 
 // --- save-attachment ---
 
-server.registerTool(
+registerTool(
   "save-attachment",
   {
     description:
@@ -1931,7 +1981,7 @@ server.registerTool(
 
 // --- fetch-attachment ---
 
-server.registerTool(
+registerTool(
   "fetch-attachment",
   {
     description:
@@ -1969,7 +2019,7 @@ server.registerTool(
 
 // --- show-attachment ---
 
-server.registerTool(
+registerTool(
   "show-attachment",
   {
     description:
@@ -2011,7 +2061,7 @@ server.registerTool(
 
 // --- export-notes-json ---
 
-server.registerTool(
+registerTool(
   "export-notes-json",
   {
     description:
@@ -2046,7 +2096,7 @@ server.registerTool(
 
 // --- get-note-markdown ---
 
-server.registerTool(
+registerTool(
   "get-note-markdown",
   {
     description:
@@ -2100,7 +2150,7 @@ server.registerTool(
 
 // --- get-checklist-state ---
 
-server.registerTool(
+registerTool(
   "get-checklist-state",
   {
     description:
@@ -2148,7 +2198,7 @@ server.registerTool(
 
 // --- get-note-metadata (BETA) ---
 
-server.registerTool(
+registerTool(
   "get-note-metadata",
   {
     description:
