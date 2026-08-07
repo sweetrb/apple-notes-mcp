@@ -55,3 +55,9 @@ overrides:
   # 2m36s. It matured at 2026-08-04T02:36:40Z and is floored here now, with no
   # minimumReleaseAgeExclude carve-out ever having been added.
   hono: ^4.12.34
+  # GHSA-5p4m-2wfm-xmqj (high): quadratic CPU consumption resolving !!omap,
+  # fixed in 4.3.1 — the CVE-2026-59870 fix was never backported to the 3.x line.
+  # Reached as eslint -> js-yaml, so development scope, and absent from the
+  # shipped build/index.js bundle: nothing vulnerable was ever published. Floored
+  # as a caret range, never an exact pin, for the reason recorded on fast-uri above.
+  js-yaml: ^4.3.1

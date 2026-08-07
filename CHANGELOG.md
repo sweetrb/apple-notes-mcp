@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Security
+
+- **Floored `js-yaml` to `^4.3.1`, clearing GHSA-5p4m-2wfm-xmqj (high).** Quadratic CPU consumption while resolving `!!omap` keys — a malicious YAML document can be made to burn CPU superlinearly in the number of map entries. The advisory notes the CVE-2026-59870 fix was never backported to the 3.x line, so 4.3.1 is the first complete release. `js-yaml` reaches the tree as `eslint` -> `js-yaml`, which is **development scope**, and it does not appear in the committed `build/index.js` — verified, 0 references — so no published artifact ever carried it and this owes no version bump. No `js-yaml` override existed here before; apple-mail-mcp carried one pinned at `^4.2.0` — below this fix — which is how the gap was found.
+
 ## [2.6.16] - 2026-08-06
 
 ### Fixed
