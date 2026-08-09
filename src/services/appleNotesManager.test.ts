@@ -1812,6 +1812,71 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("listNoteRefs", () => {
+    it("returns title/id pairs, not just titles", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          ["Note A", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Note B", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
+      });
+
+      const refs = manager.listNoteRefs();
+
+      expect(refs).toEqual([
+        { title: "Note A", id: "x-coredata://ABC/ICNote/p1" },
+        { title: "Note B", id: "x-coredata://ABC/ICNote/p2" },
+      ]);
+    });
+
+    it("keeps two distinct notes with the same title distinguishable by id", () => {
+      // This is the exact shape of bug #115 (see exportNotesAsJson's fix):
+      // listNotes() alone collapses these to two identical-looking "Same
+      // Title" strings, which a caller can't use to fetch the second note
+      // without AppleScript's ambiguous by-name resolution returning the
+      // first one twice. listNoteRefs() must expose the distinguishing id.
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          ["Same Title", "x-coredata://ABC/ICNote/p1"].join(F),
+          ["Same Title", "x-coredata://ABC/ICNote/p2"].join(F),
+        ].join(R),
+      });
+
+      const refs = manager.listNoteRefs();
+
+      expect(refs).toEqual([
+        { title: "Same Title", id: "x-coredata://ABC/ICNote/p1" },
+        { title: "Same Title", id: "x-coredata://ABC/ICNote/p2" },
+      ]);
+      expect(refs[0].id).not.toEqual(refs[1].id);
+    });
+
+    it("supports the same folder/modifiedSince/limit filtering as listNotes", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [["Note 1", "x-coredata://ABC/ICNote/p1"].join(F)].join(R),
+      });
+
+      manager.listNoteRefs("iCloud", "Work", "2025-01-01", 10);
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("Work");
+      expect(script).toContain("thresholdDate");
+    });
+
+    it("throws on failure rather than returning empty", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: "Account not found",
+      });
+
+      expect(() => manager.listNoteRefs()).toThrow(/Account not found/);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Folder Operations
   // ---------------------------------------------------------------------------

@@ -144,7 +144,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 
 ### list-notes
-- Returns note titles only, not content
+- Returns each note's `{title, id}` — not content. **Changed in 2.7.0:** `notes` was `string[]`
+- Prefer the returned `id` over the title for any follow-up read/update/move/delete — titles are not unique, and a by-title lookup collapses duplicates onto one note (the `search-notes`/`export-notes-json` identity trap)
 - Use `get-note-content` to retrieve full content
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes
 - Use `limit` to cap the number of notes returned

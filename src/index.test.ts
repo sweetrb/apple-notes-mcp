@@ -24,6 +24,7 @@ vi.mock("@/services/appleNotesManager.js", () => {
       deleteNote: vi.fn(),
       moveNote: vi.fn(),
       listNotes: vi.fn(),
+      listNoteRefs: vi.fn(),
       listFolders: vi.fn(),
       createFolder: vi.fn(),
       deleteFolder: vi.fn(),
@@ -47,6 +48,7 @@ type MockedManager = {
   deleteNote: ReturnType<typeof vi.fn>;
   moveNote: ReturnType<typeof vi.fn>;
   listNotes: ReturnType<typeof vi.fn>;
+  listNoteRefs: ReturnType<typeof vi.fn>;
   listFolders: ReturnType<typeof vi.fn>;
   createFolder: ReturnType<typeof vi.fn>;
   deleteFolder: ReturnType<typeof vi.fn>;
@@ -371,28 +373,39 @@ describe("Tool Handlers", () => {
   // ---------------------------------------------------------------------------
 
   describe("list-notes tool", () => {
-    it("returns array of note titles", () => {
-      mockManager.listNotes.mockReturnValue(["Note A", "Note B", "Note C"]);
+    it("returns array of note title/id pairs", () => {
+      mockManager.listNoteRefs.mockReturnValue([
+        { title: "Note A", id: "id-1" },
+        { title: "Note B", id: "id-2" },
+        { title: "Note C", id: "id-3" },
+      ]);
 
-      const result = mockManager.listNotes();
+      const result = mockManager.listNoteRefs();
 
-      expect(result).toEqual(["Note A", "Note B", "Note C"]);
+      expect(result).toEqual([
+        { title: "Note A", id: "id-1" },
+        { title: "Note B", id: "id-2" },
+        { title: "Note C", id: "id-3" },
+      ]);
     });
 
     it("returns empty array when no notes", () => {
-      mockManager.listNotes.mockReturnValue([]);
+      mockManager.listNoteRefs.mockReturnValue([]);
 
-      const result = mockManager.listNotes();
+      const result = mockManager.listNoteRefs();
 
       expect(result).toEqual([]);
     });
 
     it("filters by folder when specified", () => {
-      mockManager.listNotes.mockReturnValue(["Work Note 1", "Work Note 2"]);
+      mockManager.listNoteRefs.mockReturnValue([
+        { title: "Work Note 1", id: "id-1" },
+        { title: "Work Note 2", id: "id-2" },
+      ]);
 
-      mockManager.listNotes("iCloud", "Work");
+      mockManager.listNoteRefs("iCloud", "Work");
 
-      expect(mockManager.listNotes).toHaveBeenCalledWith("iCloud", "Work");
+      expect(mockManager.listNoteRefs).toHaveBeenCalledWith("iCloud", "Work");
     });
   });
 
