@@ -1324,7 +1324,7 @@ registerTool(
       });
     }
 
-    const noteList = notes.map((n) => `  - ${n.title}`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
       { notes, count: notes.length }

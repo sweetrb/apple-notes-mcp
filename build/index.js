@@ -42961,7 +42961,7 @@ ${syncWarnings.join(" ")}` : "";
         count: 0
       });
     }
-    const noteList = notes.map((n) => `  - ${n.title}`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:
 ${noteList}${syncNote}`,
