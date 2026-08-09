@@ -1466,30 +1466,17 @@ export class AppleNotesManager {
   }
 
   /**
-   * Lists all notes in an account/folder as (title, id) pairs, unfiltered
-   * and unlimited. Used internally where the id is needed to avoid
-   * re-resolving identity by (possibly duplicated) title — see exportNotesAsJson.
+   * Core listing path shared by `listNotes()` and `listNoteRefs()`: lists
+   * notes in an account, optionally filtered by folder, date, and limit,
+   * returning (title, id) pairs. Kept private because both public callers
+   * need to apply their own return shape.
    */
-  private listNoteRefs(account: string, folder?: string): { title: string; id: string }[] {
-    const folderRef = folder ? buildFolderReference(folder) : undefined;
-    const script = buildAccountScopedScript({ account }, this.buildBulkListCommand({ folderRef }));
-    const result = executeAppleScript(script);
-    if (!result.success) {
-      throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
-    }
-    return this.parseBulkListOutput(result.output);
-  }
-
-  /**
-   * Lists all notes in an account, optionally filtered by folder, date, and limit.
-   *
-   * @param account - Account to list notes from (defaults to iCloud)
-   * @param folder - Optional folder to filter by
-   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
-   * @param limit - Optional maximum number of results to return (default: no limit)
-   * @returns Array of note titles
-   */
-  listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
+  private listNotesCore(
+    account?: string,
+    folder?: string,
+    modifiedSince?: string,
+    limit?: number
+  ): { title: string; id: string }[] {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== undefined && limit > 0 ? Math.floor(limit) : undefined;
     const folderRef = folder ? buildFolderReference(folder) : undefined;
@@ -1522,7 +1509,7 @@ export class AppleNotesManager {
       const refs = this.parseBulkListOutput(records, safeLimit);
       // A malformed header (NaN) also falls through to the full fetch.
       if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs.map((ref) => ref.title);
+        return refs;
       }
     }
 
@@ -1534,7 +1521,40 @@ export class AppleNotesManager {
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit).map((ref) => ref.title);
+    return this.parseBulkListOutput(result.output, safeLimit);
+  }
+
+  /**
+   * Lists all notes in an account, optionally filtered by folder, date, and limit.
+   *
+   * @param account - Account to list notes from (defaults to iCloud)
+   * @param folder - Optional folder to filter by
+   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
+   * @param limit - Optional maximum number of results to return (default: no limit)
+   * @returns Array of note titles
+   */
+  listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
+    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+  }
+
+  /**
+   * Lists all notes in an account, optionally filtered by folder, date, and
+   * limit — same filtering semantics as `listNotes()`, but returns each
+   * note's id alongside its title. Prefer this over `listNotes()` when the
+   * caller needs to resolve notes by identity afterward: re-resolving by
+   * title is unsafe when titles are duplicated (AppleScript's `note "<name>"`
+   * specifier resolves ambiguously to the same one note every time — see
+   * the fix in exportNotesAsJson for the failure mode this avoids).
+   *
+   * @returns Array of { title, id } pairs, deduplicated by id
+   */
+  listNoteRefs(
+    account?: string,
+    folder?: string,
+    modifiedSince?: string,
+    limit?: number
+  ): { title: string; id: string }[] {
+    return this.listNotesCore(account, folder, modifiedSince, limit);
   }
 
   /**

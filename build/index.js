@@ -40100,29 +40100,12 @@ var AppleNotesManager = class {
     return refs;
   }
   /**
-   * Lists all notes in an account/folder as (title, id) pairs, unfiltered
-   * and unlimited. Used internally where the id is needed to avoid
-   * re-resolving identity by (possibly duplicated) title — see exportNotesAsJson.
+   * Core listing path shared by `listNotes()` and `listNoteRefs()`: lists
+   * notes in an account, optionally filtered by folder, date, and limit,
+   * returning (title, id) pairs. Kept private because both public callers
+   * need to apply their own return shape.
    */
-  listNoteRefs(account, folder) {
-    const folderRef = folder ? buildFolderReference(folder) : void 0;
-    const script = buildAccountScopedScript({ account }, this.buildBulkListCommand({ folderRef }));
-    const result = executeAppleScript(script);
-    if (!result.success) {
-      throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
-    }
-    return this.parseBulkListOutput(result.output);
-  }
-  /**
-   * Lists all notes in an account, optionally filtered by folder, date, and limit.
-   *
-   * @param account - Account to list notes from (defaults to iCloud)
-   * @param folder - Optional folder to filter by
-   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
-   * @param limit - Optional maximum number of results to return (default: no limit)
-   * @returns Array of note titles
-   */
-  listNotes(account, folder, modifiedSince, limit) {
+  listNotesCore(account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const folderRef = folder ? buildFolderReference(folder) : void 0;
@@ -40148,7 +40131,7 @@ var AppleNotesManager = class {
       const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
       const refs = this.parseBulkListOutput(records, safeLimit);
       if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs.map((ref) => ref.title);
+        return refs;
       }
     }
     const script = buildAccountScopedScript(
@@ -40159,7 +40142,33 @@ var AppleNotesManager = class {
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit).map((ref) => ref.title);
+    return this.parseBulkListOutput(result.output, safeLimit);
+  }
+  /**
+   * Lists all notes in an account, optionally filtered by folder, date, and limit.
+   *
+   * @param account - Account to list notes from (defaults to iCloud)
+   * @param folder - Optional folder to filter by
+   * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
+   * @param limit - Optional maximum number of results to return (default: no limit)
+   * @returns Array of note titles
+   */
+  listNotes(account, folder, modifiedSince, limit) {
+    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+  }
+  /**
+   * Lists all notes in an account, optionally filtered by folder, date, and
+   * limit — same filtering semantics as `listNotes()`, but returns each
+   * note's id alongside its title. Prefer this over `listNotes()` when the
+   * caller needs to resolve notes by identity afterward: re-resolving by
+   * title is unsafe when titles are duplicated (AppleScript's `note "<name>"`
+   * specifier resolves ambiguously to the same one note every time — see
+   * the fix in exportNotesAsJson for the failure mode this avoids).
+   *
+   * @returns Array of { title, id } pairs, deduplicated by id
+   */
+  listNoteRefs(account, folder, modifiedSince, limit) {
+    return this.listNotesCore(account, folder, modifiedSince, limit);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
@@ -42909,7 +42918,7 @@ registerTool(
 registerTool(
   "list-notes",
   {
-    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: note titles only (no content or ids).\nDo not use when: you need content (get-note-content) or ids for follow-up edits (use search-notes).\nNote: warns if iCloud sync is active and results may be partial.",
+    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
@@ -42919,7 +42928,7 @@ registerTool(
       limit: external_exports.number().int().positive().optional().describe("Maximum number of notes to return")
     },
     outputSchema: {
-      notes: external_exports.array(external_exports.string()).optional(),
+      notes: external_exports.array(external_exports.object({ title: external_exports.string(), id: external_exports.string() })).optional(),
       count: external_exports.number().optional()
     }
   },
@@ -42930,7 +42939,7 @@ registerTool(
       syncInterference
     } = withSyncAwarenessSync(
       "list-notes",
-      () => notesManager.listNotes(account, folder, modifiedSince, limit)
+      () => notesManager.listNoteRefs(account, folder, modifiedSince, limit)
     );
     const location = folder ? ` in folder "${folder}"` : "";
     const acct = account ? ` (${account})` : "";
@@ -42952,7 +42961,7 @@ ${syncWarnings.join(" ")}` : "";
         count: 0
       });
     }
-    const noteList = notes.map((t) => `  - ${t}`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title}`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:
 ${noteList}${syncNote}`,

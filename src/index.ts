@@ -1273,7 +1273,7 @@ registerTool(
   "list-notes",
   {
     description:
-      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: note titles only (no content or ids).\nDo not use when: you need content (get-note-content) or ids for follow-up edits (use search-notes).\nNote: warns if iCloud sync is active and results may be partial.",
+      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated — see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: z.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: z.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
@@ -1287,7 +1287,7 @@ registerTool(
       limit: z.number().int().positive().optional().describe("Maximum number of notes to return"),
     },
     outputSchema: {
-      notes: z.array(z.string()).optional(),
+      notes: z.array(z.object({ title: z.string(), id: z.string() })).optional(),
       count: z.number().optional(),
     },
   },
@@ -1298,7 +1298,7 @@ registerTool(
       syncBefore,
       syncInterference,
     } = withSyncAwarenessSync("list-notes", () =>
-      notesManager.listNotes(account, folder, modifiedSince, limit)
+      notesManager.listNoteRefs(account, folder, modifiedSince, limit)
     );
 
     // Build context string for the response
@@ -1324,7 +1324,7 @@ registerTool(
       });
     }
 
-    const noteList = notes.map((t) => `  - ${t}`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title}`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
       { notes, count: notes.length }
