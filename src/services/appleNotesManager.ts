@@ -193,6 +193,14 @@ const MAX_CONTENT_LENGTH = 5 * 1024 * 1024;
 /** Maximum allowed length for folder names/paths */
 const MAX_FOLDER_PATH_LENGTH = 1000;
 
+/**
+ * Sentinel account name used when no account is explicitly requested.
+ * Resolved via AppleScript's own `default account` rather than a name
+ * match, since Notes.app appends an invisible U+F8FF suffix to the
+ * system account's real name that a literal "iCloud" string can't match.
+ */
+const DEFAULT_ACCOUNT_NAME = "iCloud";
+
 /** Maximum allowed length for account names */
 const MAX_ACCOUNT_LENGTH = 200;
 
@@ -515,11 +523,29 @@ export function buildFolderReference(folderPath: string): string {
  * @param command - The AppleScript command to execute
  * @returns Complete AppleScript ready for execution
  */
+/**
+ * Builds an AppleScript account reference for the given (unescaped) account name.
+ *
+ * The default account is resolved via Notes.app's own `default account`
+ * property rather than by name, since Notes.app appends an invisible
+ * trailing character (U+F8FF) to the real name of the system account,
+ * causing an exact `tell account "iCloud"` match to fail with error
+ * -1728 even though it displays as plain "iCloud" everywhere in the UI.
+ * Explicitly-named non-default accounts (e.g. "Gmail") are matched by
+ * prefix, which is immune to the same kind of hidden-suffix mismatch.
+ */
+function accountAppleScriptRef(account: string): string {
+  if (account === DEFAULT_ACCOUNT_NAME) {
+    return "default account";
+  }
+  const safeAccount = sanitizeAccountName(account);
+  return `(first account whose name starts with "${safeAccount}")`;
+}
+
 function buildAccountScopedScript(scope: AccountScope, command: string): string {
-  const safeAccount = sanitizeAccountName(scope.account);
   return `
     tell application "Notes"
-      tell account "${safeAccount}"
+      tell ${accountAppleScriptRef(scope.account)}
         ${command}
       end tell
     end tell
@@ -657,7 +683,7 @@ export class AppleNotesManager {
    * Default account used when no account is specified.
    * iCloud is the primary account for most Apple Notes users.
    */
-  private readonly defaultAccount = "iCloud";
+  private readonly defaultAccount = DEFAULT_ACCOUNT_NAME;
 
   /**
    * Resolves the account to use for an operation.
@@ -2597,12 +2623,11 @@ export class AppleNotesManager {
    */
   listAttachments(title: string, account?: string): Attachment[] {
     const targetAccount = this.resolveAccount(account);
-    const safeAccount = escapePlainStringForAppleScript(targetAccount);
     const safeTitle = escapePlainStringForAppleScript(title);
 
     const script = `
       tell application "Notes"
-        tell account "${safeAccount}"
+        tell ${accountAppleScriptRef(targetAccount)}
           set theNote to note "${safeTitle}"
         set attachmentList to {}
         set attachmentIds to id of every attachment of theNote

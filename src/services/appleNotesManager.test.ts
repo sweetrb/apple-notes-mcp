@@ -421,9 +421,9 @@ describe("AppleNotesManager", () => {
       manager.listAttachments("My Note", 'evil" injected');
       const script = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
       // The account's double-quote must be escaped (\\") — a raw quote would
-      // terminate the tell-account string literal and allow `do shell script` injection.
-      expect(script).toContain('tell account "evil\\" injected"');
-      expect(script).not.toContain('tell account "evil" injected"');
+      // terminate the whose-name string literal and allow `do shell script` injection.
+      expect(script).toContain('whose name starts with "evil\\" injected"');
+      expect(script).not.toContain('whose name starts with "evil" injected"');
     });
   });
 
@@ -513,7 +513,7 @@ describe("AppleNotesManager", () => {
 
       expect(result?.account).toBe("Gmail");
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"'),
+        expect.stringContaining('tell (first account whose name starts with "Gmail")'),
         NO_RETRY_OPTIONS
       );
     });
@@ -842,7 +842,7 @@ describe("AppleNotesManager", () => {
       manager.searchNotes("work", false, "Exchange");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Exchange"')
+        expect.stringContaining('tell (first account whose name starts with "Exchange")')
       );
     });
 
@@ -868,7 +868,7 @@ describe("AppleNotesManager", () => {
       manager.searchNotes("task", false, "Exchange", "Projects");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain('tell account "Exchange"');
+      expect(script).toContain('tell (first account whose name starts with "Exchange")');
       expect(script).toContain('notes of folder "Projects"');
     });
 
@@ -943,7 +943,7 @@ describe("AppleNotesManager", () => {
       expect(script).toContain("modification date >= thresholdDate");
       expect(script).toContain('notes of folder "Work"');
       expect(script).toContain("(count of resultList) >= 10");
-      expect(script).toContain('tell account "iCloud"');
+      expect(script).toContain("tell default account");
     });
   });
 
@@ -994,7 +994,7 @@ describe("AppleNotesManager", () => {
       manager.getNoteContent("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('tell (first account whose name starts with "Gmail")')
       );
     });
   });
@@ -1030,7 +1030,7 @@ describe("AppleNotesManager", () => {
       manager.getNotePlaintext("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('tell (first account whose name starts with "Gmail")')
       );
     });
   });
@@ -1303,7 +1303,7 @@ describe("AppleNotesManager", () => {
 
       expect(result?.account).toBe("Exchange");
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Exchange"')
+        expect.stringContaining('tell (first account whose name starts with "Exchange")')
       );
     });
 
@@ -1363,7 +1363,7 @@ describe("AppleNotesManager", () => {
       manager.deleteNote("Draft", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"'),
+        expect.stringContaining('tell (first account whose name starts with "Gmail")'),
         NO_RETRY_OPTIONS
       );
     });
@@ -3046,7 +3046,7 @@ describe("AppleNotesManager", () => {
       manager.listAttachments("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('account "Gmail"')
+        expect.stringContaining('tell (first account whose name starts with "Gmail")')
       );
     });
 
@@ -3056,7 +3056,7 @@ describe("AppleNotesManager", () => {
       manager.listAttachments("My Note");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('account "iCloud"')
+        expect.stringContaining("tell default account")
       );
     });
 
