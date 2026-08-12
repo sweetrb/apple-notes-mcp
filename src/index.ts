@@ -43,6 +43,7 @@ import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
+import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -2314,5 +2315,8 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
 process.stdin.on("end", shutdown);
 process.stdin.on("close", shutdown);
 
-const transport = new StdioServerTransport();
+// Wrapped so every tools/list payload declares JSON Schema 2020-12: the SDK
+// stamps draft-07 on every emitted inputSchema/outputSchema, which current MCP
+// clients reject outright. See @/utils/jsonSchemaDialect.js.
+const transport = withJsonSchema2020_12(new StdioServerTransport());
 await server.connect(transport);

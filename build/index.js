@@ -42209,6 +42209,95 @@ function registerResourcesAndPrompts(server2, manager) {
   );
 }
 
+// src/utils/jsonSchemaDialect.ts
+var JSON_SCHEMA_2020_12 = "https://json-schema.org/draft/2020-12/schema";
+var DEFINITIONS_REF_PREFIX = "#/definitions/";
+function isPlainObject3(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function convertNode(node) {
+  if (Array.isArray(node)) return node.map(convertNode);
+  if (!isPlainObject3(node)) return node;
+  const hasTupleItems = Array.isArray(node.items);
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    switch (key) {
+      case "$schema":
+        break;
+      case "definitions":
+        out.$defs = convertNode(value);
+        break;
+      case "$ref":
+        out.$ref = typeof value === "string" && value.startsWith(DEFINITIONS_REF_PREFIX) ? "#/$defs/" + value.slice(DEFINITIONS_REF_PREFIX.length) : value;
+        break;
+      case "items":
+        if (hasTupleItems) out.prefixItems = value.map(convertNode);
+        else out.items = convertNode(value);
+        break;
+      case "additionalItems":
+        if (hasTupleItems) out.items = convertNode(value);
+        break;
+      case "dependencies": {
+        const dependentRequired = {};
+        const dependentSchemas = {};
+        if (isPlainObject3(value)) {
+          for (const [property, dependency] of Object.entries(value)) {
+            if (Array.isArray(dependency)) dependentRequired[property] = dependency;
+            else dependentSchemas[property] = convertNode(dependency);
+          }
+        }
+        if (Object.keys(dependentRequired).length > 0) out.dependentRequired = dependentRequired;
+        if (Object.keys(dependentSchemas).length > 0) out.dependentSchemas = dependentSchemas;
+        break;
+      }
+      case "exclusiveMinimum":
+      case "exclusiveMaximum": {
+        const bound = key === "exclusiveMinimum" ? node.minimum : node.maximum;
+        if (value === true && typeof bound === "number") out[key] = bound;
+        else if (value !== false) out[key] = convertNode(value);
+        break;
+      }
+      case "minimum":
+        if (node.exclusiveMinimum === true) break;
+        out.minimum = convertNode(value);
+        break;
+      case "maximum":
+        if (node.exclusiveMaximum === true) break;
+        out.maximum = convertNode(value);
+        break;
+      default:
+        out[key] = convertNode(value);
+    }
+  }
+  return out;
+}
+function toJsonSchema2020_12(schema) {
+  if (!isPlainObject3(schema)) return schema;
+  return {
+    $schema: JSON_SCHEMA_2020_12,
+    ...convertNode(schema)
+  };
+}
+function normalizeOutgoingMessage(message) {
+  if (!isPlainObject3(message)) return message;
+  const result = message.result;
+  if (!isPlainObject3(result) || !Array.isArray(result.tools)) return message;
+  const tools = result.tools.map((tool) => {
+    if (!isPlainObject3(tool)) return tool;
+    const next = { ...tool };
+    if (isPlainObject3(tool.inputSchema)) next.inputSchema = toJsonSchema2020_12(tool.inputSchema);
+    if (isPlainObject3(tool.outputSchema))
+      next.outputSchema = toJsonSchema2020_12(tool.outputSchema);
+    return next;
+  });
+  return { ...message, result: { ...result, tools } };
+}
+function withJsonSchema2020_12(transport2) {
+  const originalSend = transport2.send.bind(transport2);
+  transport2.send = (message, options) => originalSend(normalizeOutgoingMessage(message), options);
+  return transport2;
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
@@ -43747,7 +43836,7 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 }
 process.stdin.on("end", shutdown);
 process.stdin.on("close", shutdown);
-var transport = new StdioServerTransport();
+var transport = withJsonSchema2020_12(new StdioServerTransport());
 await server.connect(transport);
 /*! Bundled license information:
 

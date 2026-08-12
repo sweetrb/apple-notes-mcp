@@ -92,6 +92,94 @@ describe("outputSchema contract (real server over stdio)", () => {
     ).toEqual([]);
   });
 
+  it("every advertised schema declares JSON Schema 2020-12 and no draft-07 construct", async () => {
+    // MCP standardized on 2020-12 (SEP-834 / SEP-1613 / SEP-2106) and clients
+    // now HARD-REJECT anything else: "JSON Schema declares an unsupported
+    // dialect … The default validator supports JSON Schema 2020-12 only",
+    // which takes out every tool at once. The SDK converts our zod schemas
+    // with a draft-07 target and stamps draft-07 on every emitted
+    // inputSchema/outputSchema (upgrading zod does not change that — the SDK
+    // calls its converter with no target, and both branches fall back to
+    // draft-07), so src/index.ts wraps the transport with
+    // withJsonSchema2020_12 to normalize the outgoing tools/list payload.
+    // Asserted against the REAL advertised schemas, since that wrapper sits at
+    // the transport boundary and a unit test of the converter alone would not
+    // prove the server is actually using it. (sweetrb/apple-mail-mcp#147)
+    const { tools } = await client.listTools();
+    const EXPECTED = "https://json-schema.org/draft/2020-12/schema";
+    // Keywords that either changed spelling in 2020-12 or were removed.
+    const DRAFT_07_ONLY = ["definitions", "dependencies", "additionalItems"] as const;
+
+    const isObject = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null && !Array.isArray(v);
+
+    // Walk schema POSITIONS, not raw text: a substring scan would false-flag a
+    // tool that legitimately has a property named "definitions". Keys under
+    // "properties" / "$defs" are names, not keywords, so only their values are
+    // re-entered as schemas.
+    const walk = (node: unknown, path: string, report: (msg: string) => void): void => {
+      if (Array.isArray(node)) {
+        node.forEach((child, i) => walk(child, `${path}[${i}]`, report));
+        return;
+      }
+      if (!isObject(node)) return;
+
+      if (path !== "" && "$schema" in node) {
+        report(`${path} declares its own $schema (only the root may)`);
+      }
+      for (const keyword of DRAFT_07_ONLY) {
+        if (keyword in node) report(`${path || "(root)"} uses draft-07-only "${keyword}"`);
+      }
+      if (Array.isArray(node.items)) {
+        report(`${path || "(root)"} uses tuple-form "items" (2020-12 spells it "prefixItems")`);
+      }
+      for (const key of ["exclusiveMinimum", "exclusiveMaximum"] as const) {
+        if (typeof node[key] === "boolean") {
+          report(`${path || "(root)"} uses draft-4 boolean "${key}"`);
+        }
+      }
+      if (typeof node.$ref === "string" && node.$ref.startsWith("#/definitions/")) {
+        report(`${path || "(root)"} $ref points into "#/definitions/" (should be "#/$defs/")`);
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        if (key === "properties" || key === "$defs" || key === "patternProperties") {
+          if (isObject(value)) {
+            for (const [name, sub] of Object.entries(value)) {
+              walk(sub, `${path}.${key}.${name}`, report);
+            }
+          }
+          continue;
+        }
+        walk(value, path ? `${path}.${key}` : key, report);
+      }
+    };
+
+    const offenders: string[] = [];
+    for (const tool of tools) {
+      for (const [kind, schema] of [
+        ["inputSchema", tool.inputSchema],
+        ["outputSchema", tool.outputSchema],
+      ] as const) {
+        if (!schema) continue;
+        const dialect = (schema as { $schema?: unknown }).$schema;
+        if (dialect !== EXPECTED) {
+          offenders.push(`${tool.name}.${kind}: $schema=${JSON.stringify(dialect)}`);
+        }
+        if (JSON.stringify(schema).includes("draft-07")) {
+          offenders.push(`${tool.name}.${kind}: mentions draft-07`);
+        }
+        walk(schema, "", (msg) => offenders.push(`${tool.name}.${kind}: ${msg}`));
+      }
+    }
+
+    expect(
+      offenders,
+      `every advertised schema must declare ${EXPECTED} and use no draft-07-only construct — ` +
+        `clients reject the whole tool otherwise: ${offenders.join("; ")}`
+    ).toEqual([]);
+  });
+
   it("diagnostic tools' real output validates against their outputSchema (when reachable)", async () => {
     // The SDK throws an "Output validation error" McpError when a success
     // result's structuredContent is missing or fails its schema — the only
