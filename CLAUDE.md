@@ -211,14 +211,6 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
 | "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
 
-## Testing Your Understanding
-
-Before creating notes with shell commands or paths containing backslashes, verify you're escaping correctly:
-
-- `~/path/to/file` - No escaping needed (no backslashes)
-- `Mobile\ Documents` - Needs escaping: `Mobile\\ Documents`
-- `C:\Users\` - Needs escaping: `C:\\Users\\`
-
 ## Recurring macOS permission prompts → offer the official-Node fix
 
 If a user reports being **repeatedly** prompted for Full Disk Access or
