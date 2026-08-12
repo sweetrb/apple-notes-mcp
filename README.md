@@ -1229,6 +1229,26 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 - Apple Notes' internal HTML processing preserves empty divs from previous edits, so the gaps are baked into the note's internal representation and cannot be fixed through further updates
 - Fix: delete the note with `delete-note` and create a fresh one with `create-note`
 
+### Every tool is refused: "invalid outputSchema … unsupported dialect"
+
+If your client reports something like
+
+```
+Tool 'list-notes' has an invalid outputSchema: JSON Schema declares an unsupported
+dialect ("$schema": "http://json-schema.org/draft-07/schema#"). The default
+validator supports JSON Schema 2020-12 only.
+```
+
+you are on a version older than **2.7.2**. MCP standardized on JSON Schema
+2020-12, and every tool this server advertised carried the older draft-07
+dialect, so clients rejected all of them at once — nothing about your Notes
+library, permissions, or configuration is involved.
+
+- Fix: upgrade to 2.7.2 or later. `npx -y apple-notes-mcp@latest` picks it up on
+  the next launch; a marketplace install updates through the marketplace.
+- Running from a clone: `git pull && pnpm install && pnpm run build`, then
+  restart the client.
+
 ### `apple-notes` server fails to connect when run from a clone
 - Launch `claude` from **inside the repo directory** so `CLAUDE_PROJECT_DIR` resolves to the repo root (the bare `.` fallback is unreliable — it points at the launching process's working directory)
 - If you've been editing the source, rerun `pnpm run build` — the entrypoint is `${CLAUDE_PROJECT_DIR:-.}/build/index.js`, and the committed bundle only reflects your changes after a rebuild
