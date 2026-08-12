@@ -155,7 +155,13 @@ const MAX = {
  */
 const noteTitleSchema = {
   title: z.string().min(1, "Note title is required").max(MAX.TITLE),
-  account: z.string().max(MAX.ACCOUNT).optional().describe("Account name (defaults to iCloud)"),
+  account: z
+    .string()
+    .max(MAX.ACCOUNT)
+    .optional()
+    .describe(
+      "Account name (defaults to Notes.app's default account; exact or unique-prefix match)"
+    ),
 };
 
 /**
@@ -163,7 +169,13 @@ const noteTitleSchema = {
  */
 const folderNameSchema = {
   name: z.string().min(1, "Folder name is required").max(MAX.FOLDER),
-  account: z.string().max(MAX.ACCOUNT).optional().describe("Account name (defaults to iCloud)"),
+  account: z
+    .string()
+    .max(MAX.ACCOUNT)
+    .optional()
+    .describe(
+      "Account name (defaults to Notes.app's default account; exact or unique-prefix match)"
+    ),
 };
 
 // =============================================================================
@@ -255,7 +267,7 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe(
-          "Account name (defaults to iCloud). Must be an account Notes.app already has configured — see list-accounts."
+          "Account name (defaults to the account Notes.app itself reports as default). Matched exactly, or by a unique prefix; an ambiguous prefix is refused. Must be an account Notes.app already has configured — see list-accounts."
         ),
     },
     outputSchema: {
@@ -416,7 +428,9 @@ registerTool(
         .string()
         .max(MAX.ACCOUNT)
         .optional()
-        .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+        .describe(
+          "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
+        ),
     },
     outputSchema: {
       title: z.string().optional(),
@@ -517,7 +531,9 @@ registerTool(
         .string()
         .max(MAX.ACCOUNT)
         .optional()
-        .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+        .describe(
+          "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
+        ),
     },
     outputSchema: {
       title: z.string().optional(),
@@ -1122,7 +1138,9 @@ registerTool(
         .string()
         .max(MAX.ACCOUNT)
         .optional()
-        .describe("Account name (defaults to iCloud, ignored if id is provided)"),
+        .describe(
+          "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
+        ),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1401,11 +1419,18 @@ registerTool(
       return successResponse(`No folders found${acct}${syncNote}`, { folders: [], count: 0 });
     }
 
+    // Label with the account name Notes.app actually resolved to, not the one
+    // that was asked for — a unique prefix like "robert" resolves to the full
+    // "robert.b.sweet@gmail.com", and echoing the request would hide that (#128).
+    const resolvedAcct = folders[0]?.account ? ` (${folders[0].account})` : acct;
     const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
-    return successResponse(`Found ${folders.length} folders${acct}:\n${folderList}${syncNote}`, {
-      folders,
-      count: folders.length,
-    });
+    return successResponse(
+      `Found ${folders.length} folders${resolvedAcct}:\n${folderList}${syncNote}`,
+      {
+        folders,
+        count: folders.length,
+      }
+    );
   }, "Error listing folders")
 );
 
@@ -1424,7 +1449,13 @@ registerTool(
         .describe(
           'Folder name or nested path separated by "/". E.g., "Retro Tech/PC/CPUs" creates all intermediate folders. Existing segments are skipped.'
         ),
-      account: z.string().max(MAX.ACCOUNT).optional().describe("Account name (defaults to iCloud)"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe(
+          "Account name (defaults to Notes.app's default account; exact or unique-prefix match)"
+        ),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1896,7 +1927,9 @@ registerTool(
         .string()
         .max(MAX.ACCOUNT)
         .optional()
-        .describe("Account containing the destination folder (defaults to iCloud)"),
+        .describe(
+          "Account containing the destination folder (defaults to Notes.app's default account; exact or unique-prefix match)"
+        ),
     },
     outputSchema: {
       ok: z.boolean().optional(),

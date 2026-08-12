@@ -181,7 +181,7 @@ Creates a new note in Apple Notes.
 | `content` | string | Yes | The body content of the note (do not repeat the title here) |
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags) |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
-| `account` | string | No | Account name (defaults to iCloud). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
+| `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. In both formats, the title is automatically prepended as `<h1>`. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities |
 
 **Example (tagged with inline hashtags):**
@@ -224,7 +224,7 @@ Searches for notes by title or content.
 |-----------|------|----------|-------------|
 | `query` | string | Yes | Text to search for |
 | `searchContent` | boolean | No | If `true`, searches note body; if `false` (default), searches titles only |
-| `account` | string | No | Account to search in (defaults to iCloud) |
+| `account` | string | No | Account to search in (defaults to Notes.app's default account; exact or unique-prefix match) |
 | `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of results to return. **Defaults to 50** — a broad query reads several properties per match via AppleScript (~200ms/note), so an unbounded search over hundreds of matches can exceed Notes' 30s timeout and return an error instead of results. Pass a higher value to see more; the applied limit (and whether it truncated the results) is disclosed in the response. |
@@ -266,7 +266,7 @@ Retrieves the full content of a specific note.
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Note title (use `id` instead when available) |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended as it's unique and avoids issues with duplicate titles.
 
@@ -309,7 +309,7 @@ Retrieves a note's body as plain text, with no HTML markup.
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Note title (use `id` instead when available) |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. This reads the note's native `plaintext` property, so it skips the HTML-to-text conversion that `get-note-content` plus a Markdown pass would do. Use `get-note-content` when you need the HTML, or `get-note-markdown` when you want Markdown with checklist state.
 
@@ -324,7 +324,7 @@ Retrieves metadata about a note (without full content).
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `title` | string | Yes | Exact title of the note |
-| `account` | string | No | Account containing the note (defaults to iCloud) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
 ```json
@@ -383,7 +383,7 @@ Updates an existing note's content and/or title.
 | `title` | string | No | Current title of the note to update (use `id` instead when available) |
 | `newTitle` | string | No | New title (if changing the title; ignored when `format` is `"html"`) |
 | `newContent` | string | Yes | New content for the note body |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
@@ -440,7 +440,7 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Exact title of the note to delete (use `id` instead when available) |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
@@ -473,7 +473,7 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Title of the note to move (use `id` instead when available) |
 | `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
@@ -509,7 +509,7 @@ Appends or prepends content to an existing note without replacing it. Always rea
 | `position` | string | No | `"after"` (default) appends to the end; `"before"` prepends to the start |
 | `separator` | string | No | String placed between existing content and new content (default: two newlines → `<div><br></div>` in HTML) |
 | `format` | string | No | Format of the content being appended: `"plaintext"` (default) or `"html"` |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
 
@@ -545,7 +545,7 @@ Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The U
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Note title (use `id` instead when available) |
-| `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
+| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended. Password-protected notes cannot be linked.
 
@@ -568,7 +568,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `account` | string | No | Account to list notes from (defaults to iCloud) |
+| `account` | string | No | Account to list notes from (defaults to Notes.app's default account; exact or unique-prefix match) |
 | `folder` | string | No | Filter to notes in this folder only (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of notes to return |
@@ -619,7 +619,7 @@ Lists all folders in an account with full hierarchical paths.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `account` | string | No | Account to list folders from (defaults to iCloud) |
+| `account` | string | No | Account to list folders from (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
 ```json
@@ -637,7 +637,7 @@ Creates a new folder, including a whole nested hierarchy in one call.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped |
-| `account` | string | No | Account to create folder in (defaults to iCloud) |
+| `account` | string | No | Account to create folder in (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
 ```json
@@ -664,7 +664,7 @@ Deletes a folder.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | Yes | Name or path of the folder to delete (supports nested paths like `"Work/Old"`) |
-| `account` | string | No | Account containing the folder (defaults to iCloud) |
+| `account` | string | No | Account containing the folder (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
 ```json
@@ -963,7 +963,10 @@ AI: [calls get-note-content with title="Shopping List"]
 
 ### Working with Accounts
 
-By default, all operations use iCloud. To work with other accounts:
+Omit `account` and an operation targets whichever account **Notes.app itself
+reports as the default** — not a hardcoded "iCloud". That matters if your default
+is a non-iCloud account, if the account name is localized, or if it carries a
+trailing U+F8FF () character.
 
 ```
 User: "What accounts do I have?"
@@ -974,6 +977,23 @@ User: "List notes in my Gmail account"
 AI: [calls list-notes with account="Gmail"]
     "Your Gmail account has 5 notes..."
 ```
+
+When you do pass `account`, it is resolved in this order:
+
+1. **Exact name match** wins outright.
+2. A **unique prefix match** resolves — `account="robert"` finds
+   `robert.b.sweet@gmail.com`.
+3. An **ambiguous prefix is refused**, with every candidate named:
+
+   ```
+   Account "rob" is ambiguous - it matches 2 accounts:
+   rob@superiortech.io, robert.b.sweet@gmail.com. Use the full account name.
+   ```
+
+That third rule is deliberate. Silently taking the *first* prefix match would
+make `delete-note` or `move-note` land in the wrong account and report success.
+An unresolvable account is reported as such rather than as "note not found", so
+you are not sent looking for the wrong problem.
 
 ### Organizing with Folders
 
