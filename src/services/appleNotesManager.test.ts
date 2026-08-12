@@ -415,15 +415,121 @@ describe("AppleNotesManager", () => {
     vi.clearAllMocks();
   });
 
+  // ---------------------------------------------------------------------------
+  // Account Resolution (#128)
+  // ---------------------------------------------------------------------------
+
+  describe("account resolution", () => {
+    it("targets Notes.app's own default account when none is given", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.searchNotes("anything");
+
+      const script = String(mockExecuteAppleScript.mock.calls[0][0]);
+      // A hardcoded "iCloud" is wrong whenever the real default account differs
+      // — a non-iCloud default, a localized name, or a U+F8FF suffix (#128).
+      expect(script).toContain("set __acctRef to default account");
+      expect(script).not.toContain('tell account "iCloud"');
+    });
+
+    it("prefers an exact name match over a prefix match", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.searchNotes("anything", false, "Work");
+
+      const script = String(mockExecuteAppleScript.mock.calls[0][0]);
+      const exactAt = script.indexOf('every account whose name is "Work"');
+      const prefixAt = script.indexOf('every account whose name starts with "Work"');
+      expect(exactAt).toBeGreaterThan(-1);
+      expect(prefixAt).toBeGreaterThan(-1);
+      // Exact is tested first, and prefix is only consulted in the else branch.
+      expect(exactAt).toBeLessThan(prefixAt);
+    });
+
+    it("refuses an ambiguous prefix match instead of silently picking the first", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.searchNotes("anything", false, "rob");
+
+      const script = String(mockExecuteAppleScript.mock.calls[0][0]);
+      // `first account whose name starts with ...` would resolve "rob" to
+      // whichever of rob@… / robert@… Notes lists first and report success —
+      // on the delete/move paths that is a destructive wrong-account write.
+      expect(script).not.toContain("first account whose name starts with");
+      expect(script).toContain("is ambiguous");
+      expect(script).toContain("(count of _prefixMatches) > 1");
+    });
+
+    it("errors rather than proceeding when the named account does not exist", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.searchNotes("anything", false, "Nope");
+
+      const script = String(mockExecuteAppleScript.mock.calls[0][0]);
+      expect(script).toContain('Account \\"Nope\\" not found"');
+      // Tagged so the swallow-into-false callers can tell a precondition error
+      // from a genuine "note not found" outcome.
+      expect(script).toContain("AccountResolutionError:");
+    });
+
+    it("reports an unresolvable account as such instead of 'note not found' on destructive paths", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error:
+          'AccountResolutionError: Account "rob" is ambiguous - it matches 2 accounts: rob@a, rob@b. Use the full account name.',
+      });
+
+      // deleteNote normally swallows failures into `false`; an unresolvable
+      // account must surface instead, or the caller goes hunting for a missing
+      // note that was never the problem.
+      expect(() => manager.deleteNote("Doomed", "rob")).toThrow(/is ambiguous/);
+      expect(() => manager.deleteNote("Doomed", "rob")).not.toThrow(/AccountResolutionError/);
+    });
+
+    it("still swallows a genuine operation failure into false", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: false,
+        output: "",
+        error: 'Can\'t get note "Doomed".',
+      });
+
+      expect(manager.deleteNote("Doomed", "iCloud")).toBe(false);
+    });
+
+    it("resolves the account for destructive paths too (deleteNote, batch move)", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.deleteNote("Doomed", "rob");
+      const deleteScript = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
+      expect(deleteScript).toContain("is ambiguous");
+      expect(deleteScript).not.toContain("first account whose name starts with");
+
+      manager.batchMoveNotes(["x-coredata://ABC/ICNote/p1"], "Archive", "rob");
+      const moveScript = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
+      expect(moveScript).toContain("is ambiguous");
+      expect(moveScript).toContain("of __acctRef");
+    });
+
+    it("treats a blank account string as 'use the default'", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.searchNotes("anything", false, "   ");
+
+      const script = String(mockExecuteAppleScript.mock.calls[0][0]);
+      expect(script).toContain("set __acctRef to default account");
+    });
+  });
+
   describe("listAttachments — security", () => {
     it("escapes the account name so it cannot break out of the AppleScript literal (injection regression)", () => {
       mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
       manager.listAttachments("My Note", 'evil" injected');
       const script = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
       // The account's double-quote must be escaped (\\") — a raw quote would
-      // terminate the tell-account string literal and allow `do shell script` injection.
-      expect(script).toContain('tell account "evil\\" injected"');
-      expect(script).not.toContain('tell account "evil" injected"');
+      // terminate the account-name string literal and allow `do shell script` injection.
+      expect(script).toContain('every account whose name is "evil\\" injected"');
+      expect(script).not.toContain('every account whose name is "evil" injected"');
     });
   });
 
@@ -445,17 +551,21 @@ describe("AppleNotesManager", () => {
     });
 
     it("returns Note object on successful creation", () => {
-      mockExecuteAppleScript.mockReturnValue({
-        success: true,
-        output: "note id x-coredata://12345/ICNote/p100",
-      });
+      mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output: "note id x-coredata://12345/ICNote/p100",
+        })
+        // The reported account comes from Notes.app's own default account (#128),
+        // not a hardcoded "iCloud".
+        .mockReturnValueOnce({ success: true, output: "Personal" });
 
       const result = manager.createNote("Shopping List", "Eggs, Milk, Bread");
 
       expect(result).not.toBeNull();
       expect(result?.title).toBe("Shopping List");
       expect(result?.content).toBe("Eggs, Milk, Bread");
-      expect(result?.account).toBe("iCloud"); // Default account
+      expect(result?.account).toBe("Personal");
     });
 
     it("strips the 'note id ' prefix from the returned id (#create-note-id)", () => {
@@ -513,7 +623,7 @@ describe("AppleNotesManager", () => {
 
       expect(result?.account).toBe("Gmail");
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"'),
+        expect.stringContaining('every account whose name is "Gmail"'),
         NO_RETRY_OPTIONS
       );
     });
@@ -842,7 +952,7 @@ describe("AppleNotesManager", () => {
       manager.searchNotes("work", false, "Exchange");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Exchange"')
+        expect.stringContaining('every account whose name is "Exchange"')
       );
     });
 
@@ -868,7 +978,7 @@ describe("AppleNotesManager", () => {
       manager.searchNotes("task", false, "Exchange", "Projects");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain('tell account "Exchange"');
+      expect(script).toContain('every account whose name is "Exchange"');
       expect(script).toContain('notes of folder "Projects"');
     });
 
@@ -943,7 +1053,7 @@ describe("AppleNotesManager", () => {
       expect(script).toContain("modification date >= thresholdDate");
       expect(script).toContain('notes of folder "Work"');
       expect(script).toContain("(count of resultList) >= 10");
-      expect(script).toContain('tell account "iCloud"');
+      expect(script).toContain('every account whose name is "iCloud"');
     });
   });
 
@@ -994,7 +1104,7 @@ describe("AppleNotesManager", () => {
       manager.getNoteContent("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('every account whose name is "Gmail"')
       );
     });
   });
@@ -1030,7 +1140,7 @@ describe("AppleNotesManager", () => {
       manager.getNotePlaintext("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"')
+        expect.stringContaining('every account whose name is "Gmail"')
       );
     });
   });
@@ -1271,7 +1381,6 @@ describe("AppleNotesManager", () => {
       expect(result).not.toBeNull();
       expect(result?.title).toBe("Project Notes");
       expect(result?.id).toBe("x-coredata://ABC123/ICNote/p200");
-      expect(result?.account).toBe("iCloud");
     });
 
     it("returns null when note not found", () => {
@@ -1303,7 +1412,7 @@ describe("AppleNotesManager", () => {
 
       expect(result?.account).toBe("Exchange");
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Exchange"')
+        expect.stringContaining('every account whose name is "Exchange"')
       );
     });
 
@@ -1363,7 +1472,7 @@ describe("AppleNotesManager", () => {
       manager.deleteNote("Draft", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('tell account "Gmail"'),
+        expect.stringContaining('every account whose name is "Gmail"'),
         NO_RETRY_OPTIONS
       );
     });
@@ -2143,28 +2252,31 @@ describe("AppleNotesManager", () => {
     ].join(F);
 
     it("returns true when the native move completes successfully", () => {
-      // Mock sequence: getNoteDetails (resolve id) -> native move
+      // Mock sequence: getNoteDetails (resolve id) -> default-account lookup
+      // (once per manager instance, for the reported account) -> native move.
       mockExecuteAppleScript
         .mockReturnValueOnce({ success: true, output: detailsOutput })
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
         .mockReturnValueOnce({ success: true, output: "" });
 
       const result = manager.moveNote("My Note", "Archive");
 
       expect(result).toBe(true);
-      // No copy-then-delete: just the details lookup + a single native `move`.
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+      // No copy-then-delete: the details lookup + a single native `move`.
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(3);
     });
 
     it("uses the native AppleScript `move` command (preserves attachments/identity)", () => {
       mockExecuteAppleScript
         .mockReturnValueOnce({ success: true, output: detailsOutput })
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
         .mockReturnValueOnce({ success: true, output: "" });
 
       manager.moveNote("My Note", "Archive");
 
-      // The second call is the move; assert it issues a native `move ... to` and
+      // The last call is the move; assert it issues a native `move ... to` and
       // does NOT rebuild the note via `make new note` (the old lossy path).
-      const moveScript = mockExecuteAppleScript.mock.calls[1][0] as string;
+      const moveScript = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
       expect(moveScript).toContain("move noteRef to destFolder");
       expect(moveScript).not.toContain("make new note");
     });
@@ -2185,6 +2297,7 @@ describe("AppleNotesManager", () => {
     it("returns false when the move fails (e.g. destination folder missing)", () => {
       mockExecuteAppleScript
         .mockReturnValueOnce({ success: true, output: detailsOutput })
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
         .mockReturnValueOnce({
           success: false,
           output: "",
@@ -2194,7 +2307,7 @@ describe("AppleNotesManager", () => {
       const result = manager.moveNote("My Note", "Nonexistent Folder");
 
       expect(result).toBe(false);
-      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2); // Details + failed move
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(3); // Details + account lookup + failed move
     });
   });
 
@@ -3046,18 +3159,18 @@ describe("AppleNotesManager", () => {
       manager.listAttachments("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('account "Gmail"')
+        expect.stringContaining('every account whose name is "Gmail"')
       );
     });
 
-    it("defaults to iCloud account", () => {
+    it("defaults to Notes.app's own default account, not a hardcoded iCloud", () => {
       mockExecuteAppleScript.mockReturnValueOnce({ success: true, output: "" });
 
       manager.listAttachments("My Note");
 
-      expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('account "iCloud"')
-      );
+      const script = String(mockExecuteAppleScript.mock.calls.at(-1)?.[0]);
+      expect(script).toContain("set __acctRef to default account");
+      expect(script).not.toContain('"iCloud"');
     });
 
     it("returns empty array when note has no attachments", () => {

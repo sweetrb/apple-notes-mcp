@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+## [2.7.1] - 2026-08-12
+
+### Fixed
+
+- **Operations ignored Notes.app's real default account and used the literal string `"iCloud"`.** Every method that took an optional `account` fell back to a hardcoded `"iCloud"`, so the implicit path was wrong for anyone whose default account is not iCloud, whose account name is localized, or whose account name carries a trailing U+F8FF (Apple logo) character — the last is what the reporter actually hit, and no amount of passing the "right" name helped, because the name they could see was not the name AppleScript matched. The default path now resolves through AppleScript's own `default account`. The health check's `operations` probe had the same bug in a second form — it listed notes in `accounts[0]`, whichever account happened to enumerate first, and called it the default; it now exercises the real default. Diagnosed by @lakerfan0306 in #128.
+
+- **An explicit `account` was matched only exactly, and the obvious fix would have made destructive operations silently target the wrong account.** Explicit names now resolve as: exact match wins outright, a *unique* prefix match resolves, and a prefix matching more than one account is **refused** with every candidate named. The refusal is the load-bearing part. The natural repair for the bug above — `first account whose name starts with "X"`, as proposed in #128 — resolves an ambiguous prefix to whichever account AppleScript happens to list first and reports success; applied across the ~10 account-scoped call sites that includes `delete-note`, `move-note` and `batch-move-notes`, so the failure mode is a delete or a move landing in someone else's account with no error. On a library with `rob@superiortech.io` and `robert.b.sweet@gmail.com`, `account="rob"` is now an error naming both, while `account="robert"` still resolves. Same resolution shape as the sibling fix in apple-mail-mcp #137.
+
+- **An unresolvable account was reported as "note not found".** The methods that swallow AppleScript failures into `false`/`null` could not distinguish a precondition error from a real outcome, so naming a nonexistent or ambiguous account sent the caller hunting for a missing note that was never the problem — worst on exactly the destructive paths where the distinction matters. Account-resolution failures are now tagged and re-raised with their real message by `delete-note`, `move-note`, `batch-move-notes`, `create-note`, `update-note`, `create-folder`, `delete-folder`, `get-note-content`, `get-note-plaintext` and `get-note-details`. Genuine operation failures still return `false`/`null` as before.
+
+- **Returned payloads reported the account as `"iCloud"` when the caller had not named one.** `list-folders` and `create-folder` now carry the account name back from the same AppleScript call that resolved it (no extra round trip); `create-note`, `search-notes` and `get-note-details` report it via a default-account lookup cached for the life of the server process — one `osascript` call total, since the manager is a module-level singleton. `list-folders`' text summary now also echoes the **resolved** name rather than the requested one, so a unique-prefix match shows what it actually resolved to.
+
+### Documentation
+
+- Every `account` parameter description in the tool schemas, the README tool reference, and the manager's JSDoc said "defaults to iCloud". All now state the real behavior. The README's **Working with Accounts** section documents the resolution ladder, the ambiguity refusal and why it is a refusal rather than a best guess.
+
 ## [2.7.0] - 2026-08-09
 
 ### Changed

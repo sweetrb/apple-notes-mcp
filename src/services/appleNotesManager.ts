@@ -435,8 +435,11 @@ export function parseNotePropertiesOutput(output: string): ParsedNoteProperties 
  * Used by script builders to scope operations.
  */
 interface AccountScope {
-  /** Account name (e.g., "iCloud", "Gmail") */
-  account: string;
+  /**
+   * Account name (e.g., "iCloud", "Gmail"), or undefined to target whichever
+   * account Notes.app itself reports as the default.
+   */
+  account?: string;
 }
 
 /**
@@ -498,28 +501,116 @@ export function buildFolderReference(folderPath: string): string {
 }
 
 /**
+ * AppleScript variable that every account-scoped script binds to the single
+ * resolved account reference.
+ */
+const AS_ACCOUNT_REF = "__acctRef";
+
+/**
+ * Sentinel prefixed to every account-resolution failure raised from AppleScript.
+ *
+ * Account resolution failing is a *precondition* error, not an operation
+ * outcome, so the methods that otherwise swallow AppleScript failures into
+ * `false`/`null` must not report it as "note not found" — that sends the caller
+ * hunting for the wrong problem on exactly the destructive paths where the
+ * distinction matters most. {@link throwIfAccountResolutionFailed} re-raises it.
+ */
+export const ACCOUNT_RESOLUTION_ERROR = "AccountResolutionError:";
+
+/**
+ * Re-raises an account-resolution failure hidden inside an AppleScript error.
+ *
+ * No-op for every other error, so callers keep their existing swallow-and-
+ * return-false behavior for genuine operation failures.
+ */
+function throwIfAccountResolutionFailed(error: string | undefined): void {
+  if (!error) return;
+  const at = error.indexOf(ACCOUNT_RESOLUTION_ERROR);
+  if (at === -1) return;
+  throw new Error(error.slice(at + ACCOUNT_RESOLUTION_ERROR.length).trim());
+}
+
+/**
+ * Emits AppleScript that binds {@link AS_ACCOUNT_REF} to exactly one account.
+ *
+ * Must be emitted INSIDE a `tell application "Notes"` block.
+ *
+ * Resolution ladder:
+ * 1. **No account requested** → Notes.app's own `default account`, never the
+ *    literal `"iCloud"`. A hardcoded name is wrong whenever the real one
+ *    differs for *any* reason: the user's default simply is not iCloud, the
+ *    account name is localized, or it carries a U+F8FF (Apple logo) suffix.
+ * 2. **Exact name match** wins outright.
+ * 3. A **unique prefix match** resolves — so a caller that passes a shortened
+ *    or subtly-different name still lands on the right account.
+ * 4. **More than one prefix match is refused**, naming every candidate.
+ *
+ * Step 4 is the load-bearing one. `first account whose name starts with ...`
+ * silently picks whichever account AppleScript lists first and reports success;
+ * on the `delete`/`move` paths that means a destructive operation landing in
+ * the wrong account. This is the same hazard resolved in the sibling repo as
+ * apple-mail-mcp #137, and it is why prefix matching is gated on uniqueness
+ * rather than taking `first`.
+ *
+ * Reported by @lakerfan0306 in #128.
+ */
+function buildAccountResolution(account?: string): string {
+  if (account === undefined) {
+    return `set ${AS_ACCOUNT_REF} to default account`;
+  }
+
+  const safeAccount = sanitizeAccountName(account);
+  return `
+    set ${AS_ACCOUNT_REF} to missing value
+    set _exactMatches to (every account whose name is "${safeAccount}")
+    if (count of _exactMatches) is 1 then
+      set ${AS_ACCOUNT_REF} to item 1 of _exactMatches
+    else
+      set _prefixMatches to (every account whose name starts with "${safeAccount}")
+      if (count of _prefixMatches) is 1 then
+        set ${AS_ACCOUNT_REF} to item 1 of _prefixMatches
+      else if (count of _prefixMatches) > 1 then
+        set _candidateNames to {}
+        repeat with _candidate in _prefixMatches
+          set end of _candidateNames to name of (contents of _candidate)
+        end repeat
+        set AppleScript's text item delimiters to ", "
+        set _joinedNames to _candidateNames as text
+        set AppleScript's text item delimiters to ""
+        error "${ACCOUNT_RESOLUTION_ERROR} Account \\"${safeAccount}\\" is ambiguous - it matches " & (count of _prefixMatches) & " accounts: " & _joinedNames & ". Use the full account name."
+      end if
+    end if
+    if ${AS_ACCOUNT_REF} is missing value then error "${ACCOUNT_RESOLUTION_ERROR} Account \\"${safeAccount}\\" not found"
+  `;
+}
+
+/**
  * Builds an AppleScript command wrapped in account context.
  *
  * Most Notes.app operations need to be scoped to an account:
  * ```applescript
  * tell application "Notes"
- *   tell account "iCloud"
+ *   -- resolution ladder binds __acctRef to exactly one account
+ *   tell __acctRef
  *     -- command here
  *   end tell
  * end tell
  * ```
  *
- * This builder generates that wrapper structure.
+ * This builder generates that wrapper structure. The account is resolved by
+ * {@link buildAccountResolution} rather than interpolated as a literal
+ * `tell account "<name>"`, so an omitted account follows Notes.app's real
+ * default and an ambiguous name is refused instead of silently picking one.
  *
- * @param scope - Account to target
+ * @param scope - Account to target; omit `account` for Notes.app's default
  * @param command - The AppleScript command to execute
  * @returns Complete AppleScript ready for execution
  */
 function buildAccountScopedScript(scope: AccountScope, command: string): string {
-  const safeAccount = sanitizeAccountName(scope.account);
   return `
     tell application "Notes"
-      tell account "${safeAccount}"
+      ${buildAccountResolution(scope.account)}
+      tell ${AS_ACCOUNT_REF}
         ${command}
       end tell
     end tell
@@ -654,17 +745,52 @@ function extractCoreDataId(output: string, prefix: string): string {
  */
 export class AppleNotesManager {
   /**
-   * Default account used when no account is specified.
-   * iCloud is the primary account for most Apple Notes users.
+   * Normalizes a caller-supplied account name for the script builders.
+   *
+   * Returns `undefined` when no account was requested, which
+   * {@link buildAccountResolution} turns into Notes.app's own
+   * `default account`. It deliberately no longer substitutes a hardcoded
+   * `"iCloud"` — that name is wrong for anyone whose default account differs,
+   * is localized, or carries a U+F8FF suffix (#128).
    */
-  private readonly defaultAccount = "iCloud";
+  private resolveAccount(account?: string): string | undefined {
+    const trimmed = account?.trim();
+    return trimmed ? trimmed : undefined;
+  }
 
   /**
-   * Resolves the account to use for an operation.
-   * Falls back to default if not specified.
+   * Cached name of Notes.app's default account, for payload reporting only.
+   * `null` = not yet queried; `""` = queried and unavailable (don't retry).
    */
-  private resolveAccount(account?: string): string {
-    return account || this.defaultAccount;
+  private defaultAccountName: string | null = null;
+
+  /**
+   * The account name to report back in a returned payload.
+   *
+   * Returns the caller's account verbatim when they named one. When they did
+   * not, it reports the *real* default account rather than the hardcoded
+   * "iCloud" the payloads used to claim (#128).
+   *
+   * Most scripts resolve the account inline via {@link buildAccountResolution}
+   * and cost nothing extra; this exists for the handful of methods whose script
+   * output can't carry the name back — notably `createNote`, whose nested-folder
+   * branch depends on the implicit result of `make new note` and must not have
+   * its return value extended (the -1728 workaround above).
+   *
+   * The lookup runs at most once per manager instance and is cached, including
+   * the failure case, so a Notes.app that can't answer is not re-asked on every
+   * call. Returns `undefined` when unknown — `account` is an optional field, and
+   * omitting it is honest where guessing was not.
+   */
+  private reportedAccount(targetAccount?: string): string | undefined {
+    if (targetAccount !== undefined) return targetAccount;
+
+    if (this.defaultAccountName === null) {
+      const result = executeAppleScript(buildAppLevelScript("return name of default account"));
+      this.defaultAccountName = result.success ? result.output.trim() : "";
+    }
+
+    return this.defaultAccountName || undefined;
   }
 
   /**
@@ -686,7 +812,7 @@ export class AppleNotesManager {
    * Checks if a note is password-protected by its title.
    *
    * @param title - Exact title of the note
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @returns true if the note is password-protected, false otherwise
    */
   isNotePasswordProtected(title: string, account?: string): boolean {
@@ -709,7 +835,7 @@ export class AppleNotesManager {
    * @param content - Body content (plain text that will be HTML-escaped, or raw HTML when format is "html")
    * @param tags - Optional tags (stored in returned object, not used by Notes.app)
    * @param folder - Optional folder name to create the note in
-   * @param account - Account to use (defaults to iCloud)
+   * @param account - Account to use (defaults to Notes.app's default account)
    * @param format - Content format: "plaintext" escapes and wraps in div tags (default), "html" uses content as-is
    * @returns Created Note object with metadata, or null on failure
    *
@@ -782,6 +908,7 @@ export class AppleNotesManager {
     const result = executeMutationAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
     }
@@ -804,7 +931,7 @@ export class AppleNotesManager {
       created: now,
       modified: now,
       folder,
-      account: targetAccount,
+      account: this.reportedAccount(targetAccount),
     };
   }
 
@@ -816,7 +943,7 @@ export class AppleNotesManager {
    *
    * @param query - Text to search for
    * @param searchContent - If true, search note bodies; if false, search titles
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @param folder - Optional folder to limit search to
    * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
    * @param limit - Optional maximum number of results to return (default: no limit)
@@ -942,6 +1069,8 @@ export class AppleNotesManager {
 
     const notes: Note[] = [];
     const seenIds = new Set<string>();
+    // Resolve once, not per record — the first call can hit AppleScript.
+    const reportedAccount = this.reportedAccount(targetAccount);
     for (const item of items) {
       const [title, id, folder, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
@@ -956,7 +1085,7 @@ export class AppleNotesManager {
         created: parseAppleScriptDate(created ?? ""),
         modified: parseAppleScriptDate(modified ?? ""),
         folder: folder?.trim(),
-        account: targetAccount,
+        account: reportedAccount,
       });
     }
     return notes;
@@ -970,7 +1099,7 @@ export class AppleNotesManager {
    * getNoteDetails() or isNotePasswordProtected().
    *
    * @param title - Exact title of the note
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @returns HTML content of the note, or empty string if not found
    *
    * @example
@@ -991,6 +1120,7 @@ export class AppleNotesManager {
     const result = executeAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get content of note "${title}":`, result.error);
       return "";
     }
@@ -1035,7 +1165,7 @@ export class AppleNotesManager {
    * round-trip entirely.
    *
    * @param title - Exact title of the note
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @returns Plain-text content of the note, or empty string if not found
    */
   getNotePlaintext(title: string, account?: string): string {
@@ -1047,6 +1177,7 @@ export class AppleNotesManager {
     const result = executeAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get plaintext of note "${title}":`, result.error);
       return "";
     }
@@ -1135,7 +1266,7 @@ export class AppleNotesManager {
    * including creation date, modification date, and sharing status.
    *
    * @param title - Exact title of the note
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @returns Note object with full metadata, or null if not found
    */
   getNoteDetails(title: string, account?: string): Note | null {
@@ -1155,6 +1286,7 @@ export class AppleNotesManager {
     const result = executeAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get details for note "${title}":`, result.error);
       return null;
     }
@@ -1174,7 +1306,7 @@ export class AppleNotesManager {
       modified: parsed.modified,
       shared: parsed.shared,
       passwordProtected: parsed.passwordProtected,
-      account: targetAccount,
+      account: this.reportedAccount(targetAccount),
     };
   }
 
@@ -1185,7 +1317,7 @@ export class AppleNotesManager {
    * from the "Recently Deleted" folder in Notes.app.
    *
    * @param title - Exact title of the note to delete
-   * @param account - Account containing the note (defaults to iCloud)
+   * @param account - Account containing the note (defaults to Notes.app's default account)
    * @returns true if deletion succeeded, false otherwise
    */
   deleteNote(title: string, account?: string): boolean {
@@ -1197,6 +1329,7 @@ export class AppleNotesManager {
     const result = executeMutationAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to delete note "${title}":`, result.error);
       return false;
     }
@@ -1244,7 +1377,7 @@ export class AppleNotesManager {
    * @param title - Current title of the note to update
    * @param newTitle - New title (optional, keeps existing if not provided; ignored in html format)
    * @param newContent - New content for the note body
-   * @param account - Account containing the note (defaults to iCloud)
+   * @param account - Account containing the note (defaults to Notes.app's default account)
    * @param format - Content format: "plaintext" wraps in div tags (default), "html" uses content as-is
    * @returns true if update succeeded, false otherwise
    */
@@ -1277,6 +1410,7 @@ export class AppleNotesManager {
     const result = executeMutationAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to update note "${title}":`, result.error);
       return false;
     }
@@ -1527,7 +1661,7 @@ export class AppleNotesManager {
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
    *
-   * @param account - Account to list notes from (defaults to iCloud)
+   * @param account - Account to list notes from (defaults to Notes.app's default account)
    * @param folder - Optional folder to filter by
    * @param modifiedSince - Optional ISO 8601 date string to filter notes modified on or after this date
    * @param limit - Optional maximum number of results to return (default: no limit)
@@ -1650,7 +1784,7 @@ export class AppleNotesManager {
    * so that duplicate folder names (e.g., multiple "Archive" folders) are
    * distinguishable and can be used directly in other operations.
    *
-   * @param account - Account to list folders from (defaults to iCloud)
+   * @param account - Account to list folders from (defaults to Notes.app's default account)
    * @returns Array of Folder objects with path-based names
    */
   listFolders(account?: string): Folder[] {
@@ -1659,6 +1793,7 @@ export class AppleNotesManager {
     // Get each folder's ID, name, parent ID, and shared state in a single AppleScript call.
     // Using IDs enables correct tree building even with duplicate folder names.
     const listCommand = `
+      set acctName to name of it
       set folderList to {}
       set allFolders to every folder
       repeat with f in allFolders
@@ -1669,7 +1804,7 @@ export class AppleNotesManager {
           set parentId to id of cRef
         end if
         set sharedFlag to shared of fRef as text
-        set end of folderList to (id of fRef) & ${AS_FIELD_SEP} & (name of fRef) & ${AS_FIELD_SEP} & parentId & ${AS_FIELD_SEP} & sharedFlag
+        set end of folderList to (id of fRef) & ${AS_FIELD_SEP} & (name of fRef) & ${AS_FIELD_SEP} & parentId & ${AS_FIELD_SEP} & sharedFlag & ${AS_FIELD_SEP} & acctName
       end repeat
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
       return folderList as text
@@ -1693,6 +1828,10 @@ export class AppleNotesManager {
         name: (parts[1] || "").trim(),
         parentId: (parts[2] || "").trim(),
         shared: (parts[3] || "").trim().toLowerCase() === "true",
+        // The account name as Notes.app actually reports it. When the caller
+        // omitted `account` this is the resolved default, which is the whole
+        // point — reporting a hardcoded "iCloud" here was the #128 bug.
+        account: (parts[4] || "").trim(),
       };
     });
 
@@ -1716,7 +1855,7 @@ export class AppleNotesManager {
     return entries.map((entry) => ({
       id: entry.id,
       name: buildPath(entry),
-      account: targetAccount,
+      account: entry.account || targetAccount || "",
       shared: entry.shared,
     }));
   }
@@ -1725,7 +1864,7 @@ export class AppleNotesManager {
    * Creates a new folder in an account.
    *
    * @param name - Name for the new folder
-   * @param account - Account to create folder in (defaults to iCloud)
+   * @param account - Account to create folder in (defaults to Notes.app's default account)
    * @returns Created Folder object, or null on failure
    */
   createFolder(name: string, account?: string): Folder | null {
@@ -1776,24 +1915,28 @@ export class AppleNotesManager {
       const result = executeMutationAppleScript(script);
 
       if (!result.success) {
+        throwIfAccountResolutionFailed(result.error);
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
       }
     }
 
     // Get the ID of the final (deepest) folder
+    // Ask for the account's real name in the same call, so an omitted `account`
+    // reports the resolved default rather than a hardcoded "iCloud" (#128).
     const fullRef = buildFolderReference(name);
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `return id of ${fullRef}`
+      `return (id of ${fullRef}) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
-    const folderId = idResult.success ? extractCoreDataId(idResult.output, "folder") : "";
+    const [rawId = "", rawAccount = ""] = idResult.success ? idResult.output.split(FIELD_SEP) : [];
+    const folderId = idResult.success ? extractCoreDataId(rawId, "folder") : "";
 
     return {
       id: folderId,
       name,
-      account: targetAccount,
+      account: rawAccount.trim() || targetAccount || "",
     };
   }
 
@@ -1803,7 +1946,7 @@ export class AppleNotesManager {
    * Note: This may fail if the folder contains notes.
    *
    * @param name - Name of the folder to delete
-   * @param account - Account containing the folder (defaults to iCloud)
+   * @param account - Account containing the folder (defaults to Notes.app's default account)
    * @returns true if deletion succeeded, false otherwise
    */
   deleteFolder(name: string, account?: string): boolean {
@@ -1814,6 +1957,7 @@ export class AppleNotesManager {
     const result = executeMutationAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to delete folder "${name}":`, result.error);
       return false;
     }
@@ -1835,7 +1979,7 @@ export class AppleNotesManager {
    *
    * @param title - Title of the note to move
    * @param destinationFolder - Name of the folder to move to (must already exist)
-   * @param account - Account containing the note (defaults to iCloud)
+   * @param account - Account containing the note (defaults to Notes.app's default account)
    * @returns true if the move succeeded, false otherwise
    */
   moveNote(title: string, destinationFolder: string, account?: string): boolean {
@@ -1863,19 +2007,19 @@ export class AppleNotesManager {
    *
    * @param id - CoreData URL identifier for the note
    * @param destinationFolder - Name of the folder to move to (must already exist)
-   * @param account - Account containing the destination folder (defaults to iCloud)
+   * @param account - Account containing the destination folder (defaults to Notes.app's default account)
    * @returns true if the move succeeded, false otherwise
    */
   moveNoteById(id: string, destinationFolder: string, account?: string): boolean {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeId(id);
-    const safeAccount = sanitizeAccountName(targetAccount);
     // buildFolderReference validates the destination path; a malformed folder is
     // a precondition error, so let it throw. The destination folder must already
     // exist — Notes.app's `move` does not create it.
-    const destFolderRef = `${buildFolderReference(destinationFolder)} of account "${safeAccount}"`;
+    const destFolderRef = `${buildFolderReference(destinationFolder)} of ${AS_ACCOUNT_REF}`;
 
     const moveCommand = `
+      ${buildAccountResolution(targetAccount)}
       set destFolder to ${destFolderRef}
       set noteRef to note id "${safeId}"
       move noteRef to destFolder
@@ -1884,6 +2028,7 @@ export class AppleNotesManager {
     const result = executeMutationAppleScript(script);
 
     if (!result.success) {
+      throwIfAccountResolutionFailed(result.error);
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
@@ -2111,7 +2256,7 @@ export class AppleNotesManager {
    * Returns the notes:// deep-link URL for a note by title.
    *
    * @param title - Exact note title
-   * @param account - Account to search in (defaults to iCloud)
+   * @param account - Account to search in (defaults to Notes.app's default account)
    * @returns notes://showNote?identifier=<uuid> string, or null on failure
    */
   getNoteLink(title: string, account?: string): string | null {
@@ -2309,14 +2454,15 @@ export class AppleNotesManager {
       return { healthy: false, checks };
     }
 
-    // Check 4: Basic operations work (list notes in default account)
-    const defaultAccount = accounts[0]?.name || "iCloud";
-    const notes = this.listNotes(defaultAccount);
+    // Check 4: Basic operations work (list notes in the default account).
+    // Pass no account so this exercises Notes.app's real `default account`
+    // rather than whichever account happens to be listed first (#128).
+    const notes = this.listNotes();
     // Even 0 notes is fine - we just want to verify the operation works
     checks.push({
       name: "operations",
       passed: true,
-      message: `Basic operations working (${notes.length} note(s) in ${defaultAccount})`,
+      message: `Basic operations working (${notes.length} note(s) in the default account)`,
     });
 
     const allPassed = checks.every((c) => c.passed);
@@ -2590,19 +2736,19 @@ export class AppleNotesManager {
    * Lists attachments for a note by its title.
    *
    * @param title - Title of the note
-   * @param account - Account containing the note (defaults to iCloud)
+   * @param account - Account containing the note (defaults to Notes.app's default account)
    * @returns Array of Attachment objects, or empty array if the note genuinely has none
    * @throws If the AppleScript call fails, so a lookup failure is never mistaken for
    *   an attachment-free note (callers gate destructive full-body updates on this)
    */
   listAttachments(title: string, account?: string): Attachment[] {
     const targetAccount = this.resolveAccount(account);
-    const safeAccount = escapePlainStringForAppleScript(targetAccount);
     const safeTitle = escapePlainStringForAppleScript(title);
 
     const script = `
       tell application "Notes"
-        tell account "${safeAccount}"
+        ${buildAccountResolution(targetAccount)}
+        tell ${AS_ACCOUNT_REF}
           set theNote to note "${safeTitle}"
         set attachmentList to {}
         set attachmentIds to id of every attachment of theNote
@@ -2965,7 +3111,7 @@ export class AppleNotesManager {
    *
    * @param ids - Array of CoreData URL identifiers for notes to move
    * @param folder - Destination folder name
-   * @param account - Account containing the folder (defaults to iCloud)
+   * @param account - Account containing the folder (defaults to Notes.app's default account)
    * @returns Array of results with id, success status, and optional error message
    *
    * @example
@@ -2989,10 +3135,9 @@ export class AppleNotesManager {
     // command — which preserves the note's identity and metadata rather than
     // copy+delete — inside a single app-level loop with per-id `try` isolation.
     const targetAccount = this.resolveAccount(account);
-    const safeAccount = sanitizeAccountName(targetAccount);
     // buildFolderReference validates the (single, shared) destination path; a
     // malformed folder is a precondition error for the whole call, so let it throw.
-    const destFolderRef = `${buildFolderReference(folder)} of account "${safeAccount}"`;
+    const destFolderRef = `${buildFolderReference(folder)} of ${AS_ACCOUNT_REF}`;
 
     const results: { id: string; success: boolean; error?: string }[] = new Array(ids.length);
     const runnable: { index: number; safe: string }[] = [];
@@ -3012,6 +3157,7 @@ export class AppleNotesManager {
     if (runnable.length > 0) {
       const idList = runnable.map((r) => `"${r.safe}"`).join(", ");
       const script = buildAppLevelScript(`
+        ${buildAccountResolution(targetAccount)}
         set destFolder to ${destFolderRef}
         set out to ""
         repeat with rawId in {${idList}}
@@ -3044,6 +3190,10 @@ export class AppleNotesManager {
       const res = executeMutationAppleScript(script);
 
       if (!res.success) {
+        // An unresolvable/ambiguous account is a precondition error for the
+        // whole call, not a per-note outcome — surface it rather than reporting
+        // N identical "batch move failed" rows that hide the real cause.
+        throwIfAccountResolutionFailed(res.error);
         // Whole-batch failure (e.g. destination folder unresolved, Notes not
         // responding): can't isolate, so fail every runnable note.
         for (const r of runnable) {
@@ -3291,7 +3441,7 @@ export class AppleNotesManager {
    * [x] (done) or [ ] (undone) prefixes.
    *
    * @param title - Exact title of the note
-   * @param account - Account containing the note (defaults to iCloud)
+   * @param account - Account containing the note (defaults to Notes.app's default account)
    * @returns Markdown content, or empty string if not found
    *
    * @example
