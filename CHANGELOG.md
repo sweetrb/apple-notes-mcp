@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Security
+
+- **Bumped the pinned `pnpm/action-setup` to v6.0.10 and `github/codeql-action/*` to v4.37.6.** Dependabot's weekly `github-actions` group PR landed these in apple-mail-mcp (#146) and apple-numbers-mcp (#62) but **skipped this repo**, so `conformance-check.sh` reported drift in `ci.yml`, `publish.yml`, `dependabot-rebuild.yml`, `codeql.yml` and `scorecard.yml`. The four servers are meant to carry a byte-identical workflow set, and a silent group-skip is the recurring way that breaks — this is the same failure recorded for the scorecard pin in 2026-08-05. `.github/` does not ship, so this owes no version bump.
+
 ## [2.7.1] - 2026-08-12
 
 ### Fixed
