@@ -42212,8 +42212,28 @@ function registerResourcesAndPrompts(server2, manager) {
 // src/utils/jsonSchemaDialect.ts
 var JSON_SCHEMA_2020_12 = "https://json-schema.org/draft/2020-12/schema";
 var DEFINITIONS_REF_PREFIX = "#/definitions/";
+var SCHEMA_MAP_KEYWORDS = /* @__PURE__ */ new Set([
+  "properties",
+  "patternProperties",
+  "$defs",
+  "dependentSchemas"
+]);
+var DATA_KEYWORDS = /* @__PURE__ */ new Set([
+  "enum",
+  "const",
+  "default",
+  "examples",
+  "required",
+  "dependentRequired"
+]);
 function isPlainObject3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function convertSchemaMap(node) {
+  if (!isPlainObject3(node)) return node;
+  const out = {};
+  for (const [name, subschema] of Object.entries(node)) out[name] = convertNode(subschema);
+  return out;
 }
 function convertNode(node) {
   if (Array.isArray(node)) return node.map(convertNode);
@@ -42225,7 +42245,7 @@ function convertNode(node) {
       case "$schema":
         break;
       case "definitions":
-        out.$defs = convertNode(value);
+        out.$defs = convertSchemaMap(value);
         break;
       case "$ref":
         out.$ref = typeof value === "string" && value.startsWith(DEFINITIONS_REF_PREFIX) ? "#/$defs/" + value.slice(DEFINITIONS_REF_PREFIX.length) : value;
@@ -42266,7 +42286,9 @@ function convertNode(node) {
         out.maximum = convertNode(value);
         break;
       default:
-        out[key] = convertNode(value);
+        if (DATA_KEYWORDS.has(key)) out[key] = value;
+        else if (SCHEMA_MAP_KEYWORDS.has(key)) out[key] = convertSchemaMap(value);
+        else out[key] = convertNode(value);
     }
   }
   return out;
