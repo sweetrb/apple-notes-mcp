@@ -1052,9 +1052,9 @@ If installed from source, use this configuration:
 
 This repo ships a `.mcp.json` at its root so that, when you run `claude` from inside a clone, the server is registered automatically as a **project-scope** server — no manual config needed. Just launch Claude Code from the repo directory and approve the server when prompted (the bundled `build/index.js` is committed, so no build step is required).
 
-The entrypoint is written as:
+The entrypoint is written as (an excerpt of that file, not a whole config):
 
-```json
+```text
 "args": ["${CLAUDE_PROJECT_DIR:-.}/build/index.js"]
 ```
 
