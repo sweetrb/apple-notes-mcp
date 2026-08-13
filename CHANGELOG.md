@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.7.4] - 2026-08-13
+
+### Documentation
+
+- **The `.mcp.json` entrypoint excerpt was fenced ` ```json ` but is not JSON.** The block under "The entrypoint is written as:" is a bare object member — `"args": ["${CLAUDE_PROJECT_DIR:-.}/build/index.js"]` — so anything that treats a ` ```json ` fence as a copyable document (a reader, a tool, an agent extracting config from the docs) gets `Unexpected non-whitespace character after JSON at position 6`. Retagged ` ```text ` and labelled in prose as an excerpt of that file rather than a whole config. It was retagged, **not** added to an allowlist: an allowlist is how the guard below would have become decorative on its first day. README.md ships in the npm tarball (it is in package.json `files[]`), which is why a docs-only fix is released rather than parked.
+
+### Added
+
+- **Two guards that hold the docs to the software that actually exists** (`src/docsTruth.test.ts`). `claudeMdEscaping.test.ts` and `readmeEscaping.test.ts` made the escaping *examples* executable after the four-backslash defect shipped; nothing covered the rest of the documented surface, and the other defect that week — "the default account is iCloud" outliving the code that assumed it — was the same failure in a different sentence: a doc that nothing compares to reality.
+
+  **Guard A — every documented example is real.** (a) Every fenced ` ```json ` block in README.md, CLAUDE.md and `docs/*.md` must parse as JSON, because a malformed example in setup docs actively breaks whoever copies it; the scanner handles indented and longer-run fences so a block cannot dodge it by nesting in a list. (b) Every `APPLE_*_MCP_*` variable named in those docs must appear under `src/`, so a renamed or deleted knob cannot keep being advertised. A family prefix written in prose (`APPLE_NOTES_MCP_*`) is accepted only when it is a **strict prefix** of a real variable — judged structurally, with no repo-specific names hardcoded — so `APPLE_NOTES_MCP_TIMEOUT` (a prefix of the real `APPLE_NOTES_MCP_TIMEOUT_MS`, but not written as a family) still fails.
+
+  **Guard B — the README Tool Reference matches the advertised tool surface, in both directions:** no advertised tool undocumented (a tool shipped without docs is undiscoverable), and no documented tool absent from the server (a documented tool that does not exist sends every caller into a `-32602`). The truth is read from the **built server over stdio** (`initialize` → `tools/list`), not by regexing `src/index.ts`, because the wire is the contract users actually see; the documented set is parsed from the `## Tool Reference` section **only**, since the rest of the README names tools in prose and workflows and scanning the whole file would mask exactly the drift this catches. Both directions agree today — 36 advertised, 36 documented.
+
+  **Placement was the point.** Twice a guard was written that never ran in CI. `vitest.config.ts` includes `src/**/*.test.ts` and is what `pnpm test` / `pnpm run test:coverage` execute, which is what the **required** `test (22)` / `test (24)` contexts run — so this file lives in `src/`, not `test/`, whose config backs no required context. `build/index.js` is git-tracked and package.json's `prepare` script rebuilds it during CI's `pnpm install --frozen-lockfile`, before the test step, so it is present when Guard B spawns it; there is deliberately **no** skip-if-missing branch, which is how a guard passes vacuously forever.
+
+  **Every assertion was proved by breaking what it protects.** A trailing comma in the `search-notes` example fails with ``README.md:233 — a ```json example does not parse as JSON … Expected double-quoted property name``; documenting `APPLE_NOTES_MCP_ATTACHMENT_CACHE_TTL` fails with "does not appear anywhere under src/"; deleting the `get-note-link` entry fails with "the server advertises 1 tool(s) that README.md's Tool Reference never documents: get-note-link"; adding a phantom `pin-note` entry fails with "documents 1 tool(s) the server does not advertise: pin-note". Each check also has a vacuity floor, proved the same way: retagging every `json` fence away, emptying the Tool Reference section, deleting it outright, stripping every environment-variable mention, and hiding `build/index.js` each **fail** rather than pass on an empty set.
+
 ## [2.7.3] - 2026-08-13
 
 ### Documentation
