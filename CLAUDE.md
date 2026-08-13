@@ -39,8 +39,11 @@ content: "cp ~/Library/Mobile\\ Documents/file.txt ~/dest/"
 
 **Correct - Windows path:**
 ```
-content: "Path: C:\\\\Users\\\\Documents"
+content: "Path: C:\\Users\\Documents"
 ```
+(One `\\` per literal backslash, exactly as in the shell example above. `\\\\`
+is the escaping for a literal *double* backslash — see the table's second row —
+so it would store `C:\\Users\\Documents`, not a Windows path.)
 
 **Incorrect - Will fail:**
 ```
@@ -183,7 +186,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - No action needed — enrichment happens transparently
 
 ### Multi-account
-- Default account is iCloud
+- Omitting `account` targets whatever Notes.app reports as its **`default account`** — which is often, but not necessarily, iCloud. Since 2.7.1 the server resolves that name at runtime instead of assuming the literal `"iCloud"`, so it is also correct for a localized account name, a non-iCloud default, or a name carrying a trailing U+F8FF ()
 - Use `list-accounts` to see available accounts
 - Pass `account` parameter to target specific account
 - When using `id`, account is not needed (IDs are globally unique)
