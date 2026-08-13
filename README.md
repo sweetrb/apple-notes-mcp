@@ -1187,16 +1187,26 @@ When sending content containing backslashes (`\`) to this MCP server, **you must
 ```json
 {
   "title": "Install Script",
-  "content": "cp ~/Library/Mobile\\\\ Documents/file.txt ~/.config/"
+  "content": "cp ~/Library/Mobile\\ Documents/file.txt ~/.config/"
 }
 ```
+→ arrives as: `cp ~/Library/Mobile\ Documents/file.txt ~/.config/`
 
-The `\\\\` in JSON becomes `\\` in the actual string, which represents a single `\` in the note.
+In a JSON string literal the two characters `\\` denote **one** literal backslash. Doubling them to `\\\\` denotes *two* backslashes in the note, which is almost never what you want.
+
+**Example - Literal double backslash:**
+```json
+{
+  "title": "Escaping Notes",
+  "content": "Send \\\\ only when you want two backslashes"
+}
+```
+→ arrives as: `Send \\ only when you want two backslashes`
 
 **Common patterns requiring escaping:**
-- Shell escaped spaces: `Mobile\ Documents` → `Mobile\\\\ Documents` in JSON
-- Windows paths: `C:\Users\` → `C:\\\\Users\\\\` in JSON
-- Regex patterns: `\d+` → `\\\\d+` in JSON
+- Shell escaped spaces: `Mobile\ Documents` → `Mobile\\ Documents` in JSON
+- Regex patterns: `\d+` → `\\d+` in JSON
+- Literal double backslash: `\\` → `\\\\` in JSON
 
 **If you see errors** when creating/updating notes with backslashes, double-check that backslashes are properly escaped in the JSON payload.
 
