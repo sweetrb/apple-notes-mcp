@@ -36,11 +36,14 @@ If you send a single backslash without escaping:
 ```
 content: "cp ~/Library/Mobile\\ Documents/file.txt ~/dest/"
 ```
+→ arrives as: `cp ~/Library/Mobile\ Documents/file.txt ~/dest/`
 
 **Correct - Windows path:**
 ```
 content: "Path: C:\\Users\\Documents"
 ```
+→ arrives as: `Path: C:\Users\Documents`
+
 (One `\\` per literal backslash, exactly as in the shell example above. `\\\\`
 is the escaping for a literal *double* backslash — see the table's second row —
 so it would store `C:\\Users\\Documents`, not a Windows path.)

@@ -21,6 +21,17 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { resolve } from "path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import Ajv2020Import from "ajv/dist/2020.js";
+
+// ajv ships CJS. Under Node's ESM loader the default export IS the constructor;
+// under some bundler/loader interops it is the module namespace with the
+// constructor on `.default`. Unwrap so this works either way — a `.default`
+// that is missing at runtime is exactly how this guard would silently stop
+// running. ajv is a DIRECT devDependency on purpose: it is also a transitive
+// dep of @modelcontextprotocol/sdk, but pnpm's strict node_modules layout makes
+// transitive deps unimportable, so the import would fail without it.
+const Ajv2020 =
+  (Ajv2020Import as unknown as { default?: typeof Ajv2020Import }).default ?? Ajv2020Import;
 
 const SERVER = resolve(__dirname, "../build/index.js");
 
@@ -177,6 +188,52 @@ describe("outputSchema contract (real server over stdio)", () => {
       offenders,
       `every advertised schema must declare ${EXPECTED} and use no draft-07-only construct — ` +
         `clients reject the whole tool otherwise: ${offenders.join("; ")}`
+    ).toEqual([]);
+  });
+
+  it("every advertised schema compiles under a REAL 2020-12 validator (ajv)", async () => {
+    // The dialect assertion above checks the label; this checks the goods.
+    // A schema can declare 2020-12 and still be structurally invalid under it —
+    // and a client that rejects it will say only that our tool is broken. ajv is
+    // the same validator the MCP SDK itself uses, so "ajv compiles it" is the
+    // closest thing to "a real client will accept it" we can assert offline.
+    //
+    // strict: false on purpose. Strict mode rejects unknown keywords and would
+    // fail on benign annotations the SDK emits; the contract being guarded is
+    // structural validity under the 2020-12 dialect, not ajv's style opinions.
+    //
+    // No advertised schema uses the `format` KEYWORD (verified: the only
+    // "format" occurrences are tool PARAMETER names under `properties` on
+    // create-note / update-note / append-to-note), so ajv-formats is
+    // deliberately not installed. Note that under strict:false ajv only warns
+    // ("unknown format ... ignored") rather than failing — so if a real `format`
+    // is ever introduced, add ajv-formats and register it here, or this guard
+    // will pass over it without checking anything.
+    const { tools } = await client.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+
+    const failures: string[] = [];
+    for (const tool of tools) {
+      for (const [kind, schema] of [
+        ["inputSchema", tool.inputSchema],
+        ["outputSchema", tool.outputSchema],
+      ] as const) {
+        if (!schema) continue;
+        try {
+          // A fresh instance per schema: ajv keys compiled schemas by $id, so
+          // one shared instance would let an unrelated tool's collision surface
+          // as this tool's failure.
+          new Ajv2020({ strict: false }).compile(schema);
+        } catch (err) {
+          failures.push(`${tool.name}.${kind}: ${(err as Error).message}`);
+        }
+      }
+    }
+
+    expect(
+      failures,
+      `every advertised schema must compile under JSON Schema 2020-12 — a client ` +
+        `that cannot compile it drops the tool entirely: ${failures.join("; ")}`
     ).toEqual([]);
   });
 
