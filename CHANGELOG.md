@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [2.7.3] - 2026-08-13
+
+### Documentation
+
+- **README.md told callers to send FOUR backslashes for one literal backslash, and README.md is the file that ships.** The "common patterns requiring escaping" list said to send `Mobile\\\\ Documents`, `C:\\\\Users\\\\` and `\\\\d+` to store the literal texts `Mobile\ Documents`, `C:\Users\` and `\d+`, and the worked example's `content` field carried the same four-backslash form. Four backslashes in a JSON string literal decode to **two** literal backslashes, so an agent following those instructions stored `Mobile\\ Documents`, `C:\\Users\\` and `\\d+` — every escaped path and every regex silently doubled. The prose under the example was self-contradictory in the same way: it claimed `\\\\` in JSON becomes `\\` in the actual string "which represents a single `\`", but `\\` in the resulting string is two characters, not one. CLAUDE.md has said `\\` since it was written, so the two docs contradicted each other inside one repo — and the **shipped** one was the wrong one, because README.md is in package.json `files[]` and goes out in the npm tarball while CLAUDE.md does not. Every corrected example was verified by decoding it through `JSON.parse`, not by counting backslashes; eyeballing is how the original survived review.
+
+- **Dropped the Windows examples from README.md and CLAUDE.md.** This server drives Apple Notes through AppleScript and cannot run anywhere but macOS, so `C:\Users\` was generic MCP boilerplate that was never localized — and it is not a coincidence that the wrong escaping hid on the one platform nobody here could test against. The generic rule (one literal backslash is sent as `\\`) already covers every platform, so no coverage is lost. CLAUDE.md's Windows worked example is replaced by two macOS-native ones — a regex, and a **literal double backslash**, which is the table's second row and precisely the form the README was misusing; README.md gains the same pair, one as a fenced JSON payload and one as a patterns bullet.
+
+### Added
+
+- **The doc guard now covers README.md, not just CLAUDE.md.** `src/readmeEscaping.test.ts` joins the existing `src/claudeMdEscaping.test.ts`; both live under `src/` deliberately, since `vitest.config.ts` includes `src/**/*.test.ts` only and the required `test (22)` / `test (24)` CI contexts run `pnpm test`. It parses every "common patterns" bullet and asserts the documented JSON payload decodes to exactly the documented plain text — the assertion that catches the bug above — parses each worked fenced JSON block as JSON and asserts its `content` field equals the `→ arrives as:` annotation on the line after the closing fence, and fails if either doc reintroduces a Windows example. Each check also asserts it found something to check, so a doc rewrite that changes the format fails loudly instead of passing vacuously. Proved against the real defect before shipping: restoring the four-backslash Windows bullet fails with `README.md escaping bullet "- Windows paths: ..." is self-contradictory: "Windows paths" says to send C:\\\\Users\\\\, but that JSON string literal decodes to "C:\\Users\\", not C:\Users\`.
+
 ## [2.7.2] - 2026-08-12
 
 ### Fixed

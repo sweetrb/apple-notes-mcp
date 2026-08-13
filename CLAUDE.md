@@ -38,15 +38,21 @@ content: "cp ~/Library/Mobile\\ Documents/file.txt ~/dest/"
 ```
 → arrives as: `cp ~/Library/Mobile\ Documents/file.txt ~/dest/`
 
-**Correct - Windows path:**
+**Correct - Regex pattern:**
 ```
-content: "Path: C:\\Users\\Documents"
+content: "Version pattern: \\d+\\.\\d+"
 ```
-→ arrives as: `Path: C:\Users\Documents`
+→ arrives as: `Version pattern: \d+\.\d+`
+
+**Correct - Literal double backslash:**
+```
+content: "In a JSON string, one backslash is written \\\\"
+```
+→ arrives as: `In a JSON string, one backslash is written \\`
 
 (One `\\` per literal backslash, exactly as in the shell example above. `\\\\`
 is the escaping for a literal *double* backslash — see the table's second row —
-so it would store `C:\\Users\\Documents`, not a Windows path.)
+so sending `\\\\` where you mean a single backslash stores two of them.)
 
 **Incorrect - Will fail:**
 ```
