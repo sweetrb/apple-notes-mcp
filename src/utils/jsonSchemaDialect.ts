@@ -24,13 +24,16 @@ export const JSON_SCHEMA_2020_12 = "https://json-schema.org/draft/2020-12/schema
 const DEFINITIONS_REF_PREFIX = "#/definitions/";
 
 /**
- * Keywords whose value is a map of caller-chosen NAME -> schema. Their keys are
- * user data -- a tool parameter may legitimately be named "definitions",
- * "$schema" or "dependencies" -- so the keys must never be run through the
- * keyword rewrites below, only their values converted.
+ * Keywords whose value is a map of caller-chosen NAME -> schema.
  *
- * ("definitions" is deliberately absent: it is a keyword wherever it appears at
- * a schema position, and its own case converts it and renames it to $defs.)
+ * Their keys are user data -- a tool's parameter names -- not schema keywords,
+ * so they must never be run through the keyword rewrites below. Without this,
+ * a tool declaring a parameter named "definitions" would have it renamed to
+ * "$defs" on the wire, and one named "$schema" would be silently DELETED, while
+ * "required" still named the original -- yielding a schema no input satisfies.
+ *
+ * "definitions" is deliberately absent: it is a real keyword at a schema
+ * position, and its own case below converts it and renames it to $defs.
  */
 const SCHEMA_MAP_KEYWORDS: ReadonlySet<string> = new Set([
   "properties",
@@ -42,7 +45,7 @@ const SCHEMA_MAP_KEYWORDS: ReadonlySet<string> = new Set([
 /**
  * Keywords whose value is instance DATA rather than a schema. Recursing into
  * them would rewrite a caller's literal values as if they were schema keywords
- * (e.g. a default of { definitions: 1 } would come back as { $defs: 1 }).
+ * (e.g. a default of { definitions: 1, $schema: "x" }), so they pass verbatim.
  */
 const DATA_KEYWORDS: ReadonlySet<string> = new Set([
   "enum",
@@ -70,14 +73,6 @@ function convertSchemaMap(node: unknown): unknown {
 /**
  * Recursively rewrite the draft-07 keywords whose meaning or spelling changed
  * in 2020-12. Anything already dialect-neutral passes through untouched.
- *
- * POSITION-AWARE: a key only means a keyword when it sits at a schema position.
- * Inside a "properties" (or other schema-map) node the keys are caller-chosen
- * tool parameter names, and inside a data keyword the value is literal instance
- * data -- neither may be rewritten. Getting this wrong is not cosmetic: a tool
- * parameter named "definitions" would be renamed to "$defs" on the wire, and one
- * named "$schema" would be SILENTLY DELETED, while "required" still listed the
- * original name -- yielding a schema no input can satisfy.
  */
 function convertNode(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(convertNode);
@@ -94,17 +89,16 @@ function convertNode(node: unknown): unknown {
         break;
 
       case "definitions":
-        // A schema map: rename the keyword, convert the values, keep the names.
         out.$defs = convertSchemaMap(value);
         break;
 
       case "$ref":
-        // Deliberate limitation: only a $ref with the exact ROOT prefix
+        // Known, deliberate limitation: only a $ref with the exact ROOT prefix
         // "#/definitions/" is rewritten. A pointer THROUGH a nested definitions
         // block (e.g. "#/properties/x/definitions/Y") is left alone, because
-        // "#/properties/definitions/..." could equally address a property NAMED
-        // definitions, and the two are indistinguishable without resolving the
-        // pointer. The SDK's converter emits neither construct.
+        // "#/properties/definitions/..." could legitimately address a property
+        // NAMED definitions and the two are indistinguishable without resolving
+        // the pointer. The SDK's converter emits neither construct.
         out.$ref =
           typeof value === "string" && value.startsWith(DEFINITIONS_REF_PREFIX)
             ? "#/$defs/" + value.slice(DEFINITIONS_REF_PREFIX.length)
@@ -157,6 +151,9 @@ function convertNode(node: unknown): unknown {
         break;
 
       default:
+        // Position-aware fallthrough: instance data passes verbatim, a
+        // name -> schema map has only its VALUES converted, and anything else
+        // is a schema position and recurses.
         if (DATA_KEYWORDS.has(key)) out[key] = value;
         else if (SCHEMA_MAP_KEYWORDS.has(key)) out[key] = convertSchemaMap(value);
         else out[key] = convertNode(value);
