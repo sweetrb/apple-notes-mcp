@@ -733,7 +733,7 @@ function extractCoreDataId(output: string, prefix: string): string {
  * ```typescript
  * const notes = new AppleNotesManager();
  *
- * // Create a note in the default (iCloud) account
+ * // Create a note in Notes.app's default account (not necessarily iCloud)
  * const note = notes.createNote("Shopping List", "Eggs, Milk, Bread");
  *
  * // Search across all notes
