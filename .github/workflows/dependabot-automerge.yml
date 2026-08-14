@@ -1,8 +1,9 @@
 name: dependabot-automerge
 
-# Auto-merge Dependabot PRs once required checks pass — but only the SAFE ones:
-# dev-dependency and github-actions bumps, which never ship to npm. Runtime
-# ("production") dependency bumps are left open for a human to review.
+# Auto-merge Dependabot GitHub Actions PRs once required checks pass. npm
+# dependency updates, including direct development dependencies, stay open for
+# human review because the build toolchain can change the committed bundle that
+# ships to npm even when the dependency is not in `dependencies`.
 on: pull_request
 
 permissions:
@@ -17,8 +18,8 @@ jobs:
       - name: Dependabot metadata
         id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-      - name: Enable auto-merge for dev-deps and github-actions
-        if: ${{ steps.meta.outputs.package-ecosystem == 'github_actions' || steps.meta.outputs.dependency-type == 'direct:development' }}
+      - name: Enable auto-merge for GitHub Actions updates
+        if: ${{ steps.meta.outputs.package-ecosystem == 'github_actions' }}
         run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
