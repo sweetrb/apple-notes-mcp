@@ -96,8 +96,15 @@ function entryExists(path: string): boolean {
   try {
     lstatSync(path);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    // Only "genuinely absent" may report false. Any other failure — EACCES on a
+    // non-traversable parent, ELOOP — means something IS there that we could not
+    // inspect, and reporting it absent makes the ancestor walk step straight past
+    // it and treat a real (possibly symlinked) component as an uncanonicalized
+    // tail. Fail closed: treat it as present so the boundary check runs against
+    // it rather than around it.
+    const code = (e as NodeJS.ErrnoException).code;
+    return !(code === "ENOENT" || code === "ENOTDIR");
   }
 }
 

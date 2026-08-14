@@ -1,5 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { writeFileSync, existsSync, mkdtempSync, realpathSync, symlinkSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "os";
 import { join } from "path";
 import {
@@ -209,5 +217,35 @@ describe("ensureParentDir", () => {
     const dir = makeTempDir();
     dirs.push(dir);
     expect(() => ensureParentDir(join(dir, "photo.png"))).not.toThrow();
+  });
+});
+
+describe("the boundary compares path segments, not string prefixes", () => {
+  it("refuses a REAL sibling dir whose name merely shares an allowed root's prefix", () => {
+    // This has to use an existing sibling and an injected root set. A
+    // non-existent path like /Volumes-evil is already refused for an unrelated
+    // reason (its deepest existing ancestor is "/", which is in no root), so it
+    // would pass even with the boundary broken — proving nothing.
+    const box = mkdtempSync(join(homedir(), ".anatt-seg-"));
+    try {
+      const root = join(box, "allowed");
+      const sibling = join(box, "allowedevil"); // shares the "allowed" prefix
+      mkdirSync(root);
+      mkdirSync(sibling);
+
+      // Inside the root: fine.
+      expect(() => assertSafeSavePath(join(root, "ok.png"), [root])).not.toThrow();
+      // Prefix-sharing sibling: must be refused. A bare startsWith admits it.
+      expect(() => assertSafeSavePath(join(sibling, "pwned.png"), [root])).toThrow(
+        /Refusing to write outside/
+      );
+    } finally {
+      rmSync(box, { recursive: true, force: true });
+    }
+  });
+
+  it("still accepts ordinary paths inside the real allowed roots", () => {
+    expect(() => assertSafeSavePath(join(homedir(), "Downloads", "x.png"))).not.toThrow();
+    expect(() => assertSafeSavePath("/private/tmp/x.png")).not.toThrow();
   });
 });

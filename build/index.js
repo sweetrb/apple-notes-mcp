@@ -39253,8 +39253,9 @@ function entryExists(path4) {
   try {
     lstatSync(path4);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    const code = e.code;
+    return !(code === "ENOENT" || code === "ENOTDIR");
   }
 }
 function deepestExistingAncestor(abs) {
