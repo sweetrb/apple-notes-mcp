@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+## [2.7.5] - 2026-08-14
+
+### Fixed
+
+- **A symlink inside an allowed root carried an attachment save straight out of it.** `assertSafeSavePath` resolved the destination with `resolve()` and compared that against the allowed roots. `resolve()` collapses `..` but knows nothing about symlinks, so a link living inside a root passed the prefix check and Notes' AppleScript `save` followed it out — `~/probe/escape -> /etc` made `~/probe/escape/hosts` an ALLOWED destination returning `/Users/<you>/probe/escape/hosts`. The module docstring has always claimed "no writing outside sensible roots, no path traversal"; it delivered only the lexical half of the second clause.
+
+  The destination file normally does not exist yet, so the whole path cannot simply be canonicalized. The deepest **existing** ancestor is canonicalized instead — that is the only place a symlink can be — checked against the canonicalized roots, and the fully reassembled destination is checked as well. A destination that **already exists as a symlink** is now refused outright rather than followed, which is how a file outside the roots would otherwise be clobbered.
+
+  Canonicalization uses `fs.realpathSync.native`, not `fs.realpathSync`: the JS emulation resolves symlinks but preserves whatever casing the caller supplied, and macOS APFS is case-insensitive, so an exact-case comparison is defeated by respelling one segment. The roots go through the same call. That is also what keeps the legitimate cases working — macOS's `/tmp` is a symlink to `/private/tmp` and `/var/folders` to `/private/var/folders`, so a caller passing the already-resolved real path must not be refused, and is not. The returned value is still the caller's own spelling, so `/tmp/x` continues to write to `/tmp/x`.
+
+  The root boundary is a path **segment**, not a string prefix, so a sibling that merely shares a prefix (`/Volumes-evil`, `/Users/robother`) cannot slip through.
+
+- **`ensureParentDir` created the parent directory before anything validated the path.** `mkdirSync(…, { recursive: true })` builds directories **through** a symlink, so a validate-after-mkdir arrangement plants exactly the escape the check exists to prevent. It now validates first and throws the same errors `assertSafeSavePath` does. The one call site (`saveAttachmentById`) already validated first; re-checking inside the function makes the ordering a property of the function rather than of its callers.
+
+  **Proved by breaking it.** Reverting the guard fails 4 of the 19 tests in `attachmentFs.test.ts` (581/581 → 577/581 suite-wide), and the `mkdir` test fails on the directory it actually created out at `/private/var/tmp`, not merely on a missing error — the side effect is asserted before the throw for that reason. Restoring it returns 19/19 and 581/581. Two tests hold the opposite direction, so the fix cannot pass by refusing everything: a symlink that stays **inside** the roots is still accepted, and so is the real `/private/var/folders` spelling of a temp directory.
+
 ## [2.7.4] - 2026-08-13
 
 ### Documentation
