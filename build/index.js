@@ -3660,49 +3660,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative, options, skipNormalization) {
+    function resolveComponent(base, relative2, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse3(serialize(base, options), options);
-        relative = parse3(serialize(relative, options), options);
+        relative2 = parse3(serialize(relative2, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative.scheme) {
-        target.scheme = relative.scheme;
-        target.userinfo = relative.userinfo;
-        target.host = relative.host;
-        target.port = relative.port;
-        target.path = removeDotSegments(relative.path || "");
-        target.query = relative.query;
+      if (!options.tolerant && relative2.scheme) {
+        target.scheme = relative2.scheme;
+        target.userinfo = relative2.userinfo;
+        target.host = relative2.host;
+        target.port = relative2.port;
+        target.path = removeDotSegments(relative2.path || "");
+        target.query = relative2.query;
       } else {
-        if (relative.userinfo !== void 0 || relative.host !== void 0 || relative.port !== void 0) {
-          target.userinfo = relative.userinfo;
-          target.host = relative.host;
-          target.port = relative.port;
-          target.path = removeDotSegments(relative.path || "");
-          target.query = relative.query;
+        if (relative2.userinfo !== void 0 || relative2.host !== void 0 || relative2.port !== void 0) {
+          target.userinfo = relative2.userinfo;
+          target.host = relative2.host;
+          target.port = relative2.port;
+          target.path = removeDotSegments(relative2.path || "");
+          target.query = relative2.query;
         } else {
-          if (!relative.path) {
+          if (!relative2.path) {
             target.path = base.path;
-            if (relative.query !== void 0) {
-              target.query = relative.query;
+            if (relative2.query !== void 0) {
+              target.query = relative2.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative.path[0] === "/") {
-              target.path = removeDotSegments(relative.path);
+            if (relative2.path[0] === "/") {
+              target.path = removeDotSegments(relative2.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative.path;
+                target.path = "/" + relative2.path;
               } else if (!base.path) {
-                target.path = relative.path;
+                target.path = relative2.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative2.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative.query;
+            target.query = relative2.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -3710,7 +3710,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative.fragment;
+      target.fragment = relative2.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -11912,9 +11912,9 @@ var require_URL = __commonJS({
       },
       // See: http://tools.ietf.org/html/rfc3986#section-5.2
       // and https://url.spec.whatwg.org/#constructors
-      resolve: function(relative) {
+      resolve: function(relative2) {
         var base = this;
-        var r = new URL2(relative);
+        var r = new URL2(relative2);
         var t = new URL2();
         if (r.scheme !== void 0) {
           t.scheme = r.scheme;
@@ -24193,14 +24193,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join6(output, replacement);
+        return join7(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join6(output, rule.append(self.options));
+          output = join7(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24212,7 +24212,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join6(output, replacement) {
+    function join7(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -39204,8 +39204,17 @@ function getChecklistItems(noteId) {
 }
 
 // src/utils/attachmentFs.ts
-import { existsSync as existsSync2, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "fs";
-import { dirname, isAbsolute, resolve, sep } from "path";
+import {
+  existsSync as existsSync2,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync
+} from "fs";
+import { dirname, isAbsolute, join as join2, relative, resolve, sep } from "path";
 import { homedir as homedir2, tmpdir } from "os";
 function allowedSaveRoots() {
   return [
@@ -39217,16 +39226,77 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function ensureParentDir(abs) {
+function canonicalize(path4) {
+  return realpathSync.native(path4);
+}
+function isWithinRoots(candidate, roots) {
+  return roots.some((root) => {
+    const base = root.endsWith(sep) ? root.slice(0, -1) : root;
+    return candidate === base || candidate.startsWith(base + sep);
+  });
+}
+function canonicalRoots(roots) {
+  const canonical = [];
+  for (const root of roots) {
+    const abs = resolve(root);
+    let resolved;
+    try {
+      resolved = canonicalize(abs);
+    } catch {
+      resolved = abs;
+    }
+    if (!canonical.includes(resolved)) canonical.push(resolved);
+  }
+  return canonical;
+}
+function entryExists(path4) {
+  try {
+    lstatSync(path4);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function deepestExistingAncestor(abs) {
+  let current = abs;
+  for (; ; ) {
+    if (entryExists(current)) return current;
+    const parent = dirname(current);
+    if (parent === current) return current;
+    current = parent;
+  }
+}
+function ensureParentDir(abs, roots = allowedSaveRoots()) {
+  assertSafeSavePath(abs, roots);
   mkdirSync(dirname(abs), { recursive: true });
 }
 function assertSafeSavePath(p, roots = allowedSaveRoots()) {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
-  const ok = roots.some((r) => abs === r || abs.startsWith(r.endsWith(sep) ? r : r + sep));
-  if (!ok) {
+  if (!isWithinRoots(abs, roots)) {
     throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  }
+  const ancestor = deepestExistingAncestor(abs);
+  if (ancestor === abs && lstatSync(abs).isSymbolicLink()) {
+    throw new Error(`Refusing to write to the symbolic link "${abs}".`);
+  }
+  let canonicalAncestor;
+  try {
+    canonicalAncestor = canonicalize(ancestor);
+  } catch {
+    throw new Error(`Destination path cannot be resolved: "${abs}"`);
+  }
+  const suffix = relative(ancestor, abs);
+  if (suffix.split(sep).includes("..")) {
+    throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  }
+  const canonicalDest = suffix ? join2(canonicalAncestor, suffix) : canonicalAncestor;
+  const allowed = canonicalRoots(roots);
+  if (!isWithinRoots(canonicalAncestor, allowed) || !isWithinRoots(canonicalDest, allowed)) {
+    throw new Error(
+      `Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonicalDest}" through a symbolic link.`
+    );
   }
   return abs;
 }
@@ -39272,7 +39342,7 @@ function cleanupTempDir(dir) {
 var import_turndown = __toESM(require_turndown_cjs(), 1);
 import { existsSync as existsSync3 } from "fs";
 import { homedir as homedir3 } from "os";
-import { join as join2 } from "path";
+import { join as join3 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(ASCII character 31)";
@@ -39464,7 +39534,7 @@ function getNoteLinkFromDB(coreDataId) {
   const match = coreDataId.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath = join2(homedir3(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  const dbPath = join3(homedir3(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
   if (!existsSync3(dbPath)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
@@ -42108,12 +42178,12 @@ function formatDoctorReport(r) {
 
 // src/services/fileConfig.ts
 import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join5 } from "path";
+import { join as join6 } from "path";
 import { homedir as homedir6 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join5(homedir6(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join6(homedir6(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   const applied = [];
