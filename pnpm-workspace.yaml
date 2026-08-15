@@ -7,9 +7,19 @@
 allowBuilds:
   esbuild: true
 
-# Pin pnpm 11's supply-chain minimum-release-age default explicitly (1440 min = 1 day)
-# so it is documented and stable across pnpm upgrades. See https://pnpm.io/supply-chain-security.
-minimumReleaseAge: 1440
+# Supply-chain soak: refuse any package version younger than 7 days (10080 min).
+# Deliberately stricter than pnpm 11's 1440-minute default, and deliberately NOT
+# redundant with dependabot.yml's 7-day cooldown: the cooldown governs only what
+# Dependabot *proposes* (direct deps), while this governs everything a resolution
+# *installs*. Transitive packages reach the lockfile without Dependabot ever seeing
+# them -- apple-mail-mcp carried a 5-day-old transitive ip-address@10.5.0 under the
+# 1440 default, which this value rejects. See https://pnpm.io/supply-chain-security.
+#
+# Cost of the stricter value, stated here so it is not rediscovered painfully: an
+# urgent upstream fix cannot be installed until it is 7 days old. There is no
+# minimumReleaseAgeExclude carve-out; if one is ever needed, add it narrowly and
+# remove it once the version ages past the cutoff.
+minimumReleaseAge: 10080
 
 # The MCP SDK currently caps these transitive dependencies below their first
 # fully patched releases. Keep the overrides until the SDK's ranges move past
