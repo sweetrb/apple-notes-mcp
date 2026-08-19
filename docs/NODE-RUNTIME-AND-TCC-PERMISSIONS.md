@@ -60,8 +60,8 @@ the MCP runtime from your Homebrew/dev Node, which can keep updating freely.
    curl -O https://nodejs.org/dist/$VER/node-$VER-$ARCH.tar.gz
    curl -O https://nodejs.org/dist/$VER/SHASUMS256.txt
    grep "  node-$VER-$ARCH.tar.gz$" SHASUMS256.txt | shasum -a 256 -c -   # must print OK
-   tar -xzf node-$VER-$ARCH.tar.gz
-   ln -sfn node-$VER-$ARCH node-current
+   mkdir -p node-current
+   tar -xzf node-$VER-$ARCH.tar.gz --strip-components=1 -C node-current
    ```
 
 2. Confirm it's Developer-ID signed:
@@ -98,12 +98,36 @@ the MCP runtime from your Homebrew/dev Node, which can keep updating freely.
    - *Automation*: the first time the server drives an app you'll get a one-time
      `"node" wants to control "<App>"` prompt — click **Allow**.
 
-   Both grants are keyed to the official Node's stable signature, so you should
-   not be asked again — including after future Node updates. You can delete the
-   stale "node" rows from the Full Disk Access list.
+   ⚠️ **A TCC grant is keyed to the binary's resolved *path*, not only to its
+   signature.** Because the steps above unpack Node into a fixed directory
+   (`~/mcp-runtime/node-current`) rather than a versioned one, that path never
+   moves and the grants survive Node updates — see "Updating" below. If you
+   instead point `node-current` at a `node-vX.Y.Z-…` directory, every update
+   changes the resolved path, presents a brand-new ungranted identity, and you
+   will be re-prompted for all of it.
+
+   You can delete any stale "node" rows from the Full Disk Access list.
 
 ### Updating the dedicated Node later
 
-Drop a newer official LTS tarball into `~/mcp-runtime/`, repoint the
-`node-current` symlink, and restart your client. The signing identity is
-unchanged, so existing grants carry over — no re-approval.
+Replace the **contents** of the same directory — do not create a new one and do
+not repoint anything:
+
+```bash
+VER=v24.19.0 ARCH=darwin-arm64
+cd ~/mcp-runtime
+curl -O https://nodejs.org/dist/$VER/node-$VER-$ARCH.tar.gz
+curl -O https://nodejs.org/dist/$VER/SHASUMS256.txt
+grep "  node-$VER-$ARCH.tar.gz$" SHASUMS256.txt | shasum -a 256 -c -   # must print OK
+rm -rf node-current && mkdir -p node-current
+tar -xzf node-$VER-$ARCH.tar.gz --strip-components=1 -C node-current
+```
+
+The path is unchanged and the official builds are Developer-ID signed with a
+requirement that pins identifier + Team ID (no cdhash), so **both** halves of
+the grant still match: existing grants carry over with no re-approval.
+
+⚠️ **Restart your MCP client afterwards.** Replacing the binary unlinks the one
+any already-running server is executing; macOS then cannot validate that path,
+so those processes fail with *"Permission denied"* until they are restarted.
+Nothing is wrong with your grants — a freshly launched server works fine.
