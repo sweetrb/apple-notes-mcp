@@ -1,6 +1,24 @@
 ## [Unreleased]
 
+## [2.8.0] - 2026-08-28
+
 ### Changed
+
+- **Mutations now target exact note IDs and reject stale or attachment-bearing
+  rewrites.** `update-note`, `append-to-note`, and `delete-note` require the
+  `contentHash` returned by `get-note-content`; title-only mutation is no longer
+  accepted. The complete-body comparison and write/delete happen in one
+  no-retry AppleScript transaction, so a newer edit cannot be silently replaced
+  between checking and saving. Update and append refuse notes with attachments,
+  then reread the same ID and report the post-save hash plus
+  `verifiedVisibleText` (Apple Notes normalizes HTML, so byte-identical rich
+  formatting is not claimed). `move-note` requires the exact ID and verifies the
+  actual destination folder ID before reporting success. `create-note` no
+  longer invents a temporary ID when Notes.app does not return a canonical one.
+  `batch-delete-notes` now takes reviewed `{id, expectedContentHash}` snapshots.
+  Proved with duplicate-title, stale-writer, attachment, and destination-folder
+  disposable-note tests against Notes.app, plus the complete unit and live
+  integration suites.
 
 - **Supply-chain soak raised from 1 day to 7 days** (`minimumReleaseAge: 10080` in
   `pnpm-workspace.yaml`). This is a development/CI-time policy — no shipped bytes change.

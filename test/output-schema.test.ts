@@ -103,6 +103,34 @@ describe("outputSchema contract (real server over stdio)", () => {
     ).toEqual([]);
   });
 
+  it("advertises exact-ID and revision-bound contracts for existing-note mutations", async () => {
+    const { tools } = await client.listTools();
+    const byName = new Map(tools.map((tool) => [tool.name, tool]));
+
+    for (const name of ["update-note", "append-to-note", "delete-note"]) {
+      const schema = byName.get(name)?.inputSchema as
+        | { required?: string[]; properties?: Record<string, unknown> }
+        | undefined;
+      expect(schema, `${name} must be registered`).toBeDefined();
+      expect(schema?.required).toContain("id");
+      expect(schema?.required).toContain("expectedContentHash");
+      expect(schema?.properties).not.toHaveProperty("title");
+      expect(schema?.properties).not.toHaveProperty("account");
+    }
+
+    const move = byName.get("move-note")?.inputSchema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(move?.required).toContain("id");
+    expect(move?.properties).not.toHaveProperty("title");
+
+    const batchDelete = byName.get("batch-delete-notes")?.inputSchema as
+      | { required?: string[]; properties?: Record<string, unknown> }
+      | undefined;
+    expect(batchDelete?.required).toContain("notes");
+    expect(batchDelete?.properties).not.toHaveProperty("ids");
+  });
+
   it("every advertised schema declares JSON Schema 2020-12 and no draft-07 construct", async () => {
     // MCP standardized on 2020-12 (SEP-834 / SEP-1613 / SEP-2106) and clients
     // now HARD-REJECT anything else: "JSON Schema declares an unsupported

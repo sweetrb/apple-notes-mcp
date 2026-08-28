@@ -95,8 +95,6 @@ Action: Use create-note with title="Shopping List" and formatted content
 
 For structured notes, pass `format="html"` and use simple Apple Notes-friendly HTML. The server automatically prepends the `title` as an `<h1>` in both plaintext and HTML modes, so do not include the same `<h1>` title in `content` when creating a note.
 
-**Optional: full control of the title without a duplicate line.** The default approach (pass only `title`, let the server add the `<h1>`) is simplest and is what most notes need. If you instead want to control the title's HTML yourself and find the metadata title rendering as a small duplicate line above your styled `<h1>`, you can put the styled `<h1>Title</h1>` in `content`, then immediately `update-note` on the returned id with `newTitle: " "` (a single space) and the same HTML. Notes then uses the first body line as the sidebar title. Caveat: after blanking the metadata title this way, the note's CoreData id can stop resolving for follow-up calls, so address the note by its display title afterward. Prefer the default title-only approach unless you specifically need this.
-
 ### Finding Notes
 
 When the user wants to find notes:
@@ -117,10 +115,12 @@ When the user wants to see note contents:
 
 ```
 User: "Show me my shopping list"
-Action: Use get-note-content with title="Shopping List"
+Action: Search by title if needed, then use get-note-content with the exact ID
 ```
 
-When search results include an ID, prefer that ID for all follow-up reads, edits, moves, or deletes. Titles can be duplicated, truncated, or contain characters that make title lookup fragile.
+Use titles for discovery only. Mutations require the exact note ID; update,
+append, and delete also require the `contentHash` returned by
+`get-note-content`. This prevents duplicate-title mistakes and stale saves.
 
 ### Updating Notes
 
@@ -134,8 +134,8 @@ survives. Do not hand-roll read-then-`update-note` for an addition.
 User: "Add milk to my shopping list"
 Action:
 1. Use search-notes if needed to get the note ID
-2. Use list-attachments if the note may contain files, scans, images, audio, or PDFs
-3. Use append-to-note by ID with content="Milk"
+2. Read it with get-note-content and retain contentHash
+3. Use append-to-note with its exact ID, expectedContentHash, and content="Milk"
 ```
 
 **Replacing a note — use `update-note`.** Only reach for it when the body really
@@ -145,15 +145,16 @@ is being rewritten:
 User: "Rewrite my project brief with this new version"
 Action:
 1. Use search-notes if needed to get the note ID
-2. Use list-attachments if the note may contain files, scans, images, audio, or PDFs
-3. Use update-note by ID with the complete new body
+2. Read it with get-note-content and retain contentHash
+3. Use update-note with its exact ID, expectedContentHash, and complete new body
 ```
 
 `update-note` replaces the entire note body. It is not an append operation. If `format="html"`, `newTitle` is ignored and the first element in `newContent` becomes the visible title.
 
-**If you must read-modify-write by hand, do not write `get-note-content`'s body back verbatim.** For image-heavy notes that body is lossy: inline base64 images over the configured cap (default 256 KB each) come back as `[inline image omitted: …]` text placeholders, reported as `strippedImages` / `truncated` in `structuredContent` and as a warning appended to the text. Sending that body to `update-note` replaces the real images with the placeholder text. Use `append-to-note` for additions, or export the images with `save-attachment` / `fetch-attachment` first.
+**Do not write `get-note-content`'s body back through another tool.** For image-heavy notes that body is lossy: inline base64 images over the configured cap (default 256 KB each) come back as `[inline image omitted: …]` text placeholders. This server blocks updates and appends when attachments exist; edit those notes in Notes.app.
 
-Both `append-to-note` and `update-note` rewrite the full body, so neither is attachment-safe — see [Attachment-Safe Updates](#attachment-safe-updates) below.
+Both tools refuse to rewrite a note that contains attachments. Use Notes.app
+for those notes.
 
 ### Organizing Notes
 
@@ -161,7 +162,7 @@ When the user wants to organize:
 
 ```
 User: "Move my old notes to Archive"
-Action: Use move-note with the note title and folder="Archive"
+Action: Search for each note, then use move-note with its exact ID and folder="Archive"
 ```
 
 ```
@@ -205,11 +206,9 @@ Do not use CDATA sections. They can render literally in Apple Notes.
 
 ## Attachment-Safe Updates
 
-Before updating an existing note, check whether it contains attachments when the user mentions or the note likely includes images, PDFs, scans, audio, files, or other embedded objects.
-
-- Use `list-attachments` before rewriting attachment-risk notes.
-- Treat empty body output, very large content, a `stdout maxBuffer length exceeded` error, or a non-empty `list-attachments` result as a warning that a full-body update may remove embedded objects.
-- If preserving attachments matters, create a new formatted note instead of overwriting the existing one, or save/fetch the attachments first and explain the limitation to the user.
+`update-note` and `append-to-note` automatically refuse any note containing an
+attachment. Do not bypass this control. Use Notes.app for attachment-bearing
+notes, or create a separate formatted note.
 
 ## Formatting Limits
 
@@ -223,11 +222,13 @@ If the user specifically requires those features, create all API-supported conte
 
 ## Important Guidelines
 
-1. **Prefer IDs**: Use note IDs for follow-up operations whenever available. If only a title is known, use `search-notes` first and then operate on the returned ID.
+1. **Exact IDs for writes**: Search may use titles, but update, append, delete,
+   and move require the exact note ID. Update, append, and delete also require
+   the `contentHash` from the version just read.
 
 2. **Default Account**: Operations default to iCloud. Use the `account` parameter for other accounts (Gmail, Exchange).
 
-3. **Content Format**: Notes store content as HTML. Use `format="html"` for structured content. Retrieved HTML is normalized by Notes and may not match the submitted HTML byte-for-byte.
+3. **Content Format**: Notes store content as HTML. Use `format="html"` for structured content. Retrieved HTML is normalized by Notes and may not match the submitted HTML byte-for-byte. `verifiedVisibleText` proves the words survived, not every rich-formatting detail.
 
 4. **Backslash Escaping**: When content contains backslashes, escape them as `\\` in the JSON.
 
@@ -248,7 +249,7 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 - **"Note not found"**: Use search-notes to find similar titles
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
-- **Attachment-risk update**: Use list-attachments and avoid full-body updates unless the user accepts that embedded objects may be lost
+- **Attachment-risk update**: The mutation is rejected. Use Notes.app or create a separate note.
 - **Notes accumulate blank lines after repeated updates**: Apple Notes' internal HTML processing preserves empty `<div><br></div>` artifacts from previous edits, and they persist even when you update with clean content. Fix: delete the note with delete-note and create a fresh one with create-note — the artifacts are baked into the note's internal representation, so this is more reliable than trying to fix the whitespace through updates
 
 ## Examples

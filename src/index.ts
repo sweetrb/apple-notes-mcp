@@ -44,6 +44,7 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
+import { comparableVisibleText, hashNoteContent } from "@/utils/noteRevision.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -165,6 +166,51 @@ const noteTitleSchema = {
     ),
 };
 
+const noteIdInput = z
+  .string()
+  .min(1, "Note ID is required")
+  .max(MAX.ID)
+  .regex(
+    /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/,
+    "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...)"
+  )
+  .describe("Exact CoreData note ID returned by search-notes, list-notes, or create-note");
+
+const expectedContentHashInput = z
+  .string()
+  .regex(/^sha256:[a-f0-9]{64}$/, "expectedContentHash must come from get-note-content")
+  .describe(
+    "Revision token returned by get-note-content for this exact ID. The mutation stops if the note changed since that read."
+  );
+
+type ExactNoteSnapshot = {
+  note: NonNullable<ReturnType<AppleNotesManager["getNoteById"]>>;
+  body: string;
+  contentHash: string;
+};
+
+/**
+ * Reads the complete current body and metadata for one exact Apple Note.
+ * Mutations use this snapshot for revision checks and human-readable errors;
+ * the manager repeats the body comparison atomically inside the write script.
+ */
+function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string } {
+  const note = notesManager.getNoteById(id);
+  if (!note) return { error: `Note with ID "${id}" not found` };
+  if (note.passwordProtected) {
+    return {
+      error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`,
+    };
+  }
+  const body = notesManager.getNoteContentById(id);
+  if (!body) return { error: `Failed to read content of note "${note.title}"` };
+  return { note, body, contentHash: hashNoteContent(body) };
+}
+
+function revisionConflictMessage(title: string): string {
+  return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
+}
+
 /**
  * Common schema for operations requiring a folder name.
  */
@@ -277,6 +323,8 @@ registerTool(
       title: z.string().optional(),
       folder: z.string().optional(),
       account: z.string().optional(),
+      contentHash: z.string().optional(),
+      verified: z.boolean().optional(),
     },
   },
   withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
@@ -296,6 +344,17 @@ registerTool(
       );
     }
 
+    // A creation response is not enough: verify that the returned identity is
+    // a real, readable Apple Note before advertising it for future writes.
+    const created = notesManager.getNoteById(note.id);
+    const createdBody = notesManager.getNoteContentById(note.id);
+    if (!created || !createdBody) {
+      return errorResponse(
+        `A note may have been created, but its exact ID could not be verified. Do not retry automatically. Returned ID: ${note.id}`
+      );
+    }
+    const contentHash = hashNoteContent(createdBody);
+
     const checklistWarning = detectChecklistAttempt(content) ?? "";
     return successResponse(`Note created: "${note.title}" [id: ${note.id}]${checklistWarning}`, {
       ok: true,
@@ -303,6 +362,8 @@ registerTool(
       title: note.title,
       folder,
       account,
+      contentHash,
+      verified: true,
     });
   }, "Error creating note")
 );
@@ -413,7 +474,7 @@ registerTool(
   "get-note-content",
   {
     description:
-      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the note's content plus parsed hashtags, and strippedImages/truncated when the body was capped.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true — do NOT write it back with update-note or the real images are replaced by that text. Use append-to-note to add content, or export the images with save-attachment / fetch-attachment first.",
+      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, and strippedImages/truncated when the body was capped.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
     inputSchema: {
       id: z
         .string()
@@ -434,8 +495,10 @@ registerTool(
         ),
     },
     outputSchema: {
+      id: z.string().optional(),
       title: z.string().optional(),
       content: z.string().optional(),
+      contentHash: z.string().optional(),
       hashtags: z.array(z.string()).optional(),
       /** Number of oversized inline images replaced with text placeholders. */
       strippedImages: z.number().optional(),
@@ -467,8 +530,10 @@ registerTool(
       const hashtags = parseHashtags(content);
       const warning = strippedImagesWarning(stripped);
       return successResponse(warning ? content + warning : content, {
+        id,
         title: note.title,
         content,
+        contentHash: hashNoteContent(rawContent),
         hashtags,
         strippedImages: stripped.strippedCount,
         truncated: stripped.strippedCount > 0,
@@ -501,8 +566,10 @@ registerTool(
     const hashtags = parseHashtags(content);
     const warning = strippedImagesWarning(stripped);
     return successResponse(warning ? content + warning : content, {
+      id: note.id,
       title,
       content,
+      contentHash: hashNoteContent(rawContent),
       hashtags,
       strippedImages: stripped.strippedCount,
       truncated: stripped.strippedCount > 0,
@@ -827,18 +894,10 @@ registerTool(
   "update-note",
   {
     description:
-      "Use when: changing the title and/or replacing the body of an existing note, by id (preferred) or title.\nReturns: confirmation; warns when the note is shared.\nDo not use when: creating a new note (create-note).\nSafety: newContent REPLACES the entire body — it does not append. Read the note first if you need to preserve existing text, and run list-attachments first when the note may hold files, images, scans, PDFs, or audio, since a full-body replace can drop embedded attachments. Edits to shared notes are immediately visible to all collaborators.",
+      "Use when: replacing the body of one exact Apple Note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title, the note changed since the read, or the note has attachments.\nSafety: requires the exact note id and expectedContentHash from get-note-content. The server atomically rejects stale content and attachment-bearing notes, then reads the same id back after saving. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
-        .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
-      title: z
-        .string()
-        .max(MAX.TITLE)
-        .optional()
-        .describe("Current note title (use id instead when available)"),
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
       newTitle: z
         .string()
         .max(MAX.TITLE)
@@ -858,84 +917,88 @@ registerTool(
         .optional()
         .default("plaintext")
         .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
-      account: z
-        .string()
-        .max(MAX.ACCOUNT)
-        .optional()
-        .describe("Account containing the note (ignored if id is provided)"),
     },
     outputSchema: {
       ok: z.boolean().optional(),
       id: z.string().optional(),
       title: z.string().optional(),
       shared: z.boolean().optional(),
+      previousContentHash: z.string().optional(),
+      contentHash: z.string().optional(),
+      verifiedVisibleText: z.boolean().optional(),
     },
   },
-  withErrorHandling(({ id, title, newTitle, newContent, format = "plaintext", account }) => {
-    // Prefer ID-based update if provided
-    if (id) {
-      // Check for password protection first for better error message
-      const note = notesManager.getNoteById(id);
-      if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
-      }
-      if (note.passwordProtected) {
-        return errorResponse(
-          `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
-        );
-      }
-      const success = notesManager.updateNoteById(id, newTitle, newContent, format);
-      if (!success) {
-        return errorResponse(`Failed to update note "${note.title}"`);
-      }
-      const displayTitle = resolveUpdateResponseTitle(note.title, newTitle, format, newContent);
-      // Add collaboration warning if note is shared
-      const sharedWarning = note.shared
-        ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
-        : "";
-      const checklistWarning = detectChecklistAttempt(newContent) ?? "";
-      return successResponse(`Note updated: "${displayTitle}"${sharedWarning}${checklistWarning}`, {
+  withErrorHandling(({ id, expectedContentHash, newTitle, newContent, format = "plaintext" }) => {
+    const snapshot = readExactNoteSnapshot(id);
+    if ("error" in snapshot) return errorResponse(snapshot.error);
+    if (snapshot.contentHash !== expectedContentHash) {
+      return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+
+    // This preflight gives a clear count. The manager repeats the attachment
+    // check inside the same AppleScript as the write to close the race window.
+    const attachments = notesManager.listAttachmentsById(id);
+    if (attachments.length > 0) {
+      return errorResponse(
+        `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Full-body replacement is blocked; edit it in Notes.app.`
+      );
+    }
+
+    const result = notesManager.updateNoteByIdIfUnchanged(
+      id,
+      snapshot.note.title,
+      snapshot.body,
+      newTitle,
+      newContent,
+      format
+    );
+    if (result.status === "conflict") {
+      return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+    if (result.status === "attachments") {
+      return errorResponse(
+        `Note "${snapshot.note.title}" gained an attachment before saving. No content was replaced.`
+      );
+    }
+    if (result.status !== "updated") {
+      return errorResponse(
+        `The update result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
+      );
+    }
+
+    const readback = notesManager.getNoteContentById(id);
+    const contentHash = readback ? hashNoteContent(readback) : "";
+    if (
+      !readback ||
+      comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)
+    ) {
+      return errorResponse(
+        `The note accepted an update, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
+      );
+    }
+
+    const displayTitle = resolveUpdateResponseTitle(
+      snapshot.note.title,
+      newTitle,
+      format,
+      newContent
+    );
+    const sharedWarning = snapshot.note.shared
+      ? "\n\n⚠️ This note is shared with collaborators. Your changes are visible to them."
+      : "";
+    const checklistWarning = detectChecklistAttempt(newContent) ?? "";
+    return successResponse(
+      `Note updated; visible text verified: "${displayTitle}" [id: ${id}]${sharedWarning}${checklistWarning}`,
+      {
         ok: true,
         id,
         title: displayTitle,
-        shared: note.shared ?? false,
-      });
-    }
-
-    // Fall back to title-based update
-    if (!title) {
-      return errorResponse("Either 'id' or 'title' is required");
-    }
-
-    // Check for password protection first for better error message
-    const note = notesManager.getNoteDetails(title, account);
-    if (!note) {
-      return errorResponse(
-        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
-      );
-    }
-    if (note.passwordProtected) {
-      return errorResponse(
-        `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
-      );
-    }
-
-    const success = notesManager.updateNote(title, newTitle, newContent, account, format);
-    if (!success) {
-      return errorResponse(`Failed to update note "${title}"`);
-    }
-
-    const finalTitle = resolveUpdateResponseTitle(note.title, newTitle, format, newContent);
-    // Add collaboration warning if note is shared
-    const sharedWarning = note.shared
-      ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
-      : "";
-    const checklistWarning = detectChecklistAttempt(newContent) ?? "";
-    return successResponse(`Note updated: "${finalTitle}"${sharedWarning}${checklistWarning}`, {
-      ok: true,
-      title: finalTitle,
-      shared: note.shared ?? false,
-    });
+        shared: snapshot.note.shared ?? false,
+        previousContentHash: expectedContentHash,
+        contentHash,
+        verifiedVisibleText: true,
+      }
+    );
   }, "Error updating note")
 );
 
@@ -945,18 +1008,10 @@ registerTool(
   "append-to-note",
   {
     description:
-      "Use when: adding content to an existing note without replacing it, by id (preferred) or title.\nReturns: confirmation with the note id and title.\nDo not use when: creating a new note (create-note) or replacing the entire body (update-note).\nSafety: reads the existing body first, concatenates, then writes back. Run list-attachments first if the note may hold embedded files — a full-body rewrite can drop attachments.",
+      "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title, the note changed since the read, or it has attachments.\nSafety: append still rewrites the full HTML body, so it uses the same exact-ID, revision, attachment, and readback guards as update-note. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
-        .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
-      title: z
-        .string()
-        .max(MAX.TITLE)
-        .optional()
-        .describe("Note title (use id instead when available)"),
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
       content: z
         .string()
         .min(1, "Content to append is required")
@@ -980,28 +1035,25 @@ registerTool(
         .optional()
         .default("plaintext")
         .describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
-      account: z
-        .string()
-        .max(MAX.ACCOUNT)
-        .optional()
-        .describe("Account containing the note (ignored if id is provided)"),
     },
     outputSchema: {
       ok: z.boolean().optional(),
       id: z.string().optional(),
       title: z.string().optional(),
       shared: z.boolean().optional(),
+      previousContentHash: z.string().optional(),
+      contentHash: z.string().optional(),
+      verifiedVisibleText: z.boolean().optional(),
     },
   },
   withErrorHandling(
     ({
       id,
-      title,
+      expectedContentHash,
       content,
       position = "after",
       separator = "\n\n",
       format = "plaintext",
-      account,
     }) => {
       // Helper: convert new content to HTML block(s) and separator to HTML.
       // Notes stores its body as HTML; reading plaintext and writing back as
@@ -1029,89 +1081,76 @@ registerTool(
         return `<div>${escaped}</div>`;
       };
 
-      if (id) {
-        const note = notesManager.getNoteById(id);
-        if (!note) {
-          return errorResponse(`Note with ID "${id}" not found`);
-        }
-        if (note.passwordProtected) {
-          return errorResponse(
-            `Note "${note.title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
-          );
-        }
-        // Always read as HTML to avoid destroying rich formatting
-        const existingHtml = notesManager.getNoteContentById(id);
-        if (existingHtml === null || existingHtml === undefined) {
-          return errorResponse(`Failed to read content of note "${note.title}"`);
-        }
-        // The title is stored as the first <div> of the body. Separate it so we
-        // never duplicate it when writing back.
-        const firstDivEnd = existingHtml.indexOf("</div>");
-        const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
-        const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
-        const newBlock = contentToHtml(content);
-        const sepHtml = separatorToHtml(separator);
-        const combinedBody =
-          position === "before"
-            ? titleDiv + newBlock + sepHtml + bodyHtml
-            : titleDiv + bodyHtml + sepHtml + newBlock;
-        const success = notesManager.updateNoteById(id, undefined, combinedBody, "html");
-        if (!success) {
-          return errorResponse(`Failed to append to note "${note.title}"`);
-        }
-        const sharedWarning = note.shared
-          ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
-          : "";
-        return successResponse(`Note appended: "${note.title}"${sharedWarning}`, {
-          ok: true,
-          id,
-          title: note.title,
-          shared: note.shared ?? false,
-        });
+      const snapshot = readExactNoteSnapshot(id);
+      if ("error" in snapshot) return errorResponse(snapshot.error);
+      if (snapshot.contentHash !== expectedContentHash) {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-
-      if (!title) {
-        return errorResponse("Either 'id' or 'title' is required");
-      }
-
-      const note = notesManager.getNoteDetails(title, account);
-      if (!note) {
+      const attachments = notesManager.listAttachmentsById(id);
+      if (attachments.length > 0) {
         return errorResponse(
-          `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+          `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
         );
       }
-      if (note.passwordProtected) {
-        return errorResponse(
-          `Note "${title}" is password-protected and cannot be updated. Unlock it in Notes.app first.`
-        );
-      }
-      // Always read as HTML to avoid destroying rich formatting
-      const existingHtml = notesManager.getNoteContent(title, account);
-      if (existingHtml === null || existingHtml === undefined) {
-        return errorResponse(`Failed to read content of note "${title}"`);
-      }
+
       // Separate the title <div> from the body
-      const firstDivEnd = existingHtml.indexOf("</div>");
-      const titleDiv = firstDivEnd !== -1 ? existingHtml.slice(0, firstDivEnd + 6) : "";
-      const bodyHtml = firstDivEnd !== -1 ? existingHtml.slice(firstDivEnd + 6) : existingHtml;
+      const firstDivEnd = snapshot.body.indexOf("</div>");
+      const titleDiv = firstDivEnd !== -1 ? snapshot.body.slice(0, firstDivEnd + 6) : "";
+      const bodyHtml = firstDivEnd !== -1 ? snapshot.body.slice(firstDivEnd + 6) : snapshot.body;
       const newBlock = contentToHtml(content);
       const sepHtml = separatorToHtml(separator);
       const combinedBody =
         position === "before"
           ? titleDiv + newBlock + sepHtml + bodyHtml
           : titleDiv + bodyHtml + sepHtml + newBlock;
-      const success = notesManager.updateNote(title, undefined, combinedBody, account, "html");
-      if (!success) {
-        return errorResponse(`Failed to append to note "${title}"`);
+
+      const result = notesManager.updateNoteByIdIfUnchanged(
+        id,
+        snapshot.note.title,
+        snapshot.body,
+        undefined,
+        combinedBody,
+        "html"
+      );
+      if (result.status === "conflict") {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-      const sharedWarning = note.shared
-        ? "\n\n⚠️ This note is shared with collaborators. Your changes will be visible to them."
+      if (result.status === "attachments") {
+        return errorResponse(
+          `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
+        );
+      }
+      if (result.status !== "updated") {
+        return errorResponse(
+          `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
+        );
+      }
+
+      const readback = notesManager.getNoteContentById(id);
+      const contentHash = readback ? hashNoteContent(readback) : "";
+      if (
+        !readback ||
+        comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)
+      ) {
+        return errorResponse(
+          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
+        );
+      }
+      const sharedWarning = snapshot.note.shared
+        ? "\n\n⚠️ This note is shared with collaborators. Your changes are visible to them."
         : "";
-      return successResponse(`Note appended: "${title}"${sharedWarning}`, {
-        ok: true,
-        title,
-        shared: note.shared ?? false,
-      });
+      return successResponse(
+        `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
+        {
+          ok: true,
+          id,
+          title: snapshot.note.title,
+          shared: snapshot.note.shared ?? false,
+          previousContentHash: expectedContentHash,
+          contentHash,
+          verifiedVisibleText: true,
+        }
+      );
     },
     "Error appending to note"
   )
@@ -1123,84 +1162,49 @@ registerTool(
   "delete-note",
   {
     description:
-      "Use when: permanently deleting a single note, by id (preferred) or title.\nReturns: confirmation; warns when the note was shared.\nDo not use when: deleting many notes (batch-delete-notes) or just relocating one (move-note).\nSafety: requires explicit user confirmation before deleting. Prefer search-notes/list-notes first to show the affected note id and title. Deleting a shared note removes collaborator access.",
+      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
-        .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
-      title: z
-        .string()
-        .max(MAX.TITLE)
-        .optional()
-        .describe("Note title (use id instead when available)"),
-      account: z
-        .string()
-        .max(MAX.ACCOUNT)
-        .optional()
-        .describe(
-          "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
-        ),
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
       id: z.string().optional(),
       title: z.string().optional(),
       wasShared: z.boolean().optional(),
+      previousContentHash: z.string().optional(),
     },
   },
-  withErrorHandling(({ id, title, account }) => {
-    // Prefer ID-based deletion if provided
-    if (id) {
-      // Verify note exists first for better error message
-      const note = notesManager.getNoteById(id);
-      if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
-      }
-      const success = notesManager.deleteNoteById(id);
-      if (!success) {
-        return errorResponse(`Failed to delete note "${note.title}"`);
-      }
-      // Add collaboration warning if note was shared
-      const sharedWarning = note.shared
-        ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
-        : "";
-      return successResponse(`Note deleted: "${note.title}"${sharedWarning}`, {
-        ok: true,
-        id,
-        title: note.title,
-        wasShared: note.shared ?? false,
-      });
+  withErrorHandling(({ id, expectedContentHash }) => {
+    const snapshot = readExactNoteSnapshot(id);
+    if ("error" in snapshot) return errorResponse(snapshot.error);
+    if (snapshot.contentHash !== expectedContentHash) {
+      return errorResponse(revisionConflictMessage(snapshot.note.title));
     }
 
-    // Fall back to title-based deletion
-    if (!title) {
-      return errorResponse("Either 'id' or 'title' is required");
+    const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
+    if (result.status === "conflict") {
+      return errorResponse(revisionConflictMessage(snapshot.note.title));
     }
-
-    // Verify note exists first for better error message
-    const note = notesManager.getNoteDetails(title, account);
-    if (!note) {
+    if (result.status !== "deleted") {
       return errorResponse(
-        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
+        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
       );
     }
 
-    const success = notesManager.deleteNote(title, account);
-    if (!success) {
-      return errorResponse(`Failed to delete note "${title}"`);
-    }
-
-    // Add collaboration warning if note was shared
-    const sharedWarning = note.shared
+    const sharedWarning = snapshot.note.shared
       ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
       : "";
-    return successResponse(`Note deleted: "${title}"${sharedWarning}`, {
-      ok: true,
-      title,
-      wasShared: note.shared ?? false,
-    });
+    return successResponse(
+      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
+      {
+        ok: true,
+        id,
+        title: snapshot.note.title,
+        wasShared: snapshot.note.shared ?? false,
+        previousContentHash: expectedContentHash,
+      }
+    );
   }, "Error deleting note")
 );
 
@@ -1210,18 +1214,9 @@ registerTool(
   "move-note",
   {
     description:
-      "Use when: moving one note to a different folder, by id (preferred) or title.\nReturns: confirmation of the note and destination folder.\nDo not use when: moving many notes (batch-move-notes).\nNote: the note is relocated in place via Notes.app's native move, preserving its id, creation date, and all attachments. The destination folder must already exist (create-folder).",
+      "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
-        .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
-      title: z
-        .string()
-        .max(MAX.TITLE)
-        .optional()
-        .describe("Note title (use id instead when available)"),
+      id: noteIdInput,
       folder: z.string().min(1, "Destination folder is required").max(MAX.FOLDER),
       account: z
         .string()
@@ -1234,54 +1229,32 @@ registerTool(
       id: z.string().optional(),
       title: z.string().optional(),
       folder: z.string().optional(),
+      verified: z.boolean().optional(),
     },
   },
-  withErrorHandling(({ id, title, folder, account }) => {
-    // Prefer ID-based move if provided
-    if (id) {
-      // Verify note exists first for better error message
-      const note = notesManager.getNoteById(id);
-      if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
-      }
-      const success = notesManager.moveNoteById(id, folder, account);
-      if (!success) {
-        return errorResponse(
-          `Failed to move note "${note.title}" to folder "${folder}". Folder may not exist.`
-        );
-      }
-      return successResponse(`Note moved: "${note.title}" -> "${folder}"`, {
-        ok: true,
-        id,
-        title: note.title,
-        folder,
-      });
-    }
-
-    // Fall back to title-based move
-    if (!title) {
-      return errorResponse("Either 'id' or 'title' is required");
-    }
-
-    // Verify note exists first for better error message
-    const note = notesManager.getNoteDetails(title, account);
+  withErrorHandling(({ id, folder, account }) => {
+    const note = notesManager.getNoteById(id);
     if (!note) {
-      return errorResponse(
-        `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
-      );
+      return errorResponse(`Note with ID "${id}" not found`);
     }
-
-    const success = notesManager.moveNote(title, folder, account);
+    const success = notesManager.moveNoteById(id, folder, account);
     if (!success) {
       return errorResponse(
-        `Failed to move note "${title}" to folder "${folder}". Folder may not exist.`
+        `Failed to move note "${note.title}" to folder "${folder}". Folder may not exist.`
       );
     }
-
-    return successResponse(`Note moved: "${title}" -> "${folder}"`, {
+    const readback = notesManager.getNoteById(id);
+    if (!readback || readback.id !== id) {
+      return errorResponse(
+        `The move may have succeeded, but exact-ID readback failed. Inspect note ID ${id} before retrying.`
+      );
+    }
+    return successResponse(`Note moved and verified: "${readback.title}" -> "${folder}"`, {
       ok: true,
-      title,
+      id,
+      title: readback.title,
       folder,
+      verified: true,
     });
   }, "Error moving note")
 );
@@ -1863,12 +1836,17 @@ registerTool(
   "batch-delete-notes",
   {
     description:
-      "Use when: permanently deleting multiple notes by id in one call.\nReturns: per-id success/failure counts.\nDo not use when: deleting a single note (delete-note).\nSafety: requires explicit user confirmation; this is destructive and not undoable. Prefer search-notes/list-notes first to confirm the exact ids being deleted.",
+      "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
     inputSchema: {
-      ids: z
-        .array(z.string().max(MAX.ID))
+      notes: z
+        .array(
+          z.object({
+            id: noteIdInput,
+            expectedContentHash: expectedContentHashInput,
+          })
+        )
         .max(MAX.BATCH_IDS)
-        .describe(`Array of note IDs to delete (max ${MAX.BATCH_IDS} per request)`),
+        .describe(`Reviewed note IDs and revision tokens to delete (max ${MAX.BATCH_IDS})`),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1877,12 +1855,26 @@ registerTool(
       results: z.array(z.object({}).passthrough()).optional(),
     },
   },
-  withErrorHandling(({ ids }) => {
-    if (ids.length === 0) {
-      return errorResponse("No note IDs provided");
+  withErrorHandling(({ notes }) => {
+    if (notes.length === 0) {
+      return errorResponse("No reviewed notes provided");
     }
 
-    const results = notesManager.batchDeleteNotes(ids);
+    // Guard each note independently. The manager performs the decisive body
+    // comparison and delete atomically for each exact ID.
+    const results = notes.map(({ id, expectedContentHash }) => {
+      const snapshot = readExactNoteSnapshot(id);
+      if ("error" in snapshot) return { id, success: false, error: snapshot.error };
+      if (snapshot.contentHash !== expectedContentHash) {
+        return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
+      }
+      const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
+      if (result.status === "deleted") return { id, success: true };
+      if (result.status === "conflict") {
+        return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
+      }
+      return { id, success: false, error: "Delete result uncertain; inspect this exact ID" };
+    });
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
 
@@ -1912,10 +1904,10 @@ registerTool(
   "batch-move-notes",
   {
     description:
-      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts.\nDo not use when: moving a single note (move-note).\nNote: the destination folder must already exist (create-folder).",
+      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
     inputSchema: {
       ids: z
-        .array(z.string().max(MAX.ID))
+        .array(noteIdInput)
         .max(MAX.BATCH_IDS)
         .describe(`Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`),
       folder: z

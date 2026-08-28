@@ -284,8 +284,10 @@ Retrieves the full content of a specific note.
 }
 ```
 
-**Returns:** The HTML content of the note, or error if not found. The
-`structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
+**Returns:** The HTML content of the note, its exact `id`, and a
+`contentHash`. Pass that hash back as `expectedContentHash` for a later update,
+append, or delete; the write is rejected if the note changed after this read.
+The `structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
 from the body. Apple Notes tags are inline hashtags, not a scriptable property;
 see [docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
 
@@ -294,10 +296,9 @@ base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
 256 KB) are replaced with `[inline image omitted: …]` text placeholders so an
 image-heavy note cannot blow the MCP message limit. `structuredContent` reports
 this as `strippedImages` (count) and `truncated` (boolean). When either is set,
-passing this body to [`update-note`](#update-note) would replace the real images
-with the placeholder text — use [`append-to-note`](#append-to-note) for
-additions, or export the images with `save-attachment` / `fetch-attachment`
-first.
+passing this body to an unguarded full-body writer would replace the real images
+with placeholder text. This server refuses update and append operations on
+attachment-bearing notes; edit them in Notes.app.
 
 ---
 
@@ -379,39 +380,20 @@ Updates an existing note's content and/or title.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | No | Note ID (preferred - more reliable than title) |
-| `title` | string | No | Current title of the note to update (use `id` instead when available) |
+| `id` | string | Yes | Exact CoreData note ID returned by a read or search |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being replaced |
 | `newTitle` | string | No | New title (if changing the title; ignored when `format` is `"html"`) |
 | `newContent` | string | Yes | New content for the note body |
-| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
 
-**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
-
-**Returns:** Confirmation with the note's visible title and, for ID-based updates, its ID. For HTML updates, the title comes from the first rendered line of `newContent`, matching Notes.app. The response also warns if the note is shared.
+Title-only updates are rejected because Apple Notes titles are not unique.
 
 **Example - Using ID (recommended):**
 ```json
 {
   "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "newContent": "Updated content here"
-}
-```
-
-**Example - Update content only:**
-```json
-{
-  "title": "Shopping List",
-  "newContent": "- Milk\n- Eggs\n- Bread\n- Butter"
-}
-```
-
-**Example - Update title and content:**
-```json
-{
-  "title": "Draft",
-  "newTitle": "Final Version",
-  "newContent": "This is the completed document."
 }
 ```
 
@@ -419,16 +401,21 @@ Updates an existing note's content and/or title.
 ```json
 {
   "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "newContent": "<p>New findings with <b>bold</b> emphasis.</p><pre><code>console.log('hello');</code></pre>",
   "format": "html"
 }
 ```
 
-**Returns:** Confirmation message, or error if note not found.
+**Returns:** Confirmation with the exact ID, post-save `contentHash`, and
+`verifiedVisibleText: true`, or an error if the note changed before saving.
+Apple Notes normalizes HTML, so this proves the visible text after saving, not
+byte-identical rich formatting.
 
 **Note:** `newContent` **replaces the entire note body** — it is not appended. To add to a note, prefer [`append-to-note`](#append-to-note), which does the read-and-concatenate for you and always round-trips the body as HTML. If you do read-modify-write by hand, note that `get-note-content` replaces oversized inline images with text placeholders (see [`get-note-content`](#get-note-content)) — writing that body back bakes the placeholders in.
 
-**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](https://github.com/sweetrb/apple-notes-mcp/blob/main/skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
+**Attachments:** `update-note` refuses to replace any note that contains an
+attachment. Edit those notes in Notes.app or create a separate note instead.
 
 ---
 
@@ -438,23 +425,17 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | No | Note ID (preferred - more reliable than title) |
-| `title` | string | No | Exact title of the note to delete (use `id` instead when available) |
-| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
+| `id` | string | Yes | Exact CoreData note ID returned by a read or search |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
 
-**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+Title-only deletion is rejected. If the note changed after the supplied hash
+was read, deletion is also rejected.
 
 **Example - Using ID (recommended):**
 ```json
 {
-  "id": "x-coredata://ABC123/ICNote/p456"
-}
-```
-
-**Example - Using title:**
-```json
-{
-  "title": "Old Draft"
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 }
 ```
 
@@ -470,12 +451,10 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | No | Note ID (preferred - more reliable than title) |
-| `title` | string | No | Title of the note to move (use `id` instead when available) |
+| `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
-| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
-**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+Title-only moves are rejected.
 
 **Example - Using ID (recommended):**
 ```json
@@ -485,15 +464,8 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 }
 ```
 
-**Example - Using title:**
-```json
-{
-  "title": "Completed Task",
-  "folder": "Archive"
-}
-```
-
-**Returns:** Confirmation message, or error if note or folder not found.
+**Returns:** Confirmation only after the same note ID is read back and its
+actual destination folder ID matches the requested folder.
 
 ---
 
@@ -503,20 +475,20 @@ Appends or prepends content to an existing note without replacing it. Always rea
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | No | Note ID (preferred - more reliable than title) |
-| `title` | string | No | Note title (use `id` instead when available) |
+| `id` | string | Yes | Exact CoreData note ID returned by a read or search |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being extended |
 | `content` | string | Yes | Text to append to the note body |
 | `position` | string | No | `"after"` (default) appends to the end; `"before"` prepends to the start |
 | `separator` | string | No | String placed between existing content and new content (default: two newlines → `<div><br></div>` in HTML) |
 | `format` | string | No | Format of the content being appended: `"plaintext"` (default) or `"html"` |
-| `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
 
-**Note:** Either `id` or `title` must be provided. Using `id` is recommended.
+Title-only appends are rejected.
 
 **Example - Append plaintext:**
 ```json
 {
   "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "content": "New item added today"
 }
 ```
@@ -525,15 +497,20 @@ Appends or prepends content to an existing note without replacing it. Always rea
 ```json
 {
   "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "content": "<div><b>Status:</b> done</div>",
   "format": "html",
   "position": "before"
 }
 ```
 
-**Returns:** Confirmation with note id and title. Warns when the note is shared with collaborators.
+**Returns:** Confirmation with the exact ID, post-save `contentHash`, and
+`verifiedVisibleText: true`. Apple Notes normalizes HTML, so this proves the
+visible text after saving, not byte-identical rich formatting. Warns when the
+note is shared with collaborators.
 
-**⚠️ Safety:** Reads the existing body first, concatenates, then writes back. Run `list-attachments` first if the note may hold embedded files — a full-body rewrite can drop attachments.
+**Safety:** The append is rejected if the note changed since it was read or if
+the note contains an attachment.
 
 ---
 
@@ -740,7 +717,7 @@ Deletes multiple notes at once by ID.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `ids` | string[] | Yes | Array of note IDs to delete (max 500 per request) |
+| `notes` | object[] | Yes | Array of `{id, expectedContentHash}` snapshots to delete (max 500 per request) |
 
 **Returns:** Summary of successes and failures.
 
@@ -758,7 +735,8 @@ Moves multiple notes to a folder.
 | `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder) |
 | `account` | string | No | Account containing the folder |
 
-**Returns:** Summary of successes and failures.
+**Returns:** Summary of successes and failures. Each success is reported only
+after the note's actual container folder ID matches the destination folder ID.
 
 ---
 
@@ -1003,7 +981,7 @@ AI: [calls create-folder with name="Archive"]
     "Created folder 'Archive'"
 
 User: "Move my old meeting notes to Archive"
-AI: [calls move-note with title="Old Meeting Notes", folder="Archive"]
+AI: [searches for the note, then calls move-note with its exact id and folder="Archive"]
     "Moved 'Old Meeting Notes' to 'Archive'"
 
 User: "What folders do I have?"

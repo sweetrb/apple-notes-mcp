@@ -242,6 +242,23 @@ export function sanitizeId(id: string): string {
 }
 
 /**
+ * Validates a real Apple Note identity for any operation that targets a note.
+ *
+ * Generic CoreData IDs and historical `temp-*` fallbacks are intentionally
+ * rejected. A synthetic identity is not safe enough for a write because it
+ * cannot name one exact object in Notes.app.
+ */
+export function sanitizeNoteId(id: string): string {
+  const noteIdPattern = /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/;
+  if (!noteIdPattern.test(id)) {
+    throw new Error(
+      `Invalid note ID format: "${id.substring(0, 80)}". Expected canonical Apple Note ID (x-coredata://.../ICNote/p...).`
+    );
+  }
+  return escapeForAppleScript(id);
+}
+
+/**
  * Sanitizes an account name for safe embedding in AppleScript.
  *
  * @param account - Account name string
@@ -919,12 +936,27 @@ export class AppleNotesManager {
     // Strip that prefix so we return the bare x-coredata:// URL that the id
     // validator and downstream tools (get-note-content, update-note) accept.
     const rawOutput = result.output.trim();
+    // Notes.app returns either `note id x-coredata://...` or the bare URL,
+    // depending on the account/context. Accept only those two canonical forms.
     const noteId = extractCoreDataId(rawOutput, "note") || rawOutput;
+    if (!noteId) {
+      // The note may exist even when AppleScript returned an unexpected object
+      // specifier. Fail closed instead of handing out a synthetic or unverified
+      // identity that a later mutation could mis-target.
+      console.error(`Created note "${title}" but Notes.app returned no canonical note ID`);
+      return null;
+    }
+    try {
+      sanitizeNoteId(noteId);
+    } catch {
+      console.error(`Created note "${title}" but Notes.app returned an invalid note ID`);
+      return null;
+    }
 
     // Return a Note object representing the created note with real ID
     const now = new Date();
     return {
-      id: noteId || generateFallbackId(), // Use real ID, fallback to unique temp ID
+      id: noteId,
       title,
       content,
       tags,
@@ -1481,6 +1513,93 @@ export class AppleNotesManager {
   }
 
   /**
+   * Replaces one exact note body only if the body is still the snapshot the
+   * caller reviewed and the note has no attachments.
+   *
+   * Both guards and the write execute inside one AppleScript. This closes the
+   * race that would exist if JavaScript checked the note and then issued a
+   * separate unconditional `set body` command.
+   */
+  updateNoteByIdIfUnchanged(
+    id: string,
+    currentTitle: string,
+    expectedBody: string,
+    newTitle: string | undefined,
+    newContent: string,
+    format: "plaintext" | "html" = "plaintext"
+  ):
+    { status: "updated"; writtenBody: string } | { status: "conflict" | "attachments" | "failed" } {
+    const safeId = sanitizeNoteId(id);
+    if (newTitle) validateLength(newTitle, MAX_TITLE_LENGTH, "Note title");
+    validateLength(newContent, MAX_CONTENT_LENGTH, "Note content");
+    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
+
+    // Keep the unescaped form for exact-ID post-write verification. Escape only
+    // at the AppleScript boundary so the comparison reflects Notes.app's body.
+    let writtenBody: string;
+    if (format === "html") {
+      writtenBody = newContent;
+    } else {
+      const effectiveTitle = newTitle || currentTitle;
+      const encodePlaintext = (value: string): string =>
+        escapeForAppleScript(value).replace(/\\"/g, '"');
+      writtenBody = `<div>${encodePlaintext(effectiveTitle)}</div><div>${encodePlaintext(newContent)}</div>`;
+    }
+
+    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const safeWrittenBody = escapeHtmlForAppleScript(writtenBody);
+    const script = buildAppLevelScript(`
+      set noteRef to note id "${safeId}"
+      if (count of attachments of noteRef) is greater than 0 then return "SAFETY_ATTACHMENTS"
+      set currentBody to body of noteRef
+      if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+      set body of noteRef to "${safeWrittenBody}"
+      return "SAFETY_UPDATED"
+    `);
+    const result = executeMutationAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed guarded update for note ID "${id}":`, result.error);
+      return { status: "failed" };
+    }
+    const status = result.output.trim();
+    if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_ATTACHMENTS") return { status: "attachments" };
+    if (status !== "SAFETY_UPDATED") return { status: "failed" };
+    return { status: "updated", writtenBody };
+  }
+
+  /**
+   * Deletes one exact note only when its complete body still matches the body
+   * the caller reviewed. The comparison and delete are one AppleScript action,
+   * so a concurrent edit cannot slip between the guard and deletion.
+   */
+  deleteNoteByIdIfUnchanged(
+    id: string,
+    expectedBody: string
+  ): { status: "deleted" | "conflict" | "failed" } {
+    const safeId = sanitizeNoteId(id);
+    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
+    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const script = buildAppLevelScript(`
+      set noteRef to note id "${safeId}"
+      set currentBody to body of noteRef
+      if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+      delete noteRef
+      return "SAFETY_DELETED"
+    `);
+    const result = executeMutationAppleScript(script);
+
+    if (!result.success) {
+      console.error(`Failed guarded delete for note ID "${id}":`, result.error);
+      return { status: "failed" };
+    }
+    const status = result.output.trim();
+    if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
+  }
+
+  /**
    * Builds the AppleScript body for a bulk note listing.
    *
    * Names, ids, and (when date-filtering) modification dates are fetched as
@@ -2023,6 +2142,10 @@ export class AppleNotesManager {
       set destFolder to ${destFolderRef}
       set noteRef to note id "${safeId}"
       move noteRef to destFolder
+      set movedNoteRef to note id "${safeId}"
+      set actualFolder to container of movedNoteRef
+      if (id of actualFolder) is not (id of destFolder) then return "SAFETY_WRONG_FOLDER"
+      return "SAFETY_MOVED"
     `;
     const script = buildAppLevelScript(moveCommand);
     const result = executeMutationAppleScript(script);
@@ -2032,6 +2155,13 @@ export class AppleNotesManager {
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
+      );
+      return false;
+    }
+
+    if (result.output.trim() !== "SAFETY_MOVED") {
+      console.error(
+        `Move result for note ID "${id}" did not verify destination "${destinationFolder}"`
       );
       return false;
     }
@@ -3098,6 +3228,8 @@ export class AppleNotesManager {
           false,
           op === "delete" ? "Deletion failed" : "Move failed"
         );
+      case "wrongfolder":
+        return this.createBatchResult(id, false, "Destination folder verification failed");
       default:
         return this.createBatchResult(id, false, "Unknown error");
     }
@@ -3178,7 +3310,13 @@ export class AppleNotesManager {
             else
               try
                 move noteRef to destFolder
-                set out to out & "ok" & ${AS_RECORD_SEP}
+                set movedNoteRef to note id theId
+                set actualFolder to container of movedNoteRef
+                if (id of actualFolder) is (id of destFolder) then
+                  set out to out & "ok" & ${AS_RECORD_SEP}
+                else
+                  set out to out & "wrongfolder" & ${AS_RECORD_SEP}
+                end if
               on error
                 set out to out & "fail" & ${AS_RECORD_SEP}
               end try
