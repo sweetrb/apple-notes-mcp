@@ -40058,8 +40058,10 @@ var AppleNotesManager = class {
       set noteRef to note id "${safeId}"
       if (count of attachments of noteRef) is greater than 0 then return "SAFETY_ATTACHMENTS"
       set currentBody to body of noteRef
-      if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
-      set body of noteRef to "${safeWrittenBody}"
+      considering case
+        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        set body of noteRef to "${safeWrittenBody}"
+      end considering
       return "SAFETY_UPDATED"
     `);
     const result = executeMutationAppleScript(script);
@@ -40085,8 +40087,10 @@ var AppleNotesManager = class {
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"
       set currentBody to body of noteRef
-      if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
-      delete noteRef
+      considering case
+        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        delete noteRef
+      end considering
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);

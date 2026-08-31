@@ -8,8 +8,10 @@
   rewrites.** `update-note`, `append-to-note`, and `delete-note` require the
   `contentHash` returned by `get-note-content`; title-only mutation is no longer
   accepted. The complete-body comparison and write/delete happen in one
-  no-retry AppleScript transaction, so a newer edit cannot be silently replaced
-  between checking and saving. Update and append refuse notes with attachments,
+  no-retry AppleScript transaction, compared with `considering case` (plain
+  AppleScript string comparison is case-insensitive by default, which would
+  let a case-only concurrent edit slip past the guard), so a newer edit cannot
+  be silently replaced between checking and saving. Update and append refuse notes with attachments,
   then reread the same ID and report the post-save hash plus
   `verifiedVisibleText` (Apple Notes normalizes HTML, so byte-identical rich
   formatting is not claimed). `move-note` requires the exact ID and verifies the

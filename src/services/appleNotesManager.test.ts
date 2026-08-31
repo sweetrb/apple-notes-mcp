@@ -1479,6 +1479,12 @@ describe("AppleNotesManager", () => {
       expect(script.indexOf("currentBody is not")).toBeLessThan(
         script.indexOf("set body of noteRef")
       );
+      // AppleScript's `is`/`is not` is case-insensitive by default, so a
+      // case-only concurrent edit would otherwise slip past the conflict
+      // guard. `considering case` must wrap the comparison (and the write,
+      // so a false-equal never reaches `set body of noteRef`).
+      expect(script.indexOf("considering case")).toBeLessThan(script.indexOf("currentBody is not"));
+      expect(script.indexOf("set body of noteRef")).toBeLessThan(script.indexOf("end considering"));
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(expect.any(String), NO_RETRY_OPTIONS);
     });
 
@@ -1523,6 +1529,8 @@ describe("AppleNotesManager", () => {
       const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
       expect(script).toContain("currentBody is not");
       expect(script.indexOf("currentBody is not")).toBeLessThan(script.indexOf("delete noteRef"));
+      expect(script.indexOf("considering case")).toBeLessThan(script.indexOf("currentBody is not"));
+      expect(script.indexOf("delete noteRef")).toBeLessThan(script.indexOf("end considering"));
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(expect.any(String), NO_RETRY_OPTIONS);
     });
 
