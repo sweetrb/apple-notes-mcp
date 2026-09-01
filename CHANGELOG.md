@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [2.8.1] - 2026-09-01
+
+### Fixed
+
+- **`batch-move-notes` validated IDs with the looser `sanitizeId` instead of
+  `sanitizeNoteId` like every other #144-hardened mutation.** `sanitizeId`
+  accepts any `IC<Entity>` CoreData type plus a legacy `temp-*` fallback;
+  `updateNoteByIdIfUnchanged`, `deleteNoteByIdIfUnchanged`, and single-note
+  `moveNoteById` were all tightened to the strict ICNote-only `sanitizeNoteId`
+  when #144 shipped, but `batchMoveNotes` was missed. Not exploitable — the
+  `batch-move-notes` tool's Zod schema already enforces the canonical
+  `x-coredata://.../ICNote/p\d+` pattern at the boundary — but this closes the
+  manager-layer consistency gap so validation doesn't depend on the schema
+  above it. (#146)
+
 ## [2.8.0] - 2026-08-28
 
 ### Changed

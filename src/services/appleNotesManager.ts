@@ -2976,7 +2976,7 @@ export class AppleNotesManager {
 
     ids.forEach((id, i) => {
       try {
-        runnable.push({ index: i, safe: sanitizeId(id) });
+        runnable.push({ index: i, safe: sanitizeNoteId(id) });
       } catch (e) {
         results[i] = this.createBatchResult(
           id,

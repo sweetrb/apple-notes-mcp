@@ -3510,6 +3510,27 @@ describe("AppleNotesManager", () => {
         manager.moveNoteById("not-valid", "Archive");
       }).toThrow("Invalid note ID format");
     });
+
+    // #146: batchMoveNotes validated with the looser sanitizeId (accepts any
+    // ICEntity, plus legacy temp-* ids), unlike every other #144-hardened
+    // mutation — bring it in line with moveNoteById's sanitizeNoteId.
+    it("batchMoveNotes rejects a non-ICNote CoreData ID as a per-item failure, without spawning osascript", () => {
+      const results = manager.batchMoveNotes(
+        ["x-coredata://ABC123/ICFolder/p50", "temp-1704067200000-0"],
+        "Archive"
+      );
+      expect(mockExecuteAppleScript).not.toHaveBeenCalled();
+      expect(results[0]).toEqual({
+        id: "x-coredata://ABC123/ICFolder/p50",
+        success: false,
+        error: expect.stringContaining("Invalid note ID format"),
+      });
+      expect(results[1]).toEqual({
+        id: "temp-1704067200000-0",
+        success: false,
+        error: expect.stringContaining("Invalid note ID format"),
+      });
+    });
   });
 
   // ---------------------------------------------------------------------------
