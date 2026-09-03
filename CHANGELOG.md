@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [2.8.2] - 2026-09-03
+
+### Security
+
+- **Raised the `fast-uri` `pnpm-workspace.yaml` override floor from `^3.1.5` to
+  `>=3.1.6 <4`**, closing four open high-severity Dependabot alerts:
+  [GHSA-jqff-g426-hqxp](https://github.com/advisories/GHSA-jqff-g426-hqxp)
+  (host confusion via percent-encoded scheme normalization),
+  [GHSA-fph4-wmhf-6fwf](https://github.com/advisories/GHSA-fph4-wmhf-6fwf)
+  (SSRF via repeated hostname percent-decoding),
+  [GHSA-f65p-4m7j-42xc](https://github.com/advisories/GHSA-f65p-4m7j-42xc)
+  (SSRF via malformed IPv6 normalization), and
+  [GHSA-5jgf-p345-68v8](https://github.com/advisories/GHSA-5jgf-p345-68v8)
+  (host confusion via skipped IDN canonicalization). `fast-uri` arrives
+  transitively via `@modelcontextprotocol/sdk` -> `ajv`, so Dependabot cannot
+  bump it directly; the existing `^3.1.5` override was already satisfied by
+  the installed, vulnerable 3.1.5, so `pnpm install` never re-resolved past
+  it. All four are fixed upstream in `fast-uri@3.1.6`. `fast-uri` is bundled
+  into `build/index.js` (it ships), so this release rebuilds the bundle.
+
 ## [2.8.1] - 2026-09-01
 
 ### Fixed
