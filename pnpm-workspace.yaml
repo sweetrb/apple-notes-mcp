@@ -47,10 +47,20 @@ overrides:
   # security floor and then became a CEILING: when GHSA-7p8r-x3mc-p8w7 (high, host
   # confusion via a backslash authority introducer) landed with a 3.1.5 fix, the
   # exact pin held the tree on the vulnerable 3.1.4 and the advisory could never
-  # clear. Use a caret range so patch fixes flow in on their own while staying
-  # inside the major the parent's API expects. fast-uri IS in the shipped bundle
-  # (via @modelcontextprotocol/sdk -> ajv), so this one ships.
-  fast-uri: ^3.1.5
+  # clear. Use a range so patch fixes flow in on their own while staying inside
+  # the major the parent's API expects. fast-uri IS in the shipped bundle (via
+  # @modelcontextprotocol/sdk -> ajv), so this one ships.
+  #
+  # Raised from ^3.1.5 to >=3.1.6 <4 (still two-sided, still capped below 4.x)
+  # because ^3.1.5 itself was satisfied by the already-installed, already-
+  # vulnerable 3.1.5 and pnpm never re-resolved past it. Four more GHSAs landed
+  # against 3.1.5 (fixed in 3.1.6): GHSA-jqff-g426-hqxp (host confusion via
+  # percent-encoded scheme normalization), GHSA-fph4-wmhf-6fwf (SSRF via
+  # repeated hostname percent-decoding), GHSA-f65p-4m7j-42xc (SSRF via
+  # malformed IPv6 normalization), GHSA-5jgf-p345-68v8 (host confusion via
+  # skipped IDN canonicalization). Do not float to 4.x (latest on npm) without
+  # confirming ajv's fast-uri range accepts it.
+  fast-uri: ">=3.1.6 <4"
   # GHSA-mwp4-54f8-5fhr (high, leading-zero octets decoded as decimal -> SSRF /
   # trust-boundary bypass) plus GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg.
   # Reached via @modelcontextprotocol/sdk -> express-rate-limit, which caps
