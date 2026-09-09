@@ -39050,11 +39050,17 @@ function isRetryableError(errorMessage) {
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
+var PERMISSION_DENIED_PATTERN = /not author(?:i[sz])ed|not permitted|access.*denied|\(-1743\)/i;
+var PERMISSION_DENIED_MESSAGE = `Permission denied. ${AUTOMATION_REMEDIATION}`;
+function isPermissionDenied(error2) {
+  if (!error2) return false;
+  return PERMISSION_DENIED_PATTERN.test(error2) || error2.includes(PERMISSION_DENIED_MESSAGE);
+}
 var ERROR_MAPPINGS = [
   // Permission errors
   {
-    pattern: /not authorized|not permitted|access.*denied/i,
-    message: `Permission denied. ${AUTOMATION_REMEDIATION}`
+    pattern: PERMISSION_DENIED_PATTERN,
+    message: PERMISSION_DENIED_MESSAGE
   },
   // Application not running
   {
@@ -39119,6 +39125,9 @@ function parseErrorMessage(errorOutput) {
   const executionError = errorOutput.match(/execution error: (.+?)(?:\s*\(-?\d+\))?$/m);
   if (executionError) {
     coreError = executionError[1].trim();
+  }
+  if (isPermissionDenied(errorOutput)) {
+    return PERMISSION_DENIED_MESSAGE;
   }
   for (const { pattern, message } of ERROR_MAPPINGS) {
     const match = coreError.match(pattern);
@@ -41120,7 +41129,7 @@ var AppleNotesManager = class {
         message: "Notes.app is accessible"
       });
     } else {
-      const errorHint = appCheck.error?.includes("not authorized") ? " (check Automation permissions in System Settings > Privacy & Security > Automation)" : "";
+      const errorHint = isPermissionDenied(appCheck.error) ? " (check Automation permissions in System Settings > Privacy & Security > Automation)" : "";
       checks.push({
         name: "notes_app",
         passed: false,
@@ -41136,7 +41145,7 @@ var AppleNotesManager = class {
         message: "AppleScript automation permissions granted"
       });
     } else {
-      const isPermError = permCheck.error?.includes("not authorized") || permCheck.error?.includes("not permitted");
+      const isPermError = isPermissionDenied(permCheck.error);
       checks.push({
         name: "permissions",
         passed: !isPermError,

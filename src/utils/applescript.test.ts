@@ -7,7 +7,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "child_process";
-import { executeAppleScript } from "./applescript.js";
+import {
+  executeAppleScript,
+  isPermissionDenied,
+  PERMISSION_DENIED_MESSAGE,
+} from "./applescript.js";
 
 // Mock the child_process module
 vi.mock("child_process", () => ({
@@ -173,6 +177,37 @@ describe("executeAppleScript", () => {
 
       expect(result.error).toContain("Permission denied");
       expect(result.error).toContain("System Settings");
+      expect(result.error).toBe(PERMISSION_DENIED_MESSAGE);
+    });
+
+    it('normalises the en-GB "Not authorised" spelling to the same message', () => {
+      // What an en_GB / en_AU / en_IE Mac actually emits. Before the shared
+      // classifier this fell through every mapping and the raw AppleScript
+      // text was handed to the user with no remediation.
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error(
+          "27:44: execution error: Not authorised to send Apple events to Notes. (-1743)"
+        );
+      });
+
+      const result = executeAppleScript("test");
+
+      expect(result.error).toBe(PERMISSION_DENIED_MESSAGE);
+    });
+
+    it("normalises a fully localised refusal on the -1743 OSStatus alone", () => {
+      // No English substring to match: only errAEEventNotPermitted identifies
+      // this as a TCC refusal. The `execution error:` extraction strips the
+      // trailing code, which is why classification runs against the raw text.
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error(
+          "27:44: execution error: Non autorisé à envoyer des événements Apple à Notes. (-1743)"
+        );
+      });
+
+      const result = executeAppleScript("test");
+
+      expect(result.error).toBe(PERMISSION_DENIED_MESSAGE);
     });
 
     it("provides helpful message for folder not found", () => {
@@ -591,5 +626,47 @@ describe("executeAppleScript", () => {
       expect(result.success).toBe(true);
       expect(mockExecFileSync).toHaveBeenCalledTimes(4);
     });
+  });
+});
+
+describe("isPermissionDenied", () => {
+  it("recognises the American spelling", () => {
+    expect(isPermissionDenied("execution error: Not authorized to send Apple events (-1743)")).toBe(
+      true
+    );
+  });
+
+  it("recognises the en-GB spelling", () => {
+    expect(
+      isPermissionDenied("27:44: execution error: Not authorised to send Apple events to Notes.")
+    ).toBe(true);
+  });
+
+  it("recognises a fully localised refusal by its -1743 OSStatus alone", () => {
+    // errAEEventNotPermitted is emitted regardless of system language, so it
+    // is the only handle on a refusal no English regex can match.
+    expect(isPermissionDenied("erreur d'exécution : Non autorisé (-1743)")).toBe(true);
+    expect(isPermissionDenied("Fehler: Keine Berechtigung (-1743)")).toBe(true);
+  });
+
+  it("recognises the normalised remediation message (the both-sides property)", () => {
+    // A caller must not depend on which side of the error mapping it reads:
+    // the raw AppleScript text and the message that replaced it both classify.
+    expect(isPermissionDenied(PERMISSION_DENIED_MESSAGE)).toBe(true);
+    expect(isPermissionDenied(`AppleScript failed. ${PERMISSION_DENIED_MESSAGE}`)).toBe(true);
+  });
+
+  it("still recognises the other raw refusal wordings", () => {
+    expect(isPermissionDenied("The operation is not permitted")).toBe(true);
+    expect(isPermissionDenied("access to Notes denied")).toBe(true);
+  });
+
+  it("returns false for non-permission errors and for missing input", () => {
+    expect(isPermissionDenied('Can\'t get note "Missing".')).toBe(false);
+    expect(isPermissionDenied("Operation timed out after 30 seconds.")).toBe(false);
+    expect(isPermissionDenied("execution error: something else (-1728)")).toBe(false);
+    expect(isPermissionDenied(undefined)).toBe(false);
+    expect(isPermissionDenied(null)).toBe(false);
+    expect(isPermissionDenied("")).toBe(false);
   });
 });

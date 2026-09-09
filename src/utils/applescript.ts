@@ -186,14 +186,50 @@ function sleep(ms: number): void {
 }
 
 /**
+ * What a raw AppleScript TCC refusal looks like before normalisation.
+ *
+ * Exported alongside the message below because the two MUST derive from one
+ * source. They did not: `healthCheck` classified a denial by re-testing raw
+ * substrings ("not authorized" / "not permitted") that this mapping had
+ * already REPLACED, in three independent copies of the same knowledge. Each
+ * copy was free to drift from the mapping — and from the OS.
+ *
+ * Locale note: macOS emits this refusal in the system language. An `en_GB` /
+ * `en_AU` / `en_IE` Mac says "Not authorised", so the American-only spelling
+ * silently failed to classify a genuine denial. `(?:i[sz])` covers both.
+ *
+ * `\(-1743\)` is `errAEEventNotPermitted`, the OSStatus AppleScript reports
+ * for a TCC Automation refusal. It is emitted REGARDLESS OF SYSTEM LANGUAGE,
+ * so it is the only signal that classifies a fully localised (fr/de/es)
+ * refusal no English regex can match. Do not "simplify" it away.
+ */
+export const PERMISSION_DENIED_PATTERN =
+  /not author(?:i[sz])ed|not permitted|access.*denied|\(-1743\)/i;
+
+/** The normalised text a permission failure is reported to callers as. */
+export const PERMISSION_DENIED_MESSAGE = `Permission denied. ${AUTOMATION_REMEDIATION}`;
+
+/**
+ * Is this error a TCC/Automation refusal?
+ *
+ * Accepts BOTH forms deliberately — the raw text AppleScript emits and the
+ * normalised text callers actually receive — so a caller cannot be caught out
+ * by which side of the error mapping it happens to be reading.
+ */
+export function isPermissionDenied(error?: string | null): boolean {
+  if (!error) return false;
+  return PERMISSION_DENIED_PATTERN.test(error) || error.includes(PERMISSION_DENIED_MESSAGE);
+}
+
+/**
  * User-friendly error messages mapped from common AppleScript errors.
  * Each entry maps a pattern (regex or string) to a user-friendly message.
  */
 const ERROR_MAPPINGS: Array<{ pattern: RegExp; message: string }> = [
   // Permission errors
   {
-    pattern: /not authorized|not permitted|access.*denied/i,
-    message: `Permission denied. ${AUTOMATION_REMEDIATION}`,
+    pattern: PERMISSION_DENIED_PATTERN,
+    message: PERMISSION_DENIED_MESSAGE,
   },
   // Application not running
   {
@@ -274,6 +310,15 @@ function parseErrorMessage(errorOutput: string): string {
   const executionError = errorOutput.match(/execution error: (.+?)(?:\s*\(-?\d+\))?$/m);
   if (executionError) {
     coreError = executionError[1].trim();
+  }
+
+  // Classify permission refusals against the RAW output, before the mapping
+  // loop. The `execution error:` extraction above deliberately strips the
+  // trailing OSStatus code, and on a fully localised Mac `(-1743)` is the only
+  // part of the refusal any pattern can match — matching coreError alone would
+  // throw the sole locale-independent signal away.
+  if (isPermissionDenied(errorOutput)) {
+    return PERMISSION_DENIED_MESSAGE;
   }
 
   // Try to match against known error patterns for user-friendly messages

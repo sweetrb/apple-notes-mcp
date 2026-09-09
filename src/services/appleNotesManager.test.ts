@@ -29,10 +29,18 @@ import {
 
 // Mock the AppleScript execution module
 // This prevents actual osascript calls during testing
-vi.mock("@/utils/applescript.js", () => ({
-  executeAppleScript: vi.fn(),
-  BULK_LIST_MUTATION_ERROR: "Notes changed during listing",
-}));
+// Only the executor is stubbed. `isPermissionDenied` is deliberately the REAL
+// implementation: the whole point of the shared classifier is that the health
+// check and the error mapping run the same code, so a mock here would test a
+// copy instead of the thing that ships.
+vi.mock("@/utils/applescript.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/applescript.js")>();
+  return {
+    ...actual,
+    executeAppleScript: vi.fn(),
+    BULK_LIST_MUTATION_ERROR: "Notes changed during listing",
+  };
+});
 
 // Mock the checklist parser to avoid SQLite access during tests
 vi.mock("@/utils/checklistParser.js", () => ({
@@ -2554,6 +2562,60 @@ describe("AppleNotesManager", () => {
         success: false,
         output: "",
         error: "not authorized to send Apple events",
+      });
+
+      const result = manager.healthCheck();
+
+      expect(result.healthy).toBe(false);
+      expect(result.checks[0].message).toContain("Automation permissions");
+    });
+
+    it('classifies an en-GB "Not authorised" refusal as a permission failure', () => {
+      // The regression this guards: on an en_GB / en_AU / en_IE Mac the
+      // refusal reads "Not authorised", the American-only substring check
+      // missed it, and a genuine TCC denial reported `passed: true` and then
+      // misdirected the user to check their accounts.
+      mockExecuteAppleScript
+        // Check 1: Notes.app accessible
+        .mockReturnValueOnce({ success: true, output: "ok" })
+        // Check 2: permission probe refused, British spelling
+        .mockReturnValueOnce({
+          success: false,
+          output: "",
+          error: "27:44: execution error: Not authorised to send Apple events to Notes. (-1743)",
+        });
+
+      const result = manager.healthCheck();
+
+      const permCheck = result.checks.find((c) => c.name === "permissions");
+      expect(permCheck?.passed).toBe(false);
+      expect(permCheck?.message).toContain("AppleScript permissions denied");
+      // The early return fires: no account/note checks ran.
+      expect(result.healthy).toBe(false);
+      expect(result.checks).toHaveLength(2);
+    });
+
+    it("classifies a fully localised refusal by its -1743 OSStatus alone", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "ok" })
+        .mockReturnValueOnce({
+          success: false,
+          output: "",
+          error: "27:44: execution error: Non autorisé à envoyer des événements Apple (-1743)",
+        });
+
+      const result = manager.healthCheck();
+
+      expect(result.checks.find((c) => c.name === "permissions")?.passed).toBe(false);
+      expect(result.healthy).toBe(false);
+      expect(result.checks).toHaveLength(2);
+    });
+
+    it("returns unhealthy with permission hint when the refusal is British-spelled", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: false,
+        output: "",
+        error: "Not authorised to send Apple events to Notes. (-1743)",
       });
 
       const result = manager.healthCheck();

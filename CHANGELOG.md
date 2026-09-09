@@ -1,5 +1,39 @@
 ## [Unreleased]
 
+## [2.8.3] - 2026-09-09
+
+### Fixed
+
+- **A genuine Automation refusal was not recognised on a non-US-English Mac,
+  and three separate copies of the check could each drift from the others.**
+  macOS emits the TCC refusal in the system language: an `en_GB` / `en_AU` /
+  `en_IE` Mac says `Not authorised to send Apple events to Notes. (-1743)`,
+  which the American-only `not authorized` spelling never matched. The
+  consequences on those locales: `health-check` reported
+  `permissions: passed: true` on a real denial and then misdirected the user to
+  configure accounts they already had, and the error mapping never normalised
+  the refusal to the remediation message — so nobody outside `en_US` was ever
+  told to grant automation access.
+
+  Structurally, the same knowledge lived in three independent places — an
+  inline literal inside `ERROR_MAPPINGS`, and two raw `.includes()` substring
+  checks in `healthCheck` — and the health-check copies re-tested substrings
+  that the mapping had already *replaced*, so each was free to drift from the
+  mapping and from the OS. `src/utils/applescript.ts` now exports a single
+  `PERMISSION_DENIED_PATTERN`, the matching `PERMISSION_DENIED_MESSAGE`, and an
+  `isPermissionDenied()` helper that deliberately accepts **both** the raw
+  AppleScript text and the normalised message, so a caller cannot be caught out
+  by which side of the mapping it reads. `ERROR_MAPPINGS` and both
+  `healthCheck` call sites now run that one classifier.
+
+  The pattern is `/not author(?:i[sz])ed|not permitted|access.*denied|\(-1743\)/i`.
+  `-1743` is `errAEEventNotPermitted`, which AppleScript reports **regardless of
+  system language** — it is the only signal that classifies a fully localised
+  (fr/de/es) refusal no English regex can match, and classification runs against
+  the raw osascript output because the `execution error:` extraction strips that
+  trailing code. Same class of bug as `sweetrb/apple-mail-mcp#218`, found by
+  extension; this repo additionally never received mail's structural fix.
+
 ## [2.8.2] - 2026-09-03
 
 ### Security

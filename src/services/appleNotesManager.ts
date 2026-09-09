@@ -32,7 +32,11 @@ import type {
   ExportedFolder,
   ExportedNote,
 } from "@/types.js";
-import { BULK_LIST_MUTATION_ERROR, executeAppleScript } from "@/utils/applescript.js";
+import {
+  BULK_LIST_MUTATION_ERROR,
+  executeAppleScript,
+  isPermissionDenied,
+} from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import {
   assertSafeSavePath,
@@ -2333,7 +2337,7 @@ export class AppleNotesManager {
         message: "Notes.app is accessible",
       });
     } else {
-      const errorHint = appCheck.error?.includes("not authorized")
+      const errorHint = isPermissionDenied(appCheck.error)
         ? " (check Automation permissions in System Settings > Privacy & Security > Automation)"
         : "";
       checks.push({
@@ -2354,8 +2358,7 @@ export class AppleNotesManager {
         message: "AppleScript automation permissions granted",
       });
     } else {
-      const isPermError =
-        permCheck.error?.includes("not authorized") || permCheck.error?.includes("not permitted");
+      const isPermError = isPermissionDenied(permCheck.error);
       checks.push({
         name: "permissions",
         passed: !isPermError,
