@@ -48,6 +48,24 @@ describe("resolveUpdateResponseTitle", () => {
     ).toBe("&amplifier &#999999999;");
   });
 
+  it("decodes valid numeric character references in either radix", () => {
+    // The out-of-range case above only ever exercises the reject branch, so the
+    // successful decode had no coverage. Notes.app emits hex references for
+    // accented characters and dashes, which would otherwise surface raw in the
+    // reported title.
+    expect(
+      resolveUpdateResponseTitle("Old title", undefined, "html", "<h1>caf&#xE9; &#8212; ok</h1>")
+    ).toBe("café — ok");
+  });
+
+  it("leaves a lone surrogate code point undecoded", () => {
+    // String.fromCodePoint would happily produce an unpaired surrogate; the
+    // title is returned to the client as JSON text, so it must stay well-formed.
+    expect(
+      resolveUpdateResponseTitle("Old title", undefined, "html", "<h1>&#xD800; tail</h1>")
+    ).toBe("&#xD800; tail");
+  });
+
   it("removes malformed nested tags without leaving a recognizable tag in the title", () => {
     expect(
       resolveUpdateResponseTitle("Old title", undefined, "html", "<h1>A<<b>>title</h1>")

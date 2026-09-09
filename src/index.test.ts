@@ -9,29 +9,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AppleNotesManager } from "@/services/appleNotesManager.js";
 
-// Mock the AppleNotesManager class
+// Mock the AppleNotesManager class.
+//
+// The implementation must be a `function`, never an arrow: vitest 4 forwards
+// construct calls to the implementation, so `new AppleNotesManager()` invokes
+// it with `new` and an arrow function throws "is not a constructor". A normal
+// function returning an object yields that object under `new`, which is
+// exactly the vitest 3 behavior this mock has always relied on.
 vi.mock("@/services/appleNotesManager.js", () => {
   return {
-    AppleNotesManager: vi.fn().mockImplementation(() => ({
-      createNote: vi.fn(),
-      searchNotes: vi.fn(),
-      getNoteContent: vi.fn(),
-      getNoteContentById: vi.fn(),
-      getNoteById: vi.fn(),
-      getNoteDetails: vi.fn(),
-      updateNote: vi.fn(),
-      updateNoteById: vi.fn(),
-      deleteNote: vi.fn(),
-      moveNote: vi.fn(),
-      listNotes: vi.fn(),
-      listNoteRefs: vi.fn(),
-      listFolders: vi.fn(),
-      createFolder: vi.fn(),
-      deleteFolder: vi.fn(),
-      listAccounts: vi.fn(),
-      getNoteLinkById: vi.fn(),
-      getNoteLink: vi.fn(),
-    })),
+    AppleNotesManager: vi.fn().mockImplementation(function () {
+      return {
+        createNote: vi.fn(),
+        searchNotes: vi.fn(),
+        getNoteContent: vi.fn(),
+        getNoteContentById: vi.fn(),
+        getNoteById: vi.fn(),
+        getNoteDetails: vi.fn(),
+        updateNote: vi.fn(),
+        updateNoteById: vi.fn(),
+        deleteNote: vi.fn(),
+        moveNote: vi.fn(),
+        listNotes: vi.fn(),
+        listNoteRefs: vi.fn(),
+        listFolders: vi.fn(),
+        createFolder: vi.fn(),
+        deleteFolder: vi.fn(),
+        listAccounts: vi.fn(),
+        getNoteLinkById: vi.fn(),
+        getNoteLink: vi.fn(),
+      };
+    }),
   };
 });
 
