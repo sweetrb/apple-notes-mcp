@@ -46,6 +46,43 @@ describe("comparableVisibleText", () => {
     expect(comparableVisibleText("<div>caf&#xE9; &#x2014; ok</div>")).toBe("café — ok");
   });
 
+  it("does not invent a space at an inline-tag boundary (#145)", () => {
+    // Notes.app MERGES adjacent same-style inline runs on save — verified
+    // against Notes.app 2026-09-10, where `<b>merge</b><b>me</b>` read back as
+    // `<b>mergeme</b>`. Inserting a space per tag made the written side
+    // normalise to "merge me" and the readback to "mergeme", so update-note
+    // reported a readback mismatch for a write that had actually succeeded.
+    const written = "<div><b>merge</b><b>me</b></div>";
+    const readback = "<div><b>mergeme</b><br></div>";
+
+    expect(comparableVisibleText(written)).toBe("mergeme");
+    expect(comparableVisibleText(readback)).toBe("mergeme");
+    expect(comparableVisibleText(written)).toBe(comparableVisibleText(readback));
+  });
+
+  it("keeps inline runs of DIFFERENT styles equivalent across normalisation", () => {
+    // Notes leaves these unmerged, so both sides must agree either way.
+    expect(comparableVisibleText("<div><b>alpha</b><i>beta</i></div>")).toBe("alphabeta");
+    expect(comparableVisibleText("<div><b>alpha</b><i>beta</i><br></div>")).toBe("alphabeta");
+  });
+
+  it("still separates words at BLOCK boundaries", () => {
+    // The allow-list is inline-only: block tags must keep separating, or two
+    // paragraphs would silently compare equal to one run-on word.
+    expect(comparableVisibleText("<div>one</div><div>two</div>")).toBe("one two");
+    expect(comparableVisibleText("<p>one</p><p>two</p>")).toBe("one two");
+    expect(comparableVisibleText("<ul><li>one</li><li>two</li></ul>")).toBe("one two");
+    expect(comparableVisibleText("<div>one<br>two</div>")).toBe("one two");
+    // An unknown tag is not on the allow-list, so it still separates.
+    expect(comparableVisibleText("<div>one<unknown-tag>two</unknown-tag></div>")).toBe("one two");
+  });
+
+  it("does not let the inline allow-list match a longer tag name", () => {
+    // `\b` guards the prefix: <bdo>/<summary> must not be eaten as <b>/<s>.
+    expect(comparableVisibleText("<div>one<bdo>two</bdo></div>")).toBe("one two");
+    expect(comparableVisibleText("<div>one<summary>two</summary></div>")).toBe("one two");
+  });
+
   it("still detects a real visible-text mismatch", () => {
     expect(comparableVisibleText("<div>Before</div>")).not.toBe(
       comparableVisibleText("<div>After</div>")

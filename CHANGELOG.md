@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [2.8.4] - 2026-09-10
+
+### Fixed
+- `update-note` / `append-to-note` no longer report a spurious "readback visible
+  text did not match" for a write that actually succeeded (#145). Notes.app
+  **merges adjacent inline runs of the same style** when it saves — verified
+  against Notes.app on 2026-09-10, where `<b>merge</b><b>me</b>` is stored as
+  `<b>mergeme</b>`. `comparableVisibleText` replaced *every* tag with a space, so
+  the written side normalised to `merge me` while the readback normalised to
+  `mergeme`, and the verifier failed a successful write with an error telling the
+  user not to retry and to inspect the note by hand.
+  Inline tags now collapse to nothing rather than a space, which also matches how
+  the markup actually renders — `<b>foo</b><b>bar</b>` shows as `foobar`, so the
+  old transform mis-described the written side too. The change is an allow-list of
+  tags that are non-separating by definition; `div`, `p`, `li`, headings, table
+  cells, `<br>` and any unrecognised tag still separate words exactly as before.
+
+### Documentation
+- #145's other reported edge case — the linefeed-tolerant conflict guard masking a
+  concurrent one-linefeed edit — was investigated against Notes.app and **refuted**.
+  Notes normalises trailing linefeeds: a body set to `X`, `X\n` or `X\n\n` all read
+  back as exactly `X\n`. There is therefore no distinct "differs by one trailing
+  linefeed" state for the tolerance to mask, and the guard is sound as written.
+
 ## [2.8.3] - 2026-09-09
 
 ### Fixed
