@@ -286,10 +286,11 @@ Retrieves the full content of a specific note.
 
 **Returns:** The HTML content of the note, its exact `id`, and a
 `contentHash`. Pass that hash back as `expectedContentHash` for a later update,
-append, or delete; the write is rejected if the note changed after this read.
-The `structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
-from the body. Apple Notes tags are inline hashtags, not a scriptable property;
-see [docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
+append, or delete; the write is rejected if the note's body or rich metadata
+changed after this read. With Full Disk Access, embedded URLs omitted by
+AppleScript are restored and returned in `links`. The response also reports
+actual `nativeTags`, `richContentComplete`, and `writable`. Textual `hashtags`
+remain a separate field and are not proof that Notes registered native tags.
 
 **⚠️ The returned body can be lossy — do not write it back verbatim.** Inline
 base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
@@ -385,6 +386,7 @@ Updates an existing note's content and/or title.
 | `newTitle` | string | No | New title (if changing the title; ignored when `format` is `"html"`) |
 | `newContent` | string | Yes | New content for the note body |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
+| `allowLinkChanges` | boolean | No | Set to `true` only when intentionally changing or removing existing links |
 
 Title-only updates are rejected because Apple Notes titles are not unique.
 
@@ -414,8 +416,10 @@ byte-identical rich formatting.
 
 **Note:** `newContent` **replaces the entire note body** — it is not appended. To add to a note, prefer [`append-to-note`](#append-to-note), which does the read-and-concatenate for you and always round-trips the body as HTML. If you do read-modify-write by hand, note that `get-note-content` replaces oversized inline images with text placeholders (see [`get-note-content`](#get-note-content)) — writing that body back bakes the placeholders in.
 
-**Attachments:** `update-note` refuses to replace any note that contains an
-attachment. Edit those notes in Notes.app or create a separate note instead.
+**Rich-content safety:** `update-note` refuses to replace a note when its rich
+metadata is unavailable or it contains attachments, native tags, inline
+objects, or checklists that AppleScript cannot preserve. Existing link
+destinations must remain present unless `allowLinkChanges` is explicitly set.
 
 ---
 
@@ -509,8 +513,9 @@ Title-only appends are rejected.
 visible text after saving, not byte-identical rich formatting. Warns when the
 note is shared with collaborators.
 
-**Safety:** The append is rejected if the note changed since it was read or if
-the note contains an attachment.
+**Safety:** The append is rejected if the note changed since it was read, rich
+metadata is unavailable, or the note contains attachments or other native
+objects. Existing link destinations are verified after saving.
 
 ---
 

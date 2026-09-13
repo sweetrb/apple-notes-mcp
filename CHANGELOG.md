@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.8.5] - 2026-09-13
+
+### Fixed
+
+- Recover link destinations omitted by Notes.app's AppleScript HTML export from
+  the requested note's read-only rich-text record. `get-note-content` and
+  Markdown now preserve those links, including repeated labels and UTF-16 text.
+- Include rich-text metadata in revision tokens and reject full-body writes
+  when links or native objects cannot be preserved. Updates require explicit
+  `allowLinkChanges` before changing existing destinations and verify links
+  after saving.
+
+### Added
+
+- `get-note-content` now reports restored `links`, actual `nativeTags`,
+  `richContentComplete`, and `writable` so clients can distinguish textual
+  hashtags from native Notes objects and avoid lossy writes.
+
 ## [2.8.4] - 2026-09-10
 
 ### Fixed

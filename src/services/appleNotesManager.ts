@@ -38,6 +38,7 @@ import {
   isPermissionDenied,
 } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
+import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -1360,10 +1361,16 @@ export class AppleNotesManager {
     expectedBody: string,
     newTitle: string | undefined,
     newContent: string,
-    format: "plaintext" | "html" = "plaintext"
+    format: "plaintext" | "html" = "plaintext",
+    expectedRichRevision?: string
   ):
     { status: "updated"; writtenBody: string } | { status: "conflict" | "attachments" | "failed" } {
     const safeId = sanitizeNoteId(id);
+    if (expectedRichRevision) {
+      const rich = readRichNote(id);
+      if (rich.revision !== expectedRichRevision) return { status: "conflict" };
+      if (rich.hasNativeObjects || rich.hasChecklist) return { status: "attachments" };
+    }
     if (newTitle) validateLength(newTitle, MAX_TITLE_LENGTH, "Note title");
     validateLength(newContent, MAX_CONTENT_LENGTH, "Note content");
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
@@ -3294,10 +3301,11 @@ export class AppleNotesManager {
   getNoteMarkdown(title: string, account?: string): string {
     const html = this.getNoteContent(title, account);
     if (!html) return "";
-    let markdown = this.htmlToMarkdown(html);
+    const note = this.getNoteDetails(title, account);
+    const rich = note?.id ? enrichNoteRead(note.id, html) : undefined;
+    let markdown = this.htmlToMarkdown(rich?.content || html);
 
     // Try to enrich with checklist state (requires note ID)
-    const note = this.getNoteDetails(title, account);
     if (note?.id) {
       const result = getChecklistItems(note.id);
       if (result.items) {
@@ -3324,7 +3332,8 @@ export class AppleNotesManager {
   getNoteMarkdownById(id: string): string {
     const html = this.getNoteContentById(id);
     if (!html) return "";
-    let markdown = this.htmlToMarkdown(html);
+    const rich = enrichNoteRead(id, html);
+    let markdown = this.htmlToMarkdown(rich.content);
 
     // Try to enrich with checklist state
     const result = getChecklistItems(id);
