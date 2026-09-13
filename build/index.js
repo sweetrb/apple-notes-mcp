@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants2) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants);
+          this.rhs = optimizeExpr(this.rhs, names, constants2);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants2) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants);
+        this.rhs = optimizeExpr(this.rhs, names, constants2);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants) {
-        this.code = optimizeExpr(this.code, names, constants);
+      optimizeNames(names, constants2) {
+        this.code = optimizeExpr(this.code, names, constants2);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants2) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants))
+          if (n.optimizeNames(names, constants2))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants2) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
-        if (!(super.optimizeNames(names, constants) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
+        if (!(super.optimizeNames(names, constants2) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants);
+        this.condition = optimizeExpr(this.condition, names, constants2);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
+      optimizeNames(names, constants2) {
+        if (!super.optimizeNames(names, constants2))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants);
+        this.iteration = optimizeExpr(this.iteration, names, constants2);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
+      optimizeNames(names, constants2) {
+        if (!super.optimizeNames(names, constants2))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants);
+        this.iterable = optimizeExpr(this.iterable, names, constants2);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants) {
+      optimizeNames(names, constants2) {
         var _a, _b;
-        super.optimizeNames(names, constants);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants);
+        super.optimizeNames(names, constants2);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants2);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants) {
+    function optimizeExpr(expr, names, constants2) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants[n.str];
+        const c = constants2[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants2[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants = {
+    var constants2 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants) {
-      v = { value: constants[c] };
+    for (c in constants2) {
+      v = { value: constants2[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join8(output, replacement);
+        return join9(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join8(output, rule.append(self.options));
+          output = join9(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join8(output, replacement) {
+    function join9(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -39350,10 +39350,10 @@ function hasFullDiskAccess() {
     return false;
   }
 }
-function queryNoteData(noteId) {
-  const pkMatch = noteId.match(/\/p(\d+)$/);
+function queryNoteData(noteId2) {
+  const pkMatch = noteId2.match(/\/p(\d+)$/);
   if (!pkMatch) {
-    console.error(`Invalid note ID format: ${noteId}`);
+    console.error(`Invalid note ID format: ${noteId2}`);
     return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
@@ -39438,13 +39438,13 @@ function parseChecklistFromProtobuf(data) {
     return null;
   }
 }
-function getChecklistItems(noteId) {
-  const { hex: hexData, error: queryError } = queryNoteData(noteId);
+function getChecklistItems(noteId2) {
+  const { hex: hexData, error: queryError } = queryNoteData(noteId2);
   if (queryError === "invalid_id") {
     return {
       items: null,
       error: "invalid_id",
-      message: `Invalid note ID format: "${noteId}". Expected format: x-coredata://UUID/ICNote/pNNN`
+      message: `Invalid note ID format: "${noteId2}". Expected format: x-coredata://UUID/ICNote/pNNN`
     };
   }
   if (queryError === "no_fda") {
@@ -40281,20 +40281,20 @@ var AppleNotesManager = class {
       return null;
     }
     const rawOutput = result.output.trim();
-    const noteId = extractCoreDataId(rawOutput, "note") || rawOutput;
-    if (!noteId) {
+    const noteId2 = extractCoreDataId(rawOutput, "note") || rawOutput;
+    if (!noteId2) {
       console.error(`Created note "${title}" but Notes.app returned no canonical note ID`);
       return null;
     }
     try {
-      sanitizeNoteId(noteId);
+      sanitizeNoteId(noteId2);
     } catch {
       console.error(`Created note "${title}" but Notes.app returned an invalid note ID`);
       return null;
     }
     const now = /* @__PURE__ */ new Date();
     return {
-      id: noteId,
+      id: noteId2,
       title,
       content,
       tags,
@@ -40408,11 +40408,11 @@ var AppleNotesManager = class {
     for (const item of items) {
       const [title, id, folder2, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId)) continue;
-      seenIds.add(noteId);
+      const noteId2 = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId2)) continue;
+      seenIds.add(noteId2);
       notes.push({
-        id: noteId,
+        id: noteId2,
         title: title.trim(),
         content: "",
         // Not fetched in search
@@ -40780,10 +40780,10 @@ var AppleNotesManager = class {
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId)) continue;
-      seenIds.add(noteId);
-      refs.push({ title: title.trim(), id: noteId });
+      const noteId2 = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId2)) continue;
+      seenIds.add(noteId2);
+      refs.push({ title: title.trim(), id: noteId2 });
       if (safeLimit !== void 0 && refs.length >= safeLimit) break;
     }
     return refs;
@@ -40930,6 +40930,69 @@ var AppleNotesManager = class {
   // ===========================================================================
   // Folder Operations
   // ===========================================================================
+  /** Rename a folder in place while preserving its identity and contents. */
+  renameFolderById(id, expectedName, expectedParentId, newName) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+      throw new Error("An exact folder ID is required");
+    if (!newName.trim() || newName.length > 1e3 || Array.from(newName).some((char) => char.charCodeAt(0) < 32))
+      throw new Error("Invalid folder name");
+    const literal2 = (value) => `"${escapePlainStringForAppleScript(value)}"`;
+    const script = `tell application "Notes"
+      set targetFolder to folder id ${literal2(id)}
+      set parentRef to container of targetFolder
+      set parentId to id of parentRef
+      considering case
+        if name of targetFolder is not ${literal2(expectedName)} or parentId is not ${literal2(expectedParentId)} then error "Folder changed; read it again"
+      end considering
+      repeat with sibling in folders of parentRef
+        if name of sibling is ${literal2(newName)} and id of sibling is not ${literal2(id)} then error "A sibling folder already has this name"
+      end repeat
+      set name of targetFolder to ${literal2(newName)}
+      considering case
+        if id of targetFolder is not ${literal2(id)} or name of targetFolder is not ${literal2(newName)} or id of container of targetFolder is not parentId then error "Rename readback failed"
+      end considering
+      return id of targetFolder
+    end tell`;
+    const result = executeMutationAppleScript(script);
+    if (!result.success)
+      throw new Error(
+        result.error || "Rename outcome uncertain; read folder by ID before retrying"
+      );
+    return { id, name: newName, parentId: expectedParentId };
+  }
+  /** Read the exact name and parent identity used by guarded folder rename. */
+  getFolderById(id) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+      throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(`tell application "Notes"
+      set f to folder id "${id}"
+      return (name of f) & ${AS_FIELD_SEP} & (id of container of f)
+    end tell`);
+    if (!result.success) throw new Error(result.error || "Folder not found");
+    const [name, parentId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    if (!name || !parentId) throw new Error("Incomplete folder metadata");
+    return { id, name, parentId };
+  }
+  /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
+  addAttachmentById(id, expectedBody, filePath) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id))
+      throw new Error("Exact note ID required");
+    const quote = (value) => `"${escapePlainStringForAppleScript(value)}"`;
+    const result = executeMutationAppleScript(`tell application "Notes"
+      set n to note id ${quote(id)}
+      if password protected of n then error "Locked note"
+      considering case
+        if body of n is not ${quote(expectedBody)} and body of n is not (${quote(expectedBody)} & linefeed) then error "Note changed before attachment insertion"
+      end considering
+      set a to make new attachment at n with data (POSIX file ${quote(filePath)})
+      return id of a
+    end tell`);
+    if (!result.success)
+      throw new Error(
+        result.error || "Attachment insertion outcome uncertain; read note before retrying"
+      );
+    return result.output.trim();
+  }
   /**
    * Lists all folders in an account with full hierarchical paths.
    *
@@ -41372,8 +41435,8 @@ var AppleNotesManager = class {
    * @param separately - Open in a separate window when supported by Notes.app
    * @returns true if Notes.app revealed the attachment, false otherwise
    */
-  showAttachmentById(noteId, attachmentId, separately = false) {
-    const safeNoteId = sanitizeId(noteId);
+  showAttachmentById(noteId2, attachmentId, separately = false) {
+    const safeNoteId = sanitizeId(noteId2);
     const safeAttId = escapePlainStringForAppleScript(attachmentId);
     const separatelyClause = separately ? " separately true" : "";
     const script = `
@@ -41393,13 +41456,13 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(
-        `Failed to show attachment "${attachmentId}" on note "${noteId}":`,
+        `Failed to show attachment "${attachmentId}" on note "${noteId2}":`,
         result.error
       );
       return false;
     }
     if ((result.output ?? "").trim().startsWith("ERR")) {
-      console.error(`Attachment "${attachmentId}" not found on note "${noteId}"`);
+      console.error(`Attachment "${attachmentId}" not found on note "${noteId2}"`);
       return false;
     }
     return true;
@@ -41799,7 +41862,7 @@ var AppleNotesManager = class {
    * @param savePath - absolute destination file path (within home / temp / /Volumes)
    * @returns { success, savedPath?, name?, contentType?, error? }
    */
-  saveAttachmentById(noteId, attachmentId, savePath) {
+  saveAttachmentById(noteId2, attachmentId, savePath) {
     let abs;
     try {
       abs = assertSafeSavePath(savePath);
@@ -41807,7 +41870,7 @@ var AppleNotesManager = class {
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-    const safeNoteId = sanitizeId(noteId);
+    const safeNoteId = sanitizeId(noteId2);
     const safeAttId = escapePlainStringForAppleScript(attachmentId);
     const safePath = escapePlainStringForAppleScript(abs);
     const script = `
@@ -41871,11 +41934,11 @@ var AppleNotesManager = class {
    * @param attachmentId - id of the attachment
    * @returns { success, name?, contentType?, base64?, bytes?, error? }
    */
-  getAttachmentBase64ById(noteId, attachmentId) {
+  getAttachmentBase64ById(noteId2, attachmentId) {
     const dir = makeTempDir();
     try {
       const dest = `${dir}/attachment.bin`;
-      const saved = this.saveAttachmentById(noteId, attachmentId, dest);
+      const saved = this.saveAttachmentById(noteId2, attachmentId, dest);
       if (!saved.success || !saved.savedPath) {
         return { success: false, error: saved.error };
       }
@@ -42375,13 +42438,13 @@ function presentColumns() {
   }
   return cols;
 }
-function getNoteMetadata(noteId) {
-  const pkMatch = noteId.match(/\/p(\d+)$/);
+function getNoteMetadata(noteId2) {
+  const pkMatch = noteId2.match(/\/p(\d+)$/);
   if (!pkMatch) {
     return {
       metadata: null,
       error: "invalid_id",
-      message: `Invalid note ID format: "${noteId}". Expected format: x-coredata://UUID/ICNote/pNNN`
+      message: `Invalid note ID format: "${noteId2}". Expected format: x-coredata://UUID/ICNote/pNNN`
     };
   }
   const pk = pkMatch[1];
@@ -42402,7 +42465,7 @@ function getNoteMetadata(noteId) {
       return {
         metadata: null,
         error: "not_found",
-        message: `No note found in the database for ID "${noteId}".`
+        message: `No note found in the database for ID "${noteId2}".`
       };
     }
     const raw = JSON.parse(row);
@@ -42949,6 +43012,185 @@ function parseNoteTable(compressed) {
   return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
 }
 
+// src/tools/directOperations.ts
+import { createHash as createHash2 } from "node:crypto";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  mkdtempSync as mkdtempSync2,
+  openSync,
+  readFileSync as readFileSync3,
+  rmSync as rmSync2,
+  writeFileSync
+} from "node:fs";
+import { tmpdir as tmpdir2 } from "node:os";
+import { basename, isAbsolute as isAbsolute2, join as join8 } from "node:path";
+var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
+function readSnapshot(manager, id) {
+  const note = manager.getNoteById(id);
+  if (!note) throw new Error("Note not found");
+  if (note.passwordProtected) throw new Error("Locked notes cannot receive attachments");
+  const body = manager.getNoteContentById(id);
+  if (!body) throw new Error("Note content is unavailable");
+  const enriched = enrichNoteRead(id, body);
+  const rich = readRichNote(id);
+  if (!enriched.complete || enriched.revision !== rich.revision)
+    throw new Error("Native metadata changed during read; read the note again");
+  return { id, title: note.title, body, rich, hash: richContentHash(body, enriched) };
+}
+function assertExistingContentPreserved(before, after) {
+  if (before.id !== after.id || before.title !== after.title)
+    throw new Error("Note identity changed");
+  const tidy = (text) => text.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
+  if (!tidy(after.rich.text).startsWith(tidy(before.rich.text)))
+    throw new Error("Existing note text was not preserved");
+  if (linkSignature(before.rich.links) !== linkSignature(after.rich.links.slice(0, before.rich.links.length)))
+    throw new Error("Existing links were not preserved");
+  if (before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)))
+    throw new Error("Existing native object was lost");
+  if (before.rich.nativeTags.some((tag) => !after.rich.nativeTags.includes(tag)))
+    throw new Error("Existing native tag was lost");
+  for (const item of before.rich.checklistItems || []) {
+    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
+    if (!actual || actual.text !== item.text || actual.done !== item.done)
+      throw new Error("Existing checklist item identity or state changed");
+  }
+  for (const object3 of before.rich.objectData || []) {
+    const actual = after.rich.objectData?.find((current) => current.id === object3.id);
+    if (!actual || actual.mergeable !== object3.mergeable || actual.view !== object3.view)
+      throw new Error("Existing native object content or presentation changed");
+  }
+}
+function localAttachment(path4) {
+  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
+      throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
+    const bytes = readFileSync3(descriptor);
+    if (bytes.length !== stat.size)
+      throw new Error("Attachment changed while it was being read; try again");
+    return bytes;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+function registerDirectOperations(server2, manager) {
+  function tool(name, description, inputSchema, handler, readOnly = false) {
+    server2.registerTool(
+      name,
+      {
+        description,
+        inputSchema,
+        outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough(),
+        annotations: { readOnlyHint: readOnly }
+      },
+      (async (args) => {
+        try {
+          const result = handler(args);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
+          };
+        } catch (error2) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: error2 instanceof Error ? error2.message : String(error2)
+              }
+            ],
+            isError: true
+          };
+        }
+      })
+    );
+  }
+  tool(
+    "get-folder-by-id",
+    "Use when: reading the exact folder name and parent before a guarded rename.\nReturns: folder id, current name, and parent id.\nDo not use when: listing folders by path (list-folders).\nSafety: read-only.",
+    { id: external_exports.string().max(2e3) },
+    ({ id }) => manager.getFolderById(id),
+    true
+  );
+  tool(
+    "rename-folder",
+    "Use when: renaming one previously read folder in place.\nReturns: the unchanged folder id, new name, and parent id after readback.\nDo not use when: creating, moving, or deleting a folder.\nSafety: requires the expected current name and parent; refuses stale metadata and sibling conflicts.",
+    {
+      id: external_exports.string().max(2e3),
+      expectedName: external_exports.string().max(1e3),
+      expectedParentId: external_exports.string().max(2e3),
+      newName: external_exports.string().min(1).max(1e3)
+    },
+    (args) => ({
+      ok: true,
+      ...manager.renameFolderById(args.id, args.expectedName, args.expectedParentId, args.newName)
+    })
+  );
+  tool(
+    "add-attachment",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
+    ({ id, expectedContentHash, path: path4 }) => {
+      const before = readSnapshot(manager, id);
+      if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
+      const bytes = localAttachment(path4);
+      const beforeAttachments = manager.listAttachmentsById(id);
+      const directory = mkdtempSync2(join8(tmpdir2(), "notes-attachment-add-"));
+      const temporaryFile = join8(directory, basename(path4));
+      try {
+        writeFileSync(temporaryFile, bytes, { mode: 384 });
+        if (readSnapshot(manager, id).hash !== before.hash)
+          throw new Error("Note revision changed");
+        let returnedId;
+        let transportUncertain = false;
+        try {
+          returnedId = manager.addAttachmentById(id, before.body, temporaryFile);
+        } catch {
+          transportUncertain = true;
+        }
+        const after = readSnapshot(manager, id);
+        assertExistingContentPreserved(before, after);
+        const readInserted = () => [
+          ...new Map(manager.listAttachmentsById(id).map((item) => [item.id, item])).values()
+        ].filter((item) => !beforeAttachments.some((existing) => existing.id === item.id));
+        let inserted = readInserted();
+        for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+          inserted = readInserted();
+        }
+        const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
+        if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
+          throw new Error(
+            "Attachment insertion outcome uncertain; read the exact note before retrying"
+          );
+        const attachmentId = inserted[0].id;
+        const fetched = manager.getAttachmentBase64ById(id, attachmentId);
+        const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+        if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
+          throw new Error(
+            "Attachment bytes were not verified; read the exact note before retrying"
+          );
+        return {
+          ok: true,
+          id,
+          attachmentId,
+          contentHash: after.hash,
+          bytes: bytes.length,
+          ...transportUncertain ? {
+            transportWarning: "Transport was uncertain; exact bytes and prior content were verified"
+          } : {}
+        };
+      } finally {
+        rmSync2(directory, { recursive: true, force: true });
+      }
+    }
+  );
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
@@ -42959,6 +43201,7 @@ var server = new McpServer({
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes"
 });
 var notesManager = new AppleNotesManager();
+registerDirectOperations(server, notesManager);
 function successResponse(message, structured) {
   const res = { content: [{ type: "text", text: message }] };
   if (structured) res.structuredContent = structured;
@@ -44454,8 +44697,8 @@ registerTool(
       contentType: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ noteId, attachmentId, savePath }) => {
-    const r = notesManager.saveAttachmentById(noteId, attachmentId, savePath);
+  withErrorHandling(({ noteId: noteId2, attachmentId, savePath }) => {
+    const r = notesManager.saveAttachmentById(noteId2, attachmentId, savePath);
     if (!r.success) {
       return errorResponse(`Failed to save attachment: ${r.error ?? "unknown error"}`);
     }
@@ -44481,8 +44724,8 @@ registerTool(
       base64: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ noteId, attachmentId }) => {
-    const r = notesManager.getAttachmentBase64ById(noteId, attachmentId);
+  withErrorHandling(({ noteId: noteId2, attachmentId }) => {
+    const r = notesManager.getAttachmentBase64ById(noteId2, attachmentId);
     if (!r.success || !r.base64) {
       return errorResponse(`Failed to fetch attachment: ${r.error ?? "unknown error"}`);
     }
@@ -44507,13 +44750,13 @@ registerTool(
       separately: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ noteId, attachmentId, separately = false }) => {
-    const success = notesManager.showAttachmentById(noteId, attachmentId, separately);
+  withErrorHandling(({ noteId: noteId2, attachmentId, separately = false }) => {
+    const success = notesManager.showAttachmentById(noteId2, attachmentId, separately);
     if (!success) {
-      return errorResponse(`Failed to show attachment "${attachmentId}" on note "${noteId}"`);
+      return errorResponse(`Failed to show attachment "${attachmentId}" on note "${noteId2}"`);
     }
     return successResponse(`Shown attachment "${attachmentId}" in Notes.app`, {
-      noteId,
+      noteId: noteId2,
       attachmentId,
       separately
     });

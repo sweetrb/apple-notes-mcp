@@ -659,6 +659,21 @@ Creates a new folder, including a whole nested hierarchy in one call.
 
 ---
 
+#### `get-folder-by-id`
+
+Reads one exact folder's current name and parent ID. Use these values with
+`rename-folder`; this avoids relying on ambiguous folder names or paths.
+
+---
+
+#### `rename-folder`
+
+Renames an existing folder in place using its exact `id`, `expectedName`,
+`expectedParentId`, and `newName`. The operation preserves the folder ID, notes,
+and descendants. It refuses stale metadata and a conflicting sibling name.
+
+---
+
 #### `delete-folder`
 
 Deletes a folder.
@@ -832,6 +847,15 @@ Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQ
 | `id` | string | Yes | Note ID (use `search-notes` to find it first) |
 
 **Returns:** A metadata object in `structuredContent` holding any of `pinned`, `hasChecklist`, `hasChecklistInProgress`, `recoveringFromTrash`, `passwordProtected`, `passwordHint`, `snippet`, `widgetSnippet`, and `smartFolderQuery`. Unlike most read tools, it also resolves trashed notes that AppleScript can no longer find.
+
+---
+
+#### `add-attachment`
+
+Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
+latest `expectedContentHash`, and an absolute `path`. The server never retries
+the insertion. It verifies that existing rich content survived and compares the
+fetched attachment bytes with the source before reporting success.
 
 ---
 

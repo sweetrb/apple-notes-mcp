@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.8.7] - 2026-09-13
+
+### Added
+
+- `get-folder-by-id` and guarded `rename-folder` rename a folder in place while
+  preserving its identity, notes, and descendants. Renames refuse stale parent
+  metadata and sibling name conflicts.
+- `add-attachment` inserts one local file through Notes.app without replacing
+  the note body, then verifies prior rich content and the exact fetched bytes.
+
 ## [2.8.6] - 2026-09-13
 
 ### Added

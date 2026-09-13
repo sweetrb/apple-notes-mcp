@@ -55,6 +55,7 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import { registerDirectOperations } from "@/tools/directOperations.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -82,6 +83,7 @@ const server = new McpServer({
  * Handles all AppleScript execution and note operations.
  */
 const notesManager = new AppleNotesManager();
+registerDirectOperations(server, notesManager);
 
 // =============================================================================
 // Response Helpers

@@ -1741,6 +1741,76 @@ export class AppleNotesManager {
   // Folder Operations
   // ===========================================================================
 
+  /** Rename a folder in place while preserving its identity and contents. */
+  renameFolderById(id: string, expectedName: string, expectedParentId: string, newName: string) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+      throw new Error("An exact folder ID is required");
+    if (
+      !newName.trim() ||
+      newName.length > 1000 ||
+      Array.from(newName).some((char) => char.charCodeAt(0) < 32)
+    )
+      throw new Error("Invalid folder name");
+    const literal = (value: string) => `"${escapePlainStringForAppleScript(value)}"`;
+    const script = `tell application "Notes"
+      set targetFolder to folder id ${literal(id)}
+      set parentRef to container of targetFolder
+      set parentId to id of parentRef
+      considering case
+        if name of targetFolder is not ${literal(expectedName)} or parentId is not ${literal(expectedParentId)} then error "Folder changed; read it again"
+      end considering
+      repeat with sibling in folders of parentRef
+        if name of sibling is ${literal(newName)} and id of sibling is not ${literal(id)} then error "A sibling folder already has this name"
+      end repeat
+      set name of targetFolder to ${literal(newName)}
+      considering case
+        if id of targetFolder is not ${literal(id)} or name of targetFolder is not ${literal(newName)} or id of container of targetFolder is not parentId then error "Rename readback failed"
+      end considering
+      return id of targetFolder
+    end tell`;
+    const result = executeMutationAppleScript(script);
+    if (!result.success)
+      throw new Error(
+        result.error || "Rename outcome uncertain; read folder by ID before retrying"
+      );
+    return { id, name: newName, parentId: expectedParentId };
+  }
+
+  /** Read the exact name and parent identity used by guarded folder rename. */
+  getFolderById(id: string) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+      throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(`tell application "Notes"
+      set f to folder id "${id}"
+      return (name of f) & ${AS_FIELD_SEP} & (id of container of f)
+    end tell`);
+    if (!result.success) throw new Error(result.error || "Folder not found");
+    const [name, parentId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    if (!name || !parentId) throw new Error("Incomplete folder metadata");
+    return { id, name, parentId };
+  }
+
+  /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
+  addAttachmentById(id: string, expectedBody: string, filePath: string) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id))
+      throw new Error("Exact note ID required");
+    const quote = (value: string) => `"${escapePlainStringForAppleScript(value)}"`;
+    const result = executeMutationAppleScript(`tell application "Notes"
+      set n to note id ${quote(id)}
+      if password protected of n then error "Locked note"
+      considering case
+        if body of n is not ${quote(expectedBody)} and body of n is not (${quote(expectedBody)} & linefeed) then error "Note changed before attachment insertion"
+      end considering
+      set a to make new attachment at n with data (POSIX file ${quote(filePath)})
+      return id of a
+    end tell`);
+    if (!result.success)
+      throw new Error(
+        result.error || "Attachment insertion outcome uncertain; read note before retrying"
+      );
+    return result.output.trim();
+  }
+
   /**
    * Lists all folders in an account with full hierarchical paths.
    *
