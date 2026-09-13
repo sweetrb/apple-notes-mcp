@@ -303,6 +303,26 @@ attachment-bearing notes; edit them in Notes.app.
 
 ---
 
+#### `get-native-objects`
+
+Reads native object identities and ranges, checklist item IDs and state, actual
+native tags, and native table data from one exact note ID. Table output includes
+stable row and column identifiers. `tableCellsComplete` is false when Notes
+metadata cannot be decoded completely. This tool is read-only and requires Full
+Disk Access.
+
+---
+
+#### `list-native-tags`
+
+Lists actual native Notes tags used within one explicit `account` and `folder`,
+mapping each tag to its matching note IDs. This differs from textual hashtag
+search. The response reports `complete: false` and per-note errors when some
+native metadata is unavailable. This tool is read-only and requires Full Disk
+Access.
+
+---
+
 #### `get-note-plaintext`
 
 Retrieves a note's body as plain text, with no HTML markup.

@@ -52,7 +52,9 @@ import {
   htmlLinks,
   linkSignature,
   type RichRead,
+  readRichNote,
 } from "@/utils/noteRichText.js";
+import { parseNoteTable } from "@/utils/noteTables.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -920,6 +922,106 @@ registerTool(
 );
 
 // --- update-note ---
+
+registerTool(
+  "get-native-objects",
+  {
+    description:
+      "Use when: inspecting native objects, checklist identities, or tables in one exact note.\nReturns: native object IDs and ranges, checklist IDs and state, actual native tags, decoded tables, and the current rich content hash.\nDo not use when: you only need the note body (get-note-content) or AppleScript attachment metadata (list-attachments).\nSafety: read-only; requires Full Disk Access and reports incomplete table metadata instead of guessing.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      id: z.string().optional(),
+      contentHash: z.string().optional(),
+      objects: z.array(z.record(z.unknown())).optional(),
+      checklistItems: z.array(z.record(z.unknown())).optional(),
+      nativeTags: z.array(z.string()).optional(),
+      tables: z.array(z.record(z.unknown())).optional(),
+      tableCellsComplete: z.boolean().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id }) => {
+    const note = notesManager.getNoteById(id);
+    if (!note) return errorResponse(`Note with ID "${id}" not found`);
+    const body = notesManager.getNoteContentById(id);
+    if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
+    const rich = readRichNote(id);
+    const tables: Array<Record<string, unknown>> = (rich.objectData || [])
+      .filter((object) => object.type?.includes("table"))
+      .map((object) => {
+        try {
+          return {
+            id: object.id,
+            attachmentId: id.replace(/ICNote\/p\d+$/, `ICAttachment/p${object.pk}`),
+            complete: true,
+            ...parseNoteTable(Buffer.from(object.mergeable, "hex")),
+          };
+        } catch (error) {
+          return { id: object.id, complete: false, reason: String(error) };
+        }
+      });
+    for (const object of rich.objects || []) {
+      if (object.type.includes("table") && !tables.some((table) => table.id === object.id)) {
+        tables.push({
+          id: object.id,
+          complete: false,
+          reason: "Native table metadata is unavailable",
+        });
+      }
+    }
+    const richRead: RichRead = {
+      content: body,
+      links: rich.links,
+      nativeTags: rich.nativeTags,
+      complete: true,
+      writable: !rich.hasNativeObjects && !rich.hasChecklist,
+      revision: rich.revision,
+    };
+    return successResponse("Native objects read from the exact note", {
+      id,
+      contentHash: richContentHash(body, richRead),
+      objects: rich.objects,
+      checklistItems: rich.checklistItems,
+      nativeTags: rich.nativeTags,
+      tables,
+      tableCellsComplete: tables.every((table) => table.complete),
+    });
+  }, "Error reading native objects")
+);
+
+registerTool(
+  "list-native-tags",
+  {
+    description:
+      "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
+    inputSchema: {
+      account: z.string().min(1).max(MAX.ACCOUNT),
+      folder: z.string().min(1).max(MAX.FOLDER),
+    },
+    outputSchema: {
+      tags: z.record(z.array(z.string())).optional(),
+      complete: z.boolean().optional(),
+      errors: z.record(z.string()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ account, folder }) => {
+    const tags: Record<string, string[]> = {};
+    const errors: Record<string, string> = {};
+    for (const note of notesManager.listNoteRefs(account, folder)) {
+      try {
+        for (const tag of readRichNote(note.id).nativeTags) (tags[tag] ||= []).push(note.id);
+      } catch {
+        errors[note.id] = "Native metadata unavailable";
+      }
+    }
+    return successResponse("Native tags read from the requested folder", {
+      tags,
+      complete: Object.keys(errors).length === 0,
+      errors,
+    });
+  }, "Error listing native tags")
+);
 
 registerTool(
   "update-note",

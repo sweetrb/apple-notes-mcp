@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.8.6] - 2026-09-13
+
+### Added
+
+- `get-native-objects` reads exact native object, checklist, and table
+  identities without modifying Notes. Native table cells include row and column
+  identifiers, and incomplete metadata is reported instead of inferred.
+- `list-native-tags` lists actual native tag objects and matching note IDs in
+  one explicit account and folder, with partial-read reporting.
+
 ## [2.8.5] - 2026-09-13
 
 ### Fixed

@@ -3358,9 +3358,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decodeUnreserved && isUnreserved(decoded)) {
               output += decoded;
@@ -3380,9 +3380,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decoded !== "." && isUnreserved(decoded)) {
               output += decoded;
@@ -3422,9 +3422,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i += 2;
             continue;
           }
@@ -3460,9 +3460,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i += 2;
             continue;
           }
@@ -3507,9 +3507,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            const normalizedHex = hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            const normalizedHex = hex2.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (isUnreserved(decoded)) {
               output += decoded;
@@ -3547,9 +3547,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex = input.slice(i + 1, i + 3);
-          if (isHexPair(hex)) {
-            output += "%" + hex.toUpperCase();
+          const hex2 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex2)) {
+            output += "%" + hex2.toUpperCase();
             i += 2;
             continue;
           }
@@ -9329,8 +9329,8 @@ var require_select = __commonJS({
       regex = regex.replace(name, val.source || val);
       return new RegExp(regex);
     };
-    var truncateUrl = function(url, num) {
-      return url.replace(/^(?:\w+:\/\/|\/+)/, "").replace(/(?:\/+|\/*#.*?)$/, "").split("/", num).join("/");
+    var truncateUrl = function(url, num2) {
+      return url.replace(/^(?:\w+:\/\/|\/+)/, "").replace(/(?:\/+|\/*#.*?)$/, "").split("/", num2).join("/");
     };
     var parseNth = function(param_, test) {
       var param = param_.replace(/\s+/g, ""), cap;
@@ -24777,8 +24777,8 @@ var ZodError = class _ZodError extends Error {
   constructor(issues) {
     super();
     this.issues = [];
-    this.addIssue = (sub) => {
-      this.issues = [...this.issues, sub];
+    this.addIssue = (sub2) => {
+      this.issues = [...this.issues, sub2];
     };
     this.addIssues = (subs = []) => {
       this.issues = [...this.issues, ...subs];
@@ -24845,13 +24845,13 @@ var ZodError = class _ZodError extends Error {
   flatten(mapper = (issue2) => issue2.message) {
     const fieldErrors = {};
     const formErrors = [];
-    for (const sub of this.issues) {
-      if (sub.path.length > 0) {
-        const firstEl = sub.path[0];
+    for (const sub2 of this.issues) {
+      if (sub2.path.length > 0) {
+        const firstEl = sub2.path[0];
         fieldErrors[firstEl] = fieldErrors[firstEl] || [];
-        fieldErrors[firstEl].push(mapper(sub));
+        fieldErrors[firstEl].push(mapper(sub2));
       } else {
-        formErrors.push(mapper(sub));
+        formErrors.push(mapper(sub2));
       }
     }
     return { formErrors, fieldErrors };
@@ -29150,12 +29150,12 @@ var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
-  for (const sub of error2.issues) {
-    if (sub.path.length > 0) {
-      fieldErrors[sub.path[0]] = fieldErrors[sub.path[0]] || [];
-      fieldErrors[sub.path[0]].push(mapper(sub));
+  for (const sub2 of error2.issues) {
+    if (sub2.path.length > 0) {
+      fieldErrors[sub2.path[0]] = fieldErrors[sub2.path[0]] || [];
+      fieldErrors[sub2.path[0]].push(mapper(sub2));
     } else {
-      formErrors.push(mapper(sub));
+      formErrors.push(mapper(sub2));
     }
   }
   return { formErrors, fieldErrors };
@@ -39364,9 +39364,9 @@ function queryNoteData(noteId) {
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
     });
-    const hex = result.trim();
-    if (!hex) return { hex: null };
-    return { hex };
+    const hex2 = result.trim();
+    if (!hex2) return { hex: null };
+    return { hex: hex2 };
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     console.error(`Failed to query NoteStore database: ${message}`);
@@ -39376,10 +39376,10 @@ function queryNoteData(noteId) {
     return { hex: null };
   }
 }
-function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+function hexToBytes(hex2) {
+  const bytes = new Uint8Array(hex2.length / 2);
+  for (let i = 0; i < hex2.length; i += 2) {
+    bytes[i / 2] = parseInt(hex2.substring(i, i + 2), 16);
   }
   return bytes;
 }
@@ -42511,7 +42511,7 @@ function decodeHtmlEntities(text) {
     }
     return String.fromCodePoint(codePoint);
   };
-  return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex) => decodeCodePoint(match, hex, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
+  return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex2) => decodeCodePoint(match, hex2, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
 }
 function firstVisibleHtmlLine(html) {
   let text = html;
@@ -42850,6 +42850,103 @@ function comparableVisibleText(html) {
     /&#x([0-9a-f]+);/gi,
     (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
   ).replace(/\s+/g, " ").trim();
+}
+
+// src/utils/noteTables.ts
+import { gunzipSync as gunzipSync3 } from "node:zlib";
+var sub = (f, n) => {
+  const value = embeddedMessage(getField(f, n));
+  if (!value) throw new Error(`Missing table field ${n}`);
+  return value;
+};
+var num = (f, n) => {
+  const v = varintValue(getField(f, n));
+  if (v === void 0) throw new Error(`Missing table index ${n}`);
+  return v;
+};
+var many = (f, n) => getFields(f, n).map((v) => {
+  const m = embeddedMessage(v);
+  if (!m) throw new Error("Invalid table entry");
+  return m;
+});
+var hex = (f) => {
+  if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
+  return Buffer.from(f.value).toString("hex");
+};
+function parseNoteTable(compressed) {
+  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const data = sub(sub(root, 2), 3), entries = many(data, 3);
+  if (entries.length > 1e5) throw new Error("Table too large");
+  const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
+  const entry = (index) => {
+    if (!entries[index]) throw new Error("Invalid table reference");
+    return entries[index];
+  };
+  const uuidIndex = (index) => num(sub(many(sub(entry(index), 13), 3)[0], 2), 2);
+  const roots = entries.filter((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && types[num(map, 1)] === "com.apple.notes.ICTable";
+  });
+  if (roots.length !== 1) throw new Error("Ambiguous native table root");
+  const refs = new Map(
+    many(sub(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub(m, 2), 6)])
+  );
+  const ordered = (key) => {
+    const ref = refs.get(key);
+    if (ref === void 0) throw new Error("Missing table dimension");
+    const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
+    const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
+    const map = /* @__PURE__ */ new Map();
+    ids.forEach((id, i) => {
+      const index = uuids.indexOf(id);
+      if (index < 0) throw new Error("Missing dimension UUID");
+      map.set(index, i);
+    });
+    const aliases = many(sub(ordering, 2), 1).map((pair) => [
+      uuidIndex(num(sub(pair, 1), 6)),
+      uuidIndex(num(sub(pair, 2), 6))
+    ]);
+    for (let pass = 0; pass < aliases.length + 1; pass++) {
+      let changed = false;
+      for (const [key2, value] of aliases)
+        if (map.has(key2) && !map.has(value)) {
+          map.set(value, map.get(key2));
+          changed = true;
+        }
+      if (!changed) break;
+    }
+    return { ids, map };
+  };
+  const rows = ordered("crRows"), columns = ordered("crColumns");
+  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
+    throw new Error("Unsupported table size");
+  const values = rows.ids.map(() => columns.ids.map(() => ""));
+  const cellRef = refs.get("cellColumns");
+  if (cellRef === void 0) throw new Error("Missing table cells");
+  for (const column of many(sub(entry(cellRef), 6), 1)) {
+    const ci = columns.map.get(uuidIndex(num(sub(column, 1), 6)));
+    const cells = entry(num(sub(column, 2), 6));
+    for (const row of many(sub(cells, 6), 1)) {
+      const ri = rows.map.get(uuidIndex(num(sub(row, 1), 6)));
+      if (ri === void 0 || ci === void 0) continue;
+      const note = sub(entry(num(sub(row, 2), 6)), 10);
+      const text = stringValue(getField(note, 2));
+      if (text === void 0 || text.includes("\uFFFC"))
+        throw new Error("Embedded or unsupported table cell");
+      values[ri][ci] = text.replace(/\n$/u, "");
+    }
+  }
+  const rtl = entries.some((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && many(map, 3).some(
+      (m) => stringValue(getField(sub(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
+    );
+  });
+  if (rtl) {
+    for (const row of values) row.reverse();
+    columns.ids.reverse();
+  }
+  return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
 }
 
 // src/index.ts
@@ -43405,6 +43502,100 @@ registerTool(
     }
     return successResponse(`Shown account with ID "${id}" in Notes.app`, { id, separately });
   }, "Error showing account")
+);
+registerTool(
+  "get-native-objects",
+  {
+    description: "Use when: inspecting native objects, checklist identities, or tables in one exact note.\nReturns: native object IDs and ranges, checklist IDs and state, actual native tags, decoded tables, and the current rich content hash.\nDo not use when: you only need the note body (get-note-content) or AppleScript attachment metadata (list-attachments).\nSafety: read-only; requires Full Disk Access and reports incomplete table metadata instead of guessing.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      contentHash: external_exports.string().optional(),
+      objects: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      checklistItems: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      nativeTags: external_exports.array(external_exports.string()).optional(),
+      tables: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      tableCellsComplete: external_exports.boolean().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id }) => {
+    const note = notesManager.getNoteById(id);
+    if (!note) return errorResponse(`Note with ID "${id}" not found`);
+    const body = notesManager.getNoteContentById(id);
+    if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
+    const rich = readRichNote(id);
+    const tables = (rich.objectData || []).filter((object3) => object3.type?.includes("table")).map((object3) => {
+      try {
+        return {
+          id: object3.id,
+          attachmentId: id.replace(/ICNote\/p\d+$/, `ICAttachment/p${object3.pk}`),
+          complete: true,
+          ...parseNoteTable(Buffer.from(object3.mergeable, "hex"))
+        };
+      } catch (error2) {
+        return { id: object3.id, complete: false, reason: String(error2) };
+      }
+    });
+    for (const object3 of rich.objects || []) {
+      if (object3.type.includes("table") && !tables.some((table) => table.id === object3.id)) {
+        tables.push({
+          id: object3.id,
+          complete: false,
+          reason: "Native table metadata is unavailable"
+        });
+      }
+    }
+    const richRead = {
+      content: body,
+      links: rich.links,
+      nativeTags: rich.nativeTags,
+      complete: true,
+      writable: !rich.hasNativeObjects && !rich.hasChecklist,
+      revision: rich.revision
+    };
+    return successResponse("Native objects read from the exact note", {
+      id,
+      contentHash: richContentHash(body, richRead),
+      objects: rich.objects,
+      checklistItems: rich.checklistItems,
+      nativeTags: rich.nativeTags,
+      tables,
+      tableCellsComplete: tables.every((table) => table.complete)
+    });
+  }, "Error reading native objects")
+);
+registerTool(
+  "list-native-tags",
+  {
+    description: "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
+    inputSchema: {
+      account: external_exports.string().min(1).max(MAX.ACCOUNT),
+      folder: external_exports.string().min(1).max(MAX.FOLDER)
+    },
+    outputSchema: {
+      tags: external_exports.record(external_exports.array(external_exports.string())).optional(),
+      complete: external_exports.boolean().optional(),
+      errors: external_exports.record(external_exports.string()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ account, folder }) => {
+    const tags = {};
+    const errors = {};
+    for (const note of notesManager.listNoteRefs(account, folder)) {
+      try {
+        for (const tag of readRichNote(note.id).nativeTags) (tags[tag] ||= []).push(note.id);
+      } catch {
+        errors[note.id] = "Native metadata unavailable";
+      }
+    }
+    return successResponse("Native tags read from the requested folder", {
+      tags,
+      complete: Object.keys(errors).length === 0,
+      errors
+    });
+  }, "Error listing native tags")
 );
 registerTool(
   "update-note",
