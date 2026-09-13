@@ -58,6 +58,19 @@ This method also installs a **skill** that teaches Claude when and how to use Ap
 
 On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
+Native tag, checklist, table, pin, and rich append operations use two packaged
+Apple Shortcuts. Run the explicit setup once:
+
+```bash
+npx -y apple-notes-mcp setup
+```
+
+The command checks existing installations and opens only missing signed
+workflows. Confirm **Add Shortcut** in each macOS window, then verify with
+`npx -y apple-notes-mcp setup --check` or the MCP `doctor` tool. macOS does not
+support silent Shortcut import, so merely connecting an MCP client never opens
+setup windows or bypasses these confirmations.
+
 ### Using the Codex Marketplace
 
 The same plugin is available for Codex. Add the marketplace and install the plugin:

@@ -1,6 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/utils/checklistParser.js", () => ({ hasFullDiskAccess: vi.fn(() => true) }));
+vi.mock("@/services/nativeTags.js", () => ({
+  NATIVE_TAGS_SHORTCUT: "Apple Notes MCP - Native Tags",
+  nativeTagsStatus: vi.fn((shortcut: string) => ({
+    shortcut,
+    installed: true,
+    identifier: shortcut,
+  })),
+}));
+vi.mock("@/services/backgroundNotes.js", () => ({
+  BACKGROUND_SHORTCUT: "Apple Notes MCP - Background Operations v5",
+}));
 vi.mock("child_process", () => ({
   spawnSync: vi.fn(() => ({
     stdout: "",
@@ -14,6 +25,7 @@ vi.mock("child_process", () => ({
 import { spawnSync } from "child_process";
 import { runDoctor, formatDoctorReport, checkNodeRuntimeSignature } from "@/tools/doctor.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
+import { nativeTagsStatus } from "@/services/nativeTags.js";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
 
 const mockSpawnSync = vi.mocked(spawnSync);
@@ -66,6 +78,17 @@ describe("runDoctor (#22)", () => {
     const sig = r.checks.find((c) => c.name === "Node runtime signature");
     expect(sig?.status).toBe("ok");
     expect(sig?.detail).toMatch(/Team ID HX7739G8FX/);
+  });
+
+  it("points to setup when a native-write Shortcut is missing", () => {
+    vi.mocked(nativeTagsStatus)
+      .mockReturnValueOnce({ shortcut: "Native Tags", installed: true, identifier: "native" })
+      .mockReturnValueOnce({ shortcut: "Background Operations", installed: false });
+    const check = runDoctor(fakeMgr()).checks.find(
+      (item) => item.name === "Native write Shortcuts"
+    );
+    expect(check).toMatchObject({ status: "warn" });
+    expect(check?.detail).toContain("apple-notes-mcp setup");
   });
 });
 

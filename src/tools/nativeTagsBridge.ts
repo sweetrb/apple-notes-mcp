@@ -66,7 +66,10 @@ export function registerNativeTagsBridge(server: McpServer, manager: AppleNotesM
     "native-tags-status",
     "Use when: checking whether the Native Tags Shortcut is installed before a tag write.\nReturns: the configured Shortcut name, unique installed identifier, and installed state.\nDo not use when: listing tags on notes (list-native-tags).\nSafety: read-only; installation does not by itself prove Notes permission or a successful live mutation.",
     {},
-    () => nativeTagsStatus()
+    () => {
+      const status = nativeTagsStatus();
+      return status.installed ? status : { ...status, setupCommand: "apple-notes-mcp setup" };
+    }
   );
 
   tool(

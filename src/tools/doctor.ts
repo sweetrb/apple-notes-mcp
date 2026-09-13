@@ -12,6 +12,8 @@ import { spawnSync } from "child_process";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { FULL_DISK_ACCESS_GUIDE_URL, NODE_RUNTIME_TCC_GUIDE_URL } from "@/utils/docsUrls.js";
+import { NATIVE_TAGS_SHORTCUT, nativeTagsStatus } from "@/services/nativeTags.js";
+import { BACKGROUND_SHORTCUT } from "@/services/backgroundNotes.js";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 export interface DoctorCheck {
@@ -76,7 +78,29 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
         `and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`,
   });
 
-  // 4. Node runtime code signature. An ad-hoc signed Node (typically Homebrew's)
+  // 4. Optional native-write bridges. Installation is explicit because macOS
+  // requires the user to approve every imported Shortcut.
+  try {
+    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map((name) =>
+      nativeTagsStatus(name)
+    );
+    const missing = bridgeStatuses.filter((status) => !status.installed);
+    checks.push({
+      name: "Native write Shortcuts",
+      status: missing.length ? "warn" : "ok",
+      detail: missing.length
+        ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS`
+        : "both native-write bridges are installed",
+    });
+  } catch (error) {
+    checks.push({
+      name: "Native write Shortcuts",
+      status: "warn",
+      detail: `could not inspect Shortcuts: ${String(error)}. Run apple-notes-mcp setup --check`,
+    });
+  }
+
+  // 5. Node runtime code signature. An ad-hoc signed Node (typically Homebrew's)
   // gets a new cdhash on every update, so macOS TCC treats it as a brand-new
   // binary and silently drops its Automation / Full Disk Access grants — the
   // most common cause of "this worked last week" permission flakiness.

@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve2.call(this, root, ref);
+      let _sch = resolve3.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve2(root, ref) {
+    function resolve3(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve2(baseURI, relativeURI, options) {
+    function resolve3(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve2,
+      resolve: resolve3,
       resolveComponent,
       equal,
       serialize,
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve2(parseResult.data);
+            resolve3(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve2, interval);
+      const timeoutId = setTimeout(resolve3, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+      await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve3) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve2();
+        resolve3();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve3);
       }
     });
   }
@@ -42621,6 +42621,469 @@ function describeSearchScope(searchContent, resultCount) {
 
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
+
+// src/services/nativeTags.ts
+import { execFileSync as execFileSync6 } from "node:child_process";
+import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
+import { tmpdir as tmpdir2 } from "node:os";
+import { join as join7 } from "node:path";
+var NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
+function normalizeNativeTags(tags) {
+  if (!tags.length || tags.length > 100) throw new Error("Provide between 1 and 100 tags");
+  return [
+    ...new Set(
+      tags.map((value) => {
+        const tag = value.normalize("NFC").replace(/^#/, "");
+        if (tag.length > 100 || !new RegExp("^(?=.*\\p{L})[\\p{L}\\p{N}_-]+$", "u").test(tag))
+          throw new Error(
+            "Tags must contain a letter and only letters, digits, hyphens or underscores"
+          );
+        return tag;
+      })
+    )
+  ];
+}
+function addNativeTags(request, deps) {
+  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(request.id))
+    throw new Error("An exact CoreData note ID is required");
+  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
+    throw new Error("scopeText must be a stable, single-line project marker of 12\u2013500 characters");
+  const tags = normalizeNativeTags(request.tags);
+  const before = deps.read(request.id);
+  if (before.contentHash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (before.title !== request.title || !before.plaintext.includes(request.scopeText))
+    throw new Error("The exact note does not match the title and project marker");
+  const missing = tags.filter((tag) => !before.rich.nativeTags.includes(tag));
+  if (!missing.length)
+    return { nativeTags: before.rich.nativeTags, added: [], contentHash: before.contentHash };
+  const candidates = deps.candidates(request.title, request.scopeText);
+  if (candidates.length !== 1 || candidates[0] !== request.id)
+    throw new Error(
+      "Shortcuts selection is ambiguous or points to a different note; nothing was changed"
+    );
+  if (deps.read(request.id).contentHash !== request.expectedContentHash)
+    throw new Error("Note revision changed during preflight; nothing was changed");
+  let transportWarning;
+  try {
+    deps.run({ title: request.title, scopeText: request.scopeText, tags: missing });
+  } catch (error2) {
+    transportWarning = error2 instanceof Error ? error2.message : "Shortcuts completion was uncertain";
+  }
+  const after = deps.read(request.id);
+  const allTags = [.../* @__PURE__ */ new Set([...before.rich.nativeTags, ...tags])];
+  const textWithoutTags = (text) => {
+    for (const tag of [...allTags].sort((a, b) => b.length - a.length)) {
+      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      text = text.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
+    }
+    return text.replace(/[\s\ufffc]/gu, "");
+  };
+  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
+    throw new Error(
+      "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
+    );
+  }
+  return {
+    nativeTags: after.rich.nativeTags,
+    added: missing,
+    contentHash: after.contentHash,
+    ...transportWarning ? {
+      transportWarning: "Shortcuts completion was uncertain, but all requested native tags and preserved content were verified by exact ID."
+    } : {}
+  };
+}
+function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
+  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+    encoding: "utf8",
+    timeout: 15e3,
+    maxBuffer: 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"]
+  }).split(/\r?\n/u);
+  const matches = lines.flatMap((line) => {
+    const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
+    return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
+  });
+  return {
+    shortcut,
+    installed: matches.length === 1,
+    identifier: matches.length === 1 ? matches[0].identifier : void 0
+  };
+}
+function runNativeTagsShortcut(input) {
+  const status = nativeTagsStatus();
+  if (!status.installed)
+    throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
+  const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
+  try {
+    const path4 = join7(directory, "request.json");
+    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
+    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+      encoding: "utf8",
+      timeout: 6e4,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } catch {
+    throw new Error(
+      "Native tag operation did not complete cleanly (possibly waiting for macOS permission). Do not retry automatically; read the exact note and check Shortcuts"
+    );
+  } finally {
+    rmSync2(directory, { recursive: true, force: true });
+  }
+}
+
+// src/services/backgroundNotes.ts
+import { execFileSync as execFileSync7 } from "node:child_process";
+import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
+import { join as join8 } from "node:path";
+
+// src/utils/appendMarkdown.ts
+var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function appendMarkdownHtml(markdown) {
+  if (markdown.includes("\uE000") || markdown.includes("\uE001"))
+    throw new Error("Unsupported reserved characters");
+  if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
+    throw new Error("Unsupported control characters");
+  if (/[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(markdown))
+    throw new Error(
+      "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
+    );
+  const inline = (text) => {
+    const links = [];
+    let value = text.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
+      if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url))
+        throw new Error("Unsupported Markdown link URL");
+      links.push(`<a href="${escape2(url)}">${escape2(label)}</a>`);
+      return `\uE000${links.length - 1}\uE001`;
+    });
+    value = escape2(value).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
+    if (value.includes("[") || value.includes("]") || value.includes("*"))
+      throw new Error("Unsupported or unbalanced Markdown inline syntax");
+    return value.replace(/\uE000(\d+)\uE001/g, (_s, i) => links[Number(i)]);
+  };
+  let html = "", list;
+  const close = () => {
+    if (list) {
+      html += `</${list}>`;
+      list = void 0;
+    }
+  };
+  for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
+    if (/^\s{2,}\S/.test(line)) throw new Error("Nested lists and indented code are unsupported");
+    const heading = /^(#{1,3})\s+(.+)$/.exec(line), item = /^(?:([-+*])|\d+\.)\s+(.+)$/.exec(line);
+    if (item) {
+      const kind = item[1] ? "ul" : "ol";
+      if (list !== kind) {
+        close();
+        list = kind;
+        html += `<${kind}>`;
+      }
+      html += `<li>${inline(item[2])}</li>`;
+      continue;
+    }
+    close();
+    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : line.trim() ? `<div>${inline(line)}</div>` : "<div><br></div>";
+  }
+  close();
+  return html;
+}
+
+// src/utils/noteRevision.ts
+var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+function comparableVisibleText(html) {
+  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint))).replace(
+    /&#x([0-9a-f]+);/gi,
+    (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
+  ).replace(/\s+/g, " ").trim();
+}
+
+// src/services/backgroundNotes.ts
+var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+var backgroundStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+var nativeTagBridgeStatus = () => nativeTagsStatus();
+function readBackgroundSnapshot(manager, id2) {
+  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
+    throw new Error("Exact note ID required");
+  const note = manager.getNoteById(id2);
+  if (!note) throw new Error("Note not found");
+  if (note.passwordProtected) throw new Error("Locked notes are unavailable in background mode");
+  const html = manager.getNoteContentById(id2);
+  const enriched = enrichNoteRead(id2, html);
+  const rich = readRichNote(id2);
+  if (enriched.revision !== rich.revision)
+    throw new Error("Note changed during read; read it again");
+  return {
+    id: id2,
+    title: note.title,
+    hash: richContentHash(html, enriched),
+    html,
+    rich,
+    pinned: getNoteMetadata(id2).metadata?.pinned,
+    checklist: getChecklistItems(id2).items || []
+  };
+}
+function validateAppendContent(content, format) {
+  if (!content || content.length > 1024 * 1024 || content.includes("\0"))
+    throw new Error("Invalid append content (limit 1 MiB)");
+  if (format === "html") {
+    const allowed = /* @__PURE__ */ new Set([
+      "div",
+      "p",
+      "br",
+      "b",
+      "strong",
+      "i",
+      "em",
+      "u",
+      "s",
+      "del",
+      "h1",
+      "h2",
+      "h3",
+      "ul",
+      "ol",
+      "li",
+      "a",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "td",
+      "th"
+    ]);
+    for (const tag of content.matchAll(/<\/?\s*([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+      if (!allowed.has(tag[1].toLowerCase()))
+        throw new Error(`Unsupported HTML element: ${tag[1]}`);
+      let attrs = tag[2].replace(/\/$/, "").trim();
+      if (tag[1].toLowerCase() === "a")
+        attrs = attrs.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (_s, _q, url) => {
+          if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) || Array.from(url).some((c) => c.charCodeAt(0) < 33))
+            throw new Error("Unsupported link URL");
+          return "";
+        });
+      if (attrs.trim())
+        throw new Error(
+          "Unsupported HTML attributes; use semantic formatting and explicit blank paragraphs"
+        );
+    }
+    if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
+  }
+  if (format === "markdown" && /!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+    throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+}
+function runBackgroundShortcut(input) {
+  const status = backgroundStatus();
+  if (!status.installed)
+    throw new Error("Install the supplied Background Operations shortcut once");
+  const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
+  try {
+    const file = join8(directory, "request.json");
+    writeFileSync2(
+      file,
+      JSON.stringify({
+        operation: "",
+        title: "",
+        scopeText: "",
+        text: "",
+        objectId: "",
+        objectName: "",
+        change: "",
+        otherTitle: "",
+        otherScope: "",
+        tag: "",
+        size: "",
+        ...input
+      }),
+      { mode: 384 }
+    );
+    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      encoding: "utf8",
+      timeout: 6e4,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } finally {
+    rmSync3(directory, { recursive: true, force: true });
+  }
+}
+function backgroundDependencies(manager) {
+  return {
+    read: (id2) => readBackgroundSnapshot(manager, id2),
+    run: runBackgroundShortcut,
+    candidates: (title, scope) => manager.listAccounts().flatMap(
+      (account) => manager.searchNotes(title, false, account.name).filter(
+        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope)
+      ).map((note) => note.id)
+    )
+  };
+}
+function assertPreserved(before, after, options = {}) {
+  if (before.id !== after.id || before.title !== after.title)
+    throw new Error("Note identity changed");
+  const tidy = (s) => s.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
+  let oldText = tidy(before.rich.text), newText = tidy(after.rich.text);
+  if (options.tagChange) {
+    const escaped = options.tagChange.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const strip = (s) => s.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "").replace(/[\s\ufffc]/gu, "");
+    oldText = strip(oldText);
+    newText = strip(newText);
+  }
+  if (options.append ? !newText.startsWith(oldText) : newText !== oldText)
+    throw new Error("Existing note text was not preserved");
+  const links = options.append ? after.rich.links.slice(0, before.rich.links.length) : after.rich.links;
+  if (linkSignature(before.rich.links) !== linkSignature(links))
+    throw new Error("Existing links were not preserved");
+  if (!options.tagChange && before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)))
+    throw new Error("Existing native object was lost");
+  if (JSON.stringify(before.checklist) !== JSON.stringify(
+    options.append ? after.checklist.slice(0, before.checklist.length) : after.checklist
+  ))
+    throw new Error("Existing checklist items changed");
+  for (const item of before.rich.checklistItems || []) {
+    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
+    if (!actual || actual.text !== item.text || actual.done !== item.done)
+      throw new Error("Existing checklist item identity or state changed");
+  }
+  if (before.rich.nativeTags.filter((t) => t !== options.tagChange).some((t) => !after.rich.nativeTags.includes(t)))
+    throw new Error("Existing native tag was lost");
+  const allowedRemoved = options.tagChange ? before.rich.nativeTagObjectIds?.[options.tagChange] || [] : [];
+  for (const object3 of before.rich.objectData || []) {
+    if (allowedRemoved.includes(object3.id)) continue;
+    const actual = after.rich.objectData?.find((o) => o.id === object3.id);
+    if (!actual || actual.mergeable !== object3.mergeable || actual.view !== object3.view)
+      throw new Error("Existing native object content or presentation changed");
+  }
+  if (!options.tagChange && before.rich.styleRuns && after.rich.styleRuns) {
+    const end = before.rich.text.trimEnd().length;
+    for (const oldRun of before.rich.styleRuns)
+      for (const newRun of after.rich.styleRuns) {
+        const overlapStart = Math.max(oldRun.start, newRun.start);
+        const overlapEnd = Math.min(
+          end,
+          oldRun.start + oldRun.length,
+          newRun.start + newRun.length
+        );
+        if (overlapStart < overlapEnd && /[^\s\ufffc]/u.test(before.rich.text.slice(overlapStart, overlapEnd)) && oldRun.signature !== newRun.signature)
+          throw new Error("Existing rich formatting changed");
+      }
+  }
+}
+function mutateBackground(request, operation, data, verify, deps) {
+  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
+    throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
+  const before = deps.read(request.id);
+  if (before.hash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (!before.rich.text.includes(request.scopeText))
+    throw new Error("Scope is absent from exact note");
+  const candidates = deps.candidates(before.title, request.scopeText);
+  if (candidates.length !== 1 || candidates[0] !== request.id)
+    throw new Error("Ambiguous note selection; nothing changed");
+  if (deps.read(request.id).hash !== before.hash)
+    throw new Error("Note revision changed during preflight");
+  let transportUncertain = false;
+  let transportMessage = "";
+  try {
+    deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
+  } catch (error2) {
+    transportUncertain = true;
+    const detail = error2;
+    transportMessage = detail?.code === "ETIMEDOUT" ? "Shortcuts timed out; check for an interactive parameter or permission request" : String(detail?.stderr || detail?.message || "Shortcuts failed").trim().slice(0, 500);
+  }
+  const after = deps.read(request.id);
+  try {
+    verify(before, after);
+  } catch (error2) {
+    throw new Error(
+      `Operation outcome uncertain; read exact note before any retry: ${error2 instanceof Error ? error2.message : "readback failed"}${transportMessage ? "; " + transportMessage : ""}`
+    );
+  }
+  return {
+    ok: true,
+    id: request.id,
+    previousContentHash: before.hash,
+    contentHash: after.hash,
+    ...transportUncertain ? {
+      transportWarning: "Transport was uncertain; exact-ID readback verified the requested result"
+    } : {}
+  };
+}
+function assertAppendedHtmlLinks(previousCount, links, html) {
+  const remaining = links.slice(previousCount);
+  for (const expected of htmlLinks(html)) {
+    const index = remaining.findIndex(
+      (link) => linkSignature([link]) === linkSignature([expected])
+    );
+    if (index < 0) throw new Error("Appended HTML link not verified");
+    remaining.splice(index, 1);
+  }
+}
+function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
+  const before = comparableVisibleText(beforeHtml);
+  const after = comparableVisibleText(afterHtml);
+  if (!after.startsWith(before)) throw new Error("Appended text not verified");
+  const suffix = after.slice(before.length).replace(/\s+/gu, " ").trim();
+  const wanted = expected.replace(/\s+/gu, " ").trim();
+  if (!suffix || !suffix.includes(wanted)) throw new Error("Appended text not verified");
+}
+function appendNative(manager, request) {
+  validateAppendContent(request.content, request.format);
+  if (request.format === "markdown")
+    return appendNative(manager, {
+      ...request,
+      content: appendMarkdownHtml(request.content),
+      format: "html"
+    });
+  if (request.format === "html" && /<table\b/i.test(request.content))
+    throw new Error("Use create-table for verified native table insertion");
+  const op = request.format === "plaintext" ? "append-text" : request.format === "html" ? "append-html" : "append-markdown";
+  const text = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
+  return mutateBackground(
+    request,
+    op,
+    { text },
+    (before, after) => {
+      assertPreserved(before, after, { append: true });
+      const expected = request.format === "html" ? comparableVisibleText(request.content) : request.format === "plaintext" ? request.content : null;
+      if (expected) assertAppendedVisibleText(before.html, after.html, expected);
+      if (request.format === "html")
+        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, request.content);
+    },
+    backgroundDependencies(manager)
+  );
+}
+function setNativeTag(manager, request) {
+  const tag = normalizeNativeTags([request.tag])[0];
+  const initial = readBackgroundSnapshot(manager, request.id);
+  if (initial.hash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (initial.rich.nativeTags.includes(tag) === request.present)
+    return { ok: true, id: request.id, contentHash: initial.hash, changed: false };
+  const deps = backgroundDependencies(manager);
+  if (request.present)
+    deps.run = ({ title, scopeText }) => runNativeTagsShortcut({ title, scopeText, tags: [tag] });
+  return mutateBackground(
+    request,
+    request.present ? "add-tag" : "remove-tag",
+    { tag },
+    (before, after) => {
+      assertPreserved(before, after, { tagChange: tag });
+      if (after.rich.nativeTags.includes(tag) !== request.present)
+        throw new Error("Native tag state not verified");
+      const removed = before.rich.nativeObjectIds.filter(
+        (id2) => !after.rich.nativeObjectIds.includes(id2)
+      );
+      const allowed = request.present ? [] : before.rich.nativeTagObjectIds?.[tag] || [];
+      if (removed.some((id2) => !allowed.includes(id2)))
+        throw new Error("Unrelated native object was lost");
+    },
+    deps
+  );
+}
+
+// src/tools/doctor.ts
 function runDoctor(manager) {
   const checks = [];
   const hc = manager.healthCheck();
@@ -42651,6 +43114,23 @@ function runDoctor(manager) {
     status: fda ? "ok" : "warn",
     detail: fda ? "granted \u2014 the Notes database is readable (checklist state, note metadata, note links, sync detail)" : `not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else is pure AppleScript and is unaffected. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
   });
+  try {
+    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map(
+      (name) => nativeTagsStatus(name)
+    );
+    const missing = bridgeStatuses.filter((status) => !status.installed);
+    checks.push({
+      name: "Native write Shortcuts",
+      status: missing.length ? "warn" : "ok",
+      detail: missing.length ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS` : "both native-write bridges are installed"
+    });
+  } catch (error2) {
+    checks.push({
+      name: "Native write Shortcuts",
+      status: "warn",
+      detail: `could not inspect Shortcuts: ${String(error2)}. Run apple-notes-mcp setup --check`
+    });
+  }
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
   return { healthy, checks };
@@ -42694,12 +43174,12 @@ function formatDoctorReport(r) {
 
 // src/services/fileConfig.ts
 import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join7 } from "path";
+import { join as join9 } from "path";
 import { homedir as homedir7 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join7(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   const applied = [];
@@ -42906,15 +43386,6 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
-// src/utils/noteRevision.ts
-var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
-function comparableVisibleText(html) {
-  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint))).replace(
-    /&#x([0-9a-f]+);/gi,
-    (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
-  ).replace(/\s+/g, " ").trim();
-}
-
 // src/utils/noteTables.ts
 import { gunzipSync as gunzipSync3 } from "node:zlib";
 var sub = (f, n) => {
@@ -43018,14 +43489,14 @@ import {
   closeSync,
   constants,
   fstatSync,
-  mkdtempSync as mkdtempSync2,
+  mkdtempSync as mkdtempSync4,
   openSync,
   readFileSync as readFileSync3,
-  rmSync as rmSync2,
-  writeFileSync
+  rmSync as rmSync4,
+  writeFileSync as writeFileSync3
 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join8 } from "node:path";
+import { tmpdir as tmpdir4 } from "node:os";
+import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43139,10 +43610,10 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync2(join8(tmpdir2(), "notes-attachment-add-"));
-      const temporaryFile = join8(directory, basename(path4));
+      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join10(directory, basename(path4));
       try {
-        writeFileSync(temporaryFile, bytes, { mode: 384 });
+        writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
           throw new Error("Note revision changed");
         let returnedId;
@@ -43185,121 +43656,10 @@ function registerDirectOperations(server2, manager) {
           } : {}
         };
       } finally {
-        rmSync2(directory, { recursive: true, force: true });
+        rmSync4(directory, { recursive: true, force: true });
       }
     }
   );
-}
-
-// src/services/nativeTags.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
-import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
-import { tmpdir as tmpdir3 } from "node:os";
-import { join as join9 } from "node:path";
-var NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
-function normalizeNativeTags(tags) {
-  if (!tags.length || tags.length > 100) throw new Error("Provide between 1 and 100 tags");
-  return [
-    ...new Set(
-      tags.map((value) => {
-        const tag = value.normalize("NFC").replace(/^#/, "");
-        if (tag.length > 100 || !new RegExp("^(?=.*\\p{L})[\\p{L}\\p{N}_-]+$", "u").test(tag))
-          throw new Error(
-            "Tags must contain a letter and only letters, digits, hyphens or underscores"
-          );
-        return tag;
-      })
-    )
-  ];
-}
-function addNativeTags(request, deps) {
-  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(request.id))
-    throw new Error("An exact CoreData note ID is required");
-  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
-    throw new Error("scopeText must be a stable, single-line project marker of 12\u2013500 characters");
-  const tags = normalizeNativeTags(request.tags);
-  const before = deps.read(request.id);
-  if (before.contentHash !== request.expectedContentHash)
-    throw new Error("Note revision changed; read it again");
-  if (before.title !== request.title || !before.plaintext.includes(request.scopeText))
-    throw new Error("The exact note does not match the title and project marker");
-  const missing = tags.filter((tag) => !before.rich.nativeTags.includes(tag));
-  if (!missing.length)
-    return { nativeTags: before.rich.nativeTags, added: [], contentHash: before.contentHash };
-  const candidates = deps.candidates(request.title, request.scopeText);
-  if (candidates.length !== 1 || candidates[0] !== request.id)
-    throw new Error(
-      "Shortcuts selection is ambiguous or points to a different note; nothing was changed"
-    );
-  if (deps.read(request.id).contentHash !== request.expectedContentHash)
-    throw new Error("Note revision changed during preflight; nothing was changed");
-  let transportWarning;
-  try {
-    deps.run({ title: request.title, scopeText: request.scopeText, tags: missing });
-  } catch (error2) {
-    transportWarning = error2 instanceof Error ? error2.message : "Shortcuts completion was uncertain";
-  }
-  const after = deps.read(request.id);
-  const allTags = [.../* @__PURE__ */ new Set([...before.rich.nativeTags, ...tags])];
-  const textWithoutTags = (text) => {
-    for (const tag of [...allTags].sort((a, b) => b.length - a.length)) {
-      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      text = text.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
-    }
-    return text.replace(/[\s\ufffc]/gu, "");
-  };
-  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
-    throw new Error(
-      "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
-    );
-  }
-  return {
-    nativeTags: after.rich.nativeTags,
-    added: missing,
-    contentHash: after.contentHash,
-    ...transportWarning ? {
-      transportWarning: "Shortcuts completion was uncertain, but all requested native tags and preserved content were verified by exact ID."
-    } : {}
-  };
-}
-function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
-    encoding: "utf8",
-    timeout: 15e3,
-    maxBuffer: 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"]
-  }).split(/\r?\n/u);
-  const matches = lines.flatMap((line) => {
-    const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
-    return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
-  });
-  return {
-    shortcut,
-    installed: matches.length === 1,
-    identifier: matches.length === 1 ? matches[0].identifier : void 0
-  };
-}
-function runNativeTagsShortcut(input) {
-  const status = nativeTagsStatus();
-  if (!status.installed)
-    throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync3(join9(tmpdir3(), "apple-notes-native-tags-"));
-  try {
-    const path4 = join9(directory, "request.json");
-    writeFileSync2(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
-      encoding: "utf8",
-      timeout: 6e4,
-      maxBuffer: 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
-  } catch {
-    throw new Error(
-      "Native tag operation did not complete cleanly (possibly waiting for macOS permission). Do not retry automatically; read the exact note and check Shortcuts"
-    );
-  } finally {
-    rmSync3(directory, { recursive: true, force: true });
-  }
 }
 
 // src/tools/nativeTagsBridge.ts
@@ -43356,7 +43716,10 @@ function registerNativeTagsBridge(server2, manager) {
     "native-tags-status",
     "Use when: checking whether the Native Tags Shortcut is installed before a tag write.\nReturns: the configured Shortcut name, unique installed identifier, and installed state.\nDo not use when: listing tags on notes (list-native-tags).\nSafety: read-only; installation does not by itself prove Notes permission or a successful live mutation.",
     {},
-    () => nativeTagsStatus()
+    () => {
+      const status = nativeTagsStatus();
+      return status.installed ? status : { ...status, setupCommand: "apple-notes-mcp setup" };
+    }
   );
   tool(
     "add-native-tags",
@@ -43383,347 +43746,6 @@ function registerNativeTagsBridge(server2, manager) {
       );
       return { ok: true, id: id2, ...result };
     }
-  );
-}
-
-// src/services/backgroundNotes.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
-import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync3, rmSync as rmSync4 } from "node:fs";
-import { tmpdir as tmpdir4 } from "node:os";
-import { join as join10 } from "node:path";
-
-// src/utils/appendMarkdown.ts
-var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function appendMarkdownHtml(markdown) {
-  if (markdown.includes("\uE000") || markdown.includes("\uE001"))
-    throw new Error("Unsupported reserved characters");
-  if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
-    throw new Error("Unsupported control characters");
-  if (/[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(markdown))
-    throw new Error(
-      "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
-    );
-  const inline = (text) => {
-    const links = [];
-    let value = text.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
-      if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url))
-        throw new Error("Unsupported Markdown link URL");
-      links.push(`<a href="${escape2(url)}">${escape2(label)}</a>`);
-      return `\uE000${links.length - 1}\uE001`;
-    });
-    value = escape2(value).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
-    if (value.includes("[") || value.includes("]") || value.includes("*"))
-      throw new Error("Unsupported or unbalanced Markdown inline syntax");
-    return value.replace(/\uE000(\d+)\uE001/g, (_s, i) => links[Number(i)]);
-  };
-  let html = "", list;
-  const close = () => {
-    if (list) {
-      html += `</${list}>`;
-      list = void 0;
-    }
-  };
-  for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
-    if (/^\s{2,}\S/.test(line)) throw new Error("Nested lists and indented code are unsupported");
-    const heading = /^(#{1,3})\s+(.+)$/.exec(line), item = /^(?:([-+*])|\d+\.)\s+(.+)$/.exec(line);
-    if (item) {
-      const kind = item[1] ? "ul" : "ol";
-      if (list !== kind) {
-        close();
-        list = kind;
-        html += `<${kind}>`;
-      }
-      html += `<li>${inline(item[2])}</li>`;
-      continue;
-    }
-    close();
-    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : line.trim() ? `<div>${inline(line)}</div>` : "<div><br></div>";
-  }
-  close();
-  return html;
-}
-
-// src/services/backgroundNotes.ts
-var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
-var backgroundStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
-var nativeTagBridgeStatus = () => nativeTagsStatus();
-function readBackgroundSnapshot(manager, id2) {
-  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
-    throw new Error("Exact note ID required");
-  const note = manager.getNoteById(id2);
-  if (!note) throw new Error("Note not found");
-  if (note.passwordProtected) throw new Error("Locked notes are unavailable in background mode");
-  const html = manager.getNoteContentById(id2);
-  const enriched = enrichNoteRead(id2, html);
-  const rich = readRichNote(id2);
-  if (enriched.revision !== rich.revision)
-    throw new Error("Note changed during read; read it again");
-  return {
-    id: id2,
-    title: note.title,
-    hash: richContentHash(html, enriched),
-    html,
-    rich,
-    pinned: getNoteMetadata(id2).metadata?.pinned,
-    checklist: getChecklistItems(id2).items || []
-  };
-}
-function validateAppendContent(content, format) {
-  if (!content || content.length > 1024 * 1024 || content.includes("\0"))
-    throw new Error("Invalid append content (limit 1 MiB)");
-  if (format === "html") {
-    const allowed = /* @__PURE__ */ new Set([
-      "div",
-      "p",
-      "br",
-      "b",
-      "strong",
-      "i",
-      "em",
-      "u",
-      "s",
-      "del",
-      "h1",
-      "h2",
-      "h3",
-      "ul",
-      "ol",
-      "li",
-      "a",
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "td",
-      "th"
-    ]);
-    for (const tag of content.matchAll(/<\/?\s*([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
-      if (!allowed.has(tag[1].toLowerCase()))
-        throw new Error(`Unsupported HTML element: ${tag[1]}`);
-      let attrs = tag[2].replace(/\/$/, "").trim();
-      if (tag[1].toLowerCase() === "a")
-        attrs = attrs.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (_s, _q, url) => {
-          if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) || Array.from(url).some((c) => c.charCodeAt(0) < 33))
-            throw new Error("Unsupported link URL");
-          return "";
-        });
-      if (attrs.trim())
-        throw new Error(
-          "Unsupported HTML attributes; use semantic formatting and explicit blank paragraphs"
-        );
-    }
-    if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
-  }
-  if (format === "markdown" && /!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
-    throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
-}
-function runBackgroundShortcut(input) {
-  const status = backgroundStatus();
-  if (!status.installed)
-    throw new Error("Install the supplied Background Operations shortcut once");
-  const directory = mkdtempSync4(join10(tmpdir4(), "apple-notes-background-"));
-  try {
-    const file = join10(directory, "request.json");
-    writeFileSync3(
-      file,
-      JSON.stringify({
-        operation: "",
-        title: "",
-        scopeText: "",
-        text: "",
-        objectId: "",
-        objectName: "",
-        change: "",
-        otherTitle: "",
-        otherScope: "",
-        tag: "",
-        size: "",
-        ...input
-      }),
-      { mode: 384 }
-    );
-    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
-      encoding: "utf8",
-      timeout: 6e4,
-      maxBuffer: 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
-  } finally {
-    rmSync4(directory, { recursive: true, force: true });
-  }
-}
-function backgroundDependencies(manager) {
-  return {
-    read: (id2) => readBackgroundSnapshot(manager, id2),
-    run: runBackgroundShortcut,
-    candidates: (title, scope) => manager.listAccounts().flatMap(
-      (account) => manager.searchNotes(title, false, account.name).filter(
-        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope)
-      ).map((note) => note.id)
-    )
-  };
-}
-function assertPreserved(before, after, options = {}) {
-  if (before.id !== after.id || before.title !== after.title)
-    throw new Error("Note identity changed");
-  const tidy = (s) => s.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
-  let oldText = tidy(before.rich.text), newText = tidy(after.rich.text);
-  if (options.tagChange) {
-    const escaped = options.tagChange.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const strip = (s) => s.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "").replace(/[\s\ufffc]/gu, "");
-    oldText = strip(oldText);
-    newText = strip(newText);
-  }
-  if (options.append ? !newText.startsWith(oldText) : newText !== oldText)
-    throw new Error("Existing note text was not preserved");
-  const links = options.append ? after.rich.links.slice(0, before.rich.links.length) : after.rich.links;
-  if (linkSignature(before.rich.links) !== linkSignature(links))
-    throw new Error("Existing links were not preserved");
-  if (!options.tagChange && before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)))
-    throw new Error("Existing native object was lost");
-  if (JSON.stringify(before.checklist) !== JSON.stringify(
-    options.append ? after.checklist.slice(0, before.checklist.length) : after.checklist
-  ))
-    throw new Error("Existing checklist items changed");
-  for (const item of before.rich.checklistItems || []) {
-    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
-    if (!actual || actual.text !== item.text || actual.done !== item.done)
-      throw new Error("Existing checklist item identity or state changed");
-  }
-  if (before.rich.nativeTags.filter((t) => t !== options.tagChange).some((t) => !after.rich.nativeTags.includes(t)))
-    throw new Error("Existing native tag was lost");
-  const allowedRemoved = options.tagChange ? before.rich.nativeTagObjectIds?.[options.tagChange] || [] : [];
-  for (const object3 of before.rich.objectData || []) {
-    if (allowedRemoved.includes(object3.id)) continue;
-    const actual = after.rich.objectData?.find((o) => o.id === object3.id);
-    if (!actual || actual.mergeable !== object3.mergeable || actual.view !== object3.view)
-      throw new Error("Existing native object content or presentation changed");
-  }
-  if (!options.tagChange && before.rich.styleRuns && after.rich.styleRuns) {
-    const end = before.rich.text.trimEnd().length;
-    for (const oldRun of before.rich.styleRuns)
-      for (const newRun of after.rich.styleRuns) {
-        const overlapStart = Math.max(oldRun.start, newRun.start);
-        const overlapEnd = Math.min(
-          end,
-          oldRun.start + oldRun.length,
-          newRun.start + newRun.length
-        );
-        if (overlapStart < overlapEnd && /[^\s\ufffc]/u.test(before.rich.text.slice(overlapStart, overlapEnd)) && oldRun.signature !== newRun.signature)
-          throw new Error("Existing rich formatting changed");
-      }
-  }
-}
-function mutateBackground(request, operation, data, verify, deps) {
-  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
-    throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
-  const before = deps.read(request.id);
-  if (before.hash !== request.expectedContentHash)
-    throw new Error("Note revision changed; read it again");
-  if (!before.rich.text.includes(request.scopeText))
-    throw new Error("Scope is absent from exact note");
-  const candidates = deps.candidates(before.title, request.scopeText);
-  if (candidates.length !== 1 || candidates[0] !== request.id)
-    throw new Error("Ambiguous note selection; nothing changed");
-  if (deps.read(request.id).hash !== before.hash)
-    throw new Error("Note revision changed during preflight");
-  let transportUncertain = false;
-  let transportMessage = "";
-  try {
-    deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
-  } catch (error2) {
-    transportUncertain = true;
-    const detail = error2;
-    transportMessage = detail?.code === "ETIMEDOUT" ? "Shortcuts timed out; check for an interactive parameter or permission request" : String(detail?.stderr || detail?.message || "Shortcuts failed").trim().slice(0, 500);
-  }
-  const after = deps.read(request.id);
-  try {
-    verify(before, after);
-  } catch (error2) {
-    throw new Error(
-      `Operation outcome uncertain; read exact note before any retry: ${error2 instanceof Error ? error2.message : "readback failed"}${transportMessage ? "; " + transportMessage : ""}`
-    );
-  }
-  return {
-    ok: true,
-    id: request.id,
-    previousContentHash: before.hash,
-    contentHash: after.hash,
-    ...transportUncertain ? {
-      transportWarning: "Transport was uncertain; exact-ID readback verified the requested result"
-    } : {}
-  };
-}
-function assertAppendedHtmlLinks(previousCount, links, html) {
-  const remaining = links.slice(previousCount);
-  for (const expected of htmlLinks(html)) {
-    const index = remaining.findIndex(
-      (link) => linkSignature([link]) === linkSignature([expected])
-    );
-    if (index < 0) throw new Error("Appended HTML link not verified");
-    remaining.splice(index, 1);
-  }
-}
-function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
-  const before = comparableVisibleText(beforeHtml);
-  const after = comparableVisibleText(afterHtml);
-  if (!after.startsWith(before)) throw new Error("Appended text not verified");
-  const suffix = after.slice(before.length).replace(/\s+/gu, " ").trim();
-  const wanted = expected.replace(/\s+/gu, " ").trim();
-  if (!suffix || !suffix.includes(wanted)) throw new Error("Appended text not verified");
-}
-function appendNative(manager, request) {
-  validateAppendContent(request.content, request.format);
-  if (request.format === "markdown")
-    return appendNative(manager, {
-      ...request,
-      content: appendMarkdownHtml(request.content),
-      format: "html"
-    });
-  if (request.format === "html" && /<table\b/i.test(request.content))
-    throw new Error("Use create-table for verified native table insertion");
-  const op = request.format === "plaintext" ? "append-text" : request.format === "html" ? "append-html" : "append-markdown";
-  const text = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
-  return mutateBackground(
-    request,
-    op,
-    { text },
-    (before, after) => {
-      assertPreserved(before, after, { append: true });
-      const expected = request.format === "html" ? comparableVisibleText(request.content) : request.format === "plaintext" ? request.content : null;
-      if (expected) assertAppendedVisibleText(before.html, after.html, expected);
-      if (request.format === "html")
-        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, request.content);
-    },
-    backgroundDependencies(manager)
-  );
-}
-function setNativeTag(manager, request) {
-  const tag = normalizeNativeTags([request.tag])[0];
-  const initial = readBackgroundSnapshot(manager, request.id);
-  if (initial.hash !== request.expectedContentHash)
-    throw new Error("Note revision changed; read it again");
-  if (initial.rich.nativeTags.includes(tag) === request.present)
-    return { ok: true, id: request.id, contentHash: initial.hash, changed: false };
-  const deps = backgroundDependencies(manager);
-  if (request.present)
-    deps.run = ({ title, scopeText }) => runNativeTagsShortcut({ title, scopeText, tags: [tag] });
-  return mutateBackground(
-    request,
-    request.present ? "add-tag" : "remove-tag",
-    { tag },
-    (before, after) => {
-      assertPreserved(before, after, { tagChange: tag });
-      if (after.rich.nativeTags.includes(tag) !== request.present)
-        throw new Error("Native tag state not verified");
-      const removed = before.rich.nativeObjectIds.filter(
-        (id2) => !after.rich.nativeObjectIds.includes(id2)
-      );
-      const allowed = request.present ? [] : before.rich.nativeTagObjectIds?.[tag] || [];
-      if (removed.some((id2) => !allowed.includes(id2)))
-        throw new Error("Unrelated native object was lost");
-    },
-    deps
   );
 }
 
@@ -43841,7 +43863,7 @@ function registerNativeOperations(server2, manager) {
               implemented: true,
               verified: VERIFIED_BACKGROUND.has(name),
               available: VERIFIED_BACKGROUND.has(name) && (!native.includes(name) || bridge.installed) && (name !== "replace-native-tag" || tagBridgeInstalled),
-              reason: !VERIFIED_BACKGROUND.has(name) ? UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || "Live validation pending; install the shortcut and complete the isolated acceptance tests" : native.includes(name) && !bridge.installed ? "Install the supplied shortcut once" : name === "replace-native-tag" && !tagBridgeInstalled ? "Install the verified Native Tags bridge for the addition phase" : void 0
+              reason: !VERIFIED_BACKGROUND.has(name) ? UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || "Live validation pending; install the shortcut and complete the isolated acceptance tests" : native.includes(name) && !bridge.installed ? "Run apple-notes-mcp setup and approve Add Shortcut in macOS" : name === "replace-native-tag" && !tagBridgeInstalled ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase" : void 0
             }
           ])
         ),
@@ -44055,10 +44077,77 @@ function registerNativeOperations(server2, manager) {
   );
 }
 
+// src/setupShortcuts.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+import { existsSync as existsSync7 } from "node:fs";
+import { dirname as dirname2, resolve as resolve2 } from "node:path";
+import { fileURLToPath } from "node:url";
+var shortcutFiles = [
+  { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
+  {
+    name: BACKGROUND_SHORTCUT,
+    file: "Apple Notes MCP - Background Operations v5.shortcut"
+  }
+];
+function setupShortcuts(checkOnly, dependencies = {}) {
+  const status = dependencies.status || nativeTagsStatus;
+  const exists = dependencies.exists || existsSync7;
+  const open = dependencies.open || ((path4) => {
+    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+    return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
+  });
+  const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
+  const items = shortcutFiles.map(({ name, file }) => {
+    const path4 = resolve2(baseDirectory, file);
+    let installed = false;
+    let identifier;
+    let error2;
+    try {
+      const current = status(name);
+      installed = current.installed;
+      identifier = current.identifier;
+    } catch (cause) {
+      error2 = cause instanceof Error ? cause.message : String(cause);
+    }
+    let opened = false;
+    if (!installed && !checkOnly) {
+      if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else {
+        const result = open(path4);
+        opened = result.ok;
+        if (!result.ok) error2 = result.error || `Could not open ${file}`;
+      }
+    }
+    return { name, installed, identifier, file: path4, opened, ...error2 ? { error: error2 } : {} };
+  });
+  return { ready: items.every((item) => item.installed), checkOnly, items };
+}
+function formatShortcutSetup(report) {
+  const lines = ["Apple Notes MCP Shortcut setup", ""];
+  for (const item of report.items) {
+    if (item.installed) lines.push(`\u2713 ${item.name} (${item.identifier})`);
+    else if (item.opened) lines.push(`\u2192 ${item.name}: confirm \u201CAdd Shortcut\u201D in macOS`);
+    else lines.push(`\u2717 ${item.name}: ${item.error || "not installed"}`);
+  }
+  lines.push("");
+  if (report.ready) lines.push("Both Shortcut bridges are installed.");
+  else if (report.checkOnly) lines.push("Run `apple-notes-mcp setup` to open missing workflows.");
+  else
+    lines.push(
+      "After approving the macOS dialogs, run `apple-notes-mcp setup --check` or the MCP doctor tool."
+    );
+  return lines.join("\n");
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");
+if (process.argv[2] === "setup") {
+  const report = setupShortcuts(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatShortcutSetup(report) + "\n");
+  process.exit(report.ready || !report.checkOnly ? 0 : 1);
+}
 var server = new McpServer({
   name: "apple-notes",
   version: version2,

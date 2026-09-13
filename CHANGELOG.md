@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.8.10] - 2026-09-13
+
+### Added
+
+- `apple-notes-mcp setup` checks both packaged native-write bridges and opens
+  only missing signed workflows. `--check` is read-only. macOS still requires
+  the user to approve **Add Shortcut** for each import.
+- `doctor`, `native-tags-status`, and `get-capabilities` now point to the exact
+  setup command when a required bridge is missing.
+
 ## [2.8.9] - 2026-09-13
 
 ### Added

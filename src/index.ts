@@ -59,6 +59,7 @@ import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import { registerNativeOperations, VERIFIED_BACKGROUND } from "@/tools/nativeOperations.js";
 import { appendNative } from "@/services/backgroundNotes.js";
+import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -68,6 +69,11 @@ loadFileConfig();
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
+if (process.argv[2] === "setup") {
+  const report = setupShortcuts(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatShortcutSetup(report) + "\n");
+  process.exit(report.ready || !report.checkOnly ? 0 : 1);
+}
 // =============================================================================
 // Server Initialization
 // =============================================================================
