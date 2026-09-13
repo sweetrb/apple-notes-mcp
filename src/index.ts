@@ -56,6 +56,7 @@ import {
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
+import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -84,6 +85,7 @@ const server = new McpServer({
  */
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
+registerNativeTagsBridge(server, notesManager);
 
 // =============================================================================
 // Response Helpers

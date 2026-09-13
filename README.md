@@ -323,6 +323,24 @@ Access.
 
 ---
 
+#### `native-tags-status`
+
+Checks whether exactly one configured Native Tags Shortcut is installed. An
+installed workflow may still need macOS permission on its first execution.
+
+---
+
+#### `add-native-tags`
+
+Adds actual native Notes tag objects to one exact note using `id`, a fresh
+`expectedContentHash`, a distinctive existing `scopeText`, and `tags`. The
+operation verifies the note's original text, links, and native objects after the
+Shortcut runs. It refuses ambiguous title-and-scope matches and never retries an
+uncertain write. Install the signed workflow as described in
+[`shortcuts/README.md`](shortcuts/README.md).
+
+---
+
 #### `get-note-plaintext`
 
 Retrieves a note's body as plain text, with no HTML markup.

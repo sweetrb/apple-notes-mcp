@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join9(output, replacement);
+        return join10(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join9(output, rule.append(self.options));
+          output = join10(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join9(output, replacement) {
+    function join10(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -39350,10 +39350,10 @@ function hasFullDiskAccess() {
     return false;
   }
 }
-function queryNoteData(noteId2) {
-  const pkMatch = noteId2.match(/\/p(\d+)$/);
+function queryNoteData(noteId3) {
+  const pkMatch = noteId3.match(/\/p(\d+)$/);
   if (!pkMatch) {
-    console.error(`Invalid note ID format: ${noteId2}`);
+    console.error(`Invalid note ID format: ${noteId3}`);
     return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
@@ -39438,13 +39438,13 @@ function parseChecklistFromProtobuf(data) {
     return null;
   }
 }
-function getChecklistItems(noteId2) {
-  const { hex: hexData, error: queryError } = queryNoteData(noteId2);
+function getChecklistItems(noteId3) {
+  const { hex: hexData, error: queryError } = queryNoteData(noteId3);
   if (queryError === "invalid_id") {
     return {
       items: null,
       error: "invalid_id",
-      message: `Invalid note ID format: "${noteId2}". Expected format: x-coredata://UUID/ICNote/pNNN`
+      message: `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`
     };
   }
   if (queryError === "no_fda") {
@@ -40281,20 +40281,20 @@ var AppleNotesManager = class {
       return null;
     }
     const rawOutput = result.output.trim();
-    const noteId2 = extractCoreDataId(rawOutput, "note") || rawOutput;
-    if (!noteId2) {
+    const noteId3 = extractCoreDataId(rawOutput, "note") || rawOutput;
+    if (!noteId3) {
       console.error(`Created note "${title}" but Notes.app returned no canonical note ID`);
       return null;
     }
     try {
-      sanitizeNoteId(noteId2);
+      sanitizeNoteId(noteId3);
     } catch {
       console.error(`Created note "${title}" but Notes.app returned an invalid note ID`);
       return null;
     }
     const now = /* @__PURE__ */ new Date();
     return {
-      id: noteId2,
+      id: noteId3,
       title,
       content,
       tags,
@@ -40408,11 +40408,11 @@ var AppleNotesManager = class {
     for (const item of items) {
       const [title, id, folder2, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId2 = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId2)) continue;
-      seenIds.add(noteId2);
+      const noteId3 = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId3)) continue;
+      seenIds.add(noteId3);
       notes.push({
-        id: noteId2,
+        id: noteId3,
         title: title.trim(),
         content: "",
         // Not fetched in search
@@ -40780,10 +40780,10 @@ var AppleNotesManager = class {
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId2 = id?.trim() || generateFallbackId();
-      if (seenIds.has(noteId2)) continue;
-      seenIds.add(noteId2);
-      refs.push({ title: title.trim(), id: noteId2 });
+      const noteId3 = id?.trim() || generateFallbackId();
+      if (seenIds.has(noteId3)) continue;
+      seenIds.add(noteId3);
+      refs.push({ title: title.trim(), id: noteId3 });
       if (safeLimit !== void 0 && refs.length >= safeLimit) break;
     }
     return refs;
@@ -41435,8 +41435,8 @@ var AppleNotesManager = class {
    * @param separately - Open in a separate window when supported by Notes.app
    * @returns true if Notes.app revealed the attachment, false otherwise
    */
-  showAttachmentById(noteId2, attachmentId, separately = false) {
-    const safeNoteId = sanitizeId(noteId2);
+  showAttachmentById(noteId3, attachmentId, separately = false) {
+    const safeNoteId = sanitizeId(noteId3);
     const safeAttId = escapePlainStringForAppleScript(attachmentId);
     const separatelyClause = separately ? " separately true" : "";
     const script = `
@@ -41456,13 +41456,13 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(
-        `Failed to show attachment "${attachmentId}" on note "${noteId2}":`,
+        `Failed to show attachment "${attachmentId}" on note "${noteId3}":`,
         result.error
       );
       return false;
     }
     if ((result.output ?? "").trim().startsWith("ERR")) {
-      console.error(`Attachment "${attachmentId}" not found on note "${noteId2}"`);
+      console.error(`Attachment "${attachmentId}" not found on note "${noteId3}"`);
       return false;
     }
     return true;
@@ -41862,7 +41862,7 @@ var AppleNotesManager = class {
    * @param savePath - absolute destination file path (within home / temp / /Volumes)
    * @returns { success, savedPath?, name?, contentType?, error? }
    */
-  saveAttachmentById(noteId2, attachmentId, savePath) {
+  saveAttachmentById(noteId3, attachmentId, savePath) {
     let abs;
     try {
       abs = assertSafeSavePath(savePath);
@@ -41870,7 +41870,7 @@ var AppleNotesManager = class {
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-    const safeNoteId = sanitizeId(noteId2);
+    const safeNoteId = sanitizeId(noteId3);
     const safeAttId = escapePlainStringForAppleScript(attachmentId);
     const safePath = escapePlainStringForAppleScript(abs);
     const script = `
@@ -41934,11 +41934,11 @@ var AppleNotesManager = class {
    * @param attachmentId - id of the attachment
    * @returns { success, name?, contentType?, base64?, bytes?, error? }
    */
-  getAttachmentBase64ById(noteId2, attachmentId) {
+  getAttachmentBase64ById(noteId3, attachmentId) {
     const dir = makeTempDir();
     try {
       const dest = `${dir}/attachment.bin`;
-      const saved = this.saveAttachmentById(noteId2, attachmentId, dest);
+      const saved = this.saveAttachmentById(noteId3, attachmentId, dest);
       if (!saved.success || !saved.savedPath) {
         return { success: false, error: saved.error };
       }
@@ -42438,13 +42438,13 @@ function presentColumns() {
   }
   return cols;
 }
-function getNoteMetadata(noteId2) {
-  const pkMatch = noteId2.match(/\/p(\d+)$/);
+function getNoteMetadata(noteId3) {
+  const pkMatch = noteId3.match(/\/p(\d+)$/);
   if (!pkMatch) {
     return {
       metadata: null,
       error: "invalid_id",
-      message: `Invalid note ID format: "${noteId2}". Expected format: x-coredata://UUID/ICNote/pNNN`
+      message: `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`
     };
   }
   const pk = pkMatch[1];
@@ -42465,7 +42465,7 @@ function getNoteMetadata(noteId2) {
       return {
         metadata: null,
         error: "not_found",
-        message: `No note found in the database for ID "${noteId2}".`
+        message: `No note found in the database for ID "${noteId3}".`
       };
     }
     const raw = JSON.parse(row);
@@ -43191,6 +43191,201 @@ function registerDirectOperations(server2, manager) {
   );
 }
 
+// src/services/nativeTags.ts
+import { execFileSync as execFileSync6 } from "node:child_process";
+import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
+import { join as join9 } from "node:path";
+var NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
+function normalizeNativeTags(tags) {
+  if (!tags.length || tags.length > 100) throw new Error("Provide between 1 and 100 tags");
+  return [
+    ...new Set(
+      tags.map((value) => {
+        const tag = value.normalize("NFC").replace(/^#/, "");
+        if (tag.length > 100 || !new RegExp("^(?=.*\\p{L})[\\p{L}\\p{N}_-]+$", "u").test(tag))
+          throw new Error(
+            "Tags must contain a letter and only letters, digits, hyphens or underscores"
+          );
+        return tag;
+      })
+    )
+  ];
+}
+function addNativeTags(request, deps) {
+  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(request.id))
+    throw new Error("An exact CoreData note ID is required");
+  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
+    throw new Error("scopeText must be a stable, single-line project marker of 12\u2013500 characters");
+  const tags = normalizeNativeTags(request.tags);
+  const before = deps.read(request.id);
+  if (before.contentHash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (before.title !== request.title || !before.plaintext.includes(request.scopeText))
+    throw new Error("The exact note does not match the title and project marker");
+  const missing = tags.filter((tag) => !before.rich.nativeTags.includes(tag));
+  if (!missing.length)
+    return { nativeTags: before.rich.nativeTags, added: [], contentHash: before.contentHash };
+  const candidates = deps.candidates(request.title, request.scopeText);
+  if (candidates.length !== 1 || candidates[0] !== request.id)
+    throw new Error(
+      "Shortcuts selection is ambiguous or points to a different note; nothing was changed"
+    );
+  if (deps.read(request.id).contentHash !== request.expectedContentHash)
+    throw new Error("Note revision changed during preflight; nothing was changed");
+  let transportWarning;
+  try {
+    deps.run({ title: request.title, scopeText: request.scopeText, tags: missing });
+  } catch (error2) {
+    transportWarning = error2 instanceof Error ? error2.message : "Shortcuts completion was uncertain";
+  }
+  const after = deps.read(request.id);
+  const allTags = [.../* @__PURE__ */ new Set([...before.rich.nativeTags, ...tags])];
+  const textWithoutTags = (text) => {
+    for (const tag of [...allTags].sort((a, b) => b.length - a.length)) {
+      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      text = text.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
+    }
+    return text.replace(/[\s\ufffc]/gu, "");
+  };
+  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
+    throw new Error(
+      "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
+    );
+  }
+  return {
+    nativeTags: after.rich.nativeTags,
+    added: missing,
+    contentHash: after.contentHash,
+    ...transportWarning ? {
+      transportWarning: "Shortcuts completion was uncertain, but all requested native tags and preserved content were verified by exact ID."
+    } : {}
+  };
+}
+function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
+  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+    encoding: "utf8",
+    timeout: 15e3,
+    maxBuffer: 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"]
+  }).split(/\r?\n/u);
+  const matches = lines.flatMap((line) => {
+    const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
+    return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
+  });
+  return {
+    shortcut,
+    installed: matches.length === 1,
+    identifier: matches.length === 1 ? matches[0].identifier : void 0
+  };
+}
+function runNativeTagsShortcut(input) {
+  const status = nativeTagsStatus();
+  if (!status.installed)
+    throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
+  const directory = mkdtempSync3(join9(tmpdir3(), "apple-notes-native-tags-"));
+  try {
+    const path4 = join9(directory, "request.json");
+    writeFileSync2(path4, JSON.stringify(input), { mode: 384 });
+    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+      encoding: "utf8",
+      timeout: 6e4,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } catch {
+    throw new Error(
+      "Native tag operation did not complete cleanly (possibly waiting for macOS permission). Do not retry automatically; read the exact note and check Shortcuts"
+    );
+  } finally {
+    rmSync3(directory, { recursive: true, force: true });
+  }
+}
+
+// src/tools/nativeTagsBridge.ts
+var noteId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+var revision2 = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
+function registerNativeTagsBridge(server2, manager) {
+  function tool(name, description, inputSchema, handler) {
+    server2.registerTool(
+      name,
+      {
+        description,
+        inputSchema,
+        outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough()
+      },
+      (async (args) => {
+        try {
+          const result = handler(args);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
+          };
+        } catch (error2) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: error2 instanceof Error ? error2.message : String(error2)
+              }
+            ],
+            isError: true
+          };
+        }
+      })
+    );
+  }
+  const read = (id) => {
+    const note = manager.getNoteById(id);
+    if (!note) throw new Error("Note not found");
+    if (note.passwordProtected) throw new Error("Locked notes cannot receive native tags");
+    const body = manager.getNoteContentById(id);
+    if (!body) throw new Error("Note content is unavailable");
+    const enriched = enrichNoteRead(id, body);
+    const rich = readRichNote(id);
+    if (!enriched.complete || enriched.revision !== rich.revision)
+      throw new Error("Native metadata changed during read; read the note again");
+    return {
+      contentHash: richContentHash(body, enriched),
+      title: note.title,
+      plaintext: manager.getNotePlaintextById(id),
+      rich
+    };
+  };
+  tool(
+    "native-tags-status",
+    "Use when: checking whether the Native Tags Shortcut is installed before a tag write.\nReturns: the configured Shortcut name, unique installed identifier, and installed state.\nDo not use when: listing tags on notes (list-native-tags).\nSafety: read-only; installation does not by itself prove Notes permission or a successful live mutation.",
+    {},
+    () => nativeTagsStatus()
+  );
+  tool(
+    "add-native-tags",
+    "Use when: adding real clickable Apple Notes tags to one exact, freshly read note.\nReturns: verified native tags, additions, and the post-write content hash.\nDo not use when: textual #hashtags are sufficient or the note cannot be selected uniquely by its existing title and scope text.\nSafety: requires exact ID, fresh revision, and a distinctive existing scope phrase; verifies original text, links, and native objects after the Shortcut runs and never retries automatically.",
+    {
+      id: noteId2,
+      expectedContentHash: revision2,
+      scopeText: external_exports.string().min(12).max(500),
+      tags: external_exports.array(external_exports.string().min(1).max(101)).min(1).max(100)
+    },
+    ({ id, expectedContentHash, scopeText, tags }) => {
+      const initial = read(id);
+      const result = addNativeTags(
+        { id, expectedContentHash, scopeText, tags, title: initial.title },
+        {
+          read,
+          candidates: (title, scope) => manager.listAccounts().flatMap(
+            (account) => manager.searchNotes(title, false, account.name).filter(
+              (note) => !note.passwordProtected && manager.getNotePlaintextById(note.id).toLocaleLowerCase().includes(scope.toLocaleLowerCase())
+            ).map((note) => note.id)
+          ),
+          run: runNativeTagsShortcut
+        }
+      );
+      return { ok: true, id, ...result };
+    }
+  );
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
@@ -43202,6 +43397,7 @@ var server = new McpServer({
 });
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
+registerNativeTagsBridge(server, notesManager);
 function successResponse(message, structured) {
   const res = { content: [{ type: "text", text: message }] };
   if (structured) res.structuredContent = structured;
@@ -44697,8 +44893,8 @@ registerTool(
       contentType: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ noteId: noteId2, attachmentId, savePath }) => {
-    const r = notesManager.saveAttachmentById(noteId2, attachmentId, savePath);
+  withErrorHandling(({ noteId: noteId3, attachmentId, savePath }) => {
+    const r = notesManager.saveAttachmentById(noteId3, attachmentId, savePath);
     if (!r.success) {
       return errorResponse(`Failed to save attachment: ${r.error ?? "unknown error"}`);
     }
@@ -44724,8 +44920,8 @@ registerTool(
       base64: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ noteId: noteId2, attachmentId }) => {
-    const r = notesManager.getAttachmentBase64ById(noteId2, attachmentId);
+  withErrorHandling(({ noteId: noteId3, attachmentId }) => {
+    const r = notesManager.getAttachmentBase64ById(noteId3, attachmentId);
     if (!r.success || !r.base64) {
       return errorResponse(`Failed to fetch attachment: ${r.error ?? "unknown error"}`);
     }
@@ -44750,13 +44946,13 @@ registerTool(
       separately: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ noteId: noteId2, attachmentId, separately = false }) => {
-    const success = notesManager.showAttachmentById(noteId2, attachmentId, separately);
+  withErrorHandling(({ noteId: noteId3, attachmentId, separately = false }) => {
+    const success = notesManager.showAttachmentById(noteId3, attachmentId, separately);
     if (!success) {
-      return errorResponse(`Failed to show attachment "${attachmentId}" on note "${noteId2}"`);
+      return errorResponse(`Failed to show attachment "${attachmentId}" on note "${noteId3}"`);
     }
     return successResponse(`Shown attachment "${attachmentId}" in Notes.app`, {
-      noteId: noteId2,
+      noteId: noteId3,
       attachmentId,
       separately
     });

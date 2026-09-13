@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [2.8.8] - 2026-09-13
+
+### Added
+
+- `native-tags-status` detects one uniquely installed Native Tags Shortcut.
+- `add-native-tags` adds real native tag objects through the packaged signed
+  Shortcut, then verifies the exact note's revision, tags, text, links, and
+  existing native objects. Ambiguous selection and uncertain writes are refused.
+
 ## [2.8.7] - 2026-09-13
 
 ### Added
