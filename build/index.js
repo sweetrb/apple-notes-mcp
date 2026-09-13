@@ -2242,10 +2242,10 @@ var require_resolve = __commonJS({
       }
       return count;
     }
-    function getFullPath(resolver, id = "", normalize) {
+    function getFullPath(resolver, id2 = "", normalize) {
       if (normalize !== false)
-        id = normalizeId(id);
-      const p = resolver.parse(id);
+        id2 = normalizeId(id2);
+      const p = resolver.parse(id2);
       return _getFullPath(resolver, p);
     }
     exports.getFullPath = getFullPath;
@@ -2255,13 +2255,13 @@ var require_resolve = __commonJS({
     }
     exports._getFullPath = _getFullPath;
     var TRAILING_SLASH_HASH = /#\/?$/;
-    function normalizeId(id) {
-      return id ? id.replace(TRAILING_SLASH_HASH, "") : "";
+    function normalizeId(id2) {
+      return id2 ? id2.replace(TRAILING_SLASH_HASH, "") : "";
     }
     exports.normalizeId = normalizeId;
-    function resolveUrl(resolver, baseId, id) {
-      id = normalizeId(id);
-      return resolver.resolve(baseId, id);
+    function resolveUrl(resolver, baseId, id2) {
+      id2 = normalizeId(id2);
+      return resolver.resolve(baseId, id2);
     }
     exports.resolveUrl = resolveUrl;
     var ANCHOR = /^[a-z_][-a-z0-9._]*$/i;
@@ -3031,8 +3031,8 @@ var require_compile = __commonJS({
       if (Object.keys(root.schema).length > 0 && refPath === baseId) {
         return getJsonPointer.call(this, p, root);
       }
-      const id = (0, resolve_1.normalizeId)(refPath);
-      const schOrRef = this.refs[id] || this.schemas[id];
+      const id2 = (0, resolve_1.normalizeId)(refPath);
+      const schOrRef = this.refs[id2] || this.schemas[id2];
       if (typeof schOrRef == "string") {
         const sch = resolveSchema.call(this, root, schOrRef);
         if (typeof (sch === null || sch === void 0 ? void 0 : sch.schema) !== "object")
@@ -3043,7 +3043,7 @@ var require_compile = __commonJS({
         return;
       if (!schOrRef.validate)
         compileSchema.call(this, schOrRef);
-      if (id === (0, resolve_1.normalizeId)(ref)) {
+      if (id2 === (0, resolve_1.normalizeId)(ref)) {
         const { schema } = schOrRef;
         const { schemaId } = this.opts;
         const schId = schema[schemaId];
@@ -4458,15 +4458,15 @@ var require_core = __commonJS({
             this.addSchema(sch, void 0, _meta, _validateSchema);
           return this;
         }
-        let id;
+        let id2;
         if (typeof schema === "object") {
           const { schemaId } = this.opts;
-          id = schema[schemaId];
-          if (id !== void 0 && typeof id != "string") {
+          id2 = schema[schemaId];
+          if (id2 !== void 0 && typeof id2 != "string") {
             throw new Error(`schema ${schemaId} must be string`);
           }
         }
-        key = (0, resolve_1.normalizeId)(key || id);
+        key = (0, resolve_1.normalizeId)(key || id2);
         this._checkUnique(key);
         this.schemas[key] = this._addSchema(schema, _meta, key, _validateSchema, true);
         return this;
@@ -4545,11 +4545,11 @@ var require_core = __commonJS({
           case "object": {
             const cacheKey = schemaKeyRef;
             this._cache.delete(cacheKey);
-            let id = schemaKeyRef[this.opts.schemaId];
-            if (id) {
-              id = (0, resolve_1.normalizeId)(id);
-              delete this.schemas[id];
-              delete this.refs[id];
+            let id2 = schemaKeyRef[this.opts.schemaId];
+            if (id2) {
+              id2 = (0, resolve_1.normalizeId)(id2);
+              delete this.schemas[id2];
+              delete this.refs[id2];
             }
             return this;
           }
@@ -4656,10 +4656,10 @@ var require_core = __commonJS({
         }
       }
       _addSchema(schema, meta, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
-        let id;
+        let id2;
         const { schemaId } = this.opts;
         if (typeof schema == "object") {
-          id = schema[schemaId];
+          id2 = schema[schemaId];
         } else {
           if (this.opts.jtd)
             throw new Error("schema must be object");
@@ -4669,7 +4669,7 @@ var require_core = __commonJS({
         let sch = this._cache.get(schema);
         if (sch !== void 0)
           return sch;
-        baseId = (0, resolve_1.normalizeId)(id || baseId);
+        baseId = (0, resolve_1.normalizeId)(id2 || baseId);
         const localRefs = resolve_1.getSchemaRefs.call(this, schema, baseId);
         sch = new compile_1.SchemaEnv({ schema, schemaId, meta, baseId, localRefs });
         this._cache.set(sch.schema, sch);
@@ -4682,9 +4682,9 @@ var require_core = __commonJS({
           this.validateSchema(schema, true);
         return sch;
       }
-      _checkUnique(id) {
-        if (this.schemas[id] || this.refs[id]) {
-          throw new Error(`schema with key or id "${id}" already exists`);
+      _checkUnique(id2) {
+        if (this.schemas[id2] || this.refs[id2]) {
+          throw new Error(`schema with key or id "${id2}" already exists`);
         }
       }
       _compileSchemaEnv(sch) {
@@ -7952,7 +7952,7 @@ var require_NodeUtils = __commonJS({
     };
     var ESCAPE_REGEXP = /[&<>\u00A0]/g;
     var ESCAPE_ATTR_REGEXP = /[&"<>\u00A0]/g;
-    function escape2(s) {
+    function escape3(s) {
       if (!ESCAPE_REGEXP.test(s)) {
         return s;
       }
@@ -8059,7 +8059,7 @@ var require_NodeUtils = __commonJS({
           if (hasRawContent[parenttag] || parenttag === "NOSCRIPT" && parent.ownerDocument._scripting_enabled) {
             s += kid.data;
           } else {
-            s += escape2(kid.data);
+            s += escape3(kid.data);
           }
           break;
         case 8:
@@ -9922,13 +9922,13 @@ var require_select = __commonJS({
       return results;
     };
     module.exports = exports = function(sel, context) {
-      var id, r;
+      var id2, r;
       if (context.nodeType !== 11 && sel.indexOf(" ") === -1) {
         if (sel[0] === "#" && context.rooted && /^#[A-Z_][-A-Z0-9_]*$/i.test(sel)) {
           if (context.doc._hasMultipleElementsWithId) {
-            id = sel.substring(1);
-            if (!context.doc._hasMultipleElementsWithId(id)) {
-              r = context.doc.getElementById(id);
+            id2 = sel.substring(1);
+            if (!context.doc._hasMultipleElementsWithId(id2)) {
+              r = context.doc.getElementById(id2);
               return r ? [r] : [];
             }
           }
@@ -11110,12 +11110,12 @@ var require_Element = __commonJS({
             if (c.nodeType === Node.ELEMENT_NODE) {
               this[this.childrenByNumber.length] = c;
               this.childrenByNumber.push(c);
-              var id = c.getAttribute("id");
-              if (id && !this.childrenByName[id])
-                this.childrenByName[id] = c;
+              var id2 = c.getAttribute("id");
+              if (id2 && !this.childrenByName[id2])
+                this.childrenByName[id2] = c;
               var name = c.getAttribute("name");
               if (name && this.element.namespaceURI === NAMESPACE.HTML && namedElts.test(this.element.localName) && !this.childrenByName[name])
-                this.childrenByName[id] = c;
+                this.childrenByName[id2] = c;
             }
           }
         }
@@ -14845,16 +14845,16 @@ var require_Document = __commonJS({
         this._updateDocTypeElement();
         return child;
       } },
-      getElementById: { value: function(id) {
-        var n = this.byId[id];
+      getElementById: { value: function(id2) {
+        var n = this.byId[id2];
         if (!n) return null;
         if (n instanceof MultiId) {
           return n.getFirst();
         }
         return n;
       } },
-      _hasMultipleElementsWithId: { value: function(id) {
-        return this.byId[id] instanceof MultiId;
+      _hasMultipleElementsWithId: { value: function(id2) {
+        return this.byId[id2] instanceof MultiId;
       } },
       // Just copy this method from the Element prototype
       getElementsByName: { value: Element.prototype.getElementsByName },
@@ -15106,29 +15106,29 @@ var require_Document = __commonJS({
         }
       } },
       // Add a mapping from  id to n for n.ownerDocument
-      addId: { value: function addId(id, n) {
-        var val = this.byId[id];
+      addId: { value: function addId(id2, n) {
+        var val = this.byId[id2];
         if (!val) {
-          this.byId[id] = n;
+          this.byId[id2] = n;
         } else {
           if (!(val instanceof MultiId)) {
             val = new MultiId(val);
-            this.byId[id] = val;
+            this.byId[id2] = val;
           }
           val.add(n);
         }
       } },
       // Delete the mapping from id to n for n.ownerDocument
-      delId: { value: function delId(id, n) {
-        var val = this.byId[id];
+      delId: { value: function delId(id2, n) {
+        var val = this.byId[id2];
         utils.assert(val);
         if (val instanceof MultiId) {
           val.del(n);
           if (val.length === 1) {
-            this.byId[id] = val.downgrade();
+            this.byId[id2] = val.downgrade();
           }
         } else {
-          this.byId[id] = void 0;
+          this.byId[id2] = void 0;
         }
       } },
       _resolve: { value: function(href) {
@@ -15238,15 +15238,15 @@ var require_Document = __commonJS({
       n._nid = n.ownerDocument._nextnid++;
       n.ownerDocument._nodes[n._nid] = n;
       if (n.nodeType === Node.ELEMENT_NODE) {
-        var id = n.getAttribute("id");
-        if (id) n.ownerDocument.addId(id, n);
+        var id2 = n.getAttribute("id");
+        if (id2) n.ownerDocument.addId(id2, n);
         if (n._roothook) n._roothook();
       }
     }
     function uproot(n) {
       if (n.nodeType === Node.ELEMENT_NODE) {
-        var id = n.getAttribute("id");
-        if (id) n.ownerDocument.delId(id, n);
+        var id2 = n.getAttribute("id");
+        if (id2) n.ownerDocument.delId(id2, n);
       }
       n.ownerDocument._nodes[n._nid] = void 0;
       n._nid = void 0;
@@ -23908,8 +23908,8 @@ var require_turndown_cjs = __commonJS({
     }
     var markdownEscapes = [[/\\/g, "\\\\"], [/\*/g, "\\*"], [/^-/g, "\\-"], [/^\+ /g, "\\+ "], [/^(=+)/g, "\\$1"], [/^(#{1,6}) /g, "\\$1 "], [/`/g, "\\`"], [/^~~~/g, "\\~~~"], [/\[/g, "\\["], [/\]/g, "\\]"], [/^>/g, "\\>"], [/_/g, "\\_"], [/^(\d+)\. /g, "$1\\. "]];
     function escapeMarkdown(string3) {
-      return markdownEscapes.reduce(function(accumulator, escape2) {
-        return accumulator.replace(escape2[0], escape2[1]);
+      return markdownEscapes.reduce(function(accumulator, escape3) {
+        return accumulator.replace(escape3[0], escape3[1]);
       }, string3);
     }
     var rules = {};
@@ -24037,9 +24037,9 @@ var require_turndown_cjs = __commonJS({
             reference = "[" + content + "]: " + href + title;
             break;
           default:
-            var id = this.references.length + 1;
-            replacement = "[" + content + "][" + id + "]";
-            reference = "[" + id + "]: " + href + title;
+            var id2 = this.references.length + 1;
+            replacement = "[" + content + "][" + id2 + "]";
+            reference = "[" + id2 + "]: " + href + title;
         }
         this.references.push(reference);
         return replacement;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join10(output, replacement);
+        return join11(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join10(output, rule.append(self.options));
+          output = join11(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join10(output, replacement) {
+    function join11(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -30311,38 +30311,38 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     doc.write(`const newResult = {}`);
     for (const key of normalized2.keys) {
       if (normalized2.optionalKeys.has(key)) {
-        const id = ids[key];
-        doc.write(`const ${id} = ${parseStr(key)};`);
+        const id2 = ids[key];
+        doc.write(`const ${id2} = ${parseStr(key)};`);
         const k = esc(key);
         doc.write(`
-        if (${id}.issues.length) {
+        if (${id2}.issues.length) {
           if (input[${k}] === undefined) {
             if (${k} in input) {
               newResult[${k}] = undefined;
             }
           } else {
             payload.issues = payload.issues.concat(
-              ${id}.issues.map((iss) => ({
+              ${id2}.issues.map((iss) => ({
                 ...iss,
                 path: iss.path ? [${k}, ...iss.path] : [${k}],
               }))
             );
           }
-        } else if (${id}.value === undefined) {
+        } else if (${id2}.value === undefined) {
           if (${k} in input) newResult[${k}] = undefined;
         } else {
-          newResult[${k}] = ${id}.value;
+          newResult[${k}] = ${id2}.value;
         }
         `);
       } else {
-        const id = ids[key];
-        doc.write(`const ${id} = ${parseStr(key)};`);
+        const id2 = ids[key];
+        doc.write(`const ${id2} = ${parseStr(key)};`);
         doc.write(`
-          if (${id}.issues.length) payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
+          if (${id2}.issues.length) payload.issues = payload.issues.concat(${id2}.issues.map(iss => ({
             ...iss,
             path: iss.path ? [${esc(key)}, ...iss.path] : [${esc(key)}]
           })));`);
-        doc.write(`newResult[${esc(key)}] = ${id}.value`);
+        doc.write(`newResult[${esc(key)}] = ${id2}.value`);
       }
     }
     doc.write(`payload.value = newResult;`);
@@ -32073,13 +32073,13 @@ var JSONSchemaGenerator = class {
       const defsSegment = this.target === "draft-2020-12" ? "$defs" : "definitions";
       if (params.external) {
         const externalId = params.external.registry.get(entry[0])?.id;
-        const uriGenerator = params.external.uri ?? ((id2) => id2);
+        const uriGenerator = params.external.uri ?? ((id3) => id3);
         if (externalId) {
           return { ref: uriGenerator(externalId) };
         }
-        const id = entry[1].defId ?? entry[1].schema.id ?? `schema${this.counter++}`;
-        entry[1].defId = id;
-        return { defId: id, ref: `${uriGenerator("__shared")}#/${defsSegment}/${id}` };
+        const id2 = entry[1].defId ?? entry[1].schema.id ?? `schema${this.counter++}`;
+        entry[1].defId = id2;
+        return { defId: id2, ref: `${uriGenerator("__shared")}#/${defsSegment}/${id2}` };
       }
       if (entry[1] === root) {
         return { ref: "#" };
@@ -32127,8 +32127,8 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
           continue;
         }
       }
-      const id = this.metadataRegistry.get(entry[0])?.id;
-      if (id) {
+      const id2 = this.metadataRegistry.get(entry[0])?.id;
+      if (id2) {
         extractToDef(entry);
         continue;
       }
@@ -32182,10 +32182,10 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
       console.warn(`Invalid target: ${this.target}`);
     }
     if (params.external?.uri) {
-      const id = params.external.registry.get(schema)?.id;
-      if (!id)
+      const id2 = params.external.registry.get(schema)?.id;
+      if (!id2)
         throw new Error("Schema is missing an `id` property");
-      result.$id = params.external.uri(id);
+      result.$id = params.external.uri(id2);
     }
     Object.assign(result, root.def);
     const defs = params.external?.defs ?? {};
@@ -37218,7 +37218,7 @@ var ExperimentalServerTasks = class {
       if (hasPreviousToolUse) {
         const toolUseIds = new Set(previousContent.filter((c) => c.type === "tool_use").map((c) => c.id));
         const toolResultIds = new Set(lastContent.filter((c) => c.type === "tool_result").map((c) => c.toolUseId));
-        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id) => toolResultIds.has(id))) {
+        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id2) => toolResultIds.has(id2))) {
           throw new Error("ids of tool_result blocks and tool_use blocks from previous message do not match");
         }
       }
@@ -37643,7 +37643,7 @@ var Server = class extends Protocol {
       if (hasPreviousToolUse) {
         const toolUseIds = new Set(previousContent.filter((c) => c.type === "tool_use").map((c) => c.id));
         const toolResultIds = new Set(lastContent.filter((c) => c.type === "tool_result").map((c) => c.toolUseId));
-        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id) => toolResultIds.has(id))) {
+        if (toolUseIds.size !== toolResultIds.size || ![...toolUseIds].every((id2) => toolResultIds.has(id2))) {
           throw new Error("ids of tool_result blocks and tool_use blocks from previous message do not match");
         }
       }
@@ -39604,8 +39604,8 @@ function parseRichNote(data, nativeTags = []) {
     styleRuns
   };
 }
-function readRichNote(id) {
-  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id)?.[1];
+function readRichNote(id2) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id2)?.[1];
   if (!pk) throw new Error("Invalid exact note ID");
   const sql = `BEGIN; SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE=${pk}; SELECT json_group_object(ZIDENTIFIER,ZALTTEXT) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} AND ZTYPEUTI1='com.apple.notes.inlinetextattachment.hashtag'; SELECT json_group_array(json_object('id',ZIDENTIFIER,'pk',Z_PK,'type',COALESCE(ZTYPEUTI1,ZTYPEUTI),'mergeable',hex(COALESCE(ZMERGEABLEDATA1,ZMERGEABLEDATA)),'view',ZATTACHMENTVIEWTYPE)) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} OR ZNOTE=${pk}; COMMIT;`;
   const rows = execFileSync3("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
@@ -39630,14 +39630,14 @@ function readRichNote(id) {
   rich.objectData = objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id));
   rich.revision = createHash("sha256").update(rich.revision).update(JSON.stringify(rich.objectData)).digest("hex");
   rich.nativeTagObjectIds = {};
-  for (const id2 of rich.nativeObjectIds)
-    if (tagMap[id2]) {
-      const tag = tagMap[id2].replace(/^#/, "");
-      (rich.nativeTagObjectIds[tag] ||= []).push(id2);
+  for (const id3 of rich.nativeObjectIds)
+    if (tagMap[id3]) {
+      const tag = tagMap[id3].replace(/^#/, "");
+      (rich.nativeTagObjectIds[tag] ||= []).push(id3);
     }
   rich.nativeTags = [
     ...new Set(
-      rich.nativeObjectIds.flatMap((id2) => tagMap[id2] ? [tagMap[id2].replace(/^#/, "")] : [])
+      rich.nativeObjectIds.flatMap((id3) => tagMap[id3] ? [tagMap[id3].replace(/^#/, "")] : [])
     )
   ];
   return rich;
@@ -39712,10 +39712,10 @@ function restoreNoteLinks(html, rich) {
     result = result.slice(0, span.start) + `<a href="${escapeAttribute(span.url)}">` + result.slice(span.start, span.end) + "</a>" + result.slice(span.end);
   return result;
 }
-function enrichNoteRead(id, rawBody) {
+function enrichNoteRead(id2, rawBody) {
   let metadata;
   try {
-    const rich = readRichNote(id);
+    const rich = readRichNote(id2);
     metadata = rich;
     const content = restoreNoteLinks(rawBody, rich);
     const writable = !rich.hasNativeObjects && !rich.hasChecklist;
@@ -39971,24 +39971,24 @@ function validateLength(value, maxLength, label) {
   }
   return value;
 }
-function sanitizeId(id) {
+function sanitizeId(id2) {
   const coreDataPattern = /^x-coredata:\/\/[0-9A-Fa-f-]+\/IC[A-Za-z]+\/p\d+$/;
   const tempIdPattern = /^temp-\d+-\d+$/;
-  if (!coreDataPattern.test(id) && !tempIdPattern.test(id)) {
+  if (!coreDataPattern.test(id2) && !tempIdPattern.test(id2)) {
     throw new Error(
-      `Invalid note ID format: "${id.substring(0, 80)}". Expected CoreData URL (x-coredata://...) or temp ID.`
+      `Invalid note ID format: "${id2.substring(0, 80)}". Expected CoreData URL (x-coredata://...) or temp ID.`
     );
   }
-  return escapeForAppleScript(id);
+  return escapeForAppleScript(id2);
 }
-function sanitizeNoteId(id) {
+function sanitizeNoteId(id2) {
   const noteIdPattern = /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/;
-  if (!noteIdPattern.test(id)) {
+  if (!noteIdPattern.test(id2)) {
     throw new Error(
-      `Invalid note ID format: "${id.substring(0, 80)}". Expected canonical Apple Note ID (x-coredata://.../ICNote/p...).`
+      `Invalid note ID format: "${id2.substring(0, 80)}". Expected canonical Apple Note ID (x-coredata://.../ICNote/p...).`
     );
   }
-  return escapeForAppleScript(id);
+  return escapeForAppleScript(id2);
 }
 function sanitizeAccountName(account) {
   validateLength(account, MAX_ACCOUNT_LENGTH, "Account name");
@@ -40043,10 +40043,10 @@ function parseNotePropertiesOutput(output) {
     console.error("Unexpected response format: expected 6 delimited note properties");
     return null;
   }
-  const [title, id, createdStr, modifiedStr, sharedStr, ppStr] = parts;
+  const [title, id2, createdStr, modifiedStr, sharedStr, ppStr] = parts;
   return {
     title: title.trim(),
-    id: id.trim(),
+    id: id2.trim(),
     created: createdStr?.trim() ? parseAppleScriptDate(createdStr.trim()) : /* @__PURE__ */ new Date(),
     modified: modifiedStr?.trim() ? parseAppleScriptDate(modifiedStr.trim()) : /* @__PURE__ */ new Date(),
     shared: sharedStr?.trim() === "true",
@@ -40207,8 +40207,8 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns true if the note is password-protected, false otherwise
    */
-  isNotePasswordProtectedById(id) {
-    const note = this.getNoteById(id);
+  isNotePasswordProtectedById(id2) {
+    const note = this.getNoteById(id2);
     return note?.passwordProtected === true;
   }
   /**
@@ -40406,9 +40406,9 @@ var AppleNotesManager = class {
     const seenIds = /* @__PURE__ */ new Set();
     const reportedAccount = this.reportedAccount(targetAccount);
     for (const item of items) {
-      const [title, id, folder2, created, modified] = item.split(FIELD_SEP);
+      const [title, id2, folder2, created, modified] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId3 = id?.trim() || generateFallbackId();
+      const noteId3 = id2?.trim() || generateFallbackId();
       if (seenIds.has(noteId3)) continue;
       seenIds.add(noteId3);
       notes.push({
@@ -40470,13 +40470,13 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns HTML content of the note, or empty string if not found
    */
-  getNoteContentById(id) {
-    const safeId = sanitizeId(id);
+  getNoteContentById(id2) {
+    const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      console.error(`Failed to get content of note with ID "${id}":`, result.error);
+      console.error(`Failed to get content of note with ID "${id2}":`, result.error);
       return "";
     }
     return result.output;
@@ -40518,13 +40518,13 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns Plain-text content of the note, or empty string if not found
    */
-  getNotePlaintextById(id) {
-    const safeId = sanitizeId(id);
+  getNotePlaintextById(id2) {
+    const safeId = sanitizeId(id2);
     const getCommand = `get plaintext of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      console.error(`Failed to get plaintext of note with ID "${id}":`, result.error);
+      console.error(`Failed to get plaintext of note with ID "${id2}":`, result.error);
       return "";
     }
     return result.output;
@@ -40540,8 +40540,8 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns Note object with metadata, or null if not found
    */
-  getNoteById(id) {
-    const safeId = sanitizeId(id);
+  getNoteById(id2) {
+    const safeId = sanitizeId(id2);
     const getCommand = `
       set n to note id "${safeId}"
       set cd to creation date of n
@@ -40553,7 +40553,7 @@ var AppleNotesManager = class {
     const script = buildAppLevelScript(getCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      console.error(`Failed to get note with ID "${id}":`, result.error);
+      console.error(`Failed to get note with ID "${id2}":`, result.error);
       return null;
     }
     const parsed = parseNotePropertiesOutput(result.output);
@@ -40625,10 +40625,10 @@ var AppleNotesManager = class {
    * race that would exist if JavaScript checked the note and then issued a
    * separate unconditional `set body` command.
    */
-  updateNoteByIdIfUnchanged(id, currentTitle, expectedBody, newTitle, newContent, format = "plaintext", expectedRichRevision) {
-    const safeId = sanitizeNoteId(id);
+  updateNoteByIdIfUnchanged(id2, currentTitle, expectedBody, newTitle, newContent, format = "plaintext", expectedRichRevision) {
+    const safeId = sanitizeNoteId(id2);
     if (expectedRichRevision) {
-      const rich = readRichNote(id);
+      const rich = readRichNote(id2);
       if (rich.revision !== expectedRichRevision) return { status: "conflict" };
       if (rich.hasNativeObjects || rich.hasChecklist) return { status: "attachments" };
     }
@@ -40657,7 +40657,7 @@ var AppleNotesManager = class {
     `);
     const result = executeMutationAppleScript(script);
     if (!result.success) {
-      console.error(`Failed guarded update for note ID "${id}":`, result.error);
+      console.error(`Failed guarded update for note ID "${id2}":`, result.error);
       return { status: "failed" };
     }
     const status = result.output.trim();
@@ -40671,8 +40671,8 @@ var AppleNotesManager = class {
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
    */
-  deleteNoteByIdIfUnchanged(id, expectedBody) {
-    const safeId = sanitizeNoteId(id);
+  deleteNoteByIdIfUnchanged(id2, expectedBody) {
+    const safeId = sanitizeNoteId(id2);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const script = buildAppLevelScript(`
@@ -40686,7 +40686,7 @@ var AppleNotesManager = class {
     `);
     const result = executeMutationAppleScript(script);
     if (!result.success) {
-      console.error(`Failed guarded delete for note ID "${id}":`, result.error);
+      console.error(`Failed guarded delete for note ID "${id2}":`, result.error);
       return { status: "failed" };
     }
     const status = result.output.trim();
@@ -40778,9 +40778,9 @@ var AppleNotesManager = class {
     const seenIds = /* @__PURE__ */ new Set();
     const refs = [];
     for (const item of output.split(RECORD_SEP)) {
-      const [title, id] = item.split(FIELD_SEP);
+      const [title, id2] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
-      const noteId3 = id?.trim() || generateFallbackId();
+      const noteId3 = id2?.trim() || generateFallbackId();
       if (seenIds.has(noteId3)) continue;
       seenIds.add(noteId3);
       refs.push({ title: title.trim(), id: noteId3 });
@@ -40906,13 +40906,13 @@ var AppleNotesManager = class {
         const parts = item.split(FIELD_SEP);
         if (parts.length >= 6) {
           const title = parts[0].trim();
-          const id = parts[1].trim();
+          const id2 = parts[1].trim();
           const createdStr = parts[2].trim();
           const modifiedStr = parts[3].trim();
           const shared = parts[4].trim() === "true";
           const passwordProtected = parts[5].trim() === "true";
           sharedNotes.push({
-            id,
+            id: id2,
             title,
             content: "",
             tags: [],
@@ -40931,25 +40931,25 @@ var AppleNotesManager = class {
   // Folder Operations
   // ===========================================================================
   /** Rename a folder in place while preserving its identity and contents. */
-  renameFolderById(id, expectedName, expectedParentId, newName) {
-    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+  renameFolderById(id2, expectedName, expectedParentId, newName) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id2))
       throw new Error("An exact folder ID is required");
     if (!newName.trim() || newName.length > 1e3 || Array.from(newName).some((char) => char.charCodeAt(0) < 32))
       throw new Error("Invalid folder name");
     const literal2 = (value) => `"${escapePlainStringForAppleScript(value)}"`;
     const script = `tell application "Notes"
-      set targetFolder to folder id ${literal2(id)}
+      set targetFolder to folder id ${literal2(id2)}
       set parentRef to container of targetFolder
       set parentId to id of parentRef
       considering case
         if name of targetFolder is not ${literal2(expectedName)} or parentId is not ${literal2(expectedParentId)} then error "Folder changed; read it again"
       end considering
       repeat with sibling in folders of parentRef
-        if name of sibling is ${literal2(newName)} and id of sibling is not ${literal2(id)} then error "A sibling folder already has this name"
+        if name of sibling is ${literal2(newName)} and id of sibling is not ${literal2(id2)} then error "A sibling folder already has this name"
       end repeat
       set name of targetFolder to ${literal2(newName)}
       considering case
-        if id of targetFolder is not ${literal2(id)} or name of targetFolder is not ${literal2(newName)} or id of container of targetFolder is not parentId then error "Rename readback failed"
+        if id of targetFolder is not ${literal2(id2)} or name of targetFolder is not ${literal2(newName)} or id of container of targetFolder is not parentId then error "Rename readback failed"
       end considering
       return id of targetFolder
     end tell`;
@@ -40958,28 +40958,28 @@ var AppleNotesManager = class {
       throw new Error(
         result.error || "Rename outcome uncertain; read folder by ID before retrying"
       );
-    return { id, name: newName, parentId: expectedParentId };
+    return { id: id2, name: newName, parentId: expectedParentId };
   }
   /** Read the exact name and parent identity used by guarded folder rename. */
-  getFolderById(id) {
-    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
+  getFolderById(id2) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id2))
       throw new Error("An exact folder ID is required");
     const result = executeAppleScript(`tell application "Notes"
-      set f to folder id "${id}"
+      set f to folder id "${id2}"
       return (name of f) & ${AS_FIELD_SEP} & (id of container of f)
     end tell`);
     if (!result.success) throw new Error(result.error || "Folder not found");
     const [name, parentId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
     if (!name || !parentId) throw new Error("Incomplete folder metadata");
-    return { id, name, parentId };
+    return { id: id2, name, parentId };
   }
   /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
-  addAttachmentById(id, expectedBody, filePath) {
-    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id))
+  addAttachmentById(id2, expectedBody, filePath) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
       throw new Error("Exact note ID required");
     const quote = (value) => `"${escapePlainStringForAppleScript(value)}"`;
     const result = executeMutationAppleScript(`tell application "Notes"
-      set n to note id ${quote(id)}
+      set n to note id ${quote(id2)}
       if password protected of n then error "Locked note"
       considering case
         if body of n is not ${quote(expectedBody)} and body of n is not (${quote(expectedBody)} & linefeed) then error "Note changed before attachment insertion"
@@ -41151,9 +41151,9 @@ var AppleNotesManager = class {
    * @param account - Account containing the destination folder (defaults to Notes.app's default account)
    * @returns true if the move succeeded, false otherwise
    */
-  moveNoteById(id, destinationFolder, account) {
+  moveNoteById(id2, destinationFolder, account) {
     const targetAccount = this.resolveAccount(account);
-    const safeId = sanitizeNoteId(id);
+    const safeId = sanitizeNoteId(id2);
     const destFolderRef = `${buildFolderReference(destinationFolder)} of ${AS_ACCOUNT_REF}`;
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
@@ -41177,7 +41177,7 @@ var AppleNotesManager = class {
     }
     if (result.output.trim() !== "SAFETY_MOVED") {
       console.error(
-        `Move result for note ID "${id}" did not verify destination "${destinationFolder}"`
+        `Move result for note ID "${id2}" did not verify destination "${destinationFolder}"`
       );
       return false;
     }
@@ -41325,14 +41325,14 @@ var AppleNotesManager = class {
    * @param separately - Whether to open the note in a separate window
    * @returns true if Notes.app accepted the show command
    */
-  showNoteById(id, separately = false) {
-    const safeId = sanitizeId(id);
+  showNoteById(id2, separately = false) {
+    const safeId = sanitizeId(id2);
     const separatelyClause = separately ? " separately true" : "";
     const result = executeMutationAppleScript(
       buildAppLevelScript(`show note id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
-      console.error(`Failed to show note with ID "${id}":`, result.error);
+      console.error(`Failed to show note with ID "${id2}":`, result.error);
       return false;
     }
     return true;
@@ -41350,20 +41350,20 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns notes://showNote?identifier=<uuid> string, or null on failure
    */
-  getNoteLinkById(id) {
-    const note = this.getNoteById(id);
+  getNoteLinkById(id2) {
+    const note = this.getNoteById(id2);
     if (!note) return null;
     if (note.passwordProtected) return null;
-    const sqliteLink = getNoteLinkFromDB(id);
+    const sqliteLink = getNoteLinkFromDB(id2);
     if (sqliteLink) return sqliteLink;
-    const safeId = sanitizeId(id);
+    const safeId = sanitizeId(id2);
     const result = executeAppleScript(
       buildAppLevelScript(`return note link of (note id "${safeId}")`)
     );
     if (result.success && result.output.trim()) {
       return result.output.trim();
     }
-    console.error(`Failed to get note link for ID "${id}":`, result.error);
+    console.error(`Failed to get note link for ID "${id2}":`, result.error);
     return null;
   }
   /**
@@ -41388,14 +41388,14 @@ var AppleNotesManager = class {
    * @param separately - Open in a separate window when supported by Notes.app
    * @returns true if Notes.app accepted the show command, false otherwise
    */
-  showFolderById(id, separately = false) {
-    const safeId = sanitizeId(id);
+  showFolderById(id2, separately = false) {
+    const safeId = sanitizeId(id2);
     const separatelyClause = separately ? " separately true" : "";
     const result = executeMutationAppleScript(
       buildAppLevelScript(`show folder id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
-      console.error(`Failed to show folder with ID "${id}":`, result.error);
+      console.error(`Failed to show folder with ID "${id2}":`, result.error);
       return false;
     }
     return true;
@@ -41410,14 +41410,14 @@ var AppleNotesManager = class {
    * @param separately - Open in a separate window when supported by Notes.app
    * @returns true if Notes.app accepted the show command, false otherwise
    */
-  showAccountById(id, separately = false) {
-    const safeId = sanitizeId(id);
+  showAccountById(id2, separately = false) {
+    const safeId = sanitizeId(id2);
     const separatelyClause = separately ? " separately true" : "";
     const result = executeMutationAppleScript(
       buildAppLevelScript(`show account id "${safeId}"${separatelyClause}`)
     );
     if (!result.success) {
-      console.error(`Failed to show account with ID "${id}":`, result.error);
+      console.error(`Failed to show account with ID "${id2}":`, result.error);
       return false;
     }
     return true;
@@ -41692,8 +41692,8 @@ var AppleNotesManager = class {
    * attachments.forEach(a => console.log(`${a.name}: ${a.contentType}`));
    * ```
    */
-  listAttachmentsById(id) {
-    const safeId = sanitizeId(id);
+  listAttachmentsById(id2) {
+    const safeId = sanitizeId(id2);
     const script = `
       tell application "Notes"
         set theNote to note id "${safeId}"
@@ -41738,7 +41738,7 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(
-        `Failed to list attachments for note ID "${id}": ${result.error ?? "unknown AppleScript error"}`
+        `Failed to list attachments for note ID "${id2}": ${result.error ?? "unknown AppleScript error"}`
       );
     }
     if (!result.output) {
@@ -41962,32 +41962,32 @@ var AppleNotesManager = class {
   /**
    * Result of a batch operation on a single item.
    */
-  createBatchResult(id, success, error2) {
-    return error2 ? { id, success, error: error2 } : { id, success };
+  createBatchResult(id2, success, error2) {
+    return error2 ? { id: id2, success, error: error2 } : { id: id2, success };
   }
   /**
    * Maps a per-item status token emitted by a batch AppleScript loop to a
    * BatchResult, preserving the human-readable error messages of the original
    * per-note implementation. See {@link batchMoveNotes}.
    */
-  mapBatchStatus(id, status, op) {
+  mapBatchStatus(id2, status, op) {
     switch (status) {
       case "ok":
-        return this.createBatchResult(id, true);
+        return this.createBatchResult(id2, true);
       case "pw":
-        return this.createBatchResult(id, false, "Note is password-protected");
+        return this.createBatchResult(id2, false, "Note is password-protected");
       case "missing":
-        return this.createBatchResult(id, false, "Note not found");
+        return this.createBatchResult(id2, false, "Note not found");
       case "fail":
         return this.createBatchResult(
-          id,
+          id2,
           false,
           op === "delete" ? "Deletion failed" : "Move failed"
         );
       case "wrongfolder":
-        return this.createBatchResult(id, false, "Destination folder verification failed");
+        return this.createBatchResult(id2, false, "Destination folder verification failed");
       default:
-        return this.createBatchResult(id, false, "Unknown error");
+        return this.createBatchResult(id2, false, "Unknown error");
     }
   }
   /**
@@ -42015,12 +42015,12 @@ var AppleNotesManager = class {
     const destFolderRef = `${buildFolderReference(folder)} of ${AS_ACCOUNT_REF}`;
     const results = new Array(ids.length);
     const runnable = [];
-    ids.forEach((id, i) => {
+    ids.forEach((id2, i) => {
       try {
-        runnable.push({ index: i, safe: sanitizeNoteId(id) });
+        runnable.push({ index: i, safe: sanitizeNoteId(id2) });
       } catch (e) {
         results[i] = this.createBatchResult(
-          id,
+          id2,
           false,
           e instanceof Error ? e.message : "Invalid note ID"
         );
@@ -42284,12 +42284,12 @@ var AppleNotesManager = class {
    * @param id - CoreData URL identifier for the note
    * @returns Markdown content, or empty string if not found
    */
-  getNoteMarkdownById(id) {
-    const html = this.getNoteContentById(id);
+  getNoteMarkdownById(id2) {
+    const html = this.getNoteContentById(id2);
     if (!html) return "";
-    const rich = enrichNoteRead(id, html);
+    const rich = enrichNoteRead(id2, html);
     let markdown = this.htmlToMarkdown(rich.content);
-    const result = getChecklistItems(id);
+    const result = getChecklistItems(id2);
     if (result.items) {
       markdown = this.enrichMarkdownWithChecklists(markdown, result.items);
     }
@@ -42739,8 +42739,8 @@ function registerResourcesAndPrompts(server2, manager) {
     "note",
     new ResourceTemplate("notes://note/{id}", { list: void 0 }),
     (uri, variables) => {
-      const id = decodeURIComponent(String(variables.id));
-      const markdown = manager.getNoteMarkdownById(id);
+      const id2 = decodeURIComponent(String(variables.id));
+      const markdown = manager.getNoteMarkdownById(id2);
       return {
         contents: [{ uri: uri.href, mimeType: "text/markdown", text: markdown || "(not found)" }]
       };
@@ -42960,8 +42960,8 @@ function parseNoteTable(compressed) {
     const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
     const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
     const map = /* @__PURE__ */ new Map();
-    ids.forEach((id, i) => {
-      const index = uuids.indexOf(id);
+    ids.forEach((id2, i) => {
+      const index = uuids.indexOf(id2);
       if (index < 0) throw new Error("Missing dimension UUID");
       map.set(index, i);
     });
@@ -43028,17 +43028,17 @@ import { tmpdir as tmpdir2 } from "node:os";
 import { basename, isAbsolute as isAbsolute2, join as join8 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
-function readSnapshot(manager, id) {
-  const note = manager.getNoteById(id);
+function readSnapshot(manager, id2) {
+  const note = manager.getNoteById(id2);
   if (!note) throw new Error("Note not found");
   if (note.passwordProtected) throw new Error("Locked notes cannot receive attachments");
-  const body = manager.getNoteContentById(id);
+  const body = manager.getNoteContentById(id2);
   if (!body) throw new Error("Note content is unavailable");
-  const enriched = enrichNoteRead(id, body);
-  const rich = readRichNote(id);
+  const enriched = enrichNoteRead(id2, body);
+  const rich = readRichNote(id2);
   if (!enriched.complete || enriched.revision !== rich.revision)
     throw new Error("Native metadata changed during read; read the note again");
-  return { id, title: note.title, body, rich, hash: richContentHash(body, enriched) };
+  return { id: id2, title: note.title, body, rich, hash: richContentHash(body, enriched) };
 }
 function assertExistingContentPreserved(before, after) {
   if (before.id !== after.id || before.title !== after.title)
@@ -43048,7 +43048,7 @@ function assertExistingContentPreserved(before, after) {
     throw new Error("Existing note text was not preserved");
   if (linkSignature(before.rich.links) !== linkSignature(after.rich.links.slice(0, before.rich.links.length)))
     throw new Error("Existing links were not preserved");
-  if (before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)))
+  if (before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)))
     throw new Error("Existing native object was lost");
   if (before.rich.nativeTags.some((tag) => !after.rich.nativeTags.includes(tag)))
     throw new Error("Existing native tag was lost");
@@ -43113,7 +43113,7 @@ function registerDirectOperations(server2, manager) {
     "get-folder-by-id",
     "Use when: reading the exact folder name and parent before a guarded rename.\nReturns: folder id, current name, and parent id.\nDo not use when: listing folders by path (list-folders).\nSafety: read-only.",
     { id: external_exports.string().max(2e3) },
-    ({ id }) => manager.getFolderById(id),
+    ({ id: id2 }) => manager.getFolderById(id2),
     true
   );
   tool(
@@ -43134,28 +43134,28 @@ function registerDirectOperations(server2, manager) {
     "add-attachment",
     "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
     { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id, expectedContentHash, path: path4 }) => {
-      const before = readSnapshot(manager, id);
+    ({ id: id2, expectedContentHash, path: path4 }) => {
+      const before = readSnapshot(manager, id2);
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
-      const beforeAttachments = manager.listAttachmentsById(id);
+      const beforeAttachments = manager.listAttachmentsById(id2);
       const directory = mkdtempSync2(join8(tmpdir2(), "notes-attachment-add-"));
       const temporaryFile = join8(directory, basename(path4));
       try {
         writeFileSync(temporaryFile, bytes, { mode: 384 });
-        if (readSnapshot(manager, id).hash !== before.hash)
+        if (readSnapshot(manager, id2).hash !== before.hash)
           throw new Error("Note revision changed");
         let returnedId;
         let transportUncertain = false;
         try {
-          returnedId = manager.addAttachmentById(id, before.body, temporaryFile);
+          returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
         } catch {
           transportUncertain = true;
         }
-        const after = readSnapshot(manager, id);
+        const after = readSnapshot(manager, id2);
         assertExistingContentPreserved(before, after);
         const readInserted = () => [
-          ...new Map(manager.listAttachmentsById(id).map((item) => [item.id, item])).values()
+          ...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()
         ].filter((item) => !beforeAttachments.some((existing) => existing.id === item.id));
         let inserted = readInserted();
         for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
@@ -43168,7 +43168,7 @@ function registerDirectOperations(server2, manager) {
             "Attachment insertion outcome uncertain; read the exact note before retrying"
           );
         const attachmentId = inserted[0].id;
-        const fetched = manager.getAttachmentBase64ById(id, attachmentId);
+        const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
         const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
         if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
           throw new Error(
@@ -43176,7 +43176,7 @@ function registerDirectOperations(server2, manager) {
           );
         return {
           ok: true,
-          id,
+          id: id2,
           attachmentId,
           contentHash: after.hash,
           bytes: bytes.length,
@@ -43248,7 +43248,7 @@ function addNativeTags(request, deps) {
     }
     return text.replace(/[\s\ufffc]/gu, "");
   };
-  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
+  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
     throw new Error(
       "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
     );
@@ -43335,20 +43335,20 @@ function registerNativeTagsBridge(server2, manager) {
       })
     );
   }
-  const read = (id) => {
-    const note = manager.getNoteById(id);
+  const read = (id2) => {
+    const note = manager.getNoteById(id2);
     if (!note) throw new Error("Note not found");
     if (note.passwordProtected) throw new Error("Locked notes cannot receive native tags");
-    const body = manager.getNoteContentById(id);
+    const body = manager.getNoteContentById(id2);
     if (!body) throw new Error("Note content is unavailable");
-    const enriched = enrichNoteRead(id, body);
-    const rich = readRichNote(id);
+    const enriched = enrichNoteRead(id2, body);
+    const rich = readRichNote(id2);
     if (!enriched.complete || enriched.revision !== rich.revision)
       throw new Error("Native metadata changed during read; read the note again");
     return {
       contentHash: richContentHash(body, enriched),
       title: note.title,
-      plaintext: manager.getNotePlaintextById(id),
+      plaintext: manager.getNotePlaintextById(id2),
       rich
     };
   };
@@ -43367,10 +43367,10 @@ function registerNativeTagsBridge(server2, manager) {
       scopeText: external_exports.string().min(12).max(500),
       tags: external_exports.array(external_exports.string().min(1).max(101)).min(1).max(100)
     },
-    ({ id, expectedContentHash, scopeText, tags }) => {
-      const initial = read(id);
+    ({ id: id2, expectedContentHash, scopeText, tags }) => {
+      const initial = read(id2);
       const result = addNativeTags(
-        { id, expectedContentHash, scopeText, tags, title: initial.title },
+        { id: id2, expectedContentHash, scopeText, tags, title: initial.title },
         {
           read,
           candidates: (title, scope) => manager.listAccounts().flatMap(
@@ -43381,7 +43381,676 @@ function registerNativeTagsBridge(server2, manager) {
           run: runNativeTagsShortcut
         }
       );
-      return { ok: true, id, ...result };
+      return { ok: true, id: id2, ...result };
+    }
+  );
+}
+
+// src/services/backgroundNotes.ts
+import { execFileSync as execFileSync7 } from "node:child_process";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync3, rmSync as rmSync4 } from "node:fs";
+import { tmpdir as tmpdir4 } from "node:os";
+import { join as join10 } from "node:path";
+
+// src/utils/appendMarkdown.ts
+var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function appendMarkdownHtml(markdown) {
+  if (markdown.includes("\uE000") || markdown.includes("\uE001"))
+    throw new Error("Unsupported reserved characters");
+  if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
+    throw new Error("Unsupported control characters");
+  if (/[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(markdown))
+    throw new Error(
+      "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
+    );
+  const inline = (text) => {
+    const links = [];
+    let value = text.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
+      if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url))
+        throw new Error("Unsupported Markdown link URL");
+      links.push(`<a href="${escape2(url)}">${escape2(label)}</a>`);
+      return `\uE000${links.length - 1}\uE001`;
+    });
+    value = escape2(value).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
+    if (value.includes("[") || value.includes("]") || value.includes("*"))
+      throw new Error("Unsupported or unbalanced Markdown inline syntax");
+    return value.replace(/\uE000(\d+)\uE001/g, (_s, i) => links[Number(i)]);
+  };
+  let html = "", list;
+  const close = () => {
+    if (list) {
+      html += `</${list}>`;
+      list = void 0;
+    }
+  };
+  for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
+    if (/^\s{2,}\S/.test(line)) throw new Error("Nested lists and indented code are unsupported");
+    const heading = /^(#{1,3})\s+(.+)$/.exec(line), item = /^(?:([-+*])|\d+\.)\s+(.+)$/.exec(line);
+    if (item) {
+      const kind = item[1] ? "ul" : "ol";
+      if (list !== kind) {
+        close();
+        list = kind;
+        html += `<${kind}>`;
+      }
+      html += `<li>${inline(item[2])}</li>`;
+      continue;
+    }
+    close();
+    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : line.trim() ? `<div>${inline(line)}</div>` : "<div><br></div>";
+  }
+  close();
+  return html;
+}
+
+// src/services/backgroundNotes.ts
+var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+var backgroundStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+var nativeTagBridgeStatus = () => nativeTagsStatus();
+function readBackgroundSnapshot(manager, id2) {
+  if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
+    throw new Error("Exact note ID required");
+  const note = manager.getNoteById(id2);
+  if (!note) throw new Error("Note not found");
+  if (note.passwordProtected) throw new Error("Locked notes are unavailable in background mode");
+  const html = manager.getNoteContentById(id2);
+  const enriched = enrichNoteRead(id2, html);
+  const rich = readRichNote(id2);
+  if (enriched.revision !== rich.revision)
+    throw new Error("Note changed during read; read it again");
+  return {
+    id: id2,
+    title: note.title,
+    hash: richContentHash(html, enriched),
+    html,
+    rich,
+    pinned: getNoteMetadata(id2).metadata?.pinned,
+    checklist: getChecklistItems(id2).items || []
+  };
+}
+function validateAppendContent(content, format) {
+  if (!content || content.length > 1024 * 1024 || content.includes("\0"))
+    throw new Error("Invalid append content (limit 1 MiB)");
+  if (format === "html") {
+    const allowed = /* @__PURE__ */ new Set([
+      "div",
+      "p",
+      "br",
+      "b",
+      "strong",
+      "i",
+      "em",
+      "u",
+      "s",
+      "del",
+      "h1",
+      "h2",
+      "h3",
+      "ul",
+      "ol",
+      "li",
+      "a",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "td",
+      "th"
+    ]);
+    for (const tag of content.matchAll(/<\/?\s*([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+      if (!allowed.has(tag[1].toLowerCase()))
+        throw new Error(`Unsupported HTML element: ${tag[1]}`);
+      let attrs = tag[2].replace(/\/$/, "").trim();
+      if (tag[1].toLowerCase() === "a")
+        attrs = attrs.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (_s, _q, url) => {
+          if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) || Array.from(url).some((c) => c.charCodeAt(0) < 33))
+            throw new Error("Unsupported link URL");
+          return "";
+        });
+      if (attrs.trim())
+        throw new Error(
+          "Unsupported HTML attributes; use semantic formatting and explicit blank paragraphs"
+        );
+    }
+    if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
+  }
+  if (format === "markdown" && /!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+    throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+}
+function runBackgroundShortcut(input) {
+  const status = backgroundStatus();
+  if (!status.installed)
+    throw new Error("Install the supplied Background Operations shortcut once");
+  const directory = mkdtempSync4(join10(tmpdir4(), "apple-notes-background-"));
+  try {
+    const file = join10(directory, "request.json");
+    writeFileSync3(
+      file,
+      JSON.stringify({
+        operation: "",
+        title: "",
+        scopeText: "",
+        text: "",
+        objectId: "",
+        objectName: "",
+        change: "",
+        otherTitle: "",
+        otherScope: "",
+        tag: "",
+        size: "",
+        ...input
+      }),
+      { mode: 384 }
+    );
+    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      encoding: "utf8",
+      timeout: 6e4,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } finally {
+    rmSync4(directory, { recursive: true, force: true });
+  }
+}
+function backgroundDependencies(manager) {
+  return {
+    read: (id2) => readBackgroundSnapshot(manager, id2),
+    run: runBackgroundShortcut,
+    candidates: (title, scope) => manager.listAccounts().flatMap(
+      (account) => manager.searchNotes(title, false, account.name).filter(
+        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope)
+      ).map((note) => note.id)
+    )
+  };
+}
+function assertPreserved(before, after, options = {}) {
+  if (before.id !== after.id || before.title !== after.title)
+    throw new Error("Note identity changed");
+  const tidy = (s) => s.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
+  let oldText = tidy(before.rich.text), newText = tidy(after.rich.text);
+  if (options.tagChange) {
+    const escaped = options.tagChange.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const strip = (s) => s.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "").replace(/[\s\ufffc]/gu, "");
+    oldText = strip(oldText);
+    newText = strip(newText);
+  }
+  if (options.append ? !newText.startsWith(oldText) : newText !== oldText)
+    throw new Error("Existing note text was not preserved");
+  const links = options.append ? after.rich.links.slice(0, before.rich.links.length) : after.rich.links;
+  if (linkSignature(before.rich.links) !== linkSignature(links))
+    throw new Error("Existing links were not preserved");
+  if (!options.tagChange && before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)))
+    throw new Error("Existing native object was lost");
+  if (JSON.stringify(before.checklist) !== JSON.stringify(
+    options.append ? after.checklist.slice(0, before.checklist.length) : after.checklist
+  ))
+    throw new Error("Existing checklist items changed");
+  for (const item of before.rich.checklistItems || []) {
+    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
+    if (!actual || actual.text !== item.text || actual.done !== item.done)
+      throw new Error("Existing checklist item identity or state changed");
+  }
+  if (before.rich.nativeTags.filter((t) => t !== options.tagChange).some((t) => !after.rich.nativeTags.includes(t)))
+    throw new Error("Existing native tag was lost");
+  const allowedRemoved = options.tagChange ? before.rich.nativeTagObjectIds?.[options.tagChange] || [] : [];
+  for (const object3 of before.rich.objectData || []) {
+    if (allowedRemoved.includes(object3.id)) continue;
+    const actual = after.rich.objectData?.find((o) => o.id === object3.id);
+    if (!actual || actual.mergeable !== object3.mergeable || actual.view !== object3.view)
+      throw new Error("Existing native object content or presentation changed");
+  }
+  if (!options.tagChange && before.rich.styleRuns && after.rich.styleRuns) {
+    const end = before.rich.text.trimEnd().length;
+    for (const oldRun of before.rich.styleRuns)
+      for (const newRun of after.rich.styleRuns) {
+        const overlapStart = Math.max(oldRun.start, newRun.start);
+        const overlapEnd = Math.min(
+          end,
+          oldRun.start + oldRun.length,
+          newRun.start + newRun.length
+        );
+        if (overlapStart < overlapEnd && /[^\s\ufffc]/u.test(before.rich.text.slice(overlapStart, overlapEnd)) && oldRun.signature !== newRun.signature)
+          throw new Error("Existing rich formatting changed");
+      }
+  }
+}
+function mutateBackground(request, operation, data, verify, deps) {
+  if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
+    throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
+  const before = deps.read(request.id);
+  if (before.hash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (!before.rich.text.includes(request.scopeText))
+    throw new Error("Scope is absent from exact note");
+  const candidates = deps.candidates(before.title, request.scopeText);
+  if (candidates.length !== 1 || candidates[0] !== request.id)
+    throw new Error("Ambiguous note selection; nothing changed");
+  if (deps.read(request.id).hash !== before.hash)
+    throw new Error("Note revision changed during preflight");
+  let transportUncertain = false;
+  let transportMessage = "";
+  try {
+    deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
+  } catch (error2) {
+    transportUncertain = true;
+    const detail = error2;
+    transportMessage = detail?.code === "ETIMEDOUT" ? "Shortcuts timed out; check for an interactive parameter or permission request" : String(detail?.stderr || detail?.message || "Shortcuts failed").trim().slice(0, 500);
+  }
+  const after = deps.read(request.id);
+  try {
+    verify(before, after);
+  } catch (error2) {
+    throw new Error(
+      `Operation outcome uncertain; read exact note before any retry: ${error2 instanceof Error ? error2.message : "readback failed"}${transportMessage ? "; " + transportMessage : ""}`
+    );
+  }
+  return {
+    ok: true,
+    id: request.id,
+    previousContentHash: before.hash,
+    contentHash: after.hash,
+    ...transportUncertain ? {
+      transportWarning: "Transport was uncertain; exact-ID readback verified the requested result"
+    } : {}
+  };
+}
+function assertAppendedHtmlLinks(previousCount, links, html) {
+  const remaining = links.slice(previousCount);
+  for (const expected of htmlLinks(html)) {
+    const index = remaining.findIndex(
+      (link) => linkSignature([link]) === linkSignature([expected])
+    );
+    if (index < 0) throw new Error("Appended HTML link not verified");
+    remaining.splice(index, 1);
+  }
+}
+function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
+  const before = comparableVisibleText(beforeHtml);
+  const after = comparableVisibleText(afterHtml);
+  if (!after.startsWith(before)) throw new Error("Appended text not verified");
+  const suffix = after.slice(before.length).replace(/\s+/gu, " ").trim();
+  const wanted = expected.replace(/\s+/gu, " ").trim();
+  if (!suffix || !suffix.includes(wanted)) throw new Error("Appended text not verified");
+}
+function appendNative(manager, request) {
+  validateAppendContent(request.content, request.format);
+  if (request.format === "markdown")
+    return appendNative(manager, {
+      ...request,
+      content: appendMarkdownHtml(request.content),
+      format: "html"
+    });
+  if (request.format === "html" && /<table\b/i.test(request.content))
+    throw new Error("Use create-table for verified native table insertion");
+  const op = request.format === "plaintext" ? "append-text" : request.format === "html" ? "append-html" : "append-markdown";
+  const text = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
+  return mutateBackground(
+    request,
+    op,
+    { text },
+    (before, after) => {
+      assertPreserved(before, after, { append: true });
+      const expected = request.format === "html" ? comparableVisibleText(request.content) : request.format === "plaintext" ? request.content : null;
+      if (expected) assertAppendedVisibleText(before.html, after.html, expected);
+      if (request.format === "html")
+        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, request.content);
+    },
+    backgroundDependencies(manager)
+  );
+}
+function setNativeTag(manager, request) {
+  const tag = normalizeNativeTags([request.tag])[0];
+  const initial = readBackgroundSnapshot(manager, request.id);
+  if (initial.hash !== request.expectedContentHash)
+    throw new Error("Note revision changed; read it again");
+  if (initial.rich.nativeTags.includes(tag) === request.present)
+    return { ok: true, id: request.id, contentHash: initial.hash, changed: false };
+  const deps = backgroundDependencies(manager);
+  if (request.present)
+    deps.run = ({ title, scopeText }) => runNativeTagsShortcut({ title, scopeText, tags: [tag] });
+  return mutateBackground(
+    request,
+    request.present ? "add-tag" : "remove-tag",
+    { tag },
+    (before, after) => {
+      assertPreserved(before, after, { tagChange: tag });
+      if (after.rich.nativeTags.includes(tag) !== request.present)
+        throw new Error("Native tag state not verified");
+      const removed = before.rich.nativeObjectIds.filter(
+        (id2) => !after.rich.nativeObjectIds.includes(id2)
+      );
+      const allowed = request.present ? [] : before.rich.nativeTagObjectIds?.[tag] || [];
+      if (removed.some((id2) => !allowed.includes(id2)))
+        throw new Error("Unrelated native object was lost");
+    },
+    deps
+  );
+}
+
+// src/tools/nativeOperations.ts
+var VERIFIED_BACKGROUND = /* @__PURE__ */ new Set([
+  "append-native",
+  "create-checklist-item",
+  "create-table",
+  "insert-note-link",
+  "set-note-pinned",
+  "remove-native-tags",
+  "replace-native-tag"
+]);
+var LIVE_VALIDATION_BLOCKERS = {};
+var signingRefusal = "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";
+var UNAVAILABLE = {
+  "set-checklist-item": signingRefusal,
+  "delete-checklist-item": signingRefusal,
+  "set-attachment-size": signingRefusal,
+  "insert-mention": signingRefusal,
+  "update-table-cells": "No background cell-editing action; replacing a table would change its identity and position",
+  "edit-rich-note": "Native text replacement needs current UI selection; full-body rewriting is protected",
+  "smart-folders": "No supported background interface for Smart Folder rules",
+  "rename-tag-globally": "Cannot update Smart Folder references in background; use replace-native-tag on explicit notes",
+  "sharing-permissions": "No supported background interface for sharing invitations or permissions",
+  "note-lock": "Notes lock actions require the foreground and may require user authentication",
+  "record-audio": "Recording requires the Notes UI",
+  "transcribe-audio": "No supported background Notes transcription action",
+  "scan-and-markup": "No supported background scanning or graphical markup action"
+};
+function requireValidated(name) {
+  if (!VERIFIED_BACKGROUND.has(name) && process.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
+    throw new Error(
+      UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || `${name} has not passed live background validation in this build; see get-capabilities`
+    );
+}
+var id = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+var revision3 = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
+var common = {
+  id,
+  expectedContentHash: revision3,
+  scopeText: external_exports.string().min(12).max(500).describe(
+    "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
+  )
+};
+var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function registerNativeOperations(server2, manager) {
+  function tool(name, description, input, handler, readOnly = false) {
+    server2.registerTool(
+      name,
+      {
+        description,
+        inputSchema: input,
+        outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough(),
+        annotations: { readOnlyHint: readOnly }
+      },
+      (async (args) => {
+        try {
+          const result = handler(args);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
+          };
+        } catch (error2) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: error2 instanceof Error ? error2.message : "Operation failed"
+              }
+            ],
+            isError: true
+          };
+        }
+      })
+    );
+  }
+  tool(
+    "get-capabilities",
+    "Use when: checking native background-edit support before calling a write tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
+    {},
+    () => {
+      let bridge;
+      try {
+        bridge = backgroundStatus();
+      } catch {
+        bridge = {
+          installed: false,
+          shortcut: "Apple Notes MCP - Background Operations v5",
+          error: "Shortcuts helper unavailable"
+        };
+      }
+      const native = [
+        "append-native",
+        "create-checklist-item",
+        "create-table",
+        "set-note-pinned",
+        "remove-native-tags",
+        "replace-native-tag",
+        "insert-note-link"
+      ];
+      let tagBridgeInstalled = false;
+      try {
+        tagBridgeInstalled = nativeTagBridgeStatus().installed;
+      } catch {
+      }
+      return {
+        bridge,
+        nativeTagBridgeInstalled: tagBridgeInstalled,
+        mode: "background-only",
+        operations: Object.fromEntries(
+          native.map((name) => [
+            name,
+            {
+              implemented: true,
+              verified: VERIFIED_BACKGROUND.has(name),
+              available: VERIFIED_BACKGROUND.has(name) && (!native.includes(name) || bridge.installed) && (name !== "replace-native-tag" || tagBridgeInstalled),
+              reason: !VERIFIED_BACKGROUND.has(name) ? UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || "Live validation pending; install the shortcut and complete the isolated acceptance tests" : native.includes(name) && !bridge.installed ? "Install the supplied shortcut once" : name === "replace-native-tag" && !tagBridgeInstalled ? "Install the verified Native Tags bridge for the addition phase" : void 0
+            }
+          ])
+        ),
+        unavailable: UNAVAILABLE
+      };
+    },
+    true
+  );
+  tool(
+    "append-native",
+    "Use when: appending formatted content to a native-object note without replacing its body.\nReturns: exact-ID preservation and appended-content readback.\nDo not use when: the existing note can be safely handled by append-to-note or the scope phrase is ambiguous.\nSafety: requires a fresh revision and unique existing scope phrase of plain words; avoid punctuation, hashtags, and paths because Notes search may not resolve them literally. Supports bounded plaintext, semantic HTML, and Markdown without external fetching or automatic retries.",
+    {
+      ...common,
+      content: external_exports.string().min(1).max(1024 * 1024),
+      format: external_exports.enum(["plaintext", "html", "markdown"]).default("plaintext")
+    },
+    (args) => {
+      requireValidated("append-native");
+      return appendNative(manager, args);
+    }
+  );
+  tool(
+    "create-checklist-item",
+    "Use when: appending one real unchecked Notes checklist item.\nReturns: the created checklist identity after exact-note readback.\nDo not use when: plain text is sufficient or more than one item is requested.\nSafety: preserves existing text, links, native objects, checklist identities, and formatting.",
+    {
+      ...common,
+      text: external_exports.string().min(1).max(1e4).refine((s) => !/[\r\n\0]/u.test(s), "One line per checklist item")
+    },
+    (args) => {
+      requireValidated("create-checklist-item");
+      const result = mutateBackground(
+        args,
+        "create-checklist-item",
+        { text: args.text },
+        (before, after) => {
+          assertPreserved(before, after, { append: true });
+          const added = after.checklist.slice(before.checklist.length);
+          if (added.length !== 1 || added[0].text !== args.text || added[0].done)
+            throw new Error("Native checklist item not verified");
+        },
+        backgroundDependencies(manager)
+      );
+      return { ...result, items: readRichNote(args.id).checklistItems };
+    }
+  );
+  tool(
+    "create-table",
+    "Use when: appending one native Notes table from a rectangular array of strings.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    {
+      ...common,
+      rows: external_exports.array(external_exports.array(external_exports.string().max(1e4)).min(1).max(100)).min(1).max(1e3)
+    },
+    (args) => {
+      requireValidated("create-table");
+      if (args.rows.some((row) => row.length !== args.rows[0].length))
+        throw new Error("Table rows must have equal cell counts");
+      const before = readRichNote(args.id);
+      const content = "<table>" + args.rows.map(
+        (row) => "<tr>" + row.map((v) => "<td>" + htmlEscape(v) + "</td>").join("") + "</tr>"
+      ).join("") + "</table>";
+      const result = mutateBackground(
+        args,
+        "append-html",
+        { text: "<div><br></div>" + content },
+        (oldNote, newNote) => {
+          assertPreserved(oldNote, newNote, { append: true });
+          const inserted = newNote.rich.objectData?.filter(
+            (o) => o.type?.includes("table") && !oldNote.rich.nativeObjectIds.includes(o.id)
+          ) || [];
+          if (inserted.length !== 1 || JSON.stringify(parseNoteTable(Buffer.from(inserted[0].mergeable, "hex")).rows) !== JSON.stringify(args.rows))
+            throw new Error("Native table cells not verified");
+        },
+        backgroundDependencies(manager)
+      );
+      const current = readRichNote(args.id);
+      const added = current.objectData?.filter(
+        (obj) => obj.type?.includes("table") && !before.nativeObjectIds.includes(obj.id)
+      ) || [];
+      if (added.length !== 1)
+        throw new Error(
+          "Table result uncertain; native table not verified. Read the note before retrying"
+        );
+      const table = parseNoteTable(Buffer.from(added[0].mergeable, "hex"));
+      if (JSON.stringify(table.rows) !== JSON.stringify(args.rows))
+        throw new Error("Native table cells not verified; read before retrying");
+      return { ...result, table: { id: added[0].id, ...table } };
+    }
+  );
+  tool(
+    "set-note-pinned",
+    "Use when: setting one exact note's pinned state.\nReturns: the verified requested state and new revision.\nDo not use when: only reading pinned metadata (get-note-metadata).\nSafety: checks expectedPinned and a fresh content revision before changing metadata; never rewrites the body.",
+    { ...common, expectedPinned: external_exports.boolean(), pinned: external_exports.boolean() },
+    (args) => {
+      requireValidated("set-note-pinned");
+      const deps = backgroundDependencies(manager);
+      const s = deps.read(args.id);
+      if (s.hash !== args.expectedContentHash || s.pinned !== args.expectedPinned)
+        throw new Error("Note or pinned state changed; read it again");
+      if (s.pinned === args.pinned)
+        return { ok: true, id: args.id, pinned: s.pinned, contentHash: s.hash, changed: false };
+      const run = deps.run;
+      deps.run = (input) => {
+        if (deps.read(args.id).pinned !== args.expectedPinned)
+          throw new Error("Pinned state changed during preflight");
+        run(input);
+      };
+      return {
+        ...mutateBackground(
+          args,
+          "set-pinned",
+          { change: args.pinned ? "add" : "remove" },
+          (before, after) => {
+            assertPreserved(before, after);
+            if (after.pinned !== args.pinned) throw new Error("Pinned state not verified");
+          },
+          deps
+        ),
+        pinned: args.pinned
+      };
+    }
+  );
+  tool(
+    "remove-native-tags",
+    "Use when: removing specified native tags from one exact note.\nReturns: verified remaining tags and new revision.\nDo not use when: deleting a global tag definition or changing Smart Folder rules.\nSafety: preserves unrelated tags and native objects and never retries an uncertain mutation.",
+    { ...common, tags: external_exports.array(external_exports.string().min(1).max(101)).min(1).max(100) },
+    (args) => {
+      requireValidated("remove-native-tags");
+      let hash = args.expectedContentHash;
+      const completed = [];
+      for (const tag of normalizeNativeTags(args.tags)) {
+        try {
+          const result = setNativeTag(manager, {
+            ...args,
+            expectedContentHash: hash,
+            tag,
+            present: false
+          });
+          hash = result.contentHash;
+          completed.push(tag);
+        } catch (error2) {
+          throw new Error(
+            `Stopped after tags ${JSON.stringify(completed)}; read exact note before retry: ${String(error2)}`
+          );
+        }
+      }
+      return { ok: true, id: args.id, removed: completed, contentHash: hash };
+    }
+  );
+  tool(
+    "replace-native-tag",
+    "Use when: replacing one native tag across an explicit list of freshly read notes.\nReturns: per-note results and remaining work after any failure.\nDo not use when: renaming global tag definitions or Smart Folder rules.\nSafety: adds and verifies the new tag before removing the old one and stops on the first uncertain result.",
+    {
+      notes: external_exports.array(external_exports.object(common)).min(1).max(100),
+      oldTag: external_exports.string().min(1).max(101),
+      newTag: external_exports.string().min(1).max(101)
+    },
+    (args) => {
+      requireValidated("replace-native-tag");
+      const [oldTag] = normalizeNativeTags([args.oldTag]);
+      const [newTag] = normalizeNativeTags([args.newTag]);
+      if (new Set(args.notes.map((n) => n.id)).size !== args.notes.length)
+        throw new Error("Duplicate note IDs");
+      for (const n of args.notes)
+        if (readBackgroundSnapshot(manager, n.id).hash !== n.expectedContentHash)
+          throw new Error("Note revision changed; no replacement started");
+      const results = [];
+      for (const n of args.notes) {
+        try {
+          const initial = readBackgroundSnapshot(manager, n.id);
+          if (!initial.rich.nativeTags.includes(oldTag) || oldTag === newTag) {
+            results.push({ id: n.id, changed: false });
+            continue;
+          }
+          const added = setNativeTag(manager, { ...n, tag: newTag, present: true });
+          const removed = setNativeTag(manager, {
+            ...n,
+            expectedContentHash: added.contentHash,
+            tag: oldTag,
+            present: false
+          });
+          results.push(removed);
+        } catch (error2) {
+          results.push({ id: n.id, ok: false, error: String(error2) });
+          return { ok: false, results, remaining: args.notes.length - results.length };
+        }
+      }
+      return { ok: true, results };
+    }
+  );
+  tool(
+    "insert-note-link",
+    "Use when: appending a real Notes deep link to a native-object note.\nReturns: verified link destination and label after exact-note readback.\nDo not use when: only retrieving a deep link (get-note-link).\nSafety: retrieves the real target URL, preserves existing rich content, and creates a static label rather than a dynamic-title object.",
+    { ...common, linkedNoteId: id, label: external_exports.string().min(1).max(2e3).optional() },
+    (args) => {
+      requireValidated("insert-note-link");
+      const link = manager.getNoteLinkById(args.linkedNoteId);
+      if (!link) throw new Error("Real Notes link unavailable");
+      const linked = manager.getNoteById(args.linkedNoteId);
+      if (!linked) throw new Error("Linked note not found");
+      const result = appendNative(manager, {
+        ...args,
+        content: `<div><a href="${htmlEscape(link)}">${htmlEscape(args.label || linked.title)}</a></div>`,
+        format: "html"
+      });
+      if (!readRichNote(args.id).links.some(
+        (l) => l.url === link && l.text === (args.label || linked.title)
+      ))
+        throw new Error("Link result uncertain; read note before retrying");
+      return result;
     }
   );
 }
@@ -43398,6 +44067,7 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerNativeTagsBridge(server, notesManager);
+registerNativeOperations(server, notesManager);
 function successResponse(message, structured) {
   const res = { content: [{ type: "text", text: message }] };
   if (structured) res.structuredContent = structured;
@@ -43445,17 +44115,17 @@ var noteIdInput = external_exports.string().min(1, "Note ID is required").max(MA
 var expectedContentHashInput = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/, "expectedContentHash must come from get-note-content").describe(
   "Revision token returned by get-note-content for this exact ID. The mutation stops if the note changed since that read."
 );
-function readExactNoteSnapshot(id) {
-  const note = notesManager.getNoteById(id);
-  if (!note) return { error: `Note with ID "${id}" not found` };
+function readExactNoteSnapshot(id2) {
+  const note = notesManager.getNoteById(id2);
+  if (!note) return { error: `Note with ID "${id2}" not found` };
   if (note.passwordProtected) {
     return {
       error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`
     };
   }
-  const body = notesManager.getNoteContentById(id);
+  const body = notesManager.getNoteContentById(id2);
   if (!body) return { error: `Failed to read content of note "${note.title}"` };
-  const rich = enrichNoteRead(id, body);
+  const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
 function revisionConflictMessage(title) {
@@ -43636,28 +44306,28 @@ registerTool(
       truncated: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, title, account }) => {
-    if (id) {
-      const note2 = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2, title, account }) => {
+    if (id2) {
+      const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return errorResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
           `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const rawContent2 = notesManager.getNoteContentById(id);
+      const rawContent2 = notesManager.getNoteContentById(id2);
       if (!rawContent2) {
         return errorResponse(`Failed to read content of note "${note2.title}"`);
       }
-      const rich2 = enrichNoteRead(id, rawContent2);
+      const rich2 = enrichNoteRead(id2, rawContent2);
       const stripped2 = stripLargeInlineImages(rich2.content);
       const content2 = stripped2.html;
       const hashtags2 = parseHashtags(content2);
       const warning2 = [strippedImagesWarning(stripped2), rich2.warning].filter(Boolean).join("\n\n");
       return successResponse(warning2 ? content2 + warning2 : content2, {
-        id,
+        id: id2,
         title: note2.title,
         content: content2,
         contentHash: richContentHash(rawContent2, rich2),
@@ -43665,6 +44335,11 @@ registerTool(
         nativeTags: rich2.nativeTags,
         richContentComplete: rich2.complete,
         writable: rich2.writable && stripped2.strippedCount === 0,
+        supportedOperations: {
+          fullBodyReplace: rich2.writable && stripped2.strippedCount === 0,
+          nativeAppendImplemented: VERIFIED_BACKGROUND.has("append-native"),
+          requiresShortcut: !rich2.writable
+        },
         warning: rich2.warning,
         hashtags: hashtags2,
         strippedImages: stripped2.strippedCount,
@@ -43701,6 +44376,11 @@ registerTool(
       nativeTags: rich.nativeTags,
       richContentComplete: rich.complete,
       writable: rich.writable && stripped.strippedCount === 0,
+      supportedOperations: {
+        fullBodyReplace: rich.writable && stripped.strippedCount === 0,
+        nativeAppendImplemented: VERIFIED_BACKGROUND.has("append-native"),
+        requiresShortcut: !rich.writable
+      },
       warning: rich.warning,
       hashtags,
       strippedImages: stripped.strippedCount,
@@ -43724,18 +44404,18 @@ registerTool(
       plaintext: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id, title, account }) => {
-    if (id) {
-      const note2 = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2, title, account }) => {
+    if (id2) {
+      const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return errorResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
           `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const plaintext2 = notesManager.getNotePlaintextById(id);
+      const plaintext2 = notesManager.getNotePlaintextById(id2);
       if (!plaintext2) {
         return errorResponse(`Failed to read plaintext of note "${note2.title}"`);
       }
@@ -43776,10 +44456,10 @@ registerTool(
       passwordProtected: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id }) => {
-    const note = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2 }) => {
+    const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return errorResponse(`Note with ID "${id2}" not found`);
     }
     const metadata = {
       id: note.id,
@@ -43837,12 +44517,12 @@ registerTool(
       separately: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, separately = false }) => {
-    const success = notesManager.showNoteById(id, separately);
+  withErrorHandling(({ id: id2, separately = false }) => {
+    const success = notesManager.showNoteById(id2, separately);
     if (!success) {
-      return errorResponse(`Failed to show note with ID "${id}"`);
+      return errorResponse(`Failed to show note with ID "${id2}"`);
     }
-    return successResponse(`Shown note with ID "${id}" in Notes.app`, { id, separately });
+    return successResponse(`Shown note with ID "${id2}" in Notes.app`, { id: id2, separately });
   }, "Error showing note")
 );
 registerTool(
@@ -43860,24 +44540,24 @@ registerTool(
       url: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id, title, account }) => {
-    if (id) {
-      const note2 = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2, title, account }) => {
+    if (id2) {
+      const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return errorResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
           `Note "${note2.title}" is password-protected. Unlock it in Notes.app first.`
         );
       }
-      const url2 = notesManager.getNoteLinkById(id);
+      const url2 = notesManager.getNoteLinkById(id2);
       if (!url2) {
         return errorResponse(
           `Failed to get note link for "${note2.title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
         );
       }
-      return successResponse(`Note link: ${url2}`, { id, title: note2.title, url: url2 });
+      return successResponse(`Note link: ${url2}`, { id: id2, title: note2.title, url: url2 });
     }
     if (!title) {
       return errorResponse("Either 'id' or 'title' is required");
@@ -43913,12 +44593,12 @@ registerTool(
       separately: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, separately = false }) => {
-    const success = notesManager.showFolderById(id, separately);
+  withErrorHandling(({ id: id2, separately = false }) => {
+    const success = notesManager.showFolderById(id2, separately);
     if (!success) {
-      return errorResponse(`Failed to show folder with ID "${id}"`);
+      return errorResponse(`Failed to show folder with ID "${id2}"`);
     }
-    return successResponse(`Shown folder with ID "${id}" in Notes.app`, { id, separately });
+    return successResponse(`Shown folder with ID "${id2}" in Notes.app`, { id: id2, separately });
   }, "Error showing folder")
 );
 registerTool(
@@ -43934,12 +44614,12 @@ registerTool(
       separately: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, separately = false }) => {
-    const success = notesManager.showAccountById(id, separately);
+  withErrorHandling(({ id: id2, separately = false }) => {
+    const success = notesManager.showAccountById(id2, separately);
     if (!success) {
-      return errorResponse(`Failed to show account with ID "${id}"`);
+      return errorResponse(`Failed to show account with ID "${id2}"`);
     }
-    return successResponse(`Shown account with ID "${id}" in Notes.app`, { id, separately });
+    return successResponse(`Shown account with ID "${id2}" in Notes.app`, { id: id2, separately });
   }, "Error showing account")
 );
 registerTool(
@@ -43958,17 +44638,17 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ id }) => {
-    const note = notesManager.getNoteById(id);
-    if (!note) return errorResponse(`Note with ID "${id}" not found`);
-    const body = notesManager.getNoteContentById(id);
+  withErrorHandling(({ id: id2 }) => {
+    const note = notesManager.getNoteById(id2);
+    if (!note) return errorResponse(`Note with ID "${id2}" not found`);
+    const body = notesManager.getNoteContentById(id2);
     if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
-    const rich = readRichNote(id);
+    const rich = readRichNote(id2);
     const tables = (rich.objectData || []).filter((object3) => object3.type?.includes("table")).map((object3) => {
       try {
         return {
           id: object3.id,
-          attachmentId: id.replace(/ICNote\/p\d+$/, `ICAttachment/p${object3.pk}`),
+          attachmentId: id2.replace(/ICNote\/p\d+$/, `ICAttachment/p${object3.pk}`),
           complete: true,
           ...parseNoteTable(Buffer.from(object3.mergeable, "hex"))
         };
@@ -43994,7 +44674,7 @@ registerTool(
       revision: rich.revision
     };
     return successResponse("Native objects read from the exact note", {
-      id,
+      id: id2,
       contentHash: richContentHash(body, richRead),
       objects: rich.objects,
       checklistItems: rich.checklistItems,
@@ -44066,27 +44746,27 @@ registerTool(
   },
   withErrorHandling(
     ({
-      id,
+      id: id2,
       expectedContentHash,
       newTitle,
       newContent,
       format = "plaintext",
       allowLinkChanges = false
     }) => {
-      const snapshot = readExactNoteSnapshot(id);
+      const snapshot = readExactNoteSnapshot(id2);
       if ("error" in snapshot) return errorResponse(snapshot.error);
       if (snapshot.contentHash !== expectedContentHash) {
         return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
       assertLinkedWrite(snapshot.rich, newContent, format, allowLinkChanges);
-      const attachments = notesManager.listAttachmentsById(id);
+      const attachments = notesManager.listAttachmentsById(id2);
       if (attachments.length > 0) {
         return errorResponse(
           `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Full-body replacement is blocked; edit it in Notes.app.`
         );
       }
       const result = notesManager.updateNoteByIdIfUnchanged(
-        id,
+        id2,
         snapshot.note.title,
         snapshot.body,
         newTitle,
@@ -44107,8 +44787,8 @@ registerTool(
           `The update result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
         );
       }
-      const readback = notesManager.getNoteContentById(id);
-      const richReadback = enrichNoteRead(id, readback || "");
+      const readback = notesManager.getNoteContentById(id2);
+      const richReadback = enrichNoteRead(id2, readback || "");
       const contentHash = readback ? richContentHash(readback, richReadback) : "";
       if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
         return errorResponse(
@@ -44117,7 +44797,7 @@ registerTool(
       }
       if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
         return errorResponse(
-          `The note accepted an update, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
+          `The note accepted an update, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
         );
       }
       const displayTitle = resolveUpdateResponseTitle(
@@ -44129,10 +44809,10 @@ registerTool(
       const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
       const checklistWarning = detectChecklistAttempt(newContent) ?? "";
       return successResponse(
-        `Note updated; visible text verified: "${displayTitle}" [id: ${id}]${sharedWarning}${checklistWarning}`,
+        `Note updated; visible text verified: "${displayTitle}" [id: ${id2}]${sharedWarning}${checklistWarning}`,
         {
           ok: true,
-          id,
+          id: id2,
           title: displayTitle,
           shared: snapshot.note.shared ?? false,
           previousContentHash: expectedContentHash,
@@ -44147,11 +44827,12 @@ registerTool(
 registerTool(
   "append-to-note",
   {
-    description: "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title, the note changed since the read, or it has attachments or native objects.\nSafety: append rewrites the HTML body, so it uses exact-ID, rich revision, native-object, attachment, link, and readback guards. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
+    description: "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
       content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
+      scopeText: external_exports.string().min(12).max(500).optional().describe("Existing unique phrase required for native append to protected notes"),
       position: external_exports.enum(["after", "before"]).optional().default("after").describe(
         "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
       ),
@@ -44170,12 +44851,13 @@ registerTool(
   },
   withErrorHandling(
     ({
-      id,
+      id: id2,
       expectedContentHash,
       content,
       position = "after",
       separator = "\n\n",
-      format = "plaintext"
+      format = "plaintext",
+      scopeText
     }) => {
       const contentToHtml = (text) => {
         if (format === "html") return text;
@@ -44190,17 +44872,32 @@ registerTool(
         const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         return `<div>${escaped}</div>`;
       };
-      const snapshot = readExactNoteSnapshot(id);
+      const snapshot = readExactNoteSnapshot(id2);
       if ("error" in snapshot) return errorResponse(snapshot.error);
       if (snapshot.contentHash !== expectedContentHash) {
         return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
       if (!snapshot.rich.writable) {
-        return errorResponse(
-          snapshot.rich.warning || `Note "${snapshot.note.title}" contains native objects that cannot be preserved by a full-body append.`
-        );
+        if (separator !== "\n\n")
+          return errorResponse("Native append supports the default blank-line separator only");
+        if (position !== "after")
+          return errorResponse("Native append supports the end of a note only");
+        if (!scopeText)
+          return errorResponse("Provide scopeText: a unique existing phrase for native append");
+        if (!VERIFIED_BACKGROUND.has("append-native"))
+          return errorResponse(
+            "Native append has not passed live validation; see get-capabilities"
+          );
+        const result2 = appendNative(notesManager, {
+          id: id2,
+          expectedContentHash,
+          scopeText,
+          content,
+          format
+        });
+        return successResponse("Native append verified without replacing existing objects", result2);
       }
-      const attachments = notesManager.listAttachmentsById(id);
+      const attachments = notesManager.listAttachmentsById(id2);
       if (attachments.length > 0) {
         return errorResponse(
           `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
@@ -44214,7 +44911,7 @@ registerTool(
       const sepHtml = separatorToHtml(separator);
       const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
       const result = notesManager.updateNoteByIdIfUnchanged(
-        id,
+        id2,
         snapshot.note.title,
         snapshot.body,
         void 0,
@@ -44235,8 +44932,8 @@ registerTool(
           `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
         );
       }
-      const readback = notesManager.getNoteContentById(id);
-      const richReadback = enrichNoteRead(id, readback || "");
+      const readback = notesManager.getNoteContentById(id2);
+      const richReadback = enrichNoteRead(id2, readback || "");
       const contentHash = readback ? richContentHash(readback, richReadback) : "";
       if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
         return errorResponse(
@@ -44245,7 +44942,7 @@ registerTool(
       }
       if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
         return errorResponse(
-          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
+          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
         );
       }
       const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
@@ -44253,7 +44950,7 @@ registerTool(
         `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
         {
           ok: true,
-          id,
+          id: id2,
           title: snapshot.note.title,
           shared: snapshot.note.shared ?? false,
           previousContentHash: expectedContentHash,
@@ -44281,19 +44978,19 @@ registerTool(
       previousContentHash: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id, expectedContentHash }) => {
-    const snapshot = readExactNoteSnapshot(id);
+  withErrorHandling(({ id: id2, expectedContentHash }) => {
+    const snapshot = readExactNoteSnapshot(id2);
     if ("error" in snapshot) return errorResponse(snapshot.error);
     if (snapshot.contentHash !== expectedContentHash) {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
     }
-    const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
+    const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
     if (result.status === "conflict") {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
     }
     if (result.status !== "deleted") {
       return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
+        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
       );
     }
     const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
@@ -44301,7 +44998,7 @@ registerTool(
       `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
       {
         ok: true,
-        id,
+        id: id2,
         title: snapshot.note.title,
         wasShared: snapshot.note.shared ?? false,
         previousContentHash: expectedContentHash
@@ -44326,26 +45023,26 @@ registerTool(
       verified: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ id, folder, account }) => {
-    const note = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2, folder, account }) => {
+    const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return errorResponse(`Note with ID "${id2}" not found`);
     }
-    const success = notesManager.moveNoteById(id, folder, account);
+    const success = notesManager.moveNoteById(id2, folder, account);
     if (!success) {
       return errorResponse(
         `Failed to move note "${note.title}" to folder "${folder}". Folder may not exist.`
       );
     }
-    const readback = notesManager.getNoteById(id);
-    if (!readback || readback.id !== id) {
+    const readback = notesManager.getNoteById(id2);
+    if (!readback || readback.id !== id2) {
       return errorResponse(
-        `The move may have succeeded, but exact-ID readback failed. Inspect note ID ${id} before retrying.`
+        `The move may have succeeded, but exact-ID readback failed. Inspect note ID ${id2} before retrying.`
       );
     }
     return successResponse(`Note moved and verified: "${readback.title}" -> "${folder}"`, {
       ok: true,
-      id,
+      id: id2,
       title: readback.title,
       folder,
       verified: true
@@ -44740,13 +45437,13 @@ registerTool(
       count: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ id, title, account }) => {
-    if (id) {
-      const note2 = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2, title, account }) => {
+    if (id2) {
+      const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return errorResponse(`Note with ID "${id2}" not found`);
       }
-      const attachments2 = notesManager.listAttachmentsById(id);
+      const attachments2 = notesManager.listAttachmentsById(id2);
       if (attachments2.length === 0) {
         return successResponse(`Note "${note2.title}" has no attachments`, {
           attachments: [],
@@ -44804,18 +45501,18 @@ registerTool(
     if (notes.length === 0) {
       return errorResponse("No reviewed notes provided");
     }
-    const results = notes.map(({ id, expectedContentHash }) => {
-      const snapshot = readExactNoteSnapshot(id);
-      if ("error" in snapshot) return { id, success: false, error: snapshot.error };
+    const results = notes.map(({ id: id2, expectedContentHash }) => {
+      const snapshot = readExactNoteSnapshot(id2);
+      if ("error" in snapshot) return { id: id2, success: false, error: snapshot.error };
       if (snapshot.contentHash !== expectedContentHash) {
-        return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
+        return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
-      const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
-      if (result.status === "deleted") return { id, success: true };
+      const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
+      if (result.status === "deleted") return { id: id2, success: true };
       if (result.status === "conflict") {
-        return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
+        return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
-      return { id, success: false, error: "Delete result uncertain; inspect this exact ID" };
+      return { id: id2, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
@@ -45003,11 +45700,11 @@ registerTool(
       markdown: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id, title, account }) => {
-    if (id) {
-      const markdown2 = notesManager.getNoteMarkdownById(id);
+  withErrorHandling(({ id: id2, title, account }) => {
+    if (id2) {
+      const markdown2 = notesManager.getNoteMarkdownById(id2);
       if (!markdown2) {
-        return errorResponse(`Note with ID "${id}" not found or has no content`);
+        return errorResponse(`Note with ID "${id2}" not found or has no content`);
       }
       return successResponse(markdown2, { markdown: markdown2 });
     }
@@ -45036,17 +45733,17 @@ registerTool(
       total: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ id }) => {
-    const note = notesManager.getNoteById(id);
+  withErrorHandling(({ id: id2 }) => {
+    const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return errorResponse(`Note with ID "${id2}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(
         `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
       );
     }
-    const result = getChecklistItems(id);
+    const result = getChecklistItems(id2);
     if (!result.items) {
       return errorResponse(result.message || "Failed to read checklist state.");
     }
@@ -45078,13 +45775,13 @@ registerTool(
       smartFolderQuery: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id }) => {
-    const { metadata, message } = getNoteMetadata(id);
+  withErrorHandling(({ id: id2 }) => {
+    const { metadata, message } = getNoteMetadata(id2);
     if (!metadata) {
-      return errorResponse(message || `Failed to read metadata for note "${id}"`);
+      return errorResponse(message || `Failed to read metadata for note "${id2}"`);
     }
     const keys = Object.keys(metadata);
-    const summary = keys.length === 0 ? `No additional metadata is available for note "${id}" on this macOS version.` : keys.map((k) => `${k}: ${String(metadata[k])}`).join("\n");
+    const summary = keys.length === 0 ? `No additional metadata is available for note "${id2}" on this macOS version.` : keys.map((k) => `${k}: ${String(metadata[k])}`).join("\n");
     return successResponse(summary, metadata);
   }, "Error reading note metadata")
 );

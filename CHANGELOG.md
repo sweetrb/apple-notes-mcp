@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [2.8.9] - 2026-09-13
+
+### Added
+
+- A packaged Background Operations v5 Shortcut enables verified native append,
+  checklist and table creation, pin state changes, static Notes-link insertion,
+  and native tag removal without replacing the note body.
+- `get-capabilities` distinguishes implementation, live verification,
+  installation, and platform limitations for every background operation.
+- `replace-native-tag` adds and verifies the new tag before removing the old
+  across an explicit list of freshly read notes.
+
 ## [2.8.8] - 2026-09-13
 
 ### Added

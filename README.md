@@ -988,6 +988,58 @@ Lists all notes shared with collaborators.
 
 ---
 
+### Native background operations
+
+Install the signed workflows once as described in
+[`shortcuts/README.md`](shortcuts/README.md). Native writes never use UI
+automation or write directly to the Notes database. Every operation requires an
+exact note ID, a fresh `expectedContentHash`, and a distinctive existing
+`scopeText` so the Shortcut and server can independently resolve the same note.
+
+#### `get-capabilities`
+
+Reports which background operations are implemented, live-verified, installed,
+and currently available, with a specific reason for each unavailable operation.
+
+#### `append-native`
+
+Appends bounded plaintext, semantic HTML, or Markdown while preserving existing
+native objects. The regular `append-to-note` tool routes protected notes here
+when `scopeText` is supplied. Use a distinctive phrase of plain words without
+punctuation, hashtags, or paths because Notes search may not resolve them
+literally.
+
+#### `create-checklist-item`
+
+Appends one real unchecked Notes checklist item and verifies its native identity
+and text.
+
+#### `create-table`
+
+Appends a native table from rectangular string rows and verifies every decoded
+cell. It never substitutes a text table.
+
+#### `set-note-pinned`
+
+Sets an explicit pinned state after checking both the expected current state and
+the note revision. It does not rewrite the body.
+
+#### `remove-native-tags`
+
+Removes specified tags from one exact note while preserving unrelated tags and
+native objects. It does not delete global tag definitions.
+
+#### `replace-native-tag`
+
+Adds and verifies the new tag before removing the old tag on an explicit list of
+freshly read notes. Stops on the first uncertain result. Smart Folder rules are
+not changed.
+
+#### `insert-note-link`
+
+Retrieves another note's real deep link and appends it with a static label while
+preserving the target note's native objects.
+
 ## Usage Patterns
 
 ### Basic Workflow

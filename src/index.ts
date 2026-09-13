@@ -57,6 +57,8 @@ import {
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
+import { registerNativeOperations, VERIFIED_BACKGROUND } from "@/tools/nativeOperations.js";
+import { appendNative } from "@/services/backgroundNotes.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -86,6 +88,7 @@ const server = new McpServer({
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerNativeTagsBridge(server, notesManager);
+registerNativeOperations(server, notesManager);
 
 // =============================================================================
 // Response Helpers
@@ -564,6 +567,11 @@ registerTool(
         nativeTags: rich.nativeTags,
         richContentComplete: rich.complete,
         writable: rich.writable && stripped.strippedCount === 0,
+        supportedOperations: {
+          fullBodyReplace: rich.writable && stripped.strippedCount === 0,
+          nativeAppendImplemented: VERIFIED_BACKGROUND.has("append-native"),
+          requiresShortcut: !rich.writable,
+        },
         warning: rich.warning,
         hashtags,
         strippedImages: stripped.strippedCount,
@@ -606,6 +614,11 @@ registerTool(
       nativeTags: rich.nativeTags,
       richContentComplete: rich.complete,
       writable: rich.writable && stripped.strippedCount === 0,
+      supportedOperations: {
+        fullBodyReplace: rich.writable && stripped.strippedCount === 0,
+        nativeAppendImplemented: VERIFIED_BACKGROUND.has("append-native"),
+        requiresShortcut: !rich.writable,
+      },
       warning: rich.warning,
       hashtags,
       strippedImages: stripped.strippedCount,
@@ -1174,7 +1187,7 @@ registerTool(
   "append-to-note",
   {
     description:
-      "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title, the note changed since the read, or it has attachments or native objects.\nSafety: append rewrites the HTML body, so it uses exact-ID, rich revision, native-object, attachment, link, and readback guards. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
+      "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
@@ -1183,6 +1196,12 @@ registerTool(
         .min(1, "Content to append is required")
         .max(MAX.CONTENT)
         .describe("Text to append to the note body"),
+      scopeText: z
+        .string()
+        .min(12)
+        .max(500)
+        .optional()
+        .describe("Existing unique phrase required for native append to protected notes"),
       position: z
         .enum(["after", "before"])
         .optional()
@@ -1220,6 +1239,7 @@ registerTool(
       position = "after",
       separator = "\n\n",
       format = "plaintext",
+      scopeText,
     }) => {
       // Helper: convert new content to HTML block(s) and separator to HTML.
       // Notes stores its body as HTML; reading plaintext and writing back as
@@ -1253,10 +1273,24 @@ registerTool(
         return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
       if (!snapshot.rich.writable) {
-        return errorResponse(
-          snapshot.rich.warning ||
-            `Note "${snapshot.note.title}" contains native objects that cannot be preserved by a full-body append.`
-        );
+        if (separator !== "\n\n")
+          return errorResponse("Native append supports the default blank-line separator only");
+        if (position !== "after")
+          return errorResponse("Native append supports the end of a note only");
+        if (!scopeText)
+          return errorResponse("Provide scopeText: a unique existing phrase for native append");
+        if (!VERIFIED_BACKGROUND.has("append-native"))
+          return errorResponse(
+            "Native append has not passed live validation; see get-capabilities"
+          );
+        const result = appendNative(notesManager, {
+          id,
+          expectedContentHash,
+          scopeText,
+          content,
+          format,
+        });
+        return successResponse("Native append verified without replacing existing objects", result);
       }
       const attachments = notesManager.listAttachmentsById(id);
       if (attachments.length > 0) {
