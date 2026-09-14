@@ -42,7 +42,7 @@ Use this skill when the user:
 | `list-notes` | List all notes or notes in a folder |
 | `show-note` | Reveal a note in the Notes.app UI by ID |
 | `get-selected-notes` | Read the notes currently selected in Notes.app |
-| `export-notes-json` | Export all accounts, folders, and notes as JSON |
+| `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
 
 ### Folder Operations
 

@@ -687,6 +687,18 @@ export interface ExportedNote {
   shared: boolean;
   /** Whether note is password protected */
   passwordProtected: boolean;
+  /**
+   * Set when this note alone exceeded the export response budget and its
+   * oversized inline images were replaced with text placeholders; the value is
+   * how many were replaced (#162).
+   */
+  strippedImages?: number;
+  /**
+   * True when this note alone exceeded the export response budget even without
+   * its large images, so `content` (and `plaintext`, if that still did not fit)
+   * is returned empty. Read the note with get-note-content instead (#162).
+   */
+  contentOmitted?: boolean;
 }
 
 /**
@@ -731,8 +743,48 @@ export interface NotesExport {
   accounts: ExportedAccount[];
   /** Summary statistics */
   summary: {
+    /** Notes included in this export (this page) */
     totalNotes: number;
     totalFolders: number;
     totalAccounts: number;
   };
+  /** Which slice of the library this export holds (#162) */
+  page: ExportPage;
+}
+
+/**
+ * Position of one export page within the whole library (#162).
+ *
+ * Notes are numbered 0..totalAvailable-1 in account, folder, note order, after
+ * any modifiedSince filter.
+ */
+export interface ExportPage {
+  /** Position of the first note this page considered */
+  offset: number;
+  /** Maximum notes this page could hold */
+  limit: number;
+  /** Notes in the library (after modifiedSince) */
+  totalAvailable: number;
+  /** Notes included in this page */
+  returned: number;
+  /** Offset for the next page; absent on the last page */
+  nextOffset?: number;
+  /** Whether notes remain after this page */
+  hasMore: boolean;
+  /** Whether the page closed early to stay under the response size budget */
+  stoppedAtSizeLimit: boolean;
+}
+
+/**
+ * Options for exportNotesAsJson (#162).
+ */
+export interface ExportNotesOptions {
+  /** Position to start from (default 0) */
+  offset?: number;
+  /** Maximum notes in the page (default DEFAULT_EXPORT_PAGE_SIZE) */
+  limit?: number;
+  /** ISO 8601 date; only notes modified on or after it are exported */
+  modifiedSince?: string;
+  /** Response size budget in bytes (default exportMaxResponseBytes()) */
+  maxResponseBytes?: number;
 }

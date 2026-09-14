@@ -29,7 +29,11 @@ import {
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { AppleNotesManager } from "@/services/appleNotesManager.js";
+import {
+  AppleNotesManager,
+  DEFAULT_EXPORT_PAGE_SIZE,
+  exportMaxResponseBytes,
+} from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
@@ -2312,28 +2316,89 @@ registerTool(
 
 // --- export-notes-json ---
 
+/**
+ * Bytes set aside for everything in an export response that is not a note:
+ * the account/folder skeleton, summary, page info, and the prose text block.
+ */
+const EXPORT_RESPONSE_OVERHEAD_BYTES = 64 * 1024;
+
+const formatMegabytes = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
 registerTool(
   "export-notes-json",
   {
     description:
-      "Use when: exporting the entire notes library as structured JSON for backup or bulk processing.\nReturns: a summary plus the full JSON of all notes, folders, and accounts.\nDo not use when: you need a single note (get-note-content) — this reads everything and can be large.\nRead-only.",
-    inputSchema: {},
+      "Use when: exporting notes as structured JSON for backup, migration, or bulk processing.\nReturns: one page of notes (default 50) with metadata, HTML content, and plaintext, grouped by account and folder, plus page info; while page.hasMore is true, call again with offset set to page.nextOffset.\nDo not use when: you need one note (get-note-content) or only titles and ids (list-notes).\nNote: a page stops early to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES, default 8 MB), and a note too large on its own comes back with strippedImages or contentOmitted set. Read-only.",
+    inputSchema: {
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "0-based position to start from, counting notes in account, folder, note order (default 0). Pass the previous page's page.nextOffset."
+        ),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(500)
+        .optional()
+        .describe(
+          `Maximum notes in this page (default ${DEFAULT_EXPORT_PAGE_SIZE}). A page holds fewer when it reaches the response size limit; lower it if your client caps tool output.`
+        ),
+      modifiedSince: z
+        .string()
+        .max(64)
+        .optional()
+        .describe(
+          "ISO 8601 date string; export only notes modified on or after this date (e.g., '2025-01-01'). Keep the same value while paging."
+        ),
+    },
     outputSchema: {
       exportDate: z.string().optional(),
       version: z.string().optional(),
       accounts: z.array(z.object({}).passthrough()).optional(),
       summary: z.object({}).passthrough().optional(),
+      page: z.object({}).passthrough().optional(),
     },
   },
-  withErrorHandling(() => {
-    const exportData = notesManager.exportNotesAsJson();
-    const { summary } = exportData;
+  withErrorHandling(({ offset, limit, modifiedSince }) => {
+    const maxResponseBytes = exportMaxResponseBytes();
+    const exportData = notesManager.exportNotesAsJson({
+      offset,
+      limit,
+      modifiedSince,
+      maxResponseBytes: Math.max(1, maxResponseBytes - EXPORT_RESPONSE_OVERHEAD_BYTES),
+    });
+    const { summary, page } = exportData;
 
-    return {
+    const since = modifiedSince ? ` modified since ${modifiedSince}` : "";
+    const lines = [
+      `Exported ${summary.totalNotes} of ${page.totalAvailable} notes${since} (offset ${page.offset}, limit ${page.limit}) from ${summary.totalFolders} folders across ${summary.totalAccounts} account(s).`,
+    ];
+    if (page.hasMore) {
+      lines.push(
+        `More notes remain: call export-notes-json again with offset ${page.nextOffset}${modifiedSince ? " and the same modifiedSince" : ""}.` +
+          (page.stoppedAtSizeLimit
+            ? ` This page stopped early to stay under the ${formatMegabytes(maxResponseBytes)} response limit.`
+            : "")
+      );
+    }
+    const degraded = exportData.accounts
+      .flatMap((a) => a.folders.flatMap((f) => f.notes))
+      .filter((n) => n.strippedImages || n.contentOmitted);
+    if (degraded.length > 0) {
+      lines.push(
+        `Too large to return whole, so oversized inline images were replaced (strippedImages) or the body was left out (contentOmitted): ${degraded.map((n) => n.id).join(", ")}. Read these with get-note-content, and their files with list-attachments and save-attachment.`
+      );
+    }
+
+    const response: ToolResponse = {
       content: [
         {
           type: "text" as const,
-          text: `Exported ${summary.totalNotes} notes from ${summary.totalFolders} folders across ${summary.totalAccounts} account(s).\n\nFull JSON export:`,
+          text: `${lines.join("\n")}\n\nFull JSON export:`,
         },
         {
           type: "text" as const,
@@ -2342,6 +2407,17 @@ registerTool(
       ],
       structuredContent: { ...exportData },
     };
+
+    // Last line of defence (#162): the manager budgets notes by an upper-bound
+    // estimate, but never hand the transport a message the client would drop
+    // the connection over — say so instead.
+    const responseBytes = Buffer.byteLength(JSON.stringify(response));
+    if (responseBytes > maxResponseBytes) {
+      return errorResponse(
+        `Error exporting notes: this page is ${formatMegabytes(responseBytes)}, over the ${formatMegabytes(maxResponseBytes)} response limit, so it was not sent. Call export-notes-json again with offset ${page.offset} and a smaller limit (for example ${Math.max(1, Math.floor(page.returned / 2))}), or raise APPLE_NOTES_MCP_EXPORT_MAX_BYTES if your MCP client accepts larger messages.`
+      );
+    }
+    return response;
   }, "Error exporting notes")
 );
 

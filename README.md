@@ -815,11 +815,41 @@ after the note's actual container folder ID matches the destination folder ID.
 
 #### `export-notes-json`
 
-Exports all notes as a JSON structure.
+Exports notes as JSON — metadata, HTML content, and plaintext, grouped by account and folder — one page at a time. A whole library rarely fits in one MCP message (note bodies embed images as base64), so each call returns a page and says where the next one starts.
 
-**Parameters:** None
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `offset` | number | No | 0-based position to start from, counting notes in account → folder → note order (default `0`). Pass the previous page's `page.nextOffset` |
+| `limit` | number | No | Maximum notes in this page (default `50`, max `500`). A page holds fewer when it reaches the response size limit |
+| `modifiedSince` | string | No | ISO 8601 date string; export only notes modified on or after this date (e.g., `"2025-01-01"`). Keep the same value while paging |
 
-**Returns:** Complete JSON export with all accounts, folders, and notes including metadata.
+**Example - First page:**
+```json
+{}
+```
+
+**Example - A later page of an incremental backup:**
+```json
+{
+  "offset": 50,
+  "modifiedSince": "2025-06-01"
+}
+```
+
+**Returns:** `exportDate`, `version`, `accounts` (every account and folder, holding the notes that fall in this page), `summary` (`totalNotes` in this page, `totalFolders`, `totalAccounts`), and `page`:
+
+| Field | Description |
+|-------|-------------|
+| `offset` / `limit` | The window that was applied |
+| `totalAvailable` | Notes in the library, after `modifiedSince` |
+| `returned` | Notes in this page |
+| `nextOffset` | Where the next page starts; absent on the last page |
+| `hasMore` | `true` until the last page — call again with `offset` set to `nextOffset` |
+| `stoppedAtSizeLimit` | `true` when the page closed early to stay under the response size limit |
+
+**Size limit:** each response stays under `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` (default 8 MB), below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger without passing on any error text. A note too large to fit on its own is still returned: its oversized inline images are replaced with placeholders (`strippedImages`), or failing that its HTML body, and if necessary its plaintext, is left empty with `contentOmitted: true`. Read such a note with `get-note-content`, and its files with `list-attachments` / `save-attachment`. Lower `limit` if your MCP client caps tool output below that size.
+
+**Paging:** positions are worked out on every call, so notes created, deleted, or moved between calls can shift a page. Page through promptly, or use `modifiedSince` for incremental backups.
 
 ---
 
@@ -1189,6 +1219,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
+| `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |

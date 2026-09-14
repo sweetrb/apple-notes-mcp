@@ -39484,6 +39484,46 @@ function getChecklistItems(noteId3) {
   return { items };
 }
 
+// src/utils/inlineImages.ts
+var DEFAULT_MAX_INLINE_IMAGE_BYTES = 256 * 1024;
+function maxInlineImageBytes(env = process.env) {
+  const raw = env.APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES;
+  if (raw !== void 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return DEFAULT_MAX_INLINE_IMAGE_BYTES;
+}
+function formatBytes(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+var INLINE_IMG_RE = /<img\b[^>]*\bsrc\s*=\s*(["'])data:([^;'"]+);base64,([^"']*)\1[^>]*\/?>/gi;
+function stripLargeInlineImages(html, maxBytes = maxInlineImageBytes()) {
+  let strippedCount = 0;
+  let strippedBytes = 0;
+  const result = html.replace(INLINE_IMG_RE, (tag, _quote, mediaType, b64) => {
+    if (b64.length <= maxBytes) return tag;
+    const decodedBytes = Math.floor(b64.length * 3 / 4);
+    strippedCount += 1;
+    strippedBytes += decodedBytes;
+    return `<div>[inline image omitted: ${mediaType}, ~${formatBytes(
+      decodedBytes
+    )}; use list-attachments and save-attachment or fetch-attachment to export it]</div>`;
+  });
+  return { html: result, strippedCount, strippedBytes };
+}
+function strippedImagesWarning(stripped) {
+  if (stripped.strippedCount === 0) return null;
+  const plural = stripped.strippedCount === 1 ? "image" : "images";
+  return `
+
+\u26A0\uFE0F ${stripped.strippedCount} inline ${plural} (~${formatBytes(
+    stripped.strippedBytes
+  )} decoded) exceeded the per-image inline cap and ${stripped.strippedCount === 1 ? "was" : "were"} replaced with placeholders so the response stays within MCP message limits. This body is therefore lossy \u2014 do NOT write it back with update-note, or the real images are replaced by the placeholder text; use append-to-note to add content. The images are still in the note: use list-attachments with save-attachment or fetch-attachment to export them, or raise APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES.`;
+}
+
 // src/utils/noteRichText.ts
 import { execFileSync as execFileSync3 } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -39934,6 +39974,35 @@ var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(ASCII character 31)";
 var AS_RECORD_SEP = "(ASCII character 30)";
+var AS_FIELD_SEP_LOCAL = "(character id 31)";
+var AS_RECORD_SEP_LOCAL = "(character id 30)";
+var DEFAULT_EXPORT_PAGE_SIZE = 50;
+var DEFAULT_EXPORT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+function exportMaxResponseBytes(env = process.env) {
+  const raw = env.APPLE_NOTES_MCP_EXPORT_MAX_BYTES;
+  if (raw !== void 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return DEFAULT_EXPORT_MAX_RESPONSE_BYTES;
+}
+function estimateExportNoteBytes(note) {
+  return Buffer.byteLength(JSON.stringify(note)) + Buffer.byteLength(JSON.stringify(JSON.stringify(note, null, 2))) + 256;
+}
+function fitExportNoteToBudget(note, maxBytes) {
+  const stripped = stripLargeInlineImages(note.content);
+  if (stripped.strippedCount > 0) {
+    const withPlaceholders = {
+      ...note,
+      content: stripped.html,
+      strippedImages: stripped.strippedCount
+    };
+    if (estimateExportNoteBytes(withPlaceholders) <= maxBytes) return withPlaceholders;
+  }
+  const withoutHtml = { ...note, content: "", contentOmitted: true };
+  if (estimateExportNoteBytes(withoutHtml) <= maxBytes) return withoutHtml;
+  return { ...withoutHtml, plaintext: "" };
+}
 function executeMutationAppleScript(script) {
   return executeAppleScript(script, { maxRetries: 1 });
 }
@@ -40729,8 +40798,13 @@ var AppleNotesManager = class {
         set resultList to {}
         if fetchCount > 0 then
           try
-            set noteNames to name of ${slicedSource}
-            set noteIds to id of ${slicedSource}
+            if fetchCount is totalCount then
+              set noteNames to name of ${fullSource}
+              set noteIds to id of ${fullSource}
+            else
+              set noteNames to name of ${slicedSource}
+              set noteIds to id of ${slicedSource}
+            end if
           on error errMsg number errNum
             if errNum is -1719 or errNum is -1728 then
               error "${BULK_LIST_MUTATION_ERROR}"
@@ -40740,11 +40814,11 @@ var AppleNotesManager = class {
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames
-            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        return (totalCount as text) & ${AS_RECORD_SEP_LOCAL} & (resultList as text)
       `;
     }
     const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
@@ -40761,9 +40835,9 @@ var AppleNotesManager = class {
         ${dateFetch}${countGuard("noteIds")}
         ${dateCountGuard}set resultList to {}
         repeat with i from 1 to count of noteNames
-          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)${dateGuardClose}
         end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
         return resultList as text
       `;
   }
@@ -40877,18 +40951,32 @@ var AppleNotesManager = class {
     const sharedNotes = [];
     const accounts = this.listAccounts();
     for (const account of accounts) {
+      const countGuard = (listVar) => `if (count of ${listVar}) is not (count of noteShared) then error "${BULK_LIST_MUTATION_ERROR}"`;
       const script = buildAccountScopedScript(
         { account: account.name },
         `
+        set noteShared to shared of notes
         set resultList to {}
-        repeat with n in notes
-          if shared of n is true then
-            set cd to creation date of n
-            set md to modification date of n
-            set end of resultList to (name of n) & ${AS_FIELD_SEP} & (id of n) & ${AS_FIELD_SEP} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP} & (shared of n as text) & ${AS_FIELD_SEP} & (password protected of n as text)
-          end if
-        end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        if noteShared contains true then
+          set noteNames to name of notes
+          set noteIds to id of notes
+          set noteCreated to creation date of notes
+          set noteModified to modification date of notes
+          set noteLocked to password protected of notes
+          ${countGuard("noteIds")}
+          ${countGuard("noteNames")}
+          ${countGuard("noteCreated")}
+          ${countGuard("noteModified")}
+          ${countGuard("noteLocked")}
+          repeat with i from 1 to count of noteShared
+            if (item i of noteShared) is true then
+              set cd to item i of noteCreated
+              set md to item i of noteModified
+              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds) & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP_LOCAL} & "true" & ${AS_FIELD_SEP_LOCAL} & ((item i of noteLocked) as text)
+            end if
+          end repeat
+        end if
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
         return resultList as text
         `
       );
@@ -42117,31 +42205,57 @@ var AppleNotesManager = class {
     return text.replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#92;/g, "\\").replace(/&amp;/g, "&").replace(/\n{3,}/g, "\n\n").trim();
   }
   /**
-   * Exports all notes as a JSON structure for backup/migration.
+   * Exports notes as a JSON structure for backup/migration, one page at a time.
    *
    * Exports complete note data including:
    * - Metadata (id, title, dates, flags)
    * - Content (HTML and plaintext)
    * - Organization (folder, account)
    *
+   * Notes are numbered 0..N-1 in account, folder, note order, after the optional
+   * `modifiedSince` filter. A call returns the window starting at `offset`, at
+   * most `limit` notes (DEFAULT_EXPORT_PAGE_SIZE by default), and closes the page
+   * early once the next note would push the estimated tool response past
+   * `maxResponseBytes`. Every account and folder is listed on every page so the
+   * structure is stable; `page.nextOffset` says where to continue. Only the
+   * page's notes have their metadata and bodies read.
+   *
+   * Why pages (#162): the whole library does not fit in one MCP message. A
+   * 359-note library holding inline images serialized to a 95 MB response, and
+   * the MCP SDK stdio reader closes the connection on any message over 10 MB, so
+   * the caller saw a bare "Connection closed" with no error text.
+   *
+   * A note that alone exceeds the budget is degraded rather than dropped:
+   * oversized inline images become placeholders (`strippedImages`), or failing
+   * that its HTML, and if necessary its plaintext, is omitted (`contentOmitted`).
+   *
    * Note: Password-protected notes are included with metadata only (no content).
    *
-   * @returns JSON-serializable export object
+   * @param options - offset, limit, modifiedSince, and maxResponseBytes
+   * @returns JSON-serializable export object for the requested page
    *
    * @example
    * ```typescript
-   * const snapshot = manager.exportNotesAsJson();
-   * fs.writeFileSync('notes-backup.json', JSON.stringify(snapshot, null, 2));
+   * let offset: number | undefined = 0;
+   * while (offset !== undefined) {
+   *   const snapshot = manager.exportNotesAsJson({ offset });
+   *   fs.appendFileSync("notes-backup.jsonl", JSON.stringify(snapshot) + "\n");
+   *   offset = snapshot.page.nextOffset;
+   * }
    * ```
    */
-  exportNotesAsJson() {
+  exportNotesAsJson(options = {}) {
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const limit = Math.max(1, Math.floor(options.limit ?? DEFAULT_EXPORT_PAGE_SIZE));
+    const maxResponseBytes = options.maxResponseBytes ?? exportMaxResponseBytes();
+    const exportDate = (/* @__PURE__ */ new Date()).toISOString();
     const accounts = this.listAccounts();
-    const exportData = {
-      exportDate: (/* @__PURE__ */ new Date()).toISOString(),
-      version: "1.0",
-      accounts: [],
-      summary: { totalNotes: 0, totalFolders: 0, totalAccounts: accounts.length }
-    };
+    const exportedAccounts = [];
+    const summary = { totalNotes: 0, totalFolders: 0, totalAccounts: accounts.length };
+    let position = 0;
+    let usedBytes = 0;
+    let nextOffset;
+    let stoppedAtSizeLimit = false;
     for (const account of accounts) {
       const folders = this.listFolders(account.name);
       const accountData = {
@@ -42153,8 +42267,14 @@ var AppleNotesManager = class {
           name: folder.name,
           notes: []
         };
-        const noteRefs = this.listNoteRefs(account.name, folder.name);
+        const noteRefs = this.listNoteRefs(account.name, folder.name, options.modifiedSince);
         for (const ref of noteRefs) {
+          const index = position++;
+          if (index < offset || nextOffset !== void 0) continue;
+          if (summary.totalNotes >= limit) {
+            nextOffset = index;
+            continue;
+          }
           const note = this.getNoteById(ref.id);
           if (!note) continue;
           note.account = account.name;
@@ -42162,15 +42282,41 @@ var AppleNotesManager = class {
           if (!note.passwordProtected) {
             content = this.getNoteContentById(ref.id);
           }
-          folderData.notes.push(this.exportNote(note, content));
-          exportData.summary.totalNotes++;
+          let exported = this.exportNote(note, content);
+          let bytes = estimateExportNoteBytes(exported);
+          if (usedBytes + bytes > maxResponseBytes) {
+            if (summary.totalNotes > 0) {
+              nextOffset = index;
+              stoppedAtSizeLimit = true;
+              continue;
+            }
+            exported = fitExportNoteToBudget(exported, maxResponseBytes);
+            bytes = estimateExportNoteBytes(exported);
+          }
+          folderData.notes.push(exported);
+          usedBytes += bytes;
+          summary.totalNotes++;
         }
         accountData.folders.push(folderData);
-        exportData.summary.totalFolders++;
+        summary.totalFolders++;
       }
-      exportData.accounts.push(accountData);
+      exportedAccounts.push(accountData);
     }
-    return exportData;
+    return {
+      exportDate,
+      version: "1.0",
+      accounts: exportedAccounts,
+      summary,
+      page: {
+        offset,
+        limit,
+        totalAvailable: position,
+        returned: summary.totalNotes,
+        ...nextOffset !== void 0 ? { nextOffset } : {},
+        hasMore: nextOffset !== void 0,
+        stoppedAtSizeLimit
+      }
+    };
   }
   // ===========================================================================
   // Markdown Conversion
@@ -42519,46 +42665,6 @@ function parseHashtags(body) {
     }
   }
   return result;
-}
-
-// src/utils/inlineImages.ts
-var DEFAULT_MAX_INLINE_IMAGE_BYTES = 256 * 1024;
-function maxInlineImageBytes(env = process.env) {
-  const raw = env.APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES;
-  if (raw !== void 0) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return DEFAULT_MAX_INLINE_IMAGE_BYTES;
-}
-function formatBytes(bytes) {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
-}
-var INLINE_IMG_RE = /<img\b[^>]*\bsrc\s*=\s*(["'])data:([^;'"]+);base64,([^"']*)\1[^>]*\/?>/gi;
-function stripLargeInlineImages(html, maxBytes = maxInlineImageBytes()) {
-  let strippedCount = 0;
-  let strippedBytes = 0;
-  const result = html.replace(INLINE_IMG_RE, (tag, _quote, mediaType, b64) => {
-    if (b64.length <= maxBytes) return tag;
-    const decodedBytes = Math.floor(b64.length * 3 / 4);
-    strippedCount += 1;
-    strippedBytes += decodedBytes;
-    return `<div>[inline image omitted: ${mediaType}, ~${formatBytes(
-      decodedBytes
-    )}; use list-attachments and save-attachment or fetch-attachment to export it]</div>`;
-  });
-  return { html: result, strippedCount, strippedBytes };
-}
-function strippedImagesWarning(stripped) {
-  if (stripped.strippedCount === 0) return null;
-  const plural = stripped.strippedCount === 1 ? "image" : "images";
-  return `
-
-\u26A0\uFE0F ${stripped.strippedCount} inline ${plural} (~${formatBytes(
-    stripped.strippedBytes
-  )} decoded) exceeded the per-image inline cap and ${stripped.strippedCount === 1 ? "was" : "were"} replaced with placeholders so the response stays within MCP message limits. This body is therefore lossy \u2014 do NOT write it back with update-note, or the real images are replaced by the placeholder text; use append-to-note to add content. The images are still in the note: use list-attachments with save-attachment or fetch-attachment to export them, or raise APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES.`;
 }
 
 // src/utils/updateResponseTitle.ts
@@ -45744,26 +45850,60 @@ registerTool(
     });
   }, "Error showing attachment")
 );
+var EXPORT_RESPONSE_OVERHEAD_BYTES = 64 * 1024;
+var formatMegabytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 registerTool(
   "export-notes-json",
   {
-    description: "Use when: exporting the entire notes library as structured JSON for backup or bulk processing.\nReturns: a summary plus the full JSON of all notes, folders, and accounts.\nDo not use when: you need a single note (get-note-content) \u2014 this reads everything and can be large.\nRead-only.",
-    inputSchema: {},
+    description: "Use when: exporting notes as structured JSON for backup, migration, or bulk processing.\nReturns: one page of notes (default 50) with metadata, HTML content, and plaintext, grouped by account and folder, plus page info; while page.hasMore is true, call again with offset set to page.nextOffset.\nDo not use when: you need one note (get-note-content) or only titles and ids (list-notes).\nNote: a page stops early to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES, default 8 MB), and a note too large on its own comes back with strippedImages or contentOmitted set. Read-only.",
+    inputSchema: {
+      offset: external_exports.number().int().min(0).optional().describe(
+        "0-based position to start from, counting notes in account, folder, note order (default 0). Pass the previous page's page.nextOffset."
+      ),
+      limit: external_exports.number().int().positive().max(500).optional().describe(
+        `Maximum notes in this page (default ${DEFAULT_EXPORT_PAGE_SIZE}). A page holds fewer when it reaches the response size limit; lower it if your client caps tool output.`
+      ),
+      modifiedSince: external_exports.string().max(64).optional().describe(
+        "ISO 8601 date string; export only notes modified on or after this date (e.g., '2025-01-01'). Keep the same value while paging."
+      )
+    },
     outputSchema: {
       exportDate: external_exports.string().optional(),
       version: external_exports.string().optional(),
       accounts: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      summary: external_exports.object({}).passthrough().optional()
+      summary: external_exports.object({}).passthrough().optional(),
+      page: external_exports.object({}).passthrough().optional()
     }
   },
-  withErrorHandling(() => {
-    const exportData = notesManager.exportNotesAsJson();
-    const { summary } = exportData;
-    return {
+  withErrorHandling(({ offset, limit, modifiedSince }) => {
+    const maxResponseBytes = exportMaxResponseBytes();
+    const exportData = notesManager.exportNotesAsJson({
+      offset,
+      limit,
+      modifiedSince,
+      maxResponseBytes: Math.max(1, maxResponseBytes - EXPORT_RESPONSE_OVERHEAD_BYTES)
+    });
+    const { summary, page } = exportData;
+    const since = modifiedSince ? ` modified since ${modifiedSince}` : "";
+    const lines = [
+      `Exported ${summary.totalNotes} of ${page.totalAvailable} notes${since} (offset ${page.offset}, limit ${page.limit}) from ${summary.totalFolders} folders across ${summary.totalAccounts} account(s).`
+    ];
+    if (page.hasMore) {
+      lines.push(
+        `More notes remain: call export-notes-json again with offset ${page.nextOffset}${modifiedSince ? " and the same modifiedSince" : ""}.` + (page.stoppedAtSizeLimit ? ` This page stopped early to stay under the ${formatMegabytes(maxResponseBytes)} response limit.` : "")
+      );
+    }
+    const degraded = exportData.accounts.flatMap((a) => a.folders.flatMap((f) => f.notes)).filter((n) => n.strippedImages || n.contentOmitted);
+    if (degraded.length > 0) {
+      lines.push(
+        `Too large to return whole, so oversized inline images were replaced (strippedImages) or the body was left out (contentOmitted): ${degraded.map((n) => n.id).join(", ")}. Read these with get-note-content, and their files with list-attachments and save-attachment.`
+      );
+    }
+    const response = {
       content: [
         {
           type: "text",
-          text: `Exported ${summary.totalNotes} notes from ${summary.totalFolders} folders across ${summary.totalAccounts} account(s).
+          text: `${lines.join("\n")}
 
 Full JSON export:`
         },
@@ -45774,6 +45914,13 @@ Full JSON export:`
       ],
       structuredContent: { ...exportData }
     };
+    const responseBytes = Buffer.byteLength(JSON.stringify(response));
+    if (responseBytes > maxResponseBytes) {
+      return errorResponse(
+        `Error exporting notes: this page is ${formatMegabytes(responseBytes)}, over the ${formatMegabytes(maxResponseBytes)} response limit, so it was not sent. Call export-notes-json again with offset ${page.offset} and a smaller limit (for example ${Math.max(1, Math.floor(page.returned / 2))}), or raise APPLE_NOTES_MCP_EXPORT_MAX_BYTES if your MCP client accepts larger messages.`
+      );
+    }
+    return response;
   }, "Error exporting notes")
 );
 registerTool(

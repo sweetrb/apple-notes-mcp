@@ -1,5 +1,39 @@
 ## [Unreleased]
 
+## [2.8.11] - 2026-09-14
+
+### Fixed
+
+- `export-notes-json` no longer drops the MCP connection on a large library
+  (#162). It sent the whole library as one JSON-RPC message, carried twice
+  (as `structuredContent` and as a JSON text block): 95 MB for a 359-note
+  library with inline images. MCP SDK stdio clients, Claude Code included,
+  close the connection on any message over 10 MB, so the caller saw only
+  `Connection closed` although the server had finished normally.
+- `list-notes` no longer spends two Apple Events on every returned note
+  (#162). Its record separators used `ASCII character`, a Standard Additions
+  command that Notes.app answers as a separate round trip each time; they now
+  use `character id`, which AppleScript evaluates locally. A `limit` that
+  covers the whole collection also reads it directly instead of through a
+  slower `notes 1 thru N` range. On a 359-note library an unbounded listing
+  went from 3.3 s to 0.23 s and `limit: 700` from 5.5 s to 0.23 s, keeping
+  larger libraries clear of `AppleEvent timed out`.
+- `list-shared-notes` reads sharing state with bulk property reads instead of
+  one Apple Event per note: 4.2 s to 0.9 s on the same library, same result.
+
+### Changed
+
+- `export-notes-json` returns pages. New optional `offset`, `limit` (default
+  50, max 500) and `modifiedSince` parameters, and a `page` object with
+  `totalAvailable`, `returned`, `nextOffset`, `hasMore` and
+  `stoppedAtSizeLimit`; call again with `offset` set to `page.nextOffset`
+  while `hasMore` is true. Each page stays under
+  `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` (default 8 MB), and a note too large on
+  its own comes back with oversized inline images replaced (`strippedImages`)
+  or its body omitted (`contentOmitted`) instead of failing. Only the page's
+  notes are read. With no arguments it now returns the first 50 notes rather
+  than the entire library.
+
 ## [2.8.10] - 2026-09-13
 
 ### Added

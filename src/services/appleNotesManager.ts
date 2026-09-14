@@ -31,6 +31,7 @@ import type {
   ExportedAccount,
   ExportedFolder,
   ExportedNote,
+  ExportNotesOptions,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -38,6 +39,7 @@ import {
   isPermissionDenied,
 } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
+import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import {
   assertSafeSavePath,
@@ -68,6 +70,82 @@ const FIELD_SEP = "\x1f";
 const RECORD_SEP = "\x1e";
 const AS_FIELD_SEP = "(ASCII character 31)";
 const AS_RECORD_SEP = "(ASCII character 30)";
+
+/**
+ * The same separators, evaluated without an Apple Event, for scripts that
+ * build one record per note (#162). `ASCII character` is a Standard Additions
+ * command, so inside a `tell application "Notes"` block every evaluation is
+ * dispatched to Notes.app as its own Apple Event: 718 evaluations took 6.12 s
+ * there, against 0.05 s for `character id`, which is core AppleScript. A
+ * per-record loop over a whole library paid two round trips per note, which on
+ * a ~600-note library ran into the AppleEvent timeout. Same characters, same
+ * output.
+ */
+const AS_FIELD_SEP_LOCAL = "(character id 31)";
+const AS_RECORD_SEP_LOCAL = "(character id 30)";
+
+// =============================================================================
+// Export paging (#162)
+// =============================================================================
+
+/** Notes per export-notes-json page when the caller gives no limit. */
+export const DEFAULT_EXPORT_PAGE_SIZE = 50;
+
+/**
+ * Default ceiling on one export-notes-json response: 8 MiB, leaving headroom
+ * under the 10 MiB per-message limit of the MCP SDK stdio reader
+ * (STDIO_DEFAULT_MAX_BUFFER_SIZE). A client handed a larger message closes the
+ * connection before any error text can reach the caller (#162).
+ */
+const DEFAULT_EXPORT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * The export response ceiling in bytes: APPLE_NOTES_MCP_EXPORT_MAX_BYTES when it
+ * is a positive number, otherwise the 8 MiB default.
+ */
+export function exportMaxResponseBytes(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.APPLE_NOTES_MCP_EXPORT_MAX_BYTES;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return DEFAULT_EXPORT_MAX_RESPONSE_BYTES;
+}
+
+/**
+ * Upper-bound estimate of the bytes one exported note adds to the
+ * export-notes-json tool response. The response carries every note twice: once
+ * in structuredContent, and once inside a pretty-printed JSON text block that
+ * the JSON-RPC envelope escapes a second time. The fixed 256 bytes cover the
+ * deeper indentation and separators of that nested pretty-printed copy.
+ */
+export function estimateExportNoteBytes(note: ExportedNote): number {
+  return (
+    Buffer.byteLength(JSON.stringify(note)) +
+    Buffer.byteLength(JSON.stringify(JSON.stringify(note, null, 2))) +
+    256
+  );
+}
+
+/**
+ * Shrinks a note that on its own exceeds the export budget, giving up the least
+ * first: oversized inline images become placeholders, then the HTML body is
+ * dropped, then the plaintext too. Metadata always survives.
+ */
+function fitExportNoteToBudget(note: ExportedNote, maxBytes: number): ExportedNote {
+  const stripped = stripLargeInlineImages(note.content);
+  if (stripped.strippedCount > 0) {
+    const withPlaceholders: ExportedNote = {
+      ...note,
+      content: stripped.html,
+      strippedImages: stripped.strippedCount,
+    };
+    if (estimateExportNoteBytes(withPlaceholders) <= maxBytes) return withPlaceholders;
+  }
+  const withoutHtml: ExportedNote = { ...note, content: "", contentOmitted: true };
+  if (estimateExportNoteBytes(withoutHtml) <= maxBytes) return withoutHtml;
+  return { ...withoutHtml, plaintext: "" };
+}
 
 /**
  * Run an AppleScript that changes Notes.app or writes an attachment exactly
@@ -1486,6 +1564,11 @@ export class AppleNotesManager {
       // remapped to the retryable mutation error. Every other error number
       // (AppleEvent timeout -1712, lost connection, permissions) is rethrown
       // unchanged so its honest message and mapping survive. (#86)
+      //
+      // When the limit covers the whole collection the range adds nothing but
+      // cost: Notes resolves a "notes 1 thru N" range about 8x slower than the
+      // plain whole-collection read (1.3 s versus 0.16 s for 359 notes), so
+      // that case reads the collection directly. (#162)
       const slicedSource = folderRef
         ? `(notes 1 thru fetchCount of ${folderRef})`
         : `(notes 1 thru fetchCount)`;
@@ -1496,8 +1579,13 @@ export class AppleNotesManager {
         set resultList to {}
         if fetchCount > 0 then
           try
-            set noteNames to name of ${slicedSource}
-            set noteIds to id of ${slicedSource}
+            if fetchCount is totalCount then
+              set noteNames to name of ${fullSource}
+              set noteIds to id of ${fullSource}
+            else
+              set noteNames to name of ${slicedSource}
+              set noteIds to id of ${slicedSource}
+            end if
           on error errMsg number errNum
             if errNum is -1719 or errNum is -1728 then
               error "${BULK_LIST_MUTATION_ERROR}"
@@ -1507,11 +1595,11 @@ export class AppleNotesManager {
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames
-            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        return (totalCount as text) & ${AS_RECORD_SEP_LOCAL} & (resultList as text)
       `;
     }
 
@@ -1534,9 +1622,9 @@ export class AppleNotesManager {
         ${dateFetch}${countGuard("noteIds")}
         ${dateCountGuard}set resultList to {}
         repeat with i from 1 to count of noteNames
-          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)${dateGuardClose}
         end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
         return resultList as text
       `;
   }
@@ -1676,20 +1764,37 @@ export class AppleNotesManager {
     const accounts = this.listAccounts();
 
     for (const account of accounts) {
-      // Use delimited output to avoid fragile comma-based parsing.
-      // Format: name|||id|||createdDate|||modifiedDate|||shared|||passwordProtected
+      // Bulk property reads (#162): one Apple Event per property for the whole
+      // account instead of one per note, and nothing past the first read when
+      // no note is shared. Records keep the control-char format (#18):
+      // name, id, created, modified, shared, passwordProtected.
+      const countGuard = (listVar: string) =>
+        `if (count of ${listVar}) is not (count of noteShared) then error "${BULK_LIST_MUTATION_ERROR}"`;
       const script = buildAccountScopedScript(
         { account: account.name },
         `
+        set noteShared to shared of notes
         set resultList to {}
-        repeat with n in notes
-          if shared of n is true then
-            set cd to creation date of n
-            set md to modification date of n
-            set end of resultList to (name of n) & ${AS_FIELD_SEP} & (id of n) & ${AS_FIELD_SEP} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP} & (shared of n as text) & ${AS_FIELD_SEP} & (password protected of n as text)
-          end if
-        end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        if noteShared contains true then
+          set noteNames to name of notes
+          set noteIds to id of notes
+          set noteCreated to creation date of notes
+          set noteModified to modification date of notes
+          set noteLocked to password protected of notes
+          ${countGuard("noteIds")}
+          ${countGuard("noteNames")}
+          ${countGuard("noteCreated")}
+          ${countGuard("noteModified")}
+          ${countGuard("noteLocked")}
+          repeat with i from 1 to count of noteShared
+            if (item i of noteShared) is true then
+              set cd to item i of noteCreated
+              set md to item i of noteModified
+              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds) & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP_LOCAL} & "true" & ${AS_FIELD_SEP_LOCAL} & ((item i of noteLocked) as text)
+            end if
+          end repeat
+        end if
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
         return resultList as text
         `
       );
@@ -3193,31 +3298,60 @@ export class AppleNotesManager {
   }
 
   /**
-   * Exports all notes as a JSON structure for backup/migration.
+   * Exports notes as a JSON structure for backup/migration, one page at a time.
    *
    * Exports complete note data including:
    * - Metadata (id, title, dates, flags)
    * - Content (HTML and plaintext)
    * - Organization (folder, account)
    *
+   * Notes are numbered 0..N-1 in account, folder, note order, after the optional
+   * `modifiedSince` filter. A call returns the window starting at `offset`, at
+   * most `limit` notes (DEFAULT_EXPORT_PAGE_SIZE by default), and closes the page
+   * early once the next note would push the estimated tool response past
+   * `maxResponseBytes`. Every account and folder is listed on every page so the
+   * structure is stable; `page.nextOffset` says where to continue. Only the
+   * page's notes have their metadata and bodies read.
+   *
+   * Why pages (#162): the whole library does not fit in one MCP message. A
+   * 359-note library holding inline images serialized to a 95 MB response, and
+   * the MCP SDK stdio reader closes the connection on any message over 10 MB, so
+   * the caller saw a bare "Connection closed" with no error text.
+   *
+   * A note that alone exceeds the budget is degraded rather than dropped:
+   * oversized inline images become placeholders (`strippedImages`), or failing
+   * that its HTML, and if necessary its plaintext, is omitted (`contentOmitted`).
+   *
    * Note: Password-protected notes are included with metadata only (no content).
    *
-   * @returns JSON-serializable export object
+   * @param options - offset, limit, modifiedSince, and maxResponseBytes
+   * @returns JSON-serializable export object for the requested page
    *
    * @example
    * ```typescript
-   * const snapshot = manager.exportNotesAsJson();
-   * fs.writeFileSync('notes-backup.json', JSON.stringify(snapshot, null, 2));
+   * let offset: number | undefined = 0;
+   * while (offset !== undefined) {
+   *   const snapshot = manager.exportNotesAsJson({ offset });
+   *   fs.appendFileSync("notes-backup.jsonl", JSON.stringify(snapshot) + "\n");
+   *   offset = snapshot.page.nextOffset;
+   * }
    * ```
    */
-  exportNotesAsJson(): NotesExport {
+  exportNotesAsJson(options: ExportNotesOptions = {}): NotesExport {
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const limit = Math.max(1, Math.floor(options.limit ?? DEFAULT_EXPORT_PAGE_SIZE));
+    const maxResponseBytes = options.maxResponseBytes ?? exportMaxResponseBytes();
+    const exportDate = new Date().toISOString();
     const accounts = this.listAccounts();
-    const exportData: NotesExport = {
-      exportDate: new Date().toISOString(),
-      version: "1.0",
-      accounts: [],
-      summary: { totalNotes: 0, totalFolders: 0, totalAccounts: accounts.length },
-    };
+    const exportedAccounts: ExportedAccount[] = [];
+    const summary = { totalNotes: 0, totalFolders: 0, totalAccounts: accounts.length };
+
+    // `position` numbers every listed note in the library and keeps counting
+    // past the page, so the export can report how many notes exist in total.
+    let position = 0;
+    let usedBytes = 0;
+    let nextOffset: number | undefined;
+    let stoppedAtSizeLimit = false;
 
     for (const account of accounts) {
       const folders = this.listFolders(account.name);
@@ -3235,9 +3369,17 @@ export class AppleNotesManager {
         // Get all (title, id) pairs in this folder. Re-fetching by id below
         // (instead of by title) avoids AppleScript's ambiguous `note "<name>"`
         // resolution silently collapsing notes that share an exact title.
-        const noteRefs = this.listNoteRefs(account.name, folder.name);
+        const noteRefs = this.listNoteRefs(account.name, folder.name, options.modifiedSince);
 
         for (const ref of noteRefs) {
+          const index = position++;
+          // Before the window, or after the page closed: count it, read nothing.
+          if (index < offset || nextOffset !== undefined) continue;
+          if (summary.totalNotes >= limit) {
+            nextOffset = index;
+            continue;
+          }
+
           const note = this.getNoteById(ref.id);
           if (!note) continue;
           // getNoteById() doesn't scope to an account (ids are already unique
@@ -3251,18 +3393,46 @@ export class AppleNotesManager {
             content = this.getNoteContentById(ref.id);
           }
 
-          folderData.notes.push(this.exportNote(note, content));
-          exportData.summary.totalNotes++;
+          let exported = this.exportNote(note, content);
+          let bytes = estimateExportNoteBytes(exported);
+          if (usedBytes + bytes > maxResponseBytes) {
+            if (summary.totalNotes > 0) {
+              // Leave it for the next page, where it starts with the full budget.
+              nextOffset = index;
+              stoppedAtSizeLimit = true;
+              continue;
+            }
+            exported = fitExportNoteToBudget(exported, maxResponseBytes);
+            bytes = estimateExportNoteBytes(exported);
+          }
+
+          folderData.notes.push(exported);
+          usedBytes += bytes;
+          summary.totalNotes++;
         }
 
         accountData.folders.push(folderData);
-        exportData.summary.totalFolders++;
+        summary.totalFolders++;
       }
 
-      exportData.accounts.push(accountData);
+      exportedAccounts.push(accountData);
     }
 
-    return exportData;
+    return {
+      exportDate,
+      version: "1.0",
+      accounts: exportedAccounts,
+      summary,
+      page: {
+        offset,
+        limit,
+        totalAvailable: position,
+        returned: summary.totalNotes,
+        ...(nextOffset !== undefined ? { nextOffset } : {}),
+        hasMore: nextOffset !== undefined,
+        stoppedAtSizeLimit,
+      },
+    };
   }
 
   // ===========================================================================
