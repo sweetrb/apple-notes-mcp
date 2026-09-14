@@ -25,6 +25,9 @@ import {
   parseAppleScriptDate,
   sanitizeId,
   sanitizeNoteId,
+  DEFAULT_EXPORT_PAGE_SIZE,
+  estimateExportNoteBytes,
+  exportMaxResponseBytes,
 } from "./appleNotesManager.js";
 
 // Mock the AppleScript execution module
@@ -1828,6 +1831,90 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("large-library listing (#162)", () => {
+    // `ASCII character` is a Standard Additions command: inside a Notes tell
+    // block each evaluation is its own Apple Event (~8.5 ms measured), so a
+    // per-record separator cost two round trips per note.
+    it("builds every per-note record with local separators, never an Apple Event per record", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "" });
+
+      manager.listNotes();
+      manager.listNotes(undefined, undefined, "2025-06-15T00:00:00");
+      manager.listNotes(undefined, undefined, undefined, 3);
+
+      expect(mockExecuteAppleScript.mock.calls.length).toBeGreaterThanOrEqual(3);
+      for (const [script] of mockExecuteAppleScript.mock.calls) {
+        expect(script).not.toContain("ASCII character");
+        expect(script).toContain("(character id 31)");
+        expect(script).toContain("(character id 30)");
+      }
+    });
+
+    it("reads the whole collection, not a range, when the limit covers the library", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["2", ["Note 1", "p1"].join(F), ["Note 2", "p2"].join(F)].join(R),
+      });
+
+      const results = manager.listNotes("iCloud", undefined, undefined, 700);
+
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toMatch(
+        /if fetchCount is totalCount then\s+set noteNames to name of notes\s+set noteIds to id of notes\s+else\s+set noteNames to name of \(notes 1 thru fetchCount\)/
+      );
+      expect(results).toEqual(["Note 1", "Note 2"]);
+    });
+  });
+
+  describe("listSharedNotes", () => {
+    it("reads sharing state in one bulk read and stops there when nothing is shared", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" }) // listAccounts
+        .mockReturnValueOnce({ success: true, output: "" });
+
+      expect(manager.listSharedNotes()).toEqual([]);
+
+      const script = mockExecuteAppleScript.mock.calls[1][0];
+      expect(script).toContain("set noteShared to shared of notes");
+      expect(script).toContain("if noteShared contains true then");
+      expect(script).not.toContain("repeat with n in notes");
+      expect(script).not.toContain("ASCII character");
+    });
+
+    it("parses shared notes built from bulk-read properties", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            "Team plan",
+            "x-coredata://ABC/ICNote/p7",
+            "2025-1-2-3-4-5",
+            "2025-6-7-8-9-10",
+            "true",
+            "false",
+          ].join(F),
+        });
+
+      const notes = manager.listSharedNotes();
+
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toMatchObject({
+        id: "x-coredata://ABC/ICNote/p7",
+        title: "Team plan",
+        account: "iCloud",
+        shared: true,
+        passwordProtected: false,
+      });
+      expect(notes[0].modified.getMonth()).toBe(5);
+      const script = mockExecuteAppleScript.mock.calls[1][0];
+      expect(script).toContain(
+        'if (count of noteIds) is not (count of noteShared) then error "Notes changed during listing"'
+      );
+    });
+  });
+
   describe("listNoteRefs", () => {
     it("returns title/id pairs, not just titles", () => {
       mockExecuteAppleScript.mockReturnValue({
@@ -3303,6 +3390,245 @@ describe("AppleNotesManager", () => {
       expect(notes.map((n) => n.id).sort()).toEqual([idA, idB].sort());
       expect(notes.find((n) => n.id === idA)?.content).toBe(contentFor(idA));
       expect(notes.find((n) => n.id === idB)?.content).toBe(contentFor(idB));
+    });
+  });
+
+  describe("exportNotesAsJson paging and response size budget (#162)", () => {
+    type Page = {
+      offset: number;
+      limit: number;
+      totalAvailable: number;
+      returned: number;
+      nextOffset?: number;
+      hasMore: boolean;
+      stoppedAtSizeLimit: boolean;
+    };
+    type ExportedPage = {
+      summary: { totalNotes: number; totalFolders: number };
+      page: Page;
+      accounts: {
+        folders: {
+          name: string;
+          notes: {
+            id: string;
+            content: string;
+            plaintext: string;
+            strippedImages?: number;
+            contentOmitted?: boolean;
+          }[];
+        }[];
+      }[];
+    };
+    const noteIds = (n: number) =>
+      Array.from({ length: n }, (_, i) => `x-coredata://ABC/ICNote/p${i + 1}`);
+    const exportedIds = (page: ExportedPage) =>
+      page.accounts.flatMap((a) => a.folders.flatMap((f) => f.notes.map((n) => n.id)));
+
+    /**
+     * One iCloud account whose folders hold the given [id, body] notes. Each
+     * script is answered by what it asks for; body reads are recorded.
+     */
+    const mockLibrary = (folders: Record<string, [string, string][]>) => {
+      const bodyReads: string[] = [];
+      mockExecuteAppleScript.mockImplementation((script: string) => {
+        if (script.includes("repeat with a in accounts"))
+          return { success: true, output: "iCloud" };
+        if (script.includes("set allFolders to every folder")) {
+          return {
+            success: true,
+            output: Object.keys(folders)
+              .map((name, i) => [`f${i}`, name, "", "false", "iCloud"].join(F))
+              .join(R),
+          };
+        }
+        if (script.includes("set noteNames to name of")) {
+          const folder = Object.keys(folders).find((name) => script.includes(`folder "${name}"`));
+          const notes = folder ? folders[folder] : [];
+          return {
+            success: true,
+            output: notes.map(([id]) => [`Title ${id}`, id].join(F)).join(R),
+          };
+        }
+        const id = script.match(/note id "([^"]+)"/)?.[1] ?? "";
+        const body =
+          Object.values(folders)
+            .flat()
+            .find(([noteId]) => noteId === id)?.[1] ?? "";
+        if (script.includes("get body of note id")) {
+          bodyReads.push(id);
+          return { success: true, output: body };
+        }
+        return {
+          success: true,
+          output: [`Title ${id}`, id, "2025-1-1-0-0-0", "2025-1-1-0-0-0", "false", "false"].join(F),
+        };
+      });
+      return bodyReads;
+    };
+
+    it("returns the requested window across folders and reads bodies only for it", () => {
+      const [a, b, c, d, e] = noteIds(5);
+      const bodyReads = mockLibrary({
+        Notes: [
+          [a, "<div>a</div>"],
+          [b, "<div>b</div>"],
+          [c, "<div>c</div>"],
+        ],
+        Work: [
+          [d, "<div>d</div>"],
+          [e, "<div>e</div>"],
+        ],
+      });
+
+      const result = manager.exportNotesAsJson({ offset: 2, limit: 2 }) as unknown as ExportedPage;
+
+      expect(exportedIds(result)).toEqual([c, d]);
+      expect(bodyReads).toEqual([c, d]);
+      expect(result.summary.totalNotes).toBe(2);
+      expect(result.summary.totalFolders).toBe(2);
+      expect(result.page).toEqual({
+        offset: 2,
+        limit: 2,
+        totalAvailable: 5,
+        returned: 2,
+        nextOffset: 4,
+        hasMore: true,
+        stoppedAtSizeLimit: false,
+      });
+    });
+
+    it("reports the final page without a nextOffset", () => {
+      const [a, b] = noteIds(2);
+      mockLibrary({
+        Notes: [
+          [a, "<div>a</div>"],
+          [b, "<div>b</div>"],
+        ],
+      });
+
+      const result = manager.exportNotesAsJson({ offset: 1 }) as unknown as ExportedPage;
+
+      expect(exportedIds(result)).toEqual([b]);
+      expect(result.page.hasMore).toBe(false);
+      expect(result.page.nextOffset).toBeUndefined();
+      expect(result.page.totalAvailable).toBe(2);
+    });
+
+    it("bounds a no-argument export to the default page size", () => {
+      const all = noteIds(DEFAULT_EXPORT_PAGE_SIZE + 10);
+      const bodyReads = mockLibrary({
+        Notes: all.map((id) => [id, "<div>x</div>"] as [string, string]),
+      });
+
+      const result = manager.exportNotesAsJson() as unknown as ExportedPage;
+
+      expect(result.summary.totalNotes).toBe(DEFAULT_EXPORT_PAGE_SIZE);
+      expect(bodyReads).toHaveLength(DEFAULT_EXPORT_PAGE_SIZE);
+      expect(result.page.nextOffset).toBe(DEFAULT_EXPORT_PAGE_SIZE);
+      expect(result.page.hasMore).toBe(true);
+    });
+
+    it("stops a page before it outgrows the response budget, then resumes at the next note", () => {
+      const body = `<div>${"x".repeat(10_000)}</div>`;
+      const all = noteIds(4);
+      mockLibrary({ Notes: all.map((id) => [id, body] as [string, string]) });
+
+      const first = manager.exportNotesAsJson({
+        maxResponseBytes: 100_000,
+      }) as unknown as ExportedPage;
+      expect(exportedIds(first)).toEqual(all.slice(0, 2));
+      expect(first.page).toMatchObject({ nextOffset: 2, hasMore: true, stoppedAtSizeLimit: true });
+
+      const second = manager.exportNotesAsJson({
+        offset: 2,
+        maxResponseBytes: 100_000,
+      }) as unknown as ExportedPage;
+      expect(exportedIds(second)).toEqual(all.slice(2));
+      expect(second.page).toMatchObject({ hasMore: false, stoppedAtSizeLimit: false });
+      for (const note of [...first.accounts, ...second.accounts].flatMap((a) =>
+        a.folders.flatMap((f) => f.notes)
+      )) {
+        expect(note.content).toBe(body);
+        expect(note.contentOmitted).toBeUndefined();
+      }
+    });
+
+    it("degrades a single note that alone exceeds the budget instead of failing", () => {
+      const [img, markup, text] = noteIds(3);
+      mockLibrary({
+        Notes: [
+          [img, `<div>caption</div><img src="data:image/png;base64,${"A".repeat(300_000)}">`],
+          [markup, `<div>${"<b>z</b>".repeat(20_000)}</div>`],
+          [text, `<div>${"y".repeat(200_000)}</div>`],
+        ],
+      });
+      const onlyNote = (offset: number) =>
+        (
+          manager.exportNotesAsJson({
+            offset,
+            limit: 1,
+            maxResponseBytes: 100_000,
+          }) as unknown as ExportedPage
+        ).accounts[0].folders[0].notes[0];
+
+      // 1. Oversized inline images are replaced with placeholders first.
+      const imgNote = onlyNote(0);
+      expect(imgNote.id).toBe(img);
+      expect(imgNote.strippedImages).toBe(1);
+      expect(imgNote.content).toContain("caption");
+      expect(imgNote.content).not.toContain("A".repeat(1000));
+      expect(imgNote.contentOmitted).toBeUndefined();
+
+      // 2. Otherwise the HTML body is omitted but the plaintext is kept.
+      const markupNote = onlyNote(1);
+      expect(markupNote.contentOmitted).toBe(true);
+      expect(markupNote.content).toBe("");
+      expect(markupNote.plaintext).toBe("z".repeat(20_000));
+
+      // 3. And if even the plaintext cannot fit, both are omitted.
+      const textNote = onlyNote(2);
+      expect(textNote.contentOmitted).toBe(true);
+      expect(textNote.content).toBe("");
+      expect(textNote.plaintext).toBe("");
+    });
+
+    it("applies modifiedSince to the listing before paging", () => {
+      const [a] = noteIds(1);
+      mockLibrary({ Notes: [[a, "<div>a</div>"]] });
+
+      manager.exportNotesAsJson({ modifiedSince: "2025-06-15" });
+
+      const listScript = mockExecuteAppleScript.mock.calls
+        .map(([script]) => script)
+        .find((script) => script.includes("set noteNames to name of"));
+      expect(listScript).toContain("thresholdDate");
+    });
+
+    it("reads the response budget from APPLE_NOTES_MCP_EXPORT_MAX_BYTES", () => {
+      expect(exportMaxResponseBytes({})).toBe(8 * 1024 * 1024);
+      expect(exportMaxResponseBytes({ APPLE_NOTES_MCP_EXPORT_MAX_BYTES: "2048" })).toBe(2048);
+      expect(exportMaxResponseBytes({ APPLE_NOTES_MCP_EXPORT_MAX_BYTES: "nope" })).toBe(
+        8 * 1024 * 1024
+      );
+    });
+
+    it("estimates both copies of a note that a tool response carries", () => {
+      const note = {
+        id: "x-coredata://ABC/ICNote/p1",
+        title: 'A "quoted" title',
+        content: '<div class="a">b\\c</div>',
+        plaintext: "b\\c",
+        folder: "Notes",
+        account: "iCloud",
+        created: "2025-01-01T00:00:00.000Z",
+        modified: "2025-01-01T00:00:00.000Z",
+        shared: false,
+        passwordProtected: false,
+      };
+      const structuredCopy = Buffer.byteLength(JSON.stringify(note));
+      const escapedTextCopy = Buffer.byteLength(JSON.stringify(JSON.stringify(note, null, 2)));
+
+      expect(estimateExportNoteBytes(note)).toBeGreaterThan(structuredCopy + escapedTextCopy);
     });
   });
 
