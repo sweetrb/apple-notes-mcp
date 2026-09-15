@@ -1,5 +1,37 @@
 ## [Unreleased]
 
+## [2.8.12] - 2026-09-15
+
+### Fixed
+
+- Native append (`append-native`, and `append-to-note` on a note that holds
+  native objects) no longer rejects HTML that `update-note` and `create-note`
+  accept (#164). `<tt>` and `<code>` — the monospace spans the bundled skill
+  recommends for paths and commands — and `<span style="font-size: …px">`, the
+  form Notes itself stores a heading as, were refused with
+  `Unsupported HTML element: tt` / `: span`, so a heading read out of Notes
+  could not be appended back into one. The accepted elements are now `<a> <b>
+  <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li> <ol> <p> <s> <span>
+  <strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u> <ul>`, with `href`
+  on `<a>` and a `font-size` style on `<span>` as the only attributes. Every
+  other style on `<span>` (colour, font family, background) is still refused.
+- A stalled or failed Shortcuts run now names the Shortcut it was waiting on:
+  `Shortcuts timed out waiting for the "Apple Notes MCP - Background
+  Operations v5" Shortcut; …` instead of a bare `Shortcuts timed out`. The
+  "install the bridge first" errors and the native-tag failure message name it
+  too, so a missing or unapproved Shortcut can be found in Shortcuts.app
+  without guessing which one it was (#164).
+
+### Changed
+
+- A rejected element or attribute now names itself *and* the accepted subset in
+  the error, instead of `Unsupported HTML element: <name>` alone (#164).
+- The `append-to-note` and `append-native` tool descriptions, the README Tool
+  Reference and `skills/apple-notes/SKILL.md` state the native-append HTML
+  subset, along with the other native-path constraints (`scopeText` required,
+  default blank-line separator, `position: "after"` only). The description text
+  is generated from the validator's own list, so the two cannot drift.
+
 ## [2.8.11] - 2026-09-14
 
 ### Fixed

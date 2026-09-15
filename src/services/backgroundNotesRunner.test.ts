@@ -41,9 +41,22 @@ describe("background transport", () => {
     expect(path).not.toBe("");
     expect(existsSync(path)).toBe(false);
   });
-  it("refuses to run without an exact installed bridge", () => {
+  it("refuses to run without an exact installed bridge, naming the Shortcut to install", () => {
     vi.mocked(execFileSync).mockReturnValue(`${BACKGROUND_SHORTCUT} copy (${shortcutId})\n`);
-    expect(() => runBackgroundShortcut({ text: "hello" })).toThrow(/Install/);
+    expect(() => runBackgroundShortcut({ text: "hello" })).toThrow(
+      new RegExp(`Install the supplied "${BACKGROUND_SHORTCUT}" Shortcut`)
+    );
     expect(vi.mocked(execFileSync).mock.calls.every((call) => call[1]?.[0] === "list")).toBe(true);
+  });
+  // #164 — a stalled run used to report a bare "Shortcuts timed out", naming
+  // nothing for the caller to go and approve in Shortcuts.app.
+  it("carries the Shortcut name out with a transport failure", () => {
+    vi.mocked(execFileSync).mockImplementation((_file, args) => {
+      if (args?.[0] === "list") return `${BACKGROUND_SHORTCUT} (${shortcutId})\n`;
+      throw Object.assign(new Error("spawn timed out"), { code: "ETIMEDOUT" });
+    });
+    expect(() => runBackgroundShortcut({ text: "hello" })).toThrow(
+      expect.objectContaining({ code: "ETIMEDOUT", shortcut: BACKGROUND_SHORTCUT })
+    );
   });
 });

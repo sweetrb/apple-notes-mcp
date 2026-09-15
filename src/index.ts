@@ -62,7 +62,7 @@ import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import { registerNativeOperations, VERIFIED_BACKGROUND } from "@/tools/nativeOperations.js";
-import { appendNative } from "@/services/backgroundNotes.js";
+import { appendNative, NATIVE_APPEND_HTML_SUBSET } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
@@ -1197,7 +1197,9 @@ registerTool(
   "append-to-note",
   {
     description:
-      "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
+      "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.\nNative-append HTML subset (protected notes only; ordinary notes accept any HTML Notes.app renders): " +
+      NATIVE_APPEND_HTML_SUBSET +
+      " Native append also requires scopeText, the default blank-line separator and position 'after'.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,

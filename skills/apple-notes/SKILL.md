@@ -130,6 +130,16 @@ optional `position` (`"after"` is the default and appends; `"before"` prepends),
 itself, always round-tripping the body as HTML so existing rich formatting
 survives. Do not hand-roll read-then-`update-note` for an addition.
 
+A note that already contains native objects (a table, a checklist, native tags)
+cannot be spliced, so `append-to-note` routes it to the native end-append bridge
+instead. That path additionally needs `scopeText` (a unique existing phrase),
+keeps the default blank-line `separator` and `position: "after"`, and accepts a
+fixed HTML subset: `<a> <b> <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li>
+<ol> <p> <s> <span> <strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u>
+<ul>`, with `href` on `<a>` and a `font-size` style on `<span>` as the only
+attributes. Anything outside that subset is refused by name — rewrite the whole
+body with `update-note` instead.
+
 ```
 User: "Add milk to my shopping list"
 Action:
@@ -196,7 +206,7 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
 - Use `<h2>` and `<h3>` for section headings inside newly created notes. `create-note` already creates the top `<h1>` from the `title`.
 - Use `<ul><li>` and `<ol><li>` for native bullet and numbered lists. Add `<div><br></div>` after closing `</ul>` or `</ol>` so the next section has spacing.
 - Use `<b>`, `<i>`, `<u>`, and `<s>` for inline emphasis.
-- Use `<tt>` for commands, code, paths, API keys, and other technical strings.
+- Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.
 - Escape literal `&`, `<`, and `>` in user content as `&amp;`, `&lt;`, and `&gt;`.
 - Avoid nested lists when possible. Apple Notes can flatten or misplace nested list markup.
 - Use bare URLs when updating existing notes if anchor tags are stripped by Notes on save.

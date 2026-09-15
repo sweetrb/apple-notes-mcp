@@ -68,41 +68,71 @@ export function readBackgroundSnapshot(manager: AppleNotesManager, id: string): 
   };
 }
 
+/**
+ * Elements the native append path accepts, sorted so the error text below reads
+ * as a checkable list.
+ *
+ * The bridge hands this HTML to Notes itself, so the constraint is what Notes
+ * can render, not what the bundled Shortcut can parse. `tt` and `code` are the
+ * monospace spans `skills/apple-notes/SKILL.md` tells callers to use for paths
+ * and commands, and `span` is how Notes stores its own headings — reading a
+ * heading back and appending it verbatim used to be rejected (#164). Everything
+ * here survives `comparableVisibleText`, which is what verifies the readback.
+ */
+export const NATIVE_APPEND_ELEMENTS = [
+  "a",
+  "b",
+  "br",
+  "code",
+  "del",
+  "div",
+  "em",
+  "h1",
+  "h2",
+  "h3",
+  "i",
+  "li",
+  "ol",
+  "p",
+  "s",
+  "span",
+  "strong",
+  "table",
+  "tbody",
+  "td",
+  "th",
+  "thead",
+  "tr",
+  "tt",
+  "u",
+  "ul",
+] as const;
+
+/**
+ * The only inline style the native path accepts, and the only one Notes emits
+ * for text it created itself: `<span style="font-size: 18px">` around a heading.
+ * Anything else (colour, font family, background) is still refused.
+ */
+const NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*;?$/i;
+
+/** One sentence naming the HTML the native append path accepts, for tool text and errors. */
+export const NATIVE_APPEND_HTML_SUBSET =
+  `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, ` +
+  `with href on <a> and a font-size style on <span> as the only attributes; ` +
+  `everything else needs update-note.`;
+
 /** Validate imported rich text conservatively. No external image fetching or embedded code. */
 export function validateAppendContent(content: string, format: "plaintext" | "html" | "markdown") {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
   if (format === "html") {
-    const allowed = new Set([
-      "div",
-      "p",
-      "br",
-      "b",
-      "strong",
-      "i",
-      "em",
-      "u",
-      "s",
-      "del",
-      "h1",
-      "h2",
-      "h3",
-      "ul",
-      "ol",
-      "li",
-      "a",
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "td",
-      "th",
-    ]);
+    const allowed = new Set<string>(NATIVE_APPEND_ELEMENTS);
     for (const tag of content.matchAll(/<\/?\s*([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
-      if (!allowed.has(tag[1].toLowerCase()))
-        throw new Error(`Unsupported HTML element: ${tag[1]}`);
+      const name = tag[1].toLowerCase();
+      if (!allowed.has(name))
+        throw new Error(`Unsupported HTML element: <${name}>. ${NATIVE_APPEND_HTML_SUBSET}`);
       let attrs = tag[2].replace(/\/$/, "").trim();
-      if (tag[1].toLowerCase() === "a")
+      if (name === "a")
         attrs = attrs.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (_s, _q: string, url: string) => {
           if (
             !/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) ||
@@ -111,10 +141,17 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
             throw new Error("Unsupported link URL");
           return "";
         });
+      if (name === "span")
+        attrs = attrs.replace(/\bstyle\s*=\s*(["'])(.*?)\1/gi, (_s, _q: string, style: string) => {
+          if (!NATIVE_APPEND_SPAN_STYLE.test(style.trim()))
+            throw new Error(
+              `Unsupported <span> style: ${style.trim().slice(0, 80)}. ` +
+                `Native append accepts font-size only, as in <span style="font-size: 18px">.`
+            );
+          return "";
+        });
       if (attrs.trim())
-        throw new Error(
-          "Unsupported HTML attributes; use semantic formatting and explicit blank paragraphs"
-        );
+        throw new Error(`Unsupported HTML attributes on <${name}>. ${NATIVE_APPEND_HTML_SUBSET}`);
     }
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
@@ -126,7 +163,9 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
 export function runBackgroundShortcut(input: Record<string, string>) {
   const status = backgroundStatus();
   if (!status.installed)
-    throw new Error("Install the supplied Background Operations shortcut once");
+    throw new Error(
+      `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+    );
   const directory = mkdtempSync(join(tmpdir(), "apple-notes-background-"));
   try {
     const file = join(directory, "request.json");
@@ -149,12 +188,19 @@ export function runBackgroundShortcut(input: Record<string, string>) {
       }),
       { mode: 0o600 }
     );
-    execFileSync("/usr/bin/shortcuts", ["run", status.identifier!, "--input-path", file], {
-      encoding: "utf8",
-      timeout: 60000,
-      maxBuffer: 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    try {
+      execFileSync("/usr/bin/shortcuts", ["run", status.identifier!, "--input-path", file], {
+        encoding: "utf8",
+        timeout: 60000,
+        maxBuffer: 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      // Carry the Shortcut's name out with the failure. `mutateBackground`
+      // reports it, so a stalled run says what it was waiting on instead of a
+      // bare "Shortcuts timed out" that names nothing to go and approve (#164).
+      throw Object.assign(error as Error, { shortcut: status.shortcut });
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -294,13 +340,23 @@ export function mutateBackground(
     deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
   } catch (error) {
     transportUncertain = true;
-    const detail = error as { code?: string; stderr?: string | Buffer; message?: string };
+    const detail = error as {
+      code?: string;
+      stderr?: string | Buffer;
+      message?: string;
+      shortcut?: string;
+    };
+    // Name the bridge, so an unapproved or missing Shortcut is identified by the
+    // exact string Shortcuts.app shows rather than guessed at (#164).
+    const named = detail?.shortcut
+      ? `the "${detail.shortcut}" Shortcut`
+      : "the background Shortcut";
     transportMessage =
       detail?.code === "ETIMEDOUT"
-        ? "Shortcuts timed out; check for an interactive parameter or permission request"
-        : String(detail?.stderr || detail?.message || "Shortcuts failed")
+        ? `Shortcuts timed out waiting for ${named}; check for an interactive parameter or permission request`
+        : `${named} failed: ${String(detail?.stderr || detail?.message || "no output")
             .trim()
-            .slice(0, 500);
+            .slice(0, 400)}`;
   }
   const after = deps.read(request.id);
   try {

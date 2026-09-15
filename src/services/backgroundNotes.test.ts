@@ -163,6 +163,30 @@ describe("background note mutation boundaries", () => {
     );
     expect(f.deps.run).toHaveBeenCalledTimes(1);
   });
+  // #164 — the reporter could not tell which Shortcut the run had stalled on.
+  it("names the Shortcut it waited on when the transport times out", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("timeout"), {
+        code: "ETIMEDOUT",
+        shortcut: "Apple Notes MCP - Background Operations v5",
+      });
+    });
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
+      /Shortcuts timed out waiting for the "Apple Notes MCP - Background Operations v5" Shortcut/
+    );
+  });
+  it("names the Shortcut on a non-timeout transport failure too", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("no such shortcut"), { shortcut: "Named Bridge" });
+    });
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
+      /the "Named Bridge" Shortcut failed: no such shortcut/
+    );
+  });
   it("rejects absent and multiline scope markers before a write", () => {
     for (const scopeText of ["different project marker", "Unique project\nmarker"]) {
       const f = fixture();
@@ -259,6 +283,35 @@ describe("rich append input", () => {
   ])("refuses unsupported or externally fetched HTML %s", (html) =>
     expect(() => validateAppendContent(html, "html")).toThrow()
   );
+  // #164 — the native path rejected HTML that update-note/create-note accept:
+  // the <tt> the bundled skill recommends for paths and commands, and the
+  // font-size <span> Notes itself stores a heading as, so round-tripping a
+  // heading read out of Notes was refused.
+  it.each([
+    "<div>Run <tt>/usr/bin/grep -rn foo</tt> next.</div>",
+    "<div>Run <code>pnpm test</code> next.</div>",
+    '<div><b><span style="font-size: 18px">Section</span></b><br></div>',
+    '<div><span style="font-size:24.5pt">Bigger</span></div>',
+  ])("accepts monospace and heading-sized HTML %s", (html) =>
+    expect(() => validateAppendContent(html, "html")).not.toThrow()
+  );
+  it("names the rejected element and the accepted subset", () =>
+    expect(() => validateAppendContent("<div><font>x</font></div>", "html")).toThrow(
+      /Unsupported HTML element: <font>\. Native append accepts .*<tt>.*update-note/s
+    ));
+  it.each([
+    '<span style="color:red">x</span>',
+    '<span style="font-size: 18px; color: red">x</span>',
+    '<span style="font-family: Menlo">x</span>',
+  ])("accepts font-size but no other span style %s", (html) =>
+    expect(() => validateAppendContent(html, "html")).toThrow(
+      /Unsupported <span> style:.*font-size only/s
+    )
+  );
+  it("still refuses attributes on the newly accepted elements", () =>
+    expect(() => validateAppendContent('<tt class="x">y</tt>', "html")).toThrow(
+      /Unsupported HTML attributes on <tt>/
+    ));
   it("does not permit silent rich-content truncation", () =>
     expect(() => validateAppendContent("x".repeat(1024 * 1024 + 1), "plaintext")).toThrow());
   it.each(["![image](https://example.com/x)", '<img src="file:///x">', "[x](javascript:bad)"])(

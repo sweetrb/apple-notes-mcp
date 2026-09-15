@@ -42832,7 +42832,7 @@ function runNativeTagsShortcut(input) {
     });
   } catch {
     throw new Error(
-      "Native tag operation did not complete cleanly (possibly waiting for macOS permission). Do not retry automatically; read the exact note and check Shortcuts"
+      `Native tag operation did not complete cleanly; the "${status.shortcut}" Shortcut may be waiting for macOS permission. Do not retry automatically; read the exact note and check that Shortcut in Shortcuts.app`
     );
   } finally {
     rmSync2(directory, { recursive: true, force: true });
@@ -42930,49 +42930,62 @@ function readBackgroundSnapshot(manager, id2) {
     checklist: getChecklistItems(id2).items || []
   };
 }
+var NATIVE_APPEND_ELEMENTS = [
+  "a",
+  "b",
+  "br",
+  "code",
+  "del",
+  "div",
+  "em",
+  "h1",
+  "h2",
+  "h3",
+  "i",
+  "li",
+  "ol",
+  "p",
+  "s",
+  "span",
+  "strong",
+  "table",
+  "tbody",
+  "td",
+  "th",
+  "thead",
+  "tr",
+  "tt",
+  "u",
+  "ul"
+];
+var NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*;?$/i;
+var NATIVE_APPEND_HTML_SUBSET = `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, with href on <a> and a font-size style on <span> as the only attributes; everything else needs update-note.`;
 function validateAppendContent(content, format) {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
   if (format === "html") {
-    const allowed = /* @__PURE__ */ new Set([
-      "div",
-      "p",
-      "br",
-      "b",
-      "strong",
-      "i",
-      "em",
-      "u",
-      "s",
-      "del",
-      "h1",
-      "h2",
-      "h3",
-      "ul",
-      "ol",
-      "li",
-      "a",
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "td",
-      "th"
-    ]);
+    const allowed = new Set(NATIVE_APPEND_ELEMENTS);
     for (const tag of content.matchAll(/<\/?\s*([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
-      if (!allowed.has(tag[1].toLowerCase()))
-        throw new Error(`Unsupported HTML element: ${tag[1]}`);
+      const name = tag[1].toLowerCase();
+      if (!allowed.has(name))
+        throw new Error(`Unsupported HTML element: <${name}>. ${NATIVE_APPEND_HTML_SUBSET}`);
       let attrs = tag[2].replace(/\/$/, "").trim();
-      if (tag[1].toLowerCase() === "a")
+      if (name === "a")
         attrs = attrs.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (_s, _q, url) => {
           if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) || Array.from(url).some((c) => c.charCodeAt(0) < 33))
             throw new Error("Unsupported link URL");
           return "";
         });
+      if (name === "span")
+        attrs = attrs.replace(/\bstyle\s*=\s*(["'])(.*?)\1/gi, (_s, _q, style) => {
+          if (!NATIVE_APPEND_SPAN_STYLE.test(style.trim()))
+            throw new Error(
+              `Unsupported <span> style: ${style.trim().slice(0, 80)}. Native append accepts font-size only, as in <span style="font-size: 18px">.`
+            );
+          return "";
+        });
       if (attrs.trim())
-        throw new Error(
-          "Unsupported HTML attributes; use semantic formatting and explicit blank paragraphs"
-        );
+        throw new Error(`Unsupported HTML attributes on <${name}>. ${NATIVE_APPEND_HTML_SUBSET}`);
     }
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
@@ -42982,7 +42995,9 @@ function validateAppendContent(content, format) {
 function runBackgroundShortcut(input) {
   const status = backgroundStatus();
   if (!status.installed)
-    throw new Error("Install the supplied Background Operations shortcut once");
+    throw new Error(
+      `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+    );
   const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
   try {
     const file = join8(directory, "request.json");
@@ -43004,12 +43019,16 @@ function runBackgroundShortcut(input) {
       }),
       { mode: 384 }
     );
-    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
-      encoding: "utf8",
-      timeout: 6e4,
-      maxBuffer: 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
+    try {
+      execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+        encoding: "utf8",
+        timeout: 6e4,
+        maxBuffer: 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+    } catch (error2) {
+      throw Object.assign(error2, { shortcut: status.shortcut });
+    }
   } finally {
     rmSync3(directory, { recursive: true, force: true });
   }
@@ -43096,7 +43115,8 @@ function mutateBackground(request, operation, data, verify, deps) {
   } catch (error2) {
     transportUncertain = true;
     const detail = error2;
-    transportMessage = detail?.code === "ETIMEDOUT" ? "Shortcuts timed out; check for an interactive parameter or permission request" : String(detail?.stderr || detail?.message || "Shortcuts failed").trim().slice(0, 500);
+    const named = detail?.shortcut ? `the "${detail.shortcut}" Shortcut` : "the background Shortcut";
+    transportMessage = detail?.code === "ETIMEDOUT" ? `Shortcuts timed out waiting for ${named}; check for an interactive parameter or permission request` : `${named} failed: ${String(detail?.stderr || detail?.message || "no output").trim().slice(0, 400)}`;
   }
   const after = deps.read(request.id);
   try {
@@ -43980,7 +44000,7 @@ function registerNativeOperations(server2, manager) {
   );
   tool(
     "append-native",
-    "Use when: appending formatted content to a native-object note without replacing its body.\nReturns: exact-ID preservation and appended-content readback.\nDo not use when: the existing note can be safely handled by append-to-note or the scope phrase is ambiguous.\nSafety: requires a fresh revision and unique existing scope phrase of plain words; avoid punctuation, hashtags, and paths because Notes search may not resolve them literally. Supports bounded plaintext, semantic HTML, and Markdown without external fetching or automatic retries.",
+    "Use when: appending formatted content to a native-object note without replacing its body.\nReturns: exact-ID preservation and appended-content readback.\nDo not use when: the existing note can be safely handled by append-to-note or the scope phrase is ambiguous.\nSafety: requires a fresh revision and unique existing scope phrase of plain words; avoid punctuation, hashtags, and paths because Notes search may not resolve them literally. Supports bounded plaintext, semantic HTML, and Markdown without external fetching or automatic retries.\nHTML subset: " + NATIVE_APPEND_HTML_SUBSET,
     {
       ...common,
       content: external_exports.string().min(1).max(1024 * 1024),
@@ -45022,7 +45042,7 @@ registerTool(
 registerTool(
   "append-to-note",
   {
-    description: "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.",
+    description: "Use when: adding content to one exact note after reading it by id.\nReturns: exact id, new content hash, and visible-text readback verification.\nDo not use when: you only have a title or the note changed since the read.\nSafety: protected native-object notes use native end-append with scopeText; ordinary notes retain guarded HTML editing. Notes.app normalizes HTML, so rich formatting is not claimed as byte-identical.\nNative-append HTML subset (protected notes only; ordinary notes accept any HTML Notes.app renders): " + NATIVE_APPEND_HTML_SUBSET + " Native append also requires scopeText, the default blank-line separator and position 'after'.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,

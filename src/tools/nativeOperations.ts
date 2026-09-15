@@ -10,6 +10,7 @@ import {
   mutateBackground,
   assertPreserved,
   setNativeTag,
+  NATIVE_APPEND_HTML_SUBSET,
 } from "../services/backgroundNotes.js";
 import { normalizeNativeTags } from "../services/nativeTags.js";
 import { parseNoteTable } from "../utils/noteTables.js";
@@ -171,7 +172,8 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   );
   tool(
     "append-native",
-    "Use when: appending formatted content to a native-object note without replacing its body.\nReturns: exact-ID preservation and appended-content readback.\nDo not use when: the existing note can be safely handled by append-to-note or the scope phrase is ambiguous.\nSafety: requires a fresh revision and unique existing scope phrase of plain words; avoid punctuation, hashtags, and paths because Notes search may not resolve them literally. Supports bounded plaintext, semantic HTML, and Markdown without external fetching or automatic retries.",
+    "Use when: appending formatted content to a native-object note without replacing its body.\nReturns: exact-ID preservation and appended-content readback.\nDo not use when: the existing note can be safely handled by append-to-note or the scope phrase is ambiguous.\nSafety: requires a fresh revision and unique existing scope phrase of plain words; avoid punctuation, hashtags, and paths because Notes search may not resolve them literally. Supports bounded plaintext, semantic HTML, and Markdown without external fetching or automatic retries.\nHTML subset: " +
+      NATIVE_APPEND_HTML_SUBSET,
     {
       ...common,
       content: z

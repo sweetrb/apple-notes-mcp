@@ -153,7 +153,7 @@ export function runNativeTagsShortcut(input: { title: string; scopeText: string;
     // established by the caller's exact-ID native metadata/content readback.
   } catch {
     throw new Error(
-      "Native tag operation did not complete cleanly (possibly waiting for macOS permission). Do not retry automatically; read the exact note and check Shortcuts"
+      `Native tag operation did not complete cleanly; the "${status.shortcut}" Shortcut may be waiting for macOS permission. Do not retry automatically; read the exact note and check that Shortcut in Shortcuts.app`
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

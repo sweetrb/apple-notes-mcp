@@ -565,8 +565,22 @@ visible text after saving, not byte-identical rich formatting. Warns when the
 note is shared with collaborators.
 
 **Safety:** The append is rejected if the note changed since it was read, rich
-metadata is unavailable, or the note contains attachments or other native
-objects. Existing link destinations are verified after saving.
+metadata is unavailable, or the note contains attachments. Existing link
+destinations are verified after saving.
+
+**Notes containing native objects** (a table, a checklist, native tags) cannot be
+spliced, so they are routed to the native end-append bridge — see
+[`append-native`](#append-native). That path additionally requires `scopeText`,
+keeps the default blank-line `separator` and `position: "after"`, and accepts a
+fixed HTML subset rather than anything Notes.app can render:
+
+| | Native append |
+|---|---|
+| Elements | `<a>` `<b>` `<br>` `<code>` `<del>` `<div>` `<em>` `<h1>` `<h2>` `<h3>` `<i>` `<li>` `<ol>` `<p>` `<s>` `<span>` `<strong>` `<table>` `<tbody>` `<td>` `<th>` `<thead>` `<tr>` `<tt>` `<u>` `<ul>` |
+| Attributes | `href` on `<a>` (`https:`, `http:`, `notes:`, `applenotes:`, `mailto:` only) and a `font-size` style on `<span>`, e.g. `<span style="font-size: 18px">` — the form Notes itself stores a heading as |
+| Refused | every other element and attribute, by name, naming the accepted subset; `<table>` here (use [`create-table`](#create-table)); comments, doctype and processing instructions |
+
+Ordinary notes take the guarded HTML path and are not restricted to that subset.
 
 ---
 
@@ -1050,7 +1064,11 @@ Appends bounded plaintext, semantic HTML, or Markdown while preserving existing
 native objects. The regular `append-to-note` tool routes protected notes here
 when `scopeText` is supplied. Use a distinctive phrase of plain words without
 punctuation, hashtags, or paths because Notes search may not resolve them
-literally.
+literally. `format: "html"` accepts the fixed subset tabulated under
+[`append-to-note`](#append-to-note); content outside it is refused by name, with
+the accepted subset in the error. A transport failure names the Shortcut it was
+waiting on, so a missing or unapproved bridge is identified rather than guessed
+at.
 
 #### `create-checklist-item`
 

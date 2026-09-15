@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
-vi.mock("../services/backgroundNotes.js", () => ({
+// Partial mock: only the two bridge probes are stubbed. NATIVE_APPEND_HTML_SUBSET
+// must stay the real constant, because the tool description is generated from it.
+vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
   backgroundStatus: vi.fn(() => ({ installed: false, shortcut: "Background Operations" })),
   nativeTagBridgeStatus: vi.fn(() => ({ installed: false })),
 }));
