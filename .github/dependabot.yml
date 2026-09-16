@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+      # Staggered 2026-09-16 so the github-actions PR (Monday) has self-merged
+      # before the npm PR (Wednesday) opens; otherwise the npm PR is BEHIND
+      # strict-protected main within minutes and waits for a human rebase.
+      day: wednesday
     open-pull-requests-limit: 5
     # Only propose a version once it is >= 7 days old, so a bump never trips CI's
     # supply-chain minimum-release-age gate on a freshly-published release.
@@ -25,6 +29,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
     groups:

@@ -1,19 +1,39 @@
 name: dependabot-automerge
 
-# Auto-merge Dependabot GitHub Actions PRs once required checks pass. npm
-# dependency updates, including direct development dependencies, stay open for
-# human review because the build toolchain can change the committed bundle that
-# ships to npm even when the dependency is not in `dependencies`.
-on: pull_request
+# Auto-merge Dependabot PRs that carry nothing a human needs to look at:
+#   * github-actions bumps (only .github/** changes) — armed on open.
+#   * npm bumps whose ONLY changed file is pnpm-lock.yaml AFTER dependabot-rebuild
+#     has finished — the rebuild proved the committed bundle did not change, so
+#     the bytes that ship to npm are untouched and the 2026-08-14 human gate on
+#     the bundle diff has nothing to review. Any npm PR that touches package.json
+#     or build/** (a rebuilt bundle, an auto-bump, a runtime dependency) stays
+#     open for a human, exactly as before.
+#
+# BEHIND handling (2026-09-16): main is strict-protected, and the github-actions
+# PR used to self-merge minutes after the npm PR opened, leaving the npm PR
+# BEHIND until a human rebased it ~15 h later — every week from 2026-08-05 to
+# 2026-09-16. The two schedules are now staggered in dependabot.yml
+# (github-actions Monday, npm Wednesday), and the lockfile-only job below also
+# rebases a BEHIND branch itself. A push made with GITHUB_TOKEN creates no
+# pull_request runs, so — exactly as dependabot-rebuild.yml does after its own
+# push — it re-dispatches ci.yml and version-guard.yml on the new head so the
+# required contexts exist for auto-merge to complete.
+
+on:
+  pull_request:
+  workflow_run:
+    workflows: [dependabot-rebuild]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   automerge:
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
       - name: Dependabot metadata
         id: meta
@@ -23,3 +43,56 @@ jobs:
         run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lockfile-only:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'pull_request'
+          && startsWith(github.event.workflow_run.head_branch, 'dependabot/npm_and_yarn/') }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - name: Find the open Dependabot PR for this branch
+        id: pr
+        run: |
+          set -euo pipefail
+          num="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --author 'app/dependabot' --json number --jq '.[0].number // empty')"
+          if [ -z "$num" ]; then echo "No open Dependabot PR for ${BRANCH} — nothing to do."; fi
+          echo "number=${num}" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether the PR is lockfile-only
+        id: files
+        if: steps.pr.outputs.number != ''
+        run: |
+          set -euo pipefail
+          files="$(gh pr view "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --json files --jq '[.files[].path] | sort | join(",")')"
+          echo "changed files: ${files}"
+          if [ "$files" = "pnpm-lock.yaml" ]; then
+            echo "lockfile_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lockfile_only=false" >> "$GITHUB_OUTPUT"
+            echo "Touches more than pnpm-lock.yaml — stays open for human review."
+          fi
+
+      - name: Rebase onto main if BEHIND, then re-dispatch the required checks
+        if: steps.files.outputs.lockfile_only == 'true'
+        run: |
+          set -euo pipefail
+          behind="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${BRANCH}" --jq .behind_by)"
+          if [ "${behind:-0}" -gt 0 ]; then
+            echo "Branch is ${behind} commit(s) behind main — updating it."
+            gh pr update-branch "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --rebase
+            sleep 15
+            for wf in ci.yml version-guard.yml; do
+              gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+            done
+          else
+            echo "Branch is up to date with main."
+          fi
+
+      - name: Enable auto-merge
+        if: steps.files.outputs.lockfile_only == 'true'
+        run: gh pr merge "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --auto --squash
