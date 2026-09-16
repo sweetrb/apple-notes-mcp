@@ -165,6 +165,51 @@ describe("Notes rich text", () => {
     const result = restoreNoteLinks("<div>A &amp B & C</div>", note);
     expect(linkSignature(htmlLinks(result))).toBe(linkSignature(note.links));
   });
+  it("decodes a semicolonless &quot immediately followed by a letter (#166)", () => {
+    // AppleScript emits &quot with no trailing semicolon, and Apple's own
+    // output routinely runs it straight into the next word (`&quothello`).
+    // The legacy-reference lookahead used to treat that as "don't decode",
+    // splitting one rich-text `"` into five literal HTML characters and
+    // throwing "Notes HTML and rich text do not match".
+    const text = 'say "hello" now';
+    const note = rich(text, 0, 0);
+    const html = "<div>say &quothello&quot now</div>";
+    expect(() => restoreNoteLinks(html, note)).not.toThrow();
+    expect(restoreNoteLinks(html, note)).toBe(html);
+  });
+  it("decodes repeated semicolonless &quot runs with no intervening whitespace", () => {
+    // The exact shape from the issue's instrumented failure: many adjacent
+    // `&quot` occurrences, none terminated by `;`.
+    const text = '"wrapup","wrapup","wrapitup","';
+    const note = rich(text, 0, 0);
+    const html = "<div>&quotwrapup&quot,&quotwrapup&quot,&quotwrapitup&quot,&quot</div>";
+    expect(() => restoreNoteLinks(html, note)).not.toThrow();
+  });
+  it("still requires a trailing semicolon for &apos, which is not a legacy reference", () => {
+    const text = "cats'r us";
+    const note = rich(text, 0, 0);
+    // No semicolon: HTML5 never treats bare "apos" as a reference outside an
+    // explicit `;`, so this must read back as five literal characters, not a
+    // decoded apostrophe.
+    expect(() => restoreNoteLinks("<div>cats&aposr us</div>", note)).toThrow(/do not match/);
+    expect(() => restoreNoteLinks("<div>cats&apos;r us</div>", note)).not.toThrow();
+  });
+  it("decodes a semicolonless &nbsp the same as &quot, per the HTML5 legacy list", () => {
+    const text = "a b";
+    const note = rich(text, 0, 0);
+    // nbsp is whitespace once decoded, so it (like every other decoded
+    // character here) is dropped from the comparison stream entirely.
+    expect(() => restoreNoteLinks("<div>a&nbspb</div>", note)).not.toThrow();
+  });
+  it("appends the real exception to the generic warning instead of discarding it", () => {
+    // #166 also reported that enrichNoteRead's bare `catch {}` hid the actual
+    // mismatch, sending readers to check Full Disk Access / sync for what was
+    // really an entity-decoding bug. The specific cause should now survive
+    // into the warning text.
+    const result = enrichNoteRead("x-coredata://ABCDEF/ICNote/p12", "<div>Other</div>");
+    expect(result.writable).toBe(false);
+    expect(result.warning).toContain("check Full Disk Access and retry after sync.");
+  });
   it("reads actual URLs and accounts for UTF-16 emoji positions", () => {
     const text = "Планы 🐈\nЗадачи";
     const note = rich(text, text.indexOf("Задачи"), 6);

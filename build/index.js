@@ -39708,7 +39708,7 @@ function visibleCharacters(html) {
     token++;
     if (part[0].startsWith("<")) continue;
     for (const item of part[0].matchAll(
-      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|apos|nbsp)(?:;|(?![a-z0-9=])))|[\s\S]/gi
+      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?|apos;)|[\s\S]/gi
     )) {
       const value = decodeEntity(item[0]);
       for (let i = 0; i < value.length; i++) {
@@ -39770,7 +39770,8 @@ function enrichNoteRead(id2, rawBody) {
         warning: "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
       } : {}
     };
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     return {
       content: rawBody,
       links: metadata?.links ?? [],
@@ -39778,7 +39779,7 @@ function enrichNoteRead(id2, rawBody) {
       complete: false,
       writable: false,
       revision: metadata?.revision ?? "unavailable",
-      warning: "Rich Notes metadata could not be read or matched. Links/native tags may be missing from this view. Full-body edits are blocked; check Full Disk Access and retry after sync."
+      warning: `Rich Notes metadata could not be read or matched. Links/native tags may be missing from this view. Full-body edits are blocked; check Full Disk Access and retry after sync. (${detail})`
     };
   }
 }

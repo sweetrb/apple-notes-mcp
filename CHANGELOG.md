@@ -1,5 +1,31 @@
 ## [Unreleased]
 
+## [2.8.13] - 2026-09-16
+
+### Fixed
+
+- Full-body `update-note` (and `get-note-content`'s rich-text reconciliation)
+  no longer rejects a note whose body contains a straight double quote
+  immediately followed by a letter, e.g. `say "hello" now` (#166). AppleScript
+  emits that quote as `&quot` with no trailing semicolon; the character
+  extractor's `(?![a-z0-9=])` guard is an HTML5 rule for *attribute-value*
+  parsing (it exists so a query string like `?x&amp=1` survives), not for text
+  content, so applying it here caused an un-decoded `&quot` to desync the
+  AppleScript HTML from the database's rich text and throw "Notes HTML and
+  rich text do not match; retry after sync" — surfaced to callers as the
+  generic "Rich Notes metadata could not be read or matched" warning, blocking
+  every full-body edit on the affected note. `amp`, `lt`, `gt`, `quot`, and
+  `nbsp` are HTML5 "legacy" named references and are now decoded with or
+  without a trailing semicolon regardless of what follows, matching real
+  browser behavior for text content; `apos` is not on that legacy list and
+  still requires the semicolon. Thanks to @oliverames for the root-cause
+  analysis and the exact repro.
+- `enrichNoteRead`'s fallback warning now appends the actual exception message
+  instead of discarding it, e.g. `... retry after sync. (Notes HTML and rich
+  text do not match; retry after sync)` — the bare `catch {}` previously threw
+  away the one diagnostic that would have shown this was a decoding bug and
+  not a Full Disk Access or sync problem (#166).
+
 ## [2.8.12] - 2026-09-15
 
 ### Fixed

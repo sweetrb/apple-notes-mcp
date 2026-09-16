@@ -276,8 +276,17 @@ function visibleCharacters(html: string): Character[] {
   for (const part of html.matchAll(/<[^>]*>|[^<]+/g)) {
     token++;
     if (part[0].startsWith("<")) continue;
+    // amp/lt/gt/quot/nbsp are HTML5 "legacy" named references: browsers decode
+    // them with or without a trailing semicolon, in text content, regardless
+    // of what follows. The "don't decode before an alphanumeric/=" rule is a
+    // parser rule for *attribute values* only (guards `?x&amp=1`-style query
+    // strings) and doesn't apply here. Apple Notes emits `&quot` with no
+    // semicolon, immediately followed by a letter, in AppleScript HTML — the
+    // old code declined to decode that case, desyncing this text stream from
+    // the rich-text one and blocking every full-body edit (#166). apos is not
+    // a legacy reference and always requires the semicolon.
     for (const item of part[0].matchAll(
-      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|apos|nbsp)(?:;|(?![a-z0-9=])))|[\s\S]/gi
+      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?|apos;)|[\s\S]/gi
     )) {
       const value = decodeEntity(item[0]);
       for (let i = 0; i < value.length; i++) {
@@ -353,7 +362,12 @@ export function enrichNoteRead(id: string, rawBody: string): RichRead {
           }
         : {}),
     };
-  } catch {
+  } catch (err) {
+    // Keep the generic guidance (still the right first move for most readers)
+    // but append the real exception instead of discarding it — a mismatch
+    // here can be a genuine bug (#166) that Full Disk Access / sync retries
+    // will never fix, and the swallowed message was the only diagnostic.
+    const detail = err instanceof Error ? err.message : String(err);
     return {
       content: rawBody,
       links: metadata?.links ?? [],
@@ -362,7 +376,8 @@ export function enrichNoteRead(id: string, rawBody: string): RichRead {
       writable: false,
       revision: metadata?.revision ?? "unavailable",
       warning:
-        "Rich Notes metadata could not be read or matched. Links/native tags may be missing from this view. Full-body edits are blocked; check Full Disk Access and retry after sync.",
+        "Rich Notes metadata could not be read or matched. Links/native tags may be missing from this view. Full-body edits are blocked; check Full Disk Access and retry after sync. " +
+        `(${detail})`,
     };
   }
 }
