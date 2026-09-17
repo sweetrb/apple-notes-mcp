@@ -381,6 +381,27 @@ describe("rich append input", () => {
     expect(() => validateAppendContent('<tt class="x">y</tt>', "html")).toThrow(
       /Unsupported HTML attributes on <tt>/
     ));
+  it("refuses Markdown that Notes' importer rewrites, and allows what it keeps literal", () => {
+    for (const content of [
+      "_note_ this",
+      "Call __init__ first",
+      "Deploy to /_next",
+      "1\\. not a list",
+      "AT&amp;T",
+      "Goals\n---",
+      " ## Goals",
+      "1) first",
+      "## Goals ##",
+      "[**x**](https://example.com)",
+    ])
+      expect(() => validateAppendContent(content, "markdown"), content).toThrow(
+        /Notes would change that text/
+      );
+    expect(() =>
+      validateAppendContent("snake_case_name, #decision and 1. first", "markdown")
+    ).not.toThrow();
+    expect(() => validateAppendContent("_note_ this", "plaintext")).not.toThrow();
+  });
   it("does not permit silent rich-content truncation", () =>
     expect(() => validateAppendContent("x".repeat(1024 * 1024 + 1), "plaintext")).toThrow());
   it.each(["![image](https://example.com/x)", '<img src="file:///x">', "[x](javascript:bad)"])(

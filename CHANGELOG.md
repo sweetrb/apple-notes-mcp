@@ -18,6 +18,17 @@
   `create-note-markdown`.
 - `apple-notes-mcp setup` and `doctor` include the Create Markdown Note bridge.
 
+### Fixed
+
+- `append-native`'s `format: "markdown"` refuses Markdown that Notes' importer
+  rewrites before anything is written (#172): `_` or `__` emphasis outside a
+  word, backslash escapes, character references, `---`/`===` lines, indented
+  headings or list items, `1)` lists, closing `#`s, and formatting inside link
+  labels. Since 2.8.14 sends raw Markdown to that importer, content such as
+  `_x_` was written to the note as italics and then reported as
+  "Operation outcome uncertain", because verification still expected the
+  underscores.
+
 ## [2.8.15] - 2026-09-17
 
 ### Fixed

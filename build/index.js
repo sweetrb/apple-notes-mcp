@@ -42976,6 +42976,16 @@ var NATIVE_APPEND_ELEMENTS = [
 ];
 var NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*;?$/i;
 var NATIVE_APPEND_HTML_SUBSET = `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, with href on <a> and a font-size style on <span> as the only attributes; everything else needs update-note.`;
+var UNMODELED_MARKDOWN = [
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
+  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
+  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
+  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
+  [/^\d+\)[ \t]/m, "`1)` lists"],
+  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
+  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"]
+];
 function validateAppendContent(content, format) {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
@@ -43005,8 +43015,15 @@ function validateAppendContent(content, format) {
     }
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
-  if (format === "markdown" && /!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
-    throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+  if (format === "markdown") {
+    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+      throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+    for (const [pattern, name] of UNMODELED_MARKDOWN)
+      if (pattern.test(content))
+        throw new Error(
+          `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
+        );
+  }
 }
 function runBackgroundShortcut(input, status = backgroundStatus()) {
   if (!status.installed)
@@ -43226,23 +43243,10 @@ var literalMarkdown = (text) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
 function headingLevels(html) {
   return [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].filter((match) => comparableVisibleText(match[2])).map((match) => Number(match[1]));
 }
-var UNMODELED_MARKDOWN = [
-  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
-  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
-  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
-  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
-  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
-  [/^\d+\)[ \t]/m, "`1)` lists"],
-  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
-  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"]
-];
 function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
   validateAppendContent(request.content, "markdown");
   const bodyHtml = appendMarkdownHtml(request.content);
-  for (const [pattern, name] of UNMODELED_MARKDOWN)
-    if (pattern.test(request.content))
-      throw new Error(`Markdown note content cannot use ${name}; Notes would change that text`);
   if (request.folder) buildFolderReference(request.folder);
   const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`.replace(/\s+/gu, " ").trim();
   const expectedLevels = [1, ...headingLevels(bodyHtml)].join();

@@ -1140,7 +1140,10 @@ subset as `format: "html"`'s Markdown-shaped content (`#`/`##`/`###` headings,
 flat lists, emphasis, and inline links) but is sent through Notes' own native
 Markdown importer rather than converted to HTML first, so `#`/`##`/`###`
 produce real Title/Heading/Subheading — Notes' HTML importer only
-distinguishes two heading levels and renders `###` the same as `##`. A
+distinguishes two heading levels and renders `###` the same as `##`. Markdown
+that the importer would rewrite, so the appended text could not be verified, is
+refused before anything is written; the list is under
+[Markdown notes](#markdown-notes). A
 transport failure names the Shortcut it was waiting on, so a missing or
 unapproved bridge is identified rather than guessed at; a timeout also says it
 may be an unanswered first-run consent prompt and names the Shortcut to run once

@@ -126,6 +126,24 @@ export const NATIVE_APPEND_HTML_SUBSET =
   `with href on <a> and a font-size style on <span> as the only attributes; ` +
   `everything else needs update-note.`;
 
+/**
+ * Markdown that `appendMarkdownHtml` passes through as literal text but Notes'
+ * importer consumes, so an appended or created note could never match the
+ * expected readback. Verified against Notes on macOS 27: `_x_`/`__x__` emphasis,
+ * backslash escapes, entity references, setext underlines, indented block
+ * markers, `1)` lists, closing `#`s, and formatting inside link labels.
+ */
+const UNMODELED_MARKDOWN: Array<[RegExp, string]> = [
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
+  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
+  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
+  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
+  [/^\d+\)[ \t]/m, "`1)` lists"],
+  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
+  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"],
+];
+
 /** Validate imported rich text conservatively. No external image fetching or embedded code. */
 export function validateAppendContent(content: string, format: "plaintext" | "html" | "markdown") {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
@@ -160,8 +178,15 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
     }
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
-  if (format === "markdown" && /!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
-    throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+  if (format === "markdown") {
+    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+      throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+    for (const [pattern, name] of UNMODELED_MARKDOWN)
+      if (pattern.test(content))
+        throw new Error(
+          `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
+        );
+  }
 }
 
 /** Invoke an installed bridge (by default Background Operations) with a private temporary JSON request. */
@@ -509,24 +534,6 @@ export function headingLevels(html: string): number[] {
     .map((match) => Number(match[1]));
 }
 
-/**
- * Markdown that `appendMarkdownHtml` passes through as literal text but Notes'
- * importer consumes, so the created note could never match the expected
- * readback. Verified against Notes on macOS 27: `_x_`/`__x__` emphasis,
- * backslash escapes, entity references, setext underlines, indented block
- * markers, `1)` lists, closing `#`s, and formatting inside link labels.
- */
-const UNMODELED_MARKDOWN: Array<[RegExp, string]> = [
-  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
-  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
-  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
-  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
-  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
-  [/^\d+\)[ \t]/m, "`1)` lists"],
-  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
-  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"],
-];
-
 export interface MarkdownNoteRequest {
   title: string;
   content: string;
@@ -553,9 +560,6 @@ export function createMarkdownNote(
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
   validateAppendContent(request.content, "markdown");
   const bodyHtml = appendMarkdownHtml(request.content);
-  for (const [pattern, name] of UNMODELED_MARKDOWN)
-    if (pattern.test(request.content))
-      throw new Error(`Markdown note content cannot use ${name}; Notes would change that text`);
   if (request.folder) buildFolderReference(request.folder);
   const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`
     .replace(/\s+/gu, " ")

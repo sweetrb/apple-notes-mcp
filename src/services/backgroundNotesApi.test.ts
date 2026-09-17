@@ -222,6 +222,15 @@ describe("native append and tags", () => {
     expect(written.text).not.toContain("<h3>");
   });
 
+  it("refuses Markdown that Notes would rewrite before reading or writing the note", () => {
+    const manager = managerFor([snapshot()]);
+    expect(() =>
+      appendNative(manager, { ...request, content: "An _emphasised_ word", format: "markdown" })
+    ).toThrow(/underscores outside a word; Notes would change that text/);
+    expect(manager.getNoteById).not.toHaveBeenCalled();
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
+
   it("returns an idempotent tag result without invoking a workflow", () => {
     expect(
       setNativeTag(managerFor([snapshot()]), { ...request, tag: "old", present: false })
@@ -530,20 +539,12 @@ describe("create-note Markdown bridge (#172)", () => {
         content: "| a | b |",
       })
     ).toThrow(/Markdown append supports/);
-    for (const content of [
-      "_note_ this",
-      "Call __init__ first",
-      "1\\. not a list",
-      "AT&amp;T",
-      "Goals\n---",
-      " ## Goals",
-      "1) first",
-      "## Goals ##",
-      "[**x**](https://example.com)",
-    ])
-      expect(() =>
-        createMarkdownNote(manager as unknown as AppleNotesManager, { title: "Plan", content })
-      ).toThrow(/Notes would change that text/);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "_note_ this",
+      })
+    ).toThrow(/Notes would change that text/);
     expect(() =>
       createMarkdownNote(manager as unknown as AppleNotesManager, {
         title: "Plan",
