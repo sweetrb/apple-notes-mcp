@@ -44516,7 +44516,7 @@ registerTool(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
       ),
       tags: external_exports.array(external_exports.string().max(MAX.TAG)).max(MAX.TAGS).optional().describe(
-        "Returned-only metadata \u2014 NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action."
+        "Returned-only metadata \u2014 NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action. Refused with format 'markdown': add tags afterwards with add-native-tags."
       ),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe(
         "Folder to create the note in (supports nested paths like 'Work/Clients'). The folder must already exist \u2014 this tool does not create it; call create-folder first, which is idempotent and creates intermediate segments."
@@ -44540,6 +44540,10 @@ registerTool(
       if (account)
         return errorResponse(
           "Markdown notes are created in the iCloud account, the only one where Notes interprets Markdown; omit account"
+        );
+      if (tags.length)
+        return errorResponse(
+          'tags are not supported with format "markdown"; create the note without tags, then add them with add-native-tags using the returned id'
         );
       requireValidated("create-note-markdown");
       const result = createMarkdownNote(notesManager, { title, content, folder });

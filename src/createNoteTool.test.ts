@@ -102,7 +102,23 @@ describe("create-note format markdown (#172)", () => {
     expect(createMarkdownNote).not.toHaveBeenCalled();
   });
 
-  it("creates through the bridge, drops tags, and returns the verified result", async () => {
+  it("refuses tags before the gate or any write", async () => {
+    const response = await createNote({
+      title: "Plan",
+      content: "## Goals",
+      format: "markdown",
+      tags: ["work"],
+    });
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(
+      /tags are not supported with format "markdown".*add-native-tags/
+    );
+    expect(requireValidated).not.toHaveBeenCalled();
+    expect(createMarkdownNote).not.toHaveBeenCalled();
+    expect(manager.createNote).not.toHaveBeenCalled();
+  });
+
+  it("creates through the bridge and returns the verified result", async () => {
     const result = {
       ok: true,
       id: "x-coredata://ABCDEF/ICNote/p2",
@@ -118,7 +134,6 @@ describe("create-note format markdown (#172)", () => {
       content: "## Goals",
       format: "markdown",
       folder: "Work",
-      tags: ["ignored"],
     });
     expect(createMarkdownNote).toHaveBeenCalledWith(manager, {
       title: "Plan",

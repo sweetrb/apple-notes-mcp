@@ -339,7 +339,7 @@ registerTool(
         .max(MAX.TAGS)
         .optional()
         .describe(
-          "Returned-only metadata — NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action."
+          "Returned-only metadata — NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action. Refused with format 'markdown': add tags afterwards with add-native-tags."
         ),
       folder: z
         .string()
@@ -371,6 +371,12 @@ registerTool(
       if (account)
         return errorResponse(
           "Markdown notes are created in the iCloud account, the only one where Notes interprets Markdown; omit account"
+        );
+      // The bridge cannot attach tags, and silently dropping them would report
+      // success for a note the caller did not ask for.
+      if (tags.length)
+        return errorResponse(
+          'tags are not supported with format "markdown"; create the note without tags, then add them with add-native-tags using the returned id'
         );
       requireValidated("create-note-markdown");
       const result = createMarkdownNote(notesManager, { title, content, folder });
