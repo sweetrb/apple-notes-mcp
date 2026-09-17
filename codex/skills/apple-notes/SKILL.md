@@ -203,7 +203,11 @@ Action: show-note by ID to reveal it in Notes.app; get-selected-notes to read th
 Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but these tags are reliable for most API-created content:
 
 - Use `<div>` for body blocks and `<div><br></div>` for blank spacing.
-- Use `<h2>` and `<h3>` for section headings inside newly created notes. `create-note` already creates the top `<h1>` from the `title`.
+- `create-note` already creates the top `<h1>` from the `title`, but `<h2>`/`<h3>`
+  in its `content` do **not** produce real Heading/Subheading styles — AppleScript's
+  `body` property renders them as plain bold text (#172). For real interior
+  headings, create the note first, then use `append-native` with
+  `format: "markdown"` (`#`/`##`/`###` → Title/Heading/Subheading).
 - Use `<ul><li>` and `<ol><li>` for native bullet and numbered lists. Add `<div><br></div>` after closing `</ul>` or `</ol>` so the next section has spacing.
 - Use `<b>`, `<i>`, `<u>`, and `<s>` for inline emphasis.
 - Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.

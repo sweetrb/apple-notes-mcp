@@ -404,13 +404,21 @@ export function htmlLinks(html: string): Array<{ text: string; url: string }> {
   }
   return links;
 }
+// Notes rewrites a bare http(s) origin with no path/query/fragment to add a
+// trailing slash on save (`https://example.com` -> `https://example.com/`).
+// Comparing the pre-write request URL against the post-write readback URL
+// verbatim then reports a successful write as unverified (#172); treat the
+// two spellings of a bare origin as the same destination.
+const BARE_HTTP_ORIGIN = /^https?:\/\/[^/?#]+$/i;
+const normalizedUrl = (url: string) => (BARE_HTTP_ORIGIN.test(url) ? `${url}/` : url);
+
 /** Produce a stable signature that preserves duplicate labels and destinations. */
 export function linkSignature(links: Array<{ text: string; url: string }>): string {
   return JSON.stringify(
     links.flatMap((link) =>
       normalized(link.text)
         .split("")
-        .map((char) => [char, link.url])
+        .map((char) => [char, normalizedUrl(link.url)])
     )
   );
 }

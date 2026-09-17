@@ -225,6 +225,14 @@ Creates a new note in Apple Notes.
 
 > **Note:** The title is automatically prepended as `<h1>` in both plaintext and HTML formats. Do not include a `<h1>` title tag in the `content` parameter, or the title will appear twice.
 
+> **Known limitation:** `create-note` sets the note body directly via AppleScript's
+> `body` property, which does not apply real Notes paragraph styles for interior
+> content — an `<h2>`/`<h3>` tag or a `<span style="font-size: …px">` heading span
+> in `content` renders as plain bold, styled text, not an actual Heading or
+> Subheading ([#172](https://github.com/sweetrb/apple-notes-mcp/issues/172)). Real
+> Heading/Subheading styles can currently only be added to a note that already
+> exists, with [`append-native`](#append-native)'s `format: "markdown"`.
+
 **Returns:** Confirmation message with note title and ID. Save the ID for subsequent operations like `update-note`, `delete-note`, etc.
 
 ---
@@ -1066,9 +1074,14 @@ when `scopeText` is supplied. Use a distinctive phrase of plain words without
 punctuation, hashtags, or paths because Notes search may not resolve them
 literally. `format: "html"` accepts the fixed subset tabulated under
 [`append-to-note`](#append-to-note); content outside it is refused by name, with
-the accepted subset in the error. A transport failure names the Shortcut it was
-waiting on, so a missing or unapproved bridge is identified rather than guessed
-at.
+the accepted subset in the error. `format: "markdown"` accepts the same bounded
+subset as `format: "html"`'s Markdown-shaped content (`#`/`##`/`###` headings,
+flat lists, emphasis, and inline links) but is sent through Notes' own native
+Markdown importer rather than converted to HTML first, so `#`/`##`/`###`
+produce real Title/Heading/Subheading — Notes' HTML importer only
+distinguishes two heading levels and renders `###` the same as `##`. A
+transport failure names the Shortcut it was waiting on, so a missing or
+unapproved bridge is identified rather than guessed at.
 
 #### `create-checklist-item`
 

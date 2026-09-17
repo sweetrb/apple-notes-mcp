@@ -414,20 +414,24 @@ export function appendNative(
   request: BackgroundInput & { content: string; format: "plaintext" | "html" | "markdown" }
 ): ReturnType<typeof mutateBackground> {
   validateAppendContent(request.content, request.format);
-  if (request.format === "markdown")
-    return appendNative(manager, {
-      ...request,
-      content: appendMarkdownHtml(request.content),
-      format: "html",
-    });
   if (request.format === "html" && /<table\b/i.test(request.content))
     throw new Error("Use create-table for verified native table insertion");
+  // Markdown is sent to the bridge's dedicated "append-markdown" branch, which
+  // runs Shortcuts' native Markdown-to-rich-text action, instead of being
+  // converted to our own HTML subset and routed through "append-html" first.
+  // Notes' HTML importer (the "append-html" path) only distinguishes two
+  // heading levels and silently renders `<h3>` the same as `<h2>` — Heading,
+  // not Subheading — while its Markdown importer preserves all three (#172).
+  // appendMarkdownHtml() is still run for its validation of the bounded
+  // Markdown subset and to compute the expected visible text/links for
+  // readback verification; its HTML is no longer sent to Notes.
+  const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
   const op =
     request.format === "plaintext"
       ? "append-text"
-      : request.format === "html"
-        ? "append-html"
-        : "append-markdown";
+      : request.format === "markdown"
+        ? "append-markdown"
+        : "append-html";
   const text =
     request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
   return mutateBackground(
@@ -436,15 +440,12 @@ export function appendNative(
     { text },
     (before, after) => {
       assertPreserved(before, after, { append: true });
+      const verifyHtml = markdownHtml ?? request.content;
       const expected =
-        request.format === "html"
-          ? comparableVisibleText(request.content)
-          : request.format === "plaintext"
-            ? request.content
-            : null;
+        request.format === "plaintext" ? request.content : comparableVisibleText(verifyHtml);
       if (expected) assertAppendedVisibleText(before.html, after.html, expected);
-      if (request.format === "html")
-        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, request.content);
+      if (request.format === "html" || request.format === "markdown")
+        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, verifyHtml);
     },
     backgroundDependencies(manager)
   );

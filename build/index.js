@@ -39800,10 +39800,12 @@ function htmlLinks(html) {
   }
   return links;
 }
+var BARE_HTTP_ORIGIN = /^https?:\/\/[^/?#]+$/i;
+var normalizedUrl = (url) => BARE_HTTP_ORIGIN.test(url) ? `${url}/` : url;
 function linkSignature(links) {
   return JSON.stringify(
     links.flatMap(
-      (link) => normalized(link.text).split("").map((char) => [char, link.url])
+      (link) => normalized(link.text).split("").map((char) => [char, normalizedUrl(link.url)])
     )
   );
 }
@@ -43157,15 +43159,10 @@ function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
 }
 function appendNative(manager, request) {
   validateAppendContent(request.content, request.format);
-  if (request.format === "markdown")
-    return appendNative(manager, {
-      ...request,
-      content: appendMarkdownHtml(request.content),
-      format: "html"
-    });
   if (request.format === "html" && /<table\b/i.test(request.content))
     throw new Error("Use create-table for verified native table insertion");
-  const op = request.format === "plaintext" ? "append-text" : request.format === "html" ? "append-html" : "append-markdown";
+  const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
+  const op = request.format === "plaintext" ? "append-text" : request.format === "markdown" ? "append-markdown" : "append-html";
   const text = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
   return mutateBackground(
     request,
@@ -43173,10 +43170,11 @@ function appendNative(manager, request) {
     { text },
     (before, after) => {
       assertPreserved(before, after, { append: true });
-      const expected = request.format === "html" ? comparableVisibleText(request.content) : request.format === "plaintext" ? request.content : null;
+      const verifyHtml = markdownHtml ?? request.content;
+      const expected = request.format === "plaintext" ? request.content : comparableVisibleText(verifyHtml);
       if (expected) assertAppendedVisibleText(before.html, after.html, expected);
-      if (request.format === "html")
-        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, request.content);
+      if (request.format === "html" || request.format === "markdown")
+        assertAppendedHtmlLinks(before.rich.links.length, after.rich.links, verifyHtml);
     },
     backgroundDependencies(manager)
   );

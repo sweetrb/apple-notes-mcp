@@ -92,6 +92,19 @@ describe("background note mutation boundaries", () => {
       )
     ).toThrow(/not verified/);
   });
+  it("verifies a bare-origin link even after Notes appends a trailing slash (#172)", () => {
+    // Notes normalizes a path-less URL like "https://growthpath.systems" to
+    // "https://growthpath.systems/" on save. Comparing the requested link
+    // against the readback verbatim reported a successful write as
+    // unverified; the signature-based comparison must treat them as equal.
+    expect(() =>
+      assertAppendedHtmlLinks(
+        0,
+        [{ text: "link", url: "https://growthpath.systems/" }],
+        '<a href="https://growthpath.systems">link</a>'
+      )
+    ).not.toThrow();
+  });
   it("verifies the native outcome independently of empty transport output", () => {
     const f = fixture();
     expect(

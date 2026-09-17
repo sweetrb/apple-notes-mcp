@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import type { AppleNotesManager } from "./appleNotesManager.js";
 import type { BackgroundSnapshot } from "./backgroundNotes.js";
 
@@ -14,6 +15,10 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("node:child_process", () => ({ execFileSync: vi.fn() }));
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeFileSync: vi.fn(actual.writeFileSync) };
+});
 vi.mock("./nativeTags.js", () => ({
   nativeTagsStatus: mock.status,
   normalizeNativeTags: (tags: string[]) => tags.map((tag) => tag.replace(/^#/, "")),
@@ -186,6 +191,34 @@ describe("native append and tags", () => {
         format: "html",
       })
     ).toThrow(/create-table/);
+  });
+
+  it("sends Markdown to the bridge's native Markdown import, not converted HTML (#172)", () => {
+    // The bridge's "append-html" branch (Notes' HTML importer) only
+    // distinguishes two heading levels and collapses <h3> to the same style
+    // as <h2>. The "append-markdown" branch runs Shortcuts' native
+    // Markdown-to-rich-text action instead, which preserves all three, so a
+    // Markdown request must be transported as raw Markdown text on the
+    // "append-markdown" operation — never as our own HTML on "append-html".
+    const before = snapshot();
+    const after = snapshot({
+      hash: "h2",
+      html: `<div>${scopeText}</div><div><br></div><h3>Added</h3>`,
+      rich: { ...before.rich, text: `${scopeText}\nAdded`, revision: "r2" },
+    });
+    expect(
+      appendNative(managerFor([before, before, after]), {
+        ...request,
+        content: "### Added",
+        format: "markdown",
+      })
+    ).toMatchObject({ ok: true });
+    const writeMock = vi.mocked(writeFileSync);
+    const requestJson = String(writeMock.mock.calls.at(-1)?.[1]);
+    const written = JSON.parse(requestJson) as { operation: string; text: string };
+    expect(written.operation).toBe("append-markdown");
+    expect(written.text).toContain("### Added");
+    expect(written.text).not.toContain("<h3>");
   });
 
   it("returns an idempotent tag result without invoking a workflow", () => {

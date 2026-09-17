@@ -248,6 +248,27 @@ describe("Notes rich text", () => {
       /scheme/
     );
   });
+  it("treats a bare http(s) origin as equal to the same origin with a trailing slash (#172)", () => {
+    // Notes rewrites a path-less origin to add a trailing slash on save, so a
+    // link written as "https://growthpath.systems" reads back as
+    // "https://growthpath.systems/" — the two must produce the same signature
+    // or a successful write is reported as an unverified append.
+    expect(linkSignature([{ text: "site", url: "https://growthpath.systems" }])).toBe(
+      linkSignature([{ text: "site", url: "https://growthpath.systems/" }])
+    );
+    // A URL that already has a path, query, or fragment is left untouched —
+    // only a bare origin is ambiguous.
+    expect(linkSignature([{ text: "site", url: "https://growthpath.systems/docs" }])).not.toBe(
+      linkSignature([{ text: "site", url: "https://growthpath.systems/docs/" }])
+    );
+    expect(linkSignature([{ text: "site", url: "https://growthpath.systems?x=1" }])).not.toBe(
+      linkSignature([{ text: "site", url: "https://growthpath.systems/?x=1" }])
+    );
+    // Non-http(s) schemes are unaffected.
+    expect(linkSignature([{ text: "n", url: "notes://showNote?identifier=1" }])).toBe(
+      linkSignature([{ text: "n", url: "notes://showNote?identifier=1" }])
+    );
+  });
   it("distinguishes native objects and checklists from plain hashtags", () => {
     expect(parseRichNote(document("#topic", [run(6)])).hasNativeObjects).toBe(false);
     const native = Buffer.concat([run(1), b(12, b(1, "native-tag-id"))]);

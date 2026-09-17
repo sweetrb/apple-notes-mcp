@@ -1,5 +1,39 @@
 ## [Unreleased]
 
+## [2.8.14] - 2026-09-17
+
+### Fixed
+
+- `append-native`'s `format: "markdown"` no longer collapses `###` (Subheading)
+  to the same style as `##` (Heading) (#172). Markdown content was always
+  converted to our own HTML subset first and sent through the bridge's
+  `append-html` operation, which runs Notes' HTML importer — that importer
+  only distinguishes two heading levels. Markdown requests are now sent as raw
+  Markdown text on the bridge's existing (previously unused) `append-markdown`
+  operation, which runs Shortcuts' native Markdown-to-rich-text action and
+  preserves Title/Heading/Subheading for `#`/`##`/`###`. Thanks to
+  @vladbisceanu for the root-cause pointer — the macOS 27 "Interpret as
+  Markdown" Create Note intent reading back `###` correctly showed Notes could
+  store the level, isolating the bug to the HTML import path.
+- `append-native`'s appended-link verification no longer reports a successful
+  write as `"Appended HTML link not verified"` when the link is a bare
+  `http(s)` origin with no path, e.g. `https://growthpath.systems` (#172).
+  Notes rewrites a path-less origin to add a trailing slash on save; the
+  verification compared the pre-write URL against the post-write readback
+  verbatim. `linkSignature` now normalizes a bare origin and the same origin
+  with a trailing slash to the same signature before comparing. Thanks to
+  @vladbisceanu for the report.
+
+### Documentation
+
+- `create-note`'s README entry and the bundled skill now note that `<h2>`/`<h3>`
+  (and the `<span style="font-size: …px">` heading form) in its `content` do
+  **not** produce real Notes Heading/Subheading styles — `create-note` sets the
+  body directly via AppleScript's `body` property, which only special-cases the
+  title as `<h1>` — and that real interior headings currently require
+  `append-native` with `format: "markdown"` on a note that already exists
+  (#172).
+
 ## [2.8.13] - 2026-09-16
 
 ### Fixed
