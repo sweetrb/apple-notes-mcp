@@ -42976,8 +42976,9 @@ var NATIVE_APPEND_ELEMENTS = [
 ];
 var NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*;?$/i;
 var NATIVE_APPEND_HTML_SUBSET = `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, with href on <a> and a font-size style on <span> as the only attributes; everything else needs update-note.`;
+var UNDERSCORES_OUTSIDE_A_WORD = "underscores outside a word";
 var UNMODELED_MARKDOWN = [
-  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, UNDERSCORES_OUTSIDE_A_WORD],
   [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
   [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
   [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
@@ -43018,8 +43019,9 @@ function validateAppendContent(content, format) {
   if (format === "markdown") {
     if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+    const withoutLinkDestinations = content.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
     for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(content))
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : content))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );

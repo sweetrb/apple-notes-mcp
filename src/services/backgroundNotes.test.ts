@@ -402,6 +402,34 @@ describe("rich append input", () => {
     ).not.toThrow();
     expect(() => validateAppendContent("_note_ this", "plaintext")).not.toThrow();
   });
+  it("exempts link destinations from the underscore refusal, where CommonMark forms no emphasis", () => {
+    for (const content of [
+      "[docs](https://example.com/_next/static)",
+      "[x](https://e.com/a_b/_c)",
+      "## Links\n\n- [build output](https://example.com/_next/static) and [x](https://e.com/a_b/_c)",
+    ])
+      expect(() => validateAppendContent(content, "markdown"), content).not.toThrow();
+  });
+  it("still refuses underscores outside a word in text, labels and bare URLs", () => {
+    for (const content of [
+      "_x_",
+      "__init__.py",
+      "https://example.com/_next/_x_",
+      "See https://example.com/_next/_x_ and [docs](https://example.com/_next/static)",
+      "_x_ [docs](https://example.com/a)",
+      "[docs](https://example.com/a) __init__.py",
+    ])
+      expect(() => validateAppendContent(content, "markdown"), content).toThrow(
+        /underscores outside a word; Notes would change that text/
+      );
+    // Other patterns still see the destination.
+    expect(() => validateAppendContent("[x](https://e.com/a\\_b)", "markdown")).toThrow(
+      /backslash escapes/
+    );
+    expect(() => validateAppendContent("[_x_](https://e.com/a)", "markdown")).toThrow(
+      /Notes would change that text/
+    );
+  });
   it("does not permit silent rich-content truncation", () =>
     expect(() => validateAppendContent("x".repeat(1024 * 1024 + 1), "plaintext")).toThrow());
   it.each(["![image](https://example.com/x)", '<img src="file:///x">', "[x](javascript:bad)"])(

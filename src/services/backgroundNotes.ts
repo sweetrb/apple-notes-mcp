@@ -133,8 +133,9 @@ export const NATIVE_APPEND_HTML_SUBSET =
  * backslash escapes, entity references, setext underlines, indented block
  * markers, `1)` lists, closing `#`s, and formatting inside link labels.
  */
+const UNDERSCORES_OUTSIDE_A_WORD = "underscores outside a word";
 const UNMODELED_MARKDOWN: Array<[RegExp, string]> = [
-  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, UNDERSCORES_OUTSIDE_A_WORD],
   [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
   [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
   [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
@@ -181,8 +182,13 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
   if (format === "markdown") {
     if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
+    // CommonMark never forms emphasis inside an inline link destination, so a
+    // URL such as https://example.com/_next/static is kept literal. Strip the
+    // destinations of the links appendMarkdownHtml recognizes before the
+    // underscore test only; every other pattern still sees the full content.
+    const withoutLinkDestinations = content.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
     for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(content))
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : content))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
