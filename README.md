@@ -267,6 +267,7 @@ title line, with no seed line.
 
 - Notes interprets Markdown only in an iCloud account. The note is created in the
   iCloud account's default folder, then moved to `folder` in that account.
+  `folder` must already exist and is checked before anything is created.
   `account` is refused with this format.
 - `content` accepts the same bounded subset as `append-native`'s Markdown:
   `#`/`##`/`###` headings, flat lists, `**bold**`, `*italic*` and inline links.

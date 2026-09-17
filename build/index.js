@@ -43251,6 +43251,16 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
+  if (request.folder) {
+    const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+    const wanted = segments(request.folder);
+    if (!manager.listAccounts().some(
+      (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+    ))
+      throw new Error(
+        `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
+      );
+  }
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(
       (account) => account.defaultFolder ? manager.listNoteRefs(account.name, account.defaultFolder).map((note) => [note.id, account.name]) : []

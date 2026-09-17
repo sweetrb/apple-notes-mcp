@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AppleNotesManager, buildFolderReference } from "./appleNotesManager.js";
+import { AppleNotesManager, buildFolderReference, splitFolderPath } from "./appleNotesManager.js";
 import { nativeTagsStatus, normalizeNativeTags, runNativeTagsShortcut } from "./nativeTags.js";
 import { shortcutConsentHint } from "./shortcutConsent.js";
 import {
@@ -566,6 +566,25 @@ export function createMarkdownNote(
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
+  if (request.folder) {
+    // moveNoteById needs an existing folder, so check before the bridge creates
+    // anything. Compare parsed segments case-insensitively, as AppleScript does.
+    const segments = (path: string) =>
+      JSON.stringify(splitFolderPath(path).map((part) => part.toLocaleLowerCase()));
+    const wanted = segments(request.folder);
+    if (
+      !manager
+        .listAccounts()
+        .some(
+          (account) =>
+            account.defaultFolder &&
+            manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+        )
+    )
+      throw new Error(
+        `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
+      );
+  }
   const defaultFolderNotes = () =>
     new Map(
       manager

@@ -319,6 +319,10 @@ describe("create-note Markdown bridge (#172)", () => {
       ),
       getNoteById: vi.fn(() => ({ title: "Plan", passwordProtected: false })),
       getNoteContentById: vi.fn((noteId: string) => read(noteId).html),
+      listFolders: vi.fn(() => [
+        { id: "folder-1", name: "Work", account: "iCloud" },
+        { id: "folder-2", name: "Work/Clients\\/Partners", account: "iCloud" },
+      ]),
       moveNoteById: vi.fn(() => true),
     };
     mock.enrich.mockReturnValue({ revision: "r1" });
@@ -469,10 +473,42 @@ describe("create-note Markdown bridge (#172)", () => {
       createMarkdownNote(manager as unknown as AppleNotesManager, {
         title: "Plan",
         content: "## Goals\n### Detail\n- one",
-        folder: "Missing",
+        folder: "Work",
       })
     ).toThrow(
-      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: created and verified .* not moved to "Missing"; use move-note/
+      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: created and verified .* not moved to "Work"; use move-note/
+    );
+  });
+
+  it("refuses a folder that does not exist before the bridge creates anything", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals",
+        folder: "Typo",
+      })
+    ).toThrow(
+      'Folder "Typo" does not exist; create it with create-folder first. Nothing was created'
+    );
+    expect(manager.listNoteRefs).not.toHaveBeenCalled();
+    expect(execFileSync).not.toHaveBeenCalled();
+    expect(manager.moveNoteById).not.toHaveBeenCalled();
+  });
+
+  it("matches an existing nested folder the way the move resolves it", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    expect(
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "work/clients\\/partners/",
+      })
+    ).toMatchObject({ ok: true, id: created, folder: "work/clients\\/partners/" });
+    expect(manager.moveNoteById).toHaveBeenCalledWith(
+      created,
+      "work/clients\\/partners/",
+      "iCloud"
     );
   });
 
