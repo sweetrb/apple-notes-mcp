@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.8.17] - 2026-09-17
+
+### Fixed
+
+- Every generated AppleScript now builds its field and record separators with
+  `character id` (#162). 2.8.11 made that change for `list-notes` only; the
+  search, folder, account, stats, selection, attachment and batch-move scripts
+  still used `ASCII character`, a Standard Additions command that Notes.app
+  answers as a separate Apple Event each time, several per returned item.
+  Output is unchanged. Median of 3 runs on a 361-note, 3-account library:
+
+  | Call                                    | Before | After  |
+  | --------------------------------------- | ------ | ------ |
+  | `search-notes "the"` (title, 13 hits)   | 1.49 s | 1.08 s |
+  | `search-notes "the"` (content, 50 hits) | 6.09 s | 4.27 s |
+  | `list-folders`                          | 0.53 s | 0.36 s |
+  | `list-accounts`                         | 0.41 s | 0.30 s |
+  | `get-notes-stats`                       | 1.37 s | 1.12 s |
+
 ## [2.8.16] - 2026-09-17
 
 ### Added
@@ -116,7 +135,7 @@
   no longer rejects a note whose body contains a straight double quote
   immediately followed by a letter, e.g. `say "hello" now` (#166). AppleScript
   emits that quote as `&quot` with no trailing semicolon; the character
-  extractor's `(?![a-z0-9=])` guard is an HTML5 rule for *attribute-value*
+  extractor's `(?![a-z0-9=])` guard is an HTML5 rule for _attribute-value_
   parsing (it exists so a query string like `?x&amp=1` survives), not for text
   content, so applying it here caused an un-decoded `&quot` to desync the
   AppleScript HTML from the database's rich text and throw "Notes HTML and
@@ -130,7 +149,7 @@
   analysis and the exact repro.
 - `enrichNoteRead`'s fallback warning now appends the actual exception message
   instead of discarding it, e.g. `... retry after sync. (Notes HTML and rich
-  text do not match; retry after sync)` — the bare `catch {}` previously threw
+text do not match; retry after sync)` — the bare `catch {}` previously threw
   away the one diagnostic that would have shown this was a decoding bug and
   not a Full Disk Access or sync problem (#166).
 
@@ -145,20 +164,20 @@
   form Notes itself stores a heading as, were refused with
   `Unsupported HTML element: tt` / `: span`, so a heading read out of Notes
   could not be appended back into one. The accepted elements are now `<a> <b>
-  <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li> <ol> <p> <s> <span>
-  <strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u> <ul>`, with `href`
+<br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li> <ol> <p> <s> <span>
+<strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u> <ul>`, with `href`
   on `<a>` and a `font-size` style on `<span>` as the only attributes. Every
   other style on `<span>` (colour, font family, background) is still refused.
 - A stalled or failed Shortcuts run now names the Shortcut it was waiting on:
   `Shortcuts timed out waiting for the "Apple Notes MCP - Background
-  Operations v5" Shortcut; …` instead of a bare `Shortcuts timed out`. The
+Operations v5" Shortcut; …` instead of a bare `Shortcuts timed out`. The
   "install the bridge first" errors and the native-tag failure message name it
   too, so a missing or unapproved Shortcut can be found in Shortcuts.app
   without guessing which one it was (#164).
 
 ### Changed
 
-- A rejected element or attribute now names itself *and* the accepted subset in
+- A rejected element or attribute now names itself _and_ the accepted subset in
   the error, instead of `Unsupported HTML element: <name>` alone (#164).
 - The `append-to-note` and `append-native` tool descriptions, the README Tool
   Reference and `skills/apple-notes/SKILL.md` state the native-append HTML
@@ -272,11 +291,12 @@
 ## [2.8.4] - 2026-09-10
 
 ### Fixed
+
 - `update-note` / `append-to-note` no longer report a spurious "readback visible
   text did not match" for a write that actually succeeded (#145). Notes.app
   **merges adjacent inline runs of the same style** when it saves — verified
   against Notes.app on 2026-09-10, where `<b>merge</b><b>me</b>` is stored as
-  `<b>mergeme</b>`. `comparableVisibleText` replaced *every* tag with a space, so
+  `<b>mergeme</b>`. `comparableVisibleText` replaced _every_ tag with a space, so
   the written side normalised to `merge me` while the readback normalised to
   `mergeme`, and the verifier failed a successful write with an error telling the
   user not to retry and to inspect the note by hand.
@@ -287,6 +307,7 @@
   cells, `<br>` and any unrecognised tag still separate words exactly as before.
 
 ### Documentation
+
 - #145's other reported edge case — the linefeed-tolerant conflict guard masking a
   concurrent one-linefeed edit — was investigated against Notes.app and **refuted**.
   Notes normalises trailing linefeeds: a body set to `X`, `X\n` or `X\n\n` all read
@@ -311,7 +332,7 @@
   Structurally, the same knowledge lived in three independent places — an
   inline literal inside `ERROR_MAPPINGS`, and two raw `.includes()` substring
   checks in `healthCheck` — and the health-check copies re-tested substrings
-  that the mapping had already *replaced*, so each was free to drift from the
+  that the mapping had already _replaced_, so each was free to drift from the
   mapping and from the OS. `src/utils/applescript.ts` now exports a single
   `PERMISSION_DENIED_PATTERN`, the matching `PERMISSION_DENIED_MESSAGE`, and an
   `isPermissionDenied()` helper that deliberately accepts **both** the raw
@@ -394,8 +415,8 @@
 - **Supply-chain soak raised from 1 day to 7 days** (`minimumReleaseAge: 10080` in
   `pnpm-workspace.yaml`). This is a development/CI-time policy — no shipped bytes change.
   It is not redundant with Dependabot's existing 7-day cooldown: the cooldown governs only
-  what Dependabot *proposes* (direct dependencies), while `minimumReleaseAge` governs
-  everything a resolution *installs*, including transitive packages Dependabot never sees.
+  what Dependabot _proposes_ (direct dependencies), while `minimumReleaseAge` governs
+  everything a resolution _installs_, including transitive packages Dependabot never sees.
   Verified against this repo's committed lockfile, which needs no churn to satisfy it.
   Prompted by [sweetrb/apple-mail-mcp#174](https://github.com/sweetrb/apple-mail-mcp/pull/174)
   (@anupamme), applied across all four Apple MCP repos so the value cannot drift.
@@ -424,7 +445,7 @@
 
 ### Added
 
-- **Two guards that hold the docs to the software that actually exists** (`src/docsTruth.test.ts`). `claudeMdEscaping.test.ts` and `readmeEscaping.test.ts` made the escaping *examples* executable after the four-backslash defect shipped; nothing covered the rest of the documented surface, and the other defect that week — "the default account is iCloud" outliving the code that assumed it — was the same failure in a different sentence: a doc that nothing compares to reality.
+- **Two guards that hold the docs to the software that actually exists** (`src/docsTruth.test.ts`). `claudeMdEscaping.test.ts` and `readmeEscaping.test.ts` made the escaping _examples_ executable after the four-backslash defect shipped; nothing covered the rest of the documented surface, and the other defect that week — "the default account is iCloud" outliving the code that assumed it — was the same failure in a different sentence: a doc that nothing compares to reality.
 
   **Guard A — every documented example is real.** (a) Every fenced ` ```json ` block in README.md, CLAUDE.md and `docs/*.md` must parse as JSON, because a malformed example in setup docs actively breaks whoever copies it; the scanner handles indented and longer-run fences so a block cannot dodge it by nesting in a list. (b) Every `APPLE_*_MCP_*` variable named in those docs must appear under `src/`, so a renamed or deleted knob cannot keep being advertised. A family prefix written in prose (`APPLE_NOTES_MCP_*`) is accepted only when it is a **strict prefix** of a real variable — judged structurally, with no repo-specific names hardcoded — so `APPLE_NOTES_MCP_TIMEOUT` (a prefix of the real `APPLE_NOTES_MCP_TIMEOUT_MS`, but not written as a family) still fails.
 
@@ -432,7 +453,7 @@
 
   **Placement was the point.** Twice a guard was written that never ran in CI. `vitest.config.ts` includes `src/**/*.test.ts` and is what `pnpm test` / `pnpm run test:coverage` execute, which is what the **required** `test (22)` / `test (24)` contexts run — so this file lives in `src/`, not `test/`, whose config backs no required context. `build/index.js` is git-tracked and package.json's `prepare` script rebuilds it during CI's `pnpm install --frozen-lockfile`, before the test step, so it is present when Guard B spawns it; there is deliberately **no** skip-if-missing branch, which is how a guard passes vacuously forever.
 
-  **Every assertion was proved by breaking what it protects.** A trailing comma in the `search-notes` example fails with ``README.md:233 — a ```json example does not parse as JSON … Expected double-quoted property name``; documenting `APPLE_NOTES_MCP_ATTACHMENT_CACHE_TTL` fails with "does not appear anywhere under src/"; deleting the `get-note-link` entry fails with "the server advertises 1 tool(s) that README.md's Tool Reference never documents: get-note-link"; adding a phantom `pin-note` entry fails with "documents 1 tool(s) the server does not advertise: pin-note". Each check also has a vacuity floor, proved the same way: retagging every `json` fence away, emptying the Tool Reference section, deleting it outright, stripping every environment-variable mention, and hiding `build/index.js` each **fail** rather than pass on an empty set.
+  **Every assertion was proved by breaking what it protects.** A trailing comma in the `search-notes` example fails with `README.md:233 — a ```json example does not parse as JSON … Expected double-quoted property name`; documenting `APPLE_NOTES_MCP_ATTACHMENT_CACHE_TTL` fails with "does not appear anywhere under src/"; deleting the `get-note-link` entry fails with "the server advertises 1 tool(s) that README.md's Tool Reference never documents: get-note-link"; adding a phantom `pin-note` entry fails with "documents 1 tool(s) the server does not advertise: pin-note". Each check also has a vacuity floor, proved the same way: retagging every `json` fence away, emptying the Tool Reference section, deleting it outright, stripping every environment-variable mention, and hiding `build/index.js` each **fail** rather than pass on an empty set.
 
 ## [2.7.3] - 2026-08-13
 
@@ -452,7 +473,7 @@
 
 - **Every tool was refused by the client, because the advertised schemas declared JSON Schema draft-07.** MCP has standardized on JSON Schema 2020-12 (SEP-834 / SEP-1613 / SEP-2106) and current clients reject any other dialect outright — `Tool '<name>' has an invalid outputSchema: JSON Schema declares an unsupported dialect ("$schema": "http://json-schema.org/draft-07/schema#"). The default validator supports JSON Schema 2020-12 only.` — so this is not a degraded tool here and there, it is all **36 tools** unusable at once. The dialect comes from the SDK, not from this repo: `server/mcp.js` calls its zod→JSON-Schema converter with **no `target`**, `mapMiniTarget(undefined)` resolves to `draft-7`, and the result is stamped onto every `inputSchema` **and** `outputSchema`. Upgrading zod does not fix it — verified empirically on SDK 1.30.0 with zod 4.4.3, where the v4 branch still emits draft-07 — so the fix normalizes the outgoing `tools/list` payload at the transport boundary, the only public seam that does not reach into SDK internals. No tool, zod schema or handler changed. The converter also rewrites the keywords whose spelling or meaning changed in 2020-12 (`definitions`→`$defs` and the `$ref`s pointing at them, tuple `items`→`prefixItems`, `additionalItems`, `dependencies`→`dependentRequired`/`dependentSchemas`, draft-4 boolean `exclusiveMinimum`/`exclusiveMaximum`). That part is a no-op on today's emitted bodies — they use none of those — but it means a future zod construct cannot quietly reintroduce a dialect mismatch. Reported against the sibling server as sweetrb/apple-mail-mcp#147; all four Apple MCP servers were affected identically.
 
-- **The dialect converter rewrote caller-chosen tool parameter names as if they were schema keywords.** Caught before release, in the converter added above. `convertNode` recursed uniformly and then switched on every key it met — but the keys of a `properties` map are **tool parameter names**, not keywords. So a tool declaring a parameter named `definitions` would have had it renamed to `$defs` on the wire, and one named `$schema` would have been **silently deleted** while `required` still listed it, producing a schema **no input can satisfy**; parameters named `dependencies` (restructured into `dependentRequired`/`dependentSchemas`) and `additionalItems` (dropped outright) failed the same way. Symmetrically, `enum`/`const`/`default`/`examples` hold instance **data**, not schemas, so recursing into them rewrote a caller's literal values — a `default` of `{"definitions": 1}` came back as `{"$defs": 1}`. The converter is now position-aware: a key means a keyword only at a schema position, schema-map values are converted through the caller's names untouched, and data keywords pass through verbatim. Verified latent, not live: all **36** tools advertise byte-identical schemas before and after this fix (`get-checklist-state`'s `properties.items` collides with the `items` keyword but lands in a safe branch), so nothing shipped was corrupted — it is fixed before release rather than after. One known, deliberate limitation is documented in the code: only a `$ref` with the exact root prefix `#/definitions/` is rewritten, because a pointer *through* a nested `definitions` block is indistinguishable from one addressing a property *named* `definitions` without resolving it — the SDK emits neither.
+- **The dialect converter rewrote caller-chosen tool parameter names as if they were schema keywords.** Caught before release, in the converter added above. `convertNode` recursed uniformly and then switched on every key it met — but the keys of a `properties` map are **tool parameter names**, not keywords. So a tool declaring a parameter named `definitions` would have had it renamed to `$defs` on the wire, and one named `$schema` would have been **silently deleted** while `required` still listed it, producing a schema **no input can satisfy**; parameters named `dependencies` (restructured into `dependentRequired`/`dependentSchemas`) and `additionalItems` (dropped outright) failed the same way. Symmetrically, `enum`/`const`/`default`/`examples` hold instance **data**, not schemas, so recursing into them rewrote a caller's literal values — a `default` of `{"definitions": 1}` came back as `{"$defs": 1}`. The converter is now position-aware: a key means a keyword only at a schema position, schema-map values are converted through the caller's names untouched, and data keywords pass through verbatim. Verified latent, not live: all **36** tools advertise byte-identical schemas before and after this fix (`get-checklist-state`'s `properties.items` collides with the `items` keyword but lands in a safe branch), so nothing shipped was corrupted — it is fixed before release rather than after. One known, deliberate limitation is documented in the code: only a `$ref` with the exact root prefix `#/definitions/` is rewritten, because a pointer _through_ a nested `definitions` block is indistinguishable from one addressing a property _named_ `definitions` without resolving it — the SDK emits neither.
 
 ### Added
 
@@ -468,7 +489,7 @@
 
 - **Operations ignored Notes.app's real default account and used the literal string `"iCloud"`.** Every method that took an optional `account` fell back to a hardcoded `"iCloud"`, so the implicit path was wrong for anyone whose default account is not iCloud, whose account name is localized, or whose account name carries a trailing U+F8FF (Apple logo) character — the last is what the reporter actually hit, and no amount of passing the "right" name helped, because the name they could see was not the name AppleScript matched. The default path now resolves through AppleScript's own `default account`. The health check's `operations` probe had the same bug in a second form — it listed notes in `accounts[0]`, whichever account happened to enumerate first, and called it the default; it now exercises the real default. Diagnosed by @lakerfan0306 in #128.
 
-- **An explicit `account` was matched only exactly, and the obvious fix would have made destructive operations silently target the wrong account.** Explicit names now resolve as: exact match wins outright, a *unique* prefix match resolves, and a prefix matching more than one account is **refused** with every candidate named. The refusal is the load-bearing part. The natural repair for the bug above — `first account whose name starts with "X"`, as proposed in #128 — resolves an ambiguous prefix to whichever account AppleScript happens to list first and reports success; applied across the ~10 account-scoped call sites that includes `delete-note`, `move-note` and `batch-move-notes`, so the failure mode is a delete or a move landing in someone else's account with no error. On a library with `rob@superiortech.io` and `robert.b.sweet@gmail.com`, `account="rob"` is now an error naming both, while `account="robert"` still resolves. Same resolution shape as the sibling fix in apple-mail-mcp #137.
+- **An explicit `account` was matched only exactly, and the obvious fix would have made destructive operations silently target the wrong account.** Explicit names now resolve as: exact match wins outright, a _unique_ prefix match resolves, and a prefix matching more than one account is **refused** with every candidate named. The refusal is the load-bearing part. The natural repair for the bug above — `first account whose name starts with "X"`, as proposed in #128 — resolves an ambiguous prefix to whichever account AppleScript happens to list first and reports success; applied across the ~10 account-scoped call sites that includes `delete-note`, `move-note` and `batch-move-notes`, so the failure mode is a delete or a move landing in someone else's account with no error. On a library with `rob@superiortech.io` and `robert.b.sweet@gmail.com`, `account="rob"` is now an error naming both, while `account="robert"` still resolves. Same resolution shape as the sibling fix in apple-mail-mcp #137.
 
 - **An unresolvable account was reported as "note not found".** The methods that swallow AppleScript failures into `false`/`null` could not distinguish a precondition error from a real outcome, so naming a nonexistent or ambiguous account sent the caller hunting for a missing note that was never the problem — worst on exactly the destructive paths where the distinction matters. Account-resolution failures are now tagged and re-raised with their real message by `delete-note`, `move-note`, `batch-move-notes`, `create-note`, `update-note`, `create-folder`, `delete-folder`, `get-note-content`, `get-note-plaintext` and `get-note-details`. Genuine operation failures still return `false`/`null` as before.
 
@@ -481,7 +502,8 @@
 ## [2.7.0] - 2026-08-09
 
 ### Changed
-- **`list-notes` now returns each note's id alongside its title, not titles alone.** `notes` was `string[]`; it is now `Array<{title, id}>`. This is a public contract change: any caller destructuring `notes` as an array of strings will break. The motivation is the same identity problem fixed in `exportNotesAsJson` below: AppleScript's `note "<name>"` specifier resolves an ambiguous (duplicated) title deterministically to one particular note every time, so a caller that lists titles via `list-notes` and then re-resolves an id by title (e.g. via `search-notes`) for a duplicated title silently gets the same note back instead of the one it meant. The manager gained a new `listNoteRefs()` method (same `account`/`folder`/`modifiedSince`/`limit` filtering as `listNotes()`, which is unchanged and still returns `string[]` for existing internal callers) that returns `{title, id}` pairs directly from the same bulk AppleScript listing that already fetches ids internally (`parseBulkListOutput` has returned `{title, id}` since the `exportNotesAsJson` fix below) — no additional AppleScript cost. The `list-notes` tool now calls `listNoteRefs()` instead of `listNotes()`. The human-readable line is now `  - <title> [id: <id>]`, matching `search-notes`' existing format, so hosts that surface only the text content — not `structuredContent` — can see the ids too; without that, two same-titled notes still rendered as two identical lines and the trap this fixes survived on the text path. Bumped **minor**, not patch: unlike the 2.6.9 `search-notes` limit-default change (also a contract change, but one that kept the response *type*), this changes the type of `notes`, so `notes.map(t => t.toUpperCase())` throws rather than returning less. (#126, #127)
+
+- **`list-notes` now returns each note's id alongside its title, not titles alone.** `notes` was `string[]`; it is now `Array<{title, id}>`. This is a public contract change: any caller destructuring `notes` as an array of strings will break. The motivation is the same identity problem fixed in `exportNotesAsJson` below: AppleScript's `note "<name>"` specifier resolves an ambiguous (duplicated) title deterministically to one particular note every time, so a caller that lists titles via `list-notes` and then re-resolves an id by title (e.g. via `search-notes`) for a duplicated title silently gets the same note back instead of the one it meant. The manager gained a new `listNoteRefs()` method (same `account`/`folder`/`modifiedSince`/`limit` filtering as `listNotes()`, which is unchanged and still returns `string[]` for existing internal callers) that returns `{title, id}` pairs directly from the same bulk AppleScript listing that already fetches ids internally (`parseBulkListOutput` has returned `{title, id}` since the `exportNotesAsJson` fix below) — no additional AppleScript cost. The `list-notes` tool now calls `listNoteRefs()` instead of `listNotes()`. The human-readable line is now `  - <title> [id: <id>]`, matching `search-notes`' existing format, so hosts that surface only the text content — not `structuredContent` — can see the ids too; without that, two same-titled notes still rendered as two identical lines and the trap this fixes survived on the text path. Bumped **minor**, not patch: unlike the 2.6.9 `search-notes` limit-default change (also a contract change, but one that kept the response _type_), this changes the type of `notes`, so `notes.map(t => t.toUpperCase())` throws rather than returning less. (#126, #127)
 
 ### Security
 
@@ -490,95 +512,114 @@
 ## [2.6.16] - 2026-08-06
 
 ### Fixed
-- **Every tool advertised an output schema that rejected undeclared keys, discarding otherwise-correct results.** The MCP **client** validates a result's `structuredContent` against the JSON Schema the server *advertised*, not against the server's own zod object — and a bare zod raw shape renders as `additionalProperties: false`. So any field a handler emits that its schema doesn't enumerate is a hard client-side `-32602 … data must NOT have additional properties`, throwing away a payload the handler computed correctly. The server never notices, because zod's own parse silently *strips* unknown keys instead of failing, which is exactly why the `registerTool`/`outputSchema` migration's "all fields optional, no `.strict()`" read as permissive: it covered optionality, not undeclared keys. All **36 tools** in this repo were advertising `additionalProperties: false`. Every tool now registers through a wrapper applying `.passthrough()`, advertising `additionalProperties: true` — the contract that migration intended. Found while fixing the same defect in the sibling apple-mail-mcp (sweetrb/apple-mail-mcp#135), where it was not latent: it broke `get-mail-stats` on every call for anyone with IMAP configured.
+
+- **Every tool advertised an output schema that rejected undeclared keys, discarding otherwise-correct results.** The MCP **client** validates a result's `structuredContent` against the JSON Schema the server _advertised_, not against the server's own zod object — and a bare zod raw shape renders as `additionalProperties: false`. So any field a handler emits that its schema doesn't enumerate is a hard client-side `-32602 … data must NOT have additional properties`, throwing away a payload the handler computed correctly. The server never notices, because zod's own parse silently _strips_ unknown keys instead of failing, which is exactly why the `registerTool`/`outputSchema` migration's "all fields optional, no `.strict()`" read as permissive: it covered optionality, not undeclared keys. All **36 tools** in this repo were advertising `additionalProperties: false`. Every tool now registers through a wrapper applying `.passthrough()`, advertising `additionalProperties: true` — the contract that migration intended. Found while fixing the same defect in the sibling apple-mail-mcp (sweetrb/apple-mail-mcp#135), where it was not latent: it broke `get-mail-stats` on every call for anyone with IMAP configured.
 
 ### Added
+
 - **The outputSchema contract test now asserts that every tool tolerates undeclared keys.** The existing checks — every tool has an `outputSchema`, none requires a field — could not see this class, because they inspect the advertised schema and round-trip only the diagnostic tools; a tool whose payload carries an undeclared key passes CI and fails in the user's client. The suite now fails any tool advertising `additionalProperties: false`, so this cannot silently return.
 
 ## [2.6.15] - 2026-08-05
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ### Security
+
 - **Bumped the pinned `ossf/scorecard-action` to `2d1146689b8cda280b9bc96326124645441f03bc` (v2.4.4).** Dependabot's weekly `github-actions` group PR landed this in apple-mail-mcp (#134) and apple-numbers-mcp (#56) but skipped this repo and apple-photos-mcp, so `conformance-check.sh` reported `DRIFT: .github/workflows/scorecard.yml differs`. The four servers are meant to carry a byte-identical workflow set, and a silent group-skip is the recurring way that breaks. `.github/` does not ship, so this owes no version bump.
 
 ### Added
+
 - **`version-guard` now requires every version bump to be documented under a real `## [X.Y.Z]` CHANGELOG heading.** The guard already refused a bump to a version that was already on npm, but it never checked that the new version was described anywhere. Notes parked under `## [Unreleased]` are orphaned the moment the release ships: nothing in the release path renames that section — the `version` lifecycle script only syncs the plugin manifests — so the published version goes out undocumented while its release notes sit under a heading still claiming they are unreleased. **This repo is where that actually happened**: 2.6.10 and 2.6.11 both shipped with their notes stranded under `## [Unreleased]`, and were only filed under real headings retroactively. A bump whose version has no matching heading now hard-fails the PR, with an error naming the heading to add. Keep an empty `## [Unreleased]` at the top regardless — `dependabot-rebuild.yml` hard-exits without that marker, and since it already inserts a real heading, bot PRs pass unchanged. The guard file lives in `.github/`, which does not ship, so this owes no version bump. Matches apple-mail-mcp#124, keeping the guard identical across the four servers. (#117)
 
 ## [2.6.14] - 2026-08-03
 
 ### Security
+
 - **Floored `hono` to `^4.12.34`, clearing GHSA-8j4g-w8fx-2239 (moderate).** This was deferred earlier the same day: the fix release was still inside the repo's 24-hour `minimumReleaseAge` soak — it missed by under three minutes — and no `minimumReleaseAgeExclude` carve-out was added, because the soak is the point. It matured at 2026-08-04T02:36:40Z and is floored now. `pnpm audit` reports **no known vulnerabilities**.
-- **`fast-uri` was pinned to the exact version an advisory later superseded, so the fix could never reach the bundle.** `pnpm-workspace.yaml` carried `fast-uri: 3.1.4` as a security *floor*, but an exact override is also a **ceiling**: when GHSA-7p8r-x3mc-p8w7 (high — host confusion via a backslash authority introducer) landed with a 3.1.5 fix, the pin held the tree on the vulnerable 3.1.4 and `pnpm audit` reported the advisory indefinitely with no way to clear it. `fast-uri` is reached through `@modelcontextprotocol/sdk` → `ajv`/`ajv-formats` and **is inlined into the shipped `build/index.js`**, so the vulnerable parser was in the published package, not just the dev tree. Rewritten as the caret range `^3.1.5`, which stays inside the major the parent's API expects while letting patch fixes flow in on their own. Resolves 3.1.4 → 3.1.5, and the rebuilt bundle now carries the fixed authority-introducer validation. Matches apple-mail-mcp 2.10.2 (#128), keeping the override discipline identical across the four servers.
+- **`fast-uri` was pinned to the exact version an advisory later superseded, so the fix could never reach the bundle.** `pnpm-workspace.yaml` carried `fast-uri: 3.1.4` as a security _floor_, but an exact override is also a **ceiling**: when GHSA-7p8r-x3mc-p8w7 (high — host confusion via a backslash authority introducer) landed with a 3.1.5 fix, the pin held the tree on the vulnerable 3.1.4 and `pnpm audit` reported the advisory indefinitely with no way to clear it. `fast-uri` is reached through `@modelcontextprotocol/sdk` → `ajv`/`ajv-formats` and **is inlined into the shipped `build/index.js`**, so the vulnerable parser was in the published package, not just the dev tree. Rewritten as the caret range `^3.1.5`, which stays inside the major the parent's API expects while letting patch fixes flow in on their own. Resolves 3.1.4 → 3.1.5, and the rebuilt bundle now carries the fixed authority-introducer validation. Matches apple-mail-mcp 2.10.2 (#128), keeping the override discipline identical across the four servers.
 - **`ip-address` floored to `^10.3.1`** for GHSA-mwp4-54f8-5fhr (high — `Address4` decodes leading-zero octets as decimal while resolvers decode them as octal, allowing SSRF and trust-boundary bypass), plus GHSA-4xrf-jv44-h6hh (a CIDR suffix left on the parsed address) and GHSA-22jq-vg5j-6vgg (IPv4-mapped/NAT64 misclassification). `@modelcontextprotocol/sdk` → `express-rate-limit` capped it at 10.2.0, which is vulnerable to all three. Resolves 10.2.0 → 10.4.0. Not in the shipped bundle (0 references in `build/index.js`), so this hardens the dependency tree rather than fixing shipped bytes — the bump this release owes comes from `fast-uri`.
 - **`postcss` floored to `^8.5.23`** for GHSA-fxqj-rqcc-2cmp (moderate — incomplete fix of GHSA-6g55-p6wh-862q). Development scope only (`vitest` → `vite` → `postcss`) and not in the shipped bundle; resolves 8.5.19 → 8.5.25.
-- **`hono` is deliberately *not* floored yet.** GHSA-8j4g-w8fx-2239 (moderate — ReDoS in the CORS middleware) is fixed in 4.12.34, published 2026-08-03T02:36:40Z, which is still inside this repo's 24 h `minimumReleaseAge` supply-chain gate: `^4.12.34` fails the install outright with `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. No `minimumReleaseAgeExclude` carve-out was added — the gate is the point, and punching a hole in it to satisfy an audit line would trade a real supply-chain control for a cosmetic one. `hono` is reached via `@hono/node-server` → `@modelcontextprotocol/sdk` and has **0 references in `build/index.js`**, so nothing vulnerable ships in the meantime. `pnpm-workspace.yaml` records the pending floor and the reason; add `hono: ^4.12.34` once the release clears the gate.
+- **`hono` is deliberately _not_ floored yet.** GHSA-8j4g-w8fx-2239 (moderate — ReDoS in the CORS middleware) is fixed in 4.12.34, published 2026-08-03T02:36:40Z, which is still inside this repo's 24 h `minimumReleaseAge` supply-chain gate: `^4.12.34` fails the install outright with `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. No `minimumReleaseAgeExclude` carve-out was added — the gate is the point, and punching a hole in it to satisfy an audit line would trade a real supply-chain control for a cosmetic one. `hono` is reached via `@hono/node-server` → `@modelcontextprotocol/sdk` and has **0 references in `build/index.js`**, so nothing vulnerable ships in the meantime. `pnpm-workspace.yaml` records the pending floor and the reason; add `hono: ^4.12.34` once the release clears the gate.
 
 ## [2.6.13] - 2026-08-03
 
 ### Fixed
+
 - **Full Disk Access was documented and diagnosed as a checklist-only concern, understating what breaks without it.** `docs/FULL-DISK-ACCESS.md` — the page every FDA failure message hyperlinks to — opened with "**One feature area** needs Full Disk Access" and closed with "**All other tools work normally**", and the README, `doctor`, and `health-check` all said the same. Three more tools read the same protected `NoteStore.sqlite`: `get-note-metadata` fails outright without FDA, `get-note-link`'s primary path is a database read (its AppleScript `note link` fallback exists only on macOS 12–15 and is gone from the SDEF on macOS 26+), and `get-sync-status` degrades silently — it still answers, but reports no pending uploads and no active sync. A user who ran `doctor`, saw the warning scoped to checklists they don't use, and skipped the grant got unexplained failures elsewhere. All five are now enumerated, with each one's no-FDA behaviour, in the guide, the README, the `doctor` check detail and the `health-check` line. `get-note-link`'s own tool description, which said only "requires macOS 12+" and never mentioned FDA at all, now states the requirement and the fallback's version window.
-- **`get-note-content`'s lossiness was invisible to `structuredContent` consumers.** Inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) are replaced with `[inline image omitted: …]` text placeholders, but the only signal was prose appended to the *text* block — the structured payload carried the lossy body with no flag, which is precisely what an agent consuming `structuredContent` reads. Following the documented read-modify-write recipe (`get-note-content` → `update-note`) therefore replaced a note's real images with placeholder text, permanently. The output schema now carries `strippedImages` (count) and `truncated` (boolean); the tool description, the README `get-note-content` Returns block, the skill, and the warning string itself now say not to write the returned body back, and point at `append-to-note` instead.
+- **`get-note-content`'s lossiness was invisible to `structuredContent` consumers.** Inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) are replaced with `[inline image omitted: …]` text placeholders, but the only signal was prose appended to the _text_ block — the structured payload carried the lossy body with no flag, which is precisely what an agent consuming `structuredContent` reads. Following the documented read-modify-write recipe (`get-note-content` → `update-note`) therefore replaced a note's real images with placeholder text, permanently. The output schema now carries `strippedImages` (count) and `truncated` (boolean); the tool description, the README `get-note-content` Returns block, the skill, and the warning string itself now say not to write the returned body back, and point at `append-to-note` instead.
 - **`create-note` blamed Notes.app for a folder it never creates.** `createNote` addresses the target folder directly and does not create it, but the failure returned "Check that Notes.app is configured and accessible" — sending callers on a TCC/permissions hunt in the one case where Notes.app is demonstrably fine. The message now names the missing folder and points at `list-folders` / `create-folder` (or, for a bad `account`, at `list-accounts`), keeping the automation-permission advice as the fallback. The requirement is also stated in the tool description, the `folder` parameter description, and the README, matching the wording `move-note` already used.
 - **Automation-permission errors were the only setup-failure class with no docs URL and no `doctor` pointer**, though the Full Disk Access path has carried both since 2.5.11. Both strings (the generic executor error mapping in `src/utils/applescript.ts`, which fronts every tool, and the `health-check` permission probe) now share one `AUTOMATION_REMEDIATION` constant in `src/utils/docsUrls.ts` that names the app to grant, says to quit and relaunch it, and ends with the absolute troubleshooting URL plus "run the doctor tool to verify".
 
 ### Documentation
-- **The docs claimed several shipped capabilities were impossible.** `docs/APPLESCRIPT-LIMITATIONS.md` still asserted there is "no readable or constructable `applenotes://` / `notes://` deep link" and that the `show` command "is deliberately **not** wrapped as a tool" — while `get-note-link` returns exactly that URL and `show-note` / `show-folder` / `show-account` / `show-attachment` all ship; and its pinned section argued that reading `NoteStore.sqlite` was "outside what an AppleScript-based server should do" and concluded "pinned read/write is not supported", after `get-note-metadata` had shipped doing it. Both sections are rewritten around what remains true — a `note` has no `URL`/`url`/`link` property (error `-2753`), link *relationships* still cannot be read or inserted, and pin state still cannot be **set** — with the database-backed paths that superseded the rest recorded alongside. The same obsolete claims are corrected in the README's limitations bullet and its "No pinned notes" row.
+
+- **The docs claimed several shipped capabilities were impossible.** `docs/APPLESCRIPT-LIMITATIONS.md` still asserted there is "no readable or constructable `applenotes://` / `notes://` deep link" and that the `show` command "is deliberately **not** wrapped as a tool" — while `get-note-link` returns exactly that URL and `show-note` / `show-folder` / `show-account` / `show-attachment` all ship; and its pinned section argued that reading `NoteStore.sqlite` was "outside what an AppleScript-based server should do" and concluded "pinned read/write is not supported", after `get-note-metadata` had shipped doing it. Both sections are rewritten around what remains true — a `note` has no `URL`/`url`/`link` property (error `-2753`), link _relationships_ still cannot be read or inserted, and pin state still cannot be **set** — with the database-backed paths that superseded the rest recorded alongside. The same obsolete claims are corrected in the README's limitations bullet and its "No pinned notes" row.
 - **README Roadmap deleted.** It listed pinned-note support (#28), tags/hashtags (#29), note links (#30) and a local integration suite (#31) as "deliberately deferred to a future release, tracked as open issues". All four issues closed on 2026-06-20; the capabilities ship as `get-note-metadata`, `get-note-content`'s `hashtags`, `get-note-link`, and the required `integration` CI job. The two genuine residual limits (pin state unsettable, no note-to-note linking within a body) are already stated in the AppleScript-limitations section and the Known Limitations table, so nothing is lost.
-- **`docs/STABILITY-PERF-AUDIT-2026-06-19.md` marked all 17 findings "Open".** Every one is closed. The status column now records the release each landed in, with L1 (#28) and L3 (#30) marked *partial* — pin state is readable but not settable, and `get-note-link` supersedes only half of the note-links finding — and L2 (#29) marked read-only. The "Target release: **2.0.0**" line is replaced with a note that the fixes landed across 2.0.0–2.6.x and the document is a historical record, not a live backlog. The audit body is left as the dated 1.4.4 snapshot it is.
-- **`TODO.md` and `TECHNICAL_NOTES.md` both still listed prepend as "GUI-only under every approach".** `append-to-note` has done append *and* prepend over ordinary AppleScript since 2.6.0, with no Shortcuts bridge. Corrected in both, along with TODO.md's stale "As of v2.1.0" header; the Shortcuts-inventory table keeps "Prepend to a body" in its right-hand column (Notes genuinely ships no such Shortcuts action) but the column is retitled and footnoted so it no longer reads as a global impossibility. `append-to-note`'s candidate bullet is amended rather than deleted, since a true *in-place* append that cannot disturb attachments is still unbuilt.
+- **`docs/STABILITY-PERF-AUDIT-2026-06-19.md` marked all 17 findings "Open".** Every one is closed. The status column now records the release each landed in, with L1 (#28) and L3 (#30) marked _partial_ — pin state is readable but not settable, and `get-note-link` supersedes only half of the note-links finding — and L2 (#29) marked read-only. The "Target release: **2.0.0**" line is replaced with a note that the fixes landed across 2.0.0–2.6.x and the document is a historical record, not a live backlog. The audit body is left as the dated 1.4.4 snapshot it is.
+- **`TODO.md` and `TECHNICAL_NOTES.md` both still listed prepend as "GUI-only under every approach".** `append-to-note` has done append _and_ prepend over ordinary AppleScript since 2.6.0, with no Shortcuts bridge. Corrected in both, along with TODO.md's stale "As of v2.1.0" header; the Shortcuts-inventory table keeps "Prepend to a body" in its right-hand column (Notes genuinely ships no such Shortcuts action) but the column is retitled and footnoted so it no longer reads as a global impossibility. `append-to-note`'s candidate bullet is amended rather than deleted, since a true _in-place_ append that cannot disturb attachments is still unbuilt.
 - **The agent-facing skill and CLAUDE.md were missing five shipped tools**, including the whole deep-link/UI group: `append-to-note`, `show-note`, `get-note-link`, `get-selected-notes`, `get-default-location`. The skill's canonical "Add milk to my shopping list" example walked an agent through reading the whole body and resending it via `update-note` — the destructive path — six releases after the purpose-built tool existed. The Updating Notes recipe now splits addition (`append-to-note`) from replacement (`update-note`), and the tool tables and CLAUDE.md cover all five. The Attachment-Safe Updates guidance is unchanged: `append-to-note` also rewrites the full body, so it is not an attachment-safe alternative.
 - **`CLAUDE.md` said `get-checklist-state` "Returns `null`"** when a note has no checklists or the database is unreadable. It never returns null — all six failure modes come back as MCP error responses (`isError: true`), including the routine "this note has no checklist items", which an agent would otherwise treat as a tool failure. Replaced with the actual contract and the message text that distinguishes each case.
 - **`create-folder` was documented as flat-name-only, with an error it cannot raise.** The README said `name` was a "Name for the new folder" and that the call errors "if folder already exists"; it in fact takes a whole nested path, creates every intermediate segment, skips existing ones, and is idempotent — which is what its live schema has always said. Corrected, and `create-folder` and `batch-move-notes` added to CLAUDE.md's nested-path list.
 - **The 500-id cap on `batch-delete-notes` / `batch-move-notes` was undocumented in prose.** The schema already emitted `maxItems: 500` to machine callers, but no README table, tool description, skill, or CLAUDE.md entry mentioned it. Added to all four.
-- **Fixed a silently retargeted link.** `docs/FULL-DISK-ACCESS.md`'s "See also: Known Limitations" pointed at `#known-limitations`, which GitHub resolves to the *first* matching heading — a Features-level subsection about pinned notes and note links that says nothing about checklists or Full Disk Access. That subsection is renamed to "AppleScript limitations", matching its own body, so the anchor reaches the Known Limitations table again. The README's own FDA heading is renamed from "Full Disk Access for Checklist Features" to "Full Disk Access" (its two inbound anchors updated) now that the section covers more than checklists.
+- **Fixed a silently retargeted link.** `docs/FULL-DISK-ACCESS.md`'s "See also: Known Limitations" pointed at `#known-limitations`, which GitHub resolves to the _first_ matching heading — a Features-level subsection about pinned notes and note links that says nothing about checklists or Full Disk Access. That subsection is renamed to "AppleScript limitations", matching its own body, so the anchor reaches the Known Limitations table again. The README's own FDA heading is renamed from "Full Disk Access for Checklist Features" to "Full Disk Access" (its two inbound anchors updated) now that the section covers more than checklists.
 
 ## [2.6.12] - 2026-08-01
 
 ### Fixed
-- **`export-notes-json` no longer silently drops and duplicates notes that share an exact title.** `exportNotesAsJson` listed each folder's note titles, then re-fetched each note a second time by title via `getNoteDetails(title, account)` / `getNoteContent(title, account)`. AppleScript's `note "<name>"` specifier is a named-element reference that resolves ambiguous names deterministically to one particular match, so every iteration for a title with N duplicates re-fetched the *same* underlying note N times — the id-based dedup one call earlier (`parseBulkListOutput`, which correctly dedups by id) had already proven there were N distinct notes, but titles are all that survived into the export loop. The result: one note repeated N times in the export with identical id and content, and the other N−1 real notes silently absent, with no error, warning, or count mismatch (`totalNotes` just counts loop iterations, which was still internally consistent). The fix threads the ids already produced by the bulk listing straight through the loop and re-fetches by id (`getNoteById` / `getNoteContentById`) instead of by title — the same identity-safe pattern `search-notes` and `deleteNoteById` already use, since ids are unique application-wide and titles are not. (#115)
+
+- **`export-notes-json` no longer silently drops and duplicates notes that share an exact title.** `exportNotesAsJson` listed each folder's note titles, then re-fetched each note a second time by title via `getNoteDetails(title, account)` / `getNoteContent(title, account)`. AppleScript's `note "<name>"` specifier is a named-element reference that resolves ambiguous names deterministically to one particular match, so every iteration for a title with N duplicates re-fetched the _same_ underlying note N times — the id-based dedup one call earlier (`parseBulkListOutput`, which correctly dedups by id) had already proven there were N distinct notes, but titles are all that survived into the export loop. The result: one note repeated N times in the export with identical id and content, and the other N−1 real notes silently absent, with no error, warning, or count mismatch (`totalNotes` just counts loop iterations, which was still internally consistent). The fix threads the ids already produced by the bulk listing straight through the loop and re-fetches by id (`getNoteById` / `getNoteContentById`) instead of by title — the same identity-safe pattern `search-notes` and `deleteNoteById` already use, since ids are unique application-wide and titles are not. (#115)
 
 ## [2.6.11] - 2026-07-31
 
 ### Removed
+
 - **`.hermes-plugin/` packaging docs** (`README.md`, `config.yaml`). Hermes Agent has no plugin/marketplace drop-in, so a directory of manifest-looking files was easy to misread as an installable package. The setup it documented is not lost — the `hermes mcp add` command, the `~/.hermes/config.yaml` `mcp_servers:` snippet, and the restart note now live inline in the README's "Other Hosts" section. Matches apple-mail-mcp#116, keeping multi-host packaging parity across the four Apple MCP servers. No effect on the published package: `.hermes-plugin/` was never in `package.json` `files[]`.
 
 ### Fixed
-- **`search-notes` now says it searched titles only when a title search returns nothing.** `searchContent` defaults to `false`, and the two modes are exclusive: `searchNotes` builds the AppleScript `whose` clause as either `name contains` or `body contains`, never both. So the natural first call, `search-notes({query: "<term>"})`, returned a bare `{"notes":[],"count":0}` for a term appearing in dozens of note *bodies*, with nothing in the response saying bodies were never read. That is a silent false negative, the worst failure mode for a search tool: it does not error, it confidently reports absence, and a caller reasonably concludes the note does not exist. The empty result now carries a hint that only titles were searched and that `searchContent: true` searches bodies instead. Scoped to the empty result, so a successful search is byte-identical and no extra AppleScript work is done; the default stays `false` and no search semantics change. The tool description already mentioned `searchContent`, but a description is not in front of the caller at the moment it is interpreting an empty result, and that is where the wrong conclusion gets drawn. `CLAUDE.md`'s `search-notes` guidance is corrected in the same change: it read "search note body, not just titles", which describes an additive search and so stated the opposite of the exclusive behaviour, in the file agents read before they call the tool. `README.md`'s parameter table was already accurate.
+
+- **`search-notes` now says it searched titles only when a title search returns nothing.** `searchContent` defaults to `false`, and the two modes are exclusive: `searchNotes` builds the AppleScript `whose` clause as either `name contains` or `body contains`, never both. So the natural first call, `search-notes({query: "<term>"})`, returned a bare `{"notes":[],"count":0}` for a term appearing in dozens of note _bodies_, with nothing in the response saying bodies were never read. That is a silent false negative, the worst failure mode for a search tool: it does not error, it confidently reports absence, and a caller reasonably concludes the note does not exist. The empty result now carries a hint that only titles were searched and that `searchContent: true` searches bodies instead. Scoped to the empty result, so a successful search is byte-identical and no extra AppleScript work is done; the default stays `false` and no search semantics change. The tool description already mentioned `searchContent`, but a description is not in front of the caller at the moment it is interpreting an empty result, and that is where the wrong conclusion gets drawn. `CLAUDE.md`'s `search-notes` guidance is corrected in the same change: it read "search note body, not just titles", which describes an additive search and so stated the opposite of the exclusive behaviour, in the file agents read before they call the tool. `README.md`'s parameter table was already accurate.
 - **`version-guard` no longer demands a version bump for byte-neutral `src/` changes.** The shipped-bytes detector treated every non-test file under `src/` as shipped, but TypeScript there reaches users only after esbuild inlines it into `build/index.js` — so a comment-, formatting- or type-only edit that leaves the committed bundle byte-identical was hard-blocked, leaving only two bad options: publish a release of literally nothing, or do not write the comment. `src/**/*.ts` is now a first-cause detector that implies a bump only when `build/**` changed too. The exemption is sound rather than merely convenient: ci.yml's "Verify committed build/ matches source" step rebuilds and requires `git diff --quiet build/`, and it runs in the `test` job whose `test (22)`/`test (24)` contexts are required by branch protection — so at merge time an unchanged `build/` provably matches `src/`. Everything else under `src/` (the verbatim-shipped `*_reader.py` sidecars), `requirements.txt` and `build/**` stay unconditional detectors, and the rule is written fail-safe: only `.ts` counts as bundle-only, so any new file type under `src/` still requires a bump.
 - **Dependabot auto-bump silently stopped staging its own changes.** `dependabot-rebuild.yml`'s bump step writes the patch version, syncs the plugin manifests and prepends a CHANGELOG entry, then staged them with `git add package.json CHANGELOG.md build .claude-plugin .agents codex .hermes-plugin .antigravity-plugin`. Once `.hermes-plugin/` was removed that pathspec matched nothing, and `git add` is all-or-nothing — it exited 128 and staged **none** of the others, with `2>/dev/null || true` hiding the failure. The following step re-adds only `build/`, so a Dependabot PR would have committed a rebuilt bundle with no version bump and no changelog entry, failing `require-version-bump` and blocking the automation that is meant to run without a human. Dropped the stale path, and dropped the error suppression so a future missing path fails loudly instead of silently skipping the bump.
 - **`pnpm version` no longer breaks with the `.hermes-plugin/` removal.** The `version` lifecycle script listed `.hermes-plugin` in its `git add`; `git add` exits 128 on a pathspec that matches nothing, which would have broken the documented release step (`pnpm version <patch|minor|major> --no-git-tag-version`) for every subsequent release. The stale path is dropped from the `git add` list.
 
 ### Security
+
 - **Floored all three dev-only `brace-expansion` majors on their complete fixes for GHSA-mh99-v99m-4gvg / CVE-2026-14257 (high)** — `1.1.16` → `1.1.18`, `2.1.3` → `2.1.4`, and both `5.0.7` and `5.0.8` → `5.0.9`. Three separate majors are reachable through the dev toolchain (`eslint` → `minimatch@3` on v1, `minimatch@9` on v2, `minimatch@10` on v5), and they are not API-compatible — minimatch 3 requires the v1 CommonJS API, so a single floor spanning them fails with `expand is not a function`. Each major therefore carries its own **two-sided** floor; the bounds must be two-sided because a bare `<5.0.9` also matches `1.1.18` and `2.1.4` under semver and would drag the CommonJS path onto the v5 ESM API. The advisory's own first-patched versions (`1.1.17` / `2.1.3` / `5.0.8`) are **not sufficient**: they bound the accumulator in `combine` but never thread `maxLength` into `expandSequence`, so the sequence path (`{1..N}`, `{a..z..k}`) stays capped only by item count and a padded sequence still materialises ~100,000 intermediate strings before the outer bound truncates (measured 4,606 ms / 176 MB RSS on `1.1.17` vs 9 ms / 61 MB on `1.1.18`, identical final output). Two of the four paths resolved here (`1.1.16`, `5.0.7`) were below even the advisory's floor. Adopted only after every release cleared this repo's 24-hour `minimumReleaseAge` gate, with no `minimumReleaseAgeExclude` carve-out and no audit suppression — `pnpm audit` will keep reporting the advisory until GitHub's metadata (which still lists `5.0.8` as first-patched, and so marks the entire v1 line vulnerable under semver) catches up. Dev toolchain only: `brace-expansion` is not in the shipped bundle, so the published package is unaffected, the committed bundle is byte-identical, and no version bump is owed. Matches apple-mail-mcp#123 — thanks to @jjoanna2-debug for the original finding.
 
 ## [2.6.10] - 2026-07-22
 
 ### Security
+
 - Override the MCP SDK's transitive `@hono/node-server` and `fast-uri` dependencies to patched releases. This clears the path-traversal advisory in Hono's static file serving and the host-confusion advisories in `fast-uri` while the SDK's own dependency ranges still resolve vulnerable versions.
 
 ## [2.6.9] - 2026-07-22
 
 ### Changed
-- **`search-notes` now defaults `limit` to 50 instead of returning everything.** A broad query reads several properties per match via AppleScript (~200ms/note on an iCloud library), so an unbounded search over hundreds of matches — e.g. `"a"` matching 256 titles on a 340-note library — exceeded Notes' 30s timeout and returned an *error* rather than any results (#100). The tool now caps at 50 by default; the summary line discloses the applied limit (`(limit: 50, default)`) and, when the result hits the cap, appends a hint that there may be more and how to widen it (higher `limit`, or `folder`/`modifiedSince`). Callers that pass an explicit `limit` are unaffected. This is a public contract change: an unqualified `search-notes` now returns at most 50 matches instead of all of them.
+
+- **`search-notes` now defaults `limit` to 50 instead of returning everything.** A broad query reads several properties per match via AppleScript (~200ms/note on an iCloud library), so an unbounded search over hundreds of matches — e.g. `"a"` matching 256 titles on a 340-note library — exceeded Notes' 30s timeout and returned an _error_ rather than any results (#100). The tool now caps at 50 by default; the summary line discloses the applied limit (`(limit: 50, default)`) and, when the result hits the cap, appends a hint that there may be more and how to widen it (higher `limit`, or `folder`/`modifiedSince`). Callers that pass an explicit `limit` are unaffected. This is a public contract change: an unqualified `search-notes` now returns at most 50 matches instead of all of them.
 
 ## [2.6.8] - 2026-07-21
 
 ### Fixed
+
 - **`search-notes` now reports the note's actual folder instead of falling back to `Notes`.** Notes.app does not resolve `name of container of n` as one chained AppleScript expression, so the lookup threw and every result used the fallback even when the note was in a nested folder or Recently Deleted. The script now captures the container first, then reads its name.
 
 ## [2.6.7] - 2026-07-21
 
 ### Fixed
+
 - **`show-attachment` and `save-attachment` now address the attachment directly instead of scanning the note.** Both built an AppleScript loop over every attachment comparing `id of a as text`, so resolving a single attachment cost up to one Apple Event per attachment — the same per-attachment storm removed from `list-attachments` in 2.6.6, and worst on exactly the image-heavy notes that motivated it. Notes supports `attachment id "…" of theNote`, which is one event and, as before, resolves only within that note: an id belonging to a different note yields `missing value` and still reports "attachment not found".
 - **Attachment names no longer surface the literal string `missing value`.** Notes leaves `name` unset on some attachments, and the AppleScript sentinel was passed through verbatim, so `list-attachments` reported entries such as `- missing value (cid:…)` and callers saw it as a filename. The name now falls back to the content identifier, matching how the `url` field already handled the sentinel. `save-attachment` and `fetch-attachment` resolve the name through a separate script and leaked it the same way (`Saved "missing value" to …`); they now leave it unset so their existing `"attachment"` fallback applies.
 
 ### Documentation
+
 - Corrected the `Attachment.contentType` doc comment, which described a UTI (`"public.jpeg"`). Notes' AppleScript dictionary exposes no MIME type or UTI for attachments, so the field has always carried the content identifier and mirrors `contentId`; it is documented as such and kept for backwards compatibility.
 
 ## [2.6.6] - 2026-07-20
 
 ### Fixed
+
 - **`list-attachments` now fetches attachment properties in bulk instead of sending seven Apple Events per attachment.** The per-attachment loop made image-heavy notes exceed the operation's AppleScript timeout and surface as an empty attachment list, defeating the safety check callers use before replacing a note body. The property lists are now fetched as whole-list Apple Events and zipped locally, with guards that retry on a concurrent Notes mutation. A live 60-attachment note that previously timed out now returns all 60 attachments within the default timeout; a 7-attachment note measured 3.9s to 1.75s end-to-end.
 - **A failed attachment lookup no longer masquerades as a note with no attachments.** `listAttachmentsById`/`listAttachments` returned `[]` on a hard AppleScript failure, which the tool layer rendered as `Note "X" has no attachments` — a successful-looking response that is exactly the false-empty this tool exists to prevent, since callers gate destructive full-body updates on it. Exhausted retries now surface as an error; only a successful call with no output reports an empty note.
 - **The bulk zip is guarded by attachment identity, not just list lengths.** The per-attachment loop re-resolved each attachment by its stable ID, so a record's fields could never come from different attachments. Zipping seven independently-fetched lists lost that guarantee: a same-length reorder (or a delete plus an add) between Apple Events would pass every count check and yield a record carrying one attachment's ID with another's name and dates — and `save-attachment`/`fetch-attachment` resolve bytes from that ID, so the wrong file could be written under the wrong name. The script now re-reads the IDs after the other six fetches and compares them element-wise.
@@ -586,62 +627,82 @@
 ## [2.6.5] - 2026-07-20
 
 ### Fixed
+
 - **AppleScript retry attempts now share one timeout budget.** The configured 30-second timeout was applied independently to each attempt, so the default retry path could run for about 61 seconds and outlive a client's 60-second tool call. Retries now use only the time remaining in the original operation budget.
 - **Mutating AppleScripts no longer retry after ambiguous timeouts.** Notes.app can apply a create, update, delete, move, folder, attachment-save, or UI-show action before `osascript` loses the response. Replaying the action could create duplicate notes or misreport a completed mutation, so those operations now run once while read-only calls retain transient retries.
-- A retry is no longer started when too little of the budget remains for a meaningful attempt. `wrapWithTimeout` floors the in-script `with timeout` at one second, so a retry beginning with under a second left inverted the intended ordering — the in-script guard is supposed to abort *inside* Notes.app's dispatch before Node SIGKILLs `osascript`, since killing `osascript` alone does not stop work already handed to Notes.app. Measured before the fix: `timeoutMs: 1100, retryDelayMs: 1000` gave attempt 2 a 90 ms process timeout wrapped in `with timeout of 1 seconds`. The retry gate now also requires one second of headroom, matching that floor.
+- A retry is no longer started when too little of the budget remains for a meaningful attempt. `wrapWithTimeout` floors the in-script `with timeout` at one second, so a retry beginning with under a second left inverted the intended ordering — the in-script guard is supposed to abort _inside_ Notes.app's dispatch before Node SIGKILLs `osascript`, since killing `osascript` alone does not stop work already handed to Notes.app. Measured before the fix: `timeoutMs: 1100, retryDelayMs: 1000` gave attempt 2 a 90 ms process timeout wrapped in `with timeout of 1 seconds`. The retry gate now also requires one second of headroom, matching that floor.
 
 ## [2.6.4] - 2026-07-20
 
 ### Fixed
+
 - **`update-note` no longer reports an ignored `newTitle` as the note's title for HTML updates.** In `format: "html"` mode, Apple Notes derives the visible title from the first line of `newContent` and the manager intentionally ignores `newTitle`, but the tool response still echoed `newTitle` as though it had been applied. The response now reports the first visible HTML line (falling back to the known current title when the body has no text), and the live tool schema explicitly tells callers to put the visible title first in `newContent`.
-- Stripping `<script>`/`<style>` blocks while deriving that title is now linear rather than quadratic in document size. The pattern had no end-of-input alternative, so every *unclosed* `<script`/`<style>` scanned to EOF, failed, and backtracked — and the fixpoint loop repeated that. Measured on inputs of many unclosed blocks: 211 KB 63 ms, 422 KB 247 ms, 844 KB 1039 ms (quadratic), against a 5 MiB accepted-content ceiling. Now 0–2 ms across the same inputs. Unclosed blocks are also now consumed to end-of-input, which is what browsers do and prevents a truncated leading `<style>` from contributing its CSS to the reported title.
+- Stripping `<script>`/`<style>` blocks while deriving that title is now linear rather than quadratic in document size. The pattern had no end-of-input alternative, so every _unclosed_ `<script`/`<style>` scanned to EOF, failed, and backtracked — and the fixpoint loop repeated that. Measured on inputs of many unclosed blocks: 211 KB 63 ms, 422 KB 247 ms, 844 KB 1039 ms (quadratic), against a 5 MiB accepted-content ceiling. Now 0–2 ms across the same inputs. Unclosed blocks are also now consumed to end-of-input, which is what browsers do and prevents a truncated leading `<style>` from contributing its CSS to the reported title.
 
 ## [2.6.3] - 2026-07-20
 
 ### Fixed
+
 - **`search-notes` now returns each result's real creation and modification timestamps.** Search results previously filled both fields with the current time, making unrelated notes appear to have been created and modified when the search ran. The search AppleScript now emits locale-independent date components for each match and the manager parses those values into the structured response.
 - Each date read in the search loop is individually guarded with an `on error` fallback, matching the adjacent folder-name read. Without it a note whose `creation date`/`modification date` property throws would be dropped from the results entirely — and, because its ID was already recorded for deduplication, any later reference to that note would be suppressed too. The fallback degrades to the previous behaviour (current time) for that one field instead.
 
 ## [2.6.2] - 2026-07-20
+
 ### Changed
+
 - CI/release hardening: `version-guard` now treats the committed `build/` bundle as shipped bytes (closing the lockfile-only and devDep silent-never-publish vectors) with an npm version-collision check; `publish.yml` gained a daily self-healing watchdog, manual dispatch, exact-version skip, CI-validated-commit checkout, and GitHub-Release self-heal; Dependabot bundle rebuilds now auto-bump a patch version; CI boots the committed bundle standalone on Node 20 every run; the bundle is now built with `--target=node20`, making the `engines.node >= 20` claim enforced at build time.
 
 ## [2.6.1] - 2026-07-20
+
 ### Changed
+
 - **`list-notes` fetches note properties in bulk instead of two Apple Events per note (#86).** Full-library listings scaled at roughly 8 notes/second, so a 524-note library took 63 seconds and blew past the 60-second tool timeout MCP clients enforce; `health-check` runs an unbounded listing internally, so large libraries looked broken to clients. Names, ids, and (when `modifiedSince` is set) modification dates now come back as whole-list Apple Events, with the date comparison done locally in AppleScript rather than a `whose` clause, which Notes evaluates per-note. Measured on the same 524-note library: filtered listing 63s → 6.7s, `health-check` 60s+ → ~10s. Dedup and `limit` are applied in JS after the bulk fetch. Thanks @oliverames.
 - **Bounded `list-notes` calls stay O(limit), not O(library) (#86).** When `limit` is set without `modifiedSince`, the AppleScript fetch is sliced to the first `limit` notes (`notes 1 thru N`) instead of bulk-fetching the whole library and discarding the rest, so small limits on large libraries can't creep up on the osascript timeout. The script returns the library's total count alongside the slice; if id-dedup leaves the slice short while more notes exist, the listing transparently falls back to a full fetch so `limit` semantics are identical to the unsliced path.
 
 ### Fixed
+
 - **Mid-listing library mutation is now detected instead of silently mispairing note names and ids (#86).** The bulk name/id/date lists are separate snapshots of a live, syncing collection; if a note was created or deleted between those Apple Events (iCloud sync landing, a concurrent client writing), zipping the lists by index could silently attach the wrong id — and the wrong modification date — to a note, or read past the end of a list and abort. Every bulk listing now guards that the lists are the same length and raises a retryable "Notes changed during listing" error on mismatch, which `executeAppleScript` retries on a fresh snapshot automatically. (A length check can't see an exactly-offsetting delete+create landing in the milliseconds between two fetches; that residual window is accepted rather than paying an extra whole-list fetch on every listing.) In the sliced path, only the out-of-range error numbers (-1719/-1728) are remapped to the mutation error — timeouts, lost-connection, and permission errors keep their own messages and remedies.
 - **`modifiedSince` thresholds no longer shift a month on rollover days.** The AppleScript threshold date was built by assigning year → month → day onto `current date`; run on the 31st with a shorter target month, AppleScript rolls the intermediate date forward (June 31 → July 1), landing the threshold a month late and silently dropping matching notes. The day is now pinned to 1 before the month is assigned. Affects `list-notes`, `search-notes`, and `get-notes-stats` date filtering.
 
 ## [2.6.0] - 2026-07-16
+
 ### Added
+
 - **`append-to-note`**: Appends or prepends content to an existing note by id or title, preserving all existing rich HTML formatting (bold, italic, etc.). Always reads and writes as HTML, splitting the title `<div>` from body to prevent title duplication. Supports `position` (`"after"` / `"before"`), `separator`, and `format` (`"plaintext"` / `"html"`) parameters.
 - **`get-note-link`**: Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note by id or title. Primary path queries the Notes SQLite database for `ZIDENTIFIER` (works on all macOS versions including macOS 26+); falls back to the AppleScript `note link` property on macOS 12–15. Skips password-protected notes.
 
 ## [2.5.12] - 2026-07-13
+
 ### Fixed
+
 - **`get-sync-status` no longer reports orphaned Core Data rows as pending uploads.** The detector counted every `ZICCLOUDSTATE` version gap, including historical rows whose Notes syncing object no longer exists. It now requires a matching live `ZICCLOUDSYNCINGOBJECT` reference before treating a row as pending, preventing a permanent false active-sync warning while preserving detection for live unsynced objects.
 
 ## [2.5.11] - 2026-07-09
+
 ### Changed
+
 - **Setup errors are now actionable for end users** (end-user docs audit). Every Full Disk Access failure message (`get-checklist-state`, `get-note-metadata`, `health-check`, `doctor`) now says exactly what to do — grant Full Disk Access to the app that launches the server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it — and links the absolute [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md) URL instead of a repo-relative path that no-clone (npm / marketplace) installs can't resolve. The `doctor` ad-hoc-Node warning likewise links the absolute [Node runtime / TCC guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md). The shared URLs live in a new `src/utils/docsUrls.ts`. Automation-permission errors now point at **System Settings** > Privacy & Security > Automation (macOS renamed System Preferences in Ventura).
 - **The npm tarball is now docs-self-contained**: `docs/` ships in the package (added to `files` in `package.json`), and every cross-file link in the README is an absolute GitHub URL, so nothing 404s when the README is read on npmjs.com or from an installed package. This also fixes the `get-note-content` section's broken `../docs/APPLESCRIPT-LIMITATIONS.md` link, which 404'd even on GitHub.
 
 ### Fixed
+
 - **README install commands now install the published npm package** (`npm install -g apple-notes-mcp`) instead of the `github:sweetrb/apple-notes-mcp` git form, which builds from source and requires pnpm; the git form is still documented under **From Source** with that caveat. The Claude Desktop config example gained the `-y` flag (`npx -y apple-notes-mcp`) to match every shipped manifest, Claude Desktop got its own named Quick Start section instead of hiding under "Manual Installation", the Claude Code Quick Start gained a deterministic one-liner (`claude mcp add apple-notes -s user -- npx -y apple-notes-mcp`), and the plugin-marketplace Quick Start now covers the first-run macOS Automation prompt and the optional Full Disk Access grant. From-source/development instructions use `pnpm install` (the repo's package manager), not `npm install`.
 - **Stale docs corrected**: `create-note`'s `tags` parameter is documented as returned-only metadata that is never written to Notes.app (use inline `#hashtags` in `content` instead — matching the tool schema), and the first example no longer implies stored tags; the `move-note` section dropped a stale copy-then-delete warning that contradicted the documented native-move behavior (README and CLAUDE.md); and the README Troubleshooting section and the skill both document the "notes accumulate blank lines after repeated updates" artifact with the delete-and-recreate fix. The README's "Recurring macOS permission prompts" section now explains the ad-hoc-signature/cdhash cause inline instead of being a bare pointer.
 
 ## [2.5.10] - 2026-07-08
+
 ### Fixed
-- **Timeouts were never actually detected in production.** `isTimeoutError` in both executors checked `killed === true || signal === "SIGTERM"`, which is the error shape of the *async* `exec` API. A timed-out `execSync`/`execFileSync` call throws the underlying spawnSync error instead: `code: "ETIMEDOUT"` with `signal` set to the configured kill signal (`SIGKILL`, per #17). So a real timeout fell through to generic error parsing (surfacing as the raw `spawnSync /bin/sh ETIMEDOUT`) and, because the retry gate keys off timeout detection and `ETIMEDOUT` does not match the `/timed? out/i` transient pattern, **timeouts were never retried** despite the retry-on-timeout behavior shipped in #70. The mocked unit tests passed because their fake errors used the async shape; the detection now checks `ETIMEDOUT`/`SIGKILL` first (keeping the old checks as a fallback), the tests use the real error shape, and the fix was verified against a live forced timeout.
+
+- **Timeouts were never actually detected in production.** `isTimeoutError` in both executors checked `killed === true || signal === "SIGTERM"`, which is the error shape of the _async_ `exec` API. A timed-out `execSync`/`execFileSync` call throws the underlying spawnSync error instead: `code: "ETIMEDOUT"` with `signal` set to the configured kill signal (`SIGKILL`, per #17). So a real timeout fell through to generic error parsing (surfacing as the raw `spawnSync /bin/sh ETIMEDOUT`) and, because the retry gate keys off timeout detection and `ETIMEDOUT` does not match the `/timed? out/i` transient pattern, **timeouts were never retried** despite the retry-on-timeout behavior shipped in #70. The mocked unit tests passed because their fake errors used the async shape; the detection now checks `ETIMEDOUT`/`SIGKILL` first (keeping the old checks as a fallback), the tests use the real error shape, and the fix was verified against a live forced timeout.
 
 ### Security
+
 - **AppleScript and JXA no longer pass through `/bin/sh`.** Both executors composed `osascript -e '<script>'` as a shell string for `execSync`, making single-quote escaping the only barrier between note content and arbitrary shell execution, and capping script size at the kernel's argv limit (a sufficiently large generated script — big note bodies — would fail with E2BIG). They now call `execFileSync("osascript", ["-"], ...)` with the script delivered over stdin: no shell is involved at all, so the shell-injection class of bug is structurally impossible, script size is unbounded, and each call saves a `/bin/sh` fork. The retry sleep also no longer forks a `sleep` subprocess per attempt; it blocks in-process via `Atomics.wait`.
 
 ## [2.5.9] - 2026-07-08
+
 ### Fixed
+
 - **`list-attachments` always returned an empty list.** Both `listAttachmentsById` and `listAttachments` built their output with `repeat with item in attachmentList`; `item` is an AppleScript class name, so the generated script failed to compile ("Expected variable name or property but found class name", -2741) and every call surfaced as zero attachments. The silent empty array defeated the attachment-safety check callers are told to run before `update-note`, which replaces the whole body and drops attachments. The loop variable is renamed, and a regression test now inspects the generated script for reserved loop variables, which the mocked unit tests cannot catch on their own.
 - **Attachment URLs no longer leak the literal string `"missing value"`.** `URL of a as text` renders as `missing value` for attachments without a URL (most images); the parsed `url` field is now absent in that case.
 - **`save-attachment` no longer misreports successful saves as "attachment not found".** The OK/ERR sentinel interpolated the field separator inside the AppleScript string literal (`return "OK${AS_FIELD_SEP}" & ...`), so the script returned the literal text `OK(ASCII character 31)...` instead of a control character and the TypeScript split never matched, even though the file landed on disk. Separators are now concatenated as expressions, matching the list methods; `show-attachment` had the same quirk in its ERR return and is fixed for consistency. A regression test inspects the generated script for separators inside string literals.
@@ -649,111 +710,153 @@
 - **Image-heavy notes no longer kill the MCP connection on `get-note-content`.** Notes returns pasted images as base64 `data:` URIs in the note body; a few photos can produce a response large enough to exceed the client's message limit and drop the stdio transport. Each inline image whose base64 payload exceeds a per-image cap (256 KB default, `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` to override) is now replaced with a placeholder naming the media type and decoded size, and a warning points at `list-attachments` / `save-attachment` / `fetch-attachment` for exporting the real files. Small pasted images stay inline, and note text is not touched.
 
 ## [2.5.8] - 2026-07-06
+
 ### Added
+
 - **Process-wide reliability knobs for AppleScript execution** (thanks [@oliverames](https://github.com/oliverames), #70). Three env vars now tune the AppleScript layer without a per-call override: `APPLE_NOTES_MCP_TIMEOUT_MS` (default `30000`) raises the per-call timeout for full-library operations on very large Notes libraries; `APPLE_NOTES_MCP_MAX_RETRIES` (default `2`, i.e. one retry) sets the total attempt count for transient failures, with `1` restoring the old fail-fast behavior; `APPLE_NOTES_MCP_RETRY_DELAY_MS` (default `1000`) sets the base retry delay before exponential back-off. Precedence is per-call options → env knob → built-in default; invalid values fall through to the default. A shared `envPositiveNumber()` helper validates all of them (and the existing `APPLE_NOTES_MCP_MAX_BUFFER`) the same way. Documented in the README.
 - **`doctor` now checks the Node runtime's code signature** (thanks [@oliverames](https://github.com/oliverames), #70). A new `checkNodeRuntimeSignature()` check inspects `process.execPath` via `codesign` and **warns** when the running Node is ad-hoc signed (no Team ID) — an ad-hoc Node gets a fresh cdhash on every update (e.g. every `brew upgrade`), so macOS TCC silently drops its Automation / Full Disk Access grants, the most common cause of "this worked last week" permission flakiness. The warning points at `docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md`; a Developer-ID-signed Node reports `ok` with its Team ID.
 
 ### Changed
+
 - **Transient AppleScript failures now retry once by default** (thanks [@oliverames](https://github.com/oliverames), #70). `DEFAULT_MAX_RETRIES` went from `1` (no retries) to `2` (one retry after a 1s delay, backing off exponentially). Retries apply **only** to transient errors (Notes.app busy / not responding / lost connection / timeout); non-transient errors such as "note not found" still fail immediately. Set `APPLE_NOTES_MCP_MAX_RETRIES=1` to restore the previous fail-fast behavior.
 
 ### Fixed
+
 - **A bare git clone now runs the server with nothing but Node present (fixes #68).** Committing `build/` (#65) gave a fresh clone the entrypoint, but the compiled output still imported its runtime dependencies from `node_modules/`, which a git clone never has. Claude Code's marketplace auto-update re-clones the plugin from scratch, so every refresh left the server dying at session start on `ERR_MODULE_NOT_FOUND: Cannot find package '@modelcontextprotocol/sdk'`, with no install step anywhere between "marketplace refresh" and "server process starts". `npm run build` now typechecks (`tsc --noEmit`) and bundles `src/index.ts` with esbuild into a single self-contained `build/index.js` (shebang preserved, `@/` path aliases resolved from tsconfig). The only runtime file the bundle reads is `../package.json` (for the version string), which every distribution layout ships. `tsc-alias` is no longer needed and was dropped; the per-module compiled files under `build/` are gone, and only the bundled entrypoint is tracked in git.
 
 ## [2.5.7] - 2026-07-03
+
 ### Fixed
+
 - **`create-note` now returns a usable note id.** `create-note` returned the raw AppleScript object specifier (`note id x-coredata://<uuid>/ICNote/pN`) — including a literal `note id ` prefix — as the note's `id`. Downstream tools rejected it: `get-note-content id=<that>` failed with `Invalid note ID format: … Expected CoreData URL (x-coredata://...) or temp ID.` The returned specifier is now run through `extractCoreDataId`, so `create-note` returns the bare `x-coredata://` URL that the id validator and all consumers (`get-note-content`, `update-note`, etc.) accept and can round-trip.
 - **CI `format:check` restored to green.** `src/index.ts` and `src/utils/attachmentFs.test.ts` had drifted from Prettier style (unformatted code merged via dependabot PR #63), failing the `format:check` CI gate. Reformatted with `prettier --write`.
 
 ## [2.5.6] - 2026-06-30
+
 ### Fixed
+
 - **`move-note` no longer drops attachments or resets note identity (data-loss fix).** The single-note `move-note` was implemented as copy-then-delete: it rebuilt the note from its body HTML in the destination folder and deleted the original, silently discarding every embedded attachment (files, images, PDFs, scans, audio) and resetting the note's creation date and id. It now uses Notes.app's native `move` command — the same one `batch-move-notes` already used — which relocates the note in place, preserving its id, creation date, and all attachments. The destination-folder-must-exist behavior is unchanged. Tests updated to assert the native `move` path (no `make new note`).
 
 ### Added
+
 - **Configurable cap on inline attachment fetch size.** `fetch-attachment` exports an attachment to a temp file and base64-encodes it into the response via `readFileSync`, which previously had no upper bound (`APPLE_NOTES_MCP_MAX_BUFFER` does not apply to `readFileSync`), so a multi-GB attachment could exhaust memory. A size check now runs **before** the read and rejects oversized attachments with a clear error pointing at `save-attachment`. Default 25 MB, overridable via the new `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` env var (documented in the README). Temp-dir cleanup is preserved.
 
 ### Changed
+
 - **All MCP string/array inputs now have upper bounds.** Every Zod input field previously used only `.min(1)`; sane `.max(...)` caps were added to string fields (query, id, title, content, folder, account, savePath, attachmentId, tags entries, etc.) and array caps (`.max(500)`) to the unbounded `ids` arrays in `batch-delete-notes` / `batch-move-notes`. Limits mirror the bounds the manager already enforced internally. Oversized input is now rejected at the schema boundary with a clear message.
 - **`syncDetection` SQLite access converted to `execFileSync`** (argv array, no shell), matching the sibling `checklistParser` / `noteMetadata` callers. The interpolated values were not user-controlled, so this is consistency hardening, not a fix for an exploitable bug.
 - **Graceful shutdown on SIGINT/SIGTERM and stdin EOF.** Added signal and stdin `end`/`close` handlers that exit cleanly, alongside the existing `uncaughtException`/`unhandledRejection` net. This server holds no persistent resources, so the impact is low; it brings shutdown behavior in line with the sibling apple-mail server.
 
 ### Docs
+
 - **`create-note` `tags`: documented as returned-only.** The `tags` parameter was accepted but never written to Notes.app (Apple Notes tags can't be set via AppleScript). Its description now states that values are echoed back in the response but not applied to the note, and points to in-body `#hashtags` as the way to create real tags. The parameter is still accepted (not dropped) to avoid breaking existing callers.
 - **`move-note` tool description** no longer claims a copy-then-delete implementation or warns about attachment loss; it now states the note is relocated in place via the native move.
 
 ## [2.5.5] - 2026-06-26
+
 ### Changed
+
 - **Release tooling: publish now uses `pnpm publish` over OIDC trusted publishing** (Phase 2 of the npm→pnpm migration), replacing `npm publish`. Still tokenless (no `NPM_TOKEN`) with provenance attestation; the npm trusted-publisher config is keyed to the repo + workflow file, not the CLI, so it is unaffected. **No runtime or library changes** — the published package is byte-for-byte equivalent to 2.5.4; this release exists to validate the pnpm publish pipeline.
 
 ## [2.5.4] - 2026-06-25
+
 ### Security
+
 - **Hardened `htmlToPlaintext` tag stripping (note export).** The HTML-tag strip now loops until the string stabilizes instead of running a single regex pass, so overlapping angle brackets (e.g. `<<i>>`) can no longer leave residue. Clears the open CodeQL `js/incomplete-multi-character-sanitization` (high) on the export helper. It is export-only formatting (not an injection sink), but this keeps the security scan clean.
 
 ## [2.5.3] - 2026-06-25
+
 ### Fixed
+
 - Added a process-level uncaughtException/unhandledRejection safety net so a stray error or a broken stdout pipe (EPIPE) on client disconnect can no longer crash the long-lived server; EPIPE now exits cleanly.
 
-
 ## [2.5.2] - 2026-06-24
+
 ### Fixed
+
 - **`htmlToPlaintext` (note export) no longer double-unescapes HTML entities.** It decoded `&amp;` before the other entities, so an encoded sequence like `&amp;lt;` (the literal text `&lt;`) was wrongly collapsed to `<`. `&amp;` is now decoded last, so entities round-trip correctly in the exported `plaintext` field. Added unit tests covering each entity and the round-trip case. (Surfaced by CodeQL `js/double-escaping`.)
 
 ## [2.5.1] - 2026-06-24
+
 ### Security
+
 - **Fixed an AppleScript injection in `list-attachments` (title path).** The `account` parameter was interpolated into the AppleScript `tell account "…"` block without escaping — every other method escapes it — so a crafted `account` value could terminate the string literal and inject AppleScript (e.g. `do shell script`). It is now escaped via `escapePlainStringForAppleScript`, matching the rest of the codebase, with a regression test added. Found by an internal security audit. No other tool was affected (ids/titles/folders were already escaped or schema-constrained).
 
 ### Changed
+
 - **Hardened `checklistParser` SQLite access** to use `execFileSync` with an argument array instead of an `execSync` shell string (matching `noteMetadata`). Defense-in-depth — the query was already constrained to a digit-only primary key, so this is consistency hardening, not a fix for an exploitable bug.
 
 ## [2.5.0] - 2026-06-24
+
 ### Added
+
 - **`get-note-metadata` tool (BETA).** Reads note metadata AppleScript cannot expose — pinned state (`ZISPINNED`), checklist flags, trash/recovery state, preview snippet, and password hint — by querying plain scalar columns on `ZICCLOUDSYNCINGOBJECT` in the NoteStore database. No protobuf decoding (these are not the body blob), opened read-only via `execFileSync` (no shell), with Full Disk Access required. The reader feature-detects columns with `PRAGMA table_info`, so it degrades gracefully as the schema changes across macOS versions, and it resolves trashed notes AppleScript can no longer find. Marked BETA because the private schema is version-dependent. This makes pinned state **readable** for the first time (it remains unsettable); see the updated "Known limitations" note in the README.
 
 ### Documentation
+
 - **Apple Notes skill: four added techniques.** Ported field-tested guidance into `skills/apple-notes/SKILL.md` (and the Codex mirror): (1) use `get-note-plaintext` as the quickest way to verify rendered text when stored HTML looks off; (2) do not use decorative separators (horizontal rules, repeated dashes, box-drawing) between sections, since they render inconsistently; (3) treat a `stdout maxBuffer length exceeded` error as an attachment-risk signal alongside the existing ones; (4) an optional technique for taking full control of the title HTML without a duplicate sidebar line (create with a styled `<h1>` then `update-note` with `newTitle: " "`), documented with its CoreData-id-resolution caveat and flagged as advanced, not the default.
 
 ## [2.4.0] - 2026-06-23
+
 ### Added
+
 - **Regression fixtures for Notes-normalized HTML to Markdown.** `src/services/__fixtures__/notesNormalizedHtml.ts` captures representative Apple Notes-normalized bodies (div-wrapped paragraphs, `<div><br></div>` spacer rows, headings, native lists, inline emphasis, `<tt>` code spans) alongside the Markdown `getNoteMarkdown` currently produces, and `notesHtmlMarkdown.test.ts` locks it in. These characterization tests pin two existing quirks so future changes are deliberate: a `<div><br></div>` spacer leaves a stray two-space line (the Markdown-side fingerprint of the whitespace-accumulation behavior), and `<tt>` is dropped so code styling does not round-trip.
 - **Reveal folders, accounts, and attachments in Notes.app.** Three new tools extend the existing `show-note` to the rest of the objects the Notes scripting dictionary's `show` command accepts: `show-folder` (by folder id), `show-account` (by account id), and `show-attachment` (by note id + attachment id, since attachments are note-scoped). Each takes an optional `separately` flag, mirroring `show-note`. This closes the "show or reveal a note, folder, account, or attachment" surface gap from the roadmap; everything is additive AppleScript, and no existing tool changed.
 - **`get-note-plaintext` tool.** Reads a note's body as plain text by id or title via the scripting dictionary's read-only `note.plaintext` property, which Notes derives from the body with markup removed. This is more faithful than reading the HTML body and stripping it, and it skips the conversion entirely. `get-note-content` (HTML) and `get-note-markdown` (Markdown with checklist state) are unchanged; this adds a third read shape. Additive — no existing tool changed.
 
 ### Changed
+
 - **`update-note` now warns about attachments in its tool description.** A full-body replace can drop embedded files, images, scans, PDFs, or audio, so the description (and the README `update-note` section) now tells callers to run `list-attachments` first when a note may hold them. The skill already carried this guidance; this brings the MCP-visible tool description in line. Description and docs only — no behavior change.
 
 ## [2.3.0] - 2026-06-23
+
 ### Added
+
 - **All tools now declare an MCP `outputSchema`.** Every tool migrated from `server.tool(...)` to `server.registerTool(...)` so its structured-output shape is advertised in the tool metadata and validated by the SDK. Schemas are intentionally permissive (all fields optional, no `.strict()`, loose element types for arrays) so they describe the output contract without ever rejecting a valid result. No tool names, inputs, descriptions, or handler behavior changed.
 
 ## [2.2.0] - 2026-06-23
+
 ### Added
+
 - **Full `structuredContent` coverage across all tools.** Filled the last nine gaps so every data-returning and mutation tool now emits a typed `structuredContent` payload alongside its human-readable text: `health-check` (`{ healthy, checks[], fullDiskAccess }`) and the eight mutation tools — `create-note` (`{ ok, id, title, folder?, account? }`), `update-note` (`{ ok, id?, title, shared }`), `delete-note` (`{ ok, id?, title, wasShared }`), `move-note` (`{ ok, id?, title, folder }`), `batch-delete-notes` and `batch-move-notes` (`{ ok, succeeded, failed, results[] }`, the latter also `folder`), and `create-folder` / `delete-folder` (`{ ok, folder }`). Text output is unchanged; agents can now consume results without parsing prose.
 
 ### Changed
+
 - **Rewrote the Hermes Agent packaging to match NousResearch's real spec.** `.hermes-plugin/` previously shipped Claude-format JSON (`plugin.json` / `marketplace.json` / `mcp.json`) that Hermes never reads; it now provides a `config.yaml` (a `~/.hermes/config.yaml` `mcp_servers:` snippet) plus a README with the `hermes mcp add` command. The README "Other Hosts" section is corrected to match (Hermes has no plugin/marketplace drop-in; Antigravity uses its native `mcp_config.json`). Claude Code, Codex, and Antigravity packaging are unchanged.
 
 ## [2.1.4] - 2026-06-23
+
 ### Changed
+
 - Bumped `@modelcontextprotocol/sdk` to ^1.29.0, clearing the remaining `npm audit` advisory (transitive, from the SDK's unused HTTP transport) — `npm audit --omit=dev` is now clean, and the SDK version is in line with the other Apple MCP servers.
 - `publish.yml`'s `npm install -g npm@latest` step now retries, so a transient registry `ECONNRESET` no longer aborts a release.
 
 ## [2.1.3] - 2026-06-23
+
 ### Documentation
+
 - README: added npm-downloads, supported-Node, platform-macOS, and MCP badges next to the existing version/CI/License badges.
 - Synced the Codex marketplace skill (`codex/skills/apple-notes/SKILL.md`) with the canonical `skills/apple-notes/SKILL.md`, which had drifted ~100 lines behind (missing several documented tools and the formatting/safety guidance added in #42).
 
 ## [2.1.2] - 2026-06-22
+
 ### Added
+
 - **Additional AppleScript Notes surfaces (#41).** Three new read-only/UI tools — `show-note` (reveal a note in Notes.app by ID), `get-selected-notes` (the current Notes.app selection), and `get-default-location` (the default account/folder for new notes) — plus richer metadata: folder/account `shared` flags, account `upgraded` state and default folder, and attachment `url`/`created`/`modified`/`shared` fields. Output stays backward-compatible with the prior tab/newline AppleScript format. Thanks @oliverames.
 
 ### Tests
+
 - Added branch-coverage tests for the new surfaces (AppleScript failure paths, legacy tab/newline + plain-name fallbacks, and empty-field parsing), keeping `src/services/**` branch coverage above the 80% gate.
 
 ## [2.1.1] - 2026-06-22
+
 ### Added
+
 - **Hermes and Antigravity plugin packaging (#40).** Adds `.hermes-plugin/` and `.antigravity-plugin/` marketplace manifests plus the Apple Notes skill, so the server installs as a plugin on those hosts alongside the Claude Code and Codex packaging; each launches the published `apple-notes-mcp` via `npx`. Wired into `scripts/sync-plugin-version.mjs` so their versions track `package.json`, and documented in the README. Thanks @oliverames.
 - **MCP-visible structured tool descriptions on all 26 tools (#37).** Every tool now registers a description in the `Use when: / Returns: / Do not use when:` shape so agents can pick the right tool without trial and error. The eight write/destructive tools (`create-note`, `update-note`, `delete-note`, `move-note`, `batch-delete-notes`, `batch-move-notes`, `delete-folder`, `save-attachment`) additionally carry explicit `Safety:` wording calling out the confirmation expectation. No tool behavior or parameters changed — descriptions only.
 
 ### Documentation
+
 - Added `docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md`: why macOS re-prompts for Full Disk Access / Automation when the server runs under an ad-hoc-signed (e.g. Homebrew) Node, and the fix — run it under the official Developer-ID-signed Node so the grant survives Node updates. README and CLAUDE.md now point at it.
 - Synced the `package.json` `description` with the canonical GitHub repo one-liner ("…via Claude and other AI assistants").
 
@@ -766,22 +869,27 @@ collapse, inline-hashtag surfacing, an integration suite, and documentation of
 the pinned-notes and note-link AppleScript limitations.
 
 ### Added
+
 - **Integration test suite against real Notes.app (#31).** New `test/integration.test.ts` + `vitest.integration.config.ts` exercise the full `AppleNotesManager → AppleScript → Notes.app` stack (create → read → hashtags → search → delete, plus stats coverage), run via `npm run test:integration` / `npm run test:all`. The live tests self-skip when no writable Notes account is available, so the suite is safe on CI; a new `integration` CI job runs it on macOS. Default `npm test` (unit) is unchanged.
 
 ### Changed
-- **Batch delete/move collapsed from N+1 to a single osascript spawn (#26).** `batch-delete-notes` and `batch-move-notes` previously spawned 3–5 `osascript` processes *per note* (existence check + duplicate password check + the mutation, plus copy-then-delete for moves). Each now runs as one app-level script that loops over every id with per-id `try` isolation, so a batch of N notes costs one spawn instead of 3N–5N. Moves use the native `move` command, which preserves note identity and metadata instead of copy-then-delete. Per-item results, ordering, and error messages are unchanged; an invalid id is isolated to its own failed entry without a spawn. Verified end-to-end against real Notes.app.
+
+- **Batch delete/move collapsed from N+1 to a single osascript spawn (#26).** `batch-delete-notes` and `batch-move-notes` previously spawned 3–5 `osascript` processes _per note_ (existence check + duplicate password check + the mutation, plus copy-then-delete for moves). Each now runs as one app-level script that loops over every id with per-id `try` isolation, so a batch of N notes costs one spawn instead of 3N–5N. Moves use the native `move` command, which preserves note identity and metadata instead of copy-then-delete. Per-item results, ordering, and error messages are unchanged; an invalid id is isolated to its own failed entry without a spawn. Verified end-to-end against real Notes.app.
 - **`get-notes-stats` now reports partial-coverage diagnostics (#19).** A single unreachable or locked account (or a failed recent-activity scan) no longer throws away the whole stats result — the healthy scopes are returned and the failures are surfaced as a `coverage` object (`complete`, `scanned`, `covered`, `warnings[]`) in `structuredContent`, with a "⚠️ Partial results" note in the text. Only a total wipeout (no account readable) still throws, so callers can always tell a genuinely empty library apart from a partial failure.
 
 ### Added
+
 - **`get-note-content` now surfaces inline hashtags (#29).** The body is parsed for `#hashtag` tokens and they are returned as `hashtags` in `structuredContent`. Parsing matches Notes' own rule (a tag needs at least one letter, so `#123` is ignored) and de-duplicates case-insensitively (`src/utils/hashtags.ts`). Documented that Apple Notes tags are inline hashtags (not a scriptable property), that the `create-note` `tags` param is an app-level pass-through, and that Smart Folders are not scriptable.
 
 ### Documented
+
 - **Pinned notes are not supported (#28).** Investigated and confirmed Apple Notes exposes no scriptable `pinned` property (raises AppleScript error `-1700`); pin state lives only in the private Core Data store. Documented in `docs/APPLESCRIPT-LIMITATIONS.md`.
 - **Note-to-note links are not exposed (#30).** Investigated and confirmed a note has no `URL`/`link` property (error `-2753`) and no readable/constructable `applenotes://` deep link; the `x-coredata://` `id` is the only stable handle. The `show` command can reveal a note in the UI by id but is intentionally not wrapped as a tool. Documented in `docs/APPLESCRIPT-LIMITATIONS.md`.
 
 ## [2.0.1] - 2026-06-19
 
 ### Fixed
+
 - **By-title / by-name lookups failed on `&` (and other HTML-significant characters).** `get-note-content`, `get-note-details`, `delete-note`, `update-note`, `search-notes`, `list-attachments` (by title), folder creation, and the new attachment tools were escaping the lookup string with the HTML body-escaper (turning `&` into `&amp;`), so a note titled e.g. "Tom & Jerry" could never be found by title. These now use the literal AppleScript-string escaper. Found during live testing of 2.0.0. (Note bodies, which Notes stores as HTML, still use the HTML escaper — unchanged.)
 
 ## [2.0.0] - 2026-06-19
@@ -789,6 +897,7 @@ the pinned-notes and note-link AppleScript limitations.
 Maturity release bringing apple-notes-mcp to feature/stability parity with apple-mail-mcp.
 
 ### Added
+
 - **`doctor` tool** — a richer diagnostic than `health-check`: checks Notes.app reachability, the Automation permission, configured accounts, and Full Disk Access, each reported as ok / warn / fail with actionable advice (`structuredContent` carries the raw `{healthy, checks[]}`). (#22)
 - **`save-attachment` tool** — saves a note attachment to disk (`noteId`, `attachmentId`, `savePath`; destination must be under home, a temp dir, or `/Volumes`).
 - **`fetch-attachment` tool** — returns a note attachment's bytes as base64 in `structuredContent` (no disk write).
@@ -800,59 +909,71 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 - **Full Disk Access guide** — new `docs/FULL-DISK-ACCESS.md` explaining why checklist-state features need Full Disk Access and how to grant it, linked from the README. (#32)
 
 ### Changed
+
 - **Hardened AppleScript execution** — `execSync` now uses a 64 MB `maxBuffer` (configurable via `APPLE_NOTES_MCP_MAX_BUFFER`), `killSignal: SIGKILL`, and every script is wrapped in `with timeout` so a hung Apple Event can no longer wedge the process.
 - **Bounded full-library scans** — `get-notes-stats` and recent-activity counts are now counted server-side in AppleScript instead of streaming every note to JS.
 - **Locale-independent dates** — dates returned by the server are now parsed independently of the Mac's locale (previously could be wrong on non-US-locale Macs).
 
 ### Fixed
+
 - **Data corruption from delimiter collisions** — result parsing now uses ASCII control-character delimiters (US `\x1f` / RS `\x1e`) internally instead of `|||` / commas, fixing corruption when note titles or folder names contained those tokens (e.g. a note titled "Groceries, etc.").
 - **Silent empty results** — `read`/`list`/`search`/`stats` tools now surface backend failures as MCP errors instead of returning an empty result that looked like "no data".
 
 ### Known limitations / deferred
+
 - **Batch operations run per-note** — `batch-delete-notes` / `batch-move-notes` apply each note individually (AppleScript has no bulk equivalent to IMAP's `UID STORE`/`MOVE`); this preserves per-note success/failure reporting. (#26)
 - Pinned-note support (#28), tags/hashtags (#29), note links (#30), and a local integration-test suite (#31) are planned for a future release.
 
 ## [1.4.4] - 2026-06-18
 
 ### Fixed
+
 - **Folder and account names containing `&` (and other HTML-significant characters) silently matched nothing** — `buildFolderReference()` and `sanitizeAccountName()` escaped names with `escapeForAppleScript()`, which HTML-encodes `&` → `&amp;`. Apple Notes stores folder/account names as plain text, so `notes of folder "R&amp;D"` never matched the real folder "R&D" and the tool returned 0 notes for that folder. Added `escapePlainStringForAppleScript()` (escapes only `\` and `"`, no HTML encoding) and use it for folder and account names; note **body** content still uses the HTML-aware escaper. ([#14](https://github.com/sweetrb/apple-notes-mcp/issues/14) / [#15](https://github.com/sweetrb/apple-notes-mcp/pull/15))
 
 ### Changed
+
 - **CI: serialize npm publish runs** to stop the release-race 403 failures (a release lands two pushes → two publish runs; a `concurrency` group makes the second skip cleanly). Matches the guard added to apple-mail-mcp.
 
 ## [1.4.3] - 2026-06-01
 
 ### Fixed
-- **`.mcp.json` now serves both plugin installs and clones** — the marketplace plugin install was broken (no `mcpServers` declared in `plugin.json`), and the clone/contributor workflow ran the *published* `apple-notes-mcp` package via `npx` instead of the local build. These two contexts can't share one entrypoint string because plugin installs need `${CLAUDE_PLUGIN_ROOT}` while clones need `${CLAUDE_PROJECT_DIR:-.}`, and Claude Code does not support nested defaults like `${CLAUDE_PLUGIN_ROOT:-${CLAUDE_PROJECT_DIR:-.}}`. The two paths are now decoupled: the root `.mcp.json` uses `${CLAUDE_PROJECT_DIR:-.}/build/index.js` (clone workflow), and `.claude-plugin/plugin.json` declares its own `mcpServers` using `${CLAUDE_PLUGIN_ROOT}/build/index.js` (plugin install). Because `plugin.json` declares `mcpServers`, the plugin no longer auto-loads the root `.mcp.json`, so there is no double-registration. Matches the fix shipped in apple-mail-mcp.
+
+- **`.mcp.json` now serves both plugin installs and clones** — the marketplace plugin install was broken (no `mcpServers` declared in `plugin.json`), and the clone/contributor workflow ran the _published_ `apple-notes-mcp` package via `npx` instead of the local build. These two contexts can't share one entrypoint string because plugin installs need `${CLAUDE_PLUGIN_ROOT}` while clones need `${CLAUDE_PROJECT_DIR:-.}`, and Claude Code does not support nested defaults like `${CLAUDE_PLUGIN_ROOT:-${CLAUDE_PROJECT_DIR:-.}}`. The two paths are now decoupled: the root `.mcp.json` uses `${CLAUDE_PROJECT_DIR:-.}/build/index.js` (clone workflow), and `.claude-plugin/plugin.json` declares its own `mcpServers` using `${CLAUDE_PLUGIN_ROOT}/build/index.js` (plugin install). Because `plugin.json` declares `mcpServers`, the plugin no longer auto-loads the root `.mcp.json`, so there is no double-registration. Matches the fix shipped in apple-mail-mcp.
 
 ## [1.4.2] - 2026-05-27
 
 ### Added
+
 - **Runtime warning for unsupported checklist content** — `create-note` and `update-note` now detect checklist-like input (`<input type="checkbox">`, `class="checklist"|"todo"`, markdown `- [ ]` / `* [ ]` lines) and append a warning to the success response explaining that AppleScript cannot produce real Apple Notes checklists, so the failure mode is no longer silent
 - **`detectChecklistAttempt()` utility** in `src/utils/contentWarnings.ts` with 14 unit tests
 
 ### Documentation
+
 - **New "Creating Checklists" section in README** — explains why checklist creation is impossible via AppleScript (Apple Notes stores checklists as protobuf paragraph style `103`, which the scripting interface doesn't expose) and documents the ⇧⌘L manual-conversion workaround
 - **New "Checklist Creation Is Not Supported" section in CLAUDE.md** — explicit guidance so AI agents stop trying alternative HTML class names, data attributes, or Unicode characters
 - **Tool schema descriptions** — `create-note.content` and `update-note.newContent` now mention the checklist limitation so it surfaces in MCP tool listings
 - **Known Limitations table** — added a row for checklist creation alongside the existing checklist-state read row
 
 ### Fixes Issues
+
 - Closes #11 — "Can't create notes with Checklists (possibly a documentation issue)"
 
 ## [1.4.1] - 2026-04-06
 
 ### Fixed
+
 - **Nested folder creation** — `create-folder` now supports hierarchical paths (e.g., `"Retro Tech/PC/CPUs"`) by creating intermediate folders and checking existence first to prevent duplicate ghost folders in CoreData
 - **Note creation in deeply nested folders** — Fixed AppleScript `-1728` error when creating notes in nested folder contexts by switching to implicit return pattern
 - **Updated `create-folder` tool description** — Schema now documents nested path support
 
 ### Contributors
+
 - @robschmitt — nested folder creation fix and deep folder note creation fix (PR #9)
 
 ## [1.4.0] - 2026-04-06
 
 ### Added
+
 - **Hierarchical folder paths** — `list-folders` now returns full paths (e.g., `Work/Clients/Omnia`) using folder IDs to disambiguate duplicates
 - **Nested folder support** — `create-note`, `search-notes`, `list-notes`, `move-note`, and `delete-folder` all accept nested paths like `"Work/Clients"`
 - **`folder` and `account` parameters on `create-note`** — Create notes directly in a specific folder and account
@@ -862,38 +983,47 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 - **Security tests** — Injection payloads, malformed IDs, boundary conditions for folder paths
 
 ### Security
+
 - **CoreData ID validation** — New `sanitizeId()` validates ID format with regex before embedding in AppleScript, preventing injection via crafted IDs
 - **Account name sanitization** — Account names are now escaped in `buildAccountScopedScript()` to prevent AppleScript injection
 - **Defense-in-depth** — All ID-based methods (`getNoteById`, `getNoteContentById`, `deleteNoteById`, `updateNoteById`, `moveNoteById`, `listAttachmentsById`) now validate and escape IDs
 
 ### Changed
+
 - **Rewrote `listSharedNotes()` output parsing** — Switched from fragile regex/comma-based parsing to delimited `|||` output, fixing potential breakage when note titles contain commas or braces
 
 ### Contributors
+
 - Rob Schmitt ([@robschmitt](https://github.com/robschmitt)) — Hierarchical folder paths and nested folder support (PR #8)
 
 ## [1.3.1] - 2026-03-27
 
 ### Changed
+
 - **createNote uses body-only approach** — Title is now set exclusively via `<h1>` prefix in the note body instead of setting both the `name` property and body. This eliminates title duplication.
 
 ### Fixed
+
 - **Title duplication in createNote** — Previously, setting both `name` and `body` caused the title to appear twice in the note. Now only `body` (with `<h1>` title prefix) is used.
 
 ### Added
+
 - **Proper backslash and tab handling** in plaintext content encoding — Backslashes are encoded as `&#92;` and tabs are converted to `<br>` to prevent AppleScript escaping issues.
 
 ## [1.2.17] - 2025-01-01
 
 ### Security
+
 - **Fixed command injection vulnerability** in `moveNote()` - HTML content from notes was not properly escaped before embedding in AppleScript commands
 
 ### Changed
+
 - **Improved sleep implementation** - Replaced CPU-spinning busy-wait with efficient system sleep command
 - **Added sync status caching** - Sync detection now caches results for 2 seconds to reduce database queries
 - **Extracted shared parsing logic** - Consolidated duplicated note property parsing into `parseNotePropertiesOutput()` helper
 
 ### Added
+
 - **New helper functions** for cleaner code:
   - `escapeHtmlForAppleScript()` - Safely escape already-HTML content for AppleScript
   - `generateFallbackId()` - Consistent unique ID generation when AppleScript doesn't return one
@@ -903,6 +1033,7 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 - **Additional retry tests** - Coverage for all retryable error patterns (timed out, lost connection, busy)
 
 ### Developer Experience
+
 - **ESLint flat config** - Migrated from deprecated `.eslintrc.cjs` to modern `eslint.config.js`
 - **Pre-commit hooks** - Added husky + lint-staged for automatic linting on commit
 - **Test coverage thresholds** - Enforced minimum coverage (services ≥80%, utils ≥90%)
@@ -911,6 +1042,7 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 ## [1.2.16] - 2025-01-01
 
 ### Added
+
 - **Collaboration Awareness**
   - `list-shared-notes` tool to find all notes shared with collaborators
   - Warnings on `update-note` when modifying shared notes
@@ -920,6 +1052,7 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 ## [1.2.15] - 2025-01-01
 
 ### Added
+
 - **iCloud Sync Awareness**
   - `get-sync-status` tool to check if iCloud sync is active
   - Sync warnings integrated into `search-notes`, `list-notes`, `list-folders`
@@ -934,6 +1067,7 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 ## [1.2.14] - 2024-12-31
 
 ### Added
+
 - **Markdown Export**
   - `get-note-markdown` tool to retrieve note content as Markdown
   - Uses Turndown library for HTML to Markdown conversion
@@ -941,12 +1075,14 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 ## [1.2.13] - 2024-12-31
 
 ### Added
+
 - **Database Export**
   - `export-notes-json` tool for complete notes backup as JSON
 
 ## [1.2.12] - 2024-12-31
 
 ### Added
+
 - **Batch Operations**
   - `batch-delete-notes` tool to delete multiple notes by ID
   - `batch-move-notes` tool to move multiple notes to a folder
@@ -954,46 +1090,54 @@ Maturity release bringing apple-notes-mcp to feature/stability parity with apple
 ## [1.2.11] - 2024-12-31
 
 ### Added
+
 - **Attachment Listing**
   - `list-attachments` tool to see attachments in a note
 
 ## [1.2.10] - 2024-12-31
 
 ### Added
+
 - **Verbose Logging**
   - DEBUG environment variable support for troubleshooting
 
 ## [1.2.9] - 2024-12-31
 
 ### Added
+
 - **Statistics**
   - `get-notes-stats` tool for comprehensive notes statistics
 
 ## [1.2.8] - 2024-12-31
 
 ### Changed
+
 - Validate note existence before destructive operations
 - Better error messages for missing notes
 
 ## [1.2.7] - 2024-12-31
 
 ### Added
+
 - Retry logic for transient failures (Notes.app not responding)
 - Improved error message mapping
 
 ## [1.2.6] - 2024-12-31
 
 ### Added
+
 - `health-check` tool to verify Notes.app connectivity and permissions
 
 ## [1.2.5] - 2024-12-31
 
 ### Added
+
 - `folder` parameter to `search-notes` for filtering by folder
 
 ## [1.2.4] - 2024-12-31
 
 ### Added
+
 - Timeout handling for AppleScript operations (30 second default)
 - Password-protected note detection with clear error messages
 
