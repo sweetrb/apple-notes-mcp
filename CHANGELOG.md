@@ -1,5 +1,41 @@
 ## [Unreleased]
 
+## [2.8.15] - 2026-09-17
+
+### Fixed
+
+- A native write stalled by an unanswered **first-run Shortcuts consent
+  prompt** now says so (#172). The server runs the bridge Shortcuts headless,
+  where Shortcuts cannot display that prompt, so the run waited out the
+  transport timeout and readback failed with no hint of the cause while
+  `doctor` and `get-capabilities` still reported the bridges installed.
+  - A bridge timeout (`append-native`, `set-note-pinned`, `create-checklist-item`,
+    `create-table`, `insert-note-link`, `remove-native-tags`,
+    `replace-native-tag`) now says it may be an unanswered first-run consent
+    prompt and names the Shortcut to run once in the foreground in
+    Shortcuts.app with **Always Allow**.
+  - The Native Tags bridge's failure carries the same hint, plus its Shortcut
+    name and timeout code, so `replace-native-tag`'s add phase names it too.
+  - `add-native-tags` no longer drops that transport diagnosis when readback
+    then fails — its "Shortcuts ran, but exact-ID … readback was not verified"
+    error hid it.
+  - `doctor`'s "Native write Shortcuts" check and `apple-notes-mcp setup` now
+    remind that each bridge needs one foreground run after install or upgrade.
+    This is a reminder, not a detection: the `shortcuts` CLI exposes no consent
+    state or run history.
+
+  Thanks to @vladbisceanu for root-causing this as a Shortcuts first-run
+  consent prompt rather than a rate or stale-state issue.
+
+### Documentation
+
+- README (Quick Start, `native-tags-status`, native background operations, and
+  a new Troubleshooting entry), `shortcuts/README.md`, `TECHNICAL_NOTES.md` and
+  the bundled skill now say to run each bridge Shortcut —
+  `Apple Notes MCP - Native Tags` and `Apple Notes MCP - Background Operations v5`
+  — once in the foreground in Shortcuts.app and choose Always Allow after
+  install or upgrade (#172).
+
 ## [2.8.14] - 2026-09-17
 
 ### Fixed
