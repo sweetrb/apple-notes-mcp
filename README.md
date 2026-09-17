@@ -275,8 +275,11 @@ title line, with no seed line.
   verify: `_` emphasis (underscores inside a word, as in `snake_case`, are
   fine), backslash escapes, character references such as `&amp;`, `---` or
   `===` lines, indented headings or list items, `1)` lists, closing `#`s, and
-  formatting inside link labels. Markdown punctuation in `title` is escaped, so
-  the title stays literal.
+  formatting inside link labels. Content that needs one of these literally, such
+  as a `/_next` path or a literal `\*`, has no Markdown form here: use
+  `format: "html"` for that note (or `append-native` with `format: "html"` on an
+  existing one), which keeps the characters but not the Heading and Subheading
+  styles. Markdown punctuation in `title` is escaped, so the title stays literal.
 - The server finds the new note among the notes added to the default folder
   during the run by verifying each one's visible text, heading levels and links
   by exact-ID readback, and moves it only after exactly one verifies. On any
