@@ -421,7 +421,7 @@ describe("create-note Markdown bridge (#172)", () => {
         content,
       })
     ).toThrow(
-      /search for the title before any retry: no new note was found in the default folder; Shortcuts timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut/
+      /search for the title before any retry: no new note was found in the default folder; Shortcuts timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut\. This may be an unanswered first-run Shortcuts consent prompt.*run "Apple Notes MCP - Create Markdown Note" once in the foreground in Shortcuts\.app and choose Always Allow/
     );
     vi.mocked(execFileSync).mockReturnValue("");
     const other = "x-coredata://ABCDEF/ICNote/p3";
