@@ -1867,6 +1867,64 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("separators in every generated script (#162)", () => {
+    // Every script below runs inside a `tell application "Notes"` block, where
+    // each `ASCII character` evaluation is dispatched to Notes.app as its own
+    // Apple Event. Search, folder, account and stats scripts build one record
+    // per item, so the separators must be `character id`, evaluated locally.
+    const NOTE_ID = "x-coredata://ABC00000-0000-0000-0000-000000000011/ICNote/p1";
+    const FOLDER_ID = "x-coredata://ABC00000-0000-0000-0000-000000000011/ICFolder/p2";
+
+    const scriptsFor = (call: () => unknown): string[] => {
+      mockExecuteAppleScript.mockReset();
+      mockExecuteAppleScript.mockImplementation((script: string) => ({
+        success: true,
+        // listAccounts feeds the per-account stats and shared-notes scripts.
+        output: script.includes("repeat with a in accounts") ? "iCloud" : "",
+      }));
+      try {
+        call();
+      } catch {
+        // Empty output makes some parsers throw; only the scripts matter here.
+      }
+      return mockExecuteAppleScript.mock.calls.map(([script]) => String(script));
+    };
+
+    it.each<[string, () => unknown, string[]]>([
+      ["searchNotes (title)", () => manager.searchNotes("the"), ["31", "30"]],
+      ["searchNotes (content)", () => manager.searchNotes("the", true), ["31", "30"]],
+      ["listFolders", () => manager.listFolders(), ["31", "30"]],
+      ["listAccounts", () => manager.listAccounts(), ["31", "30"]],
+      ["getNotesStats", () => manager.getNotesStats(), ["31", "30"]],
+      ["getSelectedNotes", () => manager.getSelectedNotes(), ["31", "30"]],
+      ["getDefaultLocation", () => manager.getDefaultLocation(), ["31"]],
+      ["getNoteById", () => manager.getNoteById(NOTE_ID), ["31"]],
+      ["getNoteDetails", () => manager.getNoteDetails("Groceries"), ["31"]],
+      ["getFolderById", () => manager.getFolderById(FOLDER_ID), ["31"]],
+      ["createFolder", () => manager.createFolder("Archive"), ["31"]],
+      ["listAttachmentsById", () => manager.listAttachmentsById(NOTE_ID), ["31", "30"]],
+      ["listAttachments", () => manager.listAttachments("Groceries"), ["31", "30"]],
+      ["showAttachmentById", () => manager.showAttachmentById(NOTE_ID, "att-1"), ["31"]],
+      [
+        "saveAttachmentById",
+        () => manager.saveAttachmentById(NOTE_ID, "att-1", join(tmpdir(), "x.png")),
+        ["31"],
+      ],
+      ["batchMoveNotes", () => manager.batchMoveNotes([NOTE_ID], "Archive"), ["30"]],
+      ["listNotes", () => manager.listNotes(), ["31", "30"]],
+      ["listSharedNotes", () => manager.listSharedNotes(), ["31", "30"]],
+    ])("%s never emits ASCII character", (_name, call, codes) => {
+      const scripts = scriptsFor(call);
+      const all = scripts.join("\n");
+
+      expect(scripts.length).toBeGreaterThan(0);
+      expect(all).not.toContain("ASCII character");
+      for (const code of codes) {
+        expect(all).toContain(`(character id ${code})`);
+      }
+    });
+  });
+
   describe("listSharedNotes", () => {
     it("reads sharing state in one bulk read and stops there when nothing is shared", () => {
       mockExecuteAppleScript

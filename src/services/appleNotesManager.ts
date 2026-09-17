@@ -64,25 +64,20 @@ import TurndownService from "turndown";
 // content (a note titled "Groceries, etc." used to split into phantom notes).
 //   FIELD_SEP  (US, \x1f) separates fields within a record
 //   RECORD_SEP (RS, \x1e) separates records within a list
-// In AppleScript these are emitted via `ASCII character 31 / 30`.
+// In AppleScript these are emitted via `character id 31 / 30`.
+//
+// Never `ASCII character` (#162): that is a Standard Additions command, so
+// inside a `tell application "Notes"` block — where every script here runs —
+// each evaluation is dispatched to Notes.app as its own Apple Event. 718
+// evaluations took 6.12 s there, against 0.05 s for `character id`, which is
+// core AppleScript evaluated locally. Scripts that build one record per note,
+// folder, account or attachment paid several round trips per item. Same
+// characters, same output.
 // =============================================================================
 const FIELD_SEP = "\x1f";
 const RECORD_SEP = "\x1e";
-const AS_FIELD_SEP = "(ASCII character 31)";
-const AS_RECORD_SEP = "(ASCII character 30)";
-
-/**
- * The same separators, evaluated without an Apple Event, for scripts that
- * build one record per note (#162). `ASCII character` is a Standard Additions
- * command, so inside a `tell application "Notes"` block every evaluation is
- * dispatched to Notes.app as its own Apple Event: 718 evaluations took 6.12 s
- * there, against 0.05 s for `character id`, which is core AppleScript. A
- * per-record loop over a whole library paid two round trips per note, which on
- * a ~600-note library ran into the AppleEvent timeout. Same characters, same
- * output.
- */
-const AS_FIELD_SEP_LOCAL = "(character id 31)";
-const AS_RECORD_SEP_LOCAL = "(character id 30)";
+const AS_FIELD_SEP = "(character id 31)";
+const AS_RECORD_SEP = "(character id 30)";
 
 // =============================================================================
 // Export paging (#162)
@@ -1595,11 +1590,11 @@ export class AppleNotesManager {
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames
-            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
-        return (totalCount as text) & ${AS_RECORD_SEP_LOCAL} & (resultList as text)
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
       `;
     }
 
@@ -1622,9 +1617,9 @@ export class AppleNotesManager {
         ${dateFetch}${countGuard("noteIds")}
         ${dateCountGuard}set resultList to {}
         repeat with i from 1 to count of noteNames
-          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)${dateGuardClose}
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
       `;
   }
@@ -1790,11 +1785,11 @@ export class AppleNotesManager {
             if (item i of noteShared) is true then
               set cd to item i of noteCreated
               set md to item i of noteModified
-              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds) & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP_LOCAL} & "true" & ${AS_FIELD_SEP_LOCAL} & ((item i of noteLocked) as text)
+              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds) & ${AS_FIELD_SEP} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP} & "true" & ${AS_FIELD_SEP} & ((item i of noteLocked) as text)
             end if
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
         `
       );

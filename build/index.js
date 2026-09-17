@@ -39975,10 +39975,8 @@ import { homedir as homedir4 } from "os";
 import { join as join4 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
-var AS_FIELD_SEP = "(ASCII character 31)";
-var AS_RECORD_SEP = "(ASCII character 30)";
-var AS_FIELD_SEP_LOCAL = "(character id 31)";
-var AS_RECORD_SEP_LOCAL = "(character id 30)";
+var AS_FIELD_SEP = "(character id 31)";
+var AS_RECORD_SEP = "(character id 30)";
 var DEFAULT_EXPORT_PAGE_SIZE = 50;
 var DEFAULT_EXPORT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 function exportMaxResponseBytes(env = process.env) {
@@ -40817,11 +40815,11 @@ var AppleNotesManager = class {
           end try
           ${countGuard("noteIds")}
           repeat with i from 1 to count of noteNames
-            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)
+            set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
-        return (totalCount as text) & ${AS_RECORD_SEP_LOCAL} & (resultList as text)
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
       `;
     }
     const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
@@ -40838,9 +40836,9 @@ var AppleNotesManager = class {
         ${dateFetch}${countGuard("noteIds")}
         ${dateCountGuard}set resultList to {}
         repeat with i from 1 to count of noteNames
-          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds)${dateGuardClose}
+          ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
       `;
   }
@@ -40975,11 +40973,11 @@ var AppleNotesManager = class {
             if (item i of noteShared) is true then
               set cd to item i of noteCreated
               set md to item i of noteModified
-              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP_LOCAL} & (item i of noteIds) & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP_LOCAL} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP_LOCAL} & "true" & ${AS_FIELD_SEP_LOCAL} & ((item i of noteLocked) as text)
+              set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds) & ${AS_FIELD_SEP} & ${asDatePartsExpr("cd")} & ${AS_FIELD_SEP} & ${asDatePartsExpr("md")} & ${AS_FIELD_SEP} & "true" & ${AS_FIELD_SEP} & ((item i of noteLocked) as text)
             end if
           end repeat
         end if
-        set AppleScript's text item delimiters to ${AS_RECORD_SEP_LOCAL}
+        set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
         `
       );
