@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.8.16] - 2026-09-17
+
 ### Added
 
 - `create-note` accepts `format: "markdown"` (#172). A third packaged
