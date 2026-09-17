@@ -354,4 +354,110 @@ describe("create-note Markdown bridge (#172)", () => {
     expect(manager.listNoteRefs).toHaveBeenCalledWith("iCloud", "Notes");
     expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
   });
+
+  it("escapes Markdown punctuation so the title stays literal", () => {
+    const title = "1. Q4 *plan* #work";
+    const manager = markdownManager(
+      [[existing], [existing, created]],
+      `<div><b><h1>${title}</h1></b></div><div>Body</div>`,
+      `${title}\nBody`
+    );
+    expect(
+      createMarkdownNote(manager as unknown as AppleNotesManager, { title, content: "Body" })
+    ).toMatchObject({ ok: true, id: created });
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.at(-1)?.[1]));
+    expect(written.text).toBe("# 1\\. Q4 \\*plan\\* \\#work\n\nBody");
+    expect(manager.moveNoteById).not.toHaveBeenCalled();
+  });
+
+  it("reports a flattened heading as unverified and does not move the note", () => {
+    const flattened = importedHtml.replace("<h3>Detail</h3>", "<h2>Detail</h2>");
+    const manager = markdownManager([[existing], [existing, created]], flattened);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "Work",
+      })
+    ).toThrow(
+      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: Heading styles not verified/
+    );
+    expect(manager.moveNoteById).not.toHaveBeenCalled();
+  });
+
+  it("reports text Notes did not keep, such as a leading seed line", () => {
+    const manager = markdownManager(
+      [[existing], [existing, created]],
+      importedHtml,
+      "New note\nPlan\n\nGoals\nDetail\none"
+    );
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+      })
+    ).toThrow(/Note text not verified/);
+  });
+
+  it("refuses to pick a note when none or several appear", () => {
+    const content = "## Goals\n### Detail\n- one";
+    mock.status.mockReturnValue({
+      installed: true,
+      identifier: "11111111-1111-4111-8111-111111111111",
+      shortcut: "Apple Notes MCP - Create Markdown Note",
+    } as never);
+    vi.mocked(execFileSync).mockImplementation(() => {
+      throw Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
+    });
+    expect(() =>
+      createMarkdownNote(markdownManager([[existing]]) as unknown as AppleNotesManager, {
+        title: "Plan",
+        content,
+      })
+    ).toThrow(
+      /No new note was found.*timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut/
+    );
+    vi.mocked(execFileSync).mockReturnValue("");
+    const other = "x-coredata://ABCDEF/ICNote/p3";
+    expect(() =>
+      createMarkdownNote(
+        markdownManager([[existing], [existing, created, other]]) as unknown as AppleNotesManager,
+        { title: "Plan", content }
+      )
+    ).toThrow(/2 notes appeared/);
+  });
+
+  it("names the created note when the move to its folder fails", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    manager.moveNoteById.mockReturnValue(false);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "Missing",
+      })
+    ).toThrow(/Created and verified note x-coredata:\/\/ABCDEF\/ICNote\/p2.*use move-note/);
+  });
+
+  it("refuses before listing or running anything when the bridge is missing or input is invalid", () => {
+    const manager = markdownManager([[existing]]);
+    mock.status.mockReturnValue({ installed: false, identifier: undefined } as never);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, { title: "Plan", content: "x" })
+    ).toThrow(/Install the supplied/);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Two\nlines",
+        content: "x",
+      })
+    ).toThrow(/one line/);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "| a | b |",
+      })
+    ).toThrow(/Markdown append supports/);
+    expect(manager.listNoteRefs).not.toHaveBeenCalled();
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
 });

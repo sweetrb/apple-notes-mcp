@@ -3,6 +3,7 @@ import {
   assertPreserved,
   assertAppendedHtmlLinks,
   assertAppendedVisibleText,
+  headingLevels,
   mutateBackground,
   validateAppendContent,
   type BackgroundSnapshot,
@@ -254,6 +255,17 @@ describe("background note mutation boundaries", () => {
     }
   });
 });
+describe("heading readback", () => {
+  it("lists non-empty heading levels in order, skipping the empty heading Notes appends", () => {
+    expect(
+      headingLevels(
+        '<div><b><h1>Plan</h1></b><font face=".AppleSystemUIFont"><span style="font-size: 13px"><h1><br></h1></span></font></div>' +
+          "<div><br></div><div><b><h2>Goals</h2></b><h2><br></h2></div><div><b><h3>Detail</h3></b></div><div>text</div>"
+      )
+    ).toEqual([1, 2, 3]);
+  });
+});
+
 describe("preservation verification", () => {
   it("allows Notes to normalize formatting of an object placeholder without changing visible text styles", () => {
     const before = snapshot(),

@@ -58,8 +58,8 @@ This method also installs a **skill** that teaches Claude when and how to use Ap
 
 On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
-Native tag, checklist, table, pin, and rich append operations use two packaged
-Apple Shortcuts. Run the explicit setup once:
+Native tag, checklist, table, pin, rich append, and Markdown note creation use
+three packaged Apple Shortcuts. Run the explicit setup once:
 
 ```bash
 npx -y apple-notes-mcp setup
@@ -72,9 +72,12 @@ support silent Shortcut import, so merely connecting an MCP client never opens
 setup windows or bypasses these confirmations.
 
 After install **and after every upgrade**, open Shortcuts.app and run each
-bridge — `Apple Notes MCP - Native Tags` and
-`Apple Notes MCP - Background Operations v5` — once in the foreground, choosing
-**Always Allow** when Shortcuts asks for permission. The server runs these
+bridge — `Apple Notes MCP - Native Tags`,
+`Apple Notes MCP - Background Operations v5` and
+`Apple Notes MCP - Create Markdown Note` — once in the foreground, choosing
+**Always Allow** when Shortcuts asks for permission. The Create Markdown Note
+bridge stops before reaching Notes when run with no input, so start its run
+with the request in [`shortcuts/README.md`](shortcuts/README.md). The server runs these
 Shortcuts in the background, where Shortcuts cannot display a first-run consent
 prompt: an unanswered one stalls every native write on that bridge until it
 times out, while `doctor` still reports the bridge installed. Quitting or
@@ -205,7 +208,7 @@ Creates a new note in Apple Notes.
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags) |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
-| `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. In both formats, the title is automatically prepended as `<h1>`. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities |
+| `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
 
 **Example (tagged with inline hashtags):**
 ```json
@@ -235,13 +238,46 @@ Creates a new note in Apple Notes.
 
 > **Note:** The title is automatically prepended as `<h1>` in both plaintext and HTML formats. Do not include a `<h1>` title tag in the `content` parameter, or the title will appear twice.
 
-> **Known limitation:** `create-note` sets the note body directly via AppleScript's
-> `body` property, which does not apply real Notes paragraph styles for interior
-> content — an `<h2>`/`<h3>` tag or a `<span style="font-size: …px">` heading span
-> in `content` renders as plain bold, styled text, not an actual Heading or
-> Subheading ([#172](https://github.com/sweetrb/apple-notes-mcp/issues/172)). Real
-> Heading/Subheading styles can currently only be added to a note that already
-> exists, with [`append-native`](#append-native)'s `format: "markdown"`.
+> **Known limitation:** with `"plaintext"` or `"html"`, `create-note` sets the note
+> body directly via AppleScript's `body` property, which does not apply real Notes
+> paragraph styles for interior content — an `<h2>`/`<h3>` tag or a
+> `<span style="font-size: …px">` heading span in `content` renders as plain bold,
+> styled text, not an actual Heading or Subheading
+> ([#172](https://github.com/sweetrb/apple-notes-mcp/issues/172)). Use
+> `format: "markdown"` for real headings in a new note, or
+> [`append-native`](#append-native)'s `format: "markdown"` on a note that already
+> exists.
+
+##### Markdown notes
+
+`format: "markdown"` creates the note with Notes' own Markdown importer (the
+Create Note action's "Interpret as Markdown" option, macOS 26+), run through the
+packaged `Apple Notes MCP - Create Markdown Note` Shortcut. `#`, `##` and `###`
+become real Title, Heading and Subheading styles, and the note starts with the
+title line, with no seed line.
+
+```json
+{
+  "title": "Project Plan",
+  "content": "## Goals\n\n- Ship the beta\n- Collect feedback\n\n### Links\n\n[Tracker](https://example.com/tracker)",
+  "format": "markdown",
+  "folder": "Work"
+}
+```
+
+- Notes interprets Markdown only in an iCloud account. The note is created in the
+  iCloud account's default folder, then moved to `folder` in that account.
+  `account` is refused with this format.
+- `content` accepts the same bounded subset as `append-native`'s Markdown:
+  `#`/`##`/`###` headings, flat lists, `**bold**`, `*italic*` and inline links.
+  Markdown punctuation in `title` is escaped, so the title stays literal.
+- The server finds the new note as the one note added to the default folder
+  during the run, then verifies its visible text, heading levels and links by
+  exact-ID readback before moving it. On any uncertain result it reports the
+  note ID and never retries.
+- It is gated like the other native operations; `get-capabilities` reports it
+  as `create-note-markdown`. Install and approve the Shortcut as described in
+  [`shortcuts/README.md`](shortcuts/README.md).
 
 **Returns:** Confirmation message with note title and ID. Save the ID for subsequent operations like `update-note`, `delete-note`, etc.
 
@@ -1073,9 +1109,11 @@ Install the signed workflows once as described in
 foreground in Shortcuts.app and choose **Always Allow** — again after every
 upgrade — so no first-run consent prompt is left for a background run that
 cannot display it. Native writes never use UI
-automation or write directly to the Notes database. Every operation requires an
-exact note ID, a fresh `expectedContentHash`, and a distinctive existing
-`scopeText` so the Shortcut and server can independently resolve the same note.
+automation or write directly to the Notes database. Every operation on an
+existing note requires an exact note ID, a fresh `expectedContentHash`, and a
+distinctive existing `scopeText` so the Shortcut and server can independently
+resolve the same note. Creating a note from Markdown is
+[`create-note`](#create-note) with `format: "markdown"`.
 
 #### `get-capabilities`
 
@@ -1417,7 +1455,7 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 ### Native writes time out or report an uncertain outcome
 - Symptom: `add-native-tags`, `set-note-pinned`, `append-native` or another native write fails with "Shortcuts timed out waiting for …", "Operation outcome uncertain" or "readback was not verified", while `doctor` and `get-capabilities` report the bridges installed
 - Common cause, especially right after install or upgrade: the bridge Shortcut is waiting on a first-run consent prompt. The server runs it in the background, where Shortcuts cannot display that prompt, so the run stalls until it times out
-- Fix: open Shortcuts.app, run the Shortcut the error names (`Apple Notes MCP - Native Tags` or `Apple Notes MCP - Background Operations v5`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
+- Fix: open Shortcuts.app, run the Shortcut the error names (`Apple Notes MCP - Native Tags`, `Apple Notes MCP - Background Operations v5` or `Apple Notes MCP - Create Markdown Note`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
 - Read the exact note before retrying — the write may have landed
 
 ### "Note not found"

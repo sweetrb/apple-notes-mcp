@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+### Added
+
+- `create-note` accepts `format: "markdown"` (#172). A third packaged
+  Shortcut, Create Markdown Note, runs Notes' Create Note action with
+  "Interpret as Markdown", so `#`/`##`/`###` become real Title, Heading and
+  Subheading styles in a new note with no seed line. Content uses the same
+  bounded Markdown subset as `append-native`. Notes interprets Markdown only in
+  iCloud, so the note is created in the iCloud default folder, verified by
+  exact-ID readback of its text, heading levels and links, and then moved to
+  `folder`; `account` is refused with this format. The operation is gated like
+  the other native writes and reported by `get-capabilities` as
+  `create-note-markdown`.
+- `apple-notes-mcp setup` and `doctor` include the Create Markdown Note bridge.
+
 ## [2.8.15] - 2026-09-17
 
 ### Fixed
