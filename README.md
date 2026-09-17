@@ -58,23 +58,28 @@ This method also installs a **skill** that teaches Claude when and how to use Ap
 
 On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
-Native tag, checklist, table, pin, rich append, and Markdown note creation use
-three packaged Apple Shortcuts. Run the explicit setup once:
+Native tag, checklist, table, pin, and rich append operations use two packaged
+Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
+only `create-note`'s `format: "markdown"` needs it, and only on macOS 26 or
+later. Run the explicit setup once:
 
 ```bash
 npx -y apple-notes-mcp setup
 ```
 
 The command checks existing installations and opens only missing signed
-workflows. Confirm **Add Shortcut** in each macOS window, then verify with
-`npx -y apple-notes-mcp setup --check` or the MCP `doctor` tool. macOS does not
+workflows; it opens the optional Create Markdown Note bridge only on macOS 26 or
+later. Confirm **Add Shortcut** in each macOS window, then verify with
+`npx -y apple-notes-mcp setup --check` or the MCP `doctor` tool. `setup --check`
+reports ready and `doctor` reports ok once the two required bridges are
+installed; both list the optional bridge's status separately. macOS does not
 support silent Shortcut import, so merely connecting an MCP client never opens
 setup windows or bypasses these confirmations.
 
 After install **and after every upgrade**, open Shortcuts.app and run each
-bridge — `Apple Notes MCP - Native Tags`,
-`Apple Notes MCP - Background Operations v5` and
-`Apple Notes MCP - Create Markdown Note` — once in the foreground, choosing
+installed bridge — `Apple Notes MCP - Native Tags`,
+`Apple Notes MCP - Background Operations v5` and, if you installed it, the
+optional `Apple Notes MCP - Create Markdown Note` — once in the foreground, choosing
 **Always Allow** when Shortcuts asks for permission. The Create Markdown Note
 bridge stops before reaching Notes when run with no input, so start its run
 with the request in [`shortcuts/README.md`](shortcuts/README.md). The server runs these
@@ -205,7 +210,7 @@ Creates a new note in Apple Notes.
 |-----------|------|----------|-------------|
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
 | `content` | string | Yes | The body content of the note (do not repeat the title here) |
-| `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags) |
+| `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags). Refused with `format: "markdown"` |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
@@ -267,13 +272,19 @@ title line, with no seed line.
 
 - Notes interprets Markdown only in an iCloud account. The note is created in the
   iCloud account's default folder, then moved to `folder` in that account.
-  `folder` must already exist and is checked before anything is created.
-  `account` is refused with this format.
+  `folder` must already exist and is checked before anything is created. If it
+  exists only in another account, the note is still created and verified in the
+  iCloud default folder, and the error names that account and the note's id so
+  you can create the folder there and `move-note` it instead of creating the
+  note again. `account` is refused with this format.
+- `tags` are refused with this format. Create the note without them, then add
+  native tags to the returned id with [`add-native-tags`](#add-native-tags).
 - `content` accepts the same bounded subset as `append-native`'s Markdown:
   `#`/`##`/`###` headings, flat lists, `**bold**`, `*italic*` and inline links.
   It also refuses Markdown that Notes would rewrite and the server could not
-  verify: `_` emphasis (underscores inside a word, as in `snake_case`, are
-  fine), backslash escapes, character references such as `&amp;`, `---` or
+  verify: `_` emphasis (underscores inside a word, as in `snake_case`, and
+  inside a link destination, as in `[docs](https://example.com/_next/static)`,
+  are fine), backslash escapes, character references such as `&amp;`, `---` or
   `===` lines, indented headings or list items, `1)` lists, closing `#`s, and
   formatting inside link labels. Content that needs one of these literally, such
   as a `/_next` path or a literal `\*`, has no Markdown form here: use
@@ -286,7 +297,8 @@ title line, with no seed line.
   uncertain result it names the note (or says to search for the title) and
   never retries.
 - It is gated like the other native operations; `get-capabilities` reports it
-  as `create-note-markdown`. Install and approve the Shortcut as described in
+  as `create-note-markdown`. The Create Markdown Note Shortcut is optional and
+  needed only for this format (macOS 26+); install and approve it as described in
   [`shortcuts/README.md`](shortcuts/README.md).
 
 **Returns:** Confirmation message with note title and ID. Save the ID for subsequent operations like `update-note`, `delete-note`, etc.

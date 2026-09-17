@@ -208,10 +208,13 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
   `body` property renders them as plain bold text (#172). For a new note with real
   headings, use `create-note` with `format: "markdown"` (`##`/`###` →
   Heading/Subheading, flat lists, `**bold**`/`*italic*` and inline links; iCloud
-  only, no `account`). It needs the Create Markdown Note Shortcut; check
-  `get-capabilities` for `create-note-markdown`. On an existing note, use
-  `append-native` with `format: "markdown"`. Both refuse Markdown Notes would
-  rewrite, such as `_` emphasis outside a word or backslash escapes.
+  only, no `account`). `tags` are refused with this format: create the note,
+  then use `add-native-tags` on the returned id. It needs the optional Create
+  Markdown Note Shortcut (macOS 26+); check `get-capabilities` for
+  `create-note-markdown`. On an existing note, use `append-native` with
+  `format: "markdown"`. Both refuse Markdown Notes would rewrite, such as `_`
+  emphasis outside a word or backslash escapes; underscores inside a link
+  destination are fine.
 - Use `<ul><li>` and `<ol><li>` for native bullet and numbered lists. Add `<div><br></div>` after closing `</ul>` or `</ol>` so the next section has spacing.
 - Use `<b>`, `<i>`, `<u>`, and `<s>` for inline emphasis.
 - Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.

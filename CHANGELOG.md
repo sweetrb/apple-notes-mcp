@@ -4,8 +4,8 @@
 
 ### Added
 
-- `create-note` accepts `format: "markdown"` (#172). A third packaged
-  Shortcut, Create Markdown Note, runs Notes' Create Note action with
+- `create-note` accepts `format: "markdown"` (#172). A third, optional
+  packaged Shortcut, Create Markdown Note, runs Notes' Create Note action with
   "Interpret as Markdown", so `#`/`##`/`###` become real Title, Heading and
   Subheading styles in a new note with no seed line. Content uses the same
   bounded Markdown subset as `append-native`, and Markdown that Notes would
@@ -13,10 +13,17 @@
   anything is written. Notes interprets Markdown only in
   iCloud, so the note is created in the iCloud default folder, verified by
   exact-ID readback of its text, heading levels and links, and then moved to
-  `folder`; `account` is refused with this format. The operation is gated like
+  `folder`; `account` and `tags` are refused with this format (add tags
+  afterwards with `add-native-tags`). A `folder` that exists only in another
+  account is reported after creation as missing from the account the note
+  landed in, naming the note's id for `move-note`. The operation is gated like
   the other native writes and reported by `get-capabilities` as
   `create-note-markdown`.
-- `apple-notes-mcp setup` and `doctor` include the Create Markdown Note bridge.
+- `apple-notes-mcp setup` and `doctor` list the Create Markdown Note bridge as
+  optional: readiness and `doctor`'s native-write status depend only on the
+  Native Tags and Background Operations v5 bridges, so an upgrade without the
+  new Shortcut stays ready. `setup` opens it when missing only on macOS 26 or
+  later.
 
 ### Fixed
 
@@ -27,7 +34,9 @@
   labels. Since 2.8.14 sends raw Markdown to that importer, content such as
   `_x_` was written to the note as italics and then reported as
   "Operation outcome uncertain", because verification still expected the
-  underscores.
+  underscores. Underscores inside an inline link destination, such as
+  `[docs](https://example.com/_next/static)`, are exempt, since CommonMark
+  never forms emphasis there.
 
 ## [2.8.15] - 2026-09-17
 

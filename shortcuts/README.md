@@ -54,7 +54,9 @@ installed UUID and refuses duplicates.
 
 `Apple Notes MCP - Create Markdown Note.shortcut` creates one note with Notes'
 Create Note action and "Interpret as Markdown" (macOS 26+, iCloud accounts only)
-in the iCloud default folder. It reads the same JSON request file and runs only
+in the iCloud default folder. It is optional: only `create-note` with
+`format: "markdown"` uses it, and neither `setup --check`'s readiness nor
+`doctor`'s native-write check depends on it. It reads the same JSON request file and runs only
 for `operation: "create-markdown"`; it has no search, edit or delete actions.
 The server finds the new note by exact ID and verifies it before reporting
 success.
