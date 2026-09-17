@@ -508,6 +508,38 @@ describe("create-note Markdown bridge (#172)", () => {
     );
   });
 
+  it("names the landing account when the folder exists only in another account", () => {
+    const gmail = "x-coredata://ABCDEF/ICNote/p9";
+    const manager = markdownManager([[existing], [existing, created]]);
+    manager.listAccounts.mockReturnValue([
+      { name: "iCloud", defaultFolder: "Notes" },
+      { name: "Gmail", defaultFolder: "Notes" },
+    ] as never);
+    let iCloudListing = 0;
+    const listings = [[existing], [existing, created]];
+    manager.listNoteRefs.mockImplementation(((account: string) =>
+      (account === "iCloud"
+        ? listings[Math.min(iCloudListing++, listings.length - 1)]
+        : [gmail]
+      ).map((noteId) => ({ id: noteId, title: "Plan" }))) as never);
+    manager.listFolders.mockImplementation(((account: string) =>
+      account === "Gmail"
+        ? [{ id: "folder-9", name: "Archive", account: "Gmail" }]
+        : [{ id: "folder-1", name: "Work", account: "iCloud" }]) as never);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "archive",
+      })
+    ).toThrow(
+      'Operation outcome uncertain; read note x-coredata://ABCDEF/ICNote/p2 before any retry: created and verified in the iCloud default folder, but folder "archive" does not exist in iCloud; create it there, then use move-note with id x-coredata://ABCDEF/ICNote/p2 instead of creating the note again'
+    );
+    expect(execFileSync).toHaveBeenCalledTimes(1);
+    expect(manager.listFolders).toHaveBeenLastCalledWith("iCloud");
+    expect(manager.moveNoteById).not.toHaveBeenCalled();
+  });
+
   it("refuses a folder that does not exist before the bridge creates anything", () => {
     const manager = markdownManager([[existing], [existing, created]]);
     expect(() =>

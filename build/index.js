@@ -43257,8 +43257,8 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
+  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
-    const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
       (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
@@ -43315,6 +43315,11 @@ ${request.content}`
     candidates = [id2];
     let { note } = verified[0];
     if (request.folder) {
+      const wanted = segments(request.folder);
+      if (!manager.listFolders(account).some((folder) => segments(folder.name) === wanted))
+        throw new Error(
+          `created and verified in the ${account} default folder, but folder "${request.folder}" does not exist in ${account}; create it there, then use move-note with id ${id2} instead of creating the note again`
+        );
       if (!manager.moveNoteById(id2, request.folder, account))
         throw new Error(
           `created and verified in the ${account} default folder, but not moved to "${request.folder}"; use move-note instead of creating it again`

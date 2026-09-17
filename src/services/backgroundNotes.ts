@@ -576,11 +576,12 @@ export function createMarkdownNote(
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
+  // Compare parsed folder segments case-insensitively, as AppleScript does.
+  const segments = (path: string) =>
+    JSON.stringify(splitFolderPath(path).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     // moveNoteById needs an existing folder, so check before the bridge creates
-    // anything. Compare parsed segments case-insensitively, as AppleScript does.
-    const segments = (path: string) =>
-      JSON.stringify(splitFolderPath(path).map((part) => part.toLocaleLowerCase()));
+    // anything.
     const wanted = segments(request.folder);
     if (
       !manager
@@ -654,6 +655,14 @@ export function createMarkdownNote(
     candidates = [id];
     let { note } = verified[0];
     if (request.folder) {
+      // The pre-check accepts a folder from any account, but the note always
+      // lands in one account and moves within it, so name that mismatch rather
+      // than reporting a generic move failure.
+      const wanted = segments(request.folder);
+      if (!manager.listFolders(account).some((folder) => segments(folder.name) === wanted))
+        throw new Error(
+          `created and verified in the ${account} default folder, but folder "${request.folder}" does not exist in ${account}; create it there, then use move-note with id ${id} instead of creating the note again`
+        );
       if (!manager.moveNoteById(id, request.folder, account))
         throw new Error(
           `created and verified in the ${account} default folder, but not moved to "${request.folder}"; use move-note instead of creating it again`
