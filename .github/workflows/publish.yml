@@ -41,6 +41,10 @@ concurrency:
   group: publish-to-npm
   cancel-in-progress: false
 
+# Least privilege at the top; each job grants only what it uses.
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: macos-latest
@@ -51,20 +55,48 @@ jobs:
        (github.event_name == 'schedule') ||
        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    # This job runs dependency code (pnpm install, lint, tests, build), so it
+    # gets NO repository write access — only the OIDC token npm publishing
+    # needs. The pipeline's one write, creating the GitHub Release, lives in the
+    # `release` job below, which runs no dependency code.
     permissions:
+      contents: read
       id-token: write
-      contents: write
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
 
     steps:
-      - name: Checkout repository (the CI-validated commit, not a moving ref)
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # For workflow_run, check out exactly the commit CI validated —
-          # otherwise a push landing between CI completion and this checkout
-          # publishes bytes (and provenance, and a Release tag) that no CI
-          # run ever saw. Other events check out their natural ref
-          # (main for schedule/dispatch, the tag for release).
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          # Full history, so the next step can prove the commit is on main.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Pin the CI-validated commit and prove it is on main
+        id: pin
+        # For workflow_run, publish exactly the commit CI validated — otherwise
+        # a push landing between CI completion and this checkout publishes bytes
+        # (and provenance, and a Release tag) that no CI run ever saw. The job
+        # `if` above already admits only push/dispatch CI runs on main; the
+        # ancestry check makes that structural, so nothing outside main's
+        # history can ever be published. The SHA is applied here rather than as
+        # checkout's `ref:` because OpenSSF Scorecard flags any
+        # workflow_run-derived `ref:` as an untrusted checkout, whatever the job
+        # `if` says. Other events keep their natural ref (main for
+        # schedule/dispatch, the tag for release).
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
+            if ! git merge-base --is-ancestor "$HEAD_SHA" origin/main; then
+              echo "::error::CI-validated commit ${HEAD_SHA} is not on origin/main; refusing to publish it."
+              exit 1
+            fi
+            git checkout --quiet --detach "$HEAD_SHA"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -137,24 +169,39 @@ jobs:
             fi
           fi
 
-      - name: Sync GitHub Release (self-healing — runs on every trigger)
-        # Deliberately NOT gated on the skip flag: idempotent via
-        # `gh release view`, so a Release missed by a transient failure in an
-        # earlier run is healed by ANY later run, including the daily
-        # schedule.
+      - name: Skip publish (version already published)
+        if: steps.check.outputs.skip == 'true'
+        run: echo "Version ${{ steps.check.outputs.local }} is already published. Skipping."
+
+  release:
+    # Self-healing GitHub Release sync. It runs after EVERY successful publish
+    # job, including runs that skipped an already-published version, and is
+    # idempotent via `gh release view`. So a Release missed by a transient
+    # failure earlier is healed by ANY later run, the daily schedule included.
+    # This is the only job with a write token, and it runs no dependency code:
+    # checkout, jq, awk and gh only.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the published commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish.outputs.sha }}
+          persist-credentials: false
+
+      - name: Sync GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.publish.outputs.sha }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
+          VERSION=$(jq -r .version package.json)
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release v$VERSION already exists; nothing to do."
           else
             NOTES=$(awk -v v="## [$VERSION]" 'index($0,v)==1{p=1;next} p&&/^## \[/{exit} p' CHANGELOG.md)
             [ -z "$NOTES" ] && NOTES="Published to npm as v$VERSION."
-            gh release create "v$VERSION" --target "$(git rev-parse HEAD)" --title "v$VERSION" --notes "$NOTES" \
+            gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$SHA" --title "v$VERSION" --notes "$NOTES" \
               || echo "::warning::Failed to create GitHub Release v$VERSION (will self-heal on the next run)"
           fi
-
-      - name: Skip publish (version already published)
-        if: steps.check.outputs.skip == 'true'
-        run: echo "Version ${{ steps.check.outputs.local }} is already published. Skipping."

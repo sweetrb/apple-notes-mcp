@@ -25,15 +25,18 @@ on:
     workflows: [dependabot-rebuild]
     types: [completed]
 
+# Least privilege at the top; each job grants only the writes it uses. Neither
+# job checks out or runs repository or dependency code — they only call gh.
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
+  contents: read
 
 jobs:
   automerge:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+    permissions:
+      contents: write # gh pr merge --auto
+      pull-requests: write # gh pr merge --auto
     steps:
       - name: Dependabot metadata
         id: meta
@@ -51,6 +54,10 @@ jobs:
           && github.event.workflow_run.conclusion == 'success'
           && github.event.workflow_run.event == 'pull_request'
           && startsWith(github.event.workflow_run.head_branch, 'dependabot/npm_and_yarn/') }}
+    permissions:
+      contents: write # gh pr update-branch, gh pr merge --auto
+      pull-requests: write # gh pr update-branch, gh pr merge --auto
+      actions: write # gh workflow run: re-dispatch the required checks
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BRANCH: ${{ github.event.workflow_run.head_branch }}
