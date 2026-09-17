@@ -443,7 +443,26 @@ describe("create-note Markdown bridge (#172)", () => {
         markdownManager([[existing], [existing, created, other]]) as unknown as AppleNotesManager,
         { title: "Plan", content }
       )
-    ).toThrow(/2 matching notes appeared/);
+    ).toThrow(
+      "Operation outcome uncertain; read notes x-coredata://ABCDEF/ICNote/p2, x-coredata://ABCDEF/ICNote/p3 before any retry: 2 matching notes appeared"
+    );
+  });
+
+  it("names every candidate when several notes appear and none verifies", () => {
+    const synced = "x-coredata://ABCDEF/ICNote/p3";
+    const manager = markdownManager(
+      [[existing], [existing, created, synced]],
+      "<div>Other</div>",
+      "Other"
+    );
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals",
+      })
+    ).toThrow(
+      /^Operation outcome uncertain; read notes x-coredata:\/\/ABCDEF\/ICNote\/p2, x-coredata:\/\/ABCDEF\/ICNote\/p3 before any retry: no new note verified \(x-coredata:\/\/ABCDEF\/ICNote\/p2: Note text not verified; x-coredata:\/\/ABCDEF\/ICNote\/p3: Note text not verified\)$/
+    );
   });
 
   it("picks the one verified note when an unrelated note lands in the default folder", () => {

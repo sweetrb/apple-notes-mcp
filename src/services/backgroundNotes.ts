@@ -615,17 +615,17 @@ export function createMarkdownNote(
     transportMessage = describeTransportFailure(error);
   }
   const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
-  // From here a note may exist, so every failure names it (or says to search)
-  // instead of surfacing a bare error that invites a duplicate retry.
-  let id: string | undefined;
+  // From here a note may exist, so every failure names the candidates (or says
+  // to search) instead of surfacing a bare error that invites a duplicate retry.
+  let candidates: string[] = [];
   try {
     const created = [...defaultFolderNotes()].filter(([noteId]) => !before.has(noteId));
-    if (created.length === 1) id = created[0][0];
+    candidates = created.map(([noteId]) => noteId);
     const failures: string[] = [];
     const verified = created.flatMap(([noteId, account]) => {
       try {
         const note = readBackgroundSnapshot(manager, noteId);
-        if (note.rich.text.replace(/[\s￼]+/gu, " ").trim() !== expectedText)
+        if (note.rich.text.replace(/[\s\ufffc]+/gu, " ").trim() !== expectedText)
           throw new Error("Note text not verified");
         if (headingLevels(note.html).join() !== expectedLevels)
           throw new Error("Heading styles not verified");
@@ -644,8 +644,8 @@ export function createMarkdownNote(
             ? `no new note verified (${failures.join("; ")})`
             : "no new note was found in the default folder"
       );
-    id = verified[0].id;
-    const { account } = verified[0];
+    const { id, account } = verified[0];
+    candidates = [id];
     let { note } = verified[0];
     if (request.folder) {
       if (!manager.moveNoteById(id, request.folder, account))
@@ -671,7 +671,7 @@ export function createMarkdownNote(
     };
   } catch (error) {
     throw new Error(
-      `Operation outcome uncertain; ${id ? `read note ${id}` : "search for the title"} before any retry: ${reason(error)}${transportMessage ? `; ${transportMessage}` : ""}`
+      `Operation outcome uncertain; ${candidates.length ? `read ${candidates.length === 1 ? "note" : "notes"} ${candidates.join(", ")}` : "search for the title"} before any retry: ${reason(error)}${transportMessage ? `; ${transportMessage}` : ""}`
     );
   }
 }

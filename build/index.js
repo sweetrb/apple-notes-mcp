@@ -43286,15 +43286,15 @@ ${request.content}`
     transportMessage = describeTransportFailure(error2);
   }
   const reason = (error2) => error2 instanceof Error ? error2.message : String(error2);
-  let id2;
+  let candidates = [];
   try {
     const created = [...defaultFolderNotes()].filter(([noteId3]) => !before.has(noteId3));
-    if (created.length === 1) id2 = created[0][0];
+    candidates = created.map(([noteId3]) => noteId3);
     const failures = [];
     const verified = created.flatMap(([noteId3, account2]) => {
       try {
         const note2 = readBackgroundSnapshot(manager, noteId3);
-        if (note2.rich.text.replace(/[\s￼]+/gu, " ").trim() !== expectedText)
+        if (note2.rich.text.replace(/[\s\ufffc]+/gu, " ").trim() !== expectedText)
           throw new Error("Note text not verified");
         if (headingLevels(note2.html).join() !== expectedLevels)
           throw new Error("Heading styles not verified");
@@ -43309,8 +43309,8 @@ ${request.content}`
       throw new Error(
         verified.length ? `${verified.length} matching notes appeared (${verified.map((v) => v.id).join(", ")})` : created.length ? `no new note verified (${failures.join("; ")})` : "no new note was found in the default folder"
       );
-    id2 = verified[0].id;
-    const { account } = verified[0];
+    const { id: id2, account } = verified[0];
+    candidates = [id2];
     let { note } = verified[0];
     if (request.folder) {
       if (!manager.moveNoteById(id2, request.folder, account))
@@ -43333,7 +43333,7 @@ ${request.content}`
     };
   } catch (error2) {
     throw new Error(
-      `Operation outcome uncertain; ${id2 ? `read note ${id2}` : "search for the title"} before any retry: ${reason(error2)}${transportMessage ? `; ${transportMessage}` : ""}`
+      `Operation outcome uncertain; ${candidates.length ? `read ${candidates.length === 1 ? "note" : "notes"} ${candidates.join(", ")}` : "search for the title"} before any retry: ${reason(error2)}${transportMessage ? `; ${transportMessage}` : ""}`
     );
   }
 }
