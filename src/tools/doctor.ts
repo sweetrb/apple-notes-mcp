@@ -88,16 +88,17 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
     "and choose Always Allow: a background run cannot display a first-run consent prompt, so an " +
     "unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
-    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT].map(
-      (name) => nativeTagsStatus(name)
+    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map((name) =>
+      nativeTagsStatus(name)
     );
     const missing = bridgeStatuses.filter((status) => !status.installed);
+    const markdown = markdownBridgeDetail();
     checks.push({
       name: "Native write Shortcuts",
       status: missing.length ? "warn" : "ok",
       detail: missing.length
-        ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${consentReminder}`
-        : `all native-write bridges are installed. ${consentReminder}`,
+        ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${markdown} ${consentReminder}`
+        : `both native-write bridges are installed. ${markdown} ${consentReminder}`,
     });
   } catch (error) {
     checks.push({
@@ -115,6 +116,23 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
 
   const healthy = !checks.some((c) => c.status === "fail");
   return { healthy, checks };
+}
+
+/**
+ * Describe the optional Create Markdown Note bridge. It serves only create-note's
+ * `format: "markdown"` and cannot run before macOS 26, so it never changes the
+ * native-write check's status (#172 review); get-capabilities reports whether
+ * `create-note-markdown` is available.
+ */
+function markdownBridgeDetail(): string {
+  const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
+  try {
+    return nativeTagsStatus(MARKDOWN_NOTE_SHORTCUT).installed
+      ? `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: installed (${purpose}).`
+      : `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: not installed (${purpose}; apple-notes-mcp setup offers it).`;
+  } catch (error) {
+    return `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: could not inspect (${purpose}): ${String(error)}.`;
+  }
 }
 
 /**

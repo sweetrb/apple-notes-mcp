@@ -43371,14 +43371,15 @@ function runDoctor(manager) {
   });
   const consentReminder = "After install or upgrade, run each bridge Shortcut once in the foreground in Shortcuts.app and choose Always Allow: a background run cannot display a first-run consent prompt, so an unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
-    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT].map(
+    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map(
       (name) => nativeTagsStatus(name)
     );
     const missing = bridgeStatuses.filter((status) => !status.installed);
+    const markdown = markdownBridgeDetail();
     checks.push({
       name: "Native write Shortcuts",
       status: missing.length ? "warn" : "ok",
-      detail: missing.length ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${consentReminder}` : `all native-write bridges are installed. ${consentReminder}`
+      detail: missing.length ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${markdown} ${consentReminder}` : `both native-write bridges are installed. ${markdown} ${consentReminder}`
     });
   } catch (error2) {
     checks.push({
@@ -43390,6 +43391,14 @@ function runDoctor(manager) {
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
   return { healthy, checks };
+}
+function markdownBridgeDetail() {
+  const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
+  try {
+    return nativeTagsStatus(MARKDOWN_NOTE_SHORTCUT).installed ? `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: installed (${purpose}).` : `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: not installed (${purpose}; apple-notes-mcp setup offers it).`;
+  } catch (error2) {
+    return `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: could not inspect (${purpose}): ${String(error2)}.`;
+  }
 }
 function checkNodeRuntimeSignature() {
   const name = "Node runtime signature";
@@ -44345,15 +44354,22 @@ function registerNativeOperations(server2, manager) {
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync7 } from "node:fs";
+import { release } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
+var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
+var MARKDOWN_MIN_DARWIN_MAJOR = 25;
 var shortcutFiles = [
   { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
   {
     name: BACKGROUND_SHORTCUT,
     file: "Apple Notes MCP - Background Operations v5.shortcut"
   },
-  { name: MARKDOWN_NOTE_SHORTCUT, file: "Apple Notes MCP - Create Markdown Note.shortcut" }
+  {
+    name: MARKDOWN_NOTE_SHORTCUT,
+    file: "Apple Notes MCP - Create Markdown Note.shortcut",
+    optional: true
+  }
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
@@ -44363,7 +44379,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
-  const items = shortcutFiles.map(({ name, file }) => {
+  const osRelease = (dependencies.osRelease || release)();
+  const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
+  const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
     const path4 = resolve2(baseDirectory, file);
     let installed = false;
     let identifier;
@@ -44376,27 +44394,41 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       error2 = cause instanceof Error ? cause.message : String(cause);
     }
     let opened = false;
+    let skipped;
     if (!installed && !checkOnly) {
-      if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
+        skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
+      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
       else {
         const result = open(path4);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
     }
-    return { name, installed, identifier, file: path4, opened, ...error2 ? { error: error2 } : {} };
+    return {
+      name,
+      installed,
+      identifier,
+      file: path4,
+      opened,
+      ...optional2 ? { optional: optional2 } : {},
+      ...skipped ? { skipped } : {},
+      ...error2 ? { error: error2 } : {}
+    };
   });
-  return { ready: items.every((item) => item.installed), checkOnly, items };
+  return { ready: items.every((item) => item.optional || item.installed), checkOnly, items };
 }
 function formatShortcutSetup(report) {
   const lines = ["Apple Notes MCP Shortcut setup", ""];
   for (const item of report.items) {
-    if (item.installed) lines.push(`\u2713 ${item.name} (${item.identifier})`);
-    else if (item.opened) lines.push(`\u2192 ${item.name}: confirm \u201CAdd Shortcut\u201D in macOS`);
-    else lines.push(`\u2717 ${item.name}: ${item.error || "not installed"}`);
+    const note = item.optional ? ` ${OPTIONAL_BRIDGE_NOTE}` : "";
+    if (item.installed) lines.push(`\u2713 ${item.name} (${item.identifier})${note}`);
+    else if (item.opened) lines.push(`\u2192 ${item.name}: confirm \u201CAdd Shortcut\u201D in macOS${note}`);
+    else if (item.skipped) lines.push(`\u2013 ${item.name}: skipped, ${item.skipped}${note}`);
+    else lines.push(`\u2717 ${item.name}: ${item.error || "not installed"}${note}`);
   }
   lines.push("");
-  if (report.ready) lines.push("All Shortcut bridges are installed.");
+  if (report.ready) lines.push("Both required Shortcut bridges are installed.");
   else if (report.checkOnly) lines.push("Run `apple-notes-mcp setup` to open missing workflows.");
   else
     lines.push(
