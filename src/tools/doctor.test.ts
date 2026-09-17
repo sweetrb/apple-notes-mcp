@@ -89,6 +89,20 @@ describe("runDoctor (#22)", () => {
     );
     expect(check).toMatchObject({ status: "warn" });
     expect(check?.detail).toContain("apple-notes-mcp setup");
+    expect(check?.detail).toMatch(/once in the foreground in Shortcuts\.app.*Always Allow/);
+  });
+
+  // #172 item 5 — the CLI exposes no consent state, so doctor cannot detect an
+  // unanswered first-run prompt; it reminds instead of reporting a false "ok".
+  it("reminds that installed bridges still need one foreground run to answer consent", () => {
+    const check = runDoctor(fakeMgr()).checks.find(
+      (item) => item.name === "Native write Shortcuts"
+    );
+    expect(check).toMatchObject({ status: "ok" });
+    expect(check?.detail).toMatch(/installed/);
+    expect(check?.detail).toMatch(/after install or upgrade/i);
+    expect(check?.detail).toMatch(/once in the foreground in Shortcuts\.app.*Always Allow/);
+    expect(check?.detail).toMatch(/first-run consent prompt/);
   });
 });
 

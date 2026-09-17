@@ -190,6 +190,50 @@ describe("background note mutation boundaries", () => {
       /Shortcuts timed out waiting for the "Apple Notes MCP - Background Operations v5" Shortcut/
     );
   });
+  // #172 item 5 — a headless run cannot display Shortcuts' first-run consent
+  // prompt, so an unanswered one stalls the bridge until the transport timeout.
+  it("points a timed-out run at the first-run Shortcuts consent prompt for that Shortcut", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("timeout"), {
+        code: "ETIMEDOUT",
+        shortcut: "Apple Notes MCP - Background Operations v5",
+      });
+    });
+    // One invocation: the fixture's preflight reads are single-use.
+    let message = "";
+    try {
+      mutateBackground(request, "set-pinned", {}, pinVerify, f.deps);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/^Operation outcome uncertain/);
+    expect(message).toMatch(/first-run Shortcuts consent prompt/);
+    expect(message).toMatch(
+      /run "Apple Notes MCP - Background Operations v5" once in the foreground in Shortcuts\.app and choose Always Allow/
+    );
+  });
+  it("keeps the consent hint when the timed-out Shortcut is unnamed", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("timeout"), { code: "ETIMEDOUT" });
+    });
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
+      /run the bridge Shortcut once in the foreground in Shortcuts\.app and choose Always Allow/
+    );
+  });
+  it("does not blame consent for a non-timeout transport failure", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("no such shortcut"), { shortcut: "Named Bridge" });
+    });
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).not.toThrow(
+      /consent/
+    );
+  });
   it("names the Shortcut on a non-timeout transport failure too", () => {
     const f = fixture();
     f.after.pinned = false;

@@ -71,6 +71,16 @@ workflows. Confirm **Add Shortcut** in each macOS window, then verify with
 support silent Shortcut import, so merely connecting an MCP client never opens
 setup windows or bypasses these confirmations.
 
+After install **and after every upgrade**, open Shortcuts.app and run each
+bridge — `Apple Notes MCP - Native Tags` and
+`Apple Notes MCP - Background Operations v5` — once in the foreground, choosing
+**Always Allow** when Shortcuts asks for permission. The server runs these
+Shortcuts in the background, where Shortcuts cannot display a first-run consent
+prompt: an unanswered one stalls every native write on that bridge until it
+times out, while `doctor` still reports the bridge installed. Quitting or
+relaunching Shortcuts.app or Notes.app does not clear it; the foreground run
+does, once per bridge.
+
 ### Using the Codex Marketplace
 
 The same plugin is available for Codex. Add the marketplace and install the plugin:
@@ -347,7 +357,10 @@ Access.
 #### `native-tags-status`
 
 Checks whether exactly one configured Native Tags Shortcut is installed. An
-installed workflow may still need macOS permission on its first execution.
+installed workflow may still need macOS permission on its first execution, and
+installation does not show whether that consent was given: run it once in the
+foreground in Shortcuts.app and choose **Always Allow** after install or upgrade
+(see [Troubleshooting](#native-writes-time-out-or-report-an-uncertain-outcome)).
 
 ---
 
@@ -1056,7 +1069,10 @@ Lists all notes shared with collaborators.
 ### Native background operations
 
 Install the signed workflows once as described in
-[`shortcuts/README.md`](shortcuts/README.md). Native writes never use UI
+[`shortcuts/README.md`](shortcuts/README.md), then run each once in the
+foreground in Shortcuts.app and choose **Always Allow** — again after every
+upgrade — so no first-run consent prompt is left for a background run that
+cannot display it. Native writes never use UI
 automation or write directly to the Notes database. Every operation requires an
 exact note ID, a fresh `expectedContentHash`, and a distinctive existing
 `scopeText` so the Shortcut and server can independently resolve the same note.
@@ -1081,7 +1097,9 @@ Markdown importer rather than converted to HTML first, so `#`/`##`/`###`
 produce real Title/Heading/Subheading — Notes' HTML importer only
 distinguishes two heading levels and renders `###` the same as `##`. A
 transport failure names the Shortcut it was waiting on, so a missing or
-unapproved bridge is identified rather than guessed at.
+unapproved bridge is identified rather than guessed at; a timeout also says it
+may be an unanswered first-run consent prompt and names the Shortcut to run once
+in the foreground.
 
 #### `create-checklist-item`
 
@@ -1395,6 +1413,12 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 - macOS needs automation permission
 - Go to System Settings > Privacy & Security > Automation
 - Ensure your terminal/Claude has permission to control Notes
+
+### Native writes time out or report an uncertain outcome
+- Symptom: `add-native-tags`, `set-note-pinned`, `append-native` or another native write fails with "Shortcuts timed out waiting for …", "Operation outcome uncertain" or "readback was not verified", while `doctor` and `get-capabilities` report the bridges installed
+- Common cause, especially right after install or upgrade: the bridge Shortcut is waiting on a first-run consent prompt. The server runs it in the background, where Shortcuts cannot display that prompt, so the run stalls until it times out
+- Fix: open Shortcuts.app, run the Shortcut the error names (`Apple Notes MCP - Native Tags` or `Apple Notes MCP - Background Operations v5`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
+- Read the exact note before retrying — the write may have landed
 
 ### "Note not found"
 - Note titles must match exactly (case-sensitive)

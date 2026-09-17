@@ -108,6 +108,27 @@ describe("native Notes tags", () => {
     failed.after.rich.nativeTags = [];
     expect(() => addNativeTags(request, failed.deps)).toThrow(/not verified/);
   });
+  // #172 item 5 — the transport diagnosis (which names the Shortcut and the
+  // first-run consent fix) used to be swallowed when readback then failed.
+  it("surfaces the transport diagnosis when readback fails after a stalled run", () => {
+    const failed = fixture();
+    failed.deps.run.mockImplementation(() => {
+      throw new Error('run "Apple Notes MCP - Native Tags" once in the foreground');
+    });
+    failed.after.rich.nativeTags = [];
+    // One invocation: the fixture's preflight reads are single-use.
+    let message = "";
+    try {
+      addNativeTags(request, failed.deps);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/did not complete cleanly.*not verified/);
+    expect(message).toMatch(/run "Apple Notes MCP - Native Tags" once in the foreground/);
+    const clean = fixture();
+    clean.after.rich.nativeTags = [];
+    expect(() => addNativeTags(request, clean.deps)).toThrow(/^Shortcuts ran, but/);
+  });
   it("detects lost links, lost original objects and changed non-tag text", () => {
     const one = fixture();
     one.after.rich.links = [];

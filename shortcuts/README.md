@@ -15,6 +15,13 @@ Open the signed file and confirm **Add Shortcut** once. macOS may also request
 Notes access on first execution. The `shortcuts` CLI can run an installed
 workflow but cannot silently import one.
 
+After install and after every upgrade, run each bridge once in the foreground in
+Shortcuts.app and choose **Always Allow** when it asks for permission. The
+server runs bridges in the background, where Shortcuts cannot display a
+first-run consent prompt, so an unanswered one stalls that bridge's native
+writes until they time out. Quitting or relaunching Shortcuts.app or Notes.app
+does not clear it; one foreground run per bridge does.
+
 The bridge receives a private temporary JSON file with a title, a distinctive
 existing scope phrase, and normalized tags. Both the server and workflow refuse
 ambiguous note selection. Server readback, rather than CLI output, establishes
@@ -38,6 +45,7 @@ shortcuts sign --mode anyone \
   --output "shortcuts/Apple Notes MCP - Background Operations v5.shortcut"
 ```
 
-Open the signed file and confirm **Add Shortcut** once. Do not install obsolete
+Open the signed file and confirm **Add Shortcut** once, then run it once in the
+foreground in Shortcuts.app and choose **Always Allow** (see above). Do not install obsolete
 workflow versions with the same display name; the server resolves one exact
 installed UUID and refuses duplicates.

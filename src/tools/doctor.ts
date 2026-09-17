@@ -79,7 +79,14 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
   });
 
   // 4. Optional native-write bridges. Installation is explicit because macOS
-  // requires the user to approve every imported Shortcut.
+  // requires the user to approve every imported Shortcut. Installed is not the
+  // same as consented: a background run cannot display Shortcuts' first-run
+  // consent prompt, and the `shortcuts` CLI exposes no consent or run history to
+  // check, so the reminder is unconditional rather than a detected state (#172).
+  const consentReminder =
+    "After install or upgrade, run each bridge Shortcut once in the foreground in Shortcuts.app " +
+    "and choose Always Allow: a background run cannot display a first-run consent prompt, so an " +
+    "unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
     const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map((name) =>
       nativeTagsStatus(name)
@@ -89,8 +96,8 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
       name: "Native write Shortcuts",
       status: missing.length ? "warn" : "ok",
       detail: missing.length
-        ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS`
-        : "both native-write bridges are installed",
+        ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${consentReminder}`
+        : `both native-write bridges are installed. ${consentReminder}`,
     });
   } catch (error) {
     checks.push({

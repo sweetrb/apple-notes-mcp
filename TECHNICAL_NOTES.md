@@ -281,7 +281,10 @@ The constraints that make this a BETA, opt-in path rather than a default:
 - **Needs an active GUI login session.** `shortcuts run` drives the Shortcuts app and is
   not documented to work at the login window, over plain SSH, or from a `launchd`
   background agent. Only `shortcuts list` is fully GUI-free.
-- **One-time manual install** of each wrapper Shortcut.
+- **One-time manual install** of each wrapper Shortcut, plus one foreground run in
+  Shortcuts.app after install or upgrade to answer its first-run consent prompt with
+  Always Allow. A background run cannot display that prompt, so it stalls until the
+  transport timeout instead, and the CLI exposes no consent state to check first (#172).
 - **Plain text only.** Notes actions take rich text or attachments only through their
   interactive compose sheet, which defeats automation.
 - **Coarse results.** Exit code 0 or 1 with output on stdout; no structured error surface.

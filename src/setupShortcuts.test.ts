@@ -12,6 +12,10 @@ describe("Shortcut setup", () => {
     });
     expect(report.ready).toBe(true);
     expect(open).not.toHaveBeenCalled();
+    // #172 item 5 — installed is not consented; setup is where to say so.
+    expect(formatShortcutSetup(report)).toMatch(
+      /once in the foreground in Shortcuts\.app and choose Always Allow/
+    );
   });
 
   it("check-only mode reports missing bridges without opening UI", () => {

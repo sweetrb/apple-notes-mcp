@@ -42736,6 +42736,14 @@ import { execFileSync as execFileSync6 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join7 } from "node:path";
+
+// src/services/shortcutConsent.ts
+function shortcutConsentHint(shortcut) {
+  const target = shortcut ? `"${shortcut}"` : "the bridge Shortcut";
+  return `This may be an unanswered first-run Shortcuts consent prompt, which a background run cannot display: run ${target} once in the foreground in Shortcuts.app and choose Always Allow.`;
+}
+
+// src/services/nativeTags.ts
 var NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
 function normalizeNativeTags(tags) {
   if (!tags.length || tags.length > 100) throw new Error("Provide between 1 and 100 tags");
@@ -42790,7 +42798,7 @@ function addNativeTags(request, deps) {
   };
   if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
     throw new Error(
-      "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
+      transportWarning ? `Shortcuts did not complete cleanly, and exact-ID tags/text/links readback was not verified. Read the note before any retry. ${transportWarning}` : "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
     );
   }
   return {
@@ -42833,9 +42841,12 @@ function runNativeTagsShortcut(input) {
       maxBuffer: 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"]
     });
-  } catch {
-    throw new Error(
-      `Native tag operation did not complete cleanly; the "${status.shortcut}" Shortcut may be waiting for macOS permission. Do not retry automatically; read the exact note and check that Shortcut in Shortcuts.app`
+  } catch (error2) {
+    throw Object.assign(
+      new Error(
+        `Native tag operation did not complete cleanly. ${shortcutConsentHint(status.shortcut)} Do not retry automatically; read the exact note first`
+      ),
+      { shortcut: status.shortcut, code: error2?.code }
     );
   } finally {
     rmSync2(directory, { recursive: true, force: true });
@@ -43119,7 +43130,7 @@ function mutateBackground(request, operation, data, verify, deps) {
     transportUncertain = true;
     const detail = error2;
     const named = detail?.shortcut ? `the "${detail.shortcut}" Shortcut` : "the background Shortcut";
-    transportMessage = detail?.code === "ETIMEDOUT" ? `Shortcuts timed out waiting for ${named}; check for an interactive parameter or permission request` : `${named} failed: ${String(detail?.stderr || detail?.message || "no output").trim().slice(0, 400)}`;
+    transportMessage = detail?.code === "ETIMEDOUT" ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}` : `${named} failed: ${String(detail?.stderr || detail?.message || "no output").trim().slice(0, 400)}`;
   }
   const after = deps.read(request.id);
   try {
@@ -43239,6 +43250,7 @@ function runDoctor(manager) {
     status: fda ? "ok" : "warn",
     detail: fda ? "granted \u2014 the Notes database is readable (checklist state, note metadata, note links, sync detail)" : `not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else is pure AppleScript and is unaffected. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
   });
+  const consentReminder = "After install or upgrade, run each bridge Shortcut once in the foreground in Shortcuts.app and choose Always Allow: a background run cannot display a first-run consent prompt, so an unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
     const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map(
       (name) => nativeTagsStatus(name)
@@ -43247,7 +43259,7 @@ function runDoctor(manager) {
     checks.push({
       name: "Native write Shortcuts",
       status: missing.length ? "warn" : "ok",
-      detail: missing.length ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS` : "both native-write bridges are installed"
+      detail: missing.length ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${consentReminder}` : `both native-write bridges are installed. ${consentReminder}`
     });
   } catch (error2) {
     checks.push({
@@ -44261,6 +44273,9 @@ function formatShortcutSetup(report) {
     lines.push(
       "After approving the macOS dialogs, run `apple-notes-mcp setup --check` or the MCP doctor tool."
     );
+  lines.push(
+    "After install or upgrade, run each bridge once in the foreground in Shortcuts.app and choose Always Allow; a background run cannot display a first-run consent prompt and stalls until it times out."
+  );
   return lines.join("\n");
 }
 

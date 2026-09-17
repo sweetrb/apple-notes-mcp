@@ -57,4 +57,25 @@ describe("Shortcuts native-tag transport", () => {
       expect(existsSync(path)).toBe(false);
     }
   });
+  // #172 item 5 — name the Shortcut whose first-run consent prompt is likely
+  // unanswered, and carry the name and timeout code out for mutateBackground.
+  it("names the Shortcut and the first-run consent fix when a run stalls", () => {
+    vi.mocked(execFileSync).mockImplementation((_file, args) => {
+      if (args?.[0] === "list") return listed;
+      throw Object.assign(new Error("spawnSync /usr/bin/shortcuts ETIMEDOUT"), {
+        code: "ETIMEDOUT",
+      });
+    });
+    const run = () =>
+      runNativeTagsShortcut({ title: "Title", scopeText: "Project example", tags: ["tag"] });
+    expect(run).toThrow(/first-run Shortcuts consent prompt/);
+    expect(run).toThrow(
+      new RegExp(
+        `run "${NATIVE_TAGS_SHORTCUT}" once in the foreground in Shortcuts\\.app and choose Always Allow`
+      )
+    );
+    expect(run).toThrow(
+      expect.objectContaining({ shortcut: NATIVE_TAGS_SHORTCUT, code: "ETIMEDOUT" })
+    );
+  });
 });

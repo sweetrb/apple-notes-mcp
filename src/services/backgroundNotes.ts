@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AppleNotesManager } from "./appleNotesManager.js";
 import { nativeTagsStatus, normalizeNativeTags, runNativeTagsShortcut } from "./nativeTags.js";
+import { shortcutConsentHint } from "./shortcutConsent.js";
 import {
   enrichNoteRead,
   readRichNote,
@@ -351,9 +352,11 @@ export function mutateBackground(
     const named = detail?.shortcut
       ? `the "${detail.shortcut}" Shortcut`
       : "the background Shortcut";
+    // A timeout is how an unanswered first-run consent prompt presents: the
+    // headless run cannot show it, so it waits out the transport timeout (#172).
     transportMessage =
       detail?.code === "ETIMEDOUT"
-        ? `Shortcuts timed out waiting for ${named}; check for an interactive parameter or permission request`
+        ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}`
         : `${named} failed: ${String(detail?.stderr || detail?.message || "no output")
             .trim()
             .slice(0, 400)}`;

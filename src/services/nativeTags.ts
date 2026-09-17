@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { linkSignature, type RichNote } from "../utils/noteRichText.js";
+import { shortcutConsentHint } from "./shortcutConsent.js";
 
 export const NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
 
@@ -94,8 +95,12 @@ export function addNativeTags(request: NativeTagRequest, deps: NativeTagDependen
     before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)) ||
     before.rich.hasChecklist !== after.rich.hasChecklist
   ) {
+    // Keep the transport diagnosis: it names the Shortcut and the first-run
+    // consent fix, and used to be dropped right when it mattered (#172).
     throw new Error(
-      "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
+      transportWarning
+        ? `Shortcuts did not complete cleanly, and exact-ID tags/text/links readback was not verified. Read the note before any retry. ${transportWarning}`
+        : "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
     );
   }
   return {
@@ -151,9 +156,14 @@ export function runNativeTagsShortcut(input: { title: string; scopeText: string;
     });
     // CLI output may be empty even after the Notes actions complete. Success is
     // established by the caller's exact-ID native metadata/content readback.
-  } catch {
-    throw new Error(
-      `Native tag operation did not complete cleanly; the "${status.shortcut}" Shortcut may be waiting for macOS permission. Do not retry automatically; read the exact note and check that Shortcut in Shortcuts.app`
+  } catch (error) {
+    // Carry the name and timeout code out, as runBackgroundShortcut does, so
+    // replace-native-tag's add phase (via mutateBackground) names this bridge.
+    throw Object.assign(
+      new Error(
+        `Native tag operation did not complete cleanly. ${shortcutConsentHint(status.shortcut)} Do not retry automatically; read the exact note first`
+      ),
+      { shortcut: status.shortcut, code: (error as { code?: string } | null)?.code }
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

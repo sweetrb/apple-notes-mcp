@@ -262,6 +262,7 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 
 - **"Note not found"**: Use search-notes to find similar titles
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
+- **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
 - **Attachment-risk update**: The mutation is rejected. Use Notes.app or create a separate note.
 - **Notes accumulate blank lines after repeated updates**: Apple Notes' internal HTML processing preserves empty `<div><br></div>` artifacts from previous edits, and they persist even when you update with clean content. Fix: delete the note with delete-note and create a fresh one with create-note — the artifacts are baked into the note's internal representation, so this is more reliable than trying to fix the whitespace through updates

@@ -94,5 +94,10 @@ export function formatShortcutSetup(report: ShortcutSetupReport): string {
     lines.push(
       "After approving the macOS dialogs, run `apple-notes-mcp setup --check` or the MCP doctor tool."
     );
+  // Installed is not consented (#172): the server's background runs cannot
+  // display Shortcuts' first-run consent prompt, and nothing can detect it.
+  lines.push(
+    "After install or upgrade, run each bridge once in the foreground in Shortcuts.app and choose Always Allow; a background run cannot display a first-run consent prompt and stalls until it times out."
+  );
   return lines.join("\n");
 }
