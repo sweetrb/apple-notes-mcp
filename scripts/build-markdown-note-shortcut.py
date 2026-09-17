@@ -37,7 +37,7 @@ def create_note(label, source):
                                        'TeamIdentifier':'0000000000','Name':'Notes'})
 
 def build():
-    a=[action('is.workflow.actions.comment','markdown-about',WFCommentActionText='Creates one note from Markdown with Notes\' own importer, in the iCloud default folder. Input: JSON {operation: create-markdown, text}. No search, edits, deletion, shell scripts, network or arbitrary action execution. The MCP locates the new note by exact title and verifies its content by exact-ID readback.'),
+    a=[action('is.workflow.actions.comment','markdown-about',WFCommentActionText='Creates one note from Markdown with Notes\' own importer, in the iCloud default folder. Input: JSON {operation: create-markdown, text}. No search, edits, deletion, shell scripts, network or arbitrary action execution. The MCP finds the new note among notes added to the default folder and verifies it by exact-ID readback.'),
        action('is.workflow.actions.detect.dictionary','request',WFInput=token({'Type':'ExtensionInput'}))]
     for k in ['operation','text']:
         a.append(action('is.workflow.actions.getvalueforkey',k+'-value',WFInput=output('request'),WFDictionaryKey=k,WFGetDictionaryValueType='Value'))

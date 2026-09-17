@@ -43999,7 +43999,8 @@ var VERIFIED_BACKGROUND = /* @__PURE__ */ new Set([
   "insert-note-link",
   "set-note-pinned",
   "remove-native-tags",
-  "replace-native-tag"
+  "replace-native-tag",
+  "create-note-markdown"
 ]);
 var LIVE_VALIDATION_BLOCKERS = {};
 var signingRefusal = "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";

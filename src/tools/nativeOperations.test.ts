@@ -40,8 +40,9 @@ describe("background capability boundaries", () => {
     const missing = await fixture()("get-capabilities")[2]({});
     expect(missing.structuredContent.markdownNoteBridgeInstalled).toBe(false);
     expect(missing.structuredContent.operations["create-note-markdown"]).toMatchObject({
-      implemented: true,
+      verified: true,
       available: false,
+      reason: expect.stringMatching(/apple-notes-mcp setup/),
     });
     vi.mocked(markdownNoteStatus).mockReturnValueOnce({
       installed: true,
@@ -50,6 +51,10 @@ describe("background capability boundaries", () => {
     const installed = await fixture()("get-capabilities")[2]({});
     expect(installed.structuredContent.bridge.installed).toBe(false);
     expect(installed.structuredContent.markdownNoteBridgeInstalled).toBe(true);
+    expect(installed.structuredContent.operations["create-note-markdown"]).toMatchObject({
+      verified: true,
+      available: true,
+    });
     expect(installed.structuredContent.operations["append-native"].available).toBe(false);
   });
   it("discloses missing setup and rejected native actions separately", async () => {

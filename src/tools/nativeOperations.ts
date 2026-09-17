@@ -26,6 +26,7 @@ export const VERIFIED_BACKGROUND = new Set<string>([
   "set-note-pinned",
   "remove-native-tags",
   "replace-native-tag",
+  "create-note-markdown",
 ]);
 const LIVE_VALIDATION_BLOCKERS: Record<string, string> = {};
 const signingRefusal =
