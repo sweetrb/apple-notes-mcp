@@ -61,8 +61,16 @@ import {
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
-import { registerNativeOperations, VERIFIED_BACKGROUND } from "@/tools/nativeOperations.js";
-import { appendNative, NATIVE_APPEND_HTML_SUBSET } from "@/services/backgroundNotes.js";
+import {
+  registerNativeOperations,
+  requireValidated,
+  VERIFIED_BACKGROUND,
+} from "@/tools/nativeOperations.js";
+import {
+  appendNative,
+  createMarkdownNote,
+  NATIVE_APPEND_HTML_SUBSET,
+} from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
@@ -320,10 +328,12 @@ registerTool(
           'Note body. AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L.'
         ),
       format: z
-        .enum(["plaintext", "html"])
+        .enum(["plaintext", "html", "markdown"])
         .optional()
         .default("plaintext")
-        .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
+        .describe(
+          "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
+        ),
       tags: z
         .array(z.string().max(MAX.TAG))
         .max(MAX.TAGS)
@@ -357,6 +367,15 @@ registerTool(
     },
   },
   withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
+    if (format === "markdown") {
+      if (account)
+        return errorResponse(
+          "Markdown notes are created in the iCloud account, the only one where Notes interprets Markdown; omit account"
+        );
+      requireValidated("create-note-markdown");
+      const result = createMarkdownNote(notesManager, { title, content, folder });
+      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
+    }
     const note = notesManager.createNote(title, content, tags, folder, account, format);
 
     if (!note) {

@@ -24,6 +24,10 @@ export const backgroundStatus = () =>
   nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
 /** Report whether the dedicated native-tag bridge is installed uniquely. */
 export const nativeTagBridgeStatus = () => nativeTagsStatus();
+export const MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
+/** Report whether the create-from-Markdown bridge is installed uniquely. */
+export const markdownNoteStatus = () =>
+  nativeTagsStatus(process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT);
 export type BackgroundOperation =
   | "append-text"
   | "append-markdown"
@@ -160,9 +164,11 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
     throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
 }
 
-/** Invoke the installed background bridge with a private temporary JSON request. */
-export function runBackgroundShortcut(input: Record<string, string>) {
-  const status = backgroundStatus();
+/** Invoke an installed bridge (by default Background Operations) with a private temporary JSON request. */
+export function runBackgroundShortcut(
+  input: Record<string, string>,
+  status: ReturnType<typeof nativeTagsStatus> = backgroundStatus()
+) {
   if (!status.installed)
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
@@ -311,6 +317,26 @@ export function assertPreserved(
   }
 }
 
+/** Describe a failed or stalled bridge run for an uncertain-outcome message. */
+function describeTransportFailure(error: unknown): string {
+  const detail = error as {
+    code?: string;
+    stderr?: string | Buffer;
+    message?: string;
+    shortcut?: string;
+  };
+  // Name the bridge, so an unapproved or missing Shortcut is identified by the
+  // exact string Shortcuts.app shows rather than guessed at (#164).
+  const named = detail?.shortcut ? `the "${detail.shortcut}" Shortcut` : "the background Shortcut";
+  // A timeout is how an unanswered first-run consent prompt presents: the
+  // headless run cannot show it, so it waits out the transport timeout (#172).
+  return detail?.code === "ETIMEDOUT"
+    ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}`
+    : `${named} failed: ${String(detail?.stderr || detail?.message || "no output")
+        .trim()
+        .slice(0, 400)}`;
+}
+
 /** Run one guarded native mutation and verify its outcome by exact-ID readback. */
 export function mutateBackground(
   request: BackgroundInput,
@@ -341,25 +367,7 @@ export function mutateBackground(
     deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
   } catch (error) {
     transportUncertain = true;
-    const detail = error as {
-      code?: string;
-      stderr?: string | Buffer;
-      message?: string;
-      shortcut?: string;
-    };
-    // Name the bridge, so an unapproved or missing Shortcut is identified by the
-    // exact string Shortcuts.app shows rather than guessed at (#164).
-    const named = detail?.shortcut
-      ? `the "${detail.shortcut}" Shortcut`
-      : "the background Shortcut";
-    // A timeout is how an unanswered first-run consent prompt presents: the
-    // headless run cannot show it, so it waits out the transport timeout (#172).
-    transportMessage =
-      detail?.code === "ETIMEDOUT"
-        ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}`
-        : `${named} failed: ${String(detail?.stderr || detail?.message || "no output")
-            .trim()
-            .slice(0, 400)}`;
+    transportMessage = describeTransportFailure(error);
   }
   const after = deps.read(request.id);
   try {
@@ -489,4 +497,116 @@ export function setNativeTag(
     },
     deps
   );
+}
+
+const htmlEscape = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** Backslash-escape ASCII punctuation so Notes' Markdown importer keeps the text literal. */
+const literalMarkdown = (text: string) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
+
+/** Non-empty heading levels in document order. Notes follows each heading with an empty one. */
+export function headingLevels(html: string): number[] {
+  return [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)]
+    .filter((match) => comparableVisibleText(match[2]))
+    .map((match) => Number(match[1]));
+}
+
+export interface MarkdownNoteRequest {
+  title: string;
+  content: string;
+  folder?: string;
+}
+
+/**
+ * Create a note from bounded Markdown with Notes' own importer, so `#`/`##`/`###`
+ * become real Title/Heading/Subheading styles with no seed line (#172).
+ *
+ * The bridge always creates in the iCloud account's default folder, the only
+ * place Notes interprets Markdown, and returns no usable identity. The new note
+ * is found as the one ID added to the accounts' default folders during the run,
+ * verified by exact-ID readback, and only then moved to the requested folder.
+ */
+export function createMarkdownNote(
+  manager: AppleNotesManager,
+  request: MarkdownNoteRequest,
+  run: (
+    input: Record<string, string>,
+    status: ReturnType<typeof nativeTagsStatus>
+  ) => void = runBackgroundShortcut
+) {
+  if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
+  validateAppendContent(request.content, "markdown");
+  const expectedHtml = `<h1>${htmlEscape(request.title)}</h1>${appendMarkdownHtml(request.content)}`;
+  const status = markdownNoteStatus();
+  if (!status.installed)
+    throw new Error(
+      `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+    );
+  const defaultFolderNotes = () =>
+    new Map(
+      manager
+        .listAccounts()
+        .flatMap((account) =>
+          account.defaultFolder
+            ? manager
+                .listNoteRefs(account.name, account.defaultFolder)
+                .map((note) => [note.id, account.name] as const)
+            : []
+        )
+    );
+  const before = defaultFolderNotes();
+  let transportMessage = "";
+  try {
+    run(
+      {
+        operation: "create-markdown",
+        text: `# ${literalMarkdown(request.title)}\n\n${request.content}`,
+      },
+      status
+    );
+  } catch (error) {
+    transportMessage = describeTransportFailure(error);
+  }
+  const created = [...defaultFolderNotes()].filter(([id]) => !before.has(id));
+  if (created.length !== 1)
+    throw new Error(
+      created.length
+        ? `Operation outcome uncertain; ${created.length} notes appeared in the default folder (${created.map(([id]) => id).join(", ")}). Read them before any retry`
+        : `No new note was found in the default folder${transportMessage ? `; ${transportMessage}` : ""}. Search for the title before any retry`
+    );
+  const [id, account] = created[0];
+  let note = readBackgroundSnapshot(manager, id);
+  try {
+    const text = note.rich.text.replace(/[\s\ufffc]+/gu, " ").trim();
+    if (text !== comparableVisibleText(expectedHtml)) throw new Error("Note text not verified");
+    if (headingLevels(note.html).join() !== headingLevels(expectedHtml).join())
+      throw new Error("Heading styles not verified");
+    assertAppendedHtmlLinks(0, note.rich.links, expectedHtml);
+  } catch (error) {
+    throw new Error(
+      `Operation outcome uncertain; read note ${id} before any retry: ${error instanceof Error ? error.message : "readback failed"}${transportMessage ? `; ${transportMessage}` : ""}`
+    );
+  }
+  if (request.folder) {
+    if (!manager.moveNoteById(id, request.folder, account))
+      throw new Error(
+        `Created and verified note ${id} in the ${account} default folder, but could not move it to "${request.folder}"; use move-note instead of creating it again`
+      );
+    note = readBackgroundSnapshot(manager, id);
+  }
+  return {
+    ok: true,
+    id,
+    title: request.title,
+    folder: request.folder,
+    account,
+    contentHash: note.hash,
+    verified: true,
+    ...(transportMessage
+      ? {
+          transportWarning:
+            "Transport was uncertain; exact-ID readback verified the requested result",
+        }
+      : {}),
+  };
 }

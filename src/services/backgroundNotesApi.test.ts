@@ -38,6 +38,7 @@ vi.mock("../utils/checklistParser.js", () => ({ getChecklistItems: mock.checklis
 import {
   appendNative,
   backgroundDependencies,
+  createMarkdownNote,
   nativeTagBridgeStatus,
   readBackgroundSnapshot,
   setNativeTag,
@@ -288,5 +289,69 @@ describe("native append and tags", () => {
       scopeText,
       tags: ["new"],
     });
+  });
+});
+
+describe("create-note Markdown bridge (#172)", () => {
+  const existing = "x-coredata://ABCDEF/ICNote/p1";
+  const created = "x-coredata://ABCDEF/ICNote/p2";
+  // Notes' own serialization of an imported Title, Heading, Subheading and list.
+  const importedHtml =
+    '<div><b><h1>Plan</h1></b><font face=".AppleSystemUIFont"><h1><br></h1></font></div>' +
+    "<div><br></div><div><b><h2>Goals</h2></b></div><div><b><h3>Detail</h3></b></div>" +
+    '<ul class="Apple-dash-list"><li>one</li></ul>';
+
+  function markdownManager(
+    listings: string[][],
+    html = importedHtml,
+    text = "Plan\n\nGoals\nDetail\none"
+  ) {
+    let listing = 0;
+    const manager = {
+      listAccounts: vi.fn(() => [{ name: "iCloud", defaultFolder: "Notes" }, { name: "Local" }]),
+      listNoteRefs: vi.fn(() =>
+        listings[Math.min(listing++, listings.length - 1)].map((noteId) => ({
+          id: noteId,
+          title: "Plan",
+        }))
+      ),
+      getNoteById: vi.fn(() => ({ title: "Plan", passwordProtected: false })),
+      getNoteContentById: vi.fn(() => html),
+      moveNoteById: vi.fn(() => true),
+    };
+    mock.enrich.mockReturnValue({ revision: "r1" });
+    mock.readRich.mockReturnValue({ ...snapshot().rich, text, revision: "r1" });
+    mock.hash.mockReturnValue("h-created");
+    return manager;
+  }
+
+  it("sends the title and Markdown to the Create Markdown Note bridge and verifies the new note", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    expect(
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "Work",
+      })
+    ).toEqual({
+      ok: true,
+      id: created,
+      title: "Plan",
+      folder: "Work",
+      account: "iCloud",
+      contentHash: "h-created",
+      verified: true,
+    });
+    expect(mock.status).toHaveBeenCalledWith("Apple Notes MCP - Create Markdown Note");
+    expect(vi.mocked(execFileSync).mock.calls[0][1]).toEqual(
+      expect.arrayContaining(["run", "11111111-1111-4111-8111-111111111111"])
+    );
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.at(-1)?.[1]));
+    expect(written).toMatchObject({
+      operation: "create-markdown",
+      text: "# Plan\n\n## Goals\n### Detail\n- one",
+    });
+    expect(manager.listNoteRefs).toHaveBeenCalledWith("iCloud", "Notes");
+    expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
   });
 });

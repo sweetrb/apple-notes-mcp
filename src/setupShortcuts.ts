@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NATIVE_TAGS_SHORTCUT, nativeTagsStatus } from "./services/nativeTags.js";
-import { BACKGROUND_SHORTCUT } from "./services/backgroundNotes.js";
+import { BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT } from "./services/backgroundNotes.js";
 
 export interface ShortcutSetupItem {
   name: string;
@@ -33,6 +33,7 @@ const shortcutFiles = [
     name: BACKGROUND_SHORTCUT,
     file: "Apple Notes MCP - Background Operations v5.shortcut",
   },
+  { name: MARKDOWN_NOTE_SHORTCUT, file: "Apple Notes MCP - Create Markdown Note.shortcut" },
 ];
 
 /** Check packaged bridge workflows and explicitly open only missing ones. */
@@ -88,7 +89,7 @@ export function formatShortcutSetup(report: ShortcutSetupReport): string {
     else lines.push(`✗ ${item.name}: ${item.error || "not installed"}`);
   }
   lines.push("");
-  if (report.ready) lines.push("Both Shortcut bridges are installed.");
+  if (report.ready) lines.push("All Shortcut bridges are installed.");
   else if (report.checkOnly) lines.push("Run `apple-notes-mcp setup` to open missing workflows.");
   else
     lines.push(

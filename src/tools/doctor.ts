@@ -13,7 +13,7 @@ import type { AppleNotesManager } from "@/services/appleNotesManager.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { FULL_DISK_ACCESS_GUIDE_URL, NODE_RUNTIME_TCC_GUIDE_URL } from "@/utils/docsUrls.js";
 import { NATIVE_TAGS_SHORTCUT, nativeTagsStatus } from "@/services/nativeTags.js";
-import { BACKGROUND_SHORTCUT } from "@/services/backgroundNotes.js";
+import { BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT } from "@/services/backgroundNotes.js";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 export interface DoctorCheck {
@@ -88,8 +88,8 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
     "and choose Always Allow: a background run cannot display a first-run consent prompt, so an " +
     "unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
-    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT].map((name) =>
-      nativeTagsStatus(name)
+    const bridgeStatuses = [NATIVE_TAGS_SHORTCUT, BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT].map(
+      (name) => nativeTagsStatus(name)
     );
     const missing = bridgeStatuses.filter((status) => !status.installed);
     checks.push({
@@ -97,7 +97,7 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
       status: missing.length ? "warn" : "ok",
       detail: missing.length
         ? `missing: ${missing.map((status) => status.shortcut).join(", ")}. Run apple-notes-mcp setup and approve Add Shortcut in macOS. ${consentReminder}`
-        : `both native-write bridges are installed. ${consentReminder}`,
+        : `all native-write bridges are installed. ${consentReminder}`,
     });
   } catch (error) {
     checks.push({

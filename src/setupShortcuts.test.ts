@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { formatShortcutSetup, setupShortcuts } from "./setupShortcuts.js";
 
 describe("Shortcut setup", () => {
-  it("does not open anything when both bridges are installed", () => {
+  it("does not open anything when all bridges are installed", () => {
     const open = vi.fn(() => ({ ok: true }));
     const report = setupShortcuts(true, {
       status: (shortcut) => ({ shortcut, installed: true, identifier: `id-${shortcut}` }),
@@ -37,8 +37,8 @@ describe("Shortcut setup", () => {
     const report = setupShortcuts(false, {
       status: (shortcut) => ({
         shortcut,
-        installed: shortcut.includes("Native Tags"),
-        identifier: shortcut.includes("Native Tags") ? "native-id" : undefined,
+        installed: !shortcut.includes("Background Operations"),
+        identifier: shortcut.includes("Background Operations") ? undefined : "native-id",
       }),
       exists: () => true,
       open,

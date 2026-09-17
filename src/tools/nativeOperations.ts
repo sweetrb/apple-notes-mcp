@@ -5,6 +5,7 @@ import {
   appendNative,
   backgroundDependencies,
   backgroundStatus,
+  markdownNoteStatus,
   nativeTagBridgeStatus,
   readBackgroundSnapshot,
   mutateBackground,
@@ -47,7 +48,8 @@ export const UNAVAILABLE = {
   "transcribe-audio": "No supported background Notes transcription action",
   "scan-and-markup": "No supported background scanning or graphical markup action",
 };
-function requireValidated(name: string) {
+/** Refuse a native operation that has not passed live validation, unless explicitly allowed. */
+export function requireValidated(name: string) {
   if (!VERIFIED_BACKGROUND.has(name) && process.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
     throw new Error(
       (UNAVAILABLE as Record<string, string>)[name] ||
@@ -132,6 +134,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
         "remove-native-tags",
         "replace-native-tag",
         "insert-note-link",
+        "create-note-markdown",
       ];
       let tagBridgeInstalled = false;
       try {
@@ -139,9 +142,19 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
       } catch {
         /* Report unavailable without opening UI. */
       }
+      let markdownBridgeInstalled = false;
+      try {
+        markdownBridgeInstalled = markdownNoteStatus().installed;
+      } catch {
+        /* Report unavailable without opening UI. */
+      }
+      // create-note's Markdown format runs on its own bridge; the rest share Background Operations.
+      const installed = (name: string) =>
+        name === "create-note-markdown" ? markdownBridgeInstalled : bridge.installed;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
+        markdownNoteBridgeInstalled: markdownBridgeInstalled,
         mode: "background-only",
         operations: Object.fromEntries(
           native.map((name) => [
@@ -151,13 +164,13 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
               verified: VERIFIED_BACKGROUND.has(name),
               available:
                 VERIFIED_BACKGROUND.has(name) &&
-                (!native.includes(name) || bridge.installed) &&
+                installed(name) &&
                 (name !== "replace-native-tag" || tagBridgeInstalled),
               reason: !VERIFIED_BACKGROUND.has(name)
                 ? (UNAVAILABLE as Record<string, string>)[name] ||
                   LIVE_VALIDATION_BLOCKERS[name] ||
                   "Live validation pending; install the shortcut and complete the isolated acceptance tests"
-                : native.includes(name) && !bridge.installed
+                : !installed(name)
                   ? "Run apple-notes-mcp setup and approve Add Shortcut in macOS"
                   : name === "replace-native-tag" && !tagBridgeInstalled
                     ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase"
