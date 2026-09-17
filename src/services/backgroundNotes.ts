@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AppleNotesManager } from "./appleNotesManager.js";
+import { AppleNotesManager, buildFolderReference } from "./appleNotesManager.js";
 import { nativeTagsStatus, normalizeNativeTags, runNativeTagsShortcut } from "./nativeTags.js";
 import { shortcutConsentHint } from "./shortcutConsent.js";
 import {
@@ -499,8 +499,6 @@ export function setNativeTag(
   );
 }
 
-const htmlEscape = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 /** Backslash-escape ASCII punctuation so Notes' Markdown importer keeps the text literal. */
 const literalMarkdown = (text: string) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
 
@@ -510,6 +508,24 @@ export function headingLevels(html: string): number[] {
     .filter((match) => comparableVisibleText(match[2]))
     .map((match) => Number(match[1]));
 }
+
+/**
+ * Markdown that `appendMarkdownHtml` passes through as literal text but Notes'
+ * importer consumes, so the created note could never match the expected
+ * readback. Verified against Notes on macOS 27: `_x_`/`__x__` emphasis,
+ * backslash escapes, entity references, setext underlines, indented block
+ * markers, `1)` lists, closing `#`s, and formatting inside link labels.
+ */
+const UNMODELED_MARKDOWN: Array<[RegExp, string]> = [
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
+  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
+  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
+  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
+  [/^\d+\)[ \t]/m, "`1)` lists"],
+  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
+  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"],
+];
 
 export interface MarkdownNoteRequest {
   title: string;
@@ -523,8 +539,8 @@ export interface MarkdownNoteRequest {
  *
  * The bridge always creates in the iCloud account's default folder, the only
  * place Notes interprets Markdown, and returns no usable identity. The new note
- * is found as the one ID added to the accounts' default folders during the run,
- * verified by exact-ID readback, and only then moved to the requested folder.
+ * is the one note added to the accounts' default folders during the run whose
+ * exact-ID readback verifies; only then is it moved to the requested folder.
  */
 export function createMarkdownNote(
   manager: AppleNotesManager,
@@ -536,7 +552,15 @@ export function createMarkdownNote(
 ) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
   validateAppendContent(request.content, "markdown");
-  const expectedHtml = `<h1>${htmlEscape(request.title)}</h1>${appendMarkdownHtml(request.content)}`;
+  const bodyHtml = appendMarkdownHtml(request.content);
+  for (const [pattern, name] of UNMODELED_MARKDOWN)
+    if (pattern.test(request.content))
+      throw new Error(`Markdown note content cannot use ${name}; Notes would change that text`);
+  if (request.folder) buildFolderReference(request.folder);
+  const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`
+    .replace(/\s+/gu, " ")
+    .trim();
+  const expectedLevels = [1, ...headingLevels(bodyHtml)].join();
   const status = markdownNoteStatus();
   if (!status.installed)
     throw new Error(
@@ -567,46 +591,64 @@ export function createMarkdownNote(
   } catch (error) {
     transportMessage = describeTransportFailure(error);
   }
-  const created = [...defaultFolderNotes()].filter(([id]) => !before.has(id));
-  if (created.length !== 1)
-    throw new Error(
-      created.length
-        ? `Operation outcome uncertain; ${created.length} notes appeared in the default folder (${created.map(([id]) => id).join(", ")}). Read them before any retry`
-        : `No new note was found in the default folder${transportMessage ? `; ${transportMessage}` : ""}. Search for the title before any retry`
-    );
-  const [id, account] = created[0];
-  let note = readBackgroundSnapshot(manager, id);
+  const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+  // From here a note may exist, so every failure names it (or says to search)
+  // instead of surfacing a bare error that invites a duplicate retry.
+  let id: string | undefined;
   try {
-    const text = note.rich.text.replace(/[\s\ufffc]+/gu, " ").trim();
-    if (text !== comparableVisibleText(expectedHtml)) throw new Error("Note text not verified");
-    if (headingLevels(note.html).join() !== headingLevels(expectedHtml).join())
-      throw new Error("Heading styles not verified");
-    assertAppendedHtmlLinks(0, note.rich.links, expectedHtml);
+    const created = [...defaultFolderNotes()].filter(([noteId]) => !before.has(noteId));
+    if (created.length === 1) id = created[0][0];
+    const failures: string[] = [];
+    const verified = created.flatMap(([noteId, account]) => {
+      try {
+        const note = readBackgroundSnapshot(manager, noteId);
+        if (note.rich.text.replace(/[\s￼]+/gu, " ").trim() !== expectedText)
+          throw new Error("Note text not verified");
+        if (headingLevels(note.html).join() !== expectedLevels)
+          throw new Error("Heading styles not verified");
+        assertAppendedHtmlLinks(0, note.rich.links, bodyHtml);
+        return [{ id: noteId, account, note }];
+      } catch (error) {
+        failures.push(`${noteId}: ${reason(error)}`);
+        return [];
+      }
+    });
+    if (verified.length !== 1)
+      throw new Error(
+        verified.length
+          ? `${verified.length} matching notes appeared (${verified.map((v) => v.id).join(", ")})`
+          : created.length
+            ? `no new note verified (${failures.join("; ")})`
+            : "no new note was found in the default folder"
+      );
+    id = verified[0].id;
+    const { account } = verified[0];
+    let { note } = verified[0];
+    if (request.folder) {
+      if (!manager.moveNoteById(id, request.folder, account))
+        throw new Error(
+          `created and verified in the ${account} default folder, but not moved to "${request.folder}"; use move-note instead of creating it again`
+        );
+      note = readBackgroundSnapshot(manager, id);
+    }
+    return {
+      ok: true,
+      id,
+      title: request.title,
+      folder: request.folder,
+      account,
+      contentHash: note.hash,
+      verified: true,
+      ...(transportMessage
+        ? {
+            transportWarning:
+              "Transport was uncertain; exact-ID readback verified the requested result",
+          }
+        : {}),
+    };
   } catch (error) {
     throw new Error(
-      `Operation outcome uncertain; read note ${id} before any retry: ${error instanceof Error ? error.message : "readback failed"}${transportMessage ? `; ${transportMessage}` : ""}`
+      `Operation outcome uncertain; ${id ? `read note ${id}` : "search for the title"} before any retry: ${reason(error)}${transportMessage ? `; ${transportMessage}` : ""}`
     );
   }
-  if (request.folder) {
-    if (!manager.moveNoteById(id, request.folder, account))
-      throw new Error(
-        `Created and verified note ${id} in the ${account} default folder, but could not move it to "${request.folder}"; use move-note instead of creating it again`
-      );
-    note = readBackgroundSnapshot(manager, id);
-  }
-  return {
-    ok: true,
-    id,
-    title: request.title,
-    folder: request.folder,
-    account,
-    contentHash: note.hash,
-    verified: true,
-    ...(transportMessage
-      ? {
-          transportWarning:
-            "Transport was uncertain; exact-ID readback verified the requested result",
-        }
-      : {}),
-  };
 }

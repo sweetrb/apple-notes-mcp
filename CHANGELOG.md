@@ -6,7 +6,9 @@
   Shortcut, Create Markdown Note, runs Notes' Create Note action with
   "Interpret as Markdown", so `#`/`##`/`###` become real Title, Heading and
   Subheading styles in a new note with no seed line. Content uses the same
-  bounded Markdown subset as `append-native`. Notes interprets Markdown only in
+  bounded Markdown subset as `append-native`, and Markdown that Notes would
+  rewrite (such as `_` emphasis or backslash escapes) is refused before
+  anything is written. Notes interprets Markdown only in
   iCloud, so the note is created in the iCloud default folder, verified by
   exact-ID readback of its text, heading levels and links, and then moved to
   `folder`; `account` is refused with this format. The operation is gated like

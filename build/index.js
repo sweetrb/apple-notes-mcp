@@ -43222,15 +43222,30 @@ function setNativeTag(manager, request) {
     deps
   );
 }
-var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 var literalMarkdown = (text) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
 function headingLevels(html) {
   return [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].filter((match) => comparableVisibleText(match[2])).map((match) => Number(match[1]));
 }
+var UNMODELED_MARKDOWN = [
+  [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, "underscores outside a word"],
+  [/\\[!-/:-@[-`{-~]/m, "backslash escapes"],
+  [/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/im, "character references"],
+  [/^ {0,3}(?:=+|-+|(?:\*[ \t]*){3,})[ \t]*$/m, "underline or rule lines"],
+  [/^ {1,3}(?:#|[-+*][ \t]|\d+[.)][ \t])/m, "indented headings or list items"],
+  [/^\d+\)[ \t]/m, "`1)` lists"],
+  [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
+  [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"]
+];
 function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
   validateAppendContent(request.content, "markdown");
-  const expectedHtml = `<h1>${htmlEscape(request.title)}</h1>${appendMarkdownHtml(request.content)}`;
+  const bodyHtml = appendMarkdownHtml(request.content);
+  for (const [pattern, name] of UNMODELED_MARKDOWN)
+    if (pattern.test(request.content))
+      throw new Error(`Markdown note content cannot use ${name}; Notes would change that text`);
+  if (request.folder) buildFolderReference(request.folder);
+  const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`.replace(/\s+/gu, " ").trim();
+  const expectedLevels = [1, ...headingLevels(bodyHtml)].join();
   const status = markdownNoteStatus();
   if (!status.installed)
     throw new Error(
@@ -43238,7 +43253,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     );
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(
-      (account2) => account2.defaultFolder ? manager.listNoteRefs(account2.name, account2.defaultFolder).map((note2) => [note2.id, account2.name]) : []
+      (account) => account.defaultFolder ? manager.listNoteRefs(account.name, account.defaultFolder).map((note) => [note.id, account.name]) : []
     )
   );
   const before = defaultFolderNotes();
@@ -43256,43 +43271,57 @@ ${request.content}`
   } catch (error2) {
     transportMessage = describeTransportFailure(error2);
   }
-  const created = [...defaultFolderNotes()].filter(([id3]) => !before.has(id3));
-  if (created.length !== 1)
-    throw new Error(
-      created.length ? `Operation outcome uncertain; ${created.length} notes appeared in the default folder (${created.map(([id3]) => id3).join(", ")}). Read them before any retry` : `No new note was found in the default folder${transportMessage ? `; ${transportMessage}` : ""}. Search for the title before any retry`
-    );
-  const [id2, account] = created[0];
-  let note = readBackgroundSnapshot(manager, id2);
+  const reason = (error2) => error2 instanceof Error ? error2.message : String(error2);
+  let id2;
   try {
-    const text = note.rich.text.replace(/[\s\ufffc]+/gu, " ").trim();
-    if (text !== comparableVisibleText(expectedHtml)) throw new Error("Note text not verified");
-    if (headingLevels(note.html).join() !== headingLevels(expectedHtml).join())
-      throw new Error("Heading styles not verified");
-    assertAppendedHtmlLinks(0, note.rich.links, expectedHtml);
+    const created = [...defaultFolderNotes()].filter(([noteId3]) => !before.has(noteId3));
+    if (created.length === 1) id2 = created[0][0];
+    const failures = [];
+    const verified = created.flatMap(([noteId3, account2]) => {
+      try {
+        const note2 = readBackgroundSnapshot(manager, noteId3);
+        if (note2.rich.text.replace(/[\s￼]+/gu, " ").trim() !== expectedText)
+          throw new Error("Note text not verified");
+        if (headingLevels(note2.html).join() !== expectedLevels)
+          throw new Error("Heading styles not verified");
+        assertAppendedHtmlLinks(0, note2.rich.links, bodyHtml);
+        return [{ id: noteId3, account: account2, note: note2 }];
+      } catch (error2) {
+        failures.push(`${noteId3}: ${reason(error2)}`);
+        return [];
+      }
+    });
+    if (verified.length !== 1)
+      throw new Error(
+        verified.length ? `${verified.length} matching notes appeared (${verified.map((v) => v.id).join(", ")})` : created.length ? `no new note verified (${failures.join("; ")})` : "no new note was found in the default folder"
+      );
+    id2 = verified[0].id;
+    const { account } = verified[0];
+    let { note } = verified[0];
+    if (request.folder) {
+      if (!manager.moveNoteById(id2, request.folder, account))
+        throw new Error(
+          `created and verified in the ${account} default folder, but not moved to "${request.folder}"; use move-note instead of creating it again`
+        );
+      note = readBackgroundSnapshot(manager, id2);
+    }
+    return {
+      ok: true,
+      id: id2,
+      title: request.title,
+      folder: request.folder,
+      account,
+      contentHash: note.hash,
+      verified: true,
+      ...transportMessage ? {
+        transportWarning: "Transport was uncertain; exact-ID readback verified the requested result"
+      } : {}
+    };
   } catch (error2) {
     throw new Error(
-      `Operation outcome uncertain; read note ${id2} before any retry: ${error2 instanceof Error ? error2.message : "readback failed"}${transportMessage ? `; ${transportMessage}` : ""}`
+      `Operation outcome uncertain; ${id2 ? `read note ${id2}` : "search for the title"} before any retry: ${reason(error2)}${transportMessage ? `; ${transportMessage}` : ""}`
     );
   }
-  if (request.folder) {
-    if (!manager.moveNoteById(id2, request.folder, account))
-      throw new Error(
-        `Created and verified note ${id2} in the ${account} default folder, but could not move it to "${request.folder}"; use move-note instead of creating it again`
-      );
-    note = readBackgroundSnapshot(manager, id2);
-  }
-  return {
-    ok: true,
-    id: id2,
-    title: request.title,
-    folder: request.folder,
-    account,
-    contentHash: note.hash,
-    verified: true,
-    ...transportMessage ? {
-      transportWarning: "Transport was uncertain; exact-ID readback verified the requested result"
-    } : {}
-  };
 }
 
 // src/tools/doctor.ts
@@ -44004,7 +44033,7 @@ var common = {
     "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
   )
 };
-var htmlEscape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 function registerNativeOperations(server2, manager) {
   function tool(name, description, input, handler, readOnly = false) {
     server2.registerTool(
@@ -44143,7 +44172,7 @@ function registerNativeOperations(server2, manager) {
         throw new Error("Table rows must have equal cell counts");
       const before = readRichNote(args.id);
       const content = "<table>" + args.rows.map(
-        (row) => "<tr>" + row.map((v) => "<td>" + htmlEscape2(v) + "</td>").join("") + "</tr>"
+        (row) => "<tr>" + row.map((v) => "<td>" + htmlEscape(v) + "</td>").join("") + "</tr>"
       ).join("") + "</table>";
       const result = mutateBackground(
         args,
@@ -44286,7 +44315,7 @@ function registerNativeOperations(server2, manager) {
       if (!linked) throw new Error("Linked note not found");
       const result = appendNative(manager, {
         ...args,
-        content: `<div><a href="${htmlEscape2(link)}">${htmlEscape2(args.label || linked.title)}</a></div>`,
+        content: `<div><a href="${htmlEscape(link)}">${htmlEscape(args.label || linked.title)}</a></div>`,
         format: "html"
       });
       if (!readRichNote(args.id).links.some(

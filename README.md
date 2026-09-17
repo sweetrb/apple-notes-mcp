@@ -270,11 +270,17 @@ title line, with no seed line.
   `account` is refused with this format.
 - `content` accepts the same bounded subset as `append-native`'s Markdown:
   `#`/`##`/`###` headings, flat lists, `**bold**`, `*italic*` and inline links.
-  Markdown punctuation in `title` is escaped, so the title stays literal.
-- The server finds the new note as the one note added to the default folder
-  during the run, then verifies its visible text, heading levels and links by
-  exact-ID readback before moving it. On any uncertain result it reports the
-  note ID and never retries.
+  It also refuses Markdown that Notes would rewrite and the server could not
+  verify: `_` emphasis (underscores inside a word, as in `snake_case`, are
+  fine), backslash escapes, character references such as `&amp;`, `---` or
+  `===` lines, indented headings or list items, `1)` lists, closing `#`s, and
+  formatting inside link labels. Markdown punctuation in `title` is escaped, so
+  the title stays literal.
+- The server finds the new note among the notes added to the default folder
+  during the run by verifying each one's visible text, heading levels and links
+  by exact-ID readback, and moves it only after exactly one verifies. On any
+  uncertain result it names the note (or says to search for the title) and
+  never retries.
 - It is gated like the other native operations; `get-capabilities` reports it
   as `create-note-markdown`. Install and approve the Shortcut as described in
   [`shortcuts/README.md`](shortcuts/README.md).

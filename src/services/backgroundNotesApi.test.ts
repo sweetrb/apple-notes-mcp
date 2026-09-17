@@ -304,9 +304,11 @@ describe("create-note Markdown bridge (#172)", () => {
   function markdownManager(
     listings: string[][],
     html = importedHtml,
-    text = "Plan\n\nGoals\nDetail\none"
+    text = "Plan\n\nGoals\nDetail\none",
+    readbacks: Record<string, { html: string; text: string }> = {}
   ) {
     let listing = 0;
+    const read = (noteId: string) => readbacks[noteId] ?? { html, text };
     const manager = {
       listAccounts: vi.fn(() => [{ name: "iCloud", defaultFolder: "Notes" }, { name: "Local" }]),
       listNoteRefs: vi.fn(() =>
@@ -316,11 +318,15 @@ describe("create-note Markdown bridge (#172)", () => {
         }))
       ),
       getNoteById: vi.fn(() => ({ title: "Plan", passwordProtected: false })),
-      getNoteContentById: vi.fn(() => html),
+      getNoteContentById: vi.fn((noteId: string) => read(noteId).html),
       moveNoteById: vi.fn(() => true),
     };
     mock.enrich.mockReturnValue({ revision: "r1" });
-    mock.readRich.mockReturnValue({ ...snapshot().rich, text, revision: "r1" });
+    mock.readRich.mockImplementation((noteId: string) => ({
+      ...snapshot().rich,
+      text: read(noteId).text,
+      revision: "r1",
+    }));
     mock.hash.mockReturnValue("h-created");
     return manager;
   }
@@ -380,7 +386,7 @@ describe("create-note Markdown bridge (#172)", () => {
         folder: "Work",
       })
     ).toThrow(
-      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: Heading styles not verified/
+      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: no new note verified \(.*Heading styles not verified\)/
     );
     expect(manager.moveNoteById).not.toHaveBeenCalled();
   });
@@ -415,7 +421,7 @@ describe("create-note Markdown bridge (#172)", () => {
         content,
       })
     ).toThrow(
-      /No new note was found.*timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut/
+      /search for the title before any retry: no new note was found in the default folder; Shortcuts timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut/
     );
     vi.mocked(execFileSync).mockReturnValue("");
     const other = "x-coredata://ABCDEF/ICNote/p3";
@@ -424,7 +430,36 @@ describe("create-note Markdown bridge (#172)", () => {
         markdownManager([[existing], [existing, created, other]]) as unknown as AppleNotesManager,
         { title: "Plan", content }
       )
-    ).toThrow(/2 notes appeared/);
+    ).toThrow(/2 matching notes appeared/);
+  });
+
+  it("picks the one verified note when an unrelated note lands in the default folder", () => {
+    const synced = "x-coredata://ABCDEF/ICNote/p3";
+    const manager = markdownManager([[existing], [existing, synced, created]], importedHtml, "", {
+      [synced]: { html: "<div>Groceries</div>", text: "Groceries" },
+      [created]: { html: importedHtml, text: "Plan\n\nGoals\nDetail\none" },
+    });
+    expect(
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+      })
+    ).toMatchObject({ ok: true, id: created });
+  });
+
+  it("names the note when its readback fails after the bridge created it", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    mock.readRich.mockImplementation(() => {
+      throw new Error("No Notes document data");
+    });
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals",
+      })
+    ).toThrow(
+      /Operation outcome uncertain; read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: .*No Notes document data/
+    );
   });
 
   it("names the created note when the move to its folder fails", () => {
@@ -436,7 +471,9 @@ describe("create-note Markdown bridge (#172)", () => {
         content: "## Goals\n### Detail\n- one",
         folder: "Missing",
       })
-    ).toThrow(/Created and verified note x-coredata:\/\/ABCDEF\/ICNote\/p2.*use move-note/);
+    ).toThrow(
+      /read note x-coredata:\/\/ABCDEF\/ICNote\/p2 before any retry: created and verified .* not moved to "Missing"; use move-note/
+    );
   });
 
   it("refuses before listing or running anything when the bridge is missing or input is invalid", () => {
@@ -457,6 +494,27 @@ describe("create-note Markdown bridge (#172)", () => {
         content: "| a | b |",
       })
     ).toThrow(/Markdown append supports/);
+    for (const content of [
+      "_note_ this",
+      "Call __init__ first",
+      "1\\. not a list",
+      "AT&amp;T",
+      "Goals\n---",
+      " ## Goals",
+      "1) first",
+      "## Goals ##",
+      "[**x**](https://example.com)",
+    ])
+      expect(() =>
+        createMarkdownNote(manager as unknown as AppleNotesManager, { title: "Plan", content })
+      ).toThrow(/Notes would change that text/);
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "snake_case_name and #decision stay literal",
+        folder: "/",
+      })
+    ).toThrow(/folder/i);
     expect(manager.listNoteRefs).not.toHaveBeenCalled();
     expect(execFileSync).not.toHaveBeenCalled();
   });
