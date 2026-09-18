@@ -27,23 +27,49 @@ let mgr: AppleNotesManager;
 // live tests below skip themselves.
 let liveAccount: string | null = null;
 
+/**
+ * Deletes a note this suite created. The manager exposes only a guarded delete,
+ * so read the current body back and hand it over as the expected value.
+ */
+function deleteNote(id: string): "deleted" | "conflict" | "failed" {
+  return mgr.deleteNoteByIdIfUnchanged(id, mgr.getNoteContentById(id)).status;
+}
+
 beforeAll(() => {
   mgr = new AppleNotesManager();
+
+  let accounts: ReturnType<AppleNotesManager["listAccounts"]> = [];
   try {
-    for (const account of mgr.listAccounts()) {
-      try {
-        const probe = mgr.createNote("__mcp_probe__", "probe", [], undefined, account.name);
-        if (probe?.id) {
-          mgr.deleteNoteById(probe.id);
-          liveAccount = account.name;
-          break;
-        }
-      } catch {
-        // account not writable — try the next one
-      }
-    }
+    accounts = mgr.listAccounts();
   } catch {
     // Notes.app unavailable — every live test will skip
+    return;
+  }
+
+  for (const account of accounts) {
+    let probe: ReturnType<AppleNotesManager["createNote"]>;
+    try {
+      probe = mgr.createNote("__mcp_probe__", "probe", [], undefined, account.name);
+    } catch (err) {
+      // An AppleScript failure legitimately means "this account is not writable,
+      // try the next one". A programming error (wrong method name or arity) must
+      // not masquerade as one and silently skip the whole live suite.
+      if (err instanceof TypeError || err instanceof ReferenceError) throw err;
+      continue;
+    }
+    if (!probe?.id) continue;
+
+    // The probe lands in a real library, so a cleanup that does not delete it is
+    // a hard error rather than a reason to skip.
+    const status = deleteNote(probe.id);
+    if (status !== "deleted") {
+      throw new Error(
+        `probe note ${probe.id} in "${account.name}" could not be deleted (${status}); ` +
+          `it is still in the library`
+      );
+    }
+    liveAccount = account.name;
+    break;
   }
 });
 
@@ -121,7 +147,7 @@ describe("live Notes.app operations", { timeout: 120_000 }, () => {
       expect(tags).toContain("mcp");
       expect(tags).toContain("integration");
     } finally {
-      expect(mgr.deleteNoteById(created!.id)).toBe(true);
+      expect(deleteNote(created!.id)).toBe("deleted");
     }
   });
 
@@ -141,7 +167,7 @@ describe("live Notes.app operations", { timeout: 120_000 }, () => {
       expect(hit!.created).toEqual(details!.created);
       expect(hit!.modified).toEqual(details!.modified);
     } finally {
-      expect(mgr.deleteNoteById(created!.id)).toBe(true);
+      expect(deleteNote(created!.id)).toBe("deleted");
     }
   });
 
