@@ -17,17 +17,22 @@ import { getNoteMetadata } from "../utils/noteMetadata.js";
 import { getChecklistItems } from "../utils/checklistParser.js";
 import { appendMarkdownHtml } from "../utils/appendMarkdown.js";
 import { comparableVisibleText } from "../utils/noteRevision.js";
+import { callTimeoutMs } from "../utils/callTimeout.js";
 
 export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+/** The configured background-operations bridge name (env override or default). */
+export const backgroundShortcutName = () =>
+  process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
 /** Report whether the configured background-operations bridge is installed uniquely. */
-export const backgroundStatus = () =>
-  nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+export const backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 /** Report whether the dedicated native-tag bridge is installed uniquely. */
 export const nativeTagBridgeStatus = () => nativeTagsStatus();
 export const MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
+/** The configured create-from-Markdown bridge name (env override or default). */
+export const markdownShortcutName = () =>
+  process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;
 /** Report whether the create-from-Markdown bridge is installed uniquely. */
-export const markdownNoteStatus = () =>
-  nativeTagsStatus(process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT);
+export const markdownNoteStatus = () => nativeTagsStatus(markdownShortcutName());
 export type BackgroundOperation =
   | "append-text"
   | "append-markdown"
@@ -229,7 +234,7 @@ export function runBackgroundShortcut(
     try {
       execFileSync("/usr/bin/shortcuts", ["run", status.identifier!, "--input-path", file], {
         encoding: "utf8",
-        timeout: 60000,
+        timeout: callTimeoutMs() ?? 60000,
         maxBuffer: 1024 * 1024,
         stdio: ["ignore", "pipe", "pipe"],
       });

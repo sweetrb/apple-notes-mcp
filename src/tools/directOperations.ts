@@ -13,6 +13,13 @@ import { tmpdir } from "node:os";
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import {
+  exactIdInput,
+  lookupStableIdentifiers,
+  looseIdTransform,
+  NOTE_ID_MESSAGE,
+} from "../utils/noteIdentifiers.js";
+import { errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import {
   enrichNoteRead,
@@ -22,8 +29,17 @@ import {
   type RichNote,
 } from "../utils/noteRichText.js";
 
-const noteId = z.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+// Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
+// Core Data key, resolved to the x-coredata id before the handler runs.
+const noteId = exactIdInput(
+  "ICNote",
+  /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
+  NOTE_ID_MESSAGE
+);
 const revision = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+// Free-form folder id as before; a Notes UUID or numeric key resolves to the
+// folder's x-coredata id (never to a note or attachment).
+const folderId = z.string().max(2000).transform(looseIdTransform("ICFolder"));
 
 interface Snapshot {
   id: string;
@@ -118,15 +134,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
             structuredContent: result,
           };
         } catch (error) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: error instanceof Error ? error.message : String(error),
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(error instanceof Error ? error.message : String(error), error);
         }
       }) as unknown as ToolCallback<S>
     );
@@ -135,8 +143,11 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
   tool(
     "get-folder-by-id",
     "Use when: reading the exact folder name and parent before a guarded rename.\nReturns: folder id, current name, and parent id.\nDo not use when: listing folders by path (list-folders).\nSafety: read-only.",
-    { id: z.string().max(2000) },
-    ({ id }) => manager.getFolderById(id),
+    { id: folderId },
+    ({ id }) => {
+      const folder = manager.getFolderById(id);
+      return { ...folder, ...lookupStableIdentifiers([folder.id], "ICFolder").get(folder.id) };
+    },
     true
   );
 
@@ -144,7 +155,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
     "rename-folder",
     "Use when: renaming one previously read folder in place.\nReturns: the unchanged folder id, new name, and parent id after readback.\nDo not use when: creating, moving, or deleting a folder.\nSafety: requires the expected current name and parent; refuses stale metadata and sibling conflicts.",
     {
-      id: z.string().max(2000),
+      id: folderId,
       expectedName: z.string().max(1000),
       expectedParentId: z.string().max(2000),
       newName: z.string().min(1).max(1000),
