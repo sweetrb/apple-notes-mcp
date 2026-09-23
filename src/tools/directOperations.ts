@@ -7,7 +7,6 @@ import {
   openSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -336,10 +335,18 @@ function storedInsertion(
     throw new Error(UNCERTAIN);
   const expected = sha256(bytes);
   const matches = row.assetPaths.some((path) => {
+    // One descriptor for the size check and the read, so both see the same file.
+    let descriptor: number | undefined;
     try {
-      return statSync(path).size === bytes.length && sha256(readFileSync(path)) === expected;
+      descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const stat = fstatSync(descriptor);
+      return (
+        stat.isFile() && stat.size === bytes.length && sha256(readFileSync(descriptor)) === expected
+      );
     } catch {
       return false;
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
     }
   });
   if (!matches)

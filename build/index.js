@@ -51347,7 +51347,6 @@ import {
   openSync as openSync5,
   readFileSync as readFileSync3,
   rmSync as rmSync4,
-  statSync as statSync4,
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
@@ -51566,10 +51565,15 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
     throw new Error(UNCERTAIN);
   const expected = sha256(bytes);
   const matches = row.assetPaths.some((path10) => {
+    let descriptor;
     try {
-      return statSync4(path10).size === bytes.length && sha256(readFileSync3(path10)) === expected;
+      descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+      const stat = fstatSync5(descriptor);
+      return stat.isFile() && stat.size === bytes.length && sha256(readFileSync3(descriptor)) === expected;
     } catch {
       return false;
+    } finally {
+      if (descriptor !== void 0) closeSync5(descriptor);
     }
   });
   if (!matches)
