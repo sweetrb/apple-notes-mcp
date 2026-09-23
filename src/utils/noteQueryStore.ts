@@ -443,7 +443,25 @@ export interface QueryNotesOptions {
  */
 export function queryNotes(expression: string, options: QueryNotesOptions = {}): QueryNotesResult {
   const ast: QueryNode = parseNoteQuery(expression);
-  const limit = Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX);
+  return runNoteQuery(ast, {
+    ...options,
+    limit: Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX),
+  });
+}
+
+/**
+ * Runs an already-built query AST against the NoteStore, read-only.
+ *
+ * Callers that assemble a query programmatically (search-notes' body search)
+ * build the AST directly, so caller text never passes through the tokenizer and
+ * cannot be misread as a field, operator, or quote. `limit` is applied as given
+ * (search-notes has its own cap semantics); the scan window is still bounded by
+ * {@link QUERY_SCAN}.
+ *
+ * @throws NoteQueryStoreError for permission, schema, or database failures
+ */
+export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): QueryNotesResult {
+  const limit = options.limit ?? QUERY_RESULTS.DEFAULT;
   const scanLimit = Math.min(options.scanLimit ?? QUERY_SCAN.DEFAULT, QUERY_SCAN.MAX);
   const includeDeleted = options.includeDeleted ?? false;
   const withBodies = needsContent(ast);

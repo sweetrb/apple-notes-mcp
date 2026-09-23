@@ -964,6 +964,17 @@ export class AppleNotesManager {
   }
 
   /**
+   * The account a search with this `account` argument is scoped to: the
+   * caller's account when named, else Notes.app's default account (cached).
+   * Returns `undefined` when no account was named and the default cannot be
+   * determined. Used by search-notes' database path so it searches the same
+   * account the AppleScript path would.
+   */
+  searchAccountScope(account?: string): string | undefined {
+    return this.reportedAccount(this.resolveAccount(account));
+  }
+
+  /**
    * Checks if a note is password-protected by its ID.
    *
    * Password-protected notes cannot have their content read or modified

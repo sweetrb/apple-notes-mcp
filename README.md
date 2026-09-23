@@ -420,7 +420,7 @@ Searches for notes by title or content.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | string | Yes | Text to search for |
-| `searchContent` | boolean | No | If `true`, searches note body; if `false` (default), searches titles only |
+| `searchContent` | boolean | No | If `true`, searches note content (title line included); if `false` (default), searches titles only. With Full Disk Access, content search reads the Notes database (well under a second, the 5000 most recently modified notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on a broad term |
 | `account` | string | No | Account to search in (defaults to Notes.app's default account; exact or unique-prefix match) |
 | `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
@@ -451,7 +451,7 @@ Searches for notes by title or content.
 }
 ```
 
-**Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc.
+**Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc. A content search also returns `source` (`"database"` or `"applescript"`), and `scanTruncated` when the database path left older notes unsearched.
 
 ---
 

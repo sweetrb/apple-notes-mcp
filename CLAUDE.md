@@ -180,6 +180,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes — useful for large collections
 - Use `limit` to cap the number of results returned. **`limit` defaults to 50** — a broad query (e.g. a single common letter) reads several properties per match via AppleScript, so an unbounded search over hundreds of matches times out; the default keeps it useful. The response discloses the applied limit and warns when results were truncated — pass a higher `limit`, or narrow with `folder`/`modifiedSince`, to see more.
 - Use `folder` to restrict search to a specific folder (supports nested paths)
+- With Full Disk Access, `searchContent: true` reads the Notes database instead of asking Notes.app (`source: "database"` in the response): it matches the full plain text, title line included, scans the 5000 most recently modified notes, and excludes Recently Deleted. Without Full Disk Access it falls back to AppleScript (`source: "applescript"`), which scans every body before `limit` applies and can time out on a broad term; the timeout error then says how to fix it
 
 ### query-notes
 - Boolean search read straight from the NoteStore database (read-only, needs Full Disk Access). Prefer it over `search-notes` when Full Disk Access is available: one call matches title **or** body, and it returns in well under a second instead of ~200ms per result

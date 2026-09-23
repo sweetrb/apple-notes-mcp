@@ -54,6 +54,13 @@ import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineIma
 import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
 import { resolveSearchLimit, describeSearchLimit } from "@/utils/searchLimit.js";
 import { describeSearchScope } from "@/utils/searchScope.js";
+import {
+  contentSearchFailureHint,
+  describeContentScan,
+  searchContentViaDatabase,
+  type ContentSearchSource,
+  type SearchContentDbResult,
+} from "@/utils/searchContentDb.js";
 import { NoteQueryError } from "@/utils/noteQuery.js";
 import {
   NoteQueryStoreError,
@@ -627,10 +634,15 @@ registerTool(
   "search-notes",
   {
     description:
-      "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id.\nDo not use when: you already have a note id (use get-note-content) or want every note (use list-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.",
+      "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: z.string().min(1, "Search query is required").max(MAX.QUERY),
-      searchContent: z.boolean().optional().describe("Search note content instead of titles"),
+      searchContent: z
+        .boolean()
+        .optional()
+        .describe(
+          "Search note content (title line included) instead of titles. Uses the Notes database when Full Disk Access is available, else AppleScript"
+        ),
       account: z.string().max(MAX.ACCOUNT).optional().describe("Account to search in"),
       folder: z.string().max(MAX.FOLDER).optional().describe("Limit search to a specific folder"),
       modifiedSince: z
@@ -652,6 +664,8 @@ registerTool(
     outputSchema: {
       notes: z.array(z.object({}).passthrough()).optional(),
       count: z.number().optional(),
+      source: z.enum(["database", "applescript"]).optional(),
+      scanTruncated: z.boolean().optional(),
     },
   },
   withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
@@ -662,16 +676,62 @@ registerTool(
     const effectiveLimit = resolveSearchLimit(limit);
     const limitWasDefault = limit === undefined;
 
+    // Body search: prefer the NoteStore database. AppleScript's `body contains`
+    // makes Notes.app scan every body before the limit applies, so a broad term
+    // times out even with the default cap (#100). Any database failure (no Full
+    // Disk Access, unknown schema) falls back to the AppleScript path.
+    let source: ContentSearchSource | undefined;
+    let dbScan: SearchContentDbResult["scan"] | undefined;
+    let dbUnavailable: NoteQueryStoreError["kind"] | undefined;
+    const runSearch = () => {
+      if (searchContent) {
+        try {
+          const db = searchContentViaDatabase({
+            query,
+            account: notesManager.searchAccountScope(account),
+            folder,
+            modifiedSince,
+            limit: effectiveLimit,
+          });
+          source = "database";
+          dbScan = db.scan;
+          return db.notes;
+        } catch (error) {
+          if (!(error instanceof NoteQueryStoreError)) throw error;
+          dbUnavailable = error.kind;
+        }
+        source = "applescript";
+      }
+      try {
+        return notesManager.searchNotes(
+          query,
+          searchContent,
+          account,
+          folder,
+          modifiedSince,
+          effectiveLimit
+        );
+      } catch (error) {
+        if (!searchContent || !(error instanceof Error)) throw error;
+        throw new Error(contentSearchFailureHint(error.message, dbUnavailable));
+      }
+    };
+
     // Use sync-aware wrapper for this read operation
     const {
       result: notes,
       syncBefore,
       syncInterference,
-    } = withSyncAwarenessSync("search-notes", () =>
-      notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, effectiveLimit)
-    );
+    } = withSyncAwarenessSync("search-notes", runSearch);
 
-    const searchType = searchContent ? "content" : "titles";
+    const searchType = searchContent
+      ? source === "database"
+        ? "content via the Notes database"
+        : "content"
+      : "titles";
+    const sourceFields = source ? { source } : {};
+    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+    const scanNote = describeContentScan(dbScan);
     const folderInfo = folder ? ` in folder "${folder}"` : "";
     const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
     const { info: limitInfo, truncationNote } = describeSearchLimit(
@@ -696,8 +756,8 @@ registerTool(
       // appear in dozens of note bodies.
       const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
-        { notes: [], count: 0 }
+        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+        { notes: [], count: 0, ...sourceFields, ...scanFields }
       );
     }
 
@@ -715,8 +775,13 @@ registerTool(
       .join("\n");
 
     return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${syncNote}`,
-      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
+      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${scanNote}${syncNote}`,
+      {
+        notes: withStableIdentifiers(notes, "ICNote"),
+        count: notes.length,
+        ...sourceFields,
+        ...scanFields,
+      }
     );
   }, "Error searching notes")
 );

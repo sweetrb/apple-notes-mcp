@@ -127,6 +127,10 @@ User: "Search for notes containing budget information"
 Action: Use search-notes with query="budget" and searchContent=true
 ```
 
+With Full Disk Access, a `searchContent` search reads the Notes database and
+returns quickly even for a common word; without it, a broad body search can time
+out, so narrow it with `folder` or `modifiedSince`.
+
 When Full Disk Access is available, prefer `query-notes` for anything beyond a
 single keyword. It matches title or body in one call, runs in well under a
 second, and combines conditions:

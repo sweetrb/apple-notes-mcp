@@ -226,6 +226,28 @@ predicates can match them.
 
 ## Protobuf Data Format
 
+### search-notes Body Search
+
+`search-notes` with `searchContent: true` goes through the same reader
+(`src/utils/searchContentDb.ts`) before it asks Notes.app. AppleScript's
+`notes where body contains "…"` makes Notes.app render and scan every body before
+the result loop starts, so `limit` cannot bound it and a broad term ("the") times
+out at 30 s even on an ordinary library (#100). The database path builds the query
+AST directly — the caller's text is one literal `text` term, never tokenized, so
+`title:`, `OR`, `-` and quotes in it are searched literally — plus `folder:`,
+`account:` and a `modified >=` node for the other parameters. With no `account`,
+it scopes to Notes.app's default account, as the AppleScript path does. It scans
+the 5000 most recently modified notes (`QUERY_SCAN.MAX`) and discloses a truncated
+window; `limit` is applied as given, not capped at query-notes' 500.
+
+Differences from the AppleScript path, by design: text is matched against the
+decoded plain text (title line included) instead of the HTML `body`, so markup
+never matches; Recently Deleted and folderless notes are excluded, as in
+list-notes; `folder` in results is the list-folders path, not only the leaf name.
+Any `NoteQueryStoreError` (no Full Disk Access, unknown schema, sqlite failure)
+falls back to AppleScript, and a fallback timeout names Full Disk Access as the fix
+when that was why the database was skipped.
+
 ### Document Structure
 
 The `ZDATA` blob contains gzipped protobuf data:

@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [2.8.43] - 2026-09-23
+
+### Fixed
+
+- `search-notes` with `searchContent: true` no longer times out on a broad
+  term when Full Disk Access is available (#100). AppleScript's
+  `whose body contains` makes Notes.app scan every note body before `limit`
+  applies, so a query such as "the" timed out at 30 s on every run even with
+  the default limit of 50. Body search now reads the Notes database through
+  the `query-notes` reader, which answers the same question in well under a
+  second. The caller's text is passed as one literal term, never parsed as
+  query syntax; `account` (Notes.app's default account when omitted),
+  `folder`, `modifiedSince` and `limit` keep their meaning. The database path
+  matches the note's plain text (title line included) rather than its HTML,
+  excludes Recently Deleted as `list-notes` does, reports folder paths, and
+  scans the 5000 most recently modified notes, saying so when older notes
+  were left out. Without Full Disk Access, or if the database cannot be read,
+  the search falls back to AppleScript as before, and a timeout there now
+  says that granting Full Disk Access fixes it and suggests `folder` or
+  `modifiedSince`. The response's new `source` field says which path
+  answered.
+
 ## [2.8.42] - 2026-09-23
 
 ### Security

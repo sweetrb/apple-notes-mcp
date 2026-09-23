@@ -42374,6 +42374,16 @@ var AppleNotesManager = class {
     return this.defaultAccountName || void 0;
   }
   /**
+   * The account a search with this `account` argument is scoped to: the
+   * caller's account when named, else Notes.app's default account (cached).
+   * Returns `undefined` when no account was named and the default cannot be
+   * determined. Used by search-notes' database path so it searches the same
+   * account the AppleScript path would.
+   */
+  searchAccountScope(account) {
+    return this.reportedAccount(this.resolveAccount(account));
+  }
+  /**
    * Checks if a note is password-protected by its ID.
    *
    * Password-protected notes cannot have their content read or modified
@@ -45681,6 +45691,13 @@ function describeSearchScope(searchContent, resultCount) {
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
 
+// src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync13 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
+import { gunzipSync as gunzipSync7 } from "zlib";
+
 // src/utils/noteQuery.ts
 var QUERY_LIMITS = {
   /** Maximum number of tokens (terms, operators, parentheses). */
@@ -46127,11 +46144,6 @@ function positiveTextTerms(node, negated = false) {
 }
 
 // src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync13 } from "child_process";
-import * as fs8 from "fs";
-import * as os8 from "os";
-import * as path8 from "path";
-import { gunzipSync as gunzipSync7 } from "zlib";
 var NOTES_DB_PATH9 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
@@ -46327,7 +46339,13 @@ function buildSnippet(text2, terms) {
 }
 function queryNotes(expression, options = {}) {
   const ast = parseNoteQuery(expression);
-  const limit = Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX);
+  return runNoteQuery(ast, {
+    ...options,
+    limit: Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX)
+  });
+}
+function runNoteQuery(ast, options = {}) {
+  const limit = options.limit ?? QUERY_RESULTS.DEFAULT;
   const scanLimit = Math.min(options.scanLimit ?? QUERY_SCAN.DEFAULT, QUERY_SCAN.MAX);
   const includeDeleted = options.includeDeleted ?? false;
   const withBodies = needsContent(ast);
@@ -46462,6 +46480,66 @@ function queryNotes(expression, options = {}) {
     truncated: matched > hits.length,
     unreadable
   };
+}
+
+// src/utils/searchContentDb.ts
+function buildSearchContentQuery(options) {
+  const children = [{ type: "text", field: "any", value: options.query }];
+  const folder = options.folder?.trim();
+  if (folder) children.push({ type: "folder", value: folder });
+  const account = options.account?.trim();
+  if (account) children.push({ type: "account", value: account });
+  if (options.modifiedSince) {
+    const start = new Date(options.modifiedSince).getTime();
+    if (Number.isFinite(start)) {
+      children.push({
+        type: "date",
+        field: "modified",
+        op: ">=",
+        date: options.modifiedSince,
+        start,
+        end: start + 24 * 60 * 60 * 1e3
+      });
+    }
+  }
+  return children.length === 1 ? children[0] : { type: "and", children };
+}
+function searchContentViaDatabase(options) {
+  const result = runNoteQuery(buildSearchContentQuery(options), {
+    limit: options.limit,
+    scanLimit: QUERY_SCAN.MAX,
+    dbPath: options.dbPath
+  });
+  const notes = result.notes.map((hit) => ({
+    id: hit.id,
+    title: hit.title,
+    content: "",
+    tags: [],
+    created: hit.created ? new Date(hit.created) : /* @__PURE__ */ new Date(0),
+    modified: hit.modified ? new Date(hit.modified) : /* @__PURE__ */ new Date(0),
+    ...hit.folder !== void 0 ? { folder: hit.folder } : {},
+    ...hit.account !== void 0 ? { account: hit.account } : {}
+  }));
+  return {
+    notes,
+    scan: {
+      scanned: result.scanned,
+      eligible: result.eligible,
+      scanTruncated: result.scanTruncated,
+      matched: result.matched
+    }
+  };
+}
+function describeContentScan(scan) {
+  if (!scan?.scanTruncated) return "";
+  return `
+
+\u2139\uFE0F Searched the ${scan.scanned} most recently modified of ${scan.eligible} notes; older notes were not searched. A title search (\`searchContent: false\`) covers every note.`;
+}
+function contentSearchFailureHint(message, dbUnavailable) {
+  if (!/timed out/i.test(message)) return message;
+  const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the app that launches this server (run the doctor tool) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
+  return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
 }
 
 // src/tools/doctor.ts
@@ -50981,10 +51059,12 @@ registerTool(
 registerTool(
   "search-notes",
   {
-    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id.\nDo not use when: you already have a note id (use get-note-content) or want every note (use list-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.",
+    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: external_exports.string().min(1, "Search query is required").max(MAX.QUERY),
-      searchContent: external_exports.boolean().optional().describe("Search note content instead of titles"),
+      searchContent: external_exports.boolean().optional().describe(
+        "Search note content (title line included) instead of titles. Uses the Notes database when Full Disk Access is available, else AppleScript"
+      ),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to search in"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Limit search to a specific folder"),
       modifiedSince: external_exports.string().max(64).optional().describe(
@@ -50996,21 +51076,59 @@ registerTool(
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      count: external_exports.number().optional()
+      count: external_exports.number().optional(),
+      source: external_exports.enum(["database", "applescript"]).optional(),
+      scanTruncated: external_exports.boolean().optional()
     }
   },
   withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
     const effectiveLimit = resolveSearchLimit(limit);
     const limitWasDefault = limit === void 0;
+    let source;
+    let dbScan;
+    let dbUnavailable;
+    const runSearch = () => {
+      if (searchContent) {
+        try {
+          const db = searchContentViaDatabase({
+            query: query2,
+            account: notesManager.searchAccountScope(account),
+            folder,
+            modifiedSince,
+            limit: effectiveLimit
+          });
+          source = "database";
+          dbScan = db.scan;
+          return db.notes;
+        } catch (error2) {
+          if (!(error2 instanceof NoteQueryStoreError)) throw error2;
+          dbUnavailable = error2.kind;
+        }
+        source = "applescript";
+      }
+      try {
+        return notesManager.searchNotes(
+          query2,
+          searchContent,
+          account,
+          folder,
+          modifiedSince,
+          effectiveLimit
+        );
+      } catch (error2) {
+        if (!searchContent || !(error2 instanceof Error)) throw error2;
+        throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
+      }
+    };
     const {
       result: notes,
       syncBefore,
       syncInterference
-    } = withSyncAwarenessSync(
-      "search-notes",
-      () => notesManager.searchNotes(query2, searchContent, account, folder, modifiedSince, effectiveLimit)
-    );
-    const searchType = searchContent ? "content" : "titles";
+    } = withSyncAwarenessSync("search-notes", runSearch);
+    const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
+    const sourceFields = source ? { source } : {};
+    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+    const scanNote = describeContentScan(dbScan);
     const folderInfo = folder ? ` in folder "${folder}"` : "";
     const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
     const { info: limitInfo, truncationNote } = describeSearchLimit(
@@ -51031,8 +51149,8 @@ ${syncWarnings.join(" ")}` : "";
     if (notes.length === 0) {
       const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
-        { notes: [], count: 0 }
+        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+        { notes: [], count: 0, ...sourceFields, ...scanFields }
       );
     }
     const noteList = notes.map((n) => {
@@ -51046,8 +51164,13 @@ ${syncWarnings.join(" ")}` : "";
     }).join("\n");
     return successResponse(
       `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${truncationNote}${syncNote}`,
-      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
+${noteList}${truncationNote}${scanNote}${syncNote}`,
+      {
+        notes: withStableIdentifiers(notes, "ICNote"),
+        count: notes.length,
+        ...sourceFields,
+        ...scanFields
+      }
     );
   }, "Error searching notes")
 );
