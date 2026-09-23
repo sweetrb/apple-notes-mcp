@@ -37,7 +37,7 @@ That database lives in a macOS-protected directory:
 ```
 
 Reading anything under `~/Library/Group Containers/` requires **Full Disk
-Access** for the host process — without it, macOS denies the read. (The MCP only
+Access** for the process that runs the server — without it, macOS denies the read. (The MCP only
 ever **reads** this database; it never writes to it.)
 
 ## How to grant Full Disk Access
@@ -45,21 +45,47 @@ ever **reads** this database; it never writes to it.)
 1. Open **System Settings** (or **System Preferences** on older macOS).
 2. Go to **Privacy & Security → Full Disk Access**.
 3. Click the **+** button (you may need to unlock with Touch ID / your password
-   first), and add the application that **hosts** the MCP server — i.e. the app
-   that actually launches `node`:
-   - **Claude Desktop** → `/Applications/Claude.app`
-   - **Terminal** (if you run Claude Code from a shell) → `/Applications/Utilities/Terminal.app`
-   - **iTerm** → `/Applications/iTerm.app`
+   first) and add the right entry for how you run the server:
+   - **Claude Desktop** → the **Node binary** that runs the server, e.g.
+     `/usr/local/bin/node` or `~/.nvm/versions/node/v24.11.1/bin/node`. The
+     `doctor` tool prints the exact path. In the file picker, press **⌘⇧G** and
+     paste it (use **⌘⇧.** to show hidden folders such as `~/.nvm`). Adding
+     `/Applications/Claude.app` as well does no harm, but on its own it is not
+     enough (see below).
+   - **Claude Code or another client in a terminal** → the terminal app:
+     `/Applications/Utilities/Terminal.app` or `/Applications/iTerm.app`
    - **VS Code** → `/Applications/Visual Studio Code.app`
-4. Make sure the toggle next to the app is **on**.
+4. Make sure the toggle next to the entry is **on**.
 5. **Fully quit and reopen the host app.** macOS only applies the new permission
-   to processes started *after* the change — a reload or restart-server is not
-   enough; the host application itself must be quit (⌘Q) and relaunched.
+   to processes started *after* the change. A reload or restart-server is not
+   enough; quit the host application itself (⌘Q) and relaunch it. If `doctor`
+   still reports Full Disk Access as not granted after that, restart the Mac.
 
-> **Grant FDA to the right app.** FDA applies to the process that spawns the
-> server, not to `node` or to Notes.app. If you launch Claude Code from iTerm,
-> grant it to iTerm; if you use Claude Desktop, grant it to Claude. Granting it to
-> the wrong app has no effect.
+> **Why Claude Desktop needs the Node binary itself.** macOS checks Full Disk
+> Access against the *responsible process*, the app it holds accountable for a
+> request. A terminal passes that role on to everything it launches, so a grant
+> on Terminal or iTerm covers the server. Claude Desktop does not: it starts each
+> MCP server through a helper that *disclaims* responsibility, which makes the
+> `node` process its own responsible process. macOS then looks for a grant on the
+> Node binary's path and ignores the one on Claude.app
+> ([#220](https://github.com/sweetrb/apple-notes-mcp/issues/220)).
+>
+> The grant is tied to that exact path. With a version manager (nvm, fnm, Volta,
+> asdf, mise) the path changes with every Node version, so switching versions
+> drops the grant, and `npx` runs whichever `node` is first on the `PATH` Claude
+> Desktop sees. Pointing the config at one fixed Node binary keeps the grant
+> stable:
+>
+> ```json
+> "apple-notes": {
+>   "command": "/Users/you/.nvm/versions/node/v24.11.1/bin/node",
+>   "args": ["/path/to/global/node_modules/apple-notes-mcp/build/index.js"]
+> }
+> ```
+>
+> A Developer-ID-signed Node keeps its grant across updates at the same path;
+> an ad-hoc-signed one (typically Homebrew's) does not. See
+> [Node runtime and TCC permissions](NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
 
 ## Verifying it worked
 

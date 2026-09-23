@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { writeFileSync, mkdtempSync } from "fs";
-import { tmpdir } from "os";
+import { homedir, tmpdir } from "os";
 import { join } from "path";
 
 vi.mock("@/utils/applescript.js", () => ({ executeAppleScript: vi.fn() }));
@@ -119,6 +119,14 @@ describe("saveAttachmentById (#27)", () => {
     const r = manager.saveAttachmentById("x-coredata://A/ICNote/p1", "att-1", "/etc/evil.png");
     expect(r.success).toBe(false);
     expect(r.error).toMatch(/outside allowed/);
+    expect(mockExec).not.toHaveBeenCalled();
+  });
+
+  it("refuses a destination inside the Notes library container (#208)", () => {
+    const dest = join(homedir(), "Library/Group Containers/group.com.apple.notes/Media/export.png");
+    const r = manager.saveAttachmentById("x-coredata://A/ICNote/p1", "att-1", dest);
+    expect(r.success).toBe(false);
+    expect(r.error).toMatch(/Notes library container/);
     expect(mockExec).not.toHaveBeenCalled();
   });
 

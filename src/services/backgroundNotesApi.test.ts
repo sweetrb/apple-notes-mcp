@@ -572,6 +572,59 @@ describe("create-note Markdown bridge (#172)", () => {
     );
   });
 
+  describe("block quotes, code, checklists and dividers through Notes' importer", () => {
+    const content = "> quoted\n\n```\nlet a_b\n```\n\n- [ ] open\n- [x] done";
+    const text = "Plan\nquoted\nlet a_b\nopen\ndone";
+    const html = "<div><b><h1>Plan</h1></b></div><blockquote>quoted</blockquote><tt>let a_b</tt>";
+    function importedRich(done: boolean) {
+      return {
+        ...snapshot().rich,
+        text,
+        revision: "r1",
+        styleRuns: [
+          { start: 0, length: 5, signature: "", paragraphStyle: 0 },
+          { start: 5, length: 7, signature: "", paragraphStyle: 3, blockQuote: true },
+          { start: 12, length: 8, signature: "", paragraphStyle: 4 },
+          { start: 20, length: 9, signature: "", paragraphStyle: 103 },
+        ],
+        checklistItems: [
+          { id: "a", text: "open", done: false, start: 20 },
+          { id: "b", text: "done", done, start: 25 },
+        ],
+      };
+    }
+
+    it("sends the Markdown unchanged and verifies each native construct by readback", () => {
+      const manager = markdownManager([[existing], [existing, created]], html, text);
+      mock.readRich.mockImplementation(() => importedRich(true));
+      expect(
+        createMarkdownNote(manager as unknown as AppleNotesManager, {
+          title: "Plan",
+          content,
+          folder: "Work",
+        })
+      ).toMatchObject({ ok: true, id: created, verified: true });
+      const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.at(-1)?.[1]));
+      expect(written.text).toBe(`# Plan\n\n${content}`);
+      expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
+    });
+
+    it("reports a checklist item whose done state Notes did not keep and does not move the note", () => {
+      const manager = markdownManager([[existing], [existing, created]], html, text);
+      mock.readRich.mockImplementation(() => importedRich(false));
+      expect(() =>
+        createMarkdownNote(manager as unknown as AppleNotesManager, {
+          title: "Plan",
+          content,
+          folder: "Work",
+        })
+      ).toThrow(
+        /read note .*p2 before any retry: .*Checklist items or their done state not verified/
+      );
+      expect(manager.moveNoteById).not.toHaveBeenCalled();
+    });
+  });
+
   it("refuses before listing or running anything when the bridge is missing or input is invalid", () => {
     const manager = markdownManager([[existing]]);
     mock.status.mockReturnValue({ installed: false, identifier: undefined } as never);
@@ -589,7 +642,7 @@ describe("create-note Markdown bridge (#172)", () => {
         title: "Plan",
         content: "| a | b |",
       })
-    ).toThrow(/Markdown append supports/);
+    ).toThrow(/Markdown import supports/);
     expect(() =>
       createMarkdownNote(manager as unknown as AppleNotesManager, {
         title: "Plan",

@@ -9,10 +9,14 @@
  * @module utils/attachmentFs
  */
 import {
+  closeSync,
+  constants,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -36,6 +40,15 @@ export function allowedSaveRoots(): string[] {
     "/tmp",
     "/private/tmp",
   ];
+}
+
+/**
+ * Locations no save may land in even though they sit inside an allowed root
+ * (#208). The Notes group container holds Notes' own database and media;
+ * writing an export there could confuse Notes or corrupt its storage.
+ */
+export function deniedSaveRoots(): string[] {
+  return [join(homedir(), "Library/Group Containers/group.com.apple.notes")];
 }
 
 /**
@@ -135,8 +148,12 @@ function deepestExistingAncestor(abs: string): string {
  * the boundary check would plant the escape it is meant to prevent. Re-checking
  * here (callers already validate) keeps that ordering true no matter who calls.
  */
-export function ensureParentDir(abs: string, roots: string[] = allowedSaveRoots()): void {
-  assertSafeSavePath(abs, roots);
+export function ensureParentDir(
+  abs: string,
+  roots: string[] = allowedSaveRoots(),
+  denied: string[] = deniedSaveRoots()
+): void {
+  assertSafeSavePath(abs, roots, denied);
   mkdirSync(dirname(abs), { recursive: true });
 }
 
@@ -154,11 +171,21 @@ export function ensureParentDir(abs: string, roots: string[] = allowedSaveRoots(
  * already exists as a symlink is refused outright: following it is how a file
  * outside the roots gets clobbered.
  *
+ * After the allowlist, the destination is checked against `denied` (by default
+ * the Notes group container, #208): both the lexical and the canonical form of
+ * the destination, compared case-insensitively against both the lexical and
+ * canonical form of each denied root, so neither a symlink nor a respelled
+ * segment can reach inside it.
+ *
  * The returned path is the caller's own spelling (`resolve(p)`), not the
  * canonical one, so `/tmp/x` still writes to `/tmp/x` — validated to be the same
  * file as the canonical `/private/tmp/x`.
  */
-export function assertSafeSavePath(p: string, roots: string[] = allowedSaveRoots()): string {
+export function assertSafeSavePath(
+  p: string,
+  roots: string[] = allowedSaveRoots(),
+  denied: string[] = deniedSaveRoots()
+): string {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
@@ -190,6 +217,13 @@ export function assertSafeSavePath(p: string, roots: string[] = allowedSaveRoots
       `Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}" ` +
         `resolves to "${canonicalDest}" through a symbolic link.`
     );
+  }
+
+  const deniedForms = [
+    ...new Set([...denied.map((d) => resolve(d)), ...canonicalRoots(denied)]),
+  ].map((d) => d.toLowerCase());
+  if ([abs, canonicalDest].some((form) => isWithinRoots(form.toLowerCase(), deniedForms))) {
+    throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
 
   return abs;
@@ -254,6 +288,69 @@ export function fileSize(p: string): number {
 /** Make a private temp dir for a one-shot attachment export; caller cleans up. */
 export function makeTempDir(): string {
   return mkdtempSync(resolve(tmpdir(), "apple-notes-att-"));
+}
+
+/**
+ * Read a local UTF-8 text file that a tool takes as a content source (for
+ * example `create-note`'s `contentPath`).
+ *
+ * The same roots that bound `save-attachment` bound this read, so a caller can
+ * source content only from home, temp, or /Volumes, never from system or other
+ * users' locations. The path must be absolute and its canonical form must stay
+ * inside a root; the final component may not be a symbolic link, and the file
+ * is opened with O_NOFOLLOW and checked as a regular file through its
+ * descriptor, so a swap between the check and the read cannot redirect it. The
+ * size is checked before reading and the bytes must decode as strict UTF-8.
+ *
+ * @throws on any path, type, size, or encoding violation
+ */
+export function readAllowedTextFile(
+  p: string,
+  maxBytes: number,
+  roots: string[] = allowedSaveRoots()
+): string {
+  if (!p || !p.trim()) throw new Error("A content file path is required.");
+  if (!isAbsolute(p)) throw new Error(`Content file path must be absolute: "${p}"`);
+  const abs = resolve(p);
+  if (!isWithinRoots(abs, roots))
+    throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  let canonical: string;
+  try {
+    canonical = canonicalize(abs);
+  } catch {
+    throw new Error(`Content file does not exist or cannot be resolved: "${abs}"`);
+  }
+  if (!isWithinRoots(canonical, canonicalRoots(roots)))
+    throw new Error(
+      `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
+    );
+  // O_NOFOLLOW refuses a symbolic link at open time (ELOOP), so there is no
+  // separate path check that a swap could slip between.
+  let descriptor: number;
+  try {
+    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ELOOP")
+      throw new Error(`Refusing to read the symbolic link "${abs}".`);
+    throw error;
+  }
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
+    if (stat.size === 0) throw new Error(`Content file is empty: "${abs}"`);
+    if (stat.size > maxBytes)
+      throw new Error(`Content file is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
+    const bytes = readFileSync(descriptor);
+    if (bytes.length !== stat.size)
+      throw new Error("Content file changed while it was being read; try again");
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+    } catch {
+      throw new Error(`Content file is not valid UTF-8 text: "${abs}"`);
+    }
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 /** Remove a temp dir tree, ignoring errors. */
