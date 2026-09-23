@@ -166,6 +166,8 @@ const FOLDER_ID_FIELDS: Array<[string, string]> = [
   ["show-folder", "id"],
   ["get-folder-by-id", "id"],
   ["rename-folder", "id"],
+  ["delete-folder-by-id", "id"],
+  ["delete-folder-by-id", "expectedParentId"],
 ];
 
 describe("id inputs accept Notes UUIDs and numeric keys", () => {

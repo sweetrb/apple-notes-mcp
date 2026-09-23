@@ -304,7 +304,7 @@ describe("delete-folder-by-id registration", () => {
       expectedParentId: parentId,
       dryRun: true,
     });
-    expect(failed).toMatchObject({ isError: true });
+    expect(failed).toMatchObject({ isError: true, structuredContent: { code: "not_found" } });
     expect(failed.content[0].text).toBe("Folder not found");
 
     manager.readFolderForDelete.mockImplementation(() => {
@@ -318,5 +318,55 @@ describe("delete-folder-by-id registration", () => {
       dryRun: true,
     });
     expect(plain.content[0].text).toBe("plain");
+  });
+
+  it("returns stable error codes for conflict, refusal, uncertainty, and missing Full Disk Access", async () => {
+    const registerTool = vi.fn();
+    registerFolderDelete(
+      { registerTool } as unknown as McpServer,
+      manager as unknown as AppleNotesManager,
+      deps
+    );
+    const handler = registerTool.mock.calls[0][2];
+    const args = {
+      id,
+      expectedName: "Old",
+      expectedAccountId: accountId,
+      expectedParentId: parentId,
+      dryRun: true,
+    };
+
+    const conflict = await handler({ ...args, expectedName: "Other" });
+    expect(conflict.content[0].text).toMatch(/^Conflict: /);
+    expect(conflict.structuredContent).toEqual({ code: "revision_conflict", committed: false });
+
+    manager.readFolderForDelete.mockReturnValue(appFacts({ childFolderCount: 1 }));
+    const refused = await handler(args);
+    expect(refused.content[0].text).toMatch(/^Refused: /);
+    expect(refused.structuredContent).toEqual({ code: "unsupported", committed: false });
+    manager.readFolderForDelete.mockReturnValue(appFacts());
+
+    const invalid = await handler({ ...args, expectedRoot: true });
+    expect(invalid.structuredContent).toEqual({ code: "validation_error", committed: false });
+
+    const planned = await handler(args);
+    manager.folderExistsById.mockReturnValue(true);
+    const uncertain = await handler({
+      ...args,
+      dryRun: false,
+      expectedRevision: planned.structuredContent.revision,
+    });
+    expect(uncertain.structuredContent).toEqual({
+      code: "verification_failed",
+      indeterminate: true,
+    });
+
+    deps.readStore.mockImplementation(() => {
+      throw new Error(
+        "Full Disk Access is required to verify folder type and contents before deleting."
+      );
+    });
+    const noFda = await handler(args);
+    expect(noFda.structuredContent).toMatchObject({ code: "full_disk_access_missing" });
   });
 });
