@@ -220,6 +220,19 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Pass `folder` for the per-folder tag → note-id map; omit `folder` for an account-wide inventory with `noteCount` per tag (all accounts unless `account` is given)
 - `complete: false` with `unverifiedNotes` means some tagged notes (usually locked ones) were counted without confirming the tag in their body
 
+### list-recent-notes (incremental sync)
+- Database-backed (read-only, needs Full Disk Access). `since` takes a `modifiedCheckpoint` cursor, or an ISO date or date-time (strictly after that moment)
+- With `since`, rows come **oldest first** and `nextSince` is the last row's cursor. Store it and call again with it; every call advances. `saturated: true` (count equals limit) means more changes may follow, so call again right away; `false` means you are caught up
+- For a first full sync, start with `since: "1970-01-01"` and page the same way; the maximum `limit` is 1000, and paging reaches every note exactly once
+- Without `since`, rows come newest first (a browse view). `nextSince` is then set only when the call returned every matching note
+- A modification-date cursor can miss an edit that iCloud delivers later from another device with an older timestamp; run a full pass from the start now and then
+- Deletions are invisible unless `includeDeleted: true`, which adds Recently Deleted, notes awaiting deletion, and folderless rows; check `inRecentlyDeleted`/`markedForDeletion` before acting on them. A purged note leaves no row at all
+- `modifiedCheckpoint` is exact; the ISO `modified` string is not. Two notes can share the same `modified` text and still differ
+- `wordCounts: true` adds `wordCount`/`charCount` (null = locked or unavailable, 0 = known empty). `bodyPreview: true` adds a 180-character preview
+
+### list-folder-tree
+- One read for the whole hierarchy with `noteCount` (direct) and `totalNoteCount` (with subfolders), grouped by account; `kind` distinguishes regular, smart, and trash folders
+
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
 - The destination folder must already exist (create it first with `create-folder`)
@@ -277,6 +290,15 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Select the note by `id` (a Notes UUID works too) or exact `title`; `folder` narrows a title using list-folders paths. Title lookups never match a note in Recently Deleted
 - Neither tool creates or changes a paragraph ID. A later edit in Notes can replace the ID and break a link
 - Requires Full Disk Access; password-protected notes are refused
+
+### get-note-structure
+- One read-only call for a note's overview by exact id: text, block summary, links with `kind` (`inline`, `card`, `note`, `section`), tags, attachments, and metadata (`deepLink`, `isShared`, `isLocked`, `inRecentlyDeleted`, `lastViewed`, word/char counts, `attachmentCount`, checklist counts, `hasDrawing`, `firstImage`)
+- Attachments use the same `kind`, body order, `previewPath` and `firstImage` as `list-attachments`, so the two tools agree about the same attachment
+- Requires Full Disk Access. A locked note still returns metadata and attachments; `bodyDecoded` is false and body-derived fields are null, so do not read null counts as zero
+- `lastViewed: null` is normal: check `lastViewedStatus` (`never-viewed` for most notes)
+- `attachmentCount` counts top-level attachments; gallery items and recording parts are under `children`
+- `previewPath` is Notes' cached rendition (a thumbnail), not the attachment file itself; it is null when Notes has not rendered one
+- Check `linkSafe` before emitting a link into HTML
 
 ### get-capabilities / doctor feature matrix
 - Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.

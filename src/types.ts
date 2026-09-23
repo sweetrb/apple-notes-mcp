@@ -1310,3 +1310,98 @@ export interface NotesExportReceipt {
   stats: NotesExportAttachmentStats;
   skipped: NotesExportSkip[];
 }
+
+// =============================================================================
+// Database-Backed Recent Listing and Folder Tree
+// =============================================================================
+
+/** One row of `list-recent-notes`. Metadata unless a body option was requested. */
+export interface RecentNoteRow {
+  /** MCP note id (`x-coredata://<store>/ICNote/p<n>`). */
+  id: string;
+  /** The note's Notes UUID (ZIDENTIFIER). */
+  identifier: string | null;
+  title: string | null;
+  /** Folder path in list-folders syntax, or null for a folderless note. */
+  folder: string | null;
+  account: string | null;
+  created: string | null;
+  /** Modification time in ISO 8601 (millisecond precision). */
+  modified: string | null;
+  /**
+   * Opaque sync cursor: the exact stored modification timestamp plus the
+   * note's database key. Pass it back as `since` to list only notes that sort
+   * after this one. Null when the note has no modification date.
+   */
+  modifiedCheckpoint: string | null;
+  pinned: boolean;
+  locked: boolean;
+  inRecentlyDeleted: boolean;
+  markedForDeletion: boolean;
+  /** Words in the decoded body; null when the body is locked or unavailable. */
+  wordCount?: number | null;
+  /** Characters (code points) in the decoded body, attachment markers excluded. */
+  charCount?: number | null;
+  /** Up to 180 characters: the decoded body when decoded, else the stored snippet. */
+  bodyPreview?: string | null;
+  /** Whether bodyPreview and the counts came from the decoded body. */
+  textDecoded?: boolean;
+}
+
+/** Result of `list-recent-notes`. */
+export interface RecentNotesResult {
+  notes: RecentNoteRow[];
+  count: number;
+  limit: number;
+  /**
+   * Row order: `oldest-first` for a `since` query (sync), `newest-first`
+   * without one (browse).
+   */
+  order: "oldest-first" | "newest-first";
+  /**
+   * True when count reached limit. With `since`, more changes may follow:
+   * call again with `nextSince`. Without `since`, older notes were cut off.
+   */
+  saturated: boolean;
+  /**
+   * Cursor to pass as the next `since`. With `since`, the last returned row's
+   * cursor, or the incoming boundary when nothing matched, so every call
+   * advances. Without `since`, the newest row's cursor, set only when the call
+   * returned every matching note. Null when there is no complete cursor.
+   */
+  nextSince: string | null;
+  account?: string;
+  folder?: string;
+}
+
+/** One node of `list-folder-tree`. */
+export interface FolderTreeNode {
+  /** MCP folder id (`x-coredata://<store>/ICFolder/p<n>`). */
+  id: string;
+  identifier: string | null;
+  name: string;
+  /** Full path in list-folders syntax. */
+  path: string;
+  kind: "folder" | "trash" | "smart";
+  /** Notes directly in this folder (tombstones excluded). */
+  noteCount: number;
+  /** Notes in this folder and every descendant folder. */
+  totalNoteCount: number;
+  /** Present only when deleted folders were requested. */
+  markedForDeletion?: boolean;
+  children: FolderTreeNode[];
+}
+
+/** One account's folders in `list-folder-tree`. */
+export interface FolderTreeAccount {
+  account: string;
+  identifier: string | null;
+  noteCount: number;
+  folders: FolderTreeNode[];
+}
+
+/** Result of `list-folder-tree`. */
+export interface FolderTreeResult {
+  accounts: FolderTreeAccount[];
+  folderCount: number;
+}
