@@ -1664,6 +1664,71 @@ registerTool(
   }, "Error listing folders")
 );
 
+// --- list-smart-folders ---
+
+registerTool(
+  "list-smart-folders",
+  {
+    description:
+      'Use when: listing Smart Folders and the rules that define them.\nReturns: each smart folder\'s name, ids, account, and parent, its rules decoded as match ("all"/"any"/"none") plus filters (each with a readable description), the stored query with the outer deleted wrapper removed, and the raw stored query JSON. With includeMatchingNotes, also the notes Notes.app currently shows in each folder.\nDo not use when: listing ordinary folders (list-folders) or searching notes (search-notes).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. includeMatchingNotes asks Notes.app (Automation permission) for each folder\'s current contents rather than re-evaluating the rules. Unrecognized rules are kept as "unknown" filters and set fullyDecoded false.',
+    inputSchema: {
+      includeMatchingNotes: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also list the notes Notes.app currently shows in each smart folder (default false)"
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(500)
+        .optional()
+        .describe("Maximum matching notes returned per folder (default 50; count is always total)"),
+    },
+    outputSchema: {
+      smartFolders: z.array(z.object({}).passthrough()).optional(),
+      count: z.number().optional(),
+      fullyDecoded: z.boolean().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ includeMatchingNotes = false, limit }) => {
+    const folders = notesManager.listSmartFolders({ includeMatchingNotes, limit });
+    const fullyDecoded = folders.every((folder) => folder.fullyDecoded);
+    if (folders.length === 0) {
+      return successResponse("No smart folders found.", {
+        smartFolders: [],
+        count: 0,
+        fullyDecoded,
+      });
+    }
+    const lines = folders.map((folder) => {
+      const joiner = folder.match === "any" ? " OR " : " AND ";
+      const rules = folder.filters.map((filter) => filter.description).join(joiner);
+      const prefix = folder.match === "none" ? "none of: " : "";
+      const where = [folder.account, folder.parent].filter(Boolean).join(" / ");
+      const matches =
+        folder.matchingNoteCount !== undefined
+          ? ` [${folder.matchingNoteCount} note(s)]`
+          : folder.matchingNotesError
+            ? ` [notes unavailable: ${folder.matchingNotesError}]`
+            : "";
+      return `  - ${folder.name ?? "(untitled)"}${where ? ` (${where})` : ""}: ${prefix}${rules || "(no rules)"}${matches}`;
+    });
+    return successResponse(
+      `Found ${folders.length} smart folder(s):\n${lines.join("\n")}${
+        fullyDecoded ? "" : '\n\nSome rules were not recognized; see filters of type "unknown".'
+      }`,
+      {
+        smartFolders: folders as unknown as Array<Record<string, unknown>>,
+        count: folders.length,
+        fullyDecoded,
+      }
+    );
+  }, "Error listing smart folders")
+);
+
 // --- create-folder ---
 
 registerTool(

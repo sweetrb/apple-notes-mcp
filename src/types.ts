@@ -788,3 +788,76 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+/**
+ * How a smart folder's top-level filters combine: every filter ("all"), at
+ * least one ("any"), or none of them ("none").
+ */
+export type SmartFolderMatch = "all" | "any" | "none";
+
+/**
+ * One decoded smart folder filter.
+ *
+ * `type` is the stored clause key (for example `folder`, `tag`, `checklist`,
+ * `creationDateRelativeRange`), `"group"` for a nested all/any group, or
+ * `"unknown"` for a clause this server does not recognize (kept verbatim in
+ * `value`). `excluded` marks a negated filter.
+ */
+export interface SmartFolderFilter {
+  type: string;
+  /** Stored value of the clause */
+  value?: unknown;
+  /** Stored clause key, set only for `unknown` filters */
+  key?: string;
+  /** True when the filter is negated (an Exclude rule) */
+  excluded?: boolean;
+  /** Human-readable summary of the filter */
+  description: string;
+  /** Display name: folder title, tag display text, or attachment category */
+  name?: string;
+  /** CoreData id of a referenced folder (folder filters) */
+  folderId?: string;
+  /** ISO 8601 bounds of an absolute date range */
+  from?: string;
+  to?: string;
+  /** How a nested group's filters combine */
+  match?: "all" | "any";
+  /** Filters of a nested group */
+  filters?: SmartFolderFilter[];
+}
+
+/**
+ * A smart folder read from the NoteStore database.
+ */
+export interface SmartFolder {
+  /** CoreData id (x-coredata://…/ICFolder/pN) */
+  id: string;
+  /** Stable CloudKit identifier (ZIDENTIFIER) */
+  identifier: string | null;
+  name: string | null;
+  account: string | null;
+  /** CoreData id of the owning account */
+  accountId: string | null;
+  accountIdentifier: string | null;
+  /** Parent folder name; null at the account root */
+  parent: string | null;
+  parentId: string | null;
+  parentIdentifier: string | null;
+  /** How the top-level filters combine; null when no query is stored */
+  match: SmartFolderMatch | null;
+  filters: SmartFolderFilter[];
+  /** From the stored wrapper: false when Recently Deleted is excluded */
+  includesRecentlyDeleted?: boolean;
+  /** False when a clause was not recognized or the query could not be parsed */
+  fullyDecoded: boolean;
+  /** Stored query with the outer `deleted` wrapper removed */
+  query: unknown;
+  /** Stored query JSON, verbatim */
+  rawQuery: string | null;
+  /** Notes Notes.app lists in this smart folder (only when requested) */
+  matchingNotes?: Array<{ title: string; id: string }>;
+  /** Total notes Notes.app lists in this smart folder (only when requested) */
+  matchingNoteCount?: number;
+  /** Why matching notes could not be listed (only when requested) */
+  matchingNotesError?: string;
+}

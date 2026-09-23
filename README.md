@@ -756,6 +756,47 @@ Lists all folders in an account with full hierarchical paths.
 
 ---
 
+#### `list-smart-folders`
+
+Lists every Smart Folder with the rules that define it, read from the NoteStore
+database. Requires Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `includeMatchingNotes` | boolean | No | Also list the notes each smart folder currently shows (default `false`) |
+| `limit` | number | No | Maximum matching notes per folder, 1–500 (default 50). `matchingNoteCount` is always the total |
+
+**Example:**
+```json
+{
+  "includeMatchingNotes": true,
+  "limit": 20
+}
+```
+
+**Returns:** For each smart folder: `name`, `id`, `identifier`, `account`,
+`accountId`, `accountIdentifier`, `parent`, `parentId`, and `parentIdentifier`
+(the parent fields are `null` at the account root). Its rules are decoded as
+`match` (`"all"`, `"any"`, or `"none"`) and `filters`. Each filter has a `type`
+(the stored rule key, such as `folder`, `tag`, `checklist`, or
+`creationDateRelativeRange`), its stored `value`, `excluded` for an Exclude
+rule, and a readable `description`. Folder filters add the folder's `name` and
+`folderId`, and a nested rule group is a filter of type `group` with its own
+`match` and `filters`. Notes stores each query inside an outer
+`{"deleted": false}` wrapper that keeps Recently Deleted out. `query` is the
+stored query with that wrapper removed, `includesRecentlyDeleted` reports the
+wrapper's value, and `rawQuery` is the stored JSON verbatim. A rule this server
+does not recognize is kept as a filter of type `unknown`, and `fullyDecoded` is
+then `false`.
+
+With `includeMatchingNotes`, each folder also carries `matchingNoteCount` and
+`matchingNotes` (`title` and `id`). These come from Notes.app itself, which
+evaluates the folder's rules, so they need Automation permission. The server
+does not re-evaluate the rules on its own. A folder whose notes cannot be read
+carries `matchingNotesError` instead.
+
+---
+
 #### `create-folder`
 
 Creates a new folder, including a whole nested hierarchy in one call.

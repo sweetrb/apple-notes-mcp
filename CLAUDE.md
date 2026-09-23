@@ -147,6 +147,13 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
+### list-smart-folders
+- Read-only; reads the NoteStore database, so it needs Full Disk Access
+- Each smart folder's rules come back as `match` (`all` / `any` / `none`) plus `filters`; each filter has a readable `description`, and `excluded: true` marks an Exclude rule. Nested rule groups are filters of type `group`
+- `query` is the stored query without Notes' outer `{"deleted": false}` wrapper; `rawQuery` is the stored JSON verbatim
+- **Check `fullyDecoded`.** When false, at least one rule is a filter of type `unknown`; report it from `value` rather than guessing its meaning
+- `includeMatchingNotes: true` asks Notes.app which notes each smart folder currently shows (`matchingNoteCount`, `matchingNotes`, capped by `limit`, default 50). This is Notes' own evaluation, not a re-implementation of the rules
+
 ### search-notes
 - Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive

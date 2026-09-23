@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `list-smart-folders` lists every Smart Folder with its account, parent, and
+  CoreData and stable identifiers, read-only from the NoteStore database. Each
+  folder's stored query is decoded into `match` (`all`, `any`, or `none`) and
+  `filters`, each with a readable `description`; folder rules name the folder
+  they point to, and nested rule groups keep their own `match`. `query` is the
+  stored query without Notes' outer `{"deleted": false}` wrapper,
+  `includesRecentlyDeleted` reports that wrapper, and `rawQuery` is the stored
+  JSON verbatim. Unrecognized rules are kept as `unknown` filters and clear
+  `fullyDecoded`. With `includeMatchingNotes`, the tool also asks Notes.app
+  which notes each smart folder currently shows (`matchingNoteCount` and up to
+  `limit` notes), so membership is Notes' own evaluation of the rules.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
