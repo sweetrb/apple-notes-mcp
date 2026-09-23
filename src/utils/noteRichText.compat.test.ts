@@ -79,12 +79,21 @@ describe("parseRichNote compatibility", () => {
     const outputs = Object.fromEntries(
       Object.entries(corpus).map(([name, bytes]) => {
         const rich = parseRichNote(bytes);
+        // The guards read only each run's start, length and signature. The
+        // decoded paragraphStyle / blockQuote / highlight fields are additive
+        // (derived from bytes the signature already covers), so they are
+        // projected out and the golden values stay the unmodified reader's.
+        const guardRuns = rich.styleRuns?.map(({ start, length, signature }) => ({
+          start,
+          length,
+          signature,
+        }));
         return [
           name,
           {
             revision: rich.revision.slice(0, 16),
-            styleRuns: digest(rich.styleRuns),
-            all: digest(rich),
+            styleRuns: digest(guardRuns),
+            all: digest({ ...rich, styleRuns: guardRuns }),
           },
         ];
       })

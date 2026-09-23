@@ -71,10 +71,18 @@ export function decodeVarint(buf: Uint8Array, offset: number): [number, number] 
  * Iterates through the buffer, decoding tag-value pairs. Unknown wire types
  * cause parsing to stop (returns fields decoded so far).
  *
+ * Fixed-width fields (wire types 1 and 5) are skipped unless `keepFixed` is
+ * set, in which case their raw little-endian bytes are kept as the value (read
+ * a 64-bit float with {@link fixed64Double}).
+ *
  * @param buf - The protobuf binary data
+ * @param options - `keepFixed` keeps 32/64-bit fixed fields instead of skipping them
  * @returns Array of decoded fields in order
  */
-export function decodeMessage(buf: Uint8Array): ProtoField[] {
+export function decodeMessage(
+  buf: Uint8Array,
+  options: { keepFixed?: boolean } = {}
+): ProtoField[] {
   const fields: ProtoField[] = [];
   let offset = 0;
 
@@ -98,12 +106,14 @@ export function decodeMessage(buf: Uint8Array): ProtoField[] {
       const value = buf.slice(offset, offset + length);
       fields.push({ fieldNumber, wireType, value });
       offset += length;
-    } else if (wireType === 5) {
-      // 32-bit fixed — skip 4 bytes
-      offset += 4;
-    } else if (wireType === 1) {
-      // 64-bit fixed — skip 8 bytes
-      offset += 8;
+    } else if (wireType === 5 || wireType === 1) {
+      // 32-bit (wire 5) or 64-bit (wire 1) fixed width
+      const width = wireType === 5 ? 4 : 8;
+      if (offset + width > buf.length) break; // Truncated data
+      if (options.keepFixed) {
+        fields.push({ fieldNumber, wireType, value: buf.slice(offset, offset + width) });
+      }
+      offset += width;
     } else {
       // Unknown wire type — stop parsing
       break;
@@ -167,6 +177,16 @@ export function embeddedMessage(field: ProtoField | undefined): ProtoField[] | u
   const bytes = bytesValue(field);
   if (!bytes) return undefined;
   return decodeMessage(bytes);
+}
+
+/**
+ * Reads a 64-bit fixed field (wire type 1, kept via `keepFixed`) as a
+ * little-endian IEEE 754 double. Returns undefined for any other field shape.
+ */
+export function fixed64Double(field: ProtoField | undefined): number | undefined {
+  if (!field || field.wireType !== 1 || !(field.value instanceof Uint8Array)) return undefined;
+  if (field.value.length !== 8) return undefined;
+  return new DataView(field.value.buffer, field.value.byteOffset, 8).getFloat64(0, true);
 }
 
 /**

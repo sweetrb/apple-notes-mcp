@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { checklistRunLineStart } from "./checklistRuns.js";
 import {
   decodeMessage,
   decodeVarint,
@@ -30,7 +31,20 @@ export interface RichNote {
   nativeTagObjectIds?: Record<string, string[]>;
   objects?: Array<{ id: string; type: string; start: number; length: number }>;
   checklistItems?: Array<{ id: string; text: string; done: boolean; start: number }>;
-  styleRuns?: Array<{ start: number; length: number; signature: string }>;
+  /**
+   * Attribute runs in text order. `signature` is the comparable formatting of
+   * the run; `paragraphStyle` (0 Title, 1 Heading, 2 Subheading, 3 Body,
+   * 4 Monospaced, 100-103 lists), `blockQuote` and `highlight` are decoded
+   * from the same run for callers that check a specific native style.
+   */
+  styleRuns?: Array<{
+    start: number;
+    length: number;
+    signature: string;
+    paragraphStyle?: number;
+    blockQuote?: boolean;
+    highlight?: boolean;
+  }>;
   objectData?: Array<{
     id: string;
     pk: number;
@@ -115,7 +129,13 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
     const length = varintValue(getField(fields, 1));
     if (length === undefined || length < 0 || position + length > text.length)
       throw new Error("Invalid Notes run length");
+    const paragraph = embeddedMessage(getField(fields, 2));
+    // ParagraphStyle field 1 is the style type (absent means Body) and field 8
+    // the block-quote level; attribute-run field 14 is the highlight colour.
     styleRuns.push({
+      paragraphStyle: paragraph ? (varintValue(getField(paragraph, 1)) ?? 3) : 3,
+      blockQuote: Boolean(paragraph && varintValue(getField(paragraph, 8))),
+      highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
       signature: JSON.stringify(
@@ -145,13 +165,13 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
         start: position,
         length,
       });
-    const paragraph = embeddedMessage(getField(fields, 2));
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
-      const start = text.lastIndexOf("\n", position - 1) + 1;
+      // A 27.2-style run can start on the previous line's newline (#187).
+      const start = checklistRunLineStart(text, position, length);
       if (itemId && !checklistItems.some((item) => item.id === itemId))
         checklistItems.push({
           id: itemId,

@@ -12,6 +12,7 @@ import {
   bytesValue,
   stringValue,
   embeddedMessage,
+  fixed64Double,
   WIRE_TYPE,
   decodeVarint64,
   decodeWireFields,
@@ -173,6 +174,36 @@ describe("field accessors", () => {
     expect(nested).toBeDefined();
     expect(nested!).toHaveLength(1);
     expect(varintValue(getField(nested!, 1))).toBe(7);
+  });
+});
+
+describe("fixed-width fields", () => {
+  // field 1 = fixed64 double 1.5, field 2 = fixed32, field 3 = varint 9
+  const double = Buffer.alloc(8);
+  double.writeDoubleLE(1.5);
+  const buf = new Uint8Array([0x09, ...double, 0x15, 1, 2, 3, 4, 0x18, 0x09]);
+
+  it("skips fixed fields by default, as before", () => {
+    const fields = decodeMessage(buf);
+    expect(fields.map((f) => f.fieldNumber)).toEqual([3]);
+  });
+
+  it("keeps fixed fields with keepFixed and reads a double", () => {
+    const fields = decodeMessage(buf, { keepFixed: true });
+    expect(fields.map((f) => [f.fieldNumber, f.wireType])).toEqual([
+      [1, 1],
+      [2, 5],
+      [3, 0],
+    ]);
+    expect(fixed64Double(getField(fields, 1))).toBe(1.5);
+    expect(fixed64Double(getField(fields, 2))).toBeUndefined();
+    expect(fixed64Double(getField(fields, 3))).toBeUndefined();
+  });
+
+  it("stops at a truncated fixed field", () => {
+    expect(decodeMessage(new Uint8Array([0x18, 0x01, 0x09, 1, 2]), { keepFixed: true })).toEqual([
+      { fieldNumber: 3, wireType: 0, value: 1 },
+    ]);
   });
 });
 
