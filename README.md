@@ -1203,10 +1203,10 @@ then repeat the same guards with `dryRun: false` and the returned `revision`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | Exact folder id (`x-coredata://…/ICFolder/pN`) |
+| `id` | string | Yes | Exact folder id (`x-coredata://…/ICFolder/pN`), or the folder's Notes UUID or numeric key |
 | `expectedName` | string | Yes | Current folder name (not a path), matched case-sensitively |
 | `expectedAccountId` | string | Yes | Owning account id (`x-coredata://…/ICAccount/pN`) |
-| `expectedParentId` | string | One of these two | Current parent folder id |
+| `expectedParentId` | string | One of these two | Current parent folder id (same forms as `id`) |
 | `expectedRoot` | `true` | One of these two | The folder sits at the account root |
 | `dryRun` | boolean | Yes | `true` plans; `false` applies |
 | `expectedRevision` | string | On apply | The `revision` from the dry run |
@@ -1235,6 +1235,11 @@ AppleScript delete. The name, parent, account, sharing, and emptiness checks
 repeat inside the delete script, but the folder type and stable identifier come
 from the local Notes database just before it. It needs Full Disk Access and
 fails closed without it.
+
+**Errors** carry the standard `code`: `revision_conflict` (a `Conflict:` message;
+read and plan again), `unsupported` (a `Refused:` message), `verification_failed`
+with `indeterminate: true` (read the folder before any retry), and
+`full_disk_access_missing`.
 
 ---
 
