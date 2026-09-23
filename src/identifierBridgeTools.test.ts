@@ -24,6 +24,7 @@ const sqlite = vi.hoisted(() => ({ mode: "ok" as "ok" | "no_fda", calls: [] as s
 const manager = vi.hoisted(() => ({
   getNoteById: vi.fn(),
   listNoteRefs: vi.fn(),
+  listNoteRefsDetailed: vi.fn(),
   listFolders: vi.fn(),
   listAccounts: vi.fn(),
 }));
@@ -280,10 +281,13 @@ describe("list and read tools add stable identifiers", () => {
   });
 
   it("list-notes enriches every row with one batched query", async () => {
-    manager.listNoteRefs.mockReturnValue([
-      { title: "a", id: NOTE_ID },
-      { title: "b", id: `x-coredata://${STORE}/ICNote/p7` },
-    ]);
+    manager.listNoteRefsDetailed.mockReturnValue({
+      refs: [
+        { title: "a", id: NOTE_ID },
+        { title: "b", id: `x-coredata://${STORE}/ICNote/p7` },
+      ],
+      excludedRecentlyDeleted: 0,
+    });
     const response = await registered.get("list-notes")!.cb({});
     const notes = response.structuredContent?.notes as Array<Record<string, unknown>>;
     expect(notes[0]).toMatchObject({ id: NOTE_ID, identifier: NOTE_UUID });
@@ -305,7 +309,7 @@ describe("list and read tools add stable identifiers", () => {
   it("returns the same rows unchanged when the database is unreadable", async () => {
     sqlite.mode = "no_fda";
     const rows = [{ title: "a", id: NOTE_ID }];
-    manager.listNoteRefs.mockReturnValue(rows);
+    manager.listNoteRefsDetailed.mockReturnValue({ refs: rows, excludedRecentlyDeleted: 0 });
     const response = await registered.get("list-notes")!.cb({});
     expect(response.isError).toBeFalsy();
     expect(response.structuredContent?.notes).toEqual(rows);

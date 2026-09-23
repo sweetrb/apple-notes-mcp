@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [2.8.39] - 2026-09-23
+
+### Fixed
+
+- `list-notes` no longer returns notes in Recently Deleted as if they were
+  live (#207). Notes.app's account-wide `notes` includes them, so the listing
+  now asks Notes.app for the notes in the Recently Deleted folder in the same
+  script and leaves them out, reporting how many in
+  `excludedRecentlyDeleted`. `includeRecentlyDeleted: true` lists them with
+  `inRecentlyDeleted: true` and a `[RECENTLY DELETED]` marker. Exports and
+  other callers of the shared listing exclude them too.
+- `delete-note` and `batch-delete-notes` refuse a note that is already in
+  Recently Deleted, where deleting it would remove it permanently (#198).
+  The note's folder is read live from Notes.app inside the delete script,
+  not from the database, which can show a just-deleted note in its old folder
+  for several seconds.
+
+### Added
+
+- `src/utils/trashFolders.ts` reads the ids of the Recently Deleted folders
+  from NoteStore read-only (`ZFOLDERTYPE = 1`, or a `TrashFolder` identifier
+  prefix). Without Full Disk Access both fixes fall back to the English
+  folder name "Recently Deleted".
+
 ## [2.8.38] - 2026-09-23
 
 ### Added

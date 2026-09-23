@@ -356,6 +356,11 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
 const NOT_DELETED_MESSAGE =
   "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 
+/** The note is already in Recently Deleted, where a delete is permanent (#198). */
+function inRecentlyDeletedMessage(title: string): string {
+  return `Note "${title}" is already in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Remove it from Recently Deleted in Notes.app if that is intended.`;
+}
+
 function revisionConflictMessage(title: string): string {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
 }
@@ -1996,7 +2001,7 @@ registerTool(
   "delete-note",
   {
     description:
-      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
+      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
@@ -2020,6 +2025,9 @@ registerTool(
     const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
     if (result.status === "conflict") {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+    if (result.status === "in-recently-deleted") {
+      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
     }
     if (result.status === "not-deleted") {
       return errorResponse(NOT_DELETED_MESSAGE);
@@ -2104,7 +2112,7 @@ registerTool(
   "list-notes",
   {
     description:
-      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated — see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: warns if iCloud sync is active and results may be partial.",
+      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated — see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: z.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: z.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
@@ -2116,6 +2124,12 @@ registerTool(
           "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for listing only recent notes in large collections."
         ),
       limit: z.number().int().positive().optional().describe("Maximum number of notes to return"),
+      includeRecentlyDeleted: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also list notes in Recently Deleted, each flagged inRecentlyDeleted (default false)"
+        ),
     },
     outputSchema: {
       notes: z
@@ -2123,6 +2137,7 @@ registerTool(
           z.object({
             title: z.string(),
             id: z.string(),
+            inRecentlyDeleted: z.boolean().optional(),
             identifier: z.string().optional(),
             folderIdentifier: z.string().optional(),
             accountIdentifier: z.string().optional(),
@@ -2130,16 +2145,23 @@ registerTool(
         )
         .optional(),
       count: z.number().optional(),
+      excludedRecentlyDeleted: z.number().optional(),
     },
   },
-  withErrorHandling(({ account, folder, modifiedSince, limit }) => {
+  withErrorHandling(({ account, folder, modifiedSince, limit, includeRecentlyDeleted }) => {
     // Use sync-aware wrapper for this read operation
     const {
-      result: notes,
+      result: { refs: notes, excludedRecentlyDeleted },
       syncBefore,
       syncInterference,
     } = withSyncAwarenessSync("list-notes", () =>
-      notesManager.listNoteRefs(account, folder, modifiedSince, limit)
+      notesManager.listNoteRefsDetailed(
+        account,
+        folder,
+        modifiedSince,
+        limit,
+        includeRecentlyDeleted ?? false
+      )
     );
 
     // Build context string for the response
@@ -2157,18 +2179,26 @@ registerTool(
       syncWarnings.push(`Results may be incomplete.`);
     }
     const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
+    const trashNote =
+      excludedRecentlyDeleted > 0
+        ? `\n\nSkipped ${excludedRecentlyDeleted} note(s) in Recently Deleted; pass includeRecentlyDeleted: true to list them.`
+        : "";
+    const trashData = excludedRecentlyDeleted > 0 ? { excludedRecentlyDeleted } : {};
 
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`, {
+      return successResponse(`No notes found${location}${acct}${dateInfo}${trashNote}${syncNote}`, {
         notes: [],
         count: 0,
+        ...trashData,
       });
     }
 
-    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
+    const noteList = notes
+      .map((n) => `  - ${n.title}${n.inRecentlyDeleted ? " [RECENTLY DELETED]" : ""} [id: ${n.id}]`)
+      .join("\n");
     return successResponse(
-      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
-      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
+      `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${trashNote}${syncNote}`,
+      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length, ...trashData }
     );
   }, "Error listing notes")
 );
@@ -2836,7 +2866,7 @@ registerTool(
   "batch-delete-notes",
   {
     description:
-      "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
+      "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict. A note already in Recently Deleted is refused, since deleting it there would be permanent.",
     inputSchema: {
       notes: z
         .array(
@@ -2872,6 +2902,9 @@ registerTool(
       if (result.status === "deleted") return { id, success: true };
       if (result.status === "conflict") {
         return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
+      }
+      if (result.status === "in-recently-deleted") {
+        return { id, success: false, error: inRecentlyDeletedMessage(snapshot.note.title) };
       }
       if (result.status === "not-deleted")
         return { id, success: false, error: NOT_DELETED_MESSAGE };

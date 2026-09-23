@@ -12,6 +12,7 @@ const manager = vi.hoisted(() => ({
   getNoteById: vi.fn(),
   getNoteContentById: vi.fn(),
   deleteNoteByIdIfUnchanged: vi.fn(),
+  listNoteRefsDetailed: vi.fn(),
 }));
 
 vi.mock(import("@modelcontextprotocol/sdk/server/mcp.js"), async (importOriginal) => ({
@@ -378,5 +379,82 @@ describe("delete-note placement check", () => {
     })) as Response;
     expect(response.isError).toBe(true);
     expect(response.content[0].text).toMatch(/still in its original folder.*Nothing was deleted/);
+  });
+});
+
+describe("Recently Deleted handling (#198, #207)", () => {
+  const id = "x-coredata://ABCDEF/ICNote/p8";
+
+  it("delete-note refuses a note already in Recently Deleted", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "in-recently-deleted" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(
+      /"Old" is already in Recently Deleted.*permanently.*Nothing was deleted/
+    );
+  });
+
+  it("batch-delete-notes refuses a note already in Recently Deleted", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "in-recently-deleted" });
+    const response = (await registered.get("batch-delete-notes")!({
+      notes: [{ id, expectedContentHash: "sha256:plain" }],
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/0 succeeded, 1 failed/);
+    expect(response.content[0].text).toMatch(/already in Recently Deleted/);
+  });
+
+  it("list-notes excludes Recently Deleted by default and reports the skip", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({
+      refs: [{ title: "Live", id }],
+      excludedRecentlyDeleted: 2,
+    });
+    const response = (await registered.get("list-notes")!({})) as Response;
+    expect(manager.listNoteRefsDetailed).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false
+    );
+    expect(response.structuredContent?.excludedRecentlyDeleted).toBe(2);
+    expect(response.content[0].text).toMatch(/Skipped 2 note\(s\) in Recently Deleted/);
+  });
+
+  it("list-notes reports the skip even when nothing else is listed", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({ refs: [], excludedRecentlyDeleted: 1 });
+    const response = (await registered.get("list-notes")!({
+      folder: "Recently Deleted",
+    })) as Response;
+    expect(response.structuredContent).toMatchObject({ count: 0, excludedRecentlyDeleted: 1 });
+    expect(response.content[0].text).toMatch(/No notes found.*\n\nSkipped 1 note/s);
+  });
+
+  it("list-notes flags Recently Deleted notes when asked to include them", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({
+      refs: [{ title: "Gone", id, inRecentlyDeleted: true }],
+      excludedRecentlyDeleted: 0,
+    });
+    const response = (await registered.get("list-notes")!({
+      includeRecentlyDeleted: true,
+    })) as Response;
+    expect(manager.listNoteRefsDetailed).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    const notes = response.structuredContent?.notes as Array<Record<string, unknown>>;
+    expect(notes[0]).toMatchObject({ id, inRecentlyDeleted: true });
+    expect(response.content[0].text).toContain("Gone [RECENTLY DELETED]");
+    expect(response.structuredContent).not.toHaveProperty("excludedRecentlyDeleted");
   });
 });

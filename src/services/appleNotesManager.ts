@@ -48,6 +48,7 @@ import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
 import { collectNoteTables } from "@/utils/tableMarkdown.js";
 import { readSmartFolders } from "@/utils/smartFolders.js";
+import { readTrashFolderIds, RECENTLY_DELETED_FOLDER_NAME } from "@/utils/trashFolders.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -99,6 +100,58 @@ const FIELD_SEP = "\x1f";
 const RECORD_SEP = "\x1e";
 const AS_FIELD_SEP = "(character id 31)";
 const AS_RECORD_SEP = "(character id 30)";
+// Group separator: splits a bulk listing from the trailing list of note ids
+// found in Recently Deleted (#207).
+const GROUP_SEP = "\x1d";
+const AS_GROUP_SEP = "(character id 29)";
+
+/** One note from a bulk listing. */
+export interface NoteListRef {
+  title: string;
+  id: string;
+  /** Present (true) only for a note in Recently Deleted, when those are included. */
+  inRecentlyDeleted?: boolean;
+}
+
+/** A bulk listing plus how many Recently Deleted notes it skipped. */
+export interface NoteListResult {
+  refs: NoteListRef[];
+  excludedRecentlyDeleted: number;
+}
+
+/** Folder ids from the database are interpolated, so only exact Core Data ids pass. */
+const FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+
+/**
+ * AppleScript list literal of the Recently Deleted folder ids known to the
+ * database; `{}` when none are known (no Full Disk Access).
+ */
+function trashFolderIdList(): string {
+  const ids = readTrashFolderIds().filter((id) => FOLDER_ID_PATTERN.test(id));
+  return `{${ids.map((id) => `"${id}"`).join(", ")}}`;
+}
+
+/**
+ * AppleScript that sets `__trashNoteIds` to the ids of every note Notes.app
+ * currently shows in Recently Deleted, within the enclosing tell target (an
+ * account). The folder is found by its database id and, as a fallback that
+ * needs no Full Disk Access, by its English name. Each lookup is guarded, so
+ * an account without a trash folder contributes nothing. (#207)
+ */
+function buildTrashNoteIdsCollector(): string {
+  return `
+        set __trashNoteIds to {}
+        repeat with __trashFolderId in ${trashFolderIdList()}
+          try
+            set __trashNoteIds to __trashNoteIds & (id of notes of folder id (contents of __trashFolderId))
+          end try
+        end repeat
+        try
+          repeat with __trashFolder in (every folder whose name is "${RECENTLY_DELETED_FOLDER_NAME}")
+            set __trashNoteIds to __trashNoteIds & (id of notes of __trashFolder)
+          end repeat
+        end try`;
+}
 
 // =============================================================================
 // Export paging (#162)
@@ -1530,10 +1583,16 @@ export class AppleNotesManager {
   deleteNoteByIdIfUnchanged(
     id: string,
     expectedBody: string
-  ): { status: "deleted" | "conflict" | "not-deleted" | "failed" } {
+  ): { status: "deleted" | "conflict" | "not-deleted" | "in-recently-deleted" | "failed" } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    // Deleting a note that is already in Recently Deleted removes it for good,
+    // so the script refuses one whose folder is Recently Deleted (#198). The
+    // folder is read from Notes.app in the same script, not from the database,
+    // which can still show a just-deleted note in its old folder; the database
+    // only supplies which folder ids are Recently Deleted.
+    //
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
     // was not moved to Recently Deleted and must not be reported as deleted.
@@ -1543,6 +1602,16 @@ export class AppleNotesManager {
       try
         set originalFolder to container of noteRef
       end try
+      if originalFolder is not missing value then
+        set __inTrash to false
+        try
+          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+        end try
+        try
+          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+        end try
+        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      end if
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
@@ -1563,6 +1632,7 @@ export class AppleNotesManager {
     }
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
@@ -1589,14 +1659,20 @@ export class AppleNotesManager {
    *   dateSetup: a date filter must scan every note's date). The script then
    *   returns the total note count as a leading record so the caller can
    *   detect a dedup shortfall and fall back to a full fetch.
+   * @param trashCheck - Also return the ids of notes in Recently Deleted,
+   *   after a group separator, so the caller can exclude or flag them (#207).
+   *   Only valid inside an account-scoped script.
    */
   private buildBulkListCommand(opts: {
     folderRef?: string;
     dateSetup?: string;
     sliceLimit?: number;
+    trashCheck?: boolean;
   }): string {
-    const { folderRef, dateSetup, sliceLimit } = opts;
+    const { folderRef, dateSetup, sliceLimit, trashCheck } = opts;
     const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const trashSetup = trashCheck ? `${buildTrashNoteIdsCollector()}\n` : "";
+    const trashSuffix = trashCheck ? ` & ${AS_GROUP_SEP} & (__trashNoteIds as text)` : "";
     const countGuard = (listVar: string) =>
       `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
 
@@ -1617,7 +1693,7 @@ export class AppleNotesManager {
       const slicedSource = folderRef
         ? `(notes 1 thru fetchCount of ${folderRef})`
         : `(notes 1 thru fetchCount)`;
-      return `
+      return `${trashSetup}
         set totalCount to count of ${fullSource}
         set fetchCount to ${sliceLimit}
         if fetchCount > totalCount then set fetchCount to totalCount
@@ -1644,7 +1720,7 @@ export class AppleNotesManager {
           end repeat
         end if
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)${trashSuffix}
       `;
     }
 
@@ -1661,7 +1737,7 @@ export class AppleNotesManager {
       ? `if (item i of noteDates) >= thresholdDate then\n            `
       : "";
     const dateGuardClose = dateSetup ? `\n          end if` : "";
-    return `
+    return `${trashSetup}
         ${dateSetup ?? ""}set noteNames to name of ${fullSource}
         set noteIds to id of ${fullSource}
         ${dateFetch}${countGuard("noteIds")}
@@ -1670,7 +1746,7 @@ export class AppleNotesManager {
           ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
+        return (resultList as text)${trashSuffix}
       `;
   }
 
@@ -1740,19 +1816,61 @@ export class AppleNotesManager {
    * after dedup so duplicates never count against it.
    */
   private parseBulkListOutput(output: string, safeLimit?: number): { title: string; id: string }[] {
-    if (!output.trim()) return [];
+    return this.parseBulkListRecords(output, safeLimit).refs;
+  }
+
+  /**
+   * Splits a trash-checked listing (see buildBulkListCommand's trashCheck)
+   * into the listing records and the set of note ids in Recently Deleted.
+   * Output without the group separator carries no trash information (null).
+   */
+  private splitTrashIds(output: string): { records: string; trashIds: Set<string> | null } {
+    const idx = output.lastIndexOf(GROUP_SEP);
+    if (idx === -1) return { records: output, trashIds: null };
+    const trashIds = new Set(
+      output
+        .slice(idx + 1)
+        .split(RECORD_SEP)
+        .map((id) => id.trim())
+        .filter(Boolean)
+    );
+    return { records: output.slice(0, idx), trashIds };
+  }
+
+  /**
+   * Parses bulk listing records, deduplicated by id. Notes whose id is in
+   * `trash.ids` are dropped (and counted) unless `trash.include`, in which
+   * case they are kept and flagged `inRecentlyDeleted`. The limit applies
+   * after both dedup and trash filtering.
+   */
+  private parseBulkListRecords(
+    output: string,
+    safeLimit?: number,
+    trash?: { ids: Set<string> | null; include: boolean }
+  ): { refs: NoteListRef[]; excludedRecentlyDeleted: number } {
+    const refs: NoteListRef[] = [];
+    let excludedRecentlyDeleted = 0;
+    if (!output.trim()) return { refs, excludedRecentlyDeleted };
     const seenIds = new Set<string>();
-    const refs: { title: string; id: string }[] = [];
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
       seenIds.add(noteId);
-      refs.push({ title: title.trim(), id: noteId });
+      const trashed = trash?.ids?.has(noteId) ?? false;
+      if (trashed && !trash?.include) {
+        excludedRecentlyDeleted++;
+        continue;
+      }
+      refs.push(
+        trashed
+          ? { title: title.trim(), id: noteId, inRecentlyDeleted: true }
+          : { title: title.trim(), id: noteId }
+      );
       if (safeLimit !== undefined && refs.length >= safeLimit) break;
     }
-    return refs;
+    return { refs, excludedRecentlyDeleted };
   }
 
   /**
@@ -1765,8 +1883,9 @@ export class AppleNotesManager {
     account?: string,
     folder?: string,
     modifiedSince?: string,
-    limit?: number
-  ): { title: string; id: string }[] {
+    limit?: number,
+    includeRecentlyDeleted = false
+  ): NoteListResult {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== undefined && limit > 0 ? Math.floor(limit) : undefined;
     const folderRef = folder ? buildFolderReference(folder) : undefined;
@@ -1786,32 +1905,44 @@ export class AppleNotesManager {
     if (safeLimit !== undefined && !dateSetup) {
       const script = buildAccountScopedScript(
         { account: targetAccount },
-        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit, trashCheck: true })
       );
       const result = executeAppleScript(script);
       if (!result.success) {
         throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
       }
-      const sepIdx = result.output.indexOf(RECORD_SEP);
-      const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+      const { records: body, trashIds } = this.splitTrashIds(result.output);
+      const sepIdx = body.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? body : body.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
-      const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
-      const refs = this.parseBulkListOutput(records, safeLimit);
-      // A malformed header (NaN) also falls through to the full fetch.
-      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs;
+      const records = sepIdx === -1 ? "" : body.slice(sepIdx + 1);
+      const parsed = this.parseBulkListRecords(records, safeLimit, {
+        ids: trashIds,
+        include: includeRecentlyDeleted,
+      });
+      // A malformed header (NaN) also falls through to the full fetch, as
+      // does a slice thinned by dedup or by Recently Deleted exclusion.
+      if (
+        !Number.isNaN(totalCount) &&
+        (parsed.refs.length >= safeLimit || totalCount <= safeLimit)
+      ) {
+        return parsed;
       }
     }
 
     const script = buildAccountScopedScript(
       { account: targetAccount },
-      this.buildBulkListCommand({ folderRef, dateSetup })
+      this.buildBulkListCommand({ folderRef, dateSetup, trashCheck: true })
     );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    const { records, trashIds } = this.splitTrashIds(result.output);
+    return this.parseBulkListRecords(records, safeLimit, {
+      ids: trashIds,
+      include: includeRecentlyDeleted,
+    });
   }
 
   /**
@@ -1824,7 +1955,7 @@ export class AppleNotesManager {
    * @returns Array of note titles
    */
   listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
-    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs.map((ref) => ref.title);
   }
 
   /**
@@ -1836,6 +1967,9 @@ export class AppleNotesManager {
    * specifier resolves ambiguously to the same one note every time — see
    * the fix in exportNotesAsJson for the failure mode this avoids).
    *
+   * Notes in Recently Deleted are excluded (#207); use
+   * `listNoteRefsDetailed()` to include and flag them.
+   *
    * @returns Array of { title, id } pairs, deduplicated by id
    */
   listNoteRefs(
@@ -1844,7 +1978,24 @@ export class AppleNotesManager {
     modifiedSince?: string,
     limit?: number
   ): { title: string; id: string }[] {
-    return this.listNotesCore(account, folder, modifiedSince, limit);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs;
+  }
+
+  /**
+   * Same as `listNoteRefs()`, plus control over notes in Recently Deleted and
+   * a count of how many were skipped. Notes.app's account-wide `notes`
+   * includes Recently Deleted, so they are excluded unless
+   * `includeRecentlyDeleted`, in which case each is flagged
+   * `inRecentlyDeleted: true`. (#207)
+   */
+  listNoteRefsDetailed(
+    account?: string,
+    folder?: string,
+    modifiedSince?: string,
+    limit?: number,
+    includeRecentlyDeleted = false
+  ): NoteListResult {
+    return this.listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted);
   }
 
   /**

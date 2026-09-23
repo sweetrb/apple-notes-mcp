@@ -3268,8 +3268,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path8) {
-      let input = path8;
+    function removeDotSegments(path9) {
+      let input = path9;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path8 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
+        const path9 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path9 && path9 !== "/" ? path9 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7181,12 +7181,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs8, exportName) {
+    function addFormats(ajv, list, fs9, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs8[f]);
+        ajv.addFormat(f, fs9[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path8) {
-          if (!path8) return path8;
+        function remove_dot_segments(path9) {
+          if (!path9) return path9;
           var output = "";
-          while (path8.length > 0) {
-            if (path8 === "." || path8 === "..") {
-              path8 = "";
+          while (path9.length > 0) {
+            if (path9 === "." || path9 === "..") {
+              path9 = "";
               break;
             }
-            var twochars = path8.substring(0, 2);
-            var threechars = path8.substring(0, 3);
-            var fourchars = path8.substring(0, 4);
+            var twochars = path9.substring(0, 2);
+            var threechars = path9.substring(0, 3);
+            var fourchars = path9.substring(0, 4);
             if (threechars === "../") {
-              path8 = path8.substring(3);
+              path9 = path9.substring(3);
             } else if (twochars === "./") {
-              path8 = path8.substring(2);
+              path9 = path9.substring(2);
             } else if (threechars === "/./") {
-              path8 = "/" + path8.substring(3);
-            } else if (twochars === "/." && path8.length === 2) {
-              path8 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path8.length === 3) {
-              path8 = "/" + path8.substring(4);
+              path9 = "/" + path9.substring(3);
+            } else if (twochars === "/." && path9.length === 2) {
+              path9 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path9.length === 3) {
+              path9 = "/" + path9.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path8.match(/(\/?([^\/]*))/)[0];
+              var segment = path9.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path8 = path8.substring(segment.length);
+              path9 = path9.substring(segment.length);
             }
           }
           return output;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join22(output, replacement);
+        return join23(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join22(output, rule.append(self.options));
+          output = join23(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join22(output, replacement) {
+    function join23(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path8, errorMaps, issueData } = params;
-  const fullPath = [...path8, ...issueData.path || []];
+  const { data, path: path9, errorMaps, issueData } = params;
+  const fullPath = [...path9, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path8, key) {
+  constructor(parent, value, path9, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path8;
+    this._path = path9;
     this._key = key;
   }
   get path() {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path8) {
-  if (!path8)
+function getElementAtPath(obj, path9) {
+  if (!path9)
     return obj;
-  return path8.reduce((acc, key) => acc?.[key], obj);
+  return path9.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path8, issues) {
+function prefixIssues(path9, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path8);
+    iss.path.unshift(path9);
     return iss;
   });
 }
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path8) {
-  if (path8.length === 0) {
+function getDotPath(path9) {
+  if (path9.length === 0) {
     return "object root";
   }
-  return path8.reduce((acc, seg, index) => {
+  return path9.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -39452,9 +39452,9 @@ function queryNoteData(noteId3) {
     return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
-  const query = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
+  const query2 = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
   try {
-    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
+    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query2], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -40713,7 +40713,7 @@ function decodeSmartFolderQuery(raw, context = {}) {
       inner = type.and.filter((clause) => !isDeletedWrapper(clause));
     }
   }
-  const query = inner.length === 1 ? inner[0] : { and: inner };
+  const query2 = inner.length === 1 ? inner[0] : { and: inner };
   let match = "all";
   let filters;
   const only = inner.length === 1 && isClause(inner[0]) ? inner[0] : void 0;
@@ -40732,7 +40732,7 @@ function decodeSmartFolderQuery(raw, context = {}) {
   return {
     match,
     filters,
-    query,
+    query: query2,
     ...includesRecentlyDeleted === void 0 ? {} : { includesRecentlyDeleted },
     fullyDecoded: decoder.fullyDecoded
   };
@@ -40854,11 +40854,55 @@ function readSmartFolders(dbPath2 = NOTES_DB_PATH3) {
   }
 }
 
+// src/utils/trashFolders.ts
+import { execFileSync as execFileSync6 } from "child_process";
+import * as fs3 from "fs";
+import * as os3 from "os";
+import * as path3 from "path";
+var NOTES_DB_PATH4 = path3.join(
+  os3.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var RECENTLY_DELETED_FOLDER_NAME = "Recently Deleted";
+var CACHE_TTL_MS = 5 * 60 * 1e3;
+var cache = null;
+function query(dbPath2, sql) {
+  return execFileSync6("sqlite3", ["-readonly", dbPath2, sql], {
+    encoding: "utf8",
+    timeout: 5e3,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function readTrashFolderIds(dbPath2 = NOTES_DB_PATH4) {
+  if (cache && cache.dbPath === dbPath2 && Date.now() - cache.at < CACHE_TTL_MS) {
+    return cache.ids;
+  }
+  try {
+    if (!fs3.existsSync(dbPath2)) return [];
+    const columns = new Set(
+      query(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
+    );
+    const predicates = [];
+    if (columns.has("ZFOLDERTYPE")) predicates.push("COALESCE(ZFOLDERTYPE, 0) = 1");
+    if (columns.has("ZIDENTIFIER"))
+      predicates.push("COALESCE(ZIDENTIFIER, '') LIKE 'TrashFolder%'");
+    if (!predicates.length) return [];
+    const sql = `SELECT (SELECT Z_UUID FROM Z_METADATA LIMIT 1); SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder') AND (${predicates.join(" OR ")}) ORDER BY Z_PK;`;
+    const [uuid2, ...pks] = query(dbPath2, sql).split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!uuid2 || !/^[0-9A-F-]+$/i.test(uuid2)) return [];
+    const ids = pks.filter((pk) => /^\d+$/.test(pk)).map((pk) => `x-coredata://${uuid2}/ICFolder/p${pk}`);
+    cache = { dbPath: dbPath2, at: Date.now(), ids };
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
 // src/utils/attachmentFs.ts
 import {
   closeSync,
   constants,
-  existsSync as existsSync3,
+  existsSync as existsSync4,
   fstatSync,
   lstatSync,
   mkdirSync,
@@ -40869,11 +40913,11 @@ import {
   rmSync,
   statSync
 } from "fs";
-import { dirname, isAbsolute, join as join5, relative, resolve, sep } from "path";
-import { homedir as homedir5, tmpdir } from "os";
+import { dirname, isAbsolute, join as join6, relative, resolve, sep } from "path";
+import { homedir as homedir6, tmpdir } from "os";
 function allowedSaveRoots() {
   return [
-    resolve(homedir5()),
+    resolve(homedir6()),
     resolve(tmpdir()),
     "/Volumes",
     "/private/var/folders",
@@ -40881,8 +40925,8 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path8) {
-  return realpathSync.native(path8);
+function canonicalize(path9) {
+  return realpathSync.native(path9);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -40904,9 +40948,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path8) {
+function entryExists(path9) {
   try {
-    lstatSync(path8);
+    lstatSync(path9);
     return true;
   } catch (e) {
     const code = e.code;
@@ -40947,7 +40991,7 @@ function assertSafeSavePath(p, roots = allowedSaveRoots()) {
   if (suffix.split(sep).includes("..")) {
     throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
   }
-  const canonicalDest = suffix ? join5(canonicalAncestor, suffix) : canonicalAncestor;
+  const canonicalDest = suffix ? join6(canonicalAncestor, suffix) : canonicalAncestor;
   const allowed = canonicalRoots(roots);
   if (!isWithinRoots(canonicalAncestor, allowed) || !isWithinRoots(canonicalDest, allowed)) {
     throw new Error(
@@ -41031,13 +41075,13 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
 }
 function cleanupTempDir(dir) {
   try {
-    if (existsSync3(dir)) rmSync(dir, { recursive: true, force: true });
+    if (existsSync4(dir)) rmSync(dir, { recursive: true, force: true });
   } catch {
   }
 }
 
 // src/utils/paperAttachments.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync8 } from "node:child_process";
 import {
   closeSync as closeSync3,
   constants as constants3,
@@ -41050,10 +41094,10 @@ import {
   unlinkSync as unlinkSync2,
   writeSync as writeSync2
 } from "node:fs";
-import { basename as basename2, dirname as dirname3, extname as extname2, join as join7 } from "node:path";
+import { basename as basename2, dirname as dirname3, extname as extname2, join as join8 } from "node:path";
 
 // src/utils/attachmentAssets.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
+import { execFileSync as execFileSync7 } from "node:child_process";
 import {
   closeSync as closeSync2,
   constants as constants2,
@@ -41067,11 +41111,11 @@ import {
   unlinkSync,
   writeSync
 } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { basename, dirname as dirname2, extname, isAbsolute as isAbsolute2, join as join6, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { basename, dirname as dirname2, extname, isAbsolute as isAbsolute2, join as join7, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
 import { gunzipSync as gunzipSync5 } from "node:zlib";
-var NOTES_CONTAINER_DIR = join6(
-  homedir6(),
+var NOTES_CONTAINER_DIR = join7(
+  homedir7(),
   "Library/Group Containers/group.com.apple.notes"
 );
 var AttachmentStoreError = class extends Error {
@@ -41176,7 +41220,7 @@ function buildAttachmentRowsSql(notePk, columns) {
 }
 function runSqlite3(dbPath2, sql) {
   try {
-    return execFileSync6("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+    return execFileSync7("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 1e4,
       maxBuffer: 128 * 1024 * 1024,
@@ -41244,7 +41288,7 @@ function attachmentOrderFromNoteData(hex3) {
     return null;
   }
 }
-function readNoteAttachmentRows(noteId3, dbPath2 = join6(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+function readNoteAttachmentRows(noteId3, dbPath2 = join7(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
   const columnList = runSqlite3(
     dbPath2,
@@ -41274,24 +41318,24 @@ function safeComponent(value) {
   if (value === "." || value === ".." || value.includes("/") || value.includes("\0")) return null;
   return value;
 }
-function realInside(path8, rootReal) {
+function realInside(path9, rootReal) {
   try {
-    const real = realpathSync2.native(path8);
+    const real = realpathSync2.native(path9);
     return real === rootReal || real.startsWith(rootReal + sep2) ? real : null;
   } catch {
     return null;
   }
 }
-function isRegularFile(path8) {
+function isRegularFile(path9) {
   try {
-    return lstatSync2(path8).isFile();
+    return lstatSync2(path9).isFile();
   } catch {
     return false;
   }
 }
-function isDirectory(path8) {
+function isDirectory(path9) {
   try {
-    return lstatSync2(path8).isDirectory();
+    return lstatSync2(path9).isDirectory();
   } catch {
     return false;
   }
@@ -41305,7 +41349,7 @@ function boundedEntries(dir, limit) {
   }
 }
 function resolveAccountDir(containerDir, accountIdentifier) {
-  const accountsDir = join6(containerDir, "Accounts");
+  const accountsDir = join7(containerDir, "Accounts");
   let accountsReal;
   try {
     accountsReal = realpathSync2.native(accountsDir);
@@ -41314,14 +41358,14 @@ function resolveAccountDir(containerDir, accountIdentifier) {
   }
   const account = safeComponent(accountIdentifier);
   if (account) {
-    const dir = realInside(join6(accountsReal, account), accountsReal);
+    const dir = realInside(join7(accountsReal, account), accountsReal);
     if (dir && isDirectory(dir)) return dir;
   }
   const entries2 = (boundedEntries(accountsReal, 64) ?? []).filter(
-    (e) => isDirectory(join6(accountsReal, e))
+    (e) => isDirectory(join7(accountsReal, e))
   );
   if (entries2.length !== 1) return null;
-  return realInside(join6(accountsReal, entries2[0]), accountsReal);
+  return realInside(join7(accountsReal, entries2[0]), accountsReal);
 }
 function generationRank(name) {
   const m = /^(\d+)_/.exec(name);
@@ -41329,23 +41373,23 @@ function generationRank(name) {
 }
 function generationDirs(base, accountDir) {
   const entries2 = boundedEntries(base, MAX_GENERATION_DIRS) ?? [];
-  return entries2.map((e) => realInside(join6(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
+  return entries2.map((e) => realInside(join7(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
 }
 function fallbackFiles(accountDir, rootName, identifier, generation, names) {
-  const base = join6(accountDir, rootName, identifier);
+  const base = join7(accountDir, rootName, identifier);
   const found = [];
   const add = (candidate) => {
     const real = realInside(candidate, accountDir);
     if (real && isRegularFile(real) && !found.includes(real)) found.push(real);
   };
   const gen = safeComponent(generation);
-  if (gen) for (const name of names) add(join6(base, gen, name));
+  if (gen) for (const name of names) add(join7(base, gen, name));
   if (isDirectory(base)) {
     for (const dir of generationDirs(base, accountDir))
-      for (const name of names) add(join6(dir, name));
-    for (const name of names) add(join6(base, name));
+      for (const name of names) add(join7(dir, name));
+    for (const name of names) add(join7(base, name));
   }
-  for (const name of names) add(join6(accountDir, rootName, `${identifier}${extname(name)}`));
+  for (const name of names) add(join7(accountDir, rootName, `${identifier}${extname(name)}`));
   return found;
 }
 function previewPixelArea(name) {
@@ -41357,7 +41401,7 @@ function previewFileInBundle(bundle, accountDir) {
   const direct = [];
   const nested = [];
   for (const entry of boundedEntries(bundle, MAX_BUNDLE_ENTRIES) ?? []) {
-    const child = realInside(join6(bundle, entry), accountDir);
+    const child = realInside(join7(bundle, entry), accountDir);
     if (!child) continue;
     if (isRegularFile(child)) direct.push(child);
     else if (isDirectory(child)) nested.push(child);
@@ -41365,14 +41409,14 @@ function previewFileInBundle(bundle, accountDir) {
   nested.sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
   const pick2 = (files) => files.find((f) => basename(f) === "Preview.png") ?? files.find((f) => PREVIEW_IMAGE_SUFFIXES.has(extname(f).toLowerCase())) ?? null;
   for (const dir of nested) {
-    const files = (boundedEntries(dir, MAX_BUNDLE_ENTRIES) ?? []).map((e) => realInside(join6(dir, e), accountDir)).filter((p) => p !== null && isRegularFile(p));
+    const files = (boundedEntries(dir, MAX_BUNDLE_ENTRIES) ?? []).map((e) => realInside(join7(dir, e), accountDir)).filter((p) => p !== null && isRegularFile(p));
     const chosen = pick2(files);
     if (chosen) return chosen;
   }
   return pick2(direct);
 }
 function listPreviewEntries(accountDir) {
-  return boundedEntries(join6(accountDir, "Previews"), MAX_PREVIEW_DIR_ENTRIES) ?? [];
+  return boundedEntries(join7(accountDir, "Previews"), MAX_PREVIEW_DIR_ENTRIES) ?? [];
 }
 function previewPaths(accountDir, identifier, entries2) {
   const id2 = safeComponent(identifier);
@@ -41384,7 +41428,7 @@ function previewPaths(accountDir, identifier, entries2) {
   }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
   const files = [];
   for (const name of candidates) {
-    const real = realInside(join6(accountDir, "Previews", name), accountDir);
+    const real = realInside(join7(accountDir, "Previews", name), accountDir);
     if (!real) continue;
     const file = isRegularFile(real) ? real : isDirectory(real) ? previewFileInBundle(real, accountDir) : null;
     if (file && !files.includes(file)) files.push(file);
@@ -41401,13 +41445,13 @@ function assetPathsFor(accountDir, row) {
   const mediaName = safeComponent(row.mediaFilename);
   const mediaGen = safeComponent(row.mediaGeneration);
   if (mediaId && mediaName) {
-    if (mediaGen) add(join6(accountDir, "Media", mediaId, mediaGen, mediaName));
-    add(join6(accountDir, "Media", mediaId, mediaName));
+    if (mediaGen) add(join7(accountDir, "Media", mediaId, mediaGen, mediaName));
+    add(join7(accountDir, "Media", mediaId, mediaName));
   }
   const id2 = safeComponent(row.identifier);
   if (!id2) return found;
   const ownName = safeComponent(row.filename);
-  if (ownName) add(join6(accountDir, "Media", id2, ownName));
+  if (ownName) add(join7(accountDir, "Media", id2, ownName));
   for (const file of fallbackFiles(accountDir, "FallbackImages", id2, row.fallbackImageGeneration, [
     "FallbackImage.png",
     "FallbackImage.jpg"
@@ -41498,10 +41542,10 @@ function canonicalTail(p) {
   const tail = [];
   for (; ; ) {
     try {
-      return join6(realpathSync2.native(current), ...tail);
+      return join7(realpathSync2.native(current), ...tail);
     } catch {
       const parent = dirname2(current);
-      if (parent === current) return join6(current, ...tail);
+      if (parent === current) return join7(current, ...tail);
       tail.unshift(basename(current));
       current = parent;
     }
@@ -41583,7 +41627,7 @@ function exportOneAttachment(record2, dir, source) {
   if (!source) return base;
   const name = exportFileName(record2, source.path, source.kind);
   for (let attempt = 1; attempt <= MAX_COLLISION_SUFFIX; attempt++) {
-    const dest = join6(dir, collisionName(name, attempt));
+    const dest = join7(dir, collisionName(name, attempt));
     try {
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
@@ -41671,10 +41715,10 @@ function readImageInfoFd(fd) {
   const read = readSync2(fd, buf, 0, buf.length, 0);
   return parseImageHeader(buf.subarray(0, read));
 }
-function readImageInfo(path8) {
+function readImageInfo(path9) {
   let fd;
   try {
-    fd = openSync3(path8, constants3.O_RDONLY | constants3.O_NOFOLLOW);
+    fd = openSync3(path9, constants3.O_RDONLY | constants3.O_NOFOLLOW);
   } catch {
     return null;
   }
@@ -41710,7 +41754,7 @@ function buildDrawingRowsSql(notePk, columns) {
 }
 function runSqlite4(dbPath2, sql) {
   try {
-    return execFileSync7("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+    return execFileSync8("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 1e4,
       maxBuffer: 16 * 1024 * 1024,
@@ -41750,7 +41794,7 @@ function parseDrawingRows(json2) {
   }
   return rows.sort((a, b) => a.pk - b.pk);
 }
-function readDrawingRows(noteId3, dbPath2 = join7(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+function readDrawingRows(noteId3, dbPath2 = join8(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
   const columns = new Set(
     runSqlite4(
@@ -41774,9 +41818,9 @@ function readDrawingRows(noteId3, dbPath2 = join7(NOTES_CONTAINER_DIR, "NoteStor
     throw new AttachmentStoreError("Drawing rows could not be parsed", "query_error");
   }
 }
-function kindOf(path8) {
+function kindOf(path9) {
   try {
-    const st = lstatSync3(path8);
+    const st = lstatSync3(path9);
     return st.isFile() ? "file" : st.isDirectory() ? "dir" : null;
   } catch {
     return null;
@@ -41794,16 +41838,16 @@ var byGenerationDesc = (a, b) => generationRank(basename2(b)) - generationRank(b
 function findFallbackImage(accountDir, identifier, generation) {
   const id2 = safeComponent(identifier);
   if (!id2) return null;
-  const base = join7(accountDir, "FallbackImages", id2);
+  const base = join8(accountDir, "FallbackImages", id2);
   const names = ["FallbackImage.png", "FallbackImage.jpg"];
   const candidates = [];
   const gen = safeComponent(generation);
-  if (gen) for (const n of names) candidates.push(join7(base, gen, n));
-  const gens = entries(base, MAX_DIR_ENTRIES).map((e) => join7(base, e)).sort(byGenerationDesc);
-  for (const g of gens) for (const n of names) candidates.push(join7(g, n));
-  for (const n of names) candidates.push(join7(base, n));
-  candidates.push(join7(accountDir, "FallbackImages", `${id2}.png`));
-  candidates.push(join7(accountDir, "FallbackImages", `${id2}.jpg`));
+  if (gen) for (const n of names) candidates.push(join8(base, gen, n));
+  const gens = entries(base, MAX_DIR_ENTRIES).map((e) => join8(base, e)).sort(byGenerationDesc);
+  for (const g of gens) for (const n of names) candidates.push(join8(g, n));
+  for (const n of names) candidates.push(join8(base, n));
+  candidates.push(join8(accountDir, "FallbackImages", `${id2}.png`));
+  candidates.push(join8(accountDir, "FallbackImages", `${id2}.jpg`));
   for (const c of candidates) {
     const real = realInside(c, accountDir);
     if (real && kindOf(real) === "file") return real;
@@ -41813,21 +41857,21 @@ function findFallbackImage(accountDir, identifier, generation) {
 function findLargestPreview(accountDir, identifier) {
   const id2 = safeComponent(identifier);
   if (!id2) return null;
-  const dir = join7(accountDir, "Previews");
+  const dir = join8(accountDir, "Previews");
   const prefix = `${id2}-`.toLowerCase();
   const names = entries(dir, MAX_PREVIEW_DIR_ENTRIES2).filter((n) => n.toLowerCase().startsWith(prefix)).filter((n) => {
     const ext = extname2(n).toLowerCase();
     return !ext || IMAGE_SUFFIXES.has(ext) || /^\.\d+$/.test(ext);
   }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
   for (const name of names) {
-    const real = realInside(join7(dir, name), accountDir);
+    const real = realInside(join8(dir, name), accountDir);
     if (!real) continue;
     const kind = kindOf(real);
     if (kind === "file") return real;
     if (kind !== "dir") continue;
-    const gens = entries(real, MAX_DIR_ENTRIES).map((e) => realInside(join7(real, e), accountDir)).filter((p) => p !== null && kindOf(p) === "dir").sort(byGenerationDesc);
+    const gens = entries(real, MAX_DIR_ENTRIES).map((e) => realInside(join8(real, e), accountDir)).filter((p) => p !== null && kindOf(p) === "dir").sort(byGenerationDesc);
     for (const g of [...gens, real]) {
-      const file = realInside(join7(g, "Preview.png"), accountDir);
+      const file = realInside(join8(g, "Preview.png"), accountDir);
       if (file && kindOf(file) === "file") return file;
     }
   }
@@ -41840,15 +41884,15 @@ function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
     const id2 = safeComponent(row.identifier);
     const fallbackImagePath = accountDir ? findFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration) : null;
     const previewPath = accountDir ? findLargestPreview(accountDir, row.identifier) : null;
-    const bundle = accountDir && id2 && kind === "paper" ? realInside(join7(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
+    const bundle = accountDir && id2 && kind === "paper" ? realInside(join8(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
     let raster = null;
-    for (const [path8, source] of [
+    for (const [path9, source] of [
       [fallbackImagePath, "fallback"],
       [previewPath, "preview"]
     ]) {
-      const info = path8 ? readImageInfo(path8) : null;
-      if (path8 && info) {
-        raster = { path: path8, source, ...info };
+      const info = path9 ? readImageInfo(path9) : null;
+      if (path9 && info) {
+        raster = { path: path9, source, ...info };
         break;
       }
     }
@@ -41865,10 +41909,10 @@ function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
     };
   });
 }
-function verifyWrittenImage(fd, path8, expected) {
+function verifyWrittenImage(fd, path9, expected) {
   const check2 = readImageInfoFd(fd);
   if (!check2 || check2.format !== expected.format || check2.width !== expected.width || check2.height !== expected.height) {
-    unlinkSync2(path8);
+    unlinkSync2(path9);
     throw new Error("The exported image failed validation and was removed.");
   }
   return check2;
@@ -41966,13 +42010,34 @@ function exportDrawingRaster(drawing, savePath, containerDir = NOTES_CONTAINER_D
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync4 } from "fs";
-import { homedir as homedir7 } from "os";
-import { join as join8 } from "path";
+import { existsSync as existsSync5 } from "fs";
+import { homedir as homedir8 } from "os";
+import { join as join9 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(character id 31)";
 var AS_RECORD_SEP = "(character id 30)";
+var GROUP_SEP = "";
+var AS_GROUP_SEP = "(character id 29)";
+var FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+function trashFolderIdList() {
+  const ids = readTrashFolderIds().filter((id2) => FOLDER_ID_PATTERN.test(id2));
+  return `{${ids.map((id2) => `"${id2}"`).join(", ")}}`;
+}
+function buildTrashNoteIdsCollector() {
+  return `
+        set __trashNoteIds to {}
+        repeat with __trashFolderId in ${trashFolderIdList()}
+          try
+            set __trashNoteIds to __trashNoteIds & (id of notes of folder id (contents of __trashFolderId))
+          end try
+        end repeat
+        try
+          repeat with __trashFolder in (every folder whose name is "${RECENTLY_DELETED_FOLDER_NAME}")
+            set __trashNoteIds to __trashNoteIds & (id of notes of __trashFolder)
+          end repeat
+        end try`;
+}
 var DEFAULT_EXPORT_PAGE_SIZE = 50;
 var DEFAULT_EXPORT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 function exportMaxResponseBytes(env = process.env) {
@@ -42196,8 +42261,8 @@ function getNoteLinkFromDB(coreDataId2) {
   const match = coreDataId2.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath2 = join8(homedir7(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
-  if (!existsSync4(dbPath2)) return null;
+  const dbPath2 = join9(homedir8(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  if (!existsSync5(dbPath2)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
     const db = new DatabaseSync(dbPath2, { readOnly: true });
@@ -42402,9 +42467,9 @@ var AppleNotesManager = class {
    * const topResults = manager.searchNotes("project", false, undefined, undefined, undefined, 10);
    * ```
    */
-  searchNotes(query, searchContent = false, account, folder, modifiedSince, limit) {
+  searchNotes(query2, searchContent = false, account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
-    const safeQuery = escapePlainStringForAppleScript(query);
+    const safeQuery = escapePlainStringForAppleScript(query2);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const whereParts = [];
     if (searchContent) {
@@ -42462,7 +42527,7 @@ var AppleNotesManager = class {
     const script = buildAccountScopedScript({ account: targetAccount }, searchCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      throw new Error(`Failed to search notes for "${query}": ${result.error ?? "unknown error"}`);
+      throw new Error(`Failed to search notes for "${query2}": ${result.error ?? "unknown error"}`);
     }
     if (!result.output.trim()) {
       return [];
@@ -42762,6 +42827,16 @@ var AppleNotesManager = class {
       try
         set originalFolder to container of noteRef
       end try
+      if originalFolder is not missing value then
+        set __inTrash to false
+        try
+          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+        end try
+        try
+          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+        end try
+        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      end if
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
@@ -42781,6 +42856,7 @@ var AppleNotesManager = class {
     }
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
@@ -42806,14 +42882,20 @@ var AppleNotesManager = class {
    *   dateSetup: a date filter must scan every note's date). The script then
    *   returns the total note count as a leading record so the caller can
    *   detect a dedup shortfall and fall back to a full fetch.
+   * @param trashCheck - Also return the ids of notes in Recently Deleted,
+   *   after a group separator, so the caller can exclude or flag them (#207).
+   *   Only valid inside an account-scoped script.
    */
   buildBulkListCommand(opts) {
-    const { folderRef, dateSetup, sliceLimit } = opts;
+    const { folderRef, dateSetup, sliceLimit, trashCheck } = opts;
     const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const trashSetup = trashCheck ? `${buildTrashNoteIdsCollector()}
+` : "";
+    const trashSuffix = trashCheck ? ` & ${AS_GROUP_SEP} & (__trashNoteIds as text)` : "";
     const countGuard = (listVar) => `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
     if (sliceLimit !== void 0) {
       const slicedSource = folderRef ? `(notes 1 thru fetchCount of ${folderRef})` : `(notes 1 thru fetchCount)`;
-      return `
+      return `${trashSetup}
         set totalCount to count of ${fullSource}
         set fetchCount to ${sliceLimit}
         if fetchCount > totalCount then set fetchCount to totalCount
@@ -42840,7 +42922,7 @@ var AppleNotesManager = class {
           end repeat
         end if
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)${trashSuffix}
       `;
     }
     const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
@@ -42851,7 +42933,7 @@ var AppleNotesManager = class {
             ` : "";
     const dateGuardClose = dateSetup ? `
           end if` : "";
-    return `
+    return `${trashSetup}
         ${dateSetup ?? ""}set noteNames to name of ${fullSource}
         set noteIds to id of ${fullSource}
         ${dateFetch}${countGuard("noteIds")}
@@ -42860,7 +42942,7 @@ var AppleNotesManager = class {
           ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
+        return (resultList as text)${trashSuffix}
       `;
   }
   /**
@@ -42922,19 +43004,49 @@ var AppleNotesManager = class {
    * after dedup so duplicates never count against it.
    */
   parseBulkListOutput(output, safeLimit) {
-    if (!output.trim()) return [];
-    const seenIds = /* @__PURE__ */ new Set();
+    return this.parseBulkListRecords(output, safeLimit).refs;
+  }
+  /**
+   * Splits a trash-checked listing (see buildBulkListCommand's trashCheck)
+   * into the listing records and the set of note ids in Recently Deleted.
+   * Output without the group separator carries no trash information (null).
+   */
+  splitTrashIds(output) {
+    const idx = output.lastIndexOf(GROUP_SEP);
+    if (idx === -1) return { records: output, trashIds: null };
+    const trashIds = new Set(
+      output.slice(idx + 1).split(RECORD_SEP).map((id2) => id2.trim()).filter(Boolean)
+    );
+    return { records: output.slice(0, idx), trashIds };
+  }
+  /**
+   * Parses bulk listing records, deduplicated by id. Notes whose id is in
+   * `trash.ids` are dropped (and counted) unless `trash.include`, in which
+   * case they are kept and flagged `inRecentlyDeleted`. The limit applies
+   * after both dedup and trash filtering.
+   */
+  parseBulkListRecords(output, safeLimit, trash) {
     const refs = [];
+    let excludedRecentlyDeleted = 0;
+    if (!output.trim()) return { refs, excludedRecentlyDeleted };
+    const seenIds = /* @__PURE__ */ new Set();
     for (const item of output.split(RECORD_SEP)) {
       const [title, id2] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId3 = id2?.trim() || generateFallbackId();
       if (seenIds.has(noteId3)) continue;
       seenIds.add(noteId3);
-      refs.push({ title: title.trim(), id: noteId3 });
+      const trashed = trash?.ids?.has(noteId3) ?? false;
+      if (trashed && !trash?.include) {
+        excludedRecentlyDeleted++;
+        continue;
+      }
+      refs.push(
+        trashed ? { title: title.trim(), id: noteId3, inRecentlyDeleted: true } : { title: title.trim(), id: noteId3 }
+      );
       if (safeLimit !== void 0 && refs.length >= safeLimit) break;
     }
-    return refs;
+    return { refs, excludedRecentlyDeleted };
   }
   /**
    * Core listing path shared by `listNotes()` and `listNoteRefs()`: lists
@@ -42942,7 +43054,7 @@ var AppleNotesManager = class {
    * returning (title, id) pairs. Kept private because both public callers
    * need to apply their own return shape.
    */
-  listNotesCore(account, folder, modifiedSince, limit) {
+  listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted = false) {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const folderRef = folder ? buildFolderReference(folder) : void 0;
@@ -42956,30 +43068,38 @@ var AppleNotesManager = class {
     if (safeLimit !== void 0 && !dateSetup) {
       const script2 = buildAccountScopedScript(
         { account: targetAccount },
-        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit, trashCheck: true })
       );
       const result2 = executeAppleScript(script2);
       if (!result2.success) {
         throw new Error(`Failed to list notes: ${result2.error ?? "unknown error"}`);
       }
-      const sepIdx = result2.output.indexOf(RECORD_SEP);
-      const header = sepIdx === -1 ? result2.output : result2.output.slice(0, sepIdx);
+      const { records: body, trashIds: trashIds2 } = this.splitTrashIds(result2.output);
+      const sepIdx = body.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? body : body.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
-      const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
-      const refs = this.parseBulkListOutput(records, safeLimit);
-      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs;
+      const records2 = sepIdx === -1 ? "" : body.slice(sepIdx + 1);
+      const parsed = this.parseBulkListRecords(records2, safeLimit, {
+        ids: trashIds2,
+        include: includeRecentlyDeleted
+      });
+      if (!Number.isNaN(totalCount) && (parsed.refs.length >= safeLimit || totalCount <= safeLimit)) {
+        return parsed;
       }
     }
     const script = buildAccountScopedScript(
       { account: targetAccount },
-      this.buildBulkListCommand({ folderRef, dateSetup })
+      this.buildBulkListCommand({ folderRef, dateSetup, trashCheck: true })
     );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    const { records, trashIds } = this.splitTrashIds(result.output);
+    return this.parseBulkListRecords(records, safeLimit, {
+      ids: trashIds,
+      include: includeRecentlyDeleted
+    });
   }
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
@@ -42991,7 +43111,7 @@ var AppleNotesManager = class {
    * @returns Array of note titles
    */
   listNotes(account, folder, modifiedSince, limit) {
-    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs.map((ref) => ref.title);
   }
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and
@@ -43002,10 +43122,23 @@ var AppleNotesManager = class {
    * specifier resolves ambiguously to the same one note every time — see
    * the fix in exportNotesAsJson for the failure mode this avoids).
    *
+   * Notes in Recently Deleted are excluded (#207); use
+   * `listNoteRefsDetailed()` to include and flag them.
+   *
    * @returns Array of { title, id } pairs, deduplicated by id
    */
   listNoteRefs(account, folder, modifiedSince, limit) {
-    return this.listNotesCore(account, folder, modifiedSince, limit);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs;
+  }
+  /**
+   * Same as `listNoteRefs()`, plus control over notes in Recently Deleted and
+   * a count of how many were skipped. Notes.app's account-wide `notes`
+   * includes Recently Deleted, so they are excluded unless
+   * `includeRecentlyDeleted`, in which case each is flagged
+   * `inRecentlyDeleted: true`. (#207)
+   */
+  listNoteRefsDetailed(account, folder, modifiedSince, limit, includeRecentlyDeleted = false) {
+    return this.listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
@@ -44075,7 +44208,7 @@ var AppleNotesManager = class {
     if (parts[0] !== "OK") {
       return { success: false, error: parts[1]?.trim() || "attachment not found" };
     }
-    if (!existsSync4(abs) || fileSize(abs) === 0) {
+    if (!existsSync5(abs) || fileSize(abs) === 0) {
       return { success: false, error: `Notes reported success but no file was written to ${abs}` };
     }
     return {
@@ -44580,15 +44713,15 @@ var AppleNotesManager = class {
 };
 
 // src/utils/syncDetection.ts
-import { execFileSync as execFileSync8 } from "child_process";
-import * as fs3 from "fs";
-import * as path3 from "path";
-import * as os3 from "os";
-var NOTES_DB_PATH4 = path3.join(
-  os3.homedir(),
+import { execFileSync as execFileSync9 } from "child_process";
+import * as fs4 from "fs";
+import * as path4 from "path";
+import * as os4 from "os";
+var NOTES_DB_PATH5 = path4.join(
+  os4.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var WAL_PATH = `${NOTES_DB_PATH4}-wal`;
+var WAL_PATH = `${NOTES_DB_PATH5}-wal`;
 var RECENT_ACTIVITY_THRESHOLD_SECONDS = 5;
 var SYNC_STATUS_CACHE_TTL_MS = 2e3;
 var cachedSyncStatus = null;
@@ -44604,19 +44737,19 @@ function getSyncStatus(useCache = true) {
     recentActivity: false
   };
   try {
-    if (!fs3.existsSync(NOTES_DB_PATH4)) {
+    if (!fs4.existsSync(NOTES_DB_PATH5)) {
       status.error = "Notes database not found";
       cachedSyncStatus = status;
       cacheTimestamp = Date.now();
       return status;
     }
-    if (fs3.existsSync(WAL_PATH)) {
-      const walStats = fs3.statSync(WAL_PATH);
+    if (fs4.existsSync(WAL_PATH)) {
+      const walStats = fs4.statSync(WAL_PATH);
       const secondsAgo = (Date.now() - walStats.mtimeMs) / 1e3;
       status.secondsSinceLastChange = Math.round(secondsAgo);
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
     }
-    const query = `
+    const query2 = `
       SELECT COUNT(*) FROM ZICCLOUDSTATE state
       WHERE state.ZCURRENTLOCALVERSION > state.ZLATESTVERSIONSYNCEDTOCLOUD
       AND state.ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL
@@ -44625,9 +44758,9 @@ function getSyncStatus(useCache = true) {
         WHERE object.ZCLOUDSTATE = state.Z_PK
       );
     `;
-    const result = execFileSync8(
+    const result = execFileSync9(
       "sqlite3",
-      ["-readonly", NOTES_DB_PATH4, query.replace(/\n/g, " ")],
+      ["-readonly", NOTES_DB_PATH5, query2.replace(/\n/g, " ")],
       {
         encoding: "utf8",
         timeout: 5e3,
@@ -44684,12 +44817,12 @@ function withSyncAwarenessSync(operation, fn) {
 }
 
 // src/utils/noteMetadata.ts
-import { execFileSync as execFileSync9 } from "child_process";
-import * as fs4 from "fs";
-import * as path4 from "path";
-import * as os4 from "os";
-var NOTES_DB_PATH5 = path4.join(
-  os4.homedir(),
+import { execFileSync as execFileSync10 } from "child_process";
+import * as fs5 from "fs";
+import * as path5 from "path";
+import * as os5 from "os";
+var NOTES_DB_PATH6 = path5.join(
+  os5.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var FDA_MESSAGE2 = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
@@ -44704,8 +44837,8 @@ var COLUMN_MAP = [
   { key: "widgetSnippet", column: "ZWIDGETSNIPPET", type: "text" },
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
-function runSqlite5(query) {
-  return execFileSync9("sqlite3", ["-readonly", NOTES_DB_PATH5, query], {
+function runSqlite5(query2) {
+  return execFileSync10("sqlite3", ["-readonly", NOTES_DB_PATH6, query2], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -44730,7 +44863,7 @@ function getNoteMetadata(noteId3) {
     };
   }
   const pk = pkMatch[1];
-  if (!fs4.existsSync(NOTES_DB_PATH5)) {
+  if (!fs5.existsSync(NOTES_DB_PATH6)) {
     return { metadata: null, error: "no_fda", message: FDA_MESSAGE2 };
   }
   try {
@@ -44776,12 +44909,12 @@ function getNoteMetadata(noteId3) {
 import { gunzipSync as gunzipSync6 } from "zlib";
 
 // src/utils/noteStoreSql.ts
-import { execFileSync as execFileSync10 } from "child_process";
-import * as fs5 from "fs";
-import * as os5 from "os";
-import * as path5 from "path";
-var NOTES_DB_PATH6 = path5.join(
-  os5.homedir(),
+import { execFileSync as execFileSync11 } from "child_process";
+import * as fs6 from "fs";
+import * as os6 from "os";
+import * as path6 from "path";
+var NOTES_DB_PATH7 = path6.join(
+  os6.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
@@ -44819,7 +44952,7 @@ function renderValue(value) {
   return `ieee754_from_blob(x'${doubleToHex(double)}')`;
 }
 function runReadOnlySql(dbPath2, sql, params = {}) {
-  if (!fs5.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+  if (!fs6.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
   const args = ["-readonly"];
   const names = Object.keys(params);
   if (names.length) args.push("-cmd", ".parameter init");
@@ -44831,7 +44964,7 @@ function runReadOnlySql(dbPath2, sql, params = {}) {
   }
   args.push(dbPath2, sql);
   try {
-    return execFileSync10("sqlite3", args, {
+    return execFileSync11("sqlite3", args, {
       encoding: "utf8",
       timeout: 3e4,
       maxBuffer: 512 * 1024 * 1024,
@@ -45024,7 +45157,7 @@ function buildSpecialNotesSql(columns, kind, scoped) {
   ].join(" ");
 }
 function listSpecialNotes(options) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH6;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
   const limit = Math.min(
     Math.max(1, Math.trunc(options.limit ?? SPECIAL_LIMIT.DEFAULT)),
     SPECIAL_LIMIT.MAX
@@ -45115,7 +45248,7 @@ function referencedObjects(hex3) {
   }
 }
 function nativeTagInventory(options = {}) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH6;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
   const columns = readColumns(dbPath2);
   const context = readStoreContext(dbPath2, columns);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
@@ -45177,12 +45310,12 @@ function assembleInventory(rows, accounts, scope2) {
 }
 
 // src/utils/noteIdentifiers.ts
-import { execFileSync as execFileSync11 } from "child_process";
-import * as fs6 from "fs";
-import * as os6 from "os";
-import * as path6 from "path";
-var NOTES_DB_PATH7 = path6.join(
-  os6.homedir(),
+import { execFileSync as execFileSync12 } from "child_process";
+import * as fs7 from "fs";
+import * as os7 from "os";
+import * as path7 from "path";
+var NOTES_DB_PATH8 = path7.join(
+  os7.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var UUID_PATTERN = /^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/;
@@ -45256,10 +45389,10 @@ function buildLookupSql(entity3, keys) {
   return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT o ${joins}WHERE o.Z_ENT = ${entityClause(entity3)} AND o.Z_PK IN (${inList})));`;
 }
 function runJsonQuery(sql, dbPath2) {
-  if (!fs6.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+  if (!fs7.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
   let out;
   try {
-    out = execFileSync11("sqlite3", ["-readonly", dbPath2, sql], {
+    out = execFileSync12("sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -45279,7 +45412,7 @@ function runJsonQuery(sql, dbPath2) {
 function coreDataId(store, entity3, pk) {
   return `x-coredata://${store}/${entity3}/p${pk}`;
 }
-function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH7) {
+function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH8) {
   const resolved = /* @__PURE__ */ new Map();
   const keys = [];
   const uuids = [];
@@ -45325,7 +45458,7 @@ function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH7) {
   return resolved;
 }
 var COREDATA_PARTS = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(ICNote|ICFolder|ICAccount)\/p(\d{1,18})$/;
-function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH7) {
+function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH8) {
   const result = /* @__PURE__ */ new Map();
   const wanted = /* @__PURE__ */ new Map();
   for (const id2 of ids) {
@@ -45337,14 +45470,14 @@ function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH7) {
     wanted.set(pk, list);
   }
   if (wanted.size === 0) return result;
-  let query;
+  let query2;
   try {
-    query = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
+    query2 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
   } catch {
     return result;
   }
-  const store = query.store?.toUpperCase();
-  for (const row of query.rows) {
+  const store = query2.store?.toUpperCase();
+  for (const row of query2.rows) {
     const fields = {};
     for (const key of [
       "identifier",
@@ -45361,7 +45494,7 @@ function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH7) {
   }
   return result;
 }
-function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH7) {
+function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH8) {
   const ids = items.map((item) => item.id).filter((id2) => typeof id2 === "string");
   if (ids.length === 0) return items;
   const found = lookupStableIdentifiers(ids, entity3, dbPath2);
@@ -45949,13 +46082,13 @@ function positiveTextTerms(node, negated = false) {
 }
 
 // src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync12 } from "child_process";
-import * as fs7 from "fs";
-import * as os7 from "os";
-import * as path7 from "path";
+import { execFileSync as execFileSync13 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
 import { gunzipSync as gunzipSync7 } from "zlib";
-var NOTES_DB_PATH8 = path7.join(
-  os7.homedir(),
+var NOTES_DB_PATH9 = path8.join(
+  os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var QUERY_SCAN = { DEFAULT: 500, MAX: 5e3 };
@@ -46089,8 +46222,8 @@ function buildScanSql(available, options) {
     "COMMIT;"
   ].join(" ");
 }
-function runSqlite6(dbPath2, query) {
-  return execFileSync12("sqlite3", ["-readonly", dbPath2, query], {
+function runSqlite6(dbPath2, query2) {
+  return execFileSync13("sqlite3", ["-readonly", dbPath2, query2], {
     encoding: "utf8",
     timeout: 3e4,
     maxBuffer: 512 * 1024 * 1024,
@@ -46117,12 +46250,12 @@ function resolveFolders(rows) {
     seen.add(pk);
     const parent = row.parent !== null ? resolve5(row.parent, seen) : void 0;
     const name = row.name ?? "";
-    const path8 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
+    const path9 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
     const info = {
-      path: path8,
+      path: path9,
       plainPath,
-      keys: [...new Set([name, plainPath, path8].map(normalizeForMatch))],
+      keys: [...new Set([name, plainPath, path9].map(normalizeForMatch))],
       accountPk: row.owner ?? parent?.accountPk ?? null,
       shared: Boolean(row.shared) || Boolean(parent?.shared)
     };
@@ -46154,8 +46287,8 @@ function queryNotes(expression, options = {}) {
   const includeDeleted = options.includeDeleted ?? false;
   const withBodies = needsContent(ast);
   const withTags = needsTags(ast);
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
-  if (!fs7.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH9;
+  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
   let output;
   try {
     const available = presentColumns2(dbPath2);
@@ -46290,10 +46423,10 @@ function queryNotes(expression, options = {}) {
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync13 } from "node:child_process";
+import { execFileSync as execFileSync14 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join14 } from "node:path";
+import { join as join15 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -46369,7 +46502,7 @@ function addNativeTags(request, deps) {
   };
 }
 function listInstalledShortcuts() {
-  return execFileSync13("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  return execFileSync14("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
@@ -46395,11 +46528,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join14(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join15(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path8 = join14(directory, "request.json");
-    writeFileSync(path8, JSON.stringify(input), { mode: 384 });
-    execFileSync13("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path8], {
+    const path9 = join15(directory, "request.json");
+    writeFileSync(path9, JSON.stringify(input), { mode: 384 });
+    execFileSync14("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path9], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -46418,10 +46551,10 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync14 } from "node:child_process";
+import { execFileSync as execFileSync15 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join15 } from "node:path";
+import { join as join16 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -46746,9 +46879,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join15(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join15(directory, "request.json");
+    const file = join16(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -46768,7 +46901,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync14("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
         timeout: callTimeoutMs() ?? 6e4,
         maxBuffer: 1024 * 1024,
@@ -47003,7 +47136,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path8) => JSON.stringify(splitFolderPath(path8).map((part) => part.toLocaleLowerCase()));
+  const segments = (path9) => JSON.stringify(splitFolderPath(path9).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -47093,7 +47226,7 @@ ${request.content}`
 }
 
 // src/services/capabilityMatrix.ts
-import { execFileSync as execFileSync15 } from "node:child_process";
+import { execFileSync as execFileSync16 } from "node:child_process";
 import { release } from "node:os";
 var MACOS_SHORTCUTS_CLI = "12.0";
 var MACOS_MARKDOWN_IMPORT = "26.0";
@@ -47300,7 +47433,7 @@ function evaluateFeatures(env, features = FEATURES) {
 function readMacOSVersion() {
   if (process.platform !== "darwin") return null;
   try {
-    const out = execFileSync15("/usr/bin/sw_vers", ["-productVersion"], {
+    const out = execFileSync16("/usr/bin/sw_vers", ["-productVersion"], {
       encoding: "utf8",
       timeout: 3e3,
       stdio: ["ignore", "pipe", "ignore"]
@@ -47333,9 +47466,9 @@ function getCapabilityMatrix(probe = probeCapabilityEnvironment) {
   return evaluateFeatures(probe());
 }
 function formatCapabilityMatrix(matrix) {
-  const os8 = matrix.runtimeOS;
+  const os9 = matrix.runtimeOS;
   const lines = [
-    `Feature matrix (macOS ${os8.macOSVersion ?? "unknown"}, Darwin ${os8.darwinRelease}):`
+    `Feature matrix (macOS ${os9.macOSVersion ?? "unknown"}, Darwin ${os9.darwinRelease}):`
   ];
   for (const [name, status] of Object.entries(matrix.features)) {
     lines.push(
@@ -47453,19 +47586,19 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync10, readFileSync as readFileSync2 } from "fs";
-import { join as join16 } from "path";
-import { homedir as homedir13 } from "os";
+import { existsSync as existsSync11, readFileSync as readFileSync2 } from "fs";
+import { join as join17 } from "path";
+import { homedir as homedir14 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join16(homedir13(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join17(homedir14(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path8 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path9 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync10(path8)) return applied;
-    const parsed = JSON.parse(readFileSync2(path8, "utf8"));
+    if (!existsSync11(path9)) return applied;
+    const parsed = JSON.parse(readFileSync2(path9, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -47475,7 +47608,7 @@ function loadFileConfig(env = process.env, path8 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path8}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path9}: ${String(e)}`);
   }
   return applied;
 }
@@ -47762,10 +47895,10 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
 }
 
 // src/utils/noteBlocks.ts
-import { execFileSync as execFileSync16 } from "node:child_process";
-import { existsSync as existsSync11 } from "node:fs";
-import { homedir as homedir14 } from "node:os";
-import { join as join17 } from "node:path";
+import { execFileSync as execFileSync17 } from "node:child_process";
+import { existsSync as existsSync12 } from "node:fs";
+import { homedir as homedir15 } from "node:os";
+import { join as join18 } from "node:path";
 import { gunzipSync as gunzipSync8 } from "node:zlib";
 var NoteBlocksError = class extends Error {
   code;
@@ -48108,23 +48241,23 @@ function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResp
     undecodedFields: doc.undecodedFields
   };
 }
-var NOTES_DB_PATH9 = join17(
-  homedir14(),
+var NOTES_DB_PATH10 = join18(
+  homedir15(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH9 } = {}) {
+function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH10 } = {}) {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
   if (!pk)
     throw new NoteBlocksError(
       "invalid-id",
       `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
     );
-  if (!existsSync11(dbPath2))
+  if (!existsSync12(dbPath2))
     throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
   const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
   let output;
   try {
-    output = execFileSync16(
+    output = execFileSync17(
       "/usr/bin/sqlite3",
       ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
       {
@@ -48274,7 +48407,7 @@ function insertLink(request, deps) {
 
 // src/services/notesExport.ts
 import { mkdirSync as mkdirSync5 } from "node:fs";
-import { basename as basename4, dirname as dirname4, extname as extname4, join as join20 } from "node:path";
+import { basename as basename4, dirname as dirname4, extname as extname4, join as join21 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -48289,9 +48422,9 @@ import {
   statSync as statSync3,
   writeSync as writeSync3
 } from "node:fs";
-import { homedir as homedir15 } from "node:os";
-import { basename as basename3, extname as extname3, join as join18, relative as relative3, resolve as resolve3, sep as sep3 } from "node:path";
-var NOTES_CONTAINER = join18(homedir15(), "Library/Group Containers/group.com.apple.notes");
+import { homedir as homedir16 } from "node:os";
+import { basename as basename3, extname as extname3, join as join19, relative as relative3, resolve as resolve3, sep as sep3 } from "node:path";
+var NOTES_CONTAINER = join19(homedir16(), "Library/Group Containers/group.com.apple.notes");
 var MAX_EMBED_BYTES = 10 * 1024 * 1024;
 var MAX_EMBED_TOTAL_BYTES = 256 * 1024 * 1024;
 var MAX_DIRECTORY_ENTRIES = 2e4;
@@ -48318,10 +48451,10 @@ function listDirectory(dir, limit) {
     return [];
   }
 }
-function isFile(path8) {
+function isFile(path9) {
   let fd;
   try {
-    fd = openSync4(path8, constants4.O_RDONLY | constants4.O_NOFOLLOW);
+    fd = openSync4(path9, constants4.O_RDONLY | constants4.O_NOFOLLOW);
     return fstatSync4(fd).isFile();
   } catch {
     return false;
@@ -48329,9 +48462,9 @@ function isFile(path8) {
     if (fd !== void 0) closeSync4(fd);
   }
 }
-function isDirectory2(path8) {
+function isDirectory2(path9) {
   try {
-    return statSync3(path8).isDirectory();
+    return statSync3(path9).isDirectory();
   } catch {
     return false;
   }
@@ -48347,11 +48480,11 @@ var AssetLocator = class {
   constructor(container = NOTES_CONTAINER) {
     let accountsRoot = "";
     try {
-      accountsRoot = realpathSync3.native(join18(container, "Accounts"));
+      accountsRoot = realpathSync3.native(join19(container, "Accounts"));
     } catch {
     }
     this.accounts = accountsRoot ? listDirectory(accountsRoot, 1e3).flatMap((name) => {
-      const dir = safeComponent2(name) && confine(join18(accountsRoot, name), accountsRoot);
+      const dir = safeComponent2(name) && confine(join19(accountsRoot, name), accountsRoot);
       return dir && isDirectory2(dir) ? [dir] : [];
     }) : [];
   }
@@ -48411,18 +48544,18 @@ var AssetLocator = class {
     if (!mediaId || !filename) return void 0;
     const generation = safeComponent2(source.mediaGeneration);
     const candidates = [
-      ...generation ? [join18(account, "Media", mediaId, generation, filename)] : [],
-      join18(account, "Media", mediaId, filename)
+      ...generation ? [join19(account, "Media", mediaId, generation, filename)] : [],
+      join19(account, "Media", mediaId, filename)
     ];
     for (const candidate of candidates) {
-      const path8 = confine(candidate, account);
-      if (path8 && isFile(path8)) return { path: path8, name: filename, role: "original" };
+      const path9 = confine(candidate, account);
+      if (path9 && isFile(path9)) return { path: path9, name: filename, role: "original" };
     }
     return void 0;
   }
   /** <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation. */
   fallback(account, dir, id2, generation, names) {
-    const base = join18(account, dir, id2);
+    const base = join19(account, dir, id2);
     const gen = safeComponent2(generation);
     const generations = [
       ...gen ? [gen] : [],
@@ -48431,8 +48564,8 @@ var AssetLocator = class {
     ];
     for (const g of generations)
       for (const name of names) {
-        const path8 = confine(g ? join18(base, g, name) : join18(base, name), account);
-        if (path8 && isFile(path8)) return path8;
+        const path9 = confine(g ? join19(base, g, name) : join19(base, name), account);
+        if (path9 && isFile(path9)) return path9;
       }
     return void 0;
   }
@@ -48441,7 +48574,7 @@ var AssetLocator = class {
     let index = this.previewIndex.get(account);
     if (!index) {
       index = /* @__PURE__ */ new Map();
-      for (const name of listDirectory(join18(account, "Previews"), MAX_DIRECTORY_ENTRIES)) {
+      for (const name of listDirectory(join19(account, "Previews"), MAX_DIRECTORY_ENTRIES)) {
         const key = name.slice(0, 36).toUpperCase();
         const entries3 = index.get(key) ?? [];
         entries3.push(name);
@@ -48454,7 +48587,7 @@ var AssetLocator = class {
       return !ext || IMAGE_EXTENSIONS.has(ext) || /^\.\d+$/.test(ext);
     }).sort((a, b) => previewArea(b) - previewArea(a) || a.localeCompare(b));
     for (const name of entries2) {
-      const entry = confine(join18(account, "Previews", name), account);
+      const entry = confine(join19(account, "Previews", name), account);
       if (!entry) continue;
       const file = isFile(entry) ? entry : this.bundleImage(entry, account);
       if (file) return { path: file, name: "preview", role: "preview" };
@@ -48465,16 +48598,16 @@ var AssetLocator = class {
   bundleImage(bundle, account) {
     const found = [];
     for (const child of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
-      const path8 = confine(join18(bundle, child), account);
-      if (!path8) continue;
-      if (isFile(path8)) found.push(path8);
+      const path9 = confine(join19(bundle, child), account);
+      if (!path9) continue;
+      if (isFile(path9)) found.push(path9);
       else
-        for (const grandchild of listDirectory(path8, MAX_BUNDLE_ENTRIES2)) {
-          const inner = confine(join18(path8, grandchild), account);
+        for (const grandchild of listDirectory(path9, MAX_BUNDLE_ENTRIES2)) {
+          const inner = confine(join19(path9, grandchild), account);
           if (inner && isFile(inner)) found.push(inner);
         }
     }
-    return found.find((path8) => basename3(path8) === "Preview.png") ?? found.find((path8) => IMAGE_EXTENSIONS.has(extname3(path8).toLowerCase()));
+    return found.find((path9) => basename3(path9) === "Preview.png") ?? found.find((path9) => IMAGE_EXTENSIONS.has(extname3(path9).toLowerCase()));
   }
 };
 function sniffMime(head, name) {
@@ -48522,8 +48655,8 @@ function safeAssetName(name, mime) {
   if (clean.length > 120) clean = clean.slice(0, 120 - ext.length) + ext;
   return clean;
 }
-function encodePathUrl(path8) {
-  return path8.split("/").map(encodeURIComponent).join("/");
+function encodePathUrl(path9) {
+  return path9.split("/").map(encodeURIComponent).join("/");
 }
 function canonicalForm(abs) {
   let current = abs;
@@ -48531,18 +48664,18 @@ function canonicalForm(abs) {
   for (; ; ) {
     try {
       const real = realpathSync3.native(current);
-      return rest ? join18(real, rest) : real;
+      return rest ? join19(real, rest) : real;
     } catch {
       const parent = resolve3(current, "..");
       if (parent === current) return abs;
-      rest = rest ? join18(basename3(current), rest) : basename3(current);
+      rest = rest ? join19(basename3(current), rest) : basename3(current);
       current = parent;
     }
   }
 }
 function assertExportPath(p, container = NOTES_CONTAINER) {
   const abs = assertSafeSavePath(p);
-  const within = (path8, root) => path8 === root || path8.startsWith(root + sep3);
+  const within = (path9, root) => path9 === root || path9.startsWith(root + sep3);
   const roots = [resolve3(container), canonicalForm(resolve3(container))];
   const forms = [abs, canonicalForm(abs)];
   if (forms.some((form) => roots.some((root) => within(form, root))))
@@ -48552,16 +48685,16 @@ function assertExportPath(p, container = NOTES_CONTAINER) {
 var CREATE_FLAGS = constants4.O_WRONLY | constants4.O_CREAT | constants4.O_EXCL | constants4.O_NOFOLLOW;
 var OutputExistsError = class extends Error {
   code = "output_exists";
-  constructor(path8) {
-    super(`Output file already exists: ${path8}. Choose a new path or remove the old file first.`);
+  constructor(path9) {
+    super(`Output file already exists: ${path9}. Choose a new path or remove the old file first.`);
     this.name = "OutputExistsError";
   }
 };
-function openCreateOnly(path8) {
+function openCreateOnly(path9) {
   try {
-    return openSync4(path8, CREATE_FLAGS, 420);
+    return openSync4(path9, CREATE_FLAGS, 420);
   } catch (error2) {
-    if (error2.code === "EEXIST") throw new OutputExistsError(path8);
+    if (error2.code === "EEXIST") throw new OutputExistsError(path9);
     throw error2;
   }
 }
@@ -48575,8 +48708,8 @@ function writeAllAndClose(fd, content) {
     closeSync4(fd);
   }
 }
-function openSource(path8) {
-  const fd = openSync4(path8, constants4.O_RDONLY | constants4.O_NOFOLLOW);
+function openSource(path9) {
+  const fd = openSync4(path9, constants4.O_RDONLY | constants4.O_NOFOLLOW);
   const stat = fstatSync4(fd);
   if (!stat.isFile()) {
     closeSync4(fd);
@@ -48621,7 +48754,7 @@ var SidecarWriter = class {
       let target;
       let out;
       for (let n = 1; n <= 1e3 && out === void 0; n++) {
-        target = join18(this.dir, n === 1 ? name : `${stem}-${n}${ext}`);
+        target = join19(this.dir, n === 1 ? name : `${stem}-${n}${ext}`);
         try {
           out = openSync4(target, CREATE_FLAGS, 420);
         } catch (error2) {
@@ -49376,11 +49509,11 @@ function renderNotesMarkdown(notes, ctx, { wrap: wrap2 = 0 } = {}) {
 }
 
 // src/utils/noteExportData.ts
-import { execFileSync as execFileSync17 } from "node:child_process";
-import { homedir as homedir16 } from "node:os";
-import { join as join19 } from "node:path";
-var NOTES_DB_PATH10 = join19(
-  homedir16(),
+import { execFileSync as execFileSync18 } from "node:child_process";
+import { homedir as homedir17 } from "node:os";
+import { join as join20 } from "node:path";
+var NOTES_DB_PATH11 = join20(
+  homedir17(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var IMAGE_UTIS2 = /* @__PURE__ */ new Set([
@@ -49444,7 +49577,7 @@ var ATTACHMENT_COLUMNS = [
 var columnCache = /* @__PURE__ */ new Map();
 function sqlite(dbPath2, args) {
   try {
-    return execFileSync17(
+    return execFileSync18(
       "/usr/bin/sqlite3",
       ["-readonly", ...args.slice(0, -1), dbPath2, args.at(-1)],
       {
@@ -49461,7 +49594,7 @@ function sqlite(dbPath2, args) {
     throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
   }
 }
-function objectColumns(dbPath2 = NOTES_DB_PATH10) {
+function objectColumns(dbPath2 = NOTES_DB_PATH11) {
   let columns = columnCache.get(dbPath2);
   if (!columns) {
     columns = new Set(
@@ -49519,7 +49652,7 @@ function buildAttachments(rows) {
   }
   return { byId: new Map(all.map((a) => [a.id, a])), ordered };
 }
-function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH10 } = {}) {
+function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
   const doc = readNoteBlocks(id2, { dbPath: dbPath2 });
   const pk = /\/ICNote\/p([0-9]{1,18})$/.exec(id2)[1];
   const output = sqlite(dbPath2, [
@@ -49558,9 +49691,9 @@ var NotesExportError = class extends Error {
   }
   code;
 };
-function validPath(path8, what) {
+function validPath(path9, what) {
   try {
-    return assertExportPath(path8);
+    return assertExportPath(path9);
   } catch (error2) {
     throw new NotesExportError(
       "invalid-path",
@@ -49652,7 +49785,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join20(dirname4(output), `${basename4(output, extname4(output))}.assets`);
+  return join21(dirname4(output), `${basename4(output, extname4(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -49706,7 +49839,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join21 } from "node:path";
+import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join22 } from "node:path";
 var noteId = exactIdInput(
   "ICNote",
   /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
@@ -49749,9 +49882,9 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path8) {
-  if (!isAbsolute3(path8)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync5(path8, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+function localAttachment(path9) {
+  if (!isAbsolute3(path9)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync5(path9, constants5.O_RDONLY | constants5.O_NOFOLLOW);
   try {
     const stat = fstatSync5(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
@@ -49873,8 +50006,8 @@ function registerDirectOperations(server2, manager) {
     }
   );
 }
-function attachmentName(path8, filename) {
-  const source = basename5(path8);
+function attachmentName(path9, filename) {
+  const source = basename5(path9);
   if (filename === void 0) return source;
   if (Buffer.byteLength(filename, "utf8") > 255)
     throw new Error("filename must be at most 255 bytes");
@@ -49889,14 +50022,14 @@ function attachmentName(path8, filename) {
   return filename;
 }
 function attachFile(manager, args) {
-  const { id: id2, expectedContentHash, path: path8 } = args;
-  const name = attachmentName(path8, args.filename);
+  const { id: id2, expectedContentHash, path: path9 } = args;
+  const name = attachmentName(path9, args.filename);
   const before = readSnapshot(manager, id2);
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-  const bytes = localAttachment(path8);
+  const bytes = localAttachment(path9);
   const beforeAttachments = manager.listAttachmentsById(id2);
-  const directory = mkdtempSync4(join21(tmpdir4(), "notes-attachment-add-"));
-  const temporaryFile = join21(directory, name);
+  const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
+  const temporaryFile = join22(directory, name);
   try {
     writeFileSync3(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
@@ -50454,7 +50587,7 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync12 } from "node:fs";
+import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
 import { dirname as dirname5, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50474,16 +50607,16 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync12;
-  const open = dependencies.open || ((path8) => {
-    const result = spawnSync2("/usr/bin/open", [path8], { encoding: "utf8" });
+  const exists = dependencies.exists || existsSync13;
+  const open = dependencies.open || ((path9) => {
+    const result = spawnSync2("/usr/bin/open", [path9], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve4(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path8 = resolve4(baseDirectory, file);
+    const path9 = resolve4(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -50499,9 +50632,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path8)) error2 = `Packaged Shortcut is missing: ${path8}`;
+      else if (!exists(path9)) error2 = `Packaged Shortcut is missing: ${path9}`;
       else {
-        const result = open(path8);
+        const result = open(path9);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -50510,7 +50643,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path8,
+      file: path9,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -50640,6 +50773,9 @@ function readExactNoteSnapshot(id2) {
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
+function inRecentlyDeletedMessage(title) {
+  return `Note "${title}" is already in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Remove it from Recently Deleted in Notes.app if that is intended.`;
+}
 function revisionConflictMessage(title) {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
 }
@@ -50818,7 +50954,7 @@ registerTool(
       count: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
+  withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
     const effectiveLimit = resolveSearchLimit(limit);
     const limitWasDefault = limit === void 0;
     const {
@@ -50827,7 +50963,7 @@ registerTool(
       syncInterference
     } = withSyncAwarenessSync(
       "search-notes",
-      () => notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, effectiveLimit)
+      () => notesManager.searchNotes(query2, searchContent, account, folder, modifiedSince, effectiveLimit)
     );
     const searchType = searchContent ? "content" : "titles";
     const folderInfo = folder ? ` in folder "${folder}"` : "";
@@ -50850,7 +50986,7 @@ ${syncWarnings.join(" ")}` : "";
     if (notes.length === 0) {
       const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
+        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
         { notes: [], count: 0 }
       );
     }
@@ -50902,10 +51038,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ query, limit, scanLimit, includeDeleted }) => {
+  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted }) => {
     let result;
     try {
-      result = queryNotes(query, { limit, scanLimit, includeDeleted });
+      result = queryNotes(query2, { limit, scanLimit, includeDeleted });
     } catch (error2) {
       if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -51816,7 +51952,7 @@ registerTool(
 registerTool(
   "delete-note",
   {
-    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
+    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
@@ -51839,6 +51975,9 @@ registerTool(
     const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
     if (result.status === "conflict") {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+    if (result.status === "in-recently-deleted") {
+      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
     }
     if (result.status === "not-deleted") {
       return errorResponse(NOT_DELETED_MESSAGE);
@@ -51908,36 +52047,47 @@ registerTool(
 registerTool(
   "list-notes",
   {
-    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: warns if iCloud sync is active and results may be partial.",
+    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
       modifiedSince: external_exports.string().max(64).optional().describe(
         "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for listing only recent notes in large collections."
       ),
-      limit: external_exports.number().int().positive().optional().describe("Maximum number of notes to return")
+      limit: external_exports.number().int().positive().optional().describe("Maximum number of notes to return"),
+      includeRecentlyDeleted: external_exports.boolean().optional().describe(
+        "Also list notes in Recently Deleted, each flagged inRecentlyDeleted (default false)"
+      )
     },
     outputSchema: {
       notes: external_exports.array(
         external_exports.object({
           title: external_exports.string(),
           id: external_exports.string(),
+          inRecentlyDeleted: external_exports.boolean().optional(),
           identifier: external_exports.string().optional(),
           folderIdentifier: external_exports.string().optional(),
           accountIdentifier: external_exports.string().optional()
         })
       ).optional(),
-      count: external_exports.number().optional()
+      count: external_exports.number().optional(),
+      excludedRecentlyDeleted: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ account, folder, modifiedSince, limit }) => {
+  withErrorHandling(({ account, folder, modifiedSince, limit, includeRecentlyDeleted }) => {
     const {
-      result: notes,
+      result: { refs: notes, excludedRecentlyDeleted },
       syncBefore,
       syncInterference
     } = withSyncAwarenessSync(
       "list-notes",
-      () => notesManager.listNoteRefs(account, folder, modifiedSince, limit)
+      () => notesManager.listNoteRefsDetailed(
+        account,
+        folder,
+        modifiedSince,
+        limit,
+        includeRecentlyDeleted ?? false
+      )
     );
     const location = folder ? ` in folder "${folder}"` : "";
     const acct = account ? ` (${account})` : "";
@@ -51953,17 +52103,22 @@ registerTool(
     const syncNote = syncWarnings.length > 0 ? `
 
 ${syncWarnings.join(" ")}` : "";
+    const trashNote = excludedRecentlyDeleted > 0 ? `
+
+Skipped ${excludedRecentlyDeleted} note(s) in Recently Deleted; pass includeRecentlyDeleted: true to list them.` : "";
+    const trashData = excludedRecentlyDeleted > 0 ? { excludedRecentlyDeleted } : {};
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`, {
+      return successResponse(`No notes found${location}${acct}${dateInfo}${trashNote}${syncNote}`, {
         notes: [],
-        count: 0
+        count: 0,
+        ...trashData
       });
     }
-    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title}${n.inRecentlyDeleted ? " [RECENTLY DELETED]" : ""} [id: ${n.id}]`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:
-${noteList}${syncNote}`,
-      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
+${noteList}${trashNote}${syncNote}`,
+      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length, ...trashData }
     );
   }, "Error listing notes")
 );
@@ -52469,7 +52624,7 @@ ${attachmentList}`,
 registerTool(
   "batch-delete-notes",
   {
-    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
+    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict. A note already in Recently Deleted is refused, since deleting it there would be permanent.",
     inputSchema: {
       notes: external_exports.array(
         external_exports.object({
@@ -52499,6 +52654,9 @@ registerTool(
       if (result.status === "deleted") return { id: id2, success: true };
       if (result.status === "conflict") {
         return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
+      }
+      if (result.status === "in-recently-deleted") {
+        return { id: id2, success: false, error: inRecentlyDeletedMessage(snapshot.note.title) };
       }
       if (result.status === "not-deleted")
         return { id: id2, success: false, error: NOT_DELETED_MESSAGE };

@@ -98,6 +98,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **`markdownRoute: "html"`** imports Markdown through AppleScript HTML instead of the Shortcut: any account, tags allowed, no real Heading styles. Task items (`- [ ]`, `- [x]`) become list rows starting with a visible ☐ / ☑ character. Those are text, not checkable checklist items; tell the user so. Block quotes, fenced code and inline code are refused on this route, and a `---` line stays literal text; only the Shortcut route imports these natively.
 - **`timeoutSeconds`** (1–120) on `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` sets the timeout of each Notes.app automation step for that call. A timed-out write is uncertain: read the note by id before retrying.
 - **`delete-note` checks placement.** If Notes.app accepts the delete but the note is still in its original folder, the call reports that nothing was deleted.
+- **`delete-note` and `batch-delete-notes` refuse a note already in Recently Deleted**, where a delete is permanent. The folder is read live from Notes.app; the database only identifies which folder is Recently Deleted.
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
 - Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
@@ -194,6 +195,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `get-note-content` to retrieve full content
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes
 - Use `limit` to cap the number of notes returned
+- Excludes notes in Recently Deleted (counted in `excludedRecentlyDeleted`); `includeRecentlyDeleted: true` lists them flagged `inRecentlyDeleted`
 
 ### list-special-notes
 - Lists `kind: "pinned" | "quick-notes" | "recently-deleted" | "locked"` from the NoteStore database (read-only, needs Full Disk Access). AppleScript cannot enumerate any of these sets

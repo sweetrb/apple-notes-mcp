@@ -819,6 +819,12 @@ check of the note's original folder run in one AppleScript: if Notes.app accepts
 the delete but the note is still listed in that folder, the call reports that
 nothing was deleted instead of claiming success.
 
+A note that is already in Recently Deleted is refused, because deleting it there
+removes it permanently. The folder is read live from Notes.app in the same
+AppleScript; the Recently Deleted folder is recognised by its database id (with
+Full Disk Access) or by its English name. To remove such a note for good, do it
+in Notes.app.
+
 **⚠️ Safety:** Irreversible from the agent's side — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact id(s) being deleted.
 
 ---
@@ -1005,6 +1011,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 | `folder` | string | No | Filter to notes in this folder only (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of notes to return |
+| `includeRecentlyDeleted` | boolean | No | Also list notes in Recently Deleted, each flagged `inRecentlyDeleted: true` (default `false`) |
 
 **Example - All notes:**
 ```json
@@ -1026,7 +1033,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 }
 ```
 
-**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`. With Full Disk Access each entry also carries `identifier`, `folderIdentifier`, and `accountIdentifier` (see [Identifier forms](#identifier-forms)).
+**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`. Notes in Recently Deleted are left out by default and counted in `excludedRecentlyDeleted` (present only when nonzero); with `includeRecentlyDeleted: true` they are listed with `inRecentlyDeleted: true` and a `[RECENTLY DELETED]` marker. Notes.app's own listing includes them, so the Recently Deleted folder is recognised by its database id (with Full Disk Access) or by its English name. With Full Disk Access each entry also carries `identifier`, `folderIdentifier`, and `accountIdentifier` (see [Identifier forms](#identifier-forms)).
 
 Use the returned `id` for any follow-up read/update/move/delete rather than re-resolving the title: titles are not unique, and a by-title lookup resolves a duplicated title to the same one note every time, silently skipping the others.
 
@@ -1234,7 +1241,7 @@ Deletes multiple notes at once by ID.
 |-----------|------|----------|-------------|
 | `notes` | object[] | Yes | Array of `{id, expectedContentHash}` snapshots to delete (max 500 per request) |
 
-**Returns:** Summary of successes and failures.
+**Returns:** Summary of successes and failures. A note already in Recently Deleted fails without being deleted, as in `delete-note`.
 
 **⚠️ Safety:** Irreversible — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact ids being deleted.
 
