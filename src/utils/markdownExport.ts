@@ -39,14 +39,30 @@ export function escapeMarkdown(text: string): string {
     .replace(/==/g, "\\=\\=");
 }
 
-/** Escape a line start that Markdown would read as a block marker. */
-function escapeLineStart(line: string): string {
-  return line.replace(/^(\s*)([#>+-]|\d+[.)])(?=\s|$)/, (_, space: string, marker: string) =>
-    /^\d/.test(marker)
-      ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}`
-      : `${space}\\${marker}`
+/**
+ * Escape a line start that Markdown would read as a block marker: an ATX
+ * heading (`#` to `######`), a quote, a bullet or ordered list item, or a
+ * `---` thematic break. Fences, tables, `*`/`_` breaks and HTML blocks are
+ * already neutralized by {@link escapeMarkdown}. Applied to body paragraphs
+ * and to the text after a list item's own marker; Notes' headings and list
+ * markers are emitted unescaped.
+ */
+export function escapeLineStart(line: string): string {
+  if (/^\s*(?:-[ \t]*){3,}$/.test(line)) return line.replace("-", "\\-");
+  return line.replace(
+    /^(\s*)(#{1,6}|[>+-]|\d{1,9}[.)])(?=\s|$)/,
+    (_, space: string, marker: string) =>
+      /^\d/.test(marker)
+        ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}`
+        : `${space}\\${marker}`
   );
 }
+
+/**
+ * A word that would open a block if a hard wrap put it at the start of a
+ * continuation line: a heading or list marker, or a setext underline.
+ */
+const BLOCK_START_WORD = /^(?:#{1,6}|[-+*]|-+|=+|\d{1,9}[.)])$/;
 
 /** Percent-encode characters that would end or break a link destination. */
 export function linkDestination(url: string): string {
@@ -277,7 +293,7 @@ function renderLine(
     counters[level] = 0;
     if (block.style === "checklist") marker = block.checklist?.done ? "- [x]" : "- [ ]";
   }
-  return { text: `${indent}${marker} ${body}`, group: "list", quote };
+  return { text: `${indent}${marker} ${escapeLineStart(body)}`, group: "list", quote };
 }
 
 /** Join rendered lines: tight within a list, blank lines elsewhere. */
@@ -305,7 +321,8 @@ function joinLines(lines: Line[]): string {
 /**
  * Hard-wrap prose lines at `width` columns. Headings, tables, fenced code,
  * image lines and words longer than the width are left intact; list and quote
- * continuation lines are indented to their content column.
+ * continuation lines are indented to their content column. A line never breaks
+ * before a word that would read as a block marker at the start of a line.
  */
 export function wrapMarkdown(markdown: string, width: number): string {
   if (!width) return markdown;
@@ -324,7 +341,7 @@ export function wrapMarkdown(markdown: string, width: number): string {
     let current = prefix;
     let empty = true;
     for (const word of words) {
-      if (!empty && current.length + 1 + word.length > width) {
+      if (!empty && current.length + 1 + word.length > width && !BLOCK_START_WORD.test(word)) {
         out.push(current);
         current = hang + word;
       } else current += (empty ? "" : " ") + word;
