@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.9] - 2026-09-23
+## [2.9.10] - 2026-09-23
 
 ### Added
 
@@ -19,6 +19,8 @@
 - Known limitation (#236): a pasted PDF, like one sent to `add-attachment`,
   is inserted but reported as uncertain on macOS 27, because AppleScript does
   not list PDF attachments.
+
+## [2.9.9] - 2026-09-23
 
 ### Fixed
 
