@@ -663,6 +663,69 @@ Ordinary notes take the guarded HTML path and are not restricted to that subset.
 
 ---
 
+#### `insert-link`
+
+Adds one web, mail or Notes link to an exact note as its own paragraph, then
+proves it from the link runs Notes actually stored. Use `mode: "raw"` to show
+the URL itself, or `mode: "hyperlink"` with a `label` to show text that links to
+the URL. For a link to another note by id, use
+[`insert-note-link`](#insert-note-link), which looks up that note's real deep
+link.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being extended |
+| `url` | string | Yes | Absolute `http(s)` URL with a host, or a `mailto:`, `notes://` or `applenotes:` link. No spaces, `<`, `>` or `"` |
+| `mode` | string | No | `"raw"` (default) shows the URL; `"hyperlink"` shows `label` |
+| `label` | string | Hyperlink only | Visible text for `mode: "hyperlink"`; refused in raw mode |
+| `linked` | boolean | No | Raw mode only. `true` (default) stores a real link on the URL text. `false` writes plain text with no stored link |
+| `position` | string | No | `"end"` (default) or `"after-title"` (first paragraph under the title) |
+| `blankLine` | boolean | No | Leave a blank line between existing text and the link paragraph (default `true`) |
+| `scopeText` | string | Native-object notes only | Unique existing phrase, as for [`append-native`](#append-native) |
+
+**Example - Hyperlink under the title:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "url": "https://example.com/report",
+  "mode": "hyperlink",
+  "label": "Quarterly report",
+  "position": "after-title"
+}
+```
+
+**Returns:** `route` (`"applescript"` for ordinary notes, `"native"` for notes
+with native objects), `linkStored`, `storedUrl` (the destination read back from
+the note, for example `https://example.com/` for a bare origin), and the new
+`contentHash`.
+
+**Safety:** The same guards as [`append-to-note`](#append-to-note): a fresh
+`expectedContentHash`, the attachment block, and every existing link must
+survive. A linked insert must add exactly one stored link with the requested
+label and destination; if the text lands but that proof fails, the error says
+the write happened so it is not repeated.
+
+**Limits:**
+
+- Plain URL text is not linked by Notes when written this way. With
+  `linked: false`, the note stores no link and readers of the body see ordinary
+  text; Notes.app may still underline the URL on screen through its own data
+  detection. The result reports `linkStored: false`.
+- Notes with native objects (a table, a checklist, native tags) take the native
+  end-append path, so only `position: "end"` with `blankLine: true` works there.
+- The link always gets its own paragraph. Placing it at the end of one existing
+  paragraph, or inside the text, is not available.
+- Rich URL preview cards (the link tile Notes makes when you paste a URL) are
+  not produced. No public automation route creates one: the Shortcuts Notes
+  actions write text, and AppleScript's `body` has no card markup.
+- To start a new note with a link, use [`create-note`](#create-note) with
+  `format: "html"` and an `<a href>` in `content`; the link is stored the same
+  way.
+
+---
+
 #### `get-note-link`
 
 Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The URL opens the note in Notes.app on iOS and macOS and can be stored in Reminders tasks or shared links.

@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `insert-link` adds one URL to an exact note as its own paragraph, at the end
+  or directly under the title. `mode: "raw"` shows the URL itself as a stored
+  link, or as plain text with `linked: false`; `mode: "hyperlink"` shows a
+  `label` that links to the URL. It uses `append-to-note`'s guards (fresh
+  `expectedContentHash`, attachment block, existing links must survive) and
+  routes notes with native objects to native end-append. The result is proven
+  from the note's stored link runs and reports `linkStored` and `storedUrl`.
+  Rich URL preview cards are not produced: no public automation route creates
+  one.
+
 ## [2.8.18] - 2026-09-23
 
 ### Fixed

@@ -43765,6 +43765,121 @@ function parseNoteTable(compressed) {
   return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
 }
 
+// src/utils/linkInsert.ts
+var MAX_LINK_URL_LENGTH = 4096;
+var MAX_LINK_LABEL_LENGTH = 2e3;
+var LINK_SCHEMES = /^(?:https?:\/\/[^/?#\s]+|mailto:[^\s]|notes:\/\/[^\s]|applenotes:[^\s])/i;
+function validateLinkUrl(url) {
+  if (!url) throw new Error("Link URL is required");
+  if (url.length > MAX_LINK_URL_LENGTH)
+    throw new Error(`Link URL is longer than ${MAX_LINK_URL_LENGTH} characters`);
+  if (Array.from(url).some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127))
+    throw new Error("Link URL cannot contain spaces, line breaks or control characters");
+  if (/[<>"]/u.test(url)) throw new Error('Link URL cannot contain <, > or "');
+  if (!LINK_SCHEMES.test(url))
+    throw new Error(
+      "Link URL must be an absolute http(s) URL with a host, or a mailto:, notes:// or applenotes: link"
+    );
+  return url;
+}
+function validateLinkLabel(label) {
+  if (!label.trim()) throw new Error("Hyperlink label must contain visible text");
+  if (label.length > MAX_LINK_LABEL_LENGTH)
+    throw new Error(`Hyperlink label is longer than ${MAX_LINK_LABEL_LENGTH} characters`);
+  if (Array.from(label).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
+    throw new Error("Hyperlink label must be one line without control characters");
+  return label;
+}
+var escapeText = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escapeHref = (url) => escapeText(url).replace(/"/g, "&quot;");
+function buildLinkInsertion(request) {
+  const url = validateLinkUrl(request.url);
+  if (request.mode === "hyperlink") {
+    if (request.label === void 0) throw new Error("Hyperlink mode requires a label");
+    if (request.linked === false)
+      throw new Error("linked=false applies to raw mode only; a hyperlink is always linked");
+    const label = validateLinkLabel(request.label);
+    return {
+      html: `<div><a href="${escapeHref(url)}">${escapeText(label)}</a></div>`,
+      text: label,
+      link: { text: label, url }
+    };
+  }
+  if (request.label !== void 0)
+    throw new Error("A label applies to hyperlink mode only; raw mode shows the URL itself");
+  if (request.linked === false)
+    return { html: `<div>${escapeText(url)}</div>`, text: url, link: null };
+  return {
+    html: `<div><a href="${escapeHref(url)}">${escapeText(url)}</a></div>`,
+    text: url,
+    link: { text: url, url }
+  };
+}
+function countMatchingLinks(links, expected) {
+  const wanted = linkSignature([expected]);
+  return links.filter((link) => linkSignature([link]) === wanted).length;
+}
+function countLinksTo(links, url) {
+  const wanted = linkSignature([{ text: "x", url }]);
+  return links.filter((link) => linkSignature([{ text: "x", url: link.url }]) === wanted).length;
+}
+function verifyLinkReadback(before, after, insertion, url) {
+  for (const link of before) {
+    if (countMatchingLinks(after, link) < countMatchingLinks(before, link))
+      throw new Error("An existing link changed during the insert; read the note before retrying");
+  }
+  if (insertion.link) {
+    const added = countMatchingLinks(after, insertion.link) - countMatchingLinks(before, insertion.link);
+    if (added !== 1)
+      throw new Error(
+        "The inserted link was not found in the note's stored links; read the note before retrying"
+      );
+    const stored = after.filter(
+      (link) => linkSignature([link]) === linkSignature([insertion.link])
+    );
+    return { linkStored: true, storedUrl: stored[stored.length - 1].url };
+  }
+  const gained = countLinksTo(after, url) - countLinksTo(before, url);
+  return gained > 0 ? {
+    linkStored: true,
+    storedUrl: after.filter((link) => countLinksTo([link], url) === 1).pop().url
+  } : { linkStored: false };
+}
+
+// src/services/linkInsert.ts
+function insertLink(request, deps) {
+  const insertion = buildLinkInsertion(request);
+  const before = deps.readLinks(request.id);
+  const outcome = deps.append({
+    id: request.id,
+    expectedContentHash: request.expectedContentHash,
+    content: insertion.html,
+    position: request.position === "after-title" ? "before" : "after",
+    separator: request.blankLine ? "\n\n" : "",
+    scopeText: request.scopeText
+  });
+  let readback;
+  try {
+    readback = verifyLinkReadback(before, deps.readLinks(request.id), insertion, request.url);
+  } catch (error2) {
+    throw new Error(
+      `The text was written, but link verification failed: ${error2 instanceof Error ? error2.message : String(error2)}. Do not retry automatically.`
+    );
+  }
+  return {
+    ok: true,
+    id: request.id,
+    mode: request.mode,
+    url: request.url,
+    text: insertion.text,
+    position: request.position,
+    route: outcome.route,
+    ...readback,
+    previousContentHash: request.expectedContentHash,
+    contentHash: outcome.contentHash
+  };
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -45246,6 +45361,115 @@ registerTool(
     "Error updating note"
   )
 );
+function guardedAppend({
+  id: id2,
+  expectedContentHash,
+  content,
+  position = "after",
+  separator = "\n\n",
+  format = "plaintext",
+  scopeText,
+  htmlSeparator
+}, onRoute) {
+  const contentToHtml = (text) => {
+    if (format === "html") return text;
+    return text.split("\n").map((line) => {
+      const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<div>${escaped || "<br>"}</div>`;
+    }).join("");
+  };
+  const separatorToHtml = (sep2) => {
+    if (format === "html") return sep2;
+    if (sep2 === "\n\n") return "<div><br></div>";
+    const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<div>${escaped}</div>`;
+  };
+  const snapshot = readExactNoteSnapshot(id2);
+  if ("error" in snapshot) return errorResponse(snapshot.error);
+  if (snapshot.contentHash !== expectedContentHash) {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (!snapshot.rich.writable) {
+    if (separator !== "\n\n")
+      return errorResponse("Native append supports the default blank-line separator only");
+    if (position !== "after") return errorResponse("Native append supports the end of a note only");
+    if (!scopeText)
+      return errorResponse("Provide scopeText: a unique existing phrase for native append");
+    if (!VERIFIED_BACKGROUND.has("append-native"))
+      return errorResponse("Native append has not passed live validation; see get-capabilities");
+    onRoute?.("native");
+    const result2 = appendNative(notesManager, {
+      id: id2,
+      expectedContentHash,
+      scopeText,
+      content,
+      format
+    });
+    return successResponse("Native append verified without replacing existing objects", result2);
+  }
+  onRoute?.("applescript");
+  const attachments = notesManager.listAttachmentsById(id2);
+  if (attachments.length > 0) {
+    return errorResponse(
+      `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
+    );
+  }
+  assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
+  const firstDivEnd = snapshot.rich.content.indexOf("</div>");
+  const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
+  const bodyHtml = firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
+  const newBlock = contentToHtml(content);
+  const sepHtml = htmlSeparator ?? separatorToHtml(separator);
+  const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
+  const result = notesManager.updateNoteByIdIfUnchanged(
+    id2,
+    snapshot.note.title,
+    snapshot.body,
+    void 0,
+    combinedBody,
+    "html",
+    snapshot.rich.revision
+  );
+  if (result.status === "conflict") {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (result.status === "attachments") {
+    return errorResponse(
+      `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
+    );
+  }
+  if (result.status !== "updated") {
+    return errorResponse(
+      `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
+    );
+  }
+  const readback = notesManager.getNoteContentById(id2);
+  const richReadback = enrichNoteRead(id2, readback || "");
+  const contentHash = readback ? richContentHash(readback, richReadback) : "";
+  if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
+    return errorResponse(
+      "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
+    );
+  }
+  if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
+    return errorResponse(
+      `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
+    );
+  }
+  const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
+  return successResponse(
+    `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
+    {
+      ok: true,
+      id: id2,
+      title: snapshot.note.title,
+      shared: snapshot.note.shared ?? false,
+      previousContentHash: expectedContentHash,
+      contentHash,
+      verifiedVisibleText: true
+    }
+  );
+}
 registerTool(
   "append-to-note",
   {
@@ -45271,118 +45495,76 @@ registerTool(
       verifiedVisibleText: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(
-    ({
-      id: id2,
-      expectedContentHash,
-      content,
-      position = "after",
-      separator = "\n\n",
-      format = "plaintext",
-      scopeText
-    }) => {
-      const contentToHtml = (text) => {
-        if (format === "html") return text;
-        return text.split("\n").map((line) => {
-          const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return `<div>${escaped || "<br>"}</div>`;
-        }).join("");
-      };
-      const separatorToHtml = (sep2) => {
-        if (format === "html") return sep2;
-        if (sep2 === "\n\n") return "<div><br></div>";
-        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<div>${escaped}</div>`;
-      };
-      const snapshot = readExactNoteSnapshot(id2);
-      if ("error" in snapshot) return errorResponse(snapshot.error);
-      if (snapshot.contentHash !== expectedContentHash) {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (!snapshot.rich.writable) {
-        if (separator !== "\n\n")
-          return errorResponse("Native append supports the default blank-line separator only");
-        if (position !== "after")
-          return errorResponse("Native append supports the end of a note only");
-        if (!scopeText)
-          return errorResponse("Provide scopeText: a unique existing phrase for native append");
-        if (!VERIFIED_BACKGROUND.has("append-native"))
-          return errorResponse(
-            "Native append has not passed live validation; see get-capabilities"
-          );
-        const result2 = appendNative(notesManager, {
-          id: id2,
-          expectedContentHash,
-          scopeText,
-          content,
-          format
-        });
-        return successResponse("Native append verified without replacing existing objects", result2);
-      }
-      const attachments = notesManager.listAttachmentsById(id2);
-      if (attachments.length > 0) {
-        return errorResponse(
-          `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
-        );
-      }
-      assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
-      const firstDivEnd = snapshot.rich.content.indexOf("</div>");
-      const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
-      const bodyHtml = firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
-      const newBlock = contentToHtml(content);
-      const sepHtml = separatorToHtml(separator);
-      const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
-      const result = notesManager.updateNoteByIdIfUnchanged(
-        id2,
-        snapshot.note.title,
-        snapshot.body,
-        void 0,
-        combinedBody,
-        "html",
-        snapshot.rich.revision
-      );
-      if (result.status === "conflict") {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (result.status === "attachments") {
-        return errorResponse(
-          `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
-        );
-      }
-      if (result.status !== "updated") {
-        return errorResponse(
-          `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
-        );
-      }
-      const readback = notesManager.getNoteContentById(id2);
-      const richReadback = enrichNoteRead(id2, readback || "");
-      const contentHash = readback ? richContentHash(readback, richReadback) : "";
-      if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
-        return errorResponse(
-          "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
-        );
-      }
-      if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
-        return errorResponse(
-          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
-        );
-      }
-      const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
-      return successResponse(
-        `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
-        {
-          ok: true,
-          id: id2,
-          title: snapshot.note.title,
-          shared: snapshot.note.shared ?? false,
-          previousContentHash: expectedContentHash,
-          contentHash,
-          verifiedVisibleText: true
-        }
-      );
+  withErrorHandling((args) => guardedAppend(args), "Error appending to note")
+);
+registerTool(
+  "insert-link",
+  {
+    description: "Use when: adding one web, mail or Notes link to an exact note, either as the raw URL (mode 'raw') or as label text that links to the URL (mode 'hyperlink').\nReturns: exact id, the route used, whether Notes stored a link on the inserted text, the stored destination read back from the note, and the new content hash.\nDo not use when: linking to another note by id (insert-note-link fetches its real deep link), or you want a rich URL preview card (not available: no public automation route creates one).\nSafety: same guards as append-to-note (fresh expectedContentHash, attachment block, existing links must survive). Notes with native objects use native end-append and need scopeText; there only position 'end' with a blank line is supported. The link is placed in its own paragraph at the end or directly after the title; placing it inside an existing paragraph is not supported.",
+    inputSchema: {
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
+      url: external_exports.string().min(1, "url is required").max(MAX_LINK_URL_LENGTH).describe(
+        "Link destination: absolute http(s) URL with a host, or a mailto:, notes:// or applenotes: link. No spaces."
+      ),
+      mode: external_exports.enum(["raw", "hyperlink"]).optional().default("raw").describe(
+        "'raw' (default) shows the URL itself; 'hyperlink' shows `label` linking to the URL"
+      ),
+      label: external_exports.string().max(MAX_LINK_LABEL_LENGTH).optional().describe("Visible text for mode 'hyperlink' (required there, refused in raw mode)"),
+      linked: external_exports.boolean().optional().describe(
+        "Raw mode only. true (default) stores a real link on the URL text. false writes plain text with no stored link; Notes may still detect it when displaying, and the result reports linkStored."
+      ),
+      position: external_exports.enum(["end", "after-title"]).optional().default("end").describe("'end' (default) or 'after-title' (first paragraph below the title)"),
+      blankLine: external_exports.boolean().optional().default(true).describe(
+        "Leave a blank line between existing text and the link paragraph (default true; native-object notes require true)"
+      ),
+      scopeText: external_exports.string().min(12).max(500).optional().describe("Existing unique phrase; required only for notes with native objects")
     },
-    "Error appending to note"
-  )
+    outputSchema: {
+      ok: external_exports.boolean().optional(),
+      id: external_exports.string().optional(),
+      mode: external_exports.string().optional(),
+      url: external_exports.string().optional(),
+      text: external_exports.string().optional(),
+      position: external_exports.string().optional(),
+      route: external_exports.string().optional(),
+      linkStored: external_exports.boolean().optional(),
+      storedUrl: external_exports.string().optional(),
+      previousContentHash: external_exports.string().optional(),
+      contentHash: external_exports.string().optional()
+    }
+  },
+  withErrorHandling((args) => {
+    const result = insertLink(
+      {
+        ...args,
+        mode: args.mode ?? "raw",
+        position: args.position ?? "end",
+        blankLine: args.blankLine ?? true
+      },
+      {
+        readLinks: (noteId3) => readRichNote(noteId3).links,
+        append: (request) => {
+          let route = "applescript";
+          const response = guardedAppend(
+            {
+              ...request,
+              format: "html",
+              htmlSeparator: request.separator ? "<div><br></div>" : ""
+            },
+            (r) => route = r
+          );
+          if (response.isError) throw new Error(response.content[0].text);
+          return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
+        }
+      }
+    );
+    const stored = result.linkStored ? `stored link to ${result.storedUrl}` : "no stored link (plain text)";
+    return successResponse(
+      `Link inserted (${result.mode}, ${result.position}, ${result.route}); ${stored}`,
+      { ...result }
+    );
+  }, "Error inserting link")
 );
 registerTool(
   "delete-note",

@@ -35,6 +35,7 @@ Use this skill when the user:
 | `get-note-link` | Get the shareable `notes://showNote?identifier=…` deep link for a note |
 | `update-note` | Replace a note's title and/or body |
 | `append-to-note` | Add content to a note without replacing it (`position: "after"` / `"before"`) |
+| `insert-link` | Add one URL to a note as its raw text or as a labeled hyperlink, verified from the stored link |
 | `delete-note` | Remove a note (moves to Recently Deleted) |
 | `batch-delete-notes` | Delete multiple notes by ID (max 500 per call) |
 | `move-note` | Move a note to a different folder |
@@ -140,6 +141,14 @@ fixed HTML subset: `<a> <b> <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li>
 attributes. Anything outside that subset is refused by name — rewrite the whole
 body with `update-note` instead.
 
+**Adding a web link — use `insert-link`.** Pass `url` and either `mode: "raw"`
+(the URL is its own clickable text) or `mode: "hyperlink"` with a `label`.
+`position` is `"end"` (default) or `"after-title"`. It checks the stored link
+afterwards and reports `linkStored` and `storedUrl`. A plain URL typed into
+`append-to-note` content stays plain text: Notes does not turn it into a stored
+link. Rich URL preview cards cannot be created. For a link to another note, use
+`insert-note-link`.
+
 ```
 User: "Add milk to my shopping list"
 Action:
@@ -220,7 +229,7 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
 - Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.
 - Escape literal `&`, `<`, and `>` in user content as `&amp;`, `&lt;`, and `&gt;`.
 - Avoid nested lists when possible. Apple Notes can flatten or misplace nested list markup.
-- Use bare URLs when updating existing notes if anchor tags are stripped by Notes on save.
+- For a clickable link, use `<a href="…">` in HTML content or `insert-link`. A bare URL written as text is stored as plain text, not as a link.
 - Do not use decorative separators between sections (horizontal rules, repeated dashes, or box-drawing characters). They render inconsistently in Notes; use an empty `<div><br></div>` spacer instead.
 
 Do not use CDATA sections. They can render literally in Apple Notes.
