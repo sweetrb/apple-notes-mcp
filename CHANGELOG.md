@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.10.0] - 2026-09-23
+## [2.9.5] - 2026-09-23
 
 ### Added
 
@@ -17,7 +17,7 @@
   `~/Library/Application Support/apple-notes-mcp/templates`).
 - The capability matrix lists the library as `markdownTemplateLibrary`.
 
-## [2.9.0] - 2026-09-23
+## [2.9.4] - 2026-09-23
 
 ### Added
 
@@ -48,6 +48,117 @@
 
 - `export-notes-markdown` without a template produces the same output as
   2.8.49.
+
+## [2.9.3] - 2026-09-23
+
+### Added
+
+- `get-note-structure` returns a read-only overview of one note from the
+  NoteStore database: decoded text, a block summary, every link with its kind
+  (`inline` hyperlink, rich link `card`, native `note` link chip, native
+  `section` link chip) and its target note and paragraph UUIDs when the URL
+  carries them, native tags, and attachments. Attachments come from the same
+  reader `list-attachments` uses, so both tools report the same `kind`, body
+  order, `previewPath` and `firstImage` for an attachment; gallery and
+  recording children are nested under their parent. Metadata covers
+  `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `inRecentlyDeleted` (including stores that mark
+  Recently Deleted only by its `TrashFolder` identifier), `lastViewed` with a
+  `lastViewedStatus`, `wordCount`, `charCount`, `attachmentCount` (top-level
+  only), `checklistTotal`/`checklistDone` and `hasDrawing`. A
+  password-protected note returns its metadata and attachment rows, with the
+  body-derived fields null. The id accepts the same forms as the other
+  exact-id tools.
+- `src/utils/noteLinks.ts` classifies link kinds and parses Notes deep links
+  for the link features that follow.
+- TECHNICAL_NOTES.md documents where Notes stores each link kind, how preview
+  renditions map to files, the never-viewed `lastViewed` value, and how sharing
+  is derived.
+
+## [2.9.2] - 2026-09-23
+
+### Added
+
+- `list-recent-notes` lists notes from NoteStore (read-only) by stored
+  modification time, for incremental sync. With `since`, rows come oldest
+  first after that point and `nextSince` is the last row's cursor, so every
+  call advances, including one that fills its `limit`. `saturated` (count
+  equals limit) means more changes may follow; call again with `nextSince`
+  until it is `false`. `since` takes a `modifiedCheckpoint` cursor, an ISO
+  8601 date (local midnight), or an ISO date-time (local unless it carries an
+  offset). Each row's `modifiedCheckpoint` is an opaque
+  `cdts1:<bits>:<key>` cursor: the stored timestamp's exact IEEE-754 bits,
+  read and bound through sqlite3's `ieee754` functions so they never pass
+  through a JavaScript `Date` or a rounded decimal, plus the note's database
+  key, which orders notes that share one timestamp so paging never skips or
+  repeats them. A first full sync starts from `since: "1970-01-01"` and
+  reaches a library of any size. Without `since`, rows come newest first and
+  `nextSince` is set only when every match was returned. Options: `account`,
+  `folder`, `limit` (default 50, max 1000), `includeDeleted` (Recently
+  Deleted, notes awaiting deletion, and folderless rows), `wordCounts`
+  (`wordCount`/`charCount` from the shared body decoder; `null` for locked or
+  unavailable bodies, `0` for known-empty ones), and `bodyPreview` (180
+  characters plus `textDecoded`). The docs note two limits of a
+  modification-date cursor: an edit iCloud delivers later from another device
+  with an older timestamp can be missed, and deletions are invisible unless
+  `includeDeleted` is set.
+- `list-folder-tree` returns each account's folder hierarchy with direct
+  (`noteCount`) and cumulative (`totalNoteCount`) note counts, folder kind
+  (regular, smart, Recently Deleted), ids, and paths in one read.
+  `includeDeleted` adds folders marked for deletion.
+
+### Changed
+
+- `list-notes`' description now points to `list-recent-notes` for date
+  order, sync cursors, or word counts. Its behavior is unchanged.
+
+## [2.9.1] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). The guard's revision is re-read just before the delete, and
+  its body, lock state, and folder are checked again inside the delete
+  AppleScript, with the same fail-closed Recently Deleted test as the note
+  being deleted. `requireActiveNoteId` requires a second note to stay active
+  without fingerprinting its content. The Quick Note check reads the database,
+  so the guard needs Full Disk Access; a guard note the database has not saved
+  yet passes on the live checks. The pair is not one transaction.
+
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- Opt-in, **read-only** native private helper (#181, #204, thanks
+  @oliverames). A small Objective-C program, shipped as source in
+  `native/private-helper/` and built on the user's Mac with
+  `apple-notes-mcp setup --native-helper`, opens the Notes store through
+  Apple's private NotesShared model and speaks a versioned JSON protocol with
+  a fixed action list (`hello`, `probe`, `read_note_state`). It is off unless
+  `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`, and the server checks the helper's
+  source and binary SHA-256 before every call. Two tools:
+  - `native-helper-status`: build and opt-in state plus a live probe of the
+    framework, required selectors, model properties, and store access, with
+    a reason code.
+  - `native-note-state`: a note's native title, dates, flags, iCloud version
+    counters, and an opaque change token.
+- The helper is read-only by construction: every store it opens uses
+  `NSReadOnlyPersistentStoreOption` with migration disabled, it refuses to
+  continue if Core Data reports a writable store, no code path saves a
+  context, and setup refuses to install a helper that does not report
+  `readOnly: true` or offers any action outside the read-only whitelist. A
+  source test fails the build if a save or write path reappears. Helper
+  errors use the shared `code`/`committed` error envelope (#185).
+- Write support was deliberately deferred by the maintainer. The proposed
+  `native-append-plain-text` action was removed before merge: a second writer
+  beside a running Notes.app, CRDT replica identity, and the iCloud upload lag
+  (a helper-written change was not uploaded until Notes.app next saved that
+  note) are unresolved. The capability matrix's write-dependent placeholders
+  (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`)
+  stay `not_implemented`; their requirement is now labelled
+  `native_write_helper`.
 
 ## [2.8.49] - 2026-09-23
 

@@ -37,6 +37,7 @@ import type {
   AudioTranscriptsResult,
   NoteTablesResult,
   SmartFolder,
+  DeleteGuardNote,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -137,6 +138,27 @@ const FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
 function trashFolderIdList(): string {
   const ids = readTrashFolderIds().filter((id) => FOLDER_ID_PATTERN.test(id));
   return `{${ids.map((id) => `"${id}"`).join(", ")}}`;
+}
+
+/**
+ * AppleScript that sets `flagVar` to true when the container held in
+ * `containerVar` is Recently Deleted. It fails closed: a container that is not
+ * a folder, or whose class cannot be read, counts as Recently Deleted, because
+ * a note trashed earlier in the same Notes session reports such a container
+ * (#214). `trashIds` is a {@link trashFolderIdList} literal.
+ */
+function inRecentlyDeletedScript(containerVar: string, flagVar: string, trashIds: string): string {
+  return `
+      set ${flagVar} to true
+      try
+        if (class of ${containerVar}) is folder then set ${flagVar} to false
+      end try
+      try
+        if ${trashIds} contains (id of ${containerVar}) then set ${flagVar} to true
+      end try
+      try
+        if (name of ${containerVar}) is "${RECENTLY_DELETED_FOLDER_NAME}" then set ${flagVar} to true
+      end try`;
 }
 
 /**
@@ -1727,11 +1749,19 @@ export class AppleNotesManager {
    * Deletes one exact note only when its complete body still matches the body
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
+   *
+   * `guards` are other notes that must still be active when the delete runs
+   * (the copy-then-retire guard of delete-note): each must exist, be unlocked,
+   * and sit in a folder other than Recently Deleted, and one with
+   * `expectedBody` must still have that body. They are checked in the same
+   * script, just before the delete; `index` in a guard outcome points into
+   * `guards`.
    */
   deleteNoteByIdIfUnchanged(
     id: string,
     expectedBody: string,
-    scope?: ScopeGuard
+    scope?: ScopeGuard,
+    guards: DeleteGuardNote[] = []
   ):
     | {
         status:
@@ -1742,7 +1772,9 @@ export class AppleNotesManager {
           | "container-unknown"
           | "failed";
       }
-    | { status: "scope_conflict"; reason: string } {
+    | { status: "scope_conflict"; reason: string }
+    | { status: "guard-conflict"; index: number }
+    | { status: "guard-inactive"; index: number; reason: string } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
@@ -1759,27 +1791,49 @@ export class AppleNotesManager {
     // whose container cannot be read at all is refused as container-unknown,
     // since whether it is in Recently Deleted cannot be ruled out.
     //
+    // Guard notes get the same live checks, so a copy that was trashed, locked,
+    // or edited after it was verified stops the delete.
+    //
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
     // was not moved to Recently Deleted and must not be reported as deleted.
+    const trashIds = trashFolderIdList();
+    const guardChecks = guards
+      .map((guard, index) => {
+        const safeGuardId = sanitizeNoteId(guard.id);
+        const ref = `__guardRef${index}`;
+        const folderVar = `__guardFolder${index}`;
+        const inactive = (reason: string) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+        let bodyCheck = "";
+        if (guard.expectedBody !== undefined) {
+          validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
+          const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
+          bodyCheck = `
+      set __guardBody to body of ${ref}
+      considering case
+        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+      end considering`;
+        }
+        return `
+      if not (exists note id "${safeGuardId}") then ${inactive("missing")}
+      set ${ref} to note id "${safeGuardId}"
+      if password protected of ${ref} then ${inactive("locked")}
+      set ${folderVar} to missing value
+      try
+        set ${folderVar} to container of ${ref}
+      end try
+      if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
+      if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
+      })
+      .join("");
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
-      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"
-      set __inTrash to true
-      try
-        if (class of originalFolder) is folder then set __inTrash to false
-      end try
-      try
-        if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
-      end try
-      try
-        if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
-      end try
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
@@ -1799,6 +1853,13 @@ export class AppleNotesManager {
     const deleteScopeFailure = parseScopeFailure(result.output);
     if (deleteScopeFailure) return { status: "scope_conflict", reason: deleteScopeFailure };
     const status = result.output.trim();
+    const guardOutcome = /^SAFETY_GUARD_(CONFLICT|INACTIVE):(\d+)(?::(.+))?$/.exec(status);
+    if (guardOutcome && Number(guardOutcome[2]) < guards.length) {
+      const index = Number(guardOutcome[2]);
+      return guardOutcome[1] === "CONFLICT"
+        ? { status: "guard-conflict", index }
+        : { status: "guard-inactive", index, reason: guardOutcome[3] ?? "inactive" };
+    }
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
