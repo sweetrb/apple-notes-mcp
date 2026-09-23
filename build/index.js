@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve6.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve6(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve6(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve6,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join26(output, replacement);
+        return join27(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join26(output, rule.append(self.options));
+          output = join27(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join26(output, replacement) {
+    function join27(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve6(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve6, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve6();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve6);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
@@ -47332,13 +47332,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve6 = (pk, seen) => {
+  const resolve7 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve6(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47352,7 +47352,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve6(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -52858,7 +52858,7 @@ function parseXml(source, limits) {
       if (a.name === "xmlns") scope2.set("", a.value);
       else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
     }
-    const resolve6 = (qualified, isAttribute) => {
+    const resolve7 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
       const prefix = qualified.slice(0, colon);
@@ -52868,12 +52868,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve6(name, false);
+    const resolved = resolve7(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve6(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve7(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -54573,42 +54573,33 @@ function formatShortcutSetup(report) {
   return lines.join("\n");
 }
 
-// src/services/privateHelperBuild.ts
-import { spawnSync as spawnSync4 } from "node:child_process";
+// src/services/publicHelper.ts
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { createHash as createHash5 } from "node:crypto";
 import {
   chmodSync,
-  existsSync as existsSync15,
+  existsSync as existsSync14,
   mkdirSync as mkdirSync6,
   mkdtempSync as mkdtempSync5,
+  readFileSync as readFileSync4,
   renameSync,
   rmSync as rmSync5,
   writeFileSync as writeFileSync4
 } from "node:fs";
-import { release as release3 } from "node:os";
-import { join as join25 } from "node:path";
-
-// src/services/privateHelper.ts
-import { spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash5 } from "node:crypto";
-import { existsSync as existsSync14, readFileSync as readFileSync4 } from "node:fs";
-import { homedir as homedir19 } from "node:os";
+import { homedir as homedir19, release as release3 } from "node:os";
 import { dirname as dirname8, join as join24, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
-var PRIVATE_HELPER_PROTOCOL = 1;
-var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
-var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
-var TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
-var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
-  "hello",
-  "probe",
-  "read_note_state"
-]);
-var HELPER_BINARY_NAME = "apple-notes-private-helper";
-var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
-var MANIFEST_NAME = "manifest.json";
-var DEFAULT_TIMEOUT_MS2 = 2e4;
-var MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
-var manifestSchema = external_exports.object({
+var PUBLIC_HELPER_PROTOCOL = 1;
+var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
+var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
+var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
+var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
+var PUBLIC_HELPER_MANIFEST = "manifest.json";
+var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set(["hello", "decode_drawing"]);
+var DEFAULT_TIMEOUT_MS2 = 3e4;
+var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var publicManifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
   sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
@@ -54623,8 +54614,8 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
     const candidate = join24(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync4(candidate, "utf8"));
-        if (pkg.name === "apple-notes-mcp") return dir;
+        if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
+          return dir;
       } catch {
       }
     }
@@ -54633,14 +54624,623 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
     dir = parent;
   }
 }
+function defaultPublicHelperDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join24(packageRoot(), PUBLIC_HELPER_SOURCE),
+    exists: existsSync14,
+    readFile: (path10) => readFileSync4(path10),
+    spawn: spawnSync3,
+    ...overrides
+  };
+}
+function publicHelperInstallDir(env = process.env) {
+  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join24(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+}
+function sha256Hex(data) {
+  return createHash5("sha256").update(data).digest("hex");
+}
+function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
+  const installDir = publicHelperInstallDir(deps.env);
+  const binaryPath = join24(installDir, PUBLIC_HELPER_BINARY);
+  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  const manifestPath = join24(installDir, PUBLIC_HELPER_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail(
+      "helper_manifest_invalid",
+      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
+    return {
+      ...fail(
+        "helper_stale",
+        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
+      ),
+      manifest
+    };
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return {
+      ...fail(
+        "helper_modified",
+        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
+      ),
+      manifest
+    };
+  return { ...base, manifest, ready: true, reason: null, detail: null };
+}
+var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid"
+]);
+var PublicHelperError = class extends CodedError {
+  constructor(code, message) {
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      helperCode: code
+    });
+    this.code = code;
+    this.name = "PublicHelperError";
+  }
+  code;
+};
+var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
+var publicHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || options.timeoutMs || DEFAULT_TIMEOUT_MS2;
+  const result = deps.spawn(binaryPath, [], {
+    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PublicHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  let parsed;
+  try {
+    parsed = JSON.parse(String(result.stdout ?? "").trim());
+  } catch {
+    throw new PublicHelperError(
+      "invalid_response",
+      `The helper exited with status ${result.status} and no JSON response.`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
+  const object3 = parsed;
+  if (result.status !== 0 || object3.status !== "ok") {
+    const error2 = errorSchema.safeParse(object3);
+    if (!error2.success)
+      throw new PublicHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized response (exit ${result.status}).`
+      );
+    throw new PublicHelperError(error2.data.code, error2.data.message);
+  }
+  return object3;
+}
+function defaultPublicHelperBuildDeps() {
+  return {
+    ...defaultPublicHelperDeps(),
+    osVersion: () => {
+      const r = spawnSync3("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function sourceDigestSwift(sourceSha) {
+  return `let helperSourceSHA256 = "${sourceSha}"
+`;
+}
+var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
+function publicHelperInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>apple-notes-mcp public helper</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "PencilKit",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
+  const steps = [];
+  const done = (ok) => ({
+    ok,
+    checkOnly,
+    steps,
+    installation: inspectPublicHelper(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectPublicHelper(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = publicHelperInstallDir(deps.env);
+  mkdirSync6(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync5(join24(installDir, ".staging-"));
+  try {
+    const stagedBinary = join24(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join24(staging, "source-digest.swift");
+    const plistPath = join24(staging, "Info.plist");
+    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = publicHelloSchema.parse(
+        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync(stagedBinary, 448);
+    renameSync(stagedBinary, join24(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync4(
+      join24(installDir, PUBLIC_HELPER_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync5(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPublicHelper(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatPublicHelperBuild(report) {
+  const lines = ["Apple Notes MCP public native helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
+  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+
+// src/utils/noteStoreQuery.ts
+function parseNoteObjectId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/.exec(noteId3);
+  if (!match)
+    throw new NoteStoreError(
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`,
+      "invalid_input"
+    );
+  return { store: match[1], pk: Number(match[2]) };
+}
+function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH7) {
+  return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
+}
+var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
+function assertNoteReadable(stateLine, noteId3) {
+  let state;
+  try {
+    state = JSON.parse(stateLine || "{}");
+  } catch {
+    throw new NoteStoreError("Unexpected response from the Notes database.", "query_error");
+  }
+  if (!state.found)
+    throw new CodedError(`No note found in the database for ID "${noteId3}".`, {
+      code: "not_found"
+    });
+  if (state.locked)
+    throw new CodedError(
+      "This note is password-protected; its attachments are encrypted and cannot be read.",
+      { code: "unsupported" }
+    );
+}
+
+// src/utils/noteDrawings.ts
+function drawingRowsSql(columns, dataColumn) {
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`
+  ].join("\n");
+}
+function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH7) {
+  const { store, pk } = parseNoteObjectId(noteId3);
+  const columns = readColumns(dbPath2);
+  const dataColumn = columns.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
+  if (!dataColumn)
+    throw new NoteStoreError(
+      "This macOS version's Notes database has no drawing data column.",
+      "schema"
+    );
+  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns, dataColumn), pk, dbPath2);
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  return rows.map((row) => ({
+    pk: row.pk,
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier ?? "",
+    typeUti: row.uti,
+    data: row.data ? Buffer.from(row.data, "hex") : null
+  }));
+}
+function svgNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+function escapeAttribute2(value) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+var clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value || 0)));
+var clampUnit = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+function drawingViewBox(strokes, fallback) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const stroke of strokes) {
+    const pad = stroke.width / 2;
+    const extend2 = (x, y, r) => {
+      minX = Math.min(minX, x - r);
+      minY = Math.min(minY, y - r);
+      maxX = Math.max(maxX, x + r);
+      maxY = Math.max(maxY, y + r);
+    };
+    if (stroke.points?.length) for (const p of stroke.points) extend2(p.x, p.y, pad);
+    else {
+      extend2(stroke.bounds.x, stroke.bounds.y, 0);
+      extend2(stroke.bounds.x + stroke.bounds.width, stroke.bounds.y + stroke.bounds.height, 0);
+    }
+  }
+  if (minX === Infinity) return fallback ?? { x: 0, y: 0, width: 1, height: 1 };
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+function drawingToSvg(strokes, fallback) {
+  const box = drawingViewBox(strokes, fallback);
+  const parts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${svgNumber(box.x)} ${svgNumber(box.y)} ${svgNumber(box.width)} ${svgNumber(box.height)}" width="${svgNumber(box.width)}" height="${svgNumber(box.height)}">`
+  ];
+  for (const stroke of strokes) {
+    const points = stroke.points ?? [];
+    if (points.length === 0) continue;
+    const c = stroke.color;
+    const color = `rgb(${clampChannel(c.red)},${clampChannel(c.green)},${clampChannel(c.blue)})`;
+    const shared = `stroke="${color}" stroke-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"`;
+    if (points.length === 1) {
+      parts.push(
+        `<circle cx="${svgNumber(points[0].x)}" cy="${svgNumber(points[0].y)}" r="${svgNumber(stroke.width / 2)}" fill="${color}" fill-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"/>`
+      );
+      continue;
+    }
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${svgNumber(p.x)} ${svgNumber(p.y)}`).join(" ");
+    parts.push(
+      `<path d="${d}" fill="none" ${shared} stroke-width="${svgNumber(stroke.width)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    );
+  }
+  parts.push("</svg>");
+  return parts.join("\n");
+}
+
+// src/services/noteDrawings.ts
+var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
+var strokeSchema = external_exports.object({
+  inkType: external_exports.string(),
+  color: external_exports.object({
+    red: external_exports.number(),
+    green: external_exports.number(),
+    blue: external_exports.number(),
+    alpha: external_exports.number()
+  }),
+  width: external_exports.number(),
+  pointCount: external_exports.number().int(),
+  bounds,
+  points: external_exports.array(
+    external_exports.object({
+      x: external_exports.number(),
+      y: external_exports.number(),
+      width: external_exports.number(),
+      opacity: external_exports.number(),
+      force: external_exports.number()
+    })
+  ).optional(),
+  transformApplied: external_exports.boolean().optional()
+}).strip();
+var decodedDrawingSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  strokeCount: external_exports.number().int(),
+  strokes: external_exports.array(strokeSchema),
+  truncated: external_exports.boolean(),
+  bounds
+});
+function decodeRow(row, format, includePoints, deps) {
+  const base = {
+    attachmentId: row.attachmentId,
+    identifier: row.identifier,
+    typeUti: row.typeUti,
+    status: "error"
+  };
+  if (!row.data || row.data.length === 0)
+    return { ...base, code: "no_data", message: "This drawing has no stored PencilKit data." };
+  let decoded;
+  try {
+    const needPoints = includePoints || format !== "json";
+    const raw = callPublicHelper(
+      "decode_drawing",
+      { dataBase64: row.data.toString("base64"), includePoints: needPoints },
+      deps
+    );
+    const parsed = decodedDrawingSchema.safeParse(raw);
+    if (!parsed.success)
+      return { ...base, code: "invalid_response", message: "Unexpected helper response." };
+    decoded = parsed.data;
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
+  }
+  const strokes = decoded.strokes;
+  const result = {
+    ...base,
+    status: "ok",
+    strokeCount: decoded.strokeCount,
+    bounds: decoded.bounds,
+    truncated: decoded.truncated
+  };
+  if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
+  if (format !== "svg")
+    result.strokes = includePoints ? strokes : strokes.map(({ points: _points, ...rest }) => rest);
+  return result;
+}
+function getNoteDrawings(noteId3, options = {}) {
+  const format = options.format ?? "json";
+  const includePoints = options.includePoints ?? true;
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  const rows = (options.readRows ?? readDrawingRows2)(noteId3, options.dbPath);
+  if (rows.length === 0) return { id: noteId3, drawingCount: 0, status: "none", drawings: [] };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
+  const ok = drawings.filter((d) => d.status === "ok").length;
+  return {
+    id: noteId3,
+    drawingCount: drawings.length,
+    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
+    drawings
+  };
+}
+function formatNoteDrawings(result) {
+  if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
+  const lines = [
+    `${result.drawingCount} classic drawing${result.drawingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}):`
+  ];
+  for (const d of result.drawings)
+    lines.push(
+      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
+    );
+  return lines.join("\n");
+}
+
+// src/services/privateHelperBuild.ts
+import { spawnSync as spawnSync5 } from "node:child_process";
+import {
+  chmodSync as chmodSync2,
+  existsSync as existsSync16,
+  mkdirSync as mkdirSync7,
+  mkdtempSync as mkdtempSync6,
+  renameSync as renameSync2,
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
+} from "node:fs";
+import { release as release4 } from "node:os";
+import { join as join26 } from "node:path";
+
+// src/services/privateHelper.ts
+import { spawnSync as spawnSync4 } from "node:child_process";
+import { createHash as createHash6 } from "node:crypto";
+import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
+import { homedir as homedir20 } from "node:os";
+import { dirname as dirname9, join as join25, resolve as resolve6 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+var PRIVATE_HELPER_PROTOCOL = 1;
+var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
+var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
+var TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
+var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "probe",
+  "read_note_state"
+]);
+var HELPER_BINARY_NAME = "apple-notes-private-helper";
+var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
+var MANIFEST_NAME = "manifest.json";
+var DEFAULT_TIMEOUT_MS3 = 2e4;
+var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var manifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join25(dir, "package.json");
+    if (existsSync15(candidate)) {
+      try {
+        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
+        if (pkg.name === "apple-notes-mcp") return dir;
+      } catch {
+      }
+    }
+    const parent = dirname9(dir);
+    if (parent === dir) return resolve6(fromDir, "..");
+    dir = parent;
+  }
+}
 function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join24(packageRoot(), HELPER_SOURCE_RELATIVE),
-    exists: existsSync14,
-    readFile: (path10) => readFileSync4(path10),
-    spawn: spawnSync3,
+    sourcePath: join25(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    exists: existsSync15,
+    readFile: (path10) => readFileSync5(path10),
+    spawn: spawnSync4,
     ...overrides
   };
 }
@@ -54650,14 +55250,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join24(homedir19(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join25(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
-function sha256Hex(data) {
-  return createHash5("sha256").update(data).digest("hex");
+function sha256Hex2(data) {
+  return createHash6("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join24(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -54674,8 +55274,8 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  base.expectedSourceSha256 = sha256Hex(deps.readFile(deps.sourcePath));
-  const manifestPath = join24(installDir, MANIFEST_NAME);
+  base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
+  const manifestPath = join25(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -54696,7 +55296,7 @@ function inspectInstallation(deps = defaultDeps2()) {
       "helper_stale",
       "The installed helper was built from a different helper source or protocol than this apple-notes-mcp version ships. Run `apple-notes-mcp setup --native-helper` again."
     );
-  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+  if (sha256Hex2(deps.readFile(binaryPath)) !== manifest.binarySha256)
     return fail(
       "helper_modified",
       "The helper binary does not match the checksum recorded when it was built. Run `apple-notes-mcp setup --native-helper` to rebuild it."
@@ -54713,7 +55313,7 @@ var PrivateHelperError = class extends Error {
   code;
   details;
 };
-var errorSchema = external_exports.object({
+var errorSchema2 = external_exports.object({
   status: external_exports.literal("error"),
   code: external_exports.string(),
   message: external_exports.string()
@@ -54785,13 +55385,13 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
       throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS3;
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES,
+    maxBuffer: MAX_OUTPUT_BYTES2,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -54816,7 +55416,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
   const object3 = parsed;
   if (result.status !== 0 || object3.status === "error") {
-    const error2 = errorSchema.safeParse(object3);
+    const error2 = errorSchema2.safeParse(object3);
     if (!error2.success)
       throw new PrivateHelperError(
         "invalid_response",
@@ -54919,8 +55519,8 @@ function defaultBuildDeps() {
   return {
     ...defaultDeps2(),
     osVersion: () => {
-      const r = spawnSync4("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
-      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+      const r = spawnSync5("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release4()}`;
     },
     now: () => /* @__PURE__ */ new Date()
   };
@@ -54970,7 +55570,7 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
     return done(false);
   }
   const source = deps.readFile(deps.sourcePath);
-  const sourceSha = sha256Hex(source);
+  const sourceSha = sha256Hex2(source);
   steps.push({
     step: "locate source",
     ok: true,
@@ -54989,10 +55589,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync6(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join25(installDir, ".staging-"));
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join26(installDir, ".staging-"));
   try {
-    const stagedBinary = join25(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -55063,19 +55663,19 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       schemaVersion: 1,
       protocolVersion: hello.protocolVersion,
       sourceSha256: sourceSha,
-      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      binarySha256: sha256Hex2(deps.readFile(stagedBinary)),
       builtAt: deps.now().toISOString(),
       osVersion: deps.osVersion(),
       compiler
     };
-    chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join25(installDir, HELPER_BINARY_NAME));
-    writeFileSync4(join25(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    chmodSync2(stagedBinary, 448);
+    renameSync2(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
+    writeFileSync5(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync15(staging)) rmSync5(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
@@ -55215,6 +55815,11 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
   const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatHelperBuild(report) + "\n");
@@ -58244,6 +58849,41 @@ ${lines.join("\n")}${more}`,
       structured
     );
   }, "Error listing notes")
+);
+registerTool(
+  "get-note-drawings",
+  {
+    description: "Use when: reading the strokes of a note's classic PencilKit drawings (com.apple.drawing / com.apple.drawing.2 attachments), by note id, as JSON or SVG.\nReturns: per drawing its attachment id, status (ok/error with a code), stroke count, bounds, and strokes (ink type, sRGB color, width, points) and/or a standalone SVG document; overall status ok/partial/error/none.\nDo not use when: the drawing is a modern Paper sketch (com.apple.paper is not decoded here) or you want the attachment file itself (save-attachment).\nNote: read-only. Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper` (compiled locally with PencilKit; no Notes writes).",
+    inputSchema: {
+      id: noteIdInput,
+      format: external_exports.enum(["json", "svg", "both"]).optional().describe(
+        '"json" (default) returns strokes, "svg" returns SVG documents, "both" returns both'
+      ),
+      includePoints: external_exports.boolean().optional().describe(
+        "Include per-point x/y/width/opacity/force in JSON strokes (default true). SVG output always uses the points."
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      drawingCount: external_exports.number().optional(),
+      status: external_exports.string().optional(),
+      drawings: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      pointsOmitted: external_exports.boolean().optional()
+    }
+  },
+  withErrorHandling(({ id: id2, format, includePoints }) => {
+    let result = getNoteDrawings(id2, { format, includePoints });
+    let pointsOmitted = false;
+    if (Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() && includePoints !== false && format !== "svg") {
+      result = getNoteDrawings(id2, { format, includePoints: false });
+      pointsOmitted = true;
+    }
+    const text2 = formatNoteDrawings(result) + (pointsOmitted ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "");
+    return successResponse(text2, {
+      ...result,
+      ...pointsOmitted ? { pointsOmitted } : {}
+    });
+  }, "Error reading drawings")
 );
 registerTool(
   "list-recent-notes",

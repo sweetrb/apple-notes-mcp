@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.6] - 2026-09-23
+## [2.9.7] - 2026-09-23
 
 ### Added
 
@@ -18,6 +18,33 @@
   and entities, and external references are refused. The XML reader is
   written for this purpose and adds no dependency. Registered as the
   `svgAnalysis` feature in `get-capabilities`.
+
+## [2.9.6] - 2026-09-23
+
+### Added
+
+- `get-note-drawings` decodes a note's classic PencilKit drawings
+  (`com.apple.drawing.2` and `com.apple.drawing` attachments) into strokes
+  (ink type, sRGB color with alpha, width, points in drawing coordinates) and
+  standalone SVG documents. The drawing bytes are read read-only from
+  `ZMERGEABLEDATA1` (or `ZMERGEABLEDATA` on older schemas) through a
+  parameterized query; each drawing reports its own `ok`/`error` status.
+  Call-level errors use the coded error envelope: `unsupported` (with the
+  helper's own `helperCode`) when the helper is not built, stale, or modified,
+  `not_found` for a missing note, and `unsupported` for a locked note.
+- A public native helper, built on the user's Mac with
+  `apple-notes-mcp setup --public-helper` (`--check` to inspect). It is a Swift
+  program that links public frameworks only (AppKit, PencilKit), compiled with
+  `xcrun swiftc`, signed ad hoc, handshake-verified, and installed under
+  `~/Library/Application Support/apple-notes-mcp/public-helper/` with a
+  manifest of source and binary SHA-256 digests that is re-checked before
+  every call, and the server sends it only `hello` and `decode_drawing`
+  (anything else is refused before spawning). No prebuilt binary ships.
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` and
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` override the install folder and
+  per-call timeout.
+- `scripts/test-public-helper.mjs` checks an installed helper against the
+  synthetic PencilKit fixture used by the unit tests.
 
 ## [2.9.5] - 2026-09-23
 

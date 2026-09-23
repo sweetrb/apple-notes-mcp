@@ -90,6 +90,7 @@ Use this skill when the user:
 | `get-note-tables`             | Read a note's native tables as Markdown and JSON rows, in body order                                                                                |
 | `create-checklist-items`      | Append several unchecked native checklist items in order (needs the Background Operations bridge; on `ok: false`, only `landed` items are verified) |
 | `get-note-metadata`           | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB                                                                                     |
+| `get-note-drawings`           | Decode classic PencilKit drawings to strokes or SVG (needs `apple-notes-mcp setup --public-helper` once)                                            |
 | `get-note-blocks`             | Read a note's paragraph styles, inline formatting, and attachment positions as typed blocks                                                         |
 | `list-note-paragraphs`        | List a note's paragraphs with style, stored paragraph ID, and a direct link when the ID is unique                                                   |
 | `get-paragraph-link`          | Get a link that opens Notes at one paragraph, refused when its ID is shared                                                                         |

@@ -130,6 +130,7 @@ const STRICT_NOTE_ID: Array<[string, string]> = [
   ["list-note-links", "id"],
   ["get-note-tables", "id"],
   ["get-audio-transcripts", "id"],
+  ["get-note-drawings", "id"],
   ["export-notes-markdown", "id"],
   ["export-notes-html", "id"],
   ["export-attachments", "noteId"],

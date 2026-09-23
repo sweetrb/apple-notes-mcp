@@ -1,0 +1,211 @@
+{
+  "synthetic": true,
+  "strokes": [
+    {
+      "inkType": "com.apple.ink.pen",
+      "color": {
+        "red": 220,
+        "green": 30,
+        "blue": 40,
+        "alpha": 1
+      },
+      "width": 4,
+      "points": [
+        {
+          "x": 20,
+          "y": 20
+        },
+        {
+          "x": 60,
+          "y": 55
+        },
+        {
+          "x": 110,
+          "y": 30
+        },
+        {
+          "x": 150,
+          "y": 70
+        }
+      ]
+    },
+    {
+      "inkType": "com.apple.ink.marker",
+      "color": {
+        "red": 250,
+        "green": 210,
+        "blue": 0,
+        "alpha": 0.5
+      },
+      "width": 14,
+      "points": [
+        {
+          "x": 25,
+          "y": 110
+        },
+        {
+          "x": 170,
+          "y": 115
+        }
+      ]
+    },
+    {
+      "inkType": "com.apple.ink.pencil",
+      "color": {
+        "red": 30,
+        "green": 90,
+        "blue": 200,
+        "alpha": 1
+      },
+      "width": 2,
+      "points": [
+        {
+          "x": 40,
+          "y": 150
+        },
+        {
+          "x": 80,
+          "y": 140
+        },
+        {
+          "x": 120,
+          "y": 160
+        }
+      ]
+    }
+  ],
+  "dataBase64": "d3Jk8AEACAASEAAAAAAAAAAAAAAAAAAAAAASEDZZj0i9WkF2j9rU/F45yJsaBggAEAAYABoGCAMQARgDIjQKFA3d3Fw/FfHw8D0doaAgPiUAAIA/EhFjb20uYXBwbGUuaW5rLnBlbhgDQQAAAAAAAAAAIjcKFA37+no/FdPSUj8dAAAAACUAAAA/EhRjb20uYXBwbGUuaW5rLm1hcmtlchgDQQAAAAAAAAAAIjcKFA3x8PA9FbW0tD4dychIPyUAAIA/EhRjb20uYXBwbGUuaW5rLnBlbmNpbBgDQQAAAAAAAAAAKrMBChCOlF756mVDJovNyMXAHRRsEgYIABABGAEaBggAEAEYACAAKnAKEI3cU9x9KkkWlhbKcJNRYrcRAAAAQOQnzcEYBCADKPwfMhoAAIBA6AMAAOgD/38AAP9/AACAQAAAAAAAADowAACgQQAAoEEAAAAAAABwQgAAXEKrqqo+AADcQgAA8EGrqio/AAAWQwAAjEIAAIA/MhQNAACIQRUAAIhBHQAACEMlAABgQkCAjqTH1gUqmwEKEBVuRNrIOEY4pBraNQQll54SBggBEAEYAhoGCAAQARgAIAEqWAoQuvJEYT0nRlyhLSCH6DRHDxEAAABA5CfNwRgCIAMo/B8yGgAAYEHoAwAA6AP/fwAA/38AAGBBAAAAAAAAOhgAAMhBAADcQgAAAAAAACpDAADmQgAAgD8yFA0AAGBBFQAA1EIdAAAnQyUAAFBBQKCOw9CCBiqnAQoQFNDh5fKnS9mIPteGRgW4BRIGCAIQARgDGgYIABABGAAgAipkChDxbNZF3UlB8byjTQz3Omp+EQAAAEDkJ83BGAMgAyj8HzIaAAAAQOgDAADoA/9/AAD/fwAAAEAAAAAAAAA6JAAAIEIAABZDAAAAAAAAoEIAAAxDAAAAPwAA8EIAACBDAACAPzIUDQAAGEIVAAAPQx0AAKhCJQAAoEFA4PPE8M8FOgYIABAAGABCEAWL2vt50kApvTdyvGNAzQY=",
+  "decoded": {
+    "bounds": {
+      "height": 146,
+      "width": 167,
+      "x": 14,
+      "y": 17
+    },
+    "status": "ok",
+    "strokeCount": 3,
+    "strokes": [
+      {
+        "bounds": {
+          "height": 56,
+          "width": 136,
+          "x": 17,
+          "y": 17
+        },
+        "color": {
+          "alpha": 1,
+          "blue": 40,
+          "green": 30,
+          "red": 220
+        },
+        "inkType": "com.apple.ink.pen",
+        "pointCount": 4,
+        "points": [
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 4,
+            "x": 20,
+            "y": 20
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 4,
+            "x": 60,
+            "y": 55
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 4,
+            "x": 110,
+            "y": 30
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 4,
+            "x": 150,
+            "y": 70
+          }
+        ],
+        "width": 4
+      },
+      {
+        "bounds": {
+          "height": 13,
+          "width": 167,
+          "x": 14,
+          "y": 106
+        },
+        "color": {
+          "alpha": 0.5,
+          "blue": 0,
+          "green": 210,
+          "red": 250
+        },
+        "inkType": "com.apple.ink.marker",
+        "pointCount": 2,
+        "points": [
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 14,
+            "x": 25,
+            "y": 110
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 14,
+            "x": 170,
+            "y": 115
+          }
+        ],
+        "width": 14
+      },
+      {
+        "bounds": {
+          "height": 20,
+          "width": 84,
+          "x": 38,
+          "y": 143
+        },
+        "color": {
+          "alpha": 1,
+          "blue": 200,
+          "green": 90,
+          "red": 30
+        },
+        "inkType": "com.apple.ink.pencil",
+        "pointCount": 3,
+        "points": [
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 2,
+            "x": 40,
+            "y": 150
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 2,
+            "x": 80,
+            "y": 140
+          },
+          {
+            "force": 1,
+            "opacity": 1,
+            "width": 2,
+            "x": 120,
+            "y": 160
+          }
+        ],
+        "width": 2
+      }
+    ],
+    "truncated": false
+  }
+}

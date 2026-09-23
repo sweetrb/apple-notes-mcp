@@ -152,6 +152,8 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
+import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
+import { formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
 import { buildPrivateHelper, formatHelperBuild } from "@/services/privateHelperBuild.js";
 import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
 
@@ -163,6 +165,12 @@ loadFileConfig();
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+  // Compile the public native helper (PencilKit) from the packaged source.
+  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
   // Opt-in private helper: compiled locally from the packaged source (#181).
   const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
@@ -4429,6 +4437,61 @@ registerTool(
       structured
     );
   }, "Error listing notes")
+);
+
+// --- get-note-drawings (public native helper) ---
+
+registerTool(
+  "get-note-drawings",
+  {
+    description:
+      "Use when: reading the strokes of a note's classic PencilKit drawings (com.apple.drawing / com.apple.drawing.2 attachments), by note id, as JSON or SVG.\nReturns: per drawing its attachment id, status (ok/error with a code), stroke count, bounds, and strokes (ink type, sRGB color, width, points) and/or a standalone SVG document; overall status ok/partial/error/none.\nDo not use when: the drawing is a modern Paper sketch (com.apple.paper is not decoded here) or you want the attachment file itself (save-attachment).\nNote: read-only. Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper` (compiled locally with PencilKit; no Notes writes).",
+    inputSchema: {
+      id: noteIdInput,
+      format: z
+        .enum(["json", "svg", "both"])
+        .optional()
+        .describe(
+          '"json" (default) returns strokes, "svg" returns SVG documents, "both" returns both'
+        ),
+      includePoints: z
+        .boolean()
+        .optional()
+        .describe(
+          "Include per-point x/y/width/opacity/force in JSON strokes (default true). SVG output always uses the points."
+        ),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      drawingCount: z.number().optional(),
+      status: z.string().optional(),
+      drawings: z.array(z.object({}).passthrough()).optional(),
+      pointsOmitted: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(({ id, format, includePoints }) => {
+    let result = getNoteDrawings(id, { format, includePoints });
+    let pointsOmitted = false;
+    // Stroke points dominate the payload. Past the response budget, drop them
+    // (SVG and stroke summaries stay) rather than fail the whole read.
+    if (
+      Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() &&
+      includePoints !== false &&
+      format !== "svg"
+    ) {
+      result = getNoteDrawings(id, { format, includePoints: false });
+      pointsOmitted = true;
+    }
+    const text =
+      formatNoteDrawings(result) +
+      (pointsOmitted
+        ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
+        : "");
+    return successResponse(text, {
+      ...result,
+      ...(pointsOmitted ? { pointsOmitted } : {}),
+    } as unknown as Record<string, unknown>);
+  }, "Error reading drawings")
 );
 
 // --- list-recent-notes ---

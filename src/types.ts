@@ -883,6 +883,80 @@ export interface ExportNotesOptions {
 }
 
 // =============================================================================
+// Classic PencilKit drawings (public native helper)
+// =============================================================================
+
+/** sRGB color of a drawing stroke; channels 0-255, alpha 0-1. */
+export interface DrawingColor {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+}
+
+/** Axis-aligned rectangle in drawing coordinates (points). */
+export interface DrawingBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** One control point of a stroke, already in drawing coordinates. */
+export interface DrawingPoint {
+  x: number;
+  y: number;
+  width: number;
+  opacity: number;
+  force: number;
+}
+
+/** One PencilKit stroke. */
+export interface DrawingStroke {
+  /** PencilKit ink identifier, e.g. "com.apple.ink.pen" or "com.apple.ink.marker". */
+  inkType: string;
+  color: DrawingColor;
+  /** Mean control-point width. */
+  width: number;
+  pointCount: number;
+  bounds: DrawingBounds;
+  /** Control points; omitted when the caller asked for includePoints: false. */
+  points?: DrawingPoint[];
+  /** True when the stroke carried a non-identity transform, already applied to its points. */
+  transformApplied?: boolean;
+}
+
+/** Decode outcome for one classic drawing attachment. */
+export interface NoteDrawing {
+  /** x-coredata attachment id. */
+  attachmentId: string;
+  /** Notes UUID of the attachment. */
+  identifier: string;
+  /** "com.apple.drawing" or "com.apple.drawing.2". */
+  typeUti: string;
+  /** ok = decoded; error = see code and message. */
+  status: "ok" | "error";
+  code?: string;
+  message?: string;
+  strokeCount?: number;
+  bounds?: DrawingBounds;
+  strokes?: DrawingStroke[];
+  /** True when the helper stopped at its stroke or point limit. */
+  truncated?: boolean;
+  /** Standalone SVG document, when format is "svg" or "both". */
+  svg?: string;
+}
+
+/** Result of get-note-drawings. */
+export interface NoteDrawingsResult {
+  id: string;
+  drawingCount: number;
+  /** ok = all decoded, partial = some, error = none, none = the note has no classic drawing. */
+  status: "ok" | "partial" | "error" | "none";
+  drawings: NoteDrawing[];
+}
+
+// =============================================================================
 // Database-Backed Listings
 // =============================================================================
 
