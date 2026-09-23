@@ -428,6 +428,14 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
 const NOT_DELETED_MESSAGE =
   "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 
+/**
+ * Notes.app could not report the note's folder, so whether it is in Recently
+ * Deleted (where a delete is permanent) cannot be ruled out (#198).
+ */
+function containerUnknownMessage(title: string): string {
+  return `Could not read which folder note "${title}" is in, so it may already be in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Retry in a moment; if it keeps failing, quit and reopen Notes.app, then retry.`;
+}
+
 /** The note is already in Recently Deleted, where a delete is permanent (#198). */
 function inRecentlyDeletedMessage(title: string): string {
   return `Note "${title}" is already in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Remove it from Recently Deleted in Notes.app if that is intended.`;
@@ -2185,6 +2193,9 @@ registerTool(
     if (result.status === "in-recently-deleted") {
       return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
     }
+    if (result.status === "container-unknown") {
+      return errorResponse(containerUnknownMessage(snapshot.note.title));
+    }
     if (result.status === "not-deleted") {
       return errorResponse(NOT_DELETED_MESSAGE);
     }
@@ -3060,6 +3071,9 @@ registerTool(
       }
       if (result.status === "in-recently-deleted") {
         return { id, success: false, error: inRecentlyDeletedMessage(snapshot.note.title) };
+      }
+      if (result.status === "container-unknown") {
+        return { id, success: false, error: containerUnknownMessage(snapshot.note.title) };
       }
       if (result.status === "not-deleted")
         return { id, success: false, error: NOT_DELETED_MESSAGE };

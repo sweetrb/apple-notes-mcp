@@ -411,6 +411,32 @@ describe("Recently Deleted handling (#198, #207)", () => {
     expect(response.content[0].text).toMatch(/already in Recently Deleted/);
   });
 
+  it("delete-note refuses a note whose folder cannot be read, with a retry hint", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "container-unknown" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(
+      /Could not read which folder note "Old" is in.*Nothing was deleted.*Retry/
+    );
+  });
+
+  it("batch-delete-notes refuses a note whose folder cannot be read", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "container-unknown" });
+    const response = (await registered.get("batch-delete-notes")!({
+      notes: [{ id, expectedContentHash: "sha256:plain" }],
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/0 succeeded, 1 failed/);
+    expect(response.content[0].text).toMatch(/Could not read which folder.*Retry/);
+  });
+
   it("list-notes excludes Recently Deleted by default and reports the skip", async () => {
     manager.listNoteRefsDetailed.mockReturnValueOnce({
       refs: [{ title: "Live", id }],

@@ -2158,6 +2158,28 @@ describe("AppleNotesManager", () => {
       expect(() => compilesAsAppleScript(script)).not.toThrow();
     });
 
+    it("delete refuses a note whose container cannot be read, failing closed", () => {
+      mockReadTrashFolderIds.mockReturnValue([TRASH_FOLDER]);
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "SAFETY_CONTAINER_UNKNOWN",
+      });
+      // Shared by delete-note and batch-delete-notes.
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>")).toEqual({
+        status: "container-unknown",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const refusal = script.indexOf(
+        'if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"'
+      );
+      expect(refusal).toBeGreaterThan(script.indexOf("set originalFolder to container of noteRef"));
+      expect(refusal).toBeLessThan(script.indexOf("set __inTrash to true"));
+      expect(refusal).toBeLessThan(script.indexOf("delete noteRef"));
+      // No path reaches the delete with an unread container any more.
+      expect(script).not.toContain("originalFolder is not missing value");
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
     it("delete still checks the folder name without database access", () => {
       mockReadTrashFolderIds.mockReturnValue([]);
       mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });

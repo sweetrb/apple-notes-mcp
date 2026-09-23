@@ -1733,7 +1733,15 @@ export class AppleNotesManager {
     expectedBody: string,
     scope?: ScopeGuard
   ):
-    | { status: "deleted" | "conflict" | "not-deleted" | "in-recently-deleted" | "failed" }
+    | {
+        status:
+          | "deleted"
+          | "conflict"
+          | "not-deleted"
+          | "in-recently-deleted"
+          | "container-unknown"
+          | "failed";
+      }
     | { status: "scope_conflict"; reason: string } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
@@ -1747,7 +1755,9 @@ export class AppleNotesManager {
     // A note trashed earlier in the same Notes session reports a container
     // whose class is not folder (#214), so neither the id nor the name check
     // matches it. The script fails closed: a container that is not a folder,
-    // or whose class cannot be read, is treated as Recently Deleted.
+    // or whose class cannot be read, is treated as Recently Deleted. A note
+    // whose container cannot be read at all is refused as container-unknown,
+    // since whether it is in Recently Deleted cannot be ruled out.
     //
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
@@ -1758,29 +1768,26 @@ export class AppleNotesManager {
       try
         set originalFolder to container of noteRef
       end try
-      if originalFolder is not missing value then
-        set __inTrash to true
-        try
-          if (class of originalFolder) is folder then set __inTrash to false
-        end try
-        try
-          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
-        end try
-        try
-          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
-        end try
-        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
-      end if
+      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"
+      set __inTrash to true
+      try
+        if (class of originalFolder) is folder then set __inTrash to false
+      end try
+      try
+        if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+      end try
+      try
+        if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+      end try
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
-      if originalFolder is not missing value then
-        try
-          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
-        end try
-      end if
+      try
+        if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+      end try
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -1794,6 +1801,7 @@ export class AppleNotesManager {
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
+    if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }

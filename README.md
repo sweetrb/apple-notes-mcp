@@ -829,8 +829,11 @@ nothing was deleted instead of claiming success.
 A note that is already in Recently Deleted is refused, because deleting it there
 removes it permanently. The folder is read live from Notes.app in the same
 AppleScript; the Recently Deleted folder is recognised by its database id (with
-Full Disk Access) or by its English name. To remove such a note for good, do it
-in Notes.app.
+Full Disk Access) or by its English name. The check fails closed: a note whose
+folder Notes.app reports as something other than a folder (as it does for a note
+trashed earlier in the same Notes session) is refused the same way, and a note
+whose folder cannot be read at all is refused with a message to retry. To remove
+such a note for good, do it in Notes.app.
 
 **⚠️ Safety:** Irreversible from the agent's side — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact id(s) being deleted.
 

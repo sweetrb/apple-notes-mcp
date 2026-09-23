@@ -43035,29 +43035,26 @@ var AppleNotesManager = class {
       try
         set originalFolder to container of noteRef
       end try
-      if originalFolder is not missing value then
-        set __inTrash to true
-        try
-          if (class of originalFolder) is folder then set __inTrash to false
-        end try
-        try
-          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
-        end try
-        try
-          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
-        end try
-        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
-      end if
+      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"
+      set __inTrash to true
+      try
+        if (class of originalFolder) is folder then set __inTrash to false
+      end try
+      try
+        if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+      end try
+      try
+        if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+      end try
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
-      if originalFolder is not missing value then
-        try
-          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
-        end try
-      end if
+      try
+        if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+      end try
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -43070,6 +43067,7 @@ var AppleNotesManager = class {
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
+    if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
@@ -51557,6 +51555,9 @@ function readExactNoteSnapshot(id2) {
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
+function containerUnknownMessage(title) {
+  return `Could not read which folder note "${title}" is in, so it may already be in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Retry in a moment; if it keeps failing, quit and reopen Notes.app, then retry.`;
+}
 function inRecentlyDeletedMessage(title) {
   return `Note "${title}" is already in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Remove it from Recently Deleted in Notes.app if that is intended.`;
 }
@@ -52829,6 +52830,9 @@ registerTool(
     if (result.status === "in-recently-deleted") {
       return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
     }
+    if (result.status === "container-unknown") {
+      return errorResponse(containerUnknownMessage(snapshot.note.title));
+    }
     if (result.status === "not-deleted") {
       return errorResponse(NOT_DELETED_MESSAGE);
     }
@@ -53508,6 +53512,9 @@ registerTool(
       }
       if (result.status === "in-recently-deleted") {
         return { id: id2, success: false, error: inRecentlyDeletedMessage(snapshot.note.title) };
+      }
+      if (result.status === "container-unknown") {
+        return { id: id2, success: false, error: containerUnknownMessage(snapshot.note.title) };
       }
       if (result.status === "not-deleted")
         return { id: id2, success: false, error: NOT_DELETED_MESSAGE };

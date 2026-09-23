@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [2.8.49] - 2026-09-23
+
+### Fixed
+
+- `delete-note` and `batch-delete-notes` no longer delete a note whose folder
+  Notes.app cannot report (#198). The Recently Deleted guard only ran when the
+  note's container could be read, so a note whose container read failed went
+  straight to `delete` and, if it was already in Recently Deleted, was removed
+  permanently. Such a note is now refused before anything is deleted, with a
+  message that nothing was deleted and a hint to retry (or quit and reopen
+  Notes.app if it keeps failing). Completes the fail-closed guard from 2.8.48.
+
 ## [2.8.48] - 2026-09-23
 
 ### Fixed
