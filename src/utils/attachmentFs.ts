@@ -291,6 +291,37 @@ export function makeTempDir(): string {
 }
 
 /**
+ * Check that a path a tool will read is absolute and that both it and its
+ * canonical form stay inside `roots` (home, temp, /Volumes by default).
+ * Returns the resolved absolute path. The caller must still open it with
+ * O_NOFOLLOW and check the descriptor.
+ *
+ * @throws when the path is empty, relative, missing, or outside the roots
+ */
+export function assertReadableInRoots(
+  p: string,
+  roots: string[] = allowedSaveRoots(),
+  label = "Content file"
+): string {
+  if (!p || !p.trim()) throw new Error(`A ${label.toLowerCase()} path is required.`);
+  if (!isAbsolute(p)) throw new Error(`${label} path must be absolute: "${p}"`);
+  const abs = resolve(p);
+  if (!isWithinRoots(abs, roots))
+    throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  let canonical: string;
+  try {
+    canonical = canonicalize(abs);
+  } catch {
+    throw new Error(`${label} does not exist or cannot be resolved: "${abs}"`);
+  }
+  if (!isWithinRoots(canonical, canonicalRoots(roots)))
+    throw new Error(
+      `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
+    );
+  return abs;
+}
+
+/**
  * Read a local UTF-8 text file that a tool takes as a content source (for
  * example `create-note`'s `contentPath`).
  *
@@ -309,21 +340,7 @@ export function readAllowedTextFile(
   maxBytes: number,
   roots: string[] = allowedSaveRoots()
 ): string {
-  if (!p || !p.trim()) throw new Error("A content file path is required.");
-  if (!isAbsolute(p)) throw new Error(`Content file path must be absolute: "${p}"`);
-  const abs = resolve(p);
-  if (!isWithinRoots(abs, roots))
-    throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
-  let canonical: string;
-  try {
-    canonical = canonicalize(abs);
-  } catch {
-    throw new Error(`Content file does not exist or cannot be resolved: "${abs}"`);
-  }
-  if (!isWithinRoots(canonical, canonicalRoots(roots)))
-    throw new Error(
-      `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
-    );
+  const abs = assertReadableInRoots(p, roots);
   // O_NOFOLLOW refuses a symbolic link at open time (ELOOP), so there is no
   // separate path check that a swap could slip between.
   let descriptor: number;

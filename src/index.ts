@@ -133,6 +133,7 @@ import {
 import { BUILTIN_TEMPLATE_NAMES } from "@/utils/markdownTemplate.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
+import { registerSvgAnalysis } from "@/tools/svgAnalysis.js";
 import {
   hasScopeGuard,
   MAX_FORBIDDEN_FOLDERS,
@@ -202,6 +203,7 @@ const server = new McpServer({
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 registerPrivateHelperTools(server, notesManager);

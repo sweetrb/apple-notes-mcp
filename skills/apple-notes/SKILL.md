@@ -82,6 +82,7 @@ Use this skill when the user:
 | `save-attachment`             | Save an attachment to disk                                                                                                                          |
 | `list-paper-attachments`      | List Paper and classic drawings in a note, with Notes' rendered image size and any recognized handwriting text                                      |
 | `export-paper-image`          | Save Notes' rendered PNG (or JPEG) of one drawing to a new file                                                                                     |
+| `analyze-svg`                 | Read-only SVG preflight: can a local SVG become editable strokes, which losses it needs, and a digest of the result                                 |
 | `export-attachments`          | Copy a note\'s attachment files (or only its lead visual) into a directory; `exportedKind` says asset or preview                                    |
 | `fetch-attachment`            | Fetch attachment bytes as base64                                                                                                                    |
 | `show-attachment`             | Reveal an attachment in the Notes.app UI                                                                                                            |

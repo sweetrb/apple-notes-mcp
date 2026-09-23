@@ -339,6 +339,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `export-paper-image` copies that rendering to a new file. The `savePath` extension must match the format (`.png` for Paper). Pass `attachmentId` when a note has more than one drawing. It never overwrites.
 - Strokes are not decoded; there is no public reader for Notes' Paper bundles. Do not describe the export as vector data.
 
+### analyze-svg
+- Standalone, read-only analysis of one local SVG file (absolute path in home, temp, or `/Volumes`; at most 1 MiB). It opens no Notes data.
+- Branch on `classification` and `requiredLosses`, not on the issue text. `safe` needs no approximation; `lossy` needs `geometry-approximation` or `paint-approximation`; `unsupported` drops visible content or has nothing drawable (`importable: false`).
+- Refusals are errors with `svgCode` (`svg_unsafe`, `svg_invalid`, `svg_reference_invalid`, `svg_complexity_limit`, `svg_geometry_invalid`, `svg_file_invalid`). An unsafe file cannot be analyzed with any option; do not try to strip parts of it on the user's behalf.
+- `includeDrawing: true` returns the normalized strokes; leave it off unless you need them, since it can be large.
+
 ### Attachment paths, first image, and batch export
 - `list-attachments` with `includePaths: true` (needs the note `id` and Full Disk Access) adds `assetPaths` (the attachment's own files), `previewPath` (Notes' largest rendered thumbnail, always an image file), and `paths`. Use `assetPaths` when you need the original; a `previewPath` alone means the asset has not downloaded.
 - `list-attachments` with `firstImage: true` returns only the lead visual in body order: the first image even when `path` is `null`, else the first scan or drawing, else `null`.
