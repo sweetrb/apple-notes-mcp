@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Fixed
+
+- `create-checklist-item` no longer reports "Operation outcome uncertain…
+  Native checklist item not verified" after a successful append on macOS 27.2
+  (#187). Notes there stores an appended item's checklist style starting at
+  the newline before the new line (`"\nItem"`), not at its first character
+  (`"Item\n"`). Both checklist parsers gave a style run to the line holding its
+  first character, so `get-native-objects`, `get-checklist-state` and the
+  tool's own readback named the line above the item. They now attribute a run
+  to the line of its first non-newline character. A run made only of newlines
+  still belongs to the line it ends, because Notes splits off a line's
+  terminator as its own run when that line's characters carry different
+  attributes. `revision` and `styleRuns`, which the write guards compare, are
+  unchanged.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
