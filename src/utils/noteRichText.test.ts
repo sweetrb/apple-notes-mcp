@@ -71,6 +71,28 @@ describe("Notes rich text", () => {
     expect(before.styleRuns).toEqual(after.styleRuns);
     expect(before.revision).not.toBe(after.revision);
   });
+  it("decodes the paragraph style, block-quote level and highlight of each run", () => {
+    const runs = parseRichNote(
+      document("Qcode\nhi", [
+        Buffer.concat([run(1), b(2, Buffer.concat([n(1, 3), n(8, 1)]))]),
+        Buffer.concat([run(5), b(2, n(1, 4))]),
+        Buffer.concat([run(1)]),
+        Buffer.concat([run(1), n(14, 2)]),
+      ])
+    ).styleRuns;
+    expect(
+      runs?.map(({ paragraphStyle, blockQuote, highlight }) => [
+        paragraphStyle,
+        blockQuote,
+        highlight,
+      ])
+    ).toEqual([
+      [3, true, false],
+      [4, false, false],
+      [3, false, false],
+      [3, false, true],
+    ]);
+  });
   it("retains paragraph formatting, checklist identities and unknown fields in style comparison", () => {
     const style = (paragraph: Buffer) =>
       parseRichNote(document("A", [Buffer.concat([run(1), b(2, paragraph)])])).styleRuns;
@@ -118,6 +140,32 @@ describe("Notes rich text", () => {
       { id: "object-b", pk: 2, type: "table", mergeable: "BB", view: 1 },
     ]);
   });
+  it("reports a native object referenced twice once, at its first position (#197)", () => {
+    const ref = (id: string) => Buffer.concat([run(1), b(12, b(1, id))]);
+    const blob = gzipSync(
+      document("\ufffc\ufffc\ufffc", [ref("object-b"), ref("object-a"), ref("object-b")])
+    ).toString("hex");
+    vi.mocked(execFileSync).mockReturnValue(
+      blob +
+        "\n{}\n" +
+        JSON.stringify([
+          { id: "object-b", pk: 2, type: "attachment", mergeable: "B1", view: 1 },
+          { id: "object-a", pk: 1, type: "attachment", mergeable: "AA", view: 0 },
+          { id: "object-b", pk: 2, type: "attachment", mergeable: "B2", view: 1 },
+        ]) +
+        "\n"
+    );
+    const result = readRichNote("x-coredata://ABCDEF/ICNote/p12");
+    expect(result.nativeObjectIds).toEqual(["object-b", "object-a"]);
+    expect(result.objects?.map((o) => [o.id, o.start])).toEqual([
+      ["object-b", 0],
+      ["object-a", 1],
+    ]);
+    expect(result.objectData).toEqual([
+      { id: "object-a", pk: 1, type: "attachment", mergeable: "AA", view: 0 },
+      { id: "object-b", pk: 2, type: "attachment", mergeable: "B1", view: 1 },
+    ]);
+  });
   it("deduplicates native checklist runs by their stable item ID", () => {
     const item = (id: number, done: number) =>
       Buffer.concat([
@@ -131,6 +179,48 @@ describe("Notes rich text", () => {
     expect(parsed.checklistItems).toEqual([
       { id: Buffer.alloc(16, 1).toString("hex"), start: 0, text: "A", done: false },
     ]);
+  });
+  describe("checklist line attribution (#187)", () => {
+    const id = (value: number) => Buffer.alloc(16, value);
+    const checklist = (length: number, item: number, done = 0) =>
+      Buffer.concat([
+        run(length),
+        b(2, Buffer.concat([n(1, 103), b(5, Buffer.concat([b(1, id(item)), n(2, done)]))])),
+      ]);
+    const items = (text: string, runs: Buffer[]) =>
+      parseRichNote(document(text, runs)).checklistItems;
+
+    it("gives a run that starts on the preceding newline to the line after it", () => {
+      // macOS 27.2 layout: "Title\nPlain" is plain, "\nNew item" is the checklist run.
+      expect(items("Title\nPlain\nNew item", [run(11), checklist(9, 1)])).toEqual([
+        { id: id(1).toString("hex"), start: 12, text: "New item", done: false },
+      ]);
+    });
+    it("keeps a run that starts at the line's first character on that line", () => {
+      // Long-standing layout: the run covers "Old item\n".
+      expect(items("Title\nOld item\nAfter", [run(6), checklist(9, 1), run(5)])).toEqual([
+        { id: id(1).toString("hex"), start: 6, text: "Old item", done: false },
+      ]);
+    });
+    it("attributes both layouts in one note and reads a checked newline-led item", () => {
+      expect(items("Title\nFirst\nSecond", [run(6), checklist(5, 1), checklist(7, 2, 1)])).toEqual([
+        { id: id(1).toString("hex"), start: 6, text: "First", done: false },
+        { id: id(2).toString("hex"), start: 12, text: "Second", done: true },
+      ]);
+    });
+    it("keeps a split-off newline-only run with the line it terminates", () => {
+      // A line whose characters carry different attributes is split into
+      // several runs; its terminating newline can be a run of its own.
+      expect(
+        items("Title\nBold item\nNext", [
+          run(6),
+          checklist(4, 1),
+          checklist(5, 1),
+          checklist(1, 1),
+          run(4),
+        ])
+      ).toEqual([{ id: id(1).toString("hex"), start: 6, text: "Bold item", done: false }]);
+    });
   });
   it("blocks writes when the rich store is unavailable and rejects noncanonical IDs", () => {
     vi.mocked(execFileSync).mockImplementation(() => {
@@ -151,6 +241,45 @@ describe("Notes rich text", () => {
     expect(result.writable).toBe(false);
     expect(result.complete).toBe(false);
     expect(result.revision).not.toBe("unavailable");
+  });
+  describe("formatting that AppleScript HTML drops (#188, #189)", () => {
+    const id = "x-coredata://ABCDEF/ICNote/p12";
+    // Attribute-run field 8 = -1 (subscript), a sign-extended 10-byte varint.
+    const subscript = Buffer.from([
+      0x40, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01,
+    ]);
+    const stored = (text: string, runs: Buffer[]) =>
+      vi
+        .mocked(execFileSync)
+        .mockReturnValue(gzipSync(document(text, runs)).toString("hex") + "\n{}\n[]\n");
+
+    it("reads a subscript note and blocks the full-body rewrite that would drop it", () => {
+      stored("H2O", [n(1, 1), Buffer.concat([n(1, 1), subscript]), n(1, 1)]);
+      const result = enrichNoteRead(id, "<div>H2O</div>");
+      expect(result.revision).not.toBe("unavailable");
+      expect(result.complete).toBe(true);
+      expect(result.writable).toBe(false);
+      expect(result.warning).toContain("(subscript)");
+      expect(() => assertLinkedWrite(result, "<div>H2O!</div>", "html")).toThrow(/subscript/);
+    });
+
+    it("names superscript, alignment and highlight together", () => {
+      stored("x2\ny", [
+        n(1, 1),
+        Buffer.concat([n(1, 2), n(8, 1)]),
+        Buffer.concat([n(1, 1), b(2, n(2, 1)), n(14, 3)]),
+      ]);
+      const result = enrichNoteRead(id, "<div>x2</div><div>y</div>");
+      expect(result.writable).toBe(false);
+      expect(result.warning).toContain("(superscript, alignment, highlight)");
+    });
+
+    it("keeps plain formatted notes writable", () => {
+      stored("Bold", [Buffer.concat([n(1, 4), n(5, 1)])]);
+      const result = enrichNoteRead(id, "<div><b>Bold</b></div>");
+      expect(result).toMatchObject({ writable: true, complete: true });
+      expect(result.warning).toBeUndefined();
+    });
   });
   it("allows explicit link changes but still blocks native-object replacement", () => {
     const current = read(rich("Link", 0, 4));

@@ -20,11 +20,13 @@ import { z } from "zod";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import type { FolderAppFacts, FolderDeleteResult } from "../types.js";
 import { readFolderStoreFacts, type FolderStoreFacts } from "../utils/folderStore.js";
+import { looseIdTransform } from "../utils/noteIdentifiers.js";
+import { CodedError, errorResult } from "../utils/errorCodes.js";
 
-const folderIdSchema = z
-  .string()
-  .max(2000)
-  .regex(/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i, "An exact folder ID is required");
+// Same folder id input as directOperations: the x-coredata id, or the folder's
+// Notes UUID or numeric Core Data key, resolved to the x-coredata id before the
+// handler runs. The manager methods then require the exact x-coredata form.
+const folderIdSchema = z.string().max(2000).transform(looseIdTransform("ICFolder"));
 const accountIdSchema = z
   .string()
   .max(2000)
@@ -52,6 +54,26 @@ const defaultDeps: FolderDeleteDeps = {
   readStore: (pk) => readFolderStoreFacts(pk),
   sleep: (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
 };
+
+/** Drift since the caller read or planned: nothing was deleted; read and plan again. */
+function conflict(message: string): CodedError {
+  return new CodedError(`Conflict: ${message}`, { code: "revision_conflict", committed: false });
+}
+
+/** A folder this tool never deletes: nothing was deleted. */
+function refused(message: string): CodedError {
+  return new CodedError(`Refused: ${message}`, { code: "unsupported", committed: false });
+}
+
+/** The delete may or may not have happened: read the folder before any retry. */
+function uncertain(message: string): CodedError {
+  return new CodedError(message, { code: "verification_failed", indeterminate: true });
+}
+
+/** Arguments rejected before anything ran. */
+function invalid(message: string): CodedError {
+  return new CodedError(message, { code: "validation_error", committed: false });
+}
 
 /** Primary key (`pN`) of an x-coredata id. */
 export function coreDataPk(id: string): number {
@@ -111,22 +133,22 @@ function checkFolder(
   const app = manager.readFolderForDelete(args.id);
   const store = deps.readStore(coreDataPk(args.id));
   if (!store)
-    throw new Error(
-      "Conflict: the folder is not in the local Notes store yet; wait for Notes to save it and plan again"
+    throw conflict(
+      "the folder is not in the local Notes store yet; wait for Notes to save it and plan again"
     );
-  if (store.markedForDeletion) throw new Error("Conflict: the folder is already deleted");
+  if (store.markedForDeletion) throw conflict("the folder is already deleted");
   const expectedParentPk = app.parentId ? coreDataPk(app.parentId) : null;
   if (store.accountPk !== coreDataPk(app.accountId) || store.parentPk !== expectedParentPk)
-    throw new Error(
-      "Conflict: Notes.app and the local store disagree about this folder's location; wait a moment and plan again"
+    throw conflict(
+      "Notes.app and the local store disagree about this folder's location; wait a moment and plan again"
     );
-  if (app.name !== args.expectedName) throw new Error("Conflict: the folder name changed");
+  if (app.name !== args.expectedName) throw conflict("the folder name changed");
   if (app.accountId !== args.expectedAccountId)
-    throw new Error("Conflict: the folder is in a different account");
+    throw conflict("the folder is in a different account");
   if (args.expectedRoot ? app.parentId !== null : app.parentId !== args.expectedParentId)
-    throw new Error("Conflict: the folder's parent changed");
+    throw conflict("the folder's parent changed");
   const refusal = folderDeleteRefusal(app, store);
-  if (refusal) throw new Error(`Refused: ${refusal}`);
+  if (refusal) throw refused(refusal);
   // The store can keep a just-trashed note in its old folder for minutes.
   // When it counts more notes than Notes.app lists, ask Notes.app where each
   // of those notes is now and discount only the ones it places elsewhere.
@@ -141,8 +163,8 @@ function checkFolder(
   const children = Math.max(app.childFolderCount, store.childFolderCount);
   const notes = Math.max(app.noteCount, storeNotes);
   if (children > 0 || notes > 0)
-    throw new Error(
-      `Refused: the folder is not empty (${children} child folder(s), ${notes} note(s)); move or delete them first`
+    throw refused(
+      `the folder is not empty (${children} child folder(s), ${notes} note(s)); move or delete them first`
     );
   return {
     app,
@@ -155,8 +177,11 @@ function checkFolder(
 /**
  * Plans (dryRun true) or applies (dryRun false) a guarded folder delete.
  *
- * @throws Error whose message starts with "Conflict:" for drift, "Refused:"
- *   for a folder this tool never deletes, or describes an uncertain outcome
+ * @throws CodedError: "Conflict:" messages (revision_conflict) for drift,
+ *   "Refused:" messages (unsupported) for a folder this tool never deletes,
+ *   verification_failed with indeterminate for an uncertain outcome, and
+ *   validation_error for bad arguments. Store read failures (including missing
+ *   Full Disk Access) keep their own text and are classified by it.
  */
 export function runFolderDelete(
   manager: AppleNotesManager,
@@ -164,11 +189,11 @@ export function runFolderDelete(
   deps: FolderDeleteDeps = defaultDeps
 ): FolderDeleteResult {
   if (Boolean(args.expectedRoot) === (args.expectedParentId !== undefined))
-    throw new Error("Pass exactly one of expectedParentId or expectedRoot: true");
+    throw invalid("Pass exactly one of expectedParentId or expectedRoot: true");
   if (args.dryRun && args.expectedRevision)
-    throw new Error("expectedRevision belongs to the apply call (dryRun: false)");
+    throw invalid("expectedRevision belongs to the apply call (dryRun: false)");
   if (!args.dryRun && !args.expectedRevision)
-    throw new Error("Apply requires expectedRevision from a matching dry run");
+    throw invalid("Apply requires expectedRevision from a matching dry run");
 
   const checked = checkFolder(manager, args, deps);
   const base = {
@@ -187,7 +212,7 @@ export function runFolderDelete(
     return { ...base, status: "planned", dryRun: true, committed: false, wouldDelete: true };
 
   if (checked.revision !== args.expectedRevision)
-    throw new Error("Conflict: the folder changed since the dry run; plan again");
+    throw conflict("the folder changed since the dry run; plan again");
 
   const outcome = manager.deleteEmptyFolderIfUnchanged(args.id, {
     name: checked.app.name,
@@ -195,15 +220,15 @@ export function runFolderDelete(
     accountId: checked.app.accountId,
   });
   if (outcome.status === "conflict")
-    throw new Error(`Conflict: the folder ${outcome.reason} changed before deletion; plan again`);
-  if (outcome.status === "refused") throw new Error(`Refused: ${outcome.reason}`);
+    throw conflict(`the folder ${outcome.reason} changed before deletion; plan again`);
+  if (outcome.status === "refused") throw refused(outcome.reason);
   if (outcome.status === "failed")
-    throw new Error(
+    throw uncertain(
       `The delete outcome is uncertain (${outcome.reason}); read folder ${args.id} before retrying`
     );
 
   if (manager.folderExistsById(args.id))
-    throw new Error(
+    throw uncertain(
       `The delete outcome is uncertain: Notes.app still resolves folder ${args.id}; read it before retrying`
     );
   let storeTombstoned = false;
@@ -230,7 +255,9 @@ export function registerFolderDelete(
   deps: FolderDeleteDeps = defaultDeps
 ) {
   const inputSchema = {
-    id: folderIdSchema.describe("Exact folder id (x-coredata://…/ICFolder/pN) from list-folders"),
+    id: folderIdSchema.describe(
+      "Exact folder id (x-coredata://…/ICFolder/pN) from list-folders, or the folder's Notes UUID or numeric key"
+    ),
     expectedName: z
       .string()
       .min(1)
@@ -275,12 +302,7 @@ export function registerFolderDelete(
           structuredContent: result,
         };
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: error instanceof Error ? error.message : String(error) },
-          ],
-          isError: true,
-        };
+        return errorResult(error instanceof Error ? error.message : String(error), error);
       }
     }) as unknown as ToolCallback<typeof inputSchema>
   );
