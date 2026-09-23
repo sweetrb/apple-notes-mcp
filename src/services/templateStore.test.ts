@@ -6,9 +6,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   chmodSync,
+  closeSync,
+  constants,
   existsSync,
+  fstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -31,6 +35,15 @@ const editorial = JSON.stringify({
   extends: "obsidian",
   rules: { "inline.bold": { mode: "wrap", before: "__", after: "__" } },
 });
+/** Mode and text of one file, both read through a single descriptor. */
+const openedFile = (path: string) => {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    return { mode: fstatSync(fd).mode, text: readFileSync(fd, "utf8") };
+  } finally {
+    closeSync(fd);
+  }
+};
 const code = (fn: () => unknown) => {
   try {
     fn();
@@ -65,8 +78,9 @@ describe("TemplateStore", () => {
     const saved = store.save("house", editorial);
     expect(saved).toMatchObject({ replaced: false, path: join(store.dir, "house.json") });
     expect(statSync(store.dir).mode & 0o777).toBe(0o700);
-    expect(statSync(saved.path).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(readFileSync(saved.path, "utf8"))).toEqual(JSON.parse(editorial));
+    const file = openedFile(saved.path);
+    expect(file.mode & 0o777).toBe(0o600);
+    expect(JSON.parse(file.text)).toEqual(JSON.parse(editorial));
     expect(code(() => store.save("house", editorial))).toBe("template-exists");
     const replaced = store.save("house", JSON.stringify({ schemaVersion: 1 }), { force: true });
     expect(replaced.replaced).toBe(true);
