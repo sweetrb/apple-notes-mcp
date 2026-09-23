@@ -200,6 +200,20 @@ for the investigation and verification behind each:
 
 This section documents all available tools. AI agents should use these tool names and parameters exactly as specified.
 
+### Identifier forms
+
+Every tool that takes a note id (`id`, `noteId`, `ids`, `linkedNoteId`, or the `id` inside a batch entry) accepts any of three forms of the same note:
+
+| Form | Example shape | Needs Full Disk Access |
+|------|---------------|------------------------|
+| AppleScript id (canonical) | `x-coredata://<store-uuid>/ICNote/p123` | No |
+| Notes UUID (`identifier`) | `8-4-4-4-12` hex digits, as in `notes://showNote?identifier=` links | Yes |
+| Numeric Core Data key | `123` (the digits after `p`) | Yes |
+
+The server turns a UUID or numeric key into the canonical id before the tool runs, reading the Notes database read-only. A numeric key or UUID resolves only to a note, never to a folder or attachment. Without Full Disk Access those two forms fail with an error that says so, while `x-coredata` ids keep working as before. Folder-id inputs (`show-folder`, `get-folder-by-id`, `rename-folder`) accept a folder's UUID or numeric key the same way, resolving only to folders.
+
+When Full Disk Access is granted, list and read tools also return stable identifiers next to each `id`: notes carry `identifier`, `folderIdentifier`, and `accountIdentifier`; folders carry `identifier`, `parentIdentifier` (nested folders only), and `accountIdentifier`; accounts carry `identifier`. These fields come from one batched read-only query per call and are omitted when the database cannot be read. Tools that return them: `search-notes`, `list-notes`, `get-selected-notes`, `list-shared-notes`, `get-note-content`, `get-note-by-id`, `get-note-details`, `list-folders`, `get-folder-by-id`, `list-accounts`, and `get-default-location`.
+
 ### Note Operations
 
 #### `create-note`
@@ -486,9 +500,9 @@ Retrieves a note using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`) |
+| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`), or the note's Notes UUID or numeric key (see [Identifier forms](#identifier-forms)) |
 
-**Returns:** JSON with note metadata, or error if not found.
+**Returns:** JSON with note metadata, plus `identifier`, `folderIdentifier`, and `accountIdentifier` when Full Disk Access is granted, or error if not found.
 
 ---
 
@@ -498,7 +512,7 @@ Reveals a note in Notes.app using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`) |
+| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`), or the note's Notes UUID or numeric key |
 | `separately` | boolean | No | Open in a separate note window when supported by Notes.app |
 
 **Returns:** Confirmation that Notes.app accepted the show command.
@@ -719,7 +733,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 }
 ```
 
-**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`.
+**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`. With Full Disk Access each entry also carries `identifier`, `folderIdentifier`, and `accountIdentifier` (see [Identifier forms](#identifier-forms)).
 
 Use the returned `id` for any follow-up read/update/move/delete rather than re-resolving the title: titles are not unique, and a by-title lookup resolves a duplicated title to the same one note every time, silently skipping the others.
 
@@ -752,7 +766,7 @@ Lists all folders in an account with full hierarchical paths.
 {}
 ```
 
-**Returns:** List of folders with IDs, paths, account names, and shared state. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+**Returns:** List of folders with IDs, paths, account names, and shared state, plus `identifier`, `parentIdentifier`, and `accountIdentifier` when Full Disk Access is granted. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
 
 ---
 
@@ -786,7 +800,10 @@ Creates a new folder, including a whole nested hierarchy in one call.
 #### `get-folder-by-id`
 
 Reads one exact folder's current name and parent ID. Use these values with
-`rename-folder`; this avoids relying on ambiguous folder names or paths.
+`rename-folder`; this avoids relying on ambiguous folder names or paths. The
+`id` may also be the folder's Notes UUID or numeric key, and the result adds
+`identifier`, `parentIdentifier`, and `accountIdentifier` when Full Disk Access
+is granted.
 
 ---
 
@@ -826,7 +843,7 @@ Reveals a folder in Notes.app using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The folder's CoreData identifier (from `list-folders`) |
+| `id` | string | Yes | The folder's CoreData identifier (from `list-folders`), or its Notes UUID or numeric key |
 | `separately` | boolean | No | Open in a separate window when supported by Notes.app |
 
 **Returns:** Confirmation that Notes.app accepted the show command.
@@ -846,7 +863,7 @@ Lists all configured Notes accounts.
 {}
 ```
 
-**Returns:** List of accounts with names, IDs, upgraded state, and default folder metadata.
+**Returns:** List of accounts with names, IDs, upgraded state, and default folder metadata, plus each account's `identifier` (Notes UUID) when Full Disk Access is granted.
 
 ---
 

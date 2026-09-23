@@ -1,5 +1,30 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- Every tool that takes a note id now also accepts the note's Notes UUID (the
+  `ZIDENTIFIER` used by `notes://showNote?identifier=` links) or its numeric
+  Core Data key (the digits after `p` in the `x-coredata` id). One shared
+  normalizer in the input schema resolves either form to the `x-coredata` id
+  before the handler runs, so no tool's code path changes; batch id arrays
+  resolve in a single query. Resolution reads the Notes database read-only and
+  matches only rows of the note entity (looked up in `Z_PRIMARYKEY`), so a
+  numeric key can never reach a folder or attachment. Without Full Disk Access
+  these two forms fail with an error naming it, while `x-coredata` ids work
+  exactly as before. `show-folder`, `get-folder-by-id`, and `rename-folder`
+  accept a folder's UUID or numeric key the same way.
+- With Full Disk Access, list and read tools return stable identifiers beside
+  each `id`, read in one batched query per call: `identifier`,
+  `folderIdentifier`, and `accountIdentifier` on notes (`search-notes`,
+  `list-notes`, `get-selected-notes`, `list-shared-notes`, `get-note-content`,
+  `get-note-by-id`, `get-note-details`); `identifier`, `parentIdentifier`, and
+  `accountIdentifier` on folders (`list-folders`, `get-folder-by-id`,
+  `get-default-location`); and `identifier` on accounts (`list-accounts`,
+  `get-default-location`). The fields are omitted when the database cannot be
+  read.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

@@ -245,7 +245,11 @@ If the user specifically requires those features, create all API-supported conte
 
 1. **Exact IDs for writes**: Search may use titles, but update, append, delete,
    and move require the exact note ID. Update, append, and delete also require
-   the `contentHash` from the version just read.
+   the `contentHash` from the version just read. A note ID may be the
+   `x-coredata://…` id, the note's Notes UUID (the `identifier` field list and
+   read tools return with Full Disk Access), or its numeric key (the digits
+   after `p`). UUIDs and numeric keys need Full Disk Access; store the
+   `identifier` when a reference must outlive this session.
 
 2. **Default Account**: Operations default to iCloud. Use the `account` parameter for other accounts (Gmail, Exchange).
 

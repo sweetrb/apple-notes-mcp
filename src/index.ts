@@ -37,6 +37,15 @@ import {
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
+import {
+  exactIdArrayInput,
+  exactIdInput,
+  lookupStableIdentifiers,
+  looseIdTransform,
+  NOTE_ID_MESSAGE,
+  withStableIdentifiers,
+  type StableIdentifiers,
+} from "@/utils/noteIdentifiers.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
@@ -201,15 +210,52 @@ const noteTitleSchema = {
     ),
 };
 
-const noteIdInput = z
-  .string()
-  .min(1, "Note ID is required")
-  .max(MAX.ID)
-  .regex(
-    /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/,
-    "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...)"
-  )
-  .describe("Exact CoreData note ID returned by search-notes, list-notes, or create-note");
+/** The AppleScript note id pattern every exact-ID tool has always accepted. */
+const NOTE_COREDATA_ID = /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/;
+/** Kept short: it repeats in every note-id field of tools/list. */
+const NOTE_ID_FORMS = "x-coredata id, Notes UUID, or numeric key";
+
+/**
+ * Exact note id. Accepts the x-coredata id as before, plus the note's Notes
+ * UUID or numeric Core Data key, which the schema resolves to the x-coredata
+ * id before the handler runs (see utils/noteIdentifiers.ts).
+ */
+const noteIdInput = exactIdInput("ICNote", NOTE_COREDATA_ID, NOTE_ID_MESSAGE, {
+  maxLength: MAX.ID,
+}).describe(`Exact note ID returned by search-notes, list-notes, or create-note: ${NOTE_ID_FORMS}`);
+
+/** A batch of exact note ids, resolved in one database read. */
+const noteIdArrayInput = exactIdArrayInput("ICNote", NOTE_COREDATA_ID, NOTE_ID_MESSAGE, {
+  maxLength: MAX.ID,
+  maxItems: MAX.BATCH_IDS,
+});
+
+/**
+ * Free-form note id (the title-or-id tools never validated its shape). A
+ * Notes UUID or numeric key is resolved to the x-coredata id; anything else
+ * passes through unchanged.
+ */
+const looseNoteId = (base: z.ZodString) => base.max(MAX.ID).transform(looseIdTransform("ICNote"));
+
+/** Free-form folder id; a Notes UUID or numeric key resolves to the x-coredata id. */
+const looseFolderId = (base: z.ZodString) =>
+  base.max(MAX.ID).transform(looseIdTransform("ICFolder"));
+
+/** Output fields carrying a note's stable identifiers (present with Full Disk Access). */
+const noteIdentifierOutput = {
+  identifier: z.string().optional(),
+  folderIdentifier: z.string().optional(),
+  accountIdentifier: z.string().optional(),
+};
+
+/**
+ * Stable identifiers for one note (Notes UUID, folder and account UUIDs), read
+ * in one query. Empty when Full Disk Access is missing, so callers can spread
+ * it unconditionally.
+ */
+function noteIdentifiers(id: string): StableIdentifiers {
+  return lookupStableIdentifiers([id], "ICNote").get(id) ?? {};
+}
 
 const expectedContentHashInput = z
   .string()
@@ -517,7 +563,7 @@ registerTool(
 
     return successResponse(
       `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${syncNote}`,
-      { notes, count: notes.length }
+      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
     );
   }, "Error searching notes")
 );
@@ -530,11 +576,9 @@ registerTool(
     description:
       "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
+      id: looseNoteId(z.string())
         .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
+        .describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: z
         .string()
         .max(MAX.TITLE)
@@ -550,6 +594,7 @@ registerTool(
     },
     outputSchema: {
       id: z.string().optional(),
+      ...noteIdentifierOutput,
       title: z.string().optional(),
       content: z.string().optional(),
       contentHash: z.string().optional(),
@@ -595,6 +640,7 @@ registerTool(
       const warning = [strippedImagesWarning(stripped), rich.warning].filter(Boolean).join("\n\n");
       return successResponse(warning ? content + warning : content, {
         id,
+        ...noteIdentifiers(id),
         title: note.title,
         content,
         contentHash: richContentHash(rawContent, rich),
@@ -642,6 +688,7 @@ registerTool(
     const warning = [strippedImagesWarning(stripped), rich.warning].filter(Boolean).join("\n\n");
     return successResponse(warning ? content + warning : content, {
       id: note.id,
+      ...noteIdentifiers(note.id),
       title,
       content,
       contentHash: richContentHash(rawContent, rich),
@@ -670,11 +717,9 @@ registerTool(
     description:
       "Use when: reading one note's body as plain text with no HTML, by id (preferred) or title.\nReturns: the note's plaintext exactly as Notes exposes it.\nDo not use when: you need the HTML body (get-note-content) or Markdown with checklist state (get-note-markdown).\nNote: this reads the note's native plaintext property, so it skips the HTML-to-text conversion; password-protected notes must be unlocked in Notes.app first.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
+      id: looseNoteId(z.string())
         .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
+        .describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: z
         .string()
         .max(MAX.TITLE)
@@ -744,7 +789,9 @@ registerTool(
     description:
       "Use when: you have a note id and need its metadata only.\nReturns: id, title, created, modified, shared, passwordProtected.\nDo not use when: you need the body text (get-note-content) or only have a title (get-note-details).",
     inputSchema: {
-      id: z.string().min(1, "Note ID is required").max(MAX.ID),
+      id: looseNoteId(z.string().min(1, "Note ID is required")).describe(
+        `Note ID: ${NOTE_ID_FORMS}`
+      ),
     },
     outputSchema: {
       id: z.string().optional(),
@@ -753,6 +800,7 @@ registerTool(
       modified: z.string().optional(),
       shared: z.boolean().optional(),
       passwordProtected: z.boolean().optional(),
+      ...noteIdentifierOutput,
     },
   },
   withErrorHandling(({ id }) => {
@@ -770,6 +818,7 @@ registerTool(
       modified: note.modified.toISOString(),
       shared: note.shared,
       passwordProtected: note.passwordProtected,
+      ...noteIdentifiers(note.id),
     };
 
     return successResponse(JSON.stringify(metadata, null, 2), metadata);
@@ -792,6 +841,7 @@ registerTool(
       shared: z.boolean().optional(),
       passwordProtected: z.boolean().optional(),
       account: z.string().optional(),
+      ...noteIdentifierOutput,
     },
   },
   withErrorHandling(({ title, account }) => {
@@ -810,6 +860,7 @@ registerTool(
       shared: note.shared,
       passwordProtected: note.passwordProtected,
       account: note.account,
+      ...noteIdentifiers(note.id),
     };
 
     return successResponse(JSON.stringify(metadata, null, 2), metadata);
@@ -824,7 +875,9 @@ registerTool(
     description:
       "Use when: the user wants to reveal a known note in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need note content (get-note-content) or metadata (get-note-by-id).\nNote: this opens or focuses the Notes UI.",
     inputSchema: {
-      id: z.string().min(1, "Note ID is required").max(MAX.ID),
+      id: looseNoteId(z.string().min(1, "Note ID is required")).describe(
+        `Note ID: ${NOTE_ID_FORMS}`
+      ),
       separately: z
         .boolean()
         .optional()
@@ -852,11 +905,9 @@ registerTool(
     description:
       "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the app that launches this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
+      id: looseNoteId(z.string())
         .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
+        .describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: z
         .string()
         .max(MAX.TITLE)
@@ -925,7 +976,9 @@ registerTool(
     description:
       "Use when: the user wants to reveal a known folder in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the folder list (list-folders).\nNote: this opens or focuses the Notes UI. Get the id from list-folders.",
     inputSchema: {
-      id: z.string().min(1, "Folder ID is required").max(MAX.ID),
+      id: looseFolderId(z.string().min(1, "Folder ID is required")).describe(
+        "Folder ID from list-folders: x-coredata id, Notes UUID, or numeric key"
+      ),
       separately: z
         .boolean()
         .optional()
@@ -1535,7 +1588,17 @@ registerTool(
       limit: z.number().int().positive().optional().describe("Maximum number of notes to return"),
     },
     outputSchema: {
-      notes: z.array(z.object({ title: z.string(), id: z.string() })).optional(),
+      notes: z
+        .array(
+          z.object({
+            title: z.string(),
+            id: z.string(),
+            identifier: z.string().optional(),
+            folderIdentifier: z.string().optional(),
+            accountIdentifier: z.string().optional(),
+          })
+        )
+        .optional(),
       count: z.number().optional(),
     },
   },
@@ -1575,7 +1638,7 @@ registerTool(
     const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:\n${noteList}${syncNote}`,
-      { notes, count: notes.length }
+      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length }
     );
   }, "Error listing notes")
 );
@@ -1603,7 +1666,10 @@ registerTool(
     }
 
     const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
-    return successResponse(`Selected note(s):\n${noteList}`, { notes, count: notes.length });
+    return successResponse(`Selected note(s):\n${noteList}`, {
+      notes: withStableIdentifiers(notes, "ICNote"),
+      count: notes.length,
+    });
   }, "Error getting selected notes")
 );
 
@@ -1657,7 +1723,7 @@ registerTool(
     return successResponse(
       `Found ${folders.length} folders${resolvedAcct}:\n${folderList}${syncNote}`,
       {
-        folders,
+        folders: withStableIdentifiers(folders, "ICFolder"),
         count: folders.length,
       }
     );
@@ -1764,7 +1830,7 @@ registerTool(
       })
       .join("\n");
     return successResponse(`Found ${accounts.length} accounts:\n${accountList}`, {
-      accounts,
+      accounts: withStableIdentifiers(accounts, "ICAccount"),
       count: accounts.length,
     });
   }, "Error listing accounts")
@@ -1788,7 +1854,9 @@ registerTool(
     const message =
       `Default account: ${location.account.name} [id: ${location.account.id}]\n` +
       `Default folder: ${location.folder.name} [id: ${location.folder.id}]`;
-    return successResponse(message, { ...location });
+    const [account] = withStableIdentifiers([location.account], "ICAccount");
+    const [folder] = withStableIdentifiers([location.folder], "ICFolder");
+    return successResponse(message, { account, folder });
   }, "Error getting default Notes location")
 );
 
@@ -1829,7 +1897,7 @@ registerTool(
     return successResponse(
       `Found ${sharedNotes.length} shared note(s):\n${noteList}\n\n` +
         `⚠️ Changes to shared notes are visible to all collaborators.`,
-      { notes: sharedNotes, count: sharedNotes.length }
+      { notes: withStableIdentifiers(sharedNotes, "ICNote"), count: sharedNotes.length }
     );
   }, "Error listing shared notes")
 );
@@ -2019,11 +2087,9 @@ registerTool(
     description:
       "Use when: listing the attachments of one note, by id (preferred) or title.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment).\nDo not use when: you want the attachment bytes (fetch-attachment) or a file on disk (save-attachment).",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
+      id: looseNoteId(z.string())
         .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
+        .describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: z
         .string()
         .max(MAX.TITLE)
@@ -2162,10 +2228,9 @@ registerTool(
     description:
       "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
     inputSchema: {
-      ids: z
-        .array(noteIdInput)
-        .max(MAX.BATCH_IDS)
-        .describe(`Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`),
+      ids: noteIdArrayInput.describe(
+        `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`
+      ),
       folder: z
         .string()
         .max(MAX.FOLDER)
@@ -2226,11 +2291,9 @@ registerTool(
     description:
       "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes. Get the ids from list-attachments first.",
     inputSchema: {
-      noteId: z
-        .string()
-        .min(1, "noteId is required")
-        .max(MAX.ID)
-        .describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(z.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: z
         .string()
         .min(1, "attachmentId is required")
@@ -2269,11 +2332,9 @@ registerTool(
     description:
       "Use when: retrieving one note attachment's bytes inline as base64 (no file written).\nReturns: name, content type, byte count, and base64 data.\nDo not use when: you want it saved to disk (save-attachment).\nNote: get the ids from list-attachments first.",
     inputSchema: {
-      noteId: z
-        .string()
-        .min(1, "noteId is required")
-        .max(MAX.ID)
-        .describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(z.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: z
         .string()
         .min(1, "attachmentId is required")
@@ -2307,11 +2368,9 @@ registerTool(
     description:
       "Use when: the user wants to reveal one note attachment in Notes.app.\nReturns: confirmation that Notes.app revealed the attachment.\nDo not use when: you want the bytes (fetch-attachment) or a file on disk (save-attachment).\nNote: this opens or focuses the Notes UI. Get the ids from list-attachments first.",
     inputSchema: {
-      noteId: z
-        .string()
-        .min(1, "noteId is required")
-        .max(MAX.ID)
-        .describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(z.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: z
         .string()
         .min(1, "attachmentId is required")
@@ -2456,11 +2515,9 @@ registerTool(
     description:
       "Use when: reading a note as Markdown, with checklist items annotated [x]/[ ] when Full Disk Access is granted.\nReturns: the note's Markdown.\nDo not use when: you need the raw HTML/plaintext body (get-note-content) or only metadata (get-note-details).\nNote: falls back to plain lists (no checkmarks) without Full Disk Access.",
     inputSchema: {
-      id: z
-        .string()
-        .max(MAX.ID)
+      id: looseNoteId(z.string())
         .optional()
-        .describe("Note ID (preferred - more reliable than title)"),
+        .describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: z
         .string()
         .max(MAX.TITLE)
@@ -2510,10 +2567,9 @@ registerTool(
     description:
       "Use when: reading the checked/unchecked state of a note's checklist items, by id.\nReturns: each item's text and done state plus checked/total counts.\nDo not use when: you only have a title (get the id via search-notes first) or want the full body text (get-note-content).\nNote: requires Full Disk Access; reads the NoteStore database directly.",
     inputSchema: {
-      id: z
-        .string()
-        .min(1, "Note ID is required. Use search-notes to find the note ID first.")
-        .max(MAX.ID),
+      id: looseNoteId(
+        z.string().min(1, "Note ID is required. Use search-notes to find the note ID first.")
+      ).describe(`Note ID: ${NOTE_ID_FORMS}`),
     },
     outputSchema: {
       items: z.array(z.object({}).passthrough()).optional(),
@@ -2558,10 +2614,9 @@ registerTool(
     description:
       "[BETA] Use when: reading note metadata AppleScript cannot expose — pinned state, checklist flags, trash/recovery state, preview snippet, password hint — by id.\nReturns: a metadata object; fields vary by macOS version and are omitted when unavailable.\nDo not use when: you need the body (get-note-content) or per-item checklist state (get-checklist-state).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. BETA — the database schema changes between macOS releases, so some fields may be absent. Works on trashed notes that AppleScript can no longer resolve.",
     inputSchema: {
-      id: z
-        .string()
-        .min(1, "Note ID is required. Use search-notes to find the note ID first.")
-        .max(MAX.ID),
+      id: looseNoteId(
+        z.string().min(1, "Note ID is required. Use search-notes to find the note ID first.")
+      ).describe(`Note ID: ${NOTE_ID_FORMS}`),
     },
     outputSchema: {
       pinned: z.boolean().optional(),
