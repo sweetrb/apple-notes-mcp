@@ -561,7 +561,7 @@ export function splitFolderPath(folderPath: string): string[] {
  * @param name - Raw folder name (may contain `/`)
  * @returns Folder name with `/` escaped as `\/`
  */
-function escapeFolderName(name: string): string {
+export function escapeFolderName(name: string): string {
   return name.replace(/\//g, "\\/");
 }
 

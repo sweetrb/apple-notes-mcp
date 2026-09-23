@@ -160,6 +160,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 |---------|-------------|
 | **Create Notes** | Create notes with titles, content, and optional folder/account targeting |
 | **Search Notes** | Find notes by title or search within note content |
+| **Query Language** | `query-notes` combines text, folder, account, tag, attachment, checklist, flag, word-count, and date conditions with AND/OR/NOT, read from the Notes database (requires Full Disk Access) |
 | **Read Notes** | Retrieve note content and metadata |
 | **Update Notes** | Modify existing notes (title and/or content) |
 | **Delete Notes** | Remove notes (moves to Recently Deleted) |
@@ -373,6 +374,73 @@ Searches for notes by title or content.
 ```
 
 **Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc.
+
+---
+
+#### `query-notes`
+
+Finds notes with a boolean query expression evaluated against the NoteStore
+database, read-only. Because it does not go through AppleScript, a query over
+several hundred notes typically returns in well under a second, and one call
+can match titles and bodies together.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)). Without it, use `search-notes`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Query expression (syntax below), at most 2000 characters |
+| `limit` | number | No | Maximum notes to return. Defaults to 50, maximum 500. The response reports the total match count. |
+| `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 5000. The response says when older notes were left unscanned. |
+| `includeDeleted` | boolean | No | Also scan notes in Recently Deleted, notes pending deletion, and folderless notes. Defaults to `false`. |
+
+**Syntax:**
+
+| Form | Matches |
+|------|---------|
+| `budget`, `"quarterly budget"` | Title or body contains the word or phrase (case-insensitive substring) |
+| `title:x`, `body:x`, `text:x` | Title only, body only (text after the first line), or either |
+| `folder:Work`, `folder:"Work/Clients"` | The note's own folder, by name or full path, case-insensitive (notes in subfolders are not included); a literal `/` in a name can be written `\/` as in `list-folders` |
+| `account:iCloud` | Account name, case-insensitive |
+| `tag:finance` | Native Notes tag (with or without `#`); textual hashtags are ordinary words |
+| `has:link`, `has:attachment`, `has:checklist`, `has:drawing`, `has:image`, `has:video`, `has:audio`, `has:pdf`, `has:table`, `has:scan`, `has:tag` | The note body contains that kind of object |
+| `checklist:open`, `checklist:done` | At least one unchecked item; or items present and all checked |
+| `pinned`, `locked`, `shared` (or `is:pinned` …) | Note flags; `shared` includes notes in a shared folder |
+| `words:>250` | Word count, with `=`, `>`, `>=`, `<`, `<=` |
+| `created:>=2026-07-01`, `modified:<2026-09-01` | Dates as `YYYY-MM-DD` in local time, with the same operators; `=` means that whole day |
+| `a b`, `a AND b`, `a OR b`, `NOT a`, `-a`, `( … )` | AND is implicit and binds tighter than OR |
+
+Operators are case-insensitive. Quote an operator or flag word to search it
+literally, for example `"and"` or `"pinned"`. Queries are capped at 256 tokens
+and 64 levels of nesting. An unknown field such as `titel:x` is an error rather
+than a silent text search; quote it to search the literal text.
+
+Password-protected notes match on title and metadata only. Their bodies are
+encrypted, so body predicates never match them, and `-body:x` therefore does.
+Their snippets are always empty.
+
+**Example - Open to-dos in a folder:**
+```json
+{
+  "query": "folder:\"Work Projects\" has:checklist -checklist:done"
+}
+```
+
+**Example - Invoices or finance-tagged notes since July, scanning more history:**
+```json
+{
+  "query": "(title:invoice OR tag:finance) modified:>=2026-07-01",
+  "scanLimit": 2000,
+  "limit": 20
+}
+```
+
+**Returns:** Matching notes, most recently modified first, each with `id`,
+`title`, `folder`, `account`, `modified`, `created`, and a `snippet` centred on
+the first matched phrase. The ids are the same `x-coredata://…/ICNote/p…` form
+every other tool accepts. `structuredContent` also reports `matched` (total
+matches), `scanned`, `eligible`, `scanTruncated`, `truncated`, and `unreadable`
+(bodies that could not be decoded). A malformed query returns an error naming
+the problem and its position.
 
 ---
 
@@ -689,6 +757,69 @@ fixed HTML subset rather than anything Notes.app can render:
 | Refused | every other element and attribute, by name, naming the accepted subset; `<table>` here (use [`create-table`](#create-table)); comments, doctype and processing instructions |
 
 Ordinary notes take the guarded HTML path and are not restricted to that subset.
+
+---
+
+#### `insert-link`
+
+Adds one web, mail or Notes link to an exact note as its own paragraph, then
+proves it from the link runs Notes actually stored. Use `mode: "raw"` to show
+the URL itself, or `mode: "hyperlink"` with a `label` to show text that links to
+the URL. For a link to another note by id, use
+[`insert-note-link`](#insert-note-link), which looks up that note's real deep
+link.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being extended |
+| `url` | string | Yes | Absolute `http(s)` URL with a host, or a `mailto:`, `notes://` or `applenotes:` link. No spaces, `<`, `>` or `"` |
+| `mode` | string | No | `"raw"` (default) shows the URL; `"hyperlink"` shows `label` |
+| `label` | string | Hyperlink only | Visible text for `mode: "hyperlink"`; refused in raw mode |
+| `linked` | boolean | No | Raw mode only. `true` (default) stores a real link on the URL text. `false` writes plain text with no stored link |
+| `position` | string | No | `"end"` (default) or `"after-title"` (first paragraph under the title) |
+| `blankLine` | boolean | No | Leave a blank line between existing text and the link paragraph (default `true`) |
+| `scopeText` | string | Native-object notes only | Unique existing phrase, as for [`append-native`](#append-native) |
+
+**Example - Hyperlink under the title:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "url": "https://example.com/report",
+  "mode": "hyperlink",
+  "label": "Quarterly report",
+  "position": "after-title"
+}
+```
+
+**Returns:** `route` (`"applescript"` for ordinary notes, `"native"` for notes
+with native objects), `linkStored`, `storedUrl` (the destination read back from
+the note, for example `https://example.com/` for a bare origin), and the new
+`contentHash`.
+
+**Safety:** The same guards as [`append-to-note`](#append-to-note): a fresh
+`expectedContentHash`, the attachment block, and every existing link must
+survive. A linked insert must add exactly one stored link with the requested
+label and destination; if the text lands but that proof fails, the error says
+the write happened so it is not repeated.
+
+**Limits:**
+
+- Plain URL text is not linked by Notes when written this way. With
+  `linked: false`, the note stores no link and readers of the body see ordinary
+  text; Notes.app may still underline the URL on screen through its own data
+  detection. The result reports `linkStored: false`.
+- Notes with native objects (a table, a checklist, native tags) take the native
+  end-append path, so only `position: "end"` with `blankLine: true` works there.
+- The link always gets its own paragraph. Placing it at the end of one existing
+  paragraph, or inside the text, is not available.
+- Rich URL preview cards (the link tile Notes makes when you paste a URL) are
+  not produced. No public automation route creates one: the Shortcuts Notes
+  actions write text, and AppleScript's `body` has no card markup.
+- To start a new note with a link, use [`create-note`](#create-note) with
+  `format: "html"` and an `<a href>` in `content`; the link is stored the same
+  way.
 
 ---
 
@@ -1119,6 +1250,10 @@ Run a full setup diagnostic: Notes.app reachability, the Automation permission, 
 
 **Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).
 
+The report ends with the same feature matrix as [`get-capabilities`](#get-capabilities)
+(`structuredContent.runtimeOS` and `structuredContent.features`). It is
+informational: an unavailable optional feature never changes `healthy`.
+
 ---
 
 #### `get-notes-stats`
@@ -1171,6 +1306,30 @@ resolve the same note. Creating a note from Markdown is
 Reports which background operations are implemented, live-verified, installed,
 and currently available, with a specific reason for each unavailable operation.
 
+It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
+`darwinRelease`) and a `features` matrix, one entry per feature group:
+`applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
+`backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
+placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
+`audioTranscription`, which need a native helper this server does not ship.
+Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
+`requirements`, `missing`, `unverified`, `tools`, and a machine-readable
+`reason` that is `null` when available and otherwise the first that applies:
+
+| `reason` | Meaning |
+|----------|---------|
+| `unsupported_platform` | Not running on macOS |
+| `not_implemented` | The server has no implementation for this feature yet |
+| `unknown_os_version` | The feature has a macOS floor and `sw_vers` could not be read |
+| `requires_macos_<major>` | macOS is older than `minimumMacOSVersion`, e.g. `requires_macos_26` |
+| `full_disk_access_missing` | The Notes database is not readable by this process |
+| `shortcuts_unavailable` | The `shortcuts` command could not be run |
+| `shortcut_not_installed` | A bridge Shortcut is missing or installed more than once |
+
+The probe never opens Notes.app or runs a Shortcut, so the Automation
+permission for Notes.app appears under `unverified` rather than being guessed;
+`doctor` and `health-check` confirm it by contacting Notes.
+
 #### `append-native`
 
 Appends bounded plaintext, semantic HTML, or Markdown while preserving existing
@@ -1197,6 +1356,38 @@ in the foreground.
 
 Appends one real unchecked Notes checklist item and verifies its native identity
 and text.
+
+#### `create-checklist-items`
+
+Appends several real unchecked checklist items, 1 to 20, in the order given.
+It takes the same `id`, `expectedContentHash` and `scopeText` as
+`create-checklist-item`, plus `items`, an array of one-line texts. Each item is
+one run of the same verified bridge, so the call takes a few seconds per item
+(a full batch of 20 can run about a minute; if your client times out first,
+read the note before retrying rather than resending the whole batch) and is
+gated with `create-checklist-item` in `get-capabilities`.
+
+After every run the server checks that exactly one new unchecked item with that
+text and a new native identity appeared, that every item appended earlier in the
+call kept its identity and text, and that nothing else in the note changed. The
+verified revision feeds the next run. A final check confirms the new items are
+the note's last checklist items in the requested order.
+
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "scopeText": "Packing list for the trip",
+  "items": ["Passport", "Charger", "Rain jacket"]
+}
+```
+
+**Returns:** `items`, each with its `index`, native `id` and `text`, plus
+`orderVerified` and the new `contentHash`. The first uncertain result stops the
+call without a retry and returns `ok: false` with `landed` (the verified items),
+`stoppedAt` (the item's index, text, `outcome` of `"not-written"` or
+`"uncertain"`, and the error), and `notAttempted`. After an uncertain stop, read
+the note before retrying, and retry only the items that are not present.
 
 #### `create-table`
 

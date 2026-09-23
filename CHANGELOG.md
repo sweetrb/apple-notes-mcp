@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.8.18] - 2026-09-23
+## [2.8.25] - 2026-09-23
 
 ### Added
 
@@ -18,6 +18,119 @@
   outputSchema, which a test checks against the built server, so MCP clients
   that validate `structuredContent` on error results accept it. Errors the MCP
   SDK raises before a tool runs, such as input-schema failures, are unchanged.
+
+## [2.8.24] - 2026-09-23
+
+### Added
+
+- `get-capabilities` and `doctor` report an OS-version-aware feature matrix:
+  `runtimeOS` (`platform`, `macOSVersion`, `darwinRelease`) and a `features`
+  object with one entry per feature group (AppleScript core, Full Disk Access
+  reads, the Shortcuts bridges and each bridge, plus `not_implemented`
+  placeholders for features that need a native helper). Each entry reports
+  `available`, `osSupported`, `minimumMacOSVersion`, `requirements`,
+  `missing`, `unverified`, `tools`, and a machine-readable `reason`
+  (`unsupported_platform`, `not_implemented`, `unknown_os_version`,
+  `requires_macos_<major>`, `full_disk_access_missing`,
+  `shortcuts_unavailable`, `shortcut_not_installed`). The probe runs
+  `sw_vers`, one read-only database query, and one `shortcuts list`; it never
+  opens Notes.app, runs a Shortcut, or mutates anything. Existing output keys
+  are unchanged, and the matrix never changes `doctor`'s `healthy`. A new
+  feature registers with one entry in `src/services/capabilityMatrix.ts`.
+
+## [2.8.23] - 2026-09-23
+
+### Added
+
+- `query-notes`, a boolean query language evaluated against the Notes database
+  read-only (#100). Bare words and quoted phrases match title or body in one
+  call; fields `title:`, `body:`, `text:`, `folder:`, `account:`, and `tag:`
+  take quoted values; `has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`,
+  `checklist:open|done`, and the `pinned`, `locked`, and `shared` flags test
+  note structure; `words:`, `created:`, and `modified:` compare with `=`, `>`,
+  `>=`, `<`, `<=` against numbers or local `YYYY-MM-DD` dates. AND is implicit,
+  and `OR`, `NOT`, a leading `-`, and parentheses combine terms. Quoting an
+  operator searches it literally, and an unknown field is an error rather than a
+  silent text search. Queries are capped at 256 tokens and 64 nesting levels.
+  The tool scans the 500 most recently modified notes by default (`scanLimit`
+  up to 5000) and returns up to `limit` notes (default 50, max 500) with id,
+  title, folder path, account, dates, and a snippet, plus the total match count
+  and whether older notes were left unscanned. Recently Deleted and folderless
+  notes are excluded unless `includeDeleted` is set. Locked notes match on
+  title and metadata only. Requires Full Disk Access; the database is never
+  written. A broad body query returns in about a tenth of a second, where
+  `search-notes` with `searchContent: true` can exceed its 30 s timeout.
+
+## [2.8.22] - 2026-09-23
+
+### Added
+
+- `create-checklist-items` appends 1 to 20 unchecked native checklist items to
+  one note in the order given. Each item is one run of the verified
+  `create-checklist-item` bridge, chained on the previous run's verified
+  revision. After every run the server checks that exactly one new unchecked
+  item with that text and a new native identity appeared and that items
+  appended earlier kept theirs; a final check confirms the new items are the
+  note's last checklist items in order. The first uncertain result stops the
+  call and returns `ok: false` with the verified `landed` items, the item it
+  `stoppedAt` (with `outcome` `"not-written"` or `"uncertain"`), and the items
+  `notAttempted`. It is gated with `create-checklist-item`.
+  The cap is 20 because each item is a synchronous bridge run of a few
+  seconds; a larger batch could outlast an MCP client's request timeout, and a
+  client that retried the whole call would append duplicates.
+
+## [2.8.21] - 2026-09-23
+
+### Added
+
+- `insert-link` adds one URL to an exact note as its own paragraph, at the end
+  or directly under the title. `mode: "raw"` shows the URL itself as a stored
+  link, or as plain text with `linked: false`; `mode: "hyperlink"` shows a
+  `label` that links to the URL. It uses `append-to-note`'s guards (fresh
+  `expectedContentHash`, attachment block, existing links must survive) and
+  routes notes with native objects to native end-append. The result is proven
+  from the note's stored link runs and reports `linkStored` and `storedUrl`.
+  Rich URL preview cards are not produced: no public automation route creates
+  one.
+
+## [2.8.20] - 2026-09-23
+
+### Fixed
+
+- `create-checklist-item` no longer reports "Operation outcome uncertain…
+  Native checklist item not verified" after a successful append on macOS 27.2
+  (#187). Notes there stores an appended item's checklist style starting at
+  the newline before the new line (`"\nItem"`), not at its first character
+  (`"Item\n"`). Both checklist parsers gave a style run to the line holding its
+  first character, so `get-native-objects`, `get-checklist-state` and the
+  tool's own readback named the line above the item. They now attribute a run
+  to the line of its first non-newline character. A run made only of newlines
+  still belongs to the line it ends, because Notes splits off a line's
+  terminator as its own run when that line's characters carry different
+  attributes. `revision` and `styleRuns`, which the write guards compare, are
+  unchanged.
+
+## [2.8.19] - 2026-09-23
+
+### Fixed
+
+- A write whose visible text contains `&` inside a link no longer reports a
+  readback mismatch after saving correctly. Notes' AppleScript HTML writes the
+  text `a=1&b=2` inside a link as `a=1&ampb=2`, without the semicolon, and the
+  visible-text comparison only decoded `&amp;`. It now decodes the HTML legacy
+  references (`amp`, `lt`, `gt`, `quot`, `nbsp`) with or without the
+  semicolon, in a single pass so `&amp;lt;` still reads as the literal `&lt;`.
+
+## [2.8.18] - 2026-09-23
+
+### Fixed
+
+- The server no longer truncates a response when the client closes stdin right
+  after a request. Shutdown on stdin `end`/`close` (and SIGINT/SIGTERM) now
+  waits for pending stdout writes to drain, capped at two seconds, before
+  exiting. Before, any response larger than the 64 KiB pipe buffer was cut off
+  mid-message, which `tools/list` was close to reaching and which one-shot
+  clients such as `docsTruth.test.ts` hit as an unparseable line.
 
 ## [2.8.17] - 2026-09-17
 
