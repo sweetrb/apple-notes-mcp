@@ -1307,7 +1307,15 @@ export function readSvgSource(path: string): Buffer {
       "svg_file_invalid",
       `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
     );
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  // O_NONBLOCK: if the path is swapped for a FIFO between lstat and open, the
+  // open returns at once (and the fstat check below rejects it) instead of
+  // blocking the event loop. It has no effect on a regular file.
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch {
+    throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+  }
   try {
     const opened = fstatSync(fd);
     if (!opened.isFile() || opened.ino !== info.ino || opened.dev !== info.dev)

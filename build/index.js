@@ -53900,7 +53900,12 @@ function readSvgSource(path10) {
       "svg_file_invalid",
       `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
     );
-  const fd = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
+  let fd;
+  try {
+    fd = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW | constants6.O_NONBLOCK);
+  } catch {
+    throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+  }
   try {
     const opened = fstatSync6(fd);
     if (!opened.isFile() || opened.ino !== info.ino || opened.dev !== info.dev)
