@@ -39615,6 +39615,22 @@ import { createHash } from "node:crypto";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 import { gunzipSync as gunzipSync2 } from "node:zlib";
+
+// src/utils/uniqueById.ts
+function uniqueById(items) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const item of items) {
+    if (item.id) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+// src/utils/noteRichText.ts
 var HTML_LOSSY_ORDER = [
   "superscript",
   "subscript",
@@ -39706,14 +39722,15 @@ function parseRichNote(data, nativeTags = []) {
     hasNativeObjects ||= Boolean(getField(fields, 12));
     const attachment = embeddedMessage(getField(fields, 12));
     const attachmentId = attachment && stringValue(getField(attachment, 1));
-    if (attachmentId) nativeObjectIds.push(attachmentId);
-    if (attachmentId)
+    if (attachment && attachmentId && !nativeObjectIds.includes(attachmentId)) {
+      nativeObjectIds.push(attachmentId);
       objects.push({
         id: attachmentId,
         type: stringValue(getField(attachment, 2)) || "unknown",
         start: position,
         length
       });
+    }
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
@@ -39771,7 +39788,9 @@ function readRichNote(id2) {
     (row) => !row || typeof row.id !== "string" || !Number.isInteger(row.pk) || typeof row.mergeable !== "string" || !/^[0-9a-f]*$/i.test(row.mergeable)
   ))
     throw new Error("Invalid native object metadata");
-  rich.objectData = objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id));
+  rich.objectData = uniqueById(
+    objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id))
+  );
   rich.revision = createHash("sha256").update(rich.revision).update(JSON.stringify(rich.objectData)).digest("hex");
   rich.nativeTagObjectIds = {};
   for (const id3 of rich.nativeObjectIds)
@@ -43237,7 +43256,7 @@ var AppleNotesManager = class {
         }
       }
     }
-    return sharedNotes;
+    return uniqueById(sharedNotes);
   }
   // ===========================================================================
   // Folder Operations
@@ -44076,7 +44095,7 @@ var AppleNotesManager = class {
         });
       }
     }
-    return attachments;
+    return uniqueById(attachments);
   }
   /**
    * Lists attachments for a note by its title.
@@ -44163,7 +44182,7 @@ var AppleNotesManager = class {
         });
       }
     }
-    return attachments;
+    return uniqueById(attachments);
   }
   /**
    * Saves a single attachment of a note (identified by attachment id) to a file

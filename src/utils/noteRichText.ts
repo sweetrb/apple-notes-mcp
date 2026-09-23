@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { checklistRunLineStart } from "./checklistRuns.js";
+import { uniqueById } from "./uniqueById.js";
 import {
   decodeMessage,
   decodeVarint,
@@ -185,14 +186,17 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
     hasNativeObjects ||= Boolean(getField(fields, 12));
     const attachment = embeddedMessage(getField(fields, 12));
     const attachmentId = attachment && stringValue(getField(attachment, 1));
-    if (attachmentId) nativeObjectIds.push(attachmentId);
-    if (attachmentId)
+    // Notes can reference a freshly added attachment from more than one run
+    // (#197); report each native object once, at its first position.
+    if (attachment && attachmentId && !nativeObjectIds.includes(attachmentId)) {
+      nativeObjectIds.push(attachmentId);
       objects.push({
         id: attachmentId,
-        type: stringValue(getField(attachment!, 2)) || "unknown",
+        type: stringValue(getField(attachment, 2)) || "unknown",
         start: position,
         length,
       });
+    }
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
@@ -269,9 +273,13 @@ export function readRichNote(id: string): RichNote {
     )
   )
     throw new Error("Invalid native object metadata");
-  rich.objectData = objectData
-    .filter((row) => rich.nativeObjectIds.includes(row.id))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  // One object id can match more than one row while Notes settles a new
+  // attachment (#197); keep one row per id so it is not reported twice.
+  rich.objectData = uniqueById(
+    objectData
+      .filter((row) => rich.nativeObjectIds.includes(row.id))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
   rich.revision = createHash("sha256")
     .update(rich.revision)
     .update(JSON.stringify(rich.objectData))

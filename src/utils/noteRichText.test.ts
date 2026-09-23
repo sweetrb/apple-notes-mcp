@@ -140,6 +140,32 @@ describe("Notes rich text", () => {
       { id: "object-b", pk: 2, type: "table", mergeable: "BB", view: 1 },
     ]);
   });
+  it("reports a native object referenced twice once, at its first position (#197)", () => {
+    const ref = (id: string) => Buffer.concat([run(1), b(12, b(1, id))]);
+    const blob = gzipSync(
+      document("\ufffc\ufffc\ufffc", [ref("object-b"), ref("object-a"), ref("object-b")])
+    ).toString("hex");
+    vi.mocked(execFileSync).mockReturnValue(
+      blob +
+        "\n{}\n" +
+        JSON.stringify([
+          { id: "object-b", pk: 2, type: "attachment", mergeable: "B1", view: 1 },
+          { id: "object-a", pk: 1, type: "attachment", mergeable: "AA", view: 0 },
+          { id: "object-b", pk: 2, type: "attachment", mergeable: "B2", view: 1 },
+        ]) +
+        "\n"
+    );
+    const result = readRichNote("x-coredata://ABCDEF/ICNote/p12");
+    expect(result.nativeObjectIds).toEqual(["object-b", "object-a"]);
+    expect(result.objects?.map((o) => [o.id, o.start])).toEqual([
+      ["object-b", 0],
+      ["object-a", 1],
+    ]);
+    expect(result.objectData).toEqual([
+      { id: "object-a", pk: 1, type: "attachment", mergeable: "AA", view: 0 },
+      { id: "object-b", pk: 2, type: "attachment", mergeable: "B1", view: 1 },
+    ]);
+  });
   it("deduplicates native checklist runs by their stable item ID", () => {
     const item = (id: number, done: number) =>
       Buffer.concat([

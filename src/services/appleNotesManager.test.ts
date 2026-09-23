@@ -2033,6 +2033,26 @@ describe("AppleNotesManager", () => {
         'if (count of noteIds) is not (count of noteShared) then error "Notes changed during listing"'
       );
     });
+
+    it("reports a note Notes enumerates twice only once, in first-seen order (#183)", () => {
+      const row = (title: string, id: string) =>
+        [title, id, "2025-1-2-3-4-5", "2025-6-7-8-9-10", "true", "false"].join(F);
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            row("Team plan", "x-coredata://ABC/ICNote/p7"),
+            row("Budget", "x-coredata://ABC/ICNote/p8"),
+            row("Team plan", "x-coredata://ABC/ICNote/p7"),
+          ].join(R),
+        });
+
+      expect(manager.listSharedNotes().map((note) => note.id)).toEqual([
+        "x-coredata://ABC/ICNote/p7",
+        "x-coredata://ABC/ICNote/p8",
+      ]);
+    });
   });
 
   describe("Recently Deleted (#198, #207)", () => {
@@ -3179,6 +3199,21 @@ describe("AppleNotesManager", () => {
       });
       expect(attachments[0].created?.getFullYear()).toBe(2026);
       expect(attachments[0].modified?.getHours()).toBe(11);
+    });
+
+    it("reports an attachment enumerated twice only once, in first-seen order (#197)", () => {
+      const output = [
+        ["x-coredata://ABC/ICAttachment/p2", "new.png", "public.png"].join(F),
+        ["x-coredata://ABC/ICAttachment/p1", "photo.jpg", "public.jpeg"].join(F),
+        ["x-coredata://ABC/ICAttachment/p2", "new.png", "public.png"].join(F),
+      ].join(R);
+      mockExecuteAppleScript.mockReturnValue({ success: true, output });
+      const expected = ["x-coredata://ABC/ICAttachment/p2", "x-coredata://ABC/ICAttachment/p1"];
+
+      expect(manager.listAttachmentsById("x-coredata://ABC/ICNote/p123").map((a) => a.id)).toEqual(
+        expected
+      );
+      expect(manager.listAttachments("My Note", "iCloud").map((a) => a.id)).toEqual(expected);
     });
 
     it("returns empty array when note has no attachments", () => {

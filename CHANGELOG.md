@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [2.8.41] - 2026-09-23
+
+### Fixed
+
+- `list-shared-notes` no longer returns a note twice when Notes.app
+  enumerates it twice (#183). `id of notes of account` can list the same note
+  id more than once, and every row was appended as-is; the listing now keeps
+  one row per note id, in first-seen order.
+- `list-attachments` and `get-native-objects` no longer list a newly added
+  attachment twice (#197). Both AppleScript attachment listings (by id and by
+  title) keep one row per attachment id, and the note-body reader reports
+  each native object once, at its first position, with one metadata row per
+  object id, so `objects`, `tables` and native tag object ids carry no
+  repeats. First-seen order is preserved throughout.
+
 ## [2.8.40] - 2026-09-23
 
 ### Fixed

@@ -48,6 +48,7 @@ import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
 import { collectNoteTables } from "@/utils/tableMarkdown.js";
 import { readSmartFolders } from "@/utils/smartFolders.js";
+import { uniqueById } from "@/utils/uniqueById.js";
 import { readTrashFolderIds, RECENTLY_DELETED_FOLDER_NAME } from "@/utils/trashFolders.js";
 import {
   assertSafeSavePath,
@@ -2094,7 +2095,8 @@ export class AppleNotesManager {
       }
     }
 
-    return sharedNotes;
+    // Notes.app can enumerate one note twice under `notes of account` (#183).
+    return uniqueById(sharedNotes);
   }
 
   // ===========================================================================
@@ -3101,7 +3103,8 @@ export class AppleNotesManager {
       }
     }
 
-    return attachments;
+    // A freshly added attachment can be enumerated twice (#197).
+    return uniqueById(attachments);
   }
 
   /**
@@ -3196,7 +3199,8 @@ export class AppleNotesManager {
       }
     }
 
-    return attachments;
+    // A freshly added attachment can be enumerated twice (#197).
+    return uniqueById(attachments);
   }
 
   /**
