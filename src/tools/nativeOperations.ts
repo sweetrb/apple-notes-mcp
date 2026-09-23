@@ -71,6 +71,15 @@ const common = {
       "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
     ),
 };
+/**
+ * Cells for create-table when rows is omitted: an empty 2 x 2 table, matching
+ * what Format > Table inserts in Notes on Mac
+ * (https://support.apple.com/guide/notes/add-a-table-apd0a136b9cc/mac).
+ */
+export const EMPTY_TABLE_ROWS: readonly string[][] = [
+  ["", ""],
+  ["", ""],
+];
 const htmlEscape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -231,16 +240,21 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   );
   tool(
     "create-table",
-    "Use when: appending one native Notes table from a rectangular array of strings.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    "Use when: appending one native Notes table from a rectangular array of strings, or an empty table when rows is omitted.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
     {
       ...common,
       rows: z
         .array(z.array(z.string().max(10000)).min(1).max(100))
         .min(1)
-        .max(1000),
+        .max(1000)
+        .optional()
+        .describe(
+          "Cell text, row by row. Omit for an empty 2 x 2 table, the size Notes itself inserts."
+        ),
     },
-    (args) => {
+    (input) => {
       requireValidated("create-table");
+      const args = { ...input, rows: input.rows ?? EMPTY_TABLE_ROWS };
       if (args.rows.some((row) => row.length !== args.rows[0].length))
         throw new Error("Table rows must have equal cell counts");
       const before = readRichNote(args.id);

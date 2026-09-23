@@ -1,5 +1,34 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `create-note-with-attachment` creates a note and attaches one local file in
+  a single call. It checks the file and name before creating anything, then
+  attaches with `add-attachment`'s byte verification. If the attach step fails
+  after the note exists, the error names the new note's id so the caller can
+  attach to it instead of creating a second note.
+- `add-attachment` takes an optional `filename`, the name the attachment gets in
+  Notes. Notes names a file attachment after the file it receives, so the
+  server names its private temporary copy accordingly. The name must be one
+  path component that keeps the source extension. The result reports the
+  `name` Notes shows and, with `filename`, whether it matched.
+- `create-table` accepts an omitted `rows` and then inserts an empty 2 x 2
+  table, the size Notes inserts from Format > Table, with its empty cells
+  verified like any other table.
+
+### Fixed
+
+- `add-attachment` no longer reports a successful insertion as "Native
+  metadata changed during read". Its note read required the rich read to be
+  writable, which is false for any note holding a native object, and every
+  note holds one once the attachment lands. So the post-insertion readback
+  always failed, and a note that already had an attachment was refused before
+  insertion. The read now requires a consistent metadata revision, as the
+  native background writes do; preservation of existing objects is still
+  checked. Verified on macOS 27.2.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

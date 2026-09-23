@@ -167,6 +167,13 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - The destination folder must already exist (create it first with `create-folder`)
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
+### add-attachment / create-note-with-attachment
+- `filename` sets the name the attachment shows in Notes. It must keep the source file's extension and be a single path component.
+- `create-note-with-attachment` creates the note, then attaches. If the attach step fails, the error names the new note's id: call `add-attachment` on that id rather than repeating the tool, which would create a second note.
+
+### create-table
+- Omit `rows` for an empty 2 × 2 table (the size Notes inserts from Format > Table).
+
 ### get-checklist-state
 - Requires note ID (not title) — use `search-notes` to find the ID first
 - Reads directly from the NoteStore SQLite database (not via AppleScript)

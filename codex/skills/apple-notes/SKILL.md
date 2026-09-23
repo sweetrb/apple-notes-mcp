@@ -66,6 +66,8 @@ Use this skill when the user:
 | Tool | Purpose |
 |------|---------|
 | `list-attachments` | List attachments in a note |
+| `add-attachment` | Attach one local file to an exact note (optional `filename` renames it in Notes) |
+| `create-note-with-attachment` | Create a note and attach one local file in one call; on a failed attach, reuse the named note id with `add-attachment` |
 | `save-attachment` | Save an attachment to disk |
 | `fetch-attachment` | Fetch attachment bytes as base64 |
 | `show-attachment` | Reveal an attachment in the Notes.app UI |

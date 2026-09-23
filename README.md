@@ -1011,6 +1011,50 @@ latest `expectedContentHash`, and an absolute `path`. The server never retries
 the insertion. It verifies that existing rich content survived and compares the
 fetched attachment bytes with the source before reporting success.
 
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+| `expectedContentHash` | string | Yes | `contentHash` from the note version being extended |
+| `path` | string | Yes | Absolute path of the local file; symbolic links are refused |
+| `filename` | string | No | Name the attachment gets in Notes instead of the source file's name. One path component that keeps the source file's extension, with no slash, colon, backslash, control character, leading dot or surrounding spaces. Notes names a file attachment after the file it receives, so the server gives its private temporary copy this name |
+
+**Returns:** `attachmentId`, `bytes`, the `name` Notes reports, and the new
+`contentHash`. With `filename`, `filenameVerified` says whether Notes reports
+that exact name. A mismatch is a warning (`filenameWarning`), not a failure,
+because the attachment and its bytes are already verified.
+
+---
+
+#### `create-note-with-attachment`
+
+Creates a note and attaches one local file to it in a single call. It checks the
+file and `filename` before creating anything, creates the note through Notes.app
+the way [`create-note`](#create-note) does in plaintext, then attaches with the
+same verification as [`add-attachment`](#add-attachment).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `title` | string | Yes | One-line note title |
+| `content` | string | No | Plain-text body placed above the attachment |
+| `folder` | string | No | Existing folder or nested path; create it first with [`create-folder`](#create-folder) |
+| `account` | string | No | Account name; defaults to Notes.app's default account |
+| `path` | string | Yes | Absolute path of the local file (at most 64 MiB) |
+| `filename` | string | No | Attachment name override, as in `add-attachment` |
+
+```json
+{
+  "title": "Signed lease",
+  "folder": "Home",
+  "path": "/Users/me/Downloads/scan-0042.pdf",
+  "filename": "Lease 2026.pdf"
+}
+```
+
+**Returns:** the new note's `id` with `noteCreated: true` and the
+`add-attachment` result. If the attachment step fails after the note exists,
+the error names the new note's id: attach to it with `add-attachment` instead of
+calling this tool again, which would create a second note.
+
 ---
 
 #### `list-attachments`
@@ -1172,7 +1216,9 @@ and text.
 #### `create-table`
 
 Appends a native table from rectangular string rows and verifies every decoded
-cell. It never substitutes a text table.
+cell. It never substitutes a text table. Omit `rows` for an empty 2 × 2 table,
+the size Notes itself inserts from Format > Table; its four empty cells are
+verified the same way.
 
 #### `set-note-pinned`
 

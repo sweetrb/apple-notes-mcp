@@ -43766,7 +43766,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
+import { basename, extname, isAbsolute as isAbsolute2, join as join10 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43777,7 +43777,7 @@ function readSnapshot(manager, id2) {
   if (!body) throw new Error("Note content is unavailable");
   const enriched = enrichNoteRead(id2, body);
   const rich = readRichNote(id2);
-  if (!enriched.complete || enriched.revision !== rich.revision)
+  if (enriched.revision !== rich.revision)
     throw new Error("Native metadata changed during read; read the note again");
   return { id: id2, title: note.title, body, rich, hash: richContentHash(body, enriched) };
 }
@@ -43871,65 +43871,143 @@ function registerDirectOperations(server2, manager) {
       ...manager.renameFolderById(args.id, args.expectedName, args.expectedParentId, args.newName)
     })
   );
+  const attachmentInput = {
+    path: external_exports.string().min(1).max(4096).describe("Absolute path of the local file to attach"),
+    filename: external_exports.string().min(1).max(255).optional().describe(
+      "Name the attachment gets in Notes instead of the source file's name. One path component with the source file's extension; no slash, colon, or control characters, and no leading dot."
+    )
+  };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
-    { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
-      const before = readSnapshot(manager, id2);
-      if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
-      const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    { id: noteId, expectedContentHash: revision, ...attachmentInput },
+    (args) => attachFile(manager, args)
+  );
+  tool(
+    "create-note-with-attachment",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails after the note exists, the error names the new note's id; attach to it with add-attachment instead of creating another note.",
+    {
+      title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
+      content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
+      folder: external_exports.string().max(1e3).optional().describe("Existing folder or nested path; create it first with create-folder"),
+      account: external_exports.string().max(200).optional().describe("Account name; defaults to Notes' default"),
+      ...attachmentInput
+    },
+    (args) => {
+      const name = attachmentName(args.path, args.filename);
+      localAttachment(args.path);
+      const note = manager.createNote(
+        args.title,
+        args.content ?? "",
+        [],
+        args.folder,
+        args.account,
+        "plaintext"
+      );
+      if (!note)
+        throw new Error(
+          `Failed to create note "${args.title}". Check that the folder and account exist (list-folders, list-accounts); nothing was attached`
+        );
+      const handOff = `Note ${note.id} was created; attach to it with add-attachment instead of creating another note`;
+      let snapshot;
       try {
-        writeFileSync3(temporaryFile, bytes, { mode: 384 });
-        if (readSnapshot(manager, id2).hash !== before.hash)
-          throw new Error("Note revision changed");
-        let returnedId;
-        let transportUncertain = false;
-        try {
-          returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
-        } catch {
-          transportUncertain = true;
-        }
-        const after = readSnapshot(manager, id2);
-        assertExistingContentPreserved(before, after);
-        const readInserted = () => [
-          ...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()
-        ].filter((item) => !beforeAttachments.some((existing) => existing.id === item.id));
-        let inserted = readInserted();
-        for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
-          inserted = readInserted();
-        }
-        const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
-        if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
-          throw new Error(
-            "Attachment insertion outcome uncertain; read the exact note before retrying"
-          );
-        const attachmentId = inserted[0].id;
-        const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
-        const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-        if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
-          throw new Error(
-            "Attachment bytes were not verified; read the exact note before retrying"
-          );
+        snapshot = readSnapshot(manager, note.id);
+      } catch (error2) {
+        throw new Error(`${handOff}. The new note could not be read back: ${String(error2)}`);
+      }
+      try {
         return {
-          ok: true,
-          id: id2,
-          attachmentId,
-          contentHash: after.hash,
-          bytes: bytes.length,
-          ...transportUncertain ? {
-            transportWarning: "Transport was uncertain; exact bytes and prior content were verified"
-          } : {}
+          ...attachFile(manager, {
+            id: note.id,
+            expectedContentHash: snapshot.hash,
+            path: args.path,
+            filename: name
+          }),
+          title: args.title,
+          folder: args.folder,
+          noteCreated: true
         };
-      } finally {
-        rmSync4(directory, { recursive: true, force: true });
+      } catch (error2) {
+        throw new Error(`${handOff}. ${error2 instanceof Error ? error2.message : String(error2)}`);
       }
     }
   );
+}
+function attachmentName(path4, filename) {
+  const source = basename(path4);
+  if (filename === void 0) return source;
+  if (Buffer.byteLength(filename, "utf8") > 255)
+    throw new Error("filename must be at most 255 bytes");
+  if (filename !== filename.trim() || filename === "" || filename.startsWith(".") || /[/:\\\p{Cc}]/u.test(filename))
+    throw new Error(
+      "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
+    );
+  if (extname(filename).toLowerCase() !== extname(source).toLowerCase())
+    throw new Error(
+      `filename must keep the source file's extension (${extname(source) || "none"})`
+    );
+  return filename;
+}
+function attachFile(manager, args) {
+  const { id: id2, expectedContentHash, path: path4 } = args;
+  const name = attachmentName(path4, args.filename);
+  const before = readSnapshot(manager, id2);
+  if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
+  const bytes = localAttachment(path4);
+  const beforeAttachments = manager.listAttachmentsById(id2);
+  const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
+  const temporaryFile = join10(directory, name);
+  try {
+    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
+    let returnedId;
+    let transportUncertain = false;
+    try {
+      returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
+    } catch {
+      transportUncertain = true;
+    }
+    const after = readSnapshot(manager, id2);
+    assertExistingContentPreserved(before, after);
+    const readInserted = () => [...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()].filter(
+      (item) => !beforeAttachments.some((existing) => existing.id === item.id)
+    );
+    let inserted = readInserted();
+    for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      inserted = readInserted();
+    }
+    const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
+    if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
+      throw new Error(
+        "Attachment insertion outcome uncertain; read the exact note before retrying"
+      );
+    const attachmentId = inserted[0].id;
+    const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
+    const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+    if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
+      throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+    const nameVerified = inserted[0].name === name;
+    return {
+      ok: true,
+      id: id2,
+      attachmentId,
+      contentHash: after.hash,
+      bytes: bytes.length,
+      name: inserted[0].name,
+      ...args.filename === void 0 ? {} : {
+        filenameVerified: nameVerified,
+        ...nameVerified ? {} : {
+          filenameWarning: "The attachment and its bytes were verified, but Notes reports a different name"
+        }
+      },
+      ...transportUncertain ? {
+        transportWarning: "Transport was uncertain; exact bytes and prior content were verified"
+      } : {}
+    };
+  } finally {
+    rmSync4(directory, { recursive: true, force: true });
+  }
 }
 
 // src/tools/nativeTagsBridge.ts
@@ -44062,6 +44140,10 @@ var common = {
     "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
   )
 };
+var EMPTY_TABLE_ROWS = [
+  ["", ""],
+  ["", ""]
+];
 var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 function registerNativeOperations(server2, manager) {
   function tool(name, description, input, handler, readOnly = false) {
@@ -44190,13 +44272,16 @@ function registerNativeOperations(server2, manager) {
   );
   tool(
     "create-table",
-    "Use when: appending one native Notes table from a rectangular array of strings.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    "Use when: appending one native Notes table from a rectangular array of strings, or an empty table when rows is omitted.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
     {
       ...common,
-      rows: external_exports.array(external_exports.array(external_exports.string().max(1e4)).min(1).max(100)).min(1).max(1e3)
+      rows: external_exports.array(external_exports.array(external_exports.string().max(1e4)).min(1).max(100)).min(1).max(1e3).optional().describe(
+        "Cell text, row by row. Omit for an empty 2 x 2 table, the size Notes itself inserts."
+      )
     },
-    (args) => {
+    (input) => {
       requireValidated("create-table");
+      const args = { ...input, rows: input.rows ?? EMPTY_TABLE_ROWS };
       if (args.rows.some((row) => row.length !== args.rows[0].length))
         throw new Error("Table rows must have equal cell counts");
       const before = readRichNote(args.id);
