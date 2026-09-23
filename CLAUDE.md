@@ -184,6 +184,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.
 
+### Attachment paths, first image, and batch export
+- `list-attachments` with `includePaths: true` (needs the note `id` and Full Disk Access) adds `assetPaths` (the attachment's own files), `previewPath` (Notes' largest rendered thumbnail, always an image file), and `paths`. Use `assetPaths` when you need the original; a `previewPath` alone means the asset has not downloaded.
+- `list-attachments` with `firstImage: true` returns only the lead visual in body order: the first image even when `path` is `null`, else the first scan or drawing, else `null`.
+- `export-attachments` copies files into `exportDir` (same allowlist as `save-attachment`, never the Notes data folder). Check `exportedKind`: `"preview"` means you got a thumbnail, not the original. It never overwrites; collisions become `-2`, `-3`.
+- Do not hand raw Notes paths to a browser or another tool. Export first.
+
 ### get-note-link
 - Returns the shareable `notes://showNote?identifier=<uuid>` deep link — use this, not the `x-coredata://` id, whenever a link is meant to be handed to a person, stored in a Reminders task, or opened on iOS
 - Primary path reads `ZIDENTIFIER` from the NoteStore database, so it needs Full Disk Access; on macOS 12–15 it can fall back to the AppleScript `note link` property, which macOS 26+ no longer exposes

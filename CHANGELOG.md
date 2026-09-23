@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `list-attachments` takes `includePaths` and `firstImage` (both need the note
+  `id` and Full Disk Access; both read NoteStore and the Notes data folder
+  read-only). `includePaths` adds each attachment's `identifier`, `uti`,
+  `kind`, `bodyIndex`, `assetPaths` (the attachment's own files: its media
+  file, or Notes' fallback image or PDF), `previewPath` (the largest rendered
+  thumbnail by pixel area, always the image file even when Notes stores the
+  rendition as a directory holding `Preview.png`), and `paths`. `firstImage`
+  returns the note's lead visual in strict body order: the first image even
+  when its asset has not downloaded, else the first scan or drawing, with
+  gallery pages considered at the gallery's position. It falls back to
+  creation order, and says so in `orderSource`, when the body records no
+  attachment order.
+- `export-attachments` copies a note's attachment files, or only its lead
+  visual, into a directory. Each result reports `exportedKind`: `"asset"`,
+  `"preview"` (only when no asset is on disk), or `null`. Existing files are
+  never replaced; collisions get `-2`, `-3`, and so on. The directory must
+  pass the same allowlist as `save-attachment` and may not be inside the Notes
+  data folder. Sources are opened without following symlinks, and every
+  discovered path must resolve inside the Notes account folder.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

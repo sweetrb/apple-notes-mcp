@@ -555,6 +555,19 @@ export interface Attachment {
   shared?: boolean;
 }
 
+/**
+ * Attachment asset/preview discovery, first-image, and batch-export shapes
+ * (read-only NoteStore + Notes group container). Defined next to the reader in
+ * utils/attachmentAssets and re-exported here with the other public types.
+ */
+export type {
+  AttachmentKind,
+  AttachmentAssetRecord,
+  NoteAttachmentAssets,
+  FirstImage,
+  AttachmentExportResult,
+} from "@/utils/attachmentAssets.js";
+
 // =============================================================================
 // Notes Statistics
 // =============================================================================

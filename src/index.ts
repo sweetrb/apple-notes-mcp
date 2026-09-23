@@ -59,6 +59,8 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import { attachmentCoreDataId, selectFirstImage } from "@/utils/attachmentAssets.js";
+import type { AttachmentAssetRecord, FirstImage, NoteAttachmentAssets } from "@/types.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -2013,11 +2015,33 @@ registerTool(
 
 // --- list-attachments ---
 
+/** Public view of one attachment's discovered files (ids in the AppleScript format). */
+function attachmentAssetView(noteId: string, record: AttachmentAssetRecord) {
+  return {
+    attachmentId: attachmentCoreDataId(noteId, record.pk),
+    identifier: record.identifier,
+    uti: record.uti,
+    kind: record.kind,
+    parentIdentifier: record.parentIdentifier,
+    bodyIndex: record.bodyIndex,
+    assetPaths: record.assetPaths,
+    previewPath: record.previewPath,
+    paths: record.paths,
+  };
+}
+
+/** Public view of the lead visual. */
+function firstImageView(noteId: string, first: FirstImage | null) {
+  if (!first) return null;
+  const { pk, ...rest } = first;
+  return { attachmentId: attachmentCoreDataId(noteId, pk), ...rest };
+}
+
 registerTool(
   "list-attachments",
   {
     description:
-      "Use when: listing the attachments of one note, by id (preferred) or title.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment).\nDo not use when: you want the attachment bytes (fetch-attachment) or a file on disk (save-attachment).",
+      "Use when: listing the attachments of one note, by id (preferred) or title. With includePaths, also where each attachment's files are on disk; with firstImage, only the note's lead visual.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment). includePaths adds identifier, uti, kind, bodyIndex, assetPaths (the attachment's own files), previewPath (Notes' largest rendered thumbnail, always an image file), and paths. firstImage returns {firstImage, orderSource}: the first image in body order even when its asset has not downloaded (path null), else the first scan or drawing, else null.\nDo not use when: you want the attachment bytes (fetch-attachment) or files on disk (save-attachment, export-attachments).\nNote: includePaths and firstImage need the note id and Full Disk Access; they read NoteStore and the Notes data folder read-only. Treat the returned paths as local data: copy files out with export-attachments rather than handing raw paths on.",
     inputSchema: {
       id: z
         .string()
@@ -2034,13 +2058,40 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe("Account containing the note (ignored if id is provided)"),
+      includePaths: z
+        .boolean()
+        .optional()
+        .describe(
+          "Add on-disk assetPaths, previewPath, and paths to each attachment (requires id and Full Disk Access)"
+        ),
+      firstImage: z
+        .boolean()
+        .optional()
+        .describe(
+          "Return only the note's lead visual in body order instead of the list (requires id and Full Disk Access)"
+        ),
     },
     outputSchema: {
       attachments: z.array(z.object({}).passthrough()).optional(),
       count: z.number().optional(),
+      firstImage: z.object({}).passthrough().nullable().optional(),
+      orderSource: z.enum(["body", "creation"]).optional(),
+      pathsError: z.string().optional(),
     },
   },
-  withErrorHandling(({ id, title, account }) => {
+  withErrorHandling(({ id, title, account, includePaths = false, firstImage = false }) => {
+    if ((includePaths || firstImage) && !id) {
+      return errorResponse("includePaths and firstImage require the note 'id'");
+    }
+    if (firstImage && id) {
+      const assets = notesManager.getAttachmentAssetsById(id);
+      const first = firstImageView(id, selectFirstImage(assets));
+      const text = first
+        ? `Lead visual: ${first.kind} attachment ${first.attachmentId} (${first.path ? "asset on disk" : first.previewPath ? "preview only" : "not downloaded"}; order from ${assets.orderSource}).`
+        : "This note has no image, scan, or drawing attachment.";
+      return successResponse(text, { firstImage: first, orderSource: assets.orderSource });
+    }
+
     // Prefer ID-based lookup if provided
     if (id) {
       const note = notesManager.getNoteById(id);
@@ -2055,9 +2106,41 @@ registerTool(
         });
       }
       const attachmentList = attachments.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
+      if (!includePaths) {
+        return successResponse(
+          `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`,
+          { attachments, count: attachments.length }
+        );
+      }
+      let assets: NoteAttachmentAssets;
+      try {
+        assets = notesManager.getAttachmentAssetsById(id);
+      } catch (error) {
+        const pathsError = error instanceof Error ? error.message : String(error);
+        return successResponse(
+          `Found ${attachments.length} attachment(s) in "${note.title}" (paths unavailable: ${pathsError}):\n${attachmentList}`,
+          { attachments, count: attachments.length, pathsError }
+        );
+      }
+      const byPk = new Map(assets.attachments.map((r) => [r.pk, r]));
+      let onDisk = 0;
+      const enriched = attachments.map((a) => {
+        const pk = Number(/\/ICAttachment\/p(\d+)$/.exec(a.id)?.[1]);
+        const record = byPk.get(pk);
+        if (!record) return a;
+        if (record.paths.length > 0) onDisk++;
+        const children = assets.attachments
+          .filter((c) => c.parentIdentifier === record.identifier)
+          .map((c) => attachmentAssetView(id, c));
+        return {
+          ...a,
+          ...attachmentAssetView(id, record),
+          ...(children.length ? { children } : {}),
+        };
+      });
       return successResponse(
-        `Found ${attachments.length} attachment(s) in "${note.title}":\n${attachmentList}`,
-        { attachments, count: attachments.length }
+        `Found ${attachments.length} attachment(s) in "${note.title}" (${onDisk} with files on disk; order from ${assets.orderSource}):\n${attachmentList}`,
+        { attachments: enriched, count: attachments.length, orderSource: assets.orderSource }
       );
     }
 
@@ -2259,6 +2342,69 @@ registerTool(
       contentType: r.contentType,
     });
   }, "Error saving attachment")
+);
+
+// --- export-attachments ---
+
+registerTool(
+  "export-attachments",
+  {
+    description:
+      'Use when: copying every file attachment of one note (or only its lead visual) into a directory on disk.\nReturns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "preview" when the asset never downloaded and only Notes\' rendered thumbnail was available, or null when nothing was on disk.\nDo not use when: exporting one attachment to an exact path (save-attachment) or reading bytes inline (fetch-attachment).\nSafety: writes files; exportDir must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Existing files are never replaced: name collisions get -2, -3, ... suffixes. Reads NoteStore and the Notes data folder read-only; requires Full Disk Access. Notes.app is not opened.',
+    inputSchema: {
+      noteId: noteIdInput,
+      exportDir: z
+        .string()
+        .min(1, "exportDir is required")
+        .max(MAX.SAVE_PATH)
+        .describe("Absolute destination directory (created if missing; home, temp, or /Volumes)"),
+      firstImageOnly: z
+        .boolean()
+        .optional()
+        .describe("Export only the note's lead visual (see list-attachments firstImage)"),
+    },
+    outputSchema: {
+      exportDir: z.string().optional(),
+      exported: z.number().optional(),
+      previews: z.number().optional(),
+      skipped: z.number().optional(),
+      failed: z.number().optional(),
+      results: z.array(z.object({}).passthrough()).optional(),
+      firstImage: z.object({}).passthrough().nullable().optional(),
+    },
+  },
+  withErrorHandling(({ noteId, exportDir, firstImageOnly = false }) => {
+    const r = notesManager.exportAttachmentsById(noteId, exportDir, firstImageOnly);
+    const results = r.results.map(({ pk, ...rest }) => ({
+      attachmentId: attachmentCoreDataId(noteId, pk),
+      ...rest,
+    }));
+    const exported = results.filter((x) => x.exportedKind !== null).length;
+    const previews = results.filter((x) => x.exportedKind === "preview").length;
+    const failed = results.filter((x) => x.error).length;
+    const skipped = results.length - exported - failed;
+    const structured: Record<string, unknown> = {
+      exportDir: r.exportDir,
+      exported,
+      previews,
+      skipped,
+      failed,
+      results,
+    };
+    if (firstImageOnly) {
+      structured.firstImage = firstImageView(noteId, r.firstImage ?? null);
+      if (!r.firstImage) {
+        return successResponse(
+          "This note has no image, scan, or drawing attachment; nothing was exported.",
+          structured
+        );
+      }
+    }
+    return successResponse(
+      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
+      structured
+    );
+  }, "Error exporting attachments")
 );
 
 // --- fetch-attachment ---

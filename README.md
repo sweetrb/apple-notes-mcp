@@ -169,7 +169,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Batch Operations** | Delete or move multiple notes at once |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
-| **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
+| **Attachments** | List attachments with their on-disk asset and preview paths, find a note's lead image, save or batch-export them to disk, or fetch their bytes as base64 |
 | **Notes.app UI State** | Reveal a note in Notes.app or read the current Notes.app selection |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
@@ -1022,10 +1022,22 @@ Lists attachments in a note.
 | `id` | string | No | Note ID (preferred) |
 | `title` | string | No | Note title |
 | `account` | string | No | Account containing the note |
+| `includePaths` | boolean | No | Also report where each attachment's files are on disk (needs `id` and Full Disk Access) |
+| `firstImage` | boolean | No | Return only the note's lead visual instead of the list (needs `id` and Full Disk Access) |
 
 **Returns:** List of attachments with IDs, names, content identifiers, URLs when available, created/modified dates, and shared state.
 
-**⚠️ Safety:** A lookup failure is reported as an error, never as an empty list — so an empty result reliably means the note has no attachments and is safe to replace wholesale. Treat an error as "unknown", not "none".
+With `includePaths`, each attachment also carries `identifier`, `uti`, `kind` (`image`, `scan`, `drawing`, `pdf`, `audio`, `video`, `url`, `table`, `other`), `bodyIndex`, and three path fields read from NoteStore and the Notes data folder (read-only):
+
+- `assetPaths`: the attachment's own files, best first (the media file, or Notes' fallback image or PDF rendering).
+- `previewPath`: Notes' largest rendered thumbnail, chosen by pixel area from the `Previews` entries named `<identifier>-<scale>-<W>x<H>-<appearance>`. It is always the image file, including when the entry is a directory holding `<n>_<uuid>/Preview.png`. `null` when there is none.
+- `paths`: `assetPaths` followed by `previewPath`.
+
+Container attachments (a scan gallery) list their child rows under `children`. If the database cannot be read, the list is still returned with a `pathsError`.
+
+With `firstImage`, the result is `{firstImage, orderSource}`. `firstImage` is the first image in the note's body order, even when its asset has not downloaded (`path: null`, possibly with a `previewPath`). A scan or drawing stands in only when the note has no image, and a gallery's pages are considered at the gallery's position (`parentIdentifier`, `galleryIndex`). `orderSource` is `body`, or `creation` when the body did not record attachment order. `firstImage` is `null` when the note has no visual.
+
+**⚠️ Safety:** A lookup failure is reported as an error, never as an empty list — so an empty result reliably means the note has no attachments and is safe to replace wholesale. Treat an error as "unknown", not "none". Treat returned paths as local data: copy files out with [`export-attachments`](#export-attachments) instead of passing raw paths on.
 
 ---
 
@@ -1040,6 +1052,22 @@ Saves a note attachment to disk.
 | `savePath` | string | Yes | Absolute destination file path. Must be under your home directory, a temp directory, or `/Volumes` |
 
 **Returns:** Confirmation with the saved path, name, and content type (also in `structuredContent`).
+
+---
+
+#### `export-attachments`
+
+Copies a note's attachment files into a directory without opening Notes.app.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | Exact CoreData note ID |
+| `exportDir` | string | Yes | Absolute destination directory, created if missing. Same allowlist as `save-attachment` (home, temp, or `/Volumes`), and never inside the Notes data folder |
+| `firstImageOnly` | boolean | No | Export only the lead visual that `list-attachments` `firstImage` reports |
+
+**Returns:** `exportDir`, counts (`exported`, `previews`, `skipped`, `failed`), and per attachment its `attachmentId`, `identifier`, `kind`, `exportedTo`, and `exportedKind`: `"asset"` for the real file, `"preview"` when the asset never downloaded and only Notes' thumbnail was on disk, or `null` when nothing was on disk. A preview is never chosen over an available asset, and it is named `<name>-preview.<ext>` so it is not mistaken for the original. A scan gallery with no file of its own exports its pages.
+
+**⚠️ Safety:** Existing files are never replaced. A name that is taken gets `-2`, `-3`, and so on. Reads NoteStore and the Notes data folder read-only and needs Full Disk Access.
 
 ---
 
@@ -1360,7 +1388,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

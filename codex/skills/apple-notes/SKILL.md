@@ -65,8 +65,9 @@ Use this skill when the user:
 
 | Tool | Purpose |
 |------|---------|
-| `list-attachments` | List attachments in a note |
+| `list-attachments` | List attachments in a note; `includePaths` adds on-disk `assetPaths`/`previewPath`, `firstImage` returns the lead visual in body order |
 | `save-attachment` | Save an attachment to disk |
+| `export-attachments` | Copy a note's attachment files (or only its lead visual) into a directory; `exportedKind` says asset or preview |
 | `fetch-attachment` | Fetch attachment bytes as base64 |
 | `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |

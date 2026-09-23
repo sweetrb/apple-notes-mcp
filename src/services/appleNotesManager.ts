@@ -49,6 +49,13 @@ import {
   cleanupTempDir,
   ensureParentDir,
 } from "@/utils/attachmentFs.js";
+import {
+  assembleAttachmentAssets,
+  exportAttachmentAssets,
+  readNoteAttachmentRows,
+  selectFirstImage,
+} from "@/utils/attachmentAssets.js";
+import type { AttachmentExportResult, FirstImage, NoteAttachmentAssets } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { existsSync } from "fs";
 import { homedir } from "os";
@@ -3068,6 +3075,48 @@ export class AppleNotesManager {
     } finally {
       cleanupTempDir(dir);
     }
+  }
+
+  /**
+   * Reads one note's attachments with their on-disk asset and preview paths,
+   * in body order, from the NoteStore database and the Notes group container
+   * (both read-only). Requires Full Disk Access.
+   *
+   * @param noteId - canonical CoreData note id
+   * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  getAttachmentAssetsById(noteId: string): NoteAttachmentAssets {
+    const { rows, bodyOrder } = readNoteAttachmentRows(noteId);
+    return assembleAttachmentAssets(rows, bodyOrder);
+  }
+
+  /**
+   * The note's lead visual: the first image in body order (even when its asset
+   * has not downloaded), else the first scan or drawing, else null.
+   */
+  getFirstImageById(noteId: string): FirstImage | null {
+    return selectFirstImage(this.getAttachmentAssetsById(noteId));
+  }
+
+  /**
+   * Copies a note's attachment files into a directory. Each attachment exports
+   * its real asset; its rendered preview only when no asset exists. Existing
+   * files are never replaced: name collisions get `-2`, `-3`, ... suffixes.
+   * The directory must satisfy the same allowlist as save-attachment and may
+   * not be inside the Notes group container.
+   */
+  exportAttachmentsById(
+    noteId: string,
+    exportDir: string,
+    firstImageOnly = false
+  ): {
+    exportDir: string;
+    results: AttachmentExportResult[];
+    firstImage?: FirstImage | null;
+  } {
+    return exportAttachmentAssets(this.getAttachmentAssetsById(noteId), exportDir, {
+      firstImageOnly,
+    });
   }
 
   // ===========================================================================
