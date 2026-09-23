@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.3] - 2026-09-23
+## [2.9.7] - 2026-09-23
 
 ### Added
 
@@ -16,10 +16,11 @@
   `validation_error` for a malformed `locale`, `not_found` for an
   `attachmentId` that is not one of the note's audio attachments, and the same
   helper and note codes as `get-note-drawings`.
-- The public native helper gains a `transcribe` action and links AVFoundation
-  and Speech. Its embedded Info.plist now carries a Speech Recognition usage
-  description. Rebuild it with `apple-notes-mcp setup --public-helper`; the
-  old binary is reported stale until you do.
+- The public native helper gains a `transcribe` action, added to the
+  server's action allowlist, and links AVFoundation and Speech. Its
+  embedded Info.plist now carries a Speech Recognition usage description.
+  Rebuild it with `apple-notes-mcp setup --public-helper`; the old binary is
+  reported stale until you do.
 - `scripts/test-public-helper.mjs` also transcribes synthetic `say` speech.
 
 ### Changed
@@ -29,7 +30,7 @@
   `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, which remains the default for
   other calls.
 
-## [2.9.2] - 2026-09-23
+## [2.9.6] - 2026-09-23
 
 ### Added
 
@@ -48,12 +49,120 @@
   `xcrun swiftc`, signed ad hoc, handshake-verified, and installed under
   `~/Library/Application Support/apple-notes-mcp/public-helper/` with a
   manifest of source and binary SHA-256 digests that is re-checked before
-  every call. No prebuilt binary ships; the package now includes `native/`.
+  every call, and the server sends it only `hello` and `decode_drawing`
+  (anything else is refused before spawning). No prebuilt binary ships.
   `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` and
   `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` override the install folder and
   per-call timeout.
 - `scripts/test-public-helper.mjs` checks an installed helper against the
   synthetic PencilKit fixture used by the unit tests.
+
+## [2.9.5] - 2026-09-23
+
+### Added
+
+- `list-note-links` lists links in one note (by exact id), or across a
+  folder, an account or the whole library, read-only from the NoteStore
+  database. Each link has a `kind`: `inline` (a hyperlink on text), `card` (a
+  rich link preview), `note` (a native link chip to another note) or
+  `section` (a native link chip to a heading or paragraph). Rows carry the
+  URL, label, `linkSafe`, target note and paragraph UUIDs parsed from Notes
+  deep links, the card's `previewPath`, and the source `noteId`, note title
+  and modification date, folder path and account. Folder paths, account
+  matching (exact name, then a unique prefix), the Recently Deleted and
+  folderless exclusions and card previews come from the same shared helpers
+  as `list-folders`, `list-special-notes` and `list-attachments`. Cards are
+  identified by the `public.url` attachment type, the same rule
+  `get-note-structure` uses, so both tools count the same cards. A `folder`
+  scope includes its subfolders unless `includeSubfolders` is false. Inline
+  links need every body in scope decoded, so a folder, account or library
+  scan includes them only with `includeInline: true`. Results page with
+  `offset`/`limit` and can be filtered by `kinds`. Contributed by
+  @oliverames (#217).
+
+## [2.9.4] - 2026-09-23
+
+### Added
+
+- `list-note-paragraphs` lists a note's non-empty paragraphs, read-only from
+  the NoteStore database, with `blockIndex`, text, style, the stored
+  `paragraphId`, and `paragraphIdStatus` (`unique`, `shared`, `missing`).
+  A `unique` paragraph also gets a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link. The
+  note is chosen by `id` (including a Notes UUID) or by exact `title`,
+  optionally narrowed by `folder` as list-folders writes it. Title lookups
+  skip Recently Deleted, as list-notes does.
+- `get-paragraph-link` selects one paragraph by snippet (`contains`), whole
+  text (`match`) or `blockIndex`, with `occurrence` for repeated text, and
+  returns its direct link only when the paragraph's ID appears in no other
+  paragraph of the note. Notes copies paragraph IDs when a paragraph is split,
+  so a shared ID is refused rather than risk opening the wrong paragraph.
+  Refusals use the standard error envelope, with the specific cause in
+  `structuredContent.reason` (for example `paragraph-id-shared`). The tool
+  never creates or repairs an ID.
+
+## [2.9.3] - 2026-09-23
+
+### Added
+
+- `get-note-structure` returns a read-only overview of one note from the
+  NoteStore database: decoded text, a block summary, every link with its kind
+  (`inline` hyperlink, rich link `card`, native `note` link chip, native
+  `section` link chip) and its target note and paragraph UUIDs when the URL
+  carries them, native tags, and attachments. Attachments come from the same
+  reader `list-attachments` uses, so both tools report the same `kind`, body
+  order, `previewPath` and `firstImage` for an attachment; gallery and
+  recording children are nested under their parent. Metadata covers
+  `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `inRecentlyDeleted` (including stores that mark
+  Recently Deleted only by its `TrashFolder` identifier), `lastViewed` with a
+  `lastViewedStatus`, `wordCount`, `charCount`, `attachmentCount` (top-level
+  only), `checklistTotal`/`checklistDone` and `hasDrawing`. A
+  password-protected note returns its metadata and attachment rows, with the
+  body-derived fields null. The id accepts the same forms as the other
+  exact-id tools.
+- `src/utils/noteLinks.ts` classifies link kinds and parses Notes deep links
+  for the link features that follow.
+- TECHNICAL_NOTES.md documents where Notes stores each link kind, how preview
+  renditions map to files, the never-viewed `lastViewed` value, and how sharing
+  is derived.
+
+## [2.9.2] - 2026-09-23
+
+### Added
+
+- `list-recent-notes` lists notes from NoteStore (read-only) by stored
+  modification time, for incremental sync. With `since`, rows come oldest
+  first after that point and `nextSince` is the last row's cursor, so every
+  call advances, including one that fills its `limit`. `saturated` (count
+  equals limit) means more changes may follow; call again with `nextSince`
+  until it is `false`. `since` takes a `modifiedCheckpoint` cursor, an ISO
+  8601 date (local midnight), or an ISO date-time (local unless it carries an
+  offset). Each row's `modifiedCheckpoint` is an opaque
+  `cdts1:<bits>:<key>` cursor: the stored timestamp's exact IEEE-754 bits,
+  read and bound through sqlite3's `ieee754` functions so they never pass
+  through a JavaScript `Date` or a rounded decimal, plus the note's database
+  key, which orders notes that share one timestamp so paging never skips or
+  repeats them. A first full sync starts from `since: "1970-01-01"` and
+  reaches a library of any size. Without `since`, rows come newest first and
+  `nextSince` is set only when every match was returned. Options: `account`,
+  `folder`, `limit` (default 50, max 1000), `includeDeleted` (Recently
+  Deleted, notes awaiting deletion, and folderless rows), `wordCounts`
+  (`wordCount`/`charCount` from the shared body decoder; `null` for locked or
+  unavailable bodies, `0` for known-empty ones), and `bodyPreview` (180
+  characters plus `textDecoded`). The docs note two limits of a
+  modification-date cursor: an edit iCloud delivers later from another device
+  with an older timestamp can be missed, and deletions are invisible unless
+  `includeDeleted` is set.
+- `list-folder-tree` returns each account's folder hierarchy with direct
+  (`noteCount`) and cumulative (`totalNoteCount`) note counts, folder kind
+  (regular, smart, Recently Deleted), ids, and paths in one read.
+  `includeDeleted` adds folders marked for deletion.
+
+### Changed
+
+- `list-notes`' description now points to `list-recent-notes` for date
+  order, sync cursors, or word counts. Its behavior is unchanged.
 
 ## [2.9.1] - 2026-09-23
 

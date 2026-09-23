@@ -54,6 +54,16 @@ export const PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
 export const PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
 export const PUBLIC_HELPER_MANIFEST = "manifest.json";
 export const PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+/**
+ * The only actions the server sends. `encode_drawing` (fixture generation)
+ * stays reachable from scripts/test-public-helper.mjs, which runs the binary
+ * directly, but is refused here before anything is spawned.
+ */
+export const PUBLIC_HELPER_ACTIONS: ReadonlySet<string> = new Set([
+  "hello",
+  "decode_drawing",
+  "transcribe",
+]);
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
@@ -258,7 +268,8 @@ export interface PublicCallOptions {
 /**
  * Send one request and return the parsed success object. Every failure is a
  * PublicHelperError; a timeout is code `timeout` (the caller decides whether
- * that is indeterminate for its purpose).
+ * that is indeterminate for its purpose). An action outside
+ * {@link PUBLIC_HELPER_ACTIONS} is refused (`unknown_action`) before spawning.
  */
 export function callPublicHelper(
   action: string,
@@ -266,6 +277,11 @@ export function callPublicHelper(
   deps: PublicHelperDeps = defaultPublicHelperDeps(),
   options: PublicCallOptions = {}
 ): Record<string, unknown> {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
   let binaryPath = options.binaryPath;
   if (!binaryPath) {
     const install = inspectPublicHelper(deps);
