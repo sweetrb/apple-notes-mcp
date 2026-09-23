@@ -365,7 +365,8 @@ limitation above rather than real Heading and Subheading styles.
 On this route, bullet task items (`- [ ] item`, `- [x] item`) become ordinary
 list rows that start with a visible `☐` or `☑` character, and the response
 reports how many as `taskItemsRendered`. They are text, not native checkable
-checklist items. The default Shortcut route still refuses task items.
+checklist items. Use this route as the glyph fallback when the Shortcut is not
+installed or the note is outside iCloud.
 
 ```json
 {

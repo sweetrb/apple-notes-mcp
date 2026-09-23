@@ -36,7 +36,7 @@ Use this skill when the user:
 | `get-note-details`   | Get metadata (created, modified, account)                                                                                                                          |
 | `get-note-link`      | Get the shareable `notes://showNote?identifier=…` deep link for a note                                                                                             |
 | `update-note`        | Replace a note's title and/or body                                                                                                                                 |
-| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`)                                                                                      |
+| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`, which inserts below the title)                                                       |
 | `insert-link`        | Add one URL to a note as its raw text or as a labeled hyperlink, verified from the stored link                                                                     |
 | `delete-note`        | Remove a note (moves to Recently Deleted)                                                                                                                          |
 | `batch-delete-notes` | Delete multiple notes by ID (max 500 per call)                                                                                                                     |
@@ -271,6 +271,14 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
   `format: "markdown"`. Both refuse Markdown Notes would rewrite, such as `_`
   emphasis outside a word or backslash escapes; underscores inside a link
   destination are fine.
+- With `format: "markdown"`, do not repeat the title as a `# ` line; if the first
+  line is exactly `# <title>`, the server removes it. Without the Shortcut, or in
+  another account, pass `markdownRoute: "html"`: same Markdown subset through
+  AppleScript HTML, no real Heading styles, and `- [ ]` / `- [x]` task items
+  become list rows with a visible ☐ / ☑ character (text, not a checkable
+  checklist; say so to the user).
+- To import a Markdown or text file, pass its absolute path as `contentPath`
+  instead of `content` (UTF-8, at most 1 MiB, inside home, temp, or `/Volumes`).
 - Use `<ul><li>` and `<ol><li>` for native bullet and numbered lists. Add `<div><br></div>` after closing `</ul>` or `</ol>` so the next section has spacing.
 - Use `<b>`, `<i>`, `<u>`, and `<s>` for inline emphasis.
 - Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.
@@ -332,6 +340,8 @@ Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `
 - **"Note not found"**: Use search-notes to find similar titles
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
+- **Slow Notes.app**: `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` accept `timeoutSeconds` (1–120) for each automation step of that call. A timed-out write is uncertain; read the exact note before retrying
+- **"Notes.app accepted the delete, but the note is still in its original folder"**: nothing was deleted. Read the note again before retrying
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
 - **Attachment-risk update**: The mutation is rejected. Use Notes.app or create a separate note.
 - **Notes accumulate blank lines after repeated updates**: Apple Notes' internal HTML processing preserves empty `<div><br></div>` artifacts from previous edits, and they persist even when you update with clean content. Fix: delete the note with delete-note and create a fresh one with create-note — the artifacts are baked into the note's internal representation, so this is more reliable than trying to fix the whitespace through updates

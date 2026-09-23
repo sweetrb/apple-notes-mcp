@@ -448,7 +448,7 @@ registerTool(
         .optional()
         .default("shortcut")
         .describe(
-          "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities); task items (`- [ ]`) are refused there. 'html' converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible ☐ / ☑ character — not native, checkable checklist items."
+          "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible ☐ / ☑ character — not native, checkable checklist items."
         ),
       tags: z
         .array(z.string().max(MAX.TAG))

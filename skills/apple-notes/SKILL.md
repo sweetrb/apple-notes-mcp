@@ -36,7 +36,7 @@ Use this skill when the user:
 | `get-note-details`   | Get metadata (created, modified, account)                                                                                                                          |
 | `get-note-link`      | Get the shareable `notes://showNote?identifier=…` deep link for a note                                                                                             |
 | `update-note`        | Replace a note's title and/or body                                                                                                                                 |
-| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`, which inserts below the title)                                                                                      |
+| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`, which inserts below the title)                                                       |
 | `insert-link`        | Add one URL to a note as its raw text or as a labeled hyperlink, verified from the stored link                                                                     |
 | `delete-note`        | Remove a note (moves to Recently Deleted)                                                                                                                          |
 | `batch-delete-notes` | Delete multiple notes by ID (max 500 per call)                                                                                                                     |
