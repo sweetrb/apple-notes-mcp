@@ -52,9 +52,11 @@ beforeAll(() => {
   ]);
   execFileSync("/usr/bin/sqlite3", [
     db,
-    "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER PRIMARY KEY);" +
+    "CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER PRIMARY KEY, Z_NAME VARCHAR);" +
+      "INSERT INTO Z_PRIMARYKEY VALUES (12,'ICNote'),(14,'ICFolder');" +
+      "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER);" +
       "CREATE TABLE ZICNOTEDATA (Z_PK INTEGER PRIMARY KEY, ZNOTE INTEGER, ZCRYPTOINITIALIZATIONVECTOR BLOB, ZDATA BLOB);" +
-      "INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (1),(2),(3),(4);" +
+      "INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (1,12),(2,12),(3,12),(4,12),(5,14);" +
       `INSERT INTO ZICNOTEDATA (ZNOTE, ZCRYPTOINITIALIZATIONVECTOR, ZDATA) VALUES (1, NULL, X'${heading.toString("hex")}');` +
       `INSERT INTO ZICNOTEDATA (ZNOTE, ZCRYPTOINITIALIZATIONVECTOR, ZDATA) VALUES (2, X'00', X'0102');` +
       `INSERT INTO ZICNOTEDATA (ZNOTE, ZCRYPTOINITIALIZATIONVECTOR, ZDATA) VALUES (3, NULL, NULL);`,
@@ -77,6 +79,8 @@ describe("readNoteBlocks (real sqlite3)", () => {
     expect(code(() => readNoteBlocks(id(3), { dbPath: db }))).toBe("no-body");
     expect(code(() => readNoteBlocks(id(4), { dbPath: db }))).toBe("no-body");
     expect(code(() => readNoteBlocks(id(99), { dbPath: db }))).toBe("not-found");
+    // A folder's primary key is not a note, even though the row exists.
+    expect(code(() => readNoteBlocks(id(5), { dbPath: db }))).toBe("not-found");
     expect(code(() => readNoteBlocks(id("1;DROP TABLE ZICNOTEDATA"), { dbPath: db }))).toBe(
       "invalid-id"
     );

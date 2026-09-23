@@ -10,15 +10,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { NoteStoreError } from "./noteStoreSql.js";
+import { AttachmentStoreError } from "./attachmentAssets.js";
+import { NoteStoreError, type StoreFolder } from "./noteStoreSql.js";
 import {
   describeLinkInventory,
-  folderPaths,
   inventorySql,
   listNoteLinks,
-  matchAccount,
   matchFolder,
-  splitFolderPath,
 } from "./noteLinkInventory.js";
 
 const varint = (value: number): number[] => {
@@ -62,7 +60,9 @@ const code = (fn: () => unknown) => {
   try {
     fn();
   } catch (error) {
-    return error instanceof NoteStoreError ? error.code : String(error);
+    if (error instanceof NoteStoreError) return error.kind;
+    if (error instanceof AttachmentStoreError) return error.code;
+    return String(error);
   }
   return "no error";
 };
@@ -103,6 +103,9 @@ beforeAll(() => {
     insert({ Z_PK: 13, Z_ENT: 7, ZTITLE2: "A/B", ZACCOUNT8: 1 }),
     insert({ Z_PK: 14, Z_ENT: 7, ZTITLE2: "Recently Deleted", ZFOLDERTYPE: 1, ZACCOUNT8: 1 }),
     insert({ Z_PK: 15, Z_ENT: 7, ZTITLE2: "Gone", ZMARKEDFORDELETION: 1, ZACCOUNT8: 1 }),
+    insert({ Z_PK: 16, Z_ENT: 7, ZTITLE2: "Acme", ZPARENT: 11, ZACCOUNT8: 1 }),
+    // Recently Deleted known only by its identifier, as on stores without ZFOLDERTYPE values.
+    insert({ Z_PK: 17, Z_ENT: 7, ZTITLE2: "Trash", ZIDENTIFIER: "TrashFolder-A", ZACCOUNT8: 1 }),
     // Notes: 20 (Projects/Clients, newest), 21 (A/B), 22 (Work/Clients), 23 (trash),
     // 24 (folderless), 25 (locked, Projects), 26 (no body row, Projects).
     insert({
@@ -151,6 +154,25 @@ beforeAll(() => {
       ZACCOUNT7: 1,
     }),
     insert({ Z_PK: 26, Z_ENT: 3, ZIDENTIFIER: "N26", ZTITLE1: "Empty", ZFOLDER: 10, ZACCOUNT7: 1 }),
+    // 27 sits in Projects/Clients/Acme; 28 in the identifier-only trash folder.
+    insert({ Z_PK: 27, Z_ENT: 3, ZIDENTIFIER: "N27", ZTITLE1: "Acme", ZFOLDER: 16, ZACCOUNT7: 1 }),
+    insert({ Z_PK: 28, Z_ENT: 3, ZIDENTIFIER: "N28", ZFOLDER: 17, ZACCOUNT7: 1 }),
+    insert({
+      Z_PK: 44,
+      Z_ENT: 4,
+      ZIDENTIFIER: "CARD-C",
+      ZTYPEUTI: "public.url",
+      ZNOTE: 27,
+      ZURLSTRING: "https://example.com/acme",
+    }),
+    insert({
+      Z_PK: 45,
+      Z_ENT: 4,
+      ZIDENTIFIER: "CARD-D",
+      ZTYPEUTI: "public.url",
+      ZNOTE: 28,
+      ZURLSTRING: "https://example.com/deleted",
+    }),
     // A card in note 20 (in body), one in note 22 (not in body), one in the trashed note.
     insert({
       Z_PK: 40,
@@ -277,48 +299,42 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-describe("folder and account matching", () => {
+describe("matchFolder", () => {
+  const folder = (pk: number, name: string | null, parent: number | null, account = 1) =>
+    ({
+      pk,
+      name,
+      identifier: null,
+      parent,
+      account,
+      folderType: 0,
+      trash: 0,
+      tombstoned: 0,
+    }) as StoreFolder;
   const folders = [
-    { pk: 1, title: "Projects", parent: null, account: 1, type: 0 },
-    { pk: 2, title: "Clients", parent: 1, account: 1, type: 0 },
-    { pk: 3, title: "Clients", parent: null, account: 2, type: 0 },
-    { pk: 4, title: "A/B", parent: null, account: 1, type: 0 },
-    { pk: 5, title: null, parent: 6, account: 1, type: 0 },
-    { pk: 6, title: "Loop", parent: 5, account: 1, type: 0 },
+    folder(1, "Projects", null),
+    folder(2, "Clients", 1),
+    folder(3, "Clients", null, 2),
+    folder(4, "A/B", null),
+    { ...folder(5, "Clients", null), trash: 1 },
+    { ...folder(6, "Clients", 1), tombstoned: 1 },
   ];
 
-  it("splits paths on unescaped slashes", () => {
-    expect(splitFolderPath("Work/Clients")).toEqual(["Work", "Clients"]);
-    expect(splitFolderPath("Travel/Spain\\/Portugal/")).toEqual(["Travel", "Spain/Portugal"]);
+  it("matches by list-folders path, by unique name, and within one account", () => {
+    expect(matchFolder(folders, "Projects/Clients")).toMatchObject({
+      folder: { pk: 2 },
+      path: "Projects/Clients",
+    });
+    expect(matchFolder(folders, "A\\/B")).toMatchObject({ folder: { pk: 4 }, path: "A\\/B" });
+    expect(matchFolder(folders, "A/B").folder.pk).toBe(4);
+    expect(matchFolder(folders, "Clients", 2).folder.pk).toBe(3);
   });
 
-  it("builds escaped full paths and survives parent cycles", () => {
-    const paths = folderPaths(folders);
-    expect(paths.get(2)).toBe("Projects/Clients");
-    expect(paths.get(4)).toBe("A\\/B");
-    expect(paths.get(5)).toBe("Loop/");
-  });
-
-  it("matches by path, by unique name, and within one account", () => {
-    expect(matchFolder(folders, "Projects/Clients")).toEqual({ pk: 2, path: "Projects/Clients" });
-    expect(matchFolder(folders, "A\\/B").pk).toBe(4);
-    expect(matchFolder(folders, "A/B").pk).toBe(4);
-    expect(matchFolder(folders, "Clients", 2).pk).toBe(3);
-    expect(code(() => matchFolder(folders, "Clients"))).toBe("invalid-argument");
-    expect(code(() => matchFolder(folders, "Nope"))).toBe("not-found");
-  });
-
-  it("matches accounts by identifier or case-insensitive name", () => {
-    const accounts = [
-      { pk: 1, name: "iCloud", identifier: "A" },
-      { pk: 2, name: "Work", identifier: "B" },
-      { pk: 3, name: "work", identifier: "C" },
-      { pk: 4, name: null, identifier: "D" },
-    ];
-    expect(matchAccount(accounts, "ICLOUD").pk).toBe(1);
-    expect(matchAccount(accounts, "C").pk).toBe(3);
-    expect(code(() => matchAccount(accounts, "Work"))).toBe("invalid-argument");
-    expect(code(() => matchAccount(accounts, "Other"))).toBe("not-found");
+  it("ignores deleted folders and reports ambiguous or unknown names", () => {
+    expect(() => matchFolder(folders, "Clients")).toThrow(
+      /ambiguous; use one of these paths: Projects\/Clients, Clients\./
+    );
+    expect(code(() => matchFolder(folders, "Nope"))).toBe("invalid_input");
   });
 });
 
@@ -326,15 +342,17 @@ describe("listNoteLinks (real sqlite3)", () => {
   it("lists cards and chips across the library without decoding bodies", () => {
     const r = listNoteLinks({ dbPath: db, limit: 2000 });
     expect(r.inlineIncluded).toBe(false);
-    expect(r.notesInScope).toBe(111);
+    // Excludes Recently Deleted (by type and by TrashFolder identifier) and folderless notes.
+    expect(r.notesInScope).toBe(112);
     expect(r.notesWithoutBody).toBe(0);
-    expect(r.counts).toEqual({ inline: 0, card: 2, note: 1, section: 1 });
+    expect(r.counts).toEqual({ inline: 0, card: 3, note: 1, section: 1 });
     expect(r.links.map((l) => [l.kind, l.noteId, l.folderPath, l.account])).toEqual([
       ["card", id(20), "Projects/Clients", "iCloud"],
       // Without decoded bodies there are no positions: kinds order within a note.
       ["note", id(21), "A\\/B", "iCloud"],
       ["section", id(21), "A\\/B", "iCloud"],
       ["card", id(22), "Clients", "Work"],
+      ["card", id(27), "Projects/Clients/Acme", "iCloud"],
     ]);
     const card = r.links[0];
     expect(card).toMatchObject({
@@ -349,6 +367,7 @@ describe("listNoteLinks (real sqlite3)", () => {
     expect(card.previewPath).toMatch(/CARD-A-1-600x315-0\.png$/);
     expect(card.inBody).toBeUndefined();
     expect(r.links[3].previewPath).toBeNull();
+    expect(r.links[4].noteModified).toBeNull();
     expect(r.links[2]).toMatchObject({ targetNote: TARGET, paragraphId: PARA, section: "Goals" });
   });
 
@@ -356,8 +375,9 @@ describe("listNoteLinks (real sqlite3)", () => {
     const r = listNoteLinks({ dbPath: db, includeInline: true, limit: 2000 });
     expect(r.inlineIncluded).toBe(true);
     // 105 batch notes + note 20 + note 22; the trashed and folderless notes are out of scope.
-    expect(r.counts).toEqual({ inline: 107, card: 2, note: 1, section: 1 });
-    expect(r.notesWithoutBody).toBe(3);
+    expect(r.counts).toEqual({ inline: 107, card: 3, note: 1, section: 1 });
+    // Locked 25, bodyless 26 and 27, undecodable 300.
+    expect(r.notesWithoutBody).toBe(4);
     const first = r.links.slice(0, 2).map((l) => [l.kind, l.url, l.inBody, l.start]);
     expect(first).toEqual([
       ["inline", "https://example.com", undefined, 5],
@@ -367,13 +387,38 @@ describe("listNoteLinks (real sqlite3)", () => {
     expect(r.links.find((l) => l.url === "https://example.org/b")!.inBody).toBe(false);
   });
 
-  it("scopes by account and by folder", () => {
+  it("scopes by account with the shared name resolution", () => {
     const work = listNoteLinks({ dbPath: db, account: "work", includeInline: true });
     expect(work.scope).toEqual({ account: "Work", accountIdentifier: "ACCT-B" });
     expect(work.links.map((l) => l.url)).toEqual(["mailto:a@example.com", "https://example.org/b"]);
-    const clients = listNoteLinks({ dbPath: db, account: "ACCT-A", folder: "Clients" });
-    expect(clients.scope).toMatchObject({ folder: "Clients", folderPath: "Projects/Clients" });
-    expect(clients.links.map((l) => l.kind)).toEqual(["card"]);
+    // A unique prefix resolves, as in the other tools.
+    expect(listNoteLinks({ dbPath: db, account: "iCl" }).scope.account).toBe("iCloud");
+    expect(code(() => listNoteLinks({ dbPath: db, account: "Nobody" }))).toBe("invalid_input");
+  });
+
+  it("scopes a folder with its subfolders unless includeSubfolders is false", () => {
+    const projects = listNoteLinks({ dbPath: db, account: "iCloud", folder: "Projects" });
+    expect(projects.scope).toMatchObject({
+      folder: "Projects",
+      folderPath: "Projects",
+      includeSubfolders: true,
+    });
+    expect(projects.links.map((l) => l.url)).toEqual([
+      "https://example.com/card",
+      "https://example.com/acme",
+    ]);
+    const direct = listNoteLinks({
+      dbPath: db,
+      folder: "Projects/Clients",
+      includeSubfolders: false,
+    });
+    expect(direct.scope.includeSubfolders).toBe(false);
+    expect(direct.links.map((l) => l.url)).toEqual(["https://example.com/card"]);
+    const nested = listNoteLinks({ dbPath: db, folder: "Projects/Clients" });
+    expect(nested.links.map((l) => l.folderPath)).toEqual([
+      "Projects/Clients",
+      "Projects/Clients/Acme",
+    ]);
     const slash = listNoteLinks({ dbPath: db, folder: "A\\/B", kinds: ["section"] });
     expect(slash.links.map((l) => l.kind)).toEqual(["section"]);
     expect(slash.counts).toEqual({ inline: 0, card: 0, note: 0, section: 1 });
@@ -387,6 +432,9 @@ describe("listNoteLinks (real sqlite3)", () => {
       ["inline", "https://example.net/old", "Recently Deleted"],
       ["card", "https://example.net/t", "Recently Deleted"],
     ]);
+    expect(listNoteLinks({ dbPath: db, id: id(28) }).links.map((l) => l.url)).toEqual([
+      "https://example.com/deleted",
+    ]);
     const locked = listNoteLinks({ dbPath: db, id: id(25) });
     expect(locked.notesWithoutBody).toBe(1);
     expect(locked.links).toEqual([]);
@@ -396,47 +444,47 @@ describe("listNoteLinks (real sqlite3)", () => {
 
   it("pages by offset, limit and byte cap", () => {
     const p = listNoteLinks({ dbPath: db, includeInline: true, offset: 3, limit: 5 });
-    expect(p.page).toEqual({ offset: 3, returned: 5, total: 111, hasMore: true, nextOffset: 8 });
+    expect(p.page).toEqual({ offset: 3, returned: 5, total: 112, hasMore: true, nextOffset: 8 });
     const capped = listNoteLinks({ dbPath: db, includeInline: true, maxBytes: 10 });
     expect(capped.page.returned).toBe(1);
     const past = listNoteLinks({ dbPath: db, offset: 500 });
-    expect(past.page).toEqual({ offset: 4, returned: 0, total: 4, hasMore: false });
+    expect(past.page).toEqual({ offset: 5, returned: 0, total: 5, hasMore: false });
   });
 
-  it("returns null note ids when the store UUID is unknown", () => {
-    const r = listNoteLinks({ dbPath: noMeta });
-    expect(r.links).toHaveLength(1);
-    expect(r.links[0]).toMatchObject({ noteId: null, folder: "F", account: null });
-    expect(r.links[0].attachmentId).toBeUndefined();
+  it("refuses a store without an identifier, like the other database tools", () => {
+    expect(code(() => listNoteLinks({ dbPath: noMeta }))).toBe("schema");
   });
 
   it("refuses conflicting or unknown selectors and unreadable stores", () => {
     expect(code(() => listNoteLinks({ dbPath: db, id: id(20), folder: "Projects" }))).toBe(
-      "invalid-argument"
+      "invalid_input"
     );
-    expect(code(() => listNoteLinks({ dbPath: db, id: id(999) }))).toBe("not-found");
+    expect(code(() => listNoteLinks({ dbPath: db, id: id(999) }))).toBe("invalid_input");
     expect(code(() => listNoteLinks({ dbPath: db, id: "x-coredata://X/ICNote/p1 OR 1" }))).toBe(
-      "invalid-id"
+      "invalid_id"
     );
-    expect(code(() => listNoteLinks({ dbPath: db, folder: "Clients" }))).toBe("invalid-argument");
-    expect(code(() => listNoteLinks({ dbPath: db, account: "Nobody" }))).toBe("not-found");
-    expect(code(() => listNoteLinks({ dbPath: join(dir, "none.sqlite") }))).toBe(
-      "no-full-disk-access"
-    );
+    expect(code(() => listNoteLinks({ dbPath: db, folder: "Clients" }))).toBe("invalid_input");
+    expect(code(() => listNoteLinks({ dbPath: join(dir, "none.sqlite") }))).toBe("no_fda");
   });
 
   it("binds only integers into the generated SQL", () => {
-    const sql = inventorySql(new Set(["Z_PK", "Z_ENT"]));
+    const sql = inventorySql(new Set(["Z_PK", "Z_ENT", "ZFOLDER"]));
     expect(sql.rows).toContain("@note");
     expect(sql.bodies).toContain("@after");
-    expect(sql.folders).not.toMatch(/'Clients'|'Work'/);
+    expect(sql.rows).not.toMatch(/'Clients'|'Work'/);
+    // Without ZPARENT there is no hierarchy to walk.
+    expect(sql.rows).not.toContain("WITH RECURSIVE");
+    expect(inventorySql(new Set(["ZFOLDER", "ZPARENT"])).rows).toMatch(
+      /WITH RECURSIVE[\s\S]*@subfolders/
+    );
+    expect(() => inventorySql(new Set(["Z_PK"]))).toThrow(/ZFOLDER/);
   });
 });
 
 describe("describeLinkInventory", () => {
   it("summarizes a page and says when inline links were not scanned", () => {
     expect(describeLinkInventory(listNoteLinks({ dbPath: db, limit: 2 }))).toBe(
-      "Found 4 links in 111 notes (inline 0 not scanned, card 2, note 1, section 1); returned 2 from offset 0; more at offset 2."
+      "Found 5 links in 112 notes (inline 0 not scanned, card 3, note 1, section 1); returned 2 from offset 0; more at offset 2."
     );
     expect(describeLinkInventory(listNoteLinks({ dbPath: db, id: id(22) }))).toBe(
       "Found 2 links in 1 notes (inline 1, card 1, note 0, section 0); returned 2 from offset 0."

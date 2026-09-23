@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { checklistRunLineStart } from "./checklistRuns.js";
+import { uniqueById } from "./uniqueById.js";
 import {
   decodeMessage,
   decodeVarint,
@@ -30,7 +32,28 @@ export interface RichNote {
   nativeTagObjectIds?: Record<string, string[]>;
   objects?: Array<{ id: string; type: string; start: number; length: number }>;
   checklistItems?: Array<{ id: string; text: string; done: boolean; start: number }>;
-  styleRuns?: Array<{ start: number; length: number; signature: string }>;
+  /**
+   * Attribute runs in text order. `signature` is the comparable formatting of
+   * the run; `paragraphStyle` (0 Title, 1 Heading, 2 Subheading, 3 Body,
+   * 4 Monospaced, 100-103 lists), `blockQuote` and `highlight` are decoded
+   * from the same run for callers that check a specific native style.
+   */
+  styleRuns?: Array<{
+    start: number;
+    length: number;
+    signature: string;
+    paragraphStyle?: number;
+    blockQuote?: boolean;
+    highlight?: boolean;
+  }>;
+  /**
+   * Formatting present in the stored body that Notes' AppleScript HTML
+   * (`body of note`) does not carry, so a full-body rewrite would silently drop
+   * it (#189): `superscript` / `subscript` (attribute-run field 8), `alignment`
+   * (a non-left paragraph alignment) and `highlight` (field 14). Present only
+   * when non-empty.
+   */
+  htmlLossyFormatting?: HtmlLossyFormatting[];
   objectData?: Array<{
     id: string;
     pk: number;
@@ -39,6 +62,15 @@ export interface RichNote {
     view: number | null;
   }>;
 }
+/** Stored formatting that a full-body AppleScript rewrite cannot reproduce. */
+export type HtmlLossyFormatting = "superscript" | "subscript" | "alignment" | "highlight";
+const HTML_LOSSY_ORDER: HtmlLossyFormatting[] = [
+  "superscript",
+  "subscript",
+  "alignment",
+  "highlight",
+];
+
 export interface RichRead {
   content: string;
   links: NoteLink[];
@@ -81,6 +113,7 @@ function styleValue(field: ReturnType<typeof decodeMessage>[number]): unknown {
         else if (wire === 5) offset += 4;
         else if (wire === 2) {
           [length, offset] = decodeVarint(data, offset);
+          if (length < 0) return Buffer.from(data).toString("hex");
           offset += length;
         } else return Buffer.from(data).toString("hex");
         if (offset > data.length) return Buffer.from(data).toString("hex");
@@ -109,13 +142,20 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
   let position = 0;
   let hasNativeObjects = false;
   let hasChecklist = false;
+  const lossy = new Set<HtmlLossyFormatting>();
   for (const run of getFields(body, 5)) {
     const fields = embeddedMessage(run);
     if (!fields) throw new Error("Invalid Notes attribute run");
     const length = varintValue(getField(fields, 1));
     if (length === undefined || length < 0 || position + length > text.length)
       throw new Error("Invalid Notes run length");
+    const paragraph = embeddedMessage(getField(fields, 2));
+    // ParagraphStyle field 1 is the style type (absent means Body) and field 8
+    // the block-quote level; attribute-run field 14 is the highlight colour.
     styleRuns.push({
+      paragraphStyle: paragraph ? (varintValue(getField(paragraph, 1)) ?? 3) : 3,
+      blockQuote: Boolean(paragraph && varintValue(getField(paragraph, 8))),
+      highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
       signature: JSON.stringify(
@@ -124,6 +164,15 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
           .map((f) => [f.fieldNumber, styleValue(f)])
       ),
     });
+    // Only runs that cover visible text matter: Notes leaves attributes on a
+    // trailing newline that no rewrite could lose.
+    if (/[^\s\ufffc]/u.test(text.slice(position, position + length))) {
+      const baseline = varintValue(getField(fields, 8)) ?? 0;
+      if (baseline > 0) lossy.add("superscript");
+      if (baseline < 0) lossy.add("subscript");
+      if (paragraph && (varintValue(getField(paragraph, 2)) ?? 0) !== 0) lossy.add("alignment");
+      if (varintValue(getField(fields, 14))) lossy.add("highlight");
+    }
     const url = stringValue(getField(fields, 9));
     if (url) {
       if (!safeUrl(url)) throw new Error("Unsupported link scheme in note");
@@ -137,21 +186,24 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
     hasNativeObjects ||= Boolean(getField(fields, 12));
     const attachment = embeddedMessage(getField(fields, 12));
     const attachmentId = attachment && stringValue(getField(attachment, 1));
-    if (attachmentId) nativeObjectIds.push(attachmentId);
-    if (attachmentId)
+    // Notes can reference a freshly added attachment from more than one run
+    // (#197); report each native object once, at its first position.
+    if (attachment && attachmentId && !nativeObjectIds.includes(attachmentId)) {
+      nativeObjectIds.push(attachmentId);
       objects.push({
         id: attachmentId,
-        type: stringValue(getField(attachment!, 2)) || "unknown",
+        type: stringValue(getField(attachment, 2)) || "unknown",
         start: position,
         length,
       });
-    const paragraph = embeddedMessage(getField(fields, 2));
+    }
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
-      const start = text.lastIndexOf("\n", position - 1) + 1;
+      // A 27.2-style run can start on the previous line's newline (#187).
+      const start = checklistRunLineStart(text, position, length);
       if (itemId && !checklistItems.some((item) => item.id === itemId))
         checklistItems.push({
           id: itemId,
@@ -177,6 +229,7 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
     objects,
     checklistItems,
     styleRuns,
+    ...(lossy.size ? { htmlLossyFormatting: HTML_LOSSY_ORDER.filter((f) => lossy.has(f)) } : {}),
   };
 }
 
@@ -220,9 +273,13 @@ export function readRichNote(id: string): RichNote {
     )
   )
     throw new Error("Invalid native object metadata");
-  rich.objectData = objectData
-    .filter((row) => rich.nativeObjectIds.includes(row.id))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  // One object id can match more than one row while Notes settles a new
+  // attachment (#197); keep one row per id so it is not reported twice.
+  rich.objectData = uniqueById(
+    objectData
+      .filter((row) => rich.nativeObjectIds.includes(row.id))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
   rich.revision = createHash("sha256")
     .update(rich.revision)
     .update(JSON.stringify(rich.objectData))
@@ -347,20 +404,29 @@ export function enrichNoteRead(id: string, rawBody: string): RichRead {
     const rich = readRichNote(id);
     metadata = rich;
     const content = restoreNoteLinks(rawBody, rich);
-    const writable = !rich.hasNativeObjects && !rich.hasChecklist;
+    const complete = !rich.hasNativeObjects && !rich.hasChecklist;
+    const lossy = rich.htmlLossyFormatting ?? [];
+    // `complete` keeps its meaning (no native objects or checklists), so the
+    // background paths that never rewrite the body are unaffected; only the
+    // full-body rewrite is refused when it would drop formatting (#189).
+    const writable = complete && lossy.length === 0;
+    const warnings: string[] = [];
+    if (!complete)
+      warnings.push(
+        "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
+      );
+    if (lossy.length)
+      warnings.push(
+        `This note uses formatting that Notes' AppleScript HTML does not carry (${lossy.join(", ")}); a full-body edit would silently drop it, so full-body edits are blocked. Edit it in Notes.app, or use append-to-note with scopeText, which appends natively and verifies existing formatting.`
+      );
     return {
       content,
       links: rich.links,
       nativeTags: rich.nativeTags,
-      complete: writable,
+      complete,
       writable,
       revision: rich.revision,
-      ...(!writable
-        ? {
-            warning:
-              "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them.",
-          }
-        : {}),
+      ...(warnings.length ? { warning: warnings.join(" ") } : {}),
     };
   } catch (err) {
     // Keep the generic guidance (still the right first move for most readers)

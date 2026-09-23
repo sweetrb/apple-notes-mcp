@@ -225,7 +225,7 @@ const KNOWN_RUN_FIELDS = new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
 const KNOWN_PARAGRAPH_FIELDS = new Set([1, 2, 4, 5, 8, 9]);
 
 /** Same allowlist noteRichText.ts uses before re-emitting a link into HTML. */
-const isSafeLink = (url: string) =>
+export const isSafeLink = (url: string): boolean =>
   /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) &&
   !Array.from(url).some((char) => char.charCodeAt(0) < 32);
 
@@ -641,7 +641,8 @@ export function readNoteBlocks(
     throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
   const sql =
     "SELECT json_object(" +
-    "'exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk), " +
+    "'exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk " +
+    "AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), " +
     "'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), " +
     "'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
   let output: string;

@@ -1,5 +1,5 @@
 /**
- * Link and attachment classification shared by the read-only note tools.
+ * Link classification shared by the read-only note tools.
  *
  * Apple Notes stores a note's links in three different places:
  *
@@ -7,9 +7,8 @@
  *   the block model in noteBlocks.ts.
  * - **card**: a rich link preview, stored as an ICAttachment row whose type
  *   is `public.url`, with the destination in `ZURLSTRING` and the card title
- *   in `ZTITLE`. Notes renders its thumbnail as an ICAttachmentPreviewImage
- *   row whose `ZIDENTIFIER` names a file or bundle under
- *   `Accounts/<account>/Previews/`.
+ *   in `ZTITLE`. Its thumbnail is a rendition under
+ *   `Accounts/<account>/Previews/`, found by attachmentAssets.ts.
  * - **note** / **section**: a native link chip to another note (macOS 26+
  *   "Add Link" to a note, or macOS 27 "Copy Link to Section"), stored as an
  *   ICInlineAttachment row of type `com.apple.notes.inlinetextattachment.link`
@@ -17,15 +16,14 @@
  *   `applenotes://showNote?identifier=<note>[&paragraphID=<paragraph>]` URL
  *   and whose `ZALTTEXT` holds the chip label.
  *
- * Everything here is pure except {@link resolvePreviewPath}, which only stats
- * files inside one account's Previews directory.
+ * Everything here is pure. Attachment kinds, preview files and ids come from
+ * attachmentAssets.ts, which list-attachments uses too.
  *
  * @module utils/noteLinks
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join, sep } from "node:path";
-import type { NoteBlocksDocument } from "./noteBlocks.js";
+import { attachmentCoreDataId } from "./attachmentAssets.js";
+import { isSafeLink, type NoteBlocksDocument } from "./noteBlocks.js";
 
 /** Inline-attachment UTI of a native note or section link chip. */
 export const NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
@@ -66,25 +64,6 @@ export interface NoteLinkEntry {
   previewPath?: string | null;
 }
 
-/** Attachment kinds, classified from the attachment's UTI. */
-export type AttachmentKind =
-  | "image"
-  | "scan"
-  | "drawing"
-  | "pdf"
-  | "audio"
-  | "video"
-  | "url"
-  | "table"
-  | "gallery"
-  | "map"
-  | "file";
-
-const SAFE_LINK = /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i;
-/** Same scheme allowlist the write path uses before re-emitting a link. */
-export const isSafeLink = (url: string): boolean =>
-  SAFE_LINK.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
-
 const UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 
 /**
@@ -105,43 +84,6 @@ export function parseNotesShowUrl(
   if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
   return result;
 }
-
-/**
- * Classify an attachment by its UTI. Paper documents (`com.apple.paper.doc.*`)
- * are scans or PDFs, not drawings; `com.apple.paper` itself is a Paper
- * drawing and `com.apple.drawing*` a classic sketch.
- */
-export function classifyAttachmentKind(uti: string | null | undefined): AttachmentKind {
-  const u = (uti ?? "").toLowerCase();
-  if (!u) return "file";
-  if (u === "public.url" || u.startsWith("public.url")) return "url";
-  if (u === "com.apple.notes.table") return "table";
-  if (u === "com.apple.notes.gallery") return "gallery";
-  if (u === "com.apple.paper.doc.scan" || u.endsWith(".scan")) return "scan";
-  if (u === "com.apple.paper.doc.pdf" || u === "com.adobe.pdf" || u.endsWith(".pdf")) return "pdf";
-  if (u === "com.apple.paper" || u.startsWith("com.apple.drawing")) return "drawing";
-  if (u.includes("audio") || u === "public.mp3") return "audio";
-  if (u.includes("movie") || u.includes("video") || u === "public.mpeg-4") return "video";
-  if (u.startsWith("com.apple.map") || u.includes("mapkit")) return "map";
-  if (
-    u.includes("image") ||
-    u.includes("photo") ||
-    [
-      "public.jpeg",
-      "public.png",
-      "public.heic",
-      "public.heif",
-      "public.tiff",
-      "com.compuserve.gif",
-    ].includes(u)
-  )
-    return "image";
-  return "file";
-}
-
-/** True for a classic drawing or a Paper drawing UTI. */
-export const isDrawingUti = (uti: string | null | undefined): boolean =>
-  classifyAttachmentKind(uti) === "drawing";
 
 /**
  * Collect the inline hyperlinks of a decoded note. Adjacent runs with the
@@ -242,85 +184,7 @@ export function cardLink(
     ...markerPosition(doc, row.identifier),
     ...parseNotesShowUrl(row.url),
     attachmentIdentifier: row.identifier,
-    ...(noteId ? { attachmentId: attachmentIdFor(noteId, row.pk) } : {}),
+    ...(noteId ? { attachmentId: attachmentCoreDataId(noteId, row.pk) } : {}),
     ...(previewPath !== undefined ? { previewPath } : {}),
   };
-}
-
-/** `x-coredata://<store>/ICAttachment/p<pk>` for an attachment of a note id. */
-export const attachmentIdFor = (noteId: string, pk: number): string =>
-  noteId.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
-
-/** One ICAttachmentPreviewImage row. */
-export interface PreviewRow {
-  attachment: number;
-  identifier: string | null;
-  width: number | null;
-  height: number | null;
-  scale: number | null;
-  appearance: number | null;
-}
-
-/** Light-appearance renditions first, then the largest pixel area. */
-export function rankPreviews(rows: PreviewRow[]): PreviewRow[] {
-  const area = (row: PreviewRow) => (row.width ?? 0) * (row.height ?? 0) * (row.scale ?? 1) ** 2;
-  return [...rows].sort((a, b) => (a.appearance ?? 0) - (b.appearance ?? 0) || area(b) - area(a));
-}
-
-const SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const MAX_BUNDLE_ENTRIES = 64;
-
-/** Resolve `path` and keep it only if it stays inside `root` (after symlinks). */
-function confined(path: string, root: string): string | undefined {
-  try {
-    const real = realpathSync(path);
-    return real.startsWith(root + sep) ? real : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Find the image file for one attachment's best preview rendition.
- *
- * Notes writes each rendition either as a flat file named after the preview
- * identifier (usually with `.png`) or as a bundle directory holding
- * `<n>_<uuid>/Preview.png`. Only the named entries are checked, never a scan
- * of the whole Previews directory, and every resolved path must stay inside
- * the account directory. Returns null when no rendition exists on disk.
- */
-export function resolvePreviewPath(
-  storeDir: string,
-  accountIdentifier: string | null | undefined,
-  previews: PreviewRow[]
-): string | null {
-  if (!accountIdentifier || !SAFE_COMPONENT.test(accountIdentifier)) return null;
-  const accountDir = join(storeDir, "Accounts", accountIdentifier);
-  if (!existsSync(accountDir)) return null;
-  const root = realpathSync(accountDir);
-  for (const preview of rankPreviews(previews)) {
-    const id = preview.identifier;
-    if (!id || !SAFE_COMPONENT.test(id)) continue;
-    const base = join(accountDir, "Previews", id);
-    for (const candidate of [`${base}.png`, base]) {
-      const real = confined(candidate, root);
-      if (!real) continue;
-      const stat = statSync(real);
-      if (stat.isFile()) return real;
-      const inner = stat.isDirectory() ? previewInBundle(real, root) : undefined;
-      if (inner) return inner;
-    }
-  }
-  return null;
-}
-
-/** `Preview.png` inside a rendition bundle's single-level subdirectories. */
-function previewInBundle(bundle: string, root: string): string | undefined {
-  const children = readdirSync(bundle).sort();
-  if (children.length > MAX_BUNDLE_ENTRIES) return undefined;
-  for (const child of children) {
-    const file = confined(join(bundle, child, "Preview.png"), root);
-    if (file && statSync(file).isFile()) return file;
-  }
-  return undefined;
 }
