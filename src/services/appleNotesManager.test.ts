@@ -2129,6 +2129,35 @@ describe("AppleNotesManager", () => {
       expect(() => compilesAsAppleScript(script)).not.toThrow();
     });
 
+    it("delete refuses a note whose container is not a folder, failing closed (#214)", () => {
+      mockReadTrashFolderIds.mockReturnValue([TRASH_FOLDER]);
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "SAFETY_IN_RECENTLY_DELETED",
+      });
+      // Shared by delete-note and batch-delete-notes.
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>")).toEqual({
+        status: "in-recently-deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      // In-trash is the default; only a readable folder class clears it, so a
+      // non-folder container or an unreadable class both refuse.
+      const defaultTrue = script.indexOf("set __inTrash to true");
+      const classCheck = script.indexOf(
+        "if (class of originalFolder) is folder then set __inTrash to false"
+      );
+      expect(defaultTrue).toBeGreaterThan(-1);
+      expect(classCheck).toBeGreaterThan(defaultTrue);
+      // The id and name checks can only set it true afterwards, never clear it.
+      expect(script.indexOf("contains (id of originalFolder)")).toBeGreaterThan(classCheck);
+      expect(script.slice(script.indexOf("\n", classCheck))).not.toMatch(/set __inTrash to false/);
+      expect(classCheck).toBeLessThan(script.indexOf('return "SAFETY_IN_RECENTLY_DELETED"'));
+      expect(script.indexOf('return "SAFETY_IN_RECENTLY_DELETED"')).toBeLessThan(
+        script.indexOf("delete noteRef")
+      );
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
     it("delete still checks the folder name without database access", () => {
       mockReadTrashFolderIds.mockReturnValue([]);
       mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });

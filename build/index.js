@@ -43036,7 +43036,10 @@ var AppleNotesManager = class {
         set originalFolder to container of noteRef
       end try
       if originalFolder is not missing value then
-        set __inTrash to false
+        set __inTrash to true
+        try
+          if (class of originalFolder) is folder then set __inTrash to false
+        end try
         try
           if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
         end try

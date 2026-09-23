@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [2.8.48] - 2026-09-23
+
+### Fixed
+
+- `delete-note` and `batch-delete-notes` no longer permanently delete a note
+  that was moved to Recently Deleted earlier in the same Notes session (#214,
+  follow-up to #198). Notes.app reports such a note's container as something
+  that is not a folder, so the Recently Deleted check, which compared the
+  container's folder id and name, did not match it, and deleting it again
+  removed it for good. The delete script now fails closed: a container that is
+  not a folder, or whose class cannot be read, is treated as Recently Deleted
+  and the note is refused with the existing `in-recently-deleted` status.
+  Thanks to @oliverames for finding this live on macOS 27.2.
+
 ## [2.8.47] - 2026-09-23
 
 ### Fixed

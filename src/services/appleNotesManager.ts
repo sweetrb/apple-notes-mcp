@@ -1744,6 +1744,11 @@ export class AppleNotesManager {
     // which can still show a just-deleted note in its old folder; the database
     // only supplies which folder ids are Recently Deleted.
     //
+    // A note trashed earlier in the same Notes session reports a container
+    // whose class is not folder (#214), so neither the id nor the name check
+    // matches it. The script fails closed: a container that is not a folder,
+    // or whose class cannot be read, is treated as Recently Deleted.
+    //
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
     // was not moved to Recently Deleted and must not be reported as deleted.
@@ -1754,7 +1759,10 @@ export class AppleNotesManager {
         set originalFolder to container of noteRef
       end try
       if originalFolder is not missing value then
-        set __inTrash to false
+        set __inTrash to true
+        try
+          if (class of originalFolder) is folder then set __inTrash to false
+        end try
         try
           if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
         end try
