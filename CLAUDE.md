@@ -99,6 +99,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **`timeoutSeconds`** (1–120) on `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` sets the timeout of each Notes.app automation step for that call. A timed-out write is uncertain: read the note by id before retrying.
 - **`delete-note` checks placement.** If Notes.app accepts the delete but the note is still in its original folder, the call reports that nothing was deleted.
 - **`delete-note` and `batch-delete-notes` refuse a note already in Recently Deleted**, where a delete is permanent. The folder is read live from Notes.app; the database only identifies which folder is Recently Deleted.
+- **Copy-then-retire with `delete-note`:** after copying note A to note B and verifying B, read both with `get-note-content`, then call `delete-note` on A with `guardNoteId` = B and `expectedGuardContentHash` = B's `contentHash`. The delete stops if B changed, was locked, moved to Recently Deleted, or is a Quick Note. It needs Full Disk Access (the Quick Note flag is only in the database); a B the database has not saved yet still passes on Notes.app's live checks. It is a guard, not a transaction. `requireActiveNoteId` only requires the other note to stay active; it does not fingerprint its content.
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
 - Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
@@ -218,6 +219,19 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### list-native-tags
 - Pass `folder` for the per-folder tag → note-id map; omit `folder` for an account-wide inventory with `noteCount` per tag (all accounts unless `account` is given)
 - `complete: false` with `unverifiedNotes` means some tagged notes (usually locked ones) were counted without confirming the tag in their body
+
+### list-recent-notes (incremental sync)
+- Database-backed (read-only, needs Full Disk Access). `since` takes a `modifiedCheckpoint` cursor, or an ISO date or date-time (strictly after that moment)
+- With `since`, rows come **oldest first** and `nextSince` is the last row's cursor. Store it and call again with it; every call advances. `saturated: true` (count equals limit) means more changes may follow, so call again right away; `false` means you are caught up
+- For a first full sync, start with `since: "1970-01-01"` and page the same way; the maximum `limit` is 1000, and paging reaches every note exactly once
+- Without `since`, rows come newest first (a browse view). `nextSince` is then set only when the call returned every matching note
+- A modification-date cursor can miss an edit that iCloud delivers later from another device with an older timestamp; run a full pass from the start now and then
+- Deletions are invisible unless `includeDeleted: true`, which adds Recently Deleted, notes awaiting deletion, and folderless rows; check `inRecentlyDeleted`/`markedForDeletion` before acting on them. A purged note leaves no row at all
+- `modifiedCheckpoint` is exact; the ISO `modified` string is not. Two notes can share the same `modified` text and still differ
+- `wordCounts: true` adds `wordCount`/`charCount` (null = locked or unavailable, 0 = known empty). `bodyPreview: true` adds a 180-character preview
+
+### list-folder-tree
+- One read for the whole hierarchy with `noteCount` (direct) and `totalNoteCount` (with subfolders), grouped by account; `kind` distinguishes regular, smart, and trash folders
 
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved

@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.1] - 2026-09-23
+## [2.9.3] - 2026-09-23
 
 ### Added
 
@@ -25,6 +25,58 @@
 - TECHNICAL_NOTES.md documents where Notes stores each link kind, how preview
   renditions map to files, the never-viewed `lastViewed` value, and how sharing
   is derived.
+
+## [2.9.2] - 2026-09-23
+
+### Added
+
+- `list-recent-notes` lists notes from NoteStore (read-only) by stored
+  modification time, for incremental sync. With `since`, rows come oldest
+  first after that point and `nextSince` is the last row's cursor, so every
+  call advances, including one that fills its `limit`. `saturated` (count
+  equals limit) means more changes may follow; call again with `nextSince`
+  until it is `false`. `since` takes a `modifiedCheckpoint` cursor, an ISO
+  8601 date (local midnight), or an ISO date-time (local unless it carries an
+  offset). Each row's `modifiedCheckpoint` is an opaque
+  `cdts1:<bits>:<key>` cursor: the stored timestamp's exact IEEE-754 bits,
+  read and bound through sqlite3's `ieee754` functions so they never pass
+  through a JavaScript `Date` or a rounded decimal, plus the note's database
+  key, which orders notes that share one timestamp so paging never skips or
+  repeats them. A first full sync starts from `since: "1970-01-01"` and
+  reaches a library of any size. Without `since`, rows come newest first and
+  `nextSince` is set only when every match was returned. Options: `account`,
+  `folder`, `limit` (default 50, max 1000), `includeDeleted` (Recently
+  Deleted, notes awaiting deletion, and folderless rows), `wordCounts`
+  (`wordCount`/`charCount` from the shared body decoder; `null` for locked or
+  unavailable bodies, `0` for known-empty ones), and `bodyPreview` (180
+  characters plus `textDecoded`). The docs note two limits of a
+  modification-date cursor: an edit iCloud delivers later from another device
+  with an older timestamp can be missed, and deletions are invisible unless
+  `includeDeleted` is set.
+- `list-folder-tree` returns each account's folder hierarchy with direct
+  (`noteCount`) and cumulative (`totalNoteCount`) note counts, folder kind
+  (regular, smart, Recently Deleted), ids, and paths in one read.
+  `includeDeleted` adds folders marked for deletion.
+
+### Changed
+
+- `list-notes`' description now points to `list-recent-notes` for date
+  order, sync cursors, or word counts. Its behavior is unchanged.
+
+## [2.9.1] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). The guard's revision is re-read just before the delete, and
+  its body, lock state, and folder are checked again inside the delete
+  AppleScript, with the same fail-closed Recently Deleted test as the note
+  being deleted. `requireActiveNoteId` requires a second note to stay active
+  without fingerprinting its content. The Quick Note check reads the database,
+  so the guard needs Full Disk Access; a guard note the database has not saved
+  yet passes on the live checks. The pair is not one transaction.
 
 ## [2.9.0] - 2026-09-23
 
