@@ -46742,7 +46742,10 @@ var _shuttingDown = false;
 var shutdown = () => {
   if (_shuttingDown) return;
   _shuttingDown = true;
-  process.exit(0);
+  if (process.stdout.writableLength > 0) {
+    process.stdout.once("drain", () => process.exit(0));
+    setTimeout(() => process.exit(0), 2e3).unref();
+  } else process.exit(0);
 };
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
