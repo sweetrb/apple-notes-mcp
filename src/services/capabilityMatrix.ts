@@ -226,6 +226,14 @@ export const FEATURES: FeatureDefinition[] = [
     requirements: [{ kind: "native_helper" }],
   },
   {
+    name: "svgAnalysis",
+    description:
+      "Analyze a local SVG file for conversion into editable strokes: classification, required losses, and a digest",
+    tools: ["analyze-svg"],
+    minimumMacOSVersion: null,
+    requirements: [],
+  },
+  {
     name: "paragraphLinks",
     description: "Link to a specific paragraph or heading inside a note",
     tools: [],

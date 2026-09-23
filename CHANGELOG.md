@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `analyze-svg`, a standalone, read-only SVG preflight. It reads one local
+  SVG file (a regular file of at most 1 MiB of UTF-8 in home, temp, or
+  `/Volumes`) and reports whether it can be represented as editable monoline
+  strokes: a `classification` (`safe`, `lossy`, `unsupported`), the
+  `requiredLosses` (`geometry-approximation`, `paint-approximation`,
+  `drop-content`), located `issues`, work-budget counts, the source SHA-256,
+  and an `analysisDigest` over the canonical analysis and normalized drawing;
+  `includeDrawing` adds the drawing. It supports the basic shapes and paths,
+  groups, nested `svg`, local `defs`/`symbol`/`use`, transforms, `viewBox` and
+  `preserveAspectRatio`, solid colors, `currentColor`, opacity, fill rules,
+  and dashes. Scripts, event handlers, `<style>` elements, animation, DOCTYPE
+  and entities, and external references are refused. The XML reader is
+  written for this purpose and adds no dependency. Registered as the
+  `svgAnalysis` feature in `get-capabilities`.
+
 ## [2.8.49] - 2026-09-23
 
 ### Fixed
