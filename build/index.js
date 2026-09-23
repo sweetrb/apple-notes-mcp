@@ -51919,7 +51919,7 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
 
 // src/utils/svgAnalyzer.ts
 import { createHash as createHash4 } from "node:crypto";
-import { closeSync as closeSync6, constants as constants6, fstatSync as fstatSync6, lstatSync as lstatSync4, openSync as openSync6, readSync as readSync4 } from "node:fs";
+import { closeSync as closeSync6, constants as constants6, fstatSync as fstatSync6, openSync as openSync6, readSync as readSync4 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -53886,30 +53886,23 @@ function analyzeSvgBuffer(source) {
   return analysisFor(source, analyzer, viewport);
 }
 function readSvgSource(path10) {
-  let info;
-  try {
-    info = lstatSync4(path10);
-  } catch {
-    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
-  }
-  if (info.isSymbolicLink())
-    throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
-  if (!info.isFile()) throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
-  if (info.size > SVG_LIMITS.maxSourceBytes)
-    throw new SvgError(
-      "svg_file_invalid",
-      `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-    );
   let fd;
   try {
     fd = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW | constants6.O_NONBLOCK);
-  } catch {
-    throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+  } catch (error2) {
+    if (error2.code === "ELOOP")
+      throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
+    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const opened = fstatSync6(fd);
-    if (!opened.isFile() || opened.ino !== info.ino || opened.dev !== info.dev)
-      throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+    const info = fstatSync6(fd);
+    if (!info.isFile())
+      throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
+    if (info.size > SVG_LIMITS.maxSourceBytes)
+      throw new SvgError(
+        "svg_file_invalid",
+        `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
+      );
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {

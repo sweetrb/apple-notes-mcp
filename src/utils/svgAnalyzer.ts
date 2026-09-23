@@ -32,7 +32,7 @@
  * @module utils/svgAnalyzer
  */
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { parseColor, parsePaint, type Paint, type Rgba } from "./svgColor.js";
 import {
   IDENTITY,
@@ -1290,36 +1290,30 @@ export function analyzeSvgBuffer(source: Buffer): SvgAnalysisResult {
 
 /**
  * Read one SVG file: a regular file (not a symlink) of at most 1 MiB. The file
- * is opened without following links and checked again after opening.
+ * is opened without following links, and the opened descriptor is checked.
  */
 export function readSvgSource(path: string): Buffer {
-  let info;
-  try {
-    info = lstatSync(path);
-  } catch {
-    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
-  }
-  if (info.isSymbolicLink())
-    throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
-  if (!info.isFile()) throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
-  if (info.size > SVG_LIMITS.maxSourceBytes)
-    throw new SvgError(
-      "svg_file_invalid",
-      `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-    );
-  // O_NONBLOCK: if the path is swapped for a FIFO between lstat and open, the
-  // open returns at once (and the fstat check below rejects it) instead of
-  // blocking the event loop. It has no effect on a regular file.
+  // Open first and check the opened descriptor, so there is no window between
+  // a check and the open. O_NOFOLLOW refuses a symbolic link (ELOOP), and
+  // O_NONBLOCK keeps a FIFO from blocking the event loop; neither affects a
+  // regular file.
   let fd: number;
   try {
     fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  } catch {
-    throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ELOOP")
+      throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
+    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const opened = fstatSync(fd);
-    if (!opened.isFile() || opened.ino !== info.ino || opened.dev !== info.dev)
-      throw new SvgError("svg_file_invalid", "The SVG file changed while it was opened");
+    const info = fstatSync(fd);
+    if (!info.isFile())
+      throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
+    if (info.size > SVG_LIMITS.maxSourceBytes)
+      throw new SvgError(
+        "svg_file_invalid",
+        `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
+      );
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (;;) {

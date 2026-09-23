@@ -3,6 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -537,5 +538,15 @@ describe("files", () => {
     const big = join(dir, "big.svg");
     writeFileSync(big, Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1, 0x20));
     expect(code(big)).toBe("svg_file_invalid");
+  });
+
+  it("refuses a FIFO without blocking on the open", () => {
+    const fifo = join(dir, "pipe.svg");
+    try {
+      execFileSync("mkfifo", [fifo]);
+    } catch {
+      return; // no mkfifo on this platform
+    }
+    expect(() => readSvgSource(fifo)).toThrow(/not a regular file/);
   });
 });
