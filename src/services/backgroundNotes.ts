@@ -19,15 +19,19 @@ import { appendMarkdownHtml } from "../utils/appendMarkdown.js";
 import { comparableVisibleText } from "../utils/noteRevision.js";
 
 export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+/** The configured background-operations bridge name (env override or default). */
+export const backgroundShortcutName = () =>
+  process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
 /** Report whether the configured background-operations bridge is installed uniquely. */
-export const backgroundStatus = () =>
-  nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+export const backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 /** Report whether the dedicated native-tag bridge is installed uniquely. */
 export const nativeTagBridgeStatus = () => nativeTagsStatus();
 export const MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
+/** The configured create-from-Markdown bridge name (env override or default). */
+export const markdownShortcutName = () =>
+  process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;
 /** Report whether the create-from-Markdown bridge is installed uniquely. */
-export const markdownNoteStatus = () =>
-  nativeTagsStatus(process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT);
+export const markdownNoteStatus = () => nativeTagsStatus(markdownShortcutName());
 export type BackgroundOperation =
   | "append-text"
   | "append-markdown"

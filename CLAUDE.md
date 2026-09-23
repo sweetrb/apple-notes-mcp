@@ -83,6 +83,8 @@ update-note id="x-coredata://ABC/ICNote/p123" newContent="Updated"
 delete-note id="x-coredata://ABC/ICNote/p123"
 ```
 
+**Other id forms.** Anywhere a note id is accepted, you may also pass the note's Notes UUID (the `identifier` field that list and read tools return, and the value in `notes://showNote?identifier=` links) or its numeric Core Data key (the digits after `p`). The server resolves either to the `x-coredata` id before the tool runs. Both need Full Disk Access; without it they fail with an error naming it, and `x-coredata` ids keep working. A numeric key resolves only to a note, never a folder or attachment. Folder-id tools (`show-folder`, `get-folder-by-id`, `rename-folder`) accept a folder's UUID or numeric key the same way. Prefer `identifier` when you need to store a reference outside this session: it is stable across devices, while `x-coredata` ids are local to this Mac's database.
+
 ### create-note / update-note / append-to-note
 - Always escape backslashes in content (see above)
 - Newlines can be sent as `\n` (this is a valid JSON escape)
@@ -94,9 +96,18 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
 - Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
+### insert-link
+- Adds one URL to an exact note as its own paragraph: `mode: "raw"` (default) shows the URL, `mode: "hyperlink"` shows `label`. `position` is `"end"` (default) or `"after-title"`; `blankLine` (default `true`) controls the blank line before it.
+- Needs the same `expectedContentHash` as `append-to-note`. Notes with native objects route to native end-append and need `scopeText`; only `position: "end"` with `blankLine: true` works there.
+- Verified from the note's stored link runs, not the HTML sent: the result carries `linkStored` and `storedUrl` (a bare origin comes back with a trailing `/`).
+- A bare URL written as plain text is not linked by Notes. `linked: false` writes it that way on purpose and reports `linkStored: false`.
+- Rich URL preview cards cannot be created, and a link cannot be placed inside an existing paragraph. For a link to another note by id, use `insert-note-link`.
+
 ### Checklist Creation Is Not Supported
 
 **You cannot create an Apple Notes checklist (the interactive ☐ / ☑ items) via this MCP server.** This is an Apple Notes limitation, not a server bug.
+
+The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–20, one bridge run of a few seconds each; a client-side timeout does not stop the server, so read the note before any retry). If `create-checklist-items` returns `ok: false`, only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
 
 When you send checklist HTML or markdown to `create-note` or `update-note`:
 
@@ -162,6 +173,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `limit` to cap the number of results returned. **`limit` defaults to 50** — a broad query (e.g. a single common letter) reads several properties per match via AppleScript, so an unbounded search over hundreds of matches times out; the default keeps it useful. The response discloses the applied limit and warns when results were truncated — pass a higher `limit`, or narrow with `folder`/`modifiedSince`, to see more.
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 
+### query-notes
+- Boolean search read straight from the NoteStore database (read-only, needs Full Disk Access). Prefer it over `search-notes` when Full Disk Access is available: one call matches title **or** body, and it returns in well under a second instead of ~200ms per result
+- Syntax: bare words / `"phrases"`; `title:`, `body:`, `text:`, `folder:`, `account:`, `tag:`; `has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`; `checklist:open|done`; `pinned`, `locked`, `shared`; `words:>250`; `created:>=2026-07-01`, `modified:<2026-09-01`. AND is implicit; `OR`, `NOT`, leading `-`, and parentheses work. Quote an operator word to search it literally
+- Scans the 500 most recently modified notes by default (`scanLimit` up to 5000). When `scanTruncated` is true, older notes were not examined — raise `scanLimit` before concluding a note does not exist
+- Excludes Recently Deleted and folderless notes unless `includeDeleted: true`
+- Locked notes match on title and metadata only; body predicates never match them
+- Result ids chain directly into `get-note-content` and every other id-based tool
+
 ### list-notes
 - Returns each note's `{title, id}` — not content. **Changed in 2.7.0:** `notes` was `string[]`
 - Prefer the returned `id` over the title for any follow-up read/update/move/delete — titles are not unique, and a by-title lookup collapses duplicates onto one note (the `search-notes`/`export-notes-json` identity trap)
@@ -186,6 +205,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
   - `"Failed to decompress note data."` — the stored blob wasn't parseable.
   - Plus note-not-found and password-protected errors raised before the database is touched.
 - Works independently of `get-note-content` — use both for full picture
+
+### get-capabilities / doctor feature matrix
+- Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.
+- `unverified: ["notes_automation"]` means the probe did not contact Notes.app, not that Automation is denied. Run `doctor` to confirm it.
+- Placeholder features (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`) always report `not_implemented`; do not attempt them through other tools.
 
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
@@ -229,6 +253,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 | "Permission denied" | macOS automation permission needed |
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
 | "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
+
+Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections raised by the MCP SDK itself carry no code.
 
 ## Recurring macOS permission prompts → offer the official-Node fix
 

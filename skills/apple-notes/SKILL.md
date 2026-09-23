@@ -10,6 +10,7 @@ This skill enables you to manage Apple Notes on macOS through natural language. 
 ## When to Use This Skill
 
 Use this skill when the user:
+
 - Wants to create a new note or save information
 - Asks to find, search, or look up notes
 - Wants to read the contents of a note
@@ -23,60 +24,64 @@ Use this skill when the user:
 
 ### Note Operations
 
-| Tool | Purpose |
-|------|---------|
-| `create-note` | Create a new note with title and content |
-| `search-notes` | Find notes by title or content |
-| `get-note-content` | Read the full content of a note |
-| `get-note-plaintext` | Read a note's body as plain text (no HTML) |
-| `get-note-markdown` | Read note content as Markdown |
-| `get-note-by-id` | Get note metadata by ID |
-| `get-note-details` | Get metadata (created, modified, account) |
-| `get-note-link` | Get the shareable `notes://showNote?identifier=…` deep link for a note |
-| `update-note` | Replace a note's title and/or body |
-| `append-to-note` | Add content to a note without replacing it (`position: "after"` / `"before"`) |
-| `delete-note` | Remove a note (moves to Recently Deleted) |
-| `batch-delete-notes` | Delete multiple notes by ID (max 500 per call) |
-| `move-note` | Move a note to a different folder |
-| `batch-move-notes` | Move multiple notes by ID (max 500 per call) |
-| `list-notes` | List all notes or notes in a folder |
-| `show-note` | Reveal a note in the Notes.app UI by ID |
-| `get-selected-notes` | Read the notes currently selected in Notes.app |
-| `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
+| Tool                 | Purpose                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create-note`        | Create a new note with title and content                                                                                                                           |
+| `search-notes`       | Find notes by title or content                                                                                                                                     |
+| `query-notes`        | Find notes with a boolean expression over text, folders, tags, attachments, checklists, flags, word counts, and dates (reads the database; needs Full Disk Access) |
+| `get-note-content`   | Read the full content of a note                                                                                                                                    |
+| `get-note-plaintext` | Read a note's body as plain text (no HTML)                                                                                                                         |
+| `get-note-markdown`  | Read note content as Markdown                                                                                                                                      |
+| `get-note-by-id`     | Get note metadata by ID                                                                                                                                            |
+| `get-note-details`   | Get metadata (created, modified, account)                                                                                                                          |
+| `get-note-link`      | Get the shareable `notes://showNote?identifier=…` deep link for a note                                                                                             |
+| `update-note`        | Replace a note's title and/or body                                                                                                                                 |
+| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`)                                                                                      |
+| `insert-link`        | Add one URL to a note as its raw text or as a labeled hyperlink, verified from the stored link                                                                     |
+| `delete-note`        | Remove a note (moves to Recently Deleted)                                                                                                                          |
+| `batch-delete-notes` | Delete multiple notes by ID (max 500 per call)                                                                                                                     |
+| `move-note`          | Move a note to a different folder                                                                                                                                  |
+| `batch-move-notes`   | Move multiple notes by ID (max 500 per call)                                                                                                                       |
+| `list-notes`         | List all notes or notes in a folder                                                                                                                                |
+| `show-note`          | Reveal a note in the Notes.app UI by ID                                                                                                                            |
+| `get-selected-notes` | Read the notes currently selected in Notes.app                                                                                                                     |
+| `export-notes-json`  | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore`                                     |
 
 ### Folder Operations
 
-| Tool | Purpose |
-|------|---------|
-| `list-folders` | List all folders in an account |
+| Tool                 | Purpose                                                                          |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `list-folders`       | List all folders in an account                                                   |
 | `list-smart-folders` | List Smart Folders with their decoded rules; optionally the notes each one shows |
-| `create-folder` | Create a new folder |
-| `delete-folder` | Delete an empty folder |
-| `show-folder` | Reveal a folder in the Notes.app UI by ID |
+| `create-folder`      | Create a new folder                                                              |
+| `delete-folder`      | Delete an empty folder                                                           |
+| `show-folder`        | Reveal a folder in the Notes.app UI by ID                                        |
 
 ### Account Operations
 
-| Tool | Purpose |
-|------|---------|
-| `list-accounts` | List configured accounts (iCloud, Gmail, etc.) |
+| Tool                   | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `list-accounts`        | List configured accounts (iCloud, Gmail, etc.)         |
 | `get-default-location` | Read the default account and folder used for new notes |
-| `show-account` | Reveal an account in the Notes.app UI by ID |
+| `show-account`         | Reveal an account in the Notes.app UI by ID            |
 
 ### Attachments, Checklists, Collaboration, and Diagnostics
 
-| Tool | Purpose |
-|------|---------|
-| `list-attachments` | List attachments in a note |
-| `save-attachment` | Save an attachment to disk |
-| `fetch-attachment` | Fetch attachment bytes as base64 |
-| `show-attachment` | Reveal an attachment in the Notes.app UI |
-| `get-checklist-state` | Read checked/unchecked state for existing checklists |
-| `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
-| `list-shared-notes` | List notes shared with collaborators |
-| `get-sync-status` | Check whether iCloud sync is active |
-| `health-check` | Quickly verify Notes.app access |
-| `doctor` | Run detailed setup diagnostics |
-| `get-notes-stats` | Summarize note counts and recent activity |
+| Tool                     | Purpose                                                                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list-attachments`       | List attachments in a note                                                                                                                          |
+| `save-attachment`        | Save an attachment to disk                                                                                                                          |
+| `fetch-attachment`       | Fetch attachment bytes as base64                                                                                                                    |
+| `show-attachment`        | Reveal an attachment in the Notes.app UI                                                                                                            |
+| `get-checklist-state`    | Read checked/unchecked state for existing checklists                                                                                                |
+| `create-checklist-items` | Append several unchecked native checklist items in order (needs the Background Operations bridge; on `ok: false`, only `landed` items are verified) |
+| `get-note-metadata`      | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB                                                                                     |
+| `list-shared-notes`      | List notes shared with collaborators                                                                                                                |
+| `get-sync-status`        | Check whether iCloud sync is active                                                                                                                 |
+| `health-check`           | Quickly verify Notes.app access                                                                                                                     |
+| `doctor`                 | Run detailed setup diagnostics, including the feature matrix                                                                                        |
+| `get-capabilities`       | Check native-write operations and the OS-aware feature matrix (`features.<name>.available` / `reason`) before calling a tool that depends on them   |
+| `get-notes-stats`        | Summarize note counts and recent activity                                                                                                           |
 
 ## Usage Patterns
 
@@ -110,6 +115,33 @@ User: "Search for notes containing budget information"
 Action: Use search-notes with query="budget" and searchContent=true
 ```
 
+When Full Disk Access is available, prefer `query-notes` for anything beyond a
+single keyword. It matches title or body in one call, runs in well under a
+second, and combines conditions:
+
+```
+User: "Which work notes still have open to-dos?"
+Action: Use query-notes with query='folder:Work checklist:open'
+
+User: "Find invoices or anything tagged finance since July"
+Action: Use query-notes with query='(title:invoice OR tag:finance) modified:>=2026-07-01'
+
+User: "Long notes with a PDF that aren't in Archive"
+Action: Use query-notes with query='words:>250 has:pdf -folder:Archive'
+```
+
+Bare words and "quoted phrases" match title or body. Fields are `title:`,
+`body:`, `text:`, `folder:`, `account:`, and `tag:`; facets are
+`has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`;
+`checklist:open|done`; flags `pinned`, `locked`, `shared`; and `words:`,
+`created:`, `modified:` take `=`, `>`, `>=`, `<`, `<=` with `YYYY-MM-DD` local
+dates. AND is implicit; use `OR`, `NOT` or a leading `-`, and parentheses.
+Quote an operator word (`"and"`) to search it literally. It scans the 500 most
+recently modified notes unless `scanLimit` is raised (max 5000), and the
+response says when older notes were left out. Recently Deleted is excluded
+unless `includeDeleted` is true. Locked notes match on title and metadata only.
+The returned ids work with every id-based tool.
+
 ### Reading Notes
 
 When the user wants to see note contents:
@@ -140,6 +172,14 @@ fixed HTML subset: `<a> <b> <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li>
 <ul>`, with `href` on `<a>` and a `font-size` style on `<span>` as the only
 attributes. Anything outside that subset is refused by name — rewrite the whole
 body with `update-note` instead.
+
+**Adding a web link — use `insert-link`.** Pass `url` and either `mode: "raw"`
+(the URL is its own clickable text) or `mode: "hyperlink"` with a `label`.
+`position` is `"end"` (default) or `"after-title"`. It checks the stored link
+afterwards and reports `linkStored` and `storedUrl`. A plain URL typed into
+`append-to-note` content stays plain text: Notes does not turn it into a stored
+link. Rich URL preview cards cannot be created. For a link to another note, use
+`insert-note-link`.
 
 ```
 User: "Add milk to my shopping list"
@@ -221,7 +261,7 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
 - Use `<tt>` (or `<code>`) for commands, code, paths, API keys, and other technical strings.
 - Escape literal `&`, `<`, and `>` in user content as `&amp;`, `&lt;`, and `&gt;`.
 - Avoid nested lists when possible. Apple Notes can flatten or misplace nested list markup.
-- Use bare URLs when updating existing notes if anchor tags are stripped by Notes on save.
+- For a clickable link, use `<a href="…">` in HTML content or `insert-link`. A bare URL written as text is stored as plain text, not as a link.
 - Do not use decorative separators between sections (horizontal rules, repeated dashes, or box-drawing characters). They render inconsistently in Notes; use an empty `<div><br></div>` spacer instead.
 
 Do not use CDATA sections. They can render literally in Apple Notes.
@@ -246,7 +286,11 @@ If the user specifically requires those features, create all API-supported conte
 
 1. **Exact IDs for writes**: Search may use titles, but update, append, delete,
    and move require the exact note ID. Update, append, and delete also require
-   the `contentHash` from the version just read.
+   the `contentHash` from the version just read. A note ID may be the
+   `x-coredata://…` id, the note's Notes UUID (the `identifier` field list and
+   read tools return with Full Disk Access), or its numeric key (the digits
+   after `p`). UUIDs and numeric keys need Full Disk Access; store the
+   `identifier` when a reference must outlive this session.
 
 2. **Default Account**: Operations default to iCloud. Use the `account` parameter for other accounts (Gmail, Exchange).
 
@@ -268,6 +312,8 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 
 ## Error Handling
 
+Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, `operation_failed`). Branch on the code rather than the wording. If `indeterminate` is `true`, the write may have landed: read the exact note before deciding whether to retry. `committed: false` means nothing was written.
+
 - **"Note not found"**: Use search-notes to find similar titles
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
@@ -278,18 +324,21 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 ## Examples
 
 ### Save conversation to notes
+
 ```
 User: "Save our conversation about the API design to my notes"
 → create-note with title="API Design Discussion" and summarized content
 ```
 
 ### Daily workflow
+
 ```
 User: "What's on my todo list?"
 → search-notes with query="todo" or get-note-content with title="Todo"
 ```
 
 ### Multi-step organization
+
 ```
 User: "Archive all my completed project notes"
 → 1. list-notes to find notes
