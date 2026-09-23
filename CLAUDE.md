@@ -282,6 +282,15 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `link` is the stored URL; check `linkSafe` before emitting it into HTML
 - Read-only view: do not build a full-body update from it
 
+### list-note-paragraphs / get-paragraph-link
+- Paragraph links have the form `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` and open Notes at that paragraph
+- A link is given only when the paragraph's stored ID is `unique` in the note. Notes copies IDs when a paragraph is split, so body paragraphs often share one; `reason: "paragraph-id-shared"` is an expected answer, not a failure. Headings and titles usually link
+- Do not build a paragraph link yourself from `get-note-blocks` `paragraphUuid`: it skips the uniqueness check and can open the wrong paragraph
+- To link a paragraph, call `list-note-paragraphs` (optionally `linkableOnly: true`) and pick one with a `url`, or call `get-paragraph-link` with `contains`; on `reason: "ambiguous-paragraph"` pass `occurrence` or a longer snippet
+- Select the note by `id` (a Notes UUID works too) or exact `title`; `folder` narrows a title using list-folders paths. Title lookups never match a note in Recently Deleted
+- Neither tool creates or changes a paragraph ID. A later edit in Notes can replace the ID and break a link
+- Requires Full Disk Access; password-protected notes are refused
+
 ### get-note-structure
 - One read-only call for a note's overview by exact id: text, block summary, links with `kind` (`inline`, `card`, `note`, `section`), tags, attachments, and metadata (`deepLink`, `isShared`, `isLocked`, `inRecentlyDeleted`, `lastViewed`, word/char counts, `attachmentCount`, checklist counts, `hasDrawing`, `firstImage`)
 - Attachments use the same `kind`, body order, `previewPath` and `firstImage` as `list-attachments`, so the two tools agree about the same attachment
@@ -289,6 +298,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `lastViewed: null` is normal: check `lastViewedStatus` (`never-viewed` for most notes)
 - `attachmentCount` counts top-level attachments; gallery items and recording parts are under `children`
 - `previewPath` is Notes' cached rendition (a thumbnail), not the attachment file itself; it is null when Notes has not rendered one
+- Check `linkSafe` before emitting a link into HTML
+
+### list-note-links
+- Lists links with `kind` (`inline`, `card`, `note`, `section`) in one note (`id`), a `folder` (subfolders included unless `includeSubfolders: false`), an `account`, or the whole library, each with its source note id, title, folder path (as `list-folders` prints it) and account
+- Requires Full Disk Access. Folder, account and library scans skip inline links unless `includeInline: true` (it decodes every body in scope); `counts.inline` is 0 then, which does not mean there are none
+- `account` resolves like the other tools (exact name, then a unique prefix). A bare folder name must be unique; when it is ambiguous, retry with one of the paths the error lists
+- `previewPath` on a card is Notes' cached preview image; it is null when Notes has not rendered one
+- Page with `offset: page.nextOffset` while `page.hasMore` is true
 - Check `linkSafe` before emitting a link into HTML
 
 ### get-capabilities / doctor feature matrix
@@ -343,6 +360,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Automatically annotates checklist items with `[x]`/`[ ]` when database is accessible
 - Falls back to plain list items if Full Disk Access is not granted (no error)
 - No action needed — enrichment happens transparently
+
+### get-note-drawings (classic PencilKit drawings)
+- Decodes `com.apple.drawing.2` / `com.apple.drawing` attachments into strokes (`inkType`, sRGB `color`, `width`, `points`) and/or SVG (`format: "json" | "svg" | "both"`). Modern Paper sketches (`com.apple.paper`) are not decoded.
+- Needs Full Disk Access and the public native helper, built once by the user with `apple-notes-mcp setup --public-helper`. An error mentioning `setup --public-helper` means it is not built or is stale after an upgrade; tell the user to run that command rather than retrying.
+- Overall `status` is `none` when the note has no classic drawing. A per-drawing `status: "error"` carries a `code` (`no_data`, `undecodable`, `timeout`, ...) and does not fail the call.
+- For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points itself (`pointsOmitted`) past the response size limit.
 
 ### Private helper tools (opt-in)
 - `native-helper-status` and `native-note-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).

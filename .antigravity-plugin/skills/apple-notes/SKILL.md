@@ -94,8 +94,12 @@ Use this skill when the user:
 | `get-note-tables`             | Read a note's native tables as Markdown and JSON rows, in body order                                                                                |
 | `create-checklist-items`      | Append several unchecked native checklist items in order (needs the Background Operations bridge; on `ok: false`, only `landed` items are verified) |
 | `get-note-metadata`           | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB                                                                                     |
+| `get-note-drawings`           | Decode classic PencilKit drawings to strokes or SVG (needs `apple-notes-mcp setup --public-helper` once)                                            |
 | `get-note-blocks`             | Read a note's paragraph styles, inline formatting, and attachment positions as typed blocks                                                         |
+| `list-note-paragraphs`        | List a note's paragraphs with style, stored paragraph ID, and a direct link when the ID is unique                                                   |
+| `get-paragraph-link`          | Get a link that opens Notes at one paragraph, refused when its ID is shared                                                                         |
 | `get-note-structure`          | Read a note's links by kind, tags, attachments (as list-attachments reports them), counts, and view/lock/share/trash state in one call              |
+| `list-note-links`             | List links (inline, card, note, section) in a note, folder (with subfolders), account, or the whole library                                         |
 | `get-audio-transcripts`       | Read the transcripts and summaries Notes stored for a note's audio recordings                                                                       |
 | `list-shared-notes`           | List notes shared with collaborators                                                                                                                |
 | `get-sync-status`             | Check whether iCloud sync is active                                                                                                                 |

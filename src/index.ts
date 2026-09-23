@@ -119,7 +119,9 @@ import {
   pageNoteBlocks,
   readNoteBlocks,
 } from "@/utils/noteBlocks.js";
+import { pageParagraphs, paragraphLink, readNoteParagraphs } from "@/utils/noteParagraphs.js";
 import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
+import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
 import { MAX_LINK_LABEL_LENGTH, MAX_LINK_URL_LENGTH } from "@/utils/linkInsert.js";
 import { insertLink } from "@/services/linkInsert.js";
 import {
@@ -152,6 +154,8 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
+import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
+import { formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
 import { buildPrivateHelper, formatHelperBuild } from "@/services/privateHelperBuild.js";
 import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
 
@@ -163,6 +167,12 @@ loadFileConfig();
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+  // Compile the public native helper (PencilKit) from the packaged source.
+  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
   // Opt-in private helper: compiled locally from the packaged source (#181).
   const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
@@ -1702,6 +1712,130 @@ registerTool(
   }, "Error reading note blocks")
 );
 
+// --- list-note-paragraphs / get-paragraph-link ---
+
+const paragraphNoteSelector = {
+  id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
+  title: z
+    .string()
+    .min(1)
+    .max(MAX.TITLE)
+    .optional()
+    .describe("Exact note title; must match one note unless folder narrows it"),
+  folder: z
+    .string()
+    .min(1)
+    .max(MAX.FOLDER)
+    .optional()
+    .describe("With title only: the note's folder name or full path as list-folders shows it"),
+};
+
+registerTool(
+  "list-note-paragraphs",
+  {
+    description:
+      "Use when: you need a note's paragraphs with their style and stored paragraph ID, for example to choose one to link to.\nReturns: one page of non-empty paragraphs in body order, each with blockIndex (as in get-note-blocks), text, style, paragraphId, paragraphIdStatus (unique, shared, missing) and, only when unique, a direct applenotes:// url that opens that paragraph; plus counts per status and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you need inline formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Paragraph IDs repeat often (Notes copies them when a paragraph is split), so shared IDs get no url. Title lookups ignore Recently Deleted. Password-protected notes are refused.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      linkableOnly: z
+        .boolean()
+        .optional()
+        .describe("Return only paragraphs that have a direct url (default false)"),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(5000)
+        .optional()
+        .describe("Maximum paragraphs to return (default 500, max 5000)"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      identifier: z.string().nullable().optional(),
+      counts: z.record(z.unknown()).optional(),
+      paragraphs: z.array(z.record(z.unknown())).optional(),
+      page: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, title, folder, linkableOnly, offset, limit }) => {
+    const note = readNoteParagraphs({ id, title, folder });
+    const page = pageParagraphs(note.paragraphs, {
+      offset,
+      limit,
+      linkableOnly,
+      maxBytes: blocksMaxResponseBytes(),
+    });
+    const { unique, shared, missing } = note.counts;
+    return successResponse(
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` +
+        (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") +
+        ".",
+      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+    );
+  }, "Error listing paragraphs")
+);
+
+registerTool(
+  "get-paragraph-link",
+  {
+    description:
+      "Use when: you need a link that opens Notes at one paragraph (for example a heading) of a note.\nReturns: a direct applenotes://showNote?identifier=<note>&paragraphID=<paragraph> url and the selected paragraph, only when that paragraph's stored ID is present and appears in no other paragraph of the note. Otherwise an error whose structuredContent.reason says why: paragraph-id-shared, paragraph-id-missing, no-match, ambiguous-paragraph (pass occurrence or a longer snippet), occurrence-out-of-range, ambiguous-note, encrypted.\nDo not use when: you want a link to the whole note (get-note-link).\nSafety: read-only; never creates or changes a paragraph ID, so a paragraph without a unique ID cannot be linked. Requires Full Disk Access. A later edit in Notes can replace the ID and break the link.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: z
+        .string()
+        .min(1)
+        .max(MAX.CONTENT)
+        .optional()
+        .describe(
+          "Snippet of the paragraph (case, spacing and Unicode width are ignored); give one of contains, match, blockIndex"
+        ),
+      match: z
+        .string()
+        .min(1)
+        .max(MAX.CONTENT)
+        .optional()
+        .describe("The whole paragraph text, compared the same way"),
+      blockIndex: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Which match to use (1-based) when contains or match hits several paragraphs"),
+    },
+    outputSchema: {
+      url: z.string().optional(),
+      id: z.string().optional(),
+      identifier: z.string().nullable().optional(),
+      paragraph: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, title, folder, contains, match, blockIndex, occurrence }) => {
+    const note = readNoteParagraphs({ id, title, folder });
+    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+    return successResponse(`Paragraph link: ${result.url}`, {
+      url: result.url,
+      id: note.id,
+      identifier: note.identifier,
+      paragraph: { ...result.paragraph },
+    });
+  }, "No paragraph link")
+);
+
 // --- get-note-structure ---
 
 registerTool(
@@ -1762,6 +1896,88 @@ registerTool(
     });
     return successResponse(describeNoteStructure(structure), { ...structure });
   }, "Error reading note structure")
+);
+
+// --- list-note-links ---
+
+registerTool(
+  "list-note-links",
+  {
+    description:
+      "Use when: you need the links in one note (by exact id) or across a folder (with its subfolders by default), an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path (as list-folders prints it) and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account name (exact or unique-prefix match)"),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe(
+          "Folder name or path as list-folders prints it, such as Work/Clients (escape a literal slash as \\/)"
+        ),
+      includeSubfolders: z
+        .boolean()
+        .optional()
+        .describe("With folder, also list notes in its subfolders (default true)"),
+      includeInline: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+        ),
+      kinds: z
+        .array(z.enum(["inline", "card", "note", "section"]))
+        .max(4)
+        .optional()
+        .describe("Only these link kinds"),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(2000)
+        .optional()
+        .describe("Maximum links to return (default 200, max 2000)"),
+    },
+    outputSchema: {
+      scope: z.record(z.unknown()).optional(),
+      inlineIncluded: z.boolean().optional(),
+      notesInScope: z.number().optional(),
+      notesWithoutBody: z.number().optional(),
+      counts: z.record(z.unknown()).optional(),
+      links: z.array(z.record(z.unknown())).optional(),
+      page: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(
+    ({ id, account, folder, includeSubfolders, includeInline, kinds, offset, limit }) => {
+      const result = listNoteLinks({
+        id,
+        account,
+        folder,
+        includeSubfolders,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes(),
+      });
+      return successResponse(describeLinkInventory(result), { ...result });
+    },
+    "Error listing note links"
+  )
 );
 
 registerTool(
@@ -4252,6 +4468,61 @@ registerTool(
       structured
     );
   }, "Error listing notes")
+);
+
+// --- get-note-drawings (public native helper) ---
+
+registerTool(
+  "get-note-drawings",
+  {
+    description:
+      "Use when: reading the strokes of a note's classic PencilKit drawings (com.apple.drawing / com.apple.drawing.2 attachments), by note id, as JSON or SVG.\nReturns: per drawing its attachment id, status (ok/error with a code), stroke count, bounds, and strokes (ink type, sRGB color, width, points) and/or a standalone SVG document; overall status ok/partial/error/none.\nDo not use when: the drawing is a modern Paper sketch (com.apple.paper is not decoded here) or you want the attachment file itself (save-attachment).\nNote: read-only. Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper` (compiled locally with PencilKit; no Notes writes).",
+    inputSchema: {
+      id: noteIdInput,
+      format: z
+        .enum(["json", "svg", "both"])
+        .optional()
+        .describe(
+          '"json" (default) returns strokes, "svg" returns SVG documents, "both" returns both'
+        ),
+      includePoints: z
+        .boolean()
+        .optional()
+        .describe(
+          "Include per-point x/y/width/opacity/force in JSON strokes (default true). SVG output always uses the points."
+        ),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      drawingCount: z.number().optional(),
+      status: z.string().optional(),
+      drawings: z.array(z.object({}).passthrough()).optional(),
+      pointsOmitted: z.boolean().optional(),
+    },
+  },
+  withErrorHandling(({ id, format, includePoints }) => {
+    let result = getNoteDrawings(id, { format, includePoints });
+    let pointsOmitted = false;
+    // Stroke points dominate the payload. Past the response budget, drop them
+    // (SVG and stroke summaries stay) rather than fail the whole read.
+    if (
+      Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() &&
+      includePoints !== false &&
+      format !== "svg"
+    ) {
+      result = getNoteDrawings(id, { format, includePoints: false });
+      pointsOmitted = true;
+    }
+    const text =
+      formatNoteDrawings(result) +
+      (pointsOmitted
+        ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
+        : "");
+    return successResponse(text, {
+      ...result,
+      ...(pointsOmitted ? { pointsOmitted } : {}),
+    } as unknown as Record<string, unknown>);
+  }, "Error reading drawings")
 );
 
 // --- list-recent-notes ---

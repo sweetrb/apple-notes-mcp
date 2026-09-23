@@ -102,7 +102,7 @@ function kindPredicate(columns: ReadonlySet<string>, kind: SpecialNoteKind): str
  * Joins note alias `n` to its folder `f` and account `a`. A folder's owner is
  * its account; a folderless note falls back to its own account reference.
  */
-function folderAccountJoins(columns: ReadonlySet<string>): string {
+export function folderAccountJoins(columns: ReadonlySet<string>): string {
   const owner = col(columns, "f", "ZOWNER");
   const account =
     owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;

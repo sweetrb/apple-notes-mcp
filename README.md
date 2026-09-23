@@ -634,6 +634,74 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `list-note-paragraphs`
+
+Lists one note's non-empty paragraphs in body order, read-only from the
+NoteStore database. Each paragraph has `blockIndex` (its index in
+`get-note-blocks`, where empty paragraphs also count), `text`, `style`,
+`styleType`, `paragraphId` (the UUID Notes stores on the paragraph's first
+text run), and `paragraphIdStatus`:
+
+- `unique`: no other paragraph in the note carries this ID. The paragraph also
+  gets `url`, a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link that
+  opens Notes at that paragraph.
+- `shared`: other paragraphs carry the same ID (`sharedWith` counts them).
+  Notes copies the ID when a paragraph is split, so this is common for body
+  text. No `url` is given, because it could open the wrong paragraph.
+- `missing`: no ID is stored.
+
+`mixedParagraphIds: true` marks a paragraph whose text runs carry more than
+one ID; only the first-run ID is used. Titles and headings usually have unique
+IDs.
+
+**Requires:** Full Disk Access. Password-protected notes are refused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`, `title` | Exact note ID, or the note's Notes UUID |
+| `title` | string | One of `id`, `title` | Exact note title; must match one note. Notes in Recently Deleted are ignored, as in `list-notes` |
+| `folder` | string | No | With `title`: the folder's name or full path as `list-folders` shows it, such as `Work/Clients` |
+| `linkableOnly` | boolean | No | Return only paragraphs with a `url` |
+| `offset` | number | No | First paragraph to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum paragraphs per page (default 500, max 5000) |
+
+---
+
+#### `get-paragraph-link`
+
+Returns a direct link to one paragraph of a note:
+`applenotes://showNote?identifier=<note>&paragraphID=<paragraph>`. It selects
+the note like `list-note-paragraphs` and the paragraph by exactly one of:
+
+- `contains`: a snippet of the paragraph. Case, runs of spaces, and Unicode
+  width are ignored.
+- `match`: the whole paragraph, compared the same way.
+- `blockIndex`: from `list-note-paragraphs`.
+
+When `contains` or `match` hits several paragraphs, pass `occurrence` (1-based)
+or a longer snippet.
+
+The link is returned only when the paragraph's ID is `unique` in the note.
+Otherwise the result is an error whose `structuredContent` carries the usual
+`code` plus a `reason`: `paragraph-id-shared`, `paragraph-id-missing`,
+`no-match`, `ambiguous-paragraph`, `occurrence-out-of-range`, `ambiguous-note`
+(several notes have that title; the message lists their folders), `not-found`,
+`encrypted`, or `no-body`. The tool never creates or changes a paragraph ID,
+and an edit in Notes can later replace the ID and break the link.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id`, `title`, `folder` | string | One of `id`, `title` | Note selector, as in `list-note-paragraphs` |
+| `contains` | string | One of `contains`, `match`, `blockIndex` | Snippet of the paragraph |
+| `match` | string | One of `contains`, `match`, `blockIndex` | The whole paragraph |
+| `blockIndex` | number | One of `contains`, `match`, `blockIndex` | The paragraph's `blockIndex` |
+| `occurrence` | number | No | Which match to use when several paragraphs match |
+
+---
+
 #### `get-note-structure`
 
 Returns a read-only overview of one note from the NoteStore database, in one
@@ -675,6 +743,57 @@ fields null.
 
 Link URLs are returned as stored; check `linkSafe` before emitting one into
 HTML.
+
+---
+
+#### `list-note-links`
+
+Lists links, read-only from the NoteStore database, in one note (`id`) or
+across a `folder`, an `account`, or the whole library (no selector). Each link
+has a `kind`:
+
+| Kind | What it is | Where Notes stores it |
+|------|------------|-----------------------|
+| `inline` | A hyperlink on text | Inside the note body |
+| `card` | A rich link preview | An attachment row with the URL and title |
+| `note` | A native link chip to another note | An inline-attachment row with a Notes deep link |
+| `section` | A native link chip to a heading or paragraph | Same, with `paragraphID` in the deep link |
+
+Each row has `url`, `text` (label), `linkSafe`, `targetNote` and `paragraphId`
+for Notes deep links, `section` for section chips, and for cards
+`attachmentId` and `previewPath` (Notes' largest cached preview image, found
+the same way [`list-attachments`](#list-attachments) finds it, or null when
+Notes has none). Each row also names its source: `noteId`, `noteIdentifier`,
+`noteTitle`, `noteModified`, `folder`, `folderPath` (as `list-folders` prints
+it), `account`, and `accountIdentifier`. When bodies were decoded, `start` and
+`blockIndex` give the link's position, and `inBody: false` marks a card or chip
+row with no marker left in the body.
+
+Inline links need every body in scope decompressed and decoded, so a folder,
+account, or library scan includes them only with `includeInline: true`
+(slower). A single note always includes them. A `folder` scope includes its
+subfolders unless `includeSubfolders` is false. Scans skip Recently Deleted
+and folderless notes; a note requested by `id` is read wherever it is. Links
+come newest-modified note first, in body order within a note.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | One exact note ID (x-coredata id, Notes UUID, or numeric key). Do not combine with `account` or `folder` |
+| `account` | string | No | Account name (exact or unique-prefix match, as in the other tools) |
+| `folder` | string | No | Folder name (any depth, must be unique) or path from the top level as `list-folders` prints it, such as `Work/Clients`; escape a literal slash as `\/` |
+| `includeSubfolders` | boolean | No | With `folder`, also list notes in its subfolders (default true) |
+| `includeInline` | boolean | No | Decode bodies for inline links (default true for `id`, false otherwise) |
+| `kinds` | string[] | No | Only these kinds: `inline`, `card`, `note`, `section` |
+| `offset` | number | No | First link to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum links per page (default 200, max 2000) |
+
+The response also reports `scope`, `counts` per kind, `notesInScope`,
+`notesWithoutBody` (locked, empty or undecodable bodies when inline links were
+requested), and `page`. A page stops early to stay under
+`APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`. An ambiguous folder name is refused with a
+message that lists the matching paths.
 
 ---
 
@@ -1812,6 +1931,22 @@ A recording extended with more takes has several fragments. Their transcripts ar
 
 ---
 
+#### `get-note-drawings`
+
+Decodes a note's classic PencilKit drawings (`com.apple.drawing.2` and the older `com.apple.drawing` attachments) into strokes and SVG. The PencilKit bytes are read read-only from the NoteStore database and decoded by Apple's public `PKDrawing(data:)` in the [public native helper](#public-native-helper). Modern Paper sketches (`com.apple.paper`) are a different format and are not decoded here.
+
+**Requires:** Full Disk Access for the MCP host process, and the public native helper built once with `apple-notes-mcp setup --public-helper`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `format` | string | No | `"json"` (default) returns strokes, `"svg"` returns a standalone SVG document per drawing, `"both"` returns both |
+| `includePoints` | boolean | No | Include per-point `x`, `y`, `width`, `opacity`, and `force` in JSON strokes (default `true`) |
+
+**Returns:** `status` (`ok`, `partial`, `error`, or `none` when the note has no classic drawing), `drawingCount`, and one entry per drawing with `attachmentId`, `identifier`, `typeUti`, `status` (`ok`, or `error` with a `code` such as `no_data`, `undecodable`, or `timeout`), `strokeCount`, `bounds`, `truncated`, `strokes` (each with `inkType`, sRGB `color` with alpha, mean `width`, `pointCount`, `bounds`, and `points`), and `svg`. Points are already in drawing coordinates. When a response would exceed `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, points are dropped and `pointsOmitted` is set. The SVG draws one path per stroke; it is a faithful outline, not a pixel-exact copy of PencilKit's ink textures.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -2356,7 +2491,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
 | `APPLE_NOTES_MCP_TEMPLATE_DIR` | `~/Library/Application Support/apple-notes-mcp/templates` | Absolute directory of the saved Markdown template library (`save-markdown-template` and friends). |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. A [`list-note-paragraphs`](#list-note-paragraphs) or [`list-note-links`](#list-note-links) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `APPLE_NOTES_MCP_ENABLE_PRIVATE` | unset | Set to `1` to allow the opt-in [private helper](#private-helper-opt-in-unsupported-apple-api). Any other value keeps it off. |
@@ -2389,7 +2524,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-structure`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-paragraphs`, `get-paragraph-link`, `get-note-structure`, `list-note-links`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -2415,6 +2550,22 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
+- `get-note-drawings` returns the same Full Disk Access error
+
+---
+
+## Public native helper
+
+`get-note-drawings` needs Apple's PencilKit framework, which has no AppleScript or command-line interface. For it, the server uses a small Swift helper that links public Apple frameworks only (AppKit and PencilKit). No prebuilt binary ships with the package. Build it once on your Mac:
+
+```bash
+apple-notes-mcp setup --public-helper          # compile, sign, verify, install
+apple-notes-mcp setup --public-helper --check  # report the installed state only
+```
+
+Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
+
+The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin; the helper answers with one JSON object on stdout.
 
 ---
 
