@@ -12,7 +12,7 @@ import {
   readDrawingRows,
   svgNumber,
 } from "./noteDrawings.js";
-import { NoteStoreReadError } from "./noteStoreQuery.js";
+import { NoteStoreError } from "./noteStoreSql.js";
 
 /**
  * A synthetic drawing encoded by PencilKit itself (see
@@ -99,7 +99,7 @@ describe("readDrawingRows (real sqlite3, fixture database)", () => {
 
   it("rejects a malformed id before touching the database", () => {
     expect(() => readDrawingRows("x-coredata://X/ICNote/p1 OR 1=1", fixture.dbPath)).toThrow(
-      NoteStoreReadError
+      NoteStoreError
     );
   });
 
@@ -127,8 +127,9 @@ describe("readDrawingRows (real sqlite3, fixture database)", () => {
 
   it("keeps the SQL free of caller input", () => {
     for (const column of ["ZMERGEABLEDATA1", "ZMERGEABLEDATA"] as const) {
-      const sql = drawingRowsSql(column);
-      expect(sql).toContain(":pk");
+      const sql = drawingRowsSql(new Set(["ZMARKEDFORDELETION", column]), column);
+      expect(sql).toContain("@pk");
+      expect(sql).toContain("COALESCE(a.ZMARKEDFORDELETION, 0) = 0");
       expect(sql).not.toMatch(/ZNOTE = \d/);
       for (const uti of DRAWING_UTIS) expect(sql).toContain(`'${uti}'`);
     }

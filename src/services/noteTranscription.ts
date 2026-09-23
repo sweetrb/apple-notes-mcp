@@ -172,7 +172,7 @@ function transcribeRecording(
 /**
  * Transcribes every audio attachment in the note (or one, with attachmentId).
  * Per-recording failures do not fail the call. Note-level problems throw
- * NoteStoreReadError; an unusable helper throws PublicHelperError once.
+ * NoteStoreError or a coded error; an unusable helper throws PublicHelperError once.
  */
 export function transcribeNoteAudio(
   noteId: string,

@@ -17,15 +17,17 @@
  */
 import { readdirSync, realpathSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
+import { NOTES_CONTAINER_DIR } from "./attachmentAssets.js";
 import {
   assertNoteReadable,
-  NOTE_ACCOUNTS_PATH,
   NOTE_STATE_SQL,
-  NOTE_STORE_PATH,
-  NoteStoreReadError,
   parseNoteObjectId,
-  queryNoteStore,
+  queryNoteScoped,
 } from "./noteStoreQuery.js";
+import { NOTES_DB_PATH, NoteStoreError, notTombstonedSql, readColumns } from "./noteStoreSql.js";
+
+/** Root of the per-account attachment folders (Media, Previews, ...). */
+export const NOTE_ACCOUNTS_PATH = join(NOTES_CONTAINER_DIR, "Accounts");
 
 /** One audio file that can be transcribed. */
 export interface AudioTake {
@@ -74,18 +76,20 @@ const EXTRA_AUDIO_UTIS = [
   "com.microsoft.waveform-audio",
 ];
 
-const COLUMNS_SQL = "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');";
-
 /**
  * The audio query for one media-generation column. The column name comes from
- * a fixed allowlist; the note key is the bound `:pk` parameter.
+ * a fixed allowlist; the note key is the bound `@pk` parameter. Attachments
+ * marked for deletion are skipped where the schema tracks that.
  */
-export function audioRowsSql(generationColumn: "ZGENERATION1" | "ZGENERATION" | null): string {
+export function audioRowsSql(
+  columns: ReadonlySet<string>,
+  generationColumn: "ZGENERATION1" | "ZGENERATION" | null
+): string {
   const generation = generationColumn ? `m.${generationColumn}` : "NULL";
   const media = (alias: string) =>
     `json((SELECT json_object('identifier', m.ZIDENTIFIER, 'generation', ${generation}, ` +
     `'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
-  const live = "COALESCE(ZMARKEDFORDELETION, 0) = 0";
+  const live = (alias: string) => notTombstonedSql(columns, alias);
   const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
   return [
     NOTE_STATE_SQL,
@@ -93,10 +97,10 @@ export function audioRowsSql(generationColumn: "ZGENERATION1" | "ZGENERATION" | 
       `'uti', a.ZTYPEUTI, 'duration', a.ZDURATION, 'media', ${media("a")}, ` +
       "'children', json((SELECT json_group_array(json_object('pk', c.Z_PK, " +
       `'identifier', c.ZIDENTIFIER, 'duration', c.ZDURATION, 'media', ${media("c")})) ` +
-      `FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE ZPARENTATTACHMENT = a.Z_PK AND ${live} ` +
-      "ORDER BY Z_PK) c)))) FROM " +
-      "(SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE = :pk AND ZPARENTATTACHMENT IS NULL " +
-      `AND ${live} AND (ZTYPEUTI LIKE '%audio%' OR ZTYPEUTI IN (${utis})) ORDER BY Z_PK) a;`,
+      `FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT k WHERE k.ZPARENTATTACHMENT = a.Z_PK AND ${live("k")} ` +
+      "ORDER BY k.Z_PK) c)))) FROM " +
+      "(SELECT * FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE = @pk AND t.ZPARENTATTACHMENT IS NULL " +
+      `AND ${live("t")} AND (t.ZTYPEUTI LIKE '%audio%' OR t.ZTYPEUTI IN (${utis})) ORDER BY t.Z_PK) a;`,
   ].join("\n");
 }
 
@@ -155,20 +159,20 @@ export function readAudioAssets(
   options: ReadAudioOptions = {}
 ): AudioRecordingAsset[] {
   const { store, pk } = parseNoteObjectId(noteId);
-  const dbPath = options.dbPath ?? NOTE_STORE_PATH;
-  const columns = new Set(queryNoteStore(COLUMNS_SQL, {}, dbPath).map((l) => l.trim()));
+  const dbPath = options.dbPath ?? NOTES_DB_PATH;
+  const columns = readColumns(dbPath);
   const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
   if (missing.length)
-    throw new NoteStoreReadError(
-      "query_error",
-      `This macOS version's Notes database lacks ${missing.join(", ")}; audio files cannot be located.`
+    throw new NoteStoreError(
+      `This macOS version's Notes database lacks ${missing.join(", ")}; audio files cannot be located.`,
+      "schema"
     );
   const generation = columns.has("ZGENERATION1")
     ? "ZGENERATION1"
     : columns.has("ZGENERATION")
       ? "ZGENERATION"
       : null;
-  const [stateLine, rowsLine] = queryNoteStore(audioRowsSql(generation), { pk }, dbPath);
+  const [stateLine, rowsLine] = queryNoteScoped(audioRowsSql(columns, generation), pk, dbPath);
   assertNoteReadable(stateLine, noteId);
   const rows = JSON.parse(rowsLine || "[]") as AudioRow[];
   const attachmentId = (rowPk: number) => `x-coredata://${store}/ICAttachment/p${rowPk}`;

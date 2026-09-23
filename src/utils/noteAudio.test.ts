@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createNoteStoreFixture } from "./fixtures/noteStoreFixture.js";
 import { audioRowsSql, countWords, readAudioAssets, resolveMediaPath } from "./noteAudio.js";
-import { NoteStoreReadError } from "./noteStoreQuery.js";
+import { NoteStoreError } from "./noteStoreSql.js";
 
 const STORE = "ABCDEF01-2345-6789-ABCD-EF0123456789";
 const noteId = (pk: number) => `x-coredata://${STORE}/ICNote/p${pk}`;
@@ -141,7 +141,7 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
     const opts = { dbPath: fixture.dbPath, accountsRoot: accounts };
     expect(() => readAudioAssets(noteId(2), opts)).toThrow(/password-protected/);
     expect(() => readAudioAssets(noteId(3), opts)).toThrow(/No note found/);
-    expect(() => readAudioAssets("x-coredata://X/ICNote/p1'", opts)).toThrow(NoteStoreReadError);
+    expect(() => readAudioAssets("x-coredata://X/ICNote/p1'", opts)).toThrow(NoteStoreError);
   });
 
   it("works without a generation column and reports missing required columns", () => {
@@ -162,7 +162,7 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
       expect(
         readAudioAssets(noteId(1), { dbPath: old.dbPath, accountsRoot: accounts })
       ).toHaveLength(1);
-      expect(audioRowsSql("ZGENERATION")).toContain("m.ZGENERATION,");
+      expect(audioRowsSql(new Set(), "ZGENERATION")).toContain("m.ZGENERATION,");
       execFileSync("sqlite3", [
         old.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT DROP COLUMN ZFILENAME;",
@@ -175,8 +175,10 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
 
   it("keeps caller input out of the SQL", () => {
     for (const column of ["ZGENERATION1", "ZGENERATION", null] as const) {
-      const sql = audioRowsSql(column);
-      expect(sql).toContain("ZNOTE = :pk");
+      const sql = audioRowsSql(new Set(["ZMARKEDFORDELETION"]), column);
+      expect(sql).toContain("t.ZNOTE = @pk");
+      expect(sql).toContain("COALESCE(t.ZMARKEDFORDELETION, 0) = 0");
+      expect(sql).toContain("COALESCE(k.ZMARKEDFORDELETION, 0) = 0");
       expect(sql).not.toMatch(/ZNOTE = \d/);
     }
   });

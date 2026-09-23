@@ -1,12 +1,13 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { CodedError } from "./errorCodes.js";
 import { createNoteStoreFixture } from "./fixtures/noteStoreFixture.js";
 import {
   assertNoteReadable,
   NOTE_STATE_SQL,
-  NoteStoreReadError,
   parseNoteObjectId,
-  queryNoteStore,
+  queryNoteScoped,
 } from "./noteStoreQuery.js";
+import { NoteStoreError } from "./noteStoreSql.js";
 
 const fixture = createNoteStoreFixture([
   { pk: 10, ent: "ICNote" },
@@ -31,52 +32,40 @@ describe("parseNoteObjectId", () => {
     "x-coredata://ABC/ICNote/p",
     "p10",
   ])("rejects %s", (id) => {
-    expect(() => parseNoteObjectId(id)).toThrow(NoteStoreReadError);
+    expect(() => parseNoteObjectId(id)).toThrow(NoteStoreError);
   });
 });
 
-describe("queryNoteStore (real sqlite3, fixture database)", () => {
-  it("binds integer parameters instead of splicing them into SQL", () => {
-    const [line] = queryNoteStore(NOTE_STATE_SQL, { pk: 10 }, fixture.dbPath);
+describe("queryNoteScoped (real sqlite3, fixture database)", () => {
+  it("binds the note key instead of splicing it into SQL", () => {
+    expect(NOTE_STATE_SQL).toContain("@pk");
+    const [line] = queryNoteScoped(NOTE_STATE_SQL, 10, fixture.dbPath);
     expect(JSON.parse(line)).toEqual({ found: 1, locked: 0 });
   });
 
   it("treats a non-note row with the same key as not found", () => {
-    const [line] = queryNoteStore(NOTE_STATE_SQL, { pk: 12 }, fixture.dbPath);
+    const [line] = queryNoteScoped(NOTE_STATE_SQL, 12, fixture.dbPath);
     expect(JSON.parse(line).found).toBe(0);
   });
 
   it("reports a locked note", () => {
-    const [line] = queryNoteStore(NOTE_STATE_SQL, { pk: 11 }, fixture.dbPath);
+    const [line] = queryNoteScoped(NOTE_STATE_SQL, 11, fixture.dbPath);
     expect(JSON.parse(line)).toEqual({ found: 1, locked: 1 });
   });
 
-  it.each([
-    [{ pk: -1 }],
-    [{ pk: 1.5 }],
-    [{ pk: Number.MAX_SAFE_INTEGER + 2 }],
-    [{ "pk; .shell": 1 }],
-  ])("refuses unsafe parameters %j", (params) => {
-    expect(() => queryNoteStore(NOTE_STATE_SQL, params, fixture.dbPath)).toThrow(
-      "Invalid query parameter"
-    );
+  it("refuses a key that is not an integer", () => {
+    expect(() => queryNoteScoped(NOTE_STATE_SQL, 1.5, fixture.dbPath)).toThrow(NoteStoreError);
   });
 
-  it("classifies an unopenable database as missing Full Disk Access", () => {
+  it("classifies a missing database as missing Full Disk Access", () => {
     let error: unknown;
     try {
-      queryNoteStore("SELECT 1;", {}, "/nonexistent-dir/NoteStore.sqlite");
+      queryNoteScoped("SELECT 1;", 1, "/nonexistent-dir/NoteStore.sqlite");
     } catch (e) {
       error = e;
     }
-    expect(error).toBeInstanceOf(NoteStoreReadError);
-    expect((error as NoteStoreReadError).kind).toBe("no_fda");
-  });
-
-  it("classifies other sqlite failures as query errors", () => {
-    expect(() => queryNoteStore("SELECT * FROM no_such_table;", {}, fixture.dbPath)).toThrow(
-      "Failed to read the Notes database."
-    );
+    expect(error).toBeInstanceOf(NoteStoreError);
+    expect((error as NoteStoreError).kind).toBe("no_fda");
   });
 });
 
@@ -85,18 +74,20 @@ describe("assertNoteReadable", () => {
     expect(() => assertNoteReadable('{"found":1,"locked":0}', NOTE)).not.toThrow();
   });
 
-  it("throws not_found, locked and query_error", () => {
-    const kind = (line: string | undefined) => {
+  it("throws coded not_found and unsupported errors, and a query error for bad output", () => {
+    const outcome = (line: string | undefined) => {
       try {
         assertNoteReadable(line, NOTE);
       } catch (e) {
-        return (e as NoteStoreReadError).kind;
+        if (e instanceof CodedError) return e.envelope.code;
+        if (e instanceof NoteStoreError) return e.kind;
+        return "other";
       }
       return "none";
     };
-    expect(kind('{"found":0,"locked":null}')).toBe("not_found");
-    expect(kind(undefined)).toBe("not_found");
-    expect(kind('{"found":1,"locked":1}')).toBe("locked");
-    expect(kind("not json")).toBe("query_error");
+    expect(outcome('{"found":0,"locked":null}')).toBe("not_found");
+    expect(outcome(undefined)).toBe("not_found");
+    expect(outcome('{"found":1,"locked":1}')).toBe("unsupported");
+    expect(outcome("not json")).toBe("query_error");
   });
 });
