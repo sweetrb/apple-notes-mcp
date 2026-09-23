@@ -12,6 +12,8 @@
   same AppleScript as the write, immediately before it. A native append to a
   protected note runs through Shortcuts, so there the check is a separate read
   just before the append.
+  Each guard folder id accepts the x-coredata id, the folder's Notes UUID, or
+  its numeric key, like every other exact id field.
 
 ## [2.8.43] - 2026-09-23
 
