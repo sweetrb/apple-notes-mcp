@@ -148,6 +148,33 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
 
+#### Exact modification checkpoints (`list-recent-notes`)
+
+`ZMODIFICATIONDATE1` is a Core Data double: seconds since 2001-01-01 UTC with
+sub-microsecond fraction bits. Every text path out of SQLite rounds it:
+`json_object()` renders 15 significant digits and `printf('%.17g')` is not
+reliable either, and a JavaScript `Date` keeps only milliseconds. So neither an
+ISO string nor a decimal can serve as an exact incremental-sync boundary.
+
+The sqlite3 command-line shell ships the `ieee754` extension. The reader selects
+`hex(ieee754_to_blob(ZMODIFICATIONDATE1))`, the raw big-endian IEEE-754 bits, and
+emits them as an opaque `cdts1:<16 hex>` token. A `since` token is validated,
+decoded to a finite double, re-encoded canonically, and bound with
+`.parameter set @since ieee754_from_blob(x'…')`, so the comparison
+`ZMODIFICATIONDATE1 > @since` runs against the identical double. A fixture test
+stores two timestamps one unit in the last place apart, which render to the
+same ISO string, and shows the token separates them. On a live store, listing
+from the tenth-newest note's token returned exactly the nine newer notes.
+
+Because a listing returns the newest `limit` matches, a result with
+`count == limit` may have skipped older matches after the boundary. Callers
+repeat from the same boundary with a larger limit and advance only after a
+result that was not saturated.
+
+AppleScript's per-account note enumeration includes notes in Recently Deleted.
+On the test store (2026-09-23) `list-notes` returned 735 ids: all 449 active
+notes and all 286 notes the database places in Recently Deleted.
+
 Reading these is safe under the existing rules: copy the three database files first, open
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.

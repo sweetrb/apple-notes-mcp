@@ -788,3 +788,92 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+// =============================================================================
+// Database-Backed Recent Listing and Folder Tree
+// =============================================================================
+
+/** One row of `list-recent-notes`. Metadata unless a body option was requested. */
+export interface RecentNoteRow {
+  /** MCP note id (`x-coredata://<store>/ICNote/p<n>`). */
+  id: string;
+  /** The note's Notes UUID (ZIDENTIFIER). */
+  identifier: string | null;
+  title: string | null;
+  /** Folder path in list-folders syntax, or null for a folderless note. */
+  folder: string | null;
+  account: string | null;
+  created: string | null;
+  /** Modification time in ISO 8601 (millisecond precision). */
+  modified: string | null;
+  /**
+   * Opaque token holding the exact stored modification timestamp. Pass it back
+   * as `since` to list only notes modified strictly after this one.
+   */
+  modifiedCheckpoint: string | null;
+  pinned: boolean;
+  locked: boolean;
+  inRecentlyDeleted: boolean;
+  markedForDeletion: boolean;
+  /** Words in the decoded body; null when the body is locked or unavailable. */
+  wordCount?: number | null;
+  /** Characters (code points) in the decoded body, attachment markers excluded. */
+  charCount?: number | null;
+  /** Up to 180 characters: the decoded body when decoded, else the stored snippet. */
+  bodyPreview?: string | null;
+  /** Whether bodyPreview and the counts came from the decoded body. */
+  textDecoded?: boolean;
+}
+
+/** Result of `list-recent-notes`. */
+export interface RecentNotesResult {
+  notes: RecentNoteRow[];
+  count: number;
+  limit: number;
+  /**
+   * True when count reached limit: older matches may exist between `since` and
+   * the oldest returned row. Repeat from the same `since` with a larger limit
+   * before advancing.
+   */
+  saturated: boolean;
+  /**
+   * Checkpoint to pass as the next `since`: the newest returned row's
+   * modifiedCheckpoint, or the incoming checkpoint when nothing matched. Null
+   * while `saturated` (do not advance) or when there is no exact checkpoint.
+   */
+  nextSince: string | null;
+  account?: string;
+  folder?: string;
+}
+
+/** One node of `list-folder-tree`. */
+export interface FolderTreeNode {
+  /** MCP folder id (`x-coredata://<store>/ICFolder/p<n>`). */
+  id: string;
+  identifier: string | null;
+  name: string;
+  /** Full path in list-folders syntax. */
+  path: string;
+  kind: "folder" | "trash" | "smart";
+  /** Notes directly in this folder (tombstones excluded). */
+  noteCount: number;
+  /** Notes in this folder and every descendant folder. */
+  totalNoteCount: number;
+  /** Present only when deleted folders were requested. */
+  markedForDeletion?: boolean;
+  children: FolderTreeNode[];
+}
+
+/** One account's folders in `list-folder-tree`. */
+export interface FolderTreeAccount {
+  account: string;
+  identifier: string | null;
+  noteCount: number;
+  folders: FolderTreeNode[];
+}
+
+/** Result of `list-folder-tree`. */
+export interface FolderTreeResult {
+  accounts: FolderTreeAccount[];
+  folderCount: number;
+}

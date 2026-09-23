@@ -40,6 +40,7 @@ Use this skill when the user:
 | `move-note` | Move a note to a different folder |
 | `batch-move-notes` | Move multiple notes by ID (max 500 per call) |
 | `list-notes` | List all notes or notes in a folder |
+| `list-recent-notes` | Newest-first listing with a strict `since`, exact `modifiedCheckpoint` tokens, optional word counts and previews (needs Full Disk Access). Advance to `nextSince` only when `saturated` is false |
 | `show-note` | Reveal a note in the Notes.app UI by ID |
 | `get-selected-notes` | Read the notes currently selected in Notes.app |
 | `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
@@ -49,6 +50,7 @@ Use this skill when the user:
 | Tool | Purpose |
 |------|---------|
 | `list-folders` | List all folders in an account |
+| `list-folder-tree` | Folder hierarchy with direct and cumulative note counts per account |
 | `create-folder` | Create a new folder |
 | `delete-folder` | Delete an empty folder |
 | `show-folder` | Reveal a folder in the Notes.app UI by ID |

@@ -161,6 +161,17 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `get-note-content` to retrieve full content
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes
 - Use `limit` to cap the number of notes returned
+- AppleScript's note enumeration also returns notes in Recently Deleted; use `list-recent-notes` when that matters
+
+### list-recent-notes (incremental sync)
+- Database-backed (read-only, needs Full Disk Access), newest first. `since` is **strictly after**; it takes an ISO date or date-time, or a `modifiedCheckpoint` token
+- Store `nextSince` only when `saturated` is `false`. When `saturated` is `true` (count equals limit), call again with the **same** `since` and a larger `limit`; advancing would skip notes
+- `modifiedCheckpoint` is exact; the ISO `modified` string is not. Two notes can share the same `modified` text and still differ
+- `wordCounts: true` adds `wordCount`/`charCount` (null = locked or unavailable, 0 = known empty). `bodyPreview: true` adds a 180-character preview
+- `includeDeleted: true` adds Recently Deleted, notes awaiting deletion, and folderless rows; check `inRecentlyDeleted`/`markedForDeletion` before acting on them
+
+### list-folder-tree
+- One read for the whole hierarchy with `noteCount` (direct) and `totalNoteCount` (with subfolders), grouped by account; `kind` distinguishes regular, smart, and trash folders
 
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved

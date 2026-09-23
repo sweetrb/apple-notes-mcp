@@ -1,5 +1,35 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `list-recent-notes` lists notes newest first from NoteStore (read-only) for
+  incremental sync. `since` is a strict boundary (modified strictly after)
+  and takes an ISO 8601 date (local midnight), an ISO date-time (local unless
+  it carries an offset), or a `modifiedCheckpoint` token. Each row carries
+  `modifiedCheckpoint`, an opaque `cdts1:` token holding the stored
+  timestamp's exact IEEE-754 bits, read and bound through sqlite3's
+  `ieee754` functions so it never passes through a JavaScript `Date` or a
+  rounded decimal. Responses report `saturated` and `nextSince`: when
+  `count` equals `limit`, repeat from the same `since` with a larger limit,
+  and advance only after a call that was not saturated. Options:
+  `account`, `folder`, `limit` (default 50, max 1000), `includeDeleted`
+  (Recently Deleted, notes awaiting deletion, and folderless rows),
+  `wordCounts` (`wordCount`/`charCount` from the shared body decoder; `null`
+  for locked or unavailable bodies, `0` for known-empty ones), and
+  `bodyPreview` (180 characters plus `textDecoded`).
+- `list-folder-tree` returns each account's folder hierarchy with direct
+  (`noteCount`) and cumulative (`totalNoteCount`) note counts, folder kind
+  (regular, smart, Recently Deleted), ids, and paths in one read.
+  `includeDeleted` adds folders marked for deletion.
+
+### Changed
+
+- `list-notes`' description now points to `list-recent-notes` for
+  date-ordered, checkpointed, or deleted-note listings. Its behavior is
+  unchanged.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added

@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -755,6 +755,42 @@ Use the returned `id` for any follow-up read/update/move/delete rather than re-r
 
 > **Changed in 2.7.0:** `notes` was previously `string[]` (titles only). Callers that treated the array as strings must now read `.title`.
 
+For newest-first order, a strict boundary, exact change checkpoints, Recently Deleted, or word counts, use [`list-recent-notes`](#list-recent-notes).
+
+---
+
+#### `list-recent-notes`
+
+Lists notes newest first from the NoteStore database (read-only), with an exact checkpoint for incremental sync. Unlike `list-notes`, it orders by the stored modification time, can include Recently Deleted, and can count words.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `folder` | string | No | Only notes directly in this folder: a full path in `list-folders` syntax, or a unique folder name |
+| `since` | string | No | Only notes modified **strictly after** this. An ISO 8601 date (local midnight), an ISO date-time (local time unless it carries `Z` or an offset), or a `modifiedCheckpoint` token |
+| `limit` | number | No | Maximum rows, 1–1000 (default 50) |
+| `includeDeleted` | boolean | No | Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default `false`) |
+| `wordCounts` | boolean | No | Decode each body and add `wordCount` and `charCount` (default `false`) |
+| `bodyPreview` | boolean | No | Add `bodyPreview` (up to 180 characters) and `textDecoded` (default `false`) |
+
+**Returns:** `notes`, each with `id`, `identifier`, `title`, `folder`, `account`, `created`, `modified`, `modifiedCheckpoint`, `pinned`, `locked`, `inRecentlyDeleted`, and `markedForDeletion`. Also `count`, `limit`, `saturated`, and `nextSince`.
+
+- **Checkpoints.** `modifiedCheckpoint` is an opaque token (`cdts1:` plus 16 hex digits) carrying the exact stored timestamp bits, so it never loses precision the way an ISO string can. Pass it back as `since`.
+- **The saturated-limit rule.** A call returns the newest `limit` matches. When `count` equals `limit`, `saturated` is `true` and `nextSince` is `null`: older matches after `since` may have been cut off, so repeat from the **same** `since` with a larger `limit`. Advance to `nextSince` only after a call where `saturated` is `false`. `nextSince` is the newest returned row's checkpoint, or the incoming boundary when nothing matched.
+- **Word counts.** A word is a whitespace-separated token containing a letter or digit; `charCount` counts Unicode code points. Attachment markers are not counted. Both are `null` for locked notes and bodies that are not downloaded or cannot be decoded, and `0` for a body known to be empty.
+- **Previews.** With `wordCounts`, `bodyPreview` comes from the decoded body and `textDecoded` is `true`. Otherwise it is the stored snippet. Locked notes never get a preview.
+- Folderless notes (abandoned Quick Note drafts Notes.app never shows) and Recently Deleted appear only with `includeDeleted`.
+
+**Example - incremental sync:**
+```json
+{
+  "since": "cdts1:41c7e0ef438fcd6f",
+  "limit": 200
+}
+```
+
 ---
 
 #### `get-selected-notes`
@@ -783,6 +819,21 @@ Lists all folders in an account with full hierarchical paths.
 ```
 
 **Returns:** List of folders with IDs, paths, account names, and shared state. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+
+---
+
+#### `list-folder-tree`
+
+Returns the folder hierarchy with note counts for each account, read from the NoteStore database in one pass.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `includeDeleted` | boolean | No | Include folders marked for deletion (flagged `markedForDeletion`) and folders whose account no longer exists (default `false`) |
+
+**Returns:** `accounts`, each with `account`, `identifier`, `noteCount`, and `folders`. Each folder node has `id`, `identifier`, `name`, `path` (in `list-folders` syntax), `kind` (`folder`, `smart`, or `trash`), `noteCount` (notes directly inside), `totalNoteCount` (including subfolders), and `children`. Regular folders sort by name, then smart folders, then Recently Deleted. An account's `noteCount` sums its regular folders. Smart folders report 0 because their contents are a saved search. Also returns `folderCount`.
 
 ---
 
@@ -1391,7 +1442,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -1412,6 +1463,7 @@ Several tools read directly from the Apple Notes SQLite database, which lives in
 Every tool that does not read the Notes database works normally without Full Disk Access — that is the whole AppleScript surface (create, read, search, update, move, delete, folders, accounts, attachments, stats, export). The database-backed tools degrade like this:
 - `get-checklist-state` returns an error explaining that database access is needed
 - `get-note-metadata` returns the same kind of error — it has no non-database path
+- `list-recent-notes` and `list-folder-tree` return the same kind of error
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
