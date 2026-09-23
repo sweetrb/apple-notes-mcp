@@ -282,6 +282,32 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `link` is the stored URL; check `linkSafe` before emitting it into HTML
 - Read-only view: do not build a full-body update from it
 
+### list-note-paragraphs / get-paragraph-link
+- Paragraph links have the form `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` and open Notes at that paragraph
+- A link is given only when the paragraph's stored ID is `unique` in the note. Notes copies IDs when a paragraph is split, so body paragraphs often share one; `reason: "paragraph-id-shared"` is an expected answer, not a failure. Headings and titles usually link
+- Do not build a paragraph link yourself from `get-note-blocks` `paragraphUuid`: it skips the uniqueness check and can open the wrong paragraph
+- To link a paragraph, call `list-note-paragraphs` (optionally `linkableOnly: true`) and pick one with a `url`, or call `get-paragraph-link` with `contains`; on `reason: "ambiguous-paragraph"` pass `occurrence` or a longer snippet
+- Select the note by `id` (a Notes UUID works too) or exact `title`; `folder` narrows a title using list-folders paths. Title lookups never match a note in Recently Deleted
+- Neither tool creates or changes a paragraph ID. A later edit in Notes can replace the ID and break a link
+- Requires Full Disk Access; password-protected notes are refused
+
+### get-note-structure
+- One read-only call for a note's overview by exact id: text, block summary, links with `kind` (`inline`, `card`, `note`, `section`), tags, attachments, and metadata (`deepLink`, `isShared`, `isLocked`, `inRecentlyDeleted`, `lastViewed`, word/char counts, `attachmentCount`, checklist counts, `hasDrawing`, `firstImage`)
+- Attachments use the same `kind`, body order, `previewPath` and `firstImage` as `list-attachments`, so the two tools agree about the same attachment
+- Requires Full Disk Access. A locked note still returns metadata and attachments; `bodyDecoded` is false and body-derived fields are null, so do not read null counts as zero
+- `lastViewed: null` is normal: check `lastViewedStatus` (`never-viewed` for most notes)
+- `attachmentCount` counts top-level attachments; gallery items and recording parts are under `children`
+- `previewPath` is Notes' cached rendition (a thumbnail), not the attachment file itself; it is null when Notes has not rendered one
+- Check `linkSafe` before emitting a link into HTML
+
+### list-note-links
+- Lists links with `kind` (`inline`, `card`, `note`, `section`) in one note (`id`), a `folder` (subfolders included unless `includeSubfolders: false`), an `account`, or the whole library, each with its source note id, title, folder path (as `list-folders` prints it) and account
+- Requires Full Disk Access. Folder, account and library scans skip inline links unless `includeInline: true` (it decodes every body in scope); `counts.inline` is 0 then, which does not mean there are none
+- `account` resolves like the other tools (exact name, then a unique prefix). A bare folder name must be unique; when it is ambiguous, retry with one of the paths the error lists
+- `previewPath` on a card is Notes' cached preview image; it is null when Notes has not rendered one
+- Page with `offset: page.nextOffset` while `page.hasMore` is true
+- Check `linkSafe` before emitting a link into HTML
+
 ### get-capabilities / doctor feature matrix
 - Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.
 - `unverified: ["notes_automation"]` means the probe did not contact Notes.app, not that Automation is denied. Run `doctor` to confirm it.

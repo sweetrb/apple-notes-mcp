@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.3] - 2026-09-23
+## [2.9.6] - 2026-09-23
 
 ### Added
 
@@ -18,6 +18,76 @@
   and entities, and external references are refused. The XML reader is
   written for this purpose and adds no dependency. Registered as the
   `svgAnalysis` feature in `get-capabilities`.
+
+## [2.9.5] - 2026-09-23
+
+### Added
+
+- `list-note-links` lists links in one note (by exact id), or across a
+  folder, an account or the whole library, read-only from the NoteStore
+  database. Each link has a `kind`: `inline` (a hyperlink on text), `card` (a
+  rich link preview), `note` (a native link chip to another note) or
+  `section` (a native link chip to a heading or paragraph). Rows carry the
+  URL, label, `linkSafe`, target note and paragraph UUIDs parsed from Notes
+  deep links, the card's `previewPath`, and the source `noteId`, note title
+  and modification date, folder path and account. Folder paths, account
+  matching (exact name, then a unique prefix), the Recently Deleted and
+  folderless exclusions and card previews come from the same shared helpers
+  as `list-folders`, `list-special-notes` and `list-attachments`. Cards are
+  identified by the `public.url` attachment type, the same rule
+  `get-note-structure` uses, so both tools count the same cards. A `folder`
+  scope includes its subfolders unless `includeSubfolders` is false. Inline
+  links need every body in scope decoded, so a folder, account or library
+  scan includes them only with `includeInline: true`. Results page with
+  `offset`/`limit` and can be filtered by `kinds`. Contributed by
+  @oliverames (#217).
+
+## [2.9.4] - 2026-09-23
+
+### Added
+
+- `list-note-paragraphs` lists a note's non-empty paragraphs, read-only from
+  the NoteStore database, with `blockIndex`, text, style, the stored
+  `paragraphId`, and `paragraphIdStatus` (`unique`, `shared`, `missing`).
+  A `unique` paragraph also gets a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link. The
+  note is chosen by `id` (including a Notes UUID) or by exact `title`,
+  optionally narrowed by `folder` as list-folders writes it. Title lookups
+  skip Recently Deleted, as list-notes does.
+- `get-paragraph-link` selects one paragraph by snippet (`contains`), whole
+  text (`match`) or `blockIndex`, with `occurrence` for repeated text, and
+  returns its direct link only when the paragraph's ID appears in no other
+  paragraph of the note. Notes copies paragraph IDs when a paragraph is split,
+  so a shared ID is refused rather than risk opening the wrong paragraph.
+  Refusals use the standard error envelope, with the specific cause in
+  `structuredContent.reason` (for example `paragraph-id-shared`). The tool
+  never creates or repairs an ID.
+
+## [2.9.3] - 2026-09-23
+
+### Added
+
+- `get-note-structure` returns a read-only overview of one note from the
+  NoteStore database: decoded text, a block summary, every link with its kind
+  (`inline` hyperlink, rich link `card`, native `note` link chip, native
+  `section` link chip) and its target note and paragraph UUIDs when the URL
+  carries them, native tags, and attachments. Attachments come from the same
+  reader `list-attachments` uses, so both tools report the same `kind`, body
+  order, `previewPath` and `firstImage` for an attachment; gallery and
+  recording children are nested under their parent. Metadata covers
+  `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `inRecentlyDeleted` (including stores that mark
+  Recently Deleted only by its `TrashFolder` identifier), `lastViewed` with a
+  `lastViewedStatus`, `wordCount`, `charCount`, `attachmentCount` (top-level
+  only), `checklistTotal`/`checklistDone` and `hasDrawing`. A
+  password-protected note returns its metadata and attachment rows, with the
+  body-derived fields null. The id accepts the same forms as the other
+  exact-id tools.
+- `src/utils/noteLinks.ts` classifies link kinds and parses Notes deep links
+  for the link features that follow.
+- TECHNICAL_NOTES.md documents where Notes stores each link kind, how preview
+  renditions map to files, the never-viewed `lastViewed` value, and how sharing
+  is derived.
 
 ## [2.9.2] - 2026-09-23
 

@@ -46177,10 +46177,10 @@ function parseSince(input) {
   return { modified: (ms - CORE_DATA_EPOCH_MS) / 1e3 };
 }
 function textStats(text2) {
-  const visible = text2.replace(OBJECT_REPLACEMENT, "");
-  let wordCount = 0;
-  for (const token of visible.split(/\s+/u)) if (/[\p{L}\p{N}]/u.test(token)) wordCount++;
-  return { wordCount, charCount: [...visible].length };
+  const visible2 = text2.replace(OBJECT_REPLACEMENT, "");
+  let wordCount2 = 0;
+  for (const token of visible2.split(/\s+/u)) if (/[\p{L}\p{N}]/u.test(token)) wordCount2++;
+  return { wordCount: wordCount2, charCount: [...visible2].length };
 }
 function previewText(text2) {
   const flat = text2.replace(OBJECT_REPLACEMENT, " ").replace(/\s+/gu, " ").trim();
@@ -46333,12 +46333,12 @@ function folderTree(options = {}) {
 }
 function assembleFolderTree(context, counts, includeDeleted, scope2) {
   const paths = folderPaths(context.folders);
-  const visible = context.folders.filter(
+  const visible2 = context.folders.filter(
     (folder) => (includeDeleted || !folder.tombstoned) && (!scope2 || folder.account === scope2.pk)
   );
-  const byPk = new Map(visible.map((folder) => [folder.pk, folder]));
+  const byPk = new Map(visible2.map((folder) => [folder.pk, folder]));
   const nodes = /* @__PURE__ */ new Map();
-  for (const folder of visible) {
+  for (const folder of visible2) {
     const node = {
       id: `x-coredata://${context.uuid}/ICFolder/p${folder.pk}`,
       identifier: folder.identifier,
@@ -46362,7 +46362,7 @@ function assembleFolderTree(context, counts, includeDeleted, scope2) {
     return folder.parent;
   };
   const roots = /* @__PURE__ */ new Map();
-  for (const folder of visible) {
+  for (const folder of visible2) {
     const node = nodes.get(folder.pk);
     const parent = parentOf(folder);
     if (parent !== void 0) nodes.get(parent).children.push(node);
@@ -47794,7 +47794,7 @@ function renderMarkdown(markdown, options = {}) {
     }
     return text2;
   };
-  const visible = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const visible2 = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
   let html = "", list, quote = false, code, previousBlank = true;
   const close = () => {
     if (list) {
@@ -47841,7 +47841,7 @@ function renderMarkdown(markdown, options = {}) {
         }
         const rendered = inline(text2);
         html += `<div>${rendered}</div>`;
-        expect.quotes[expect.quotes.length - 1] += ` ${visible(rendered)}`;
+        expect.quotes[expect.quotes.length - 1] += ` ${visible2(rendered)}`;
         previousBlank = false;
         continue;
       }
@@ -47864,7 +47864,7 @@ function renderMarkdown(markdown, options = {}) {
         }
         const rendered = inline(task[2]);
         html += `<li>${rendered}</li>`;
-        expect.checklist.push({ text: visible(rendered).trim(), done: task[1] === "x" });
+        expect.checklist.push({ text: visible2(rendered).trim(), done: task[1] === "x" });
         previousBlank = false;
         continue;
       }
@@ -49063,6 +49063,742 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
   };
 }
 
+// src/utils/noteParagraphs.ts
+import { gunzipSync as gunzipSync9 } from "node:zlib";
+var ENVELOPE_CODE = {
+  "invalid-argument": "validation_error",
+  "not-found": "not_found",
+  encrypted: "unsupported",
+  "no-body": "unsupported",
+  "ambiguous-note": "ambiguous",
+  "no-match": "not_found",
+  "ambiguous-paragraph": "ambiguous",
+  "occurrence-out-of-range": "validation_error",
+  "paragraph-id-missing": "unsupported",
+  "paragraph-id-shared": "unsupported"
+};
+var ParagraphLinkError = class extends CodedError {
+  reason;
+  constructor(reason, message) {
+    super(message, { code: ENVELOPE_CODE[reason], reason });
+    this.name = "ParagraphLinkError";
+    this.reason = reason;
+  }
+};
+var paragraphUrl = (noteIdentifier, paragraphId) => `applenotes://showNote?identifier=${noteIdentifier.toUpperCase()}&paragraphID=${paragraphId.toUpperCase()}`;
+var normalizeParagraphText = (text2) => text2.normalize("NFKC").replace(/\ufffc/g, "").split(/\s+/u).filter(Boolean).join(" ").toLowerCase();
+var bytesField = (fields, n) => fields.find((f) => f.fieldNumber === n && f.wireType === 2)?.bytes;
+var uuidOf = (bytes) => {
+  if (bytes?.length !== 16) return void 0;
+  const h = Buffer.from(bytes).toString("hex").toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+function runParagraphIds(data) {
+  const document = decodeWireFields(bytesField(decodeWireFields(data), 2));
+  const note = decodeWireFields(bytesField(document, 3));
+  const runs = [];
+  let start = 0;
+  for (const field of note.filter((f) => f.fieldNumber === 5)) {
+    const run = decodeWireFields(field.bytes);
+    const length = Number(run.find((f) => f.fieldNumber === 1).varint);
+    const style = bytesField(run, 2);
+    const paragraphId = style ? uuidOf(bytesField(decodeWireFields(style), 9)) : void 0;
+    runs.push({ start, length, ...paragraphId ? { paragraphId } : {} });
+    start += length;
+  }
+  return runs;
+}
+function classifyParagraphIds(doc, runs) {
+  const ranges = doc.blocks.map((block) => [block.start, block.start + block.length + 1]);
+  const blocksOfId = /* @__PURE__ */ new Map();
+  const idsOfBlock = doc.blocks.map(() => /* @__PURE__ */ new Set());
+  let b = 0;
+  for (const run of runs) {
+    const end = run.start + run.length;
+    while (b < ranges.length && ranges[b][1] <= run.start) b++;
+    for (let i = b; i < ranges.length && ranges[i][0] < end; i++) {
+      idsOfBlock[i].add(run.paragraphId);
+      if (run.paragraphId) {
+        const owners = blocksOfId.get(run.paragraphId) ?? /* @__PURE__ */ new Set();
+        owners.add(i);
+        blocksOfId.set(run.paragraphId, owners);
+      }
+    }
+  }
+  return doc.blocks.map((block, i) => {
+    const paragraphId = block.paragraphUuid ?? null;
+    const mixed = idsOfBlock[i].size > 1;
+    if (!paragraphId) return { status: "missing", paragraphId, mixed };
+    const owners = blocksOfId.get(paragraphId).size;
+    return owners === 1 ? { status: "unique", paragraphId, mixed } : { status: "shared", paragraphId, sharedWith: owners - 1, mixed };
+  });
+}
+function paragraphsOf(doc, runs, noteIdentifier) {
+  const ids = classifyParagraphIds(doc, runs);
+  const out = [];
+  doc.blocks.forEach((block, i) => {
+    if (!normalizeParagraphText(block.text)) return;
+    const { status, paragraphId, sharedWith, mixed } = ids[i];
+    out.push({
+      blockIndex: block.index,
+      text: block.text,
+      style: block.style,
+      styleType: block.styleType,
+      paragraphId,
+      paragraphIdStatus: status,
+      ...sharedWith !== void 0 ? { sharedWith } : {},
+      ...mixed ? { mixedParagraphIds: true } : {},
+      ...status === "unique" && noteIdentifier ? { url: paragraphUrl(noteIdentifier, paragraphId) } : {}
+    });
+  });
+  return out;
+}
+function selectParagraph(paragraphs, selector) {
+  const given = [selector.contains, selector.match, selector.blockIndex].filter(
+    (value) => value !== void 0
+  ).length;
+  if (given !== 1)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Choose exactly one paragraph selector: contains, match, or blockIndex"
+    );
+  if (selector.blockIndex !== void 0) {
+    const hit = paragraphs.find((p) => p.blockIndex === selector.blockIndex);
+    if (!hit)
+      throw new ParagraphLinkError(
+        "no-match",
+        `Block ${selector.blockIndex} is not a non-empty paragraph of this note`
+      );
+    return hit;
+  }
+  const wanted = normalizeParagraphText(selector.contains ?? selector.match);
+  if (!wanted)
+    throw new ParagraphLinkError("invalid-argument", "The paragraph selector has no visible text");
+  const matches = paragraphs.filter(
+    (p) => selector.match !== void 0 ? normalizeParagraphText(p.text) === wanted : normalizeParagraphText(p.text).includes(wanted)
+  );
+  if (!matches.length)
+    throw new ParagraphLinkError("no-match", "No paragraph matches the selector");
+  if (selector.occurrence === void 0 && matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-paragraph",
+      `The selector matches ${matches.length} paragraphs; use a longer snippet or pass occurrence (1-${matches.length})`
+    );
+  const occurrence = selector.occurrence ?? 1;
+  if (occurrence > matches.length)
+    throw new ParagraphLinkError(
+      "occurrence-out-of-range",
+      `Occurrence ${occurrence} requested but only ${matches.length} paragraphs match`
+    );
+  return matches[occurrence - 1];
+}
+var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+function titleMatchSql(columns) {
+  return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
+}
+function checkNoteSelector(selector) {
+  const given = [selector.id, selector.title].filter((value) => value !== void 0).length;
+  if (given !== 1)
+    throw new ParagraphLinkError("invalid-argument", "Choose exactly one of id or title");
+  if (selector.folder !== void 0 && selector.title === void 0)
+    throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
+  if (selector.id === void 0) return void 0;
+  const pk = NOTE_ID.exec(selector.id)?.[1];
+  if (!pk)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number> or a Notes UUID"
+    );
+  return Number(pk);
+}
+function resolveNote(dbPath2, columns, selector) {
+  const idPk = checkNoteSelector(selector);
+  if (idPk !== void 0) return { pk: idPk, id: selector.id };
+  requireColumns(columns, ["ZTITLE1", "ZFOLDER"], "title lookup");
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const names = new Map(context.folders.map((f) => [f.pk, escapeFolderName(f.name ?? "")]));
+  let matches = parseJsonLines(
+    runReadOnlySql(dbPath2, titleMatchSql(columns), {
+      title: { blob: Buffer.from(selector.title, "utf8") }
+    })
+  );
+  if (selector.folder !== void 0) {
+    const wanted = selector.folder;
+    matches = matches.filter(
+      (n) => paths.get(n.folder) === wanted || names.get(n.folder) === wanted
+    );
+  }
+  if (!matches.length) throw new ParagraphLinkError("not-found", "No note matches the selector");
+  if (matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-note",
+      `${matches.length} notes match; pass folder (a name or a path as list-folders shows it) or use the note id. Folders: ${matches.map((n) => paths.get(n.folder)).join(", ")}`
+    );
+  return { pk: matches[0].pk, id: noteIdFor(context.uuid, matches[0].pk) };
+}
+function noteBodySql(columns) {
+  return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
+}
+function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH7 } = {}) {
+  checkNoteSelector(selector);
+  const columns = readColumns(dbPath2);
+  const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
+  const [row] = parseJsonLines(runReadOnlySql(dbPath2, noteBodySql(columns), { pk: { int: pk } }));
+  if (!row?.isNote) throw new ParagraphLinkError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted || row.locked)
+    throw new ParagraphLinkError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new ParagraphLinkError("no-body", "No body data is stored for this note");
+  let doc;
+  let runs;
+  try {
+    const data = gunzipSync9(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    doc = decodeNoteBlocks(data);
+    runs = runParagraphIds(data);
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    throw new ParagraphLinkError("no-body", `The note body could not be decoded: ${message}`);
+  }
+  const paragraphs = paragraphsOf(doc, runs, row.identifier);
+  const counts = { unique: 0, shared: 0, missing: 0 };
+  for (const p of paragraphs) counts[p.paragraphIdStatus]++;
+  return { id: id2, identifier: row.identifier, paragraphs, counts };
+}
+function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 1024 * 1024, linkableOnly = false } = {}) {
+  const list = linkableOnly ? paragraphs.filter((p) => p.url) : paragraphs;
+  const start = Math.min(Math.max(0, offset), list.length);
+  const out = [];
+  let bytes = 0;
+  for (let i = start; i < list.length && out.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(list[i]));
+    if (out.length && bytes + size > maxBytes) break;
+    out.push(list[i]);
+    bytes += size;
+  }
+  const next = start + out.length;
+  return {
+    paragraphs: out,
+    page: {
+      offset: start,
+      returned: out.length,
+      total: list.length,
+      hasMore: next < list.length,
+      ...next < list.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function paragraphLink(note, selector) {
+  const paragraph = selectParagraph(note.paragraphs, selector);
+  if (paragraph.paragraphIdStatus === "shared")
+    throw new ParagraphLinkError(
+      "paragraph-id-shared",
+      `This paragraph's ID is shared with ${paragraph.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
+    );
+  if (!paragraph.url)
+    throw new ParagraphLinkError(
+      "paragraph-id-missing",
+      paragraph.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
+    );
+  return { url: paragraph.url, paragraph };
+}
+
+// src/utils/noteStructure.ts
+import { dirname as dirname4 } from "node:path";
+
+// src/utils/noteLinks.ts
+var NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
+var HASHTAG_UTI2 = "com.apple.notes.inlinetextattachment.hashtag";
+var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+function parseNotesShowUrl(url) {
+  const match = /^(?:apple)?notes:\/\/showNote\?(.*)$/i.exec(url);
+  if (!match) return void 0;
+  const query2 = new URLSearchParams(match[1]);
+  const note = query2.get("identifier") ?? "";
+  const paragraph = query2.get("paragraphID") ?? "";
+  const result = {};
+  if (UUID.test(note)) result.targetNote = note.toUpperCase();
+  if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
+  return result;
+}
+function inlineLinks(doc) {
+  const links = [];
+  let last;
+  for (const block of doc.blocks)
+    for (const run of block.runs) {
+      if (!run.link) {
+        last = void 0;
+        continue;
+      }
+      if (last && last.url === run.link && last.start + last.length === run.start) {
+        last.length += run.length;
+        last.text += run.text;
+        continue;
+      }
+      last = {
+        kind: "inline",
+        url: run.link,
+        linkSafe: run.linkSafe === true,
+        text: run.text,
+        start: run.start,
+        length: run.length,
+        blockIndex: block.index,
+        ...parseNotesShowUrl(run.link)
+      };
+      links.push(last);
+    }
+  return links;
+}
+function markerPosition(doc, identifier) {
+  if (!doc) return {};
+  const wanted = identifier.toUpperCase();
+  const marker = doc.attachments.find((item) => item.id.toUpperCase() === wanted);
+  return marker ? { start: marker.start, blockIndex: marker.blockIndex, inBody: true } : { inBody: false };
+}
+function nativeLink(row, doc) {
+  if (!row.token) return void 0;
+  const target = parseNotesShowUrl(row.token) ?? {};
+  const kind = target.paragraphId ? "section" : "note";
+  return {
+    kind,
+    url: row.token,
+    linkSafe: isSafeLink(row.token),
+    ...row.alt ? { text: row.alt } : {},
+    ...markerPosition(doc, row.identifier),
+    ...target,
+    ...kind === "section" && row.alt ? { section: row.alt } : {},
+    attachmentIdentifier: row.identifier
+  };
+}
+function cardLink(row, {
+  doc,
+  noteId: noteId3,
+  previewPath
+} = {}) {
+  if (!row.url) return void 0;
+  return {
+    kind: "card",
+    url: row.url,
+    linkSafe: isSafeLink(row.url),
+    ...row.title ? { text: row.title } : {},
+    ...markerPosition(doc, row.identifier),
+    ...parseNotesShowUrl(row.url),
+    attachmentIdentifier: row.identifier,
+    ...noteId3 ? { attachmentId: attachmentCoreDataId(noteId3, row.pk) } : {},
+    ...previewPath !== void 0 ? { previewPath } : {}
+  };
+}
+
+// src/utils/noteStructure.ts
+var APPLE_EPOCH_OFFSET = 978307200;
+var LAST_VIEWED_NEVER = -541228980;
+function lastViewedOf(raw, columnPresent = true, now = Date.now()) {
+  if (!columnPresent) return { lastViewed: null, lastViewedStatus: "unsupported" };
+  if (raw === null || raw === void 0)
+    return { lastViewed: null, lastViewedStatus: "not-recorded" };
+  const seconds = typeof raw === "number" ? raw : Number.NaN;
+  if (seconds === LAST_VIEWED_NEVER) return { lastViewed: null, lastViewedStatus: "never-viewed" };
+  const ms = (seconds + APPLE_EPOCH_OFFSET) * 1e3;
+  if (!Number.isFinite(ms) || ms < Date.UTC(2007, 0, 1) || ms > now + 864e5)
+    return { lastViewed: null, lastViewedStatus: "malformed" };
+  return { lastViewed: new Date(ms).toISOString(), lastViewedStatus: "viewed" };
+}
+var visible = (text2) => text2.replace(/\ufffc/g, "");
+var wordCount = (text2) => visible(text2).split(/\s+/u).filter((word) => word !== "").length;
+var charCount = (text2) => Array.from(visible(text2)).length;
+function noteStructureSql(columns) {
+  const c = (alias, name) => col(columns, alias, name);
+  const sharedExpr = columns.has("ZSERVERSHAREDATA") ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
+         WITH RECURSIVE up(pk, depth) AS (
+           SELECT n.ZFOLDER, 0 UNION ALL
+           SELECT ${c("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
+           WHERE depth < 64)
+         SELECT 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT s ON s.Z_PK = up.pk WHERE s.ZSERVERSHAREDATA IS NOT NULL))` : "NULL";
+  const children = columns.has("ZPARENTATTACHMENT") ? ` OR att.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE ${c("p", "ZNOTE")} = @pk)` : "";
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'note',
+      'isNote', n.Z_ENT = ${entity("ICNote")},
+      'identifier', ${c("n", "ZIDENTIFIER")},
+      'title', ${c("n", "ZTITLE1")},
+      'folder', ${c("f", "ZTITLE2")},
+      'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns, "f")} END,
+      'account', ${c("a", "ZNAME")},
+      'locked', ${c("n", "ZISPASSWORDPROTECTED")},
+      'pinned', ${c("n", "ZISPINNED")},
+      'shared', ${sharedExpr},
+      'lastViewed', ${c("n", "ZLASTVIEWEDMODIFICATIONDATE")},
+      'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+      'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK))
+    FROM ZICCLOUDSYNCINGOBJECT n
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${c("n", "ZFOLDER")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountRef(columns, "n")} AND a.Z_ENT = ${entity("ICAccount")}
+    WHERE n.Z_PK = @pk;`,
+    `SELECT json_object('k', 'attachment',
+      'pk', att.Z_PK,
+      'title', ${c("att", "ZTITLE")},
+      'url', ${c("att", "ZURLSTRING")},
+      'fileSize', ${c("att", "ZFILESIZE")})
+    FROM ZICCLOUDSYNCINGOBJECT att
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+      AND (${c("att", "ZNOTE")} = @pk${children});`,
+    `SELECT json_object('k', 'inline',
+      'identifier', ${c("i", "ZIDENTIFIER")},
+      'uti', ${c("i", "ZTYPEUTI1")},
+      'alt', ${c("i", "ZALTTEXT")},
+      'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")})
+    FROM ZICCLOUDSYNCINGOBJECT i
+    WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${c("i", "ZNOTE1")} = @pk
+      AND ${notTombstonedSql(columns, "i")} AND ${c("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI2}', '${NOTE_LINK_UTI}');`,
+    "COMMIT;"
+  ].join("\n");
+}
+function describeNoteStructure(s) {
+  const parts = [
+    s.bodyDecoded ? `${s.blockSummary.blocks} blocks, ${s.wordCount} words` : `body not decoded (${s.bodyError})`,
+    `${s.links.length} links (inline ${s.linkCounts.inline}, card ${s.linkCounts.card}, note ${s.linkCounts.note}, section ${s.linkCounts.section})`,
+    `${s.attachmentCount} attachments`,
+    `${s.tags.length} tags`
+  ];
+  if (s.checklistTotal) parts.push(`checklist ${s.checklistDone}/${s.checklistTotal} done`);
+  if (s.hasDrawing) parts.push("has a drawing");
+  if (s.isLocked) parts.push("locked");
+  if (s.isShared) parts.push("shared");
+  return `Note structure: ${parts.join("; ")}.`;
+}
+function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
+  const { pk } = parseNoteId2(id2);
+  const columns = readColumns(dbPath2);
+  const rows = parseJsonLines(
+    runReadOnlySql(dbPath2, noteStructureSql(columns), { pk: { int: pk } })
+  );
+  const note = rows.find((row) => row.k === "note");
+  if (!note?.isNote) throw new NoteStoreError(`No note found for ID "${id2}".`, "invalid_input");
+  const details = new Map(
+    rows.filter((row) => row.k === "attachment").map((row) => [row.pk, row])
+  );
+  const inlineRows = rows.filter((row) => row.k === "inline");
+  let doc;
+  let bodyError;
+  if (note.encrypted || note.locked) bodyError = "encrypted";
+  else if (!note.data || !/^[0-9a-f]+$/i.test(note.data)) bodyError = "no-body";
+  else
+    try {
+      doc = decodeCompressedNoteBlocks(Buffer.from(note.data, "hex"));
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      bodyError = error2.code;
+    }
+  const { rows: attachmentRows, bodyOrder } = readNoteAttachmentRows(id2, dbPath2);
+  const assets = assembleAttachmentAssets(attachmentRows, bodyOrder, dirname4(dbPath2));
+  const roots = /* @__PURE__ */ new Map();
+  const attachments = [];
+  const pks = /* @__PURE__ */ new Map();
+  for (const record2 of assets.attachments) {
+    const detail = details.get(record2.pk);
+    const parent = record2.parentIdentifier !== null ? roots.get(record2.parentIdentifier) : void 0;
+    const item = {
+      id: attachmentCoreDataId(id2, record2.pk),
+      identifier: record2.identifier,
+      uti: record2.uti,
+      kind: record2.kind,
+      ...detail?.title ? { title: detail.title } : {},
+      ...record2.filename ? { filename: record2.filename } : {},
+      ...detail?.url ? { url: detail.url } : {},
+      ...typeof detail?.fileSize === "number" ? { fileSize: detail.fileSize } : {},
+      ...markerPosition(doc, record2.identifier),
+      previewPath: record2.previewPath,
+      ...parent ? { parentId: parent.id } : {}
+    };
+    pks.set(item, record2.pk);
+    if (parent) (parent.children ||= []).push(item);
+    else {
+      roots.set(record2.identifier, item);
+      attachments.push(item);
+    }
+  }
+  const flat = attachments.flatMap((item) => [item, ...item.children ?? []]);
+  const links = doc ? inlineLinks(doc) : [];
+  for (const item of flat) {
+    if (item.kind !== "url") continue;
+    const link = cardLink(
+      {
+        pk: pks.get(item),
+        identifier: item.identifier,
+        url: item.url ?? null,
+        title: item.title ?? null
+      },
+      { doc, noteId: id2, previewPath: item.previewPath }
+    );
+    if (link) links.push(link);
+  }
+  const tagOrder = [];
+  for (const row of inlineRows) {
+    if (!row.identifier) continue;
+    if (row.uti === NOTE_LINK_UTI) {
+      const link = nativeLink({ identifier: row.identifier, token: row.token, alt: row.alt }, doc);
+      if (link) links.push(link);
+    } else if (row.alt) {
+      const position = markerPosition(doc, row.identifier);
+      if (position.inBody !== false)
+        tagOrder.push({ tag: row.alt.replace(/^#/, ""), start: position.start ?? 0 });
+    }
+  }
+  links.sort((a, b) => (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER));
+  const tags = [...new Set(tagOrder.sort((a, b) => a.start - b.start).map((entry) => entry.tag))];
+  let text2;
+  let textOmitted;
+  if (doc && includeText) {
+    if (Buffer.byteLength(doc.text) <= maxTextBytes) text2 = doc.text;
+    else textOmitted = true;
+  }
+  const linkCounts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) linkCounts[link.kind]++;
+  const lastViewed = lastViewedOf(note.lastViewed, columns.has("ZLASTVIEWEDMODIFICATIONDATE"));
+  const first2 = selectFirstImage(assets);
+  return {
+    id: id2,
+    identifier: note.identifier,
+    deepLink: note.identifier ? `notes://showNote?identifier=${note.identifier}` : null,
+    title: note.title,
+    folder: note.folder,
+    account: note.account,
+    inRecentlyDeleted: note.inTrash === 1,
+    isShared: note.shared === null ? null : note.shared === 1,
+    isLocked: note.locked === 1 || note.encrypted === 1,
+    isPinned: note.pinned === null ? null : note.pinned === 1,
+    ...lastViewed,
+    bodyDecoded: doc !== void 0,
+    ...bodyError ? { bodyError } : {},
+    ...text2 !== void 0 ? { text: text2 } : {},
+    ...textOmitted ? { textOmitted } : {},
+    textLength: doc ? doc.textLength : null,
+    wordCount: doc ? wordCount(doc.text) : null,
+    charCount: doc ? charCount(doc.text) : null,
+    blockSummary: doc ? doc.summary : null,
+    links,
+    linkCounts,
+    linksComplete: doc !== void 0,
+    tags,
+    attachments,
+    attachmentCount: attachments.length,
+    checklistTotal: doc ? doc.summary.checklist.total : null,
+    checklistDone: doc ? doc.summary.checklist.done : null,
+    hasDrawing: flat.some((item) => item.kind === "drawing"),
+    firstImage: first2 ? { ...first2, id: attachmentCoreDataId(id2, first2.pk) } : null,
+    ...doc ? { undecodedFields: doc.undecodedFields } : {}
+  };
+}
+
+// src/utils/noteLinkInventory.ts
+import { dirname as dirname5 } from "node:path";
+var BODY_BATCH = 100;
+function matchFolder(folders, wanted, account) {
+  const paths = folderPaths(folders);
+  const segments = splitFolderPath(wanted);
+  const key = (parts) => parts.join("\0");
+  const pool = folders.filter(
+    (f) => !f.tombstoned && !f.trash && (account === void 0 || f.account === account)
+  );
+  const byPath = segments.length === 1 ? pool.filter((f) => f.name === segments[0]) : pool.filter((f) => key(splitFolderPath(paths.get(f.pk))) === key(segments));
+  const matches = byPath.length ? byPath : pool.filter((f) => f.name === wanted);
+  if (!matches.length) throw new NoteStoreError(`No folder matches "${wanted}".`, "invalid_input");
+  if (matches.length > 1)
+    throw new NoteStoreError(
+      `Folder "${wanted}" is ambiguous; use one of these paths: ${matches.map((f) => paths.get(f.pk)).join(", ")}.`,
+      "invalid_input"
+    );
+  return { folder: matches[0], path: paths.get(matches[0].pk) };
+}
+function inventorySql(columns) {
+  requireColumns(columns, ["ZFOLDER"], "list-note-links");
+  const c = (alias, name) => col(columns, alias, name);
+  const subtree = columns.has("ZPARENT") ? `WITH RECURSIVE sub(pk) AS (SELECT @folder UNION
+         SELECT x.Z_PK FROM ZICCLOUDSYNCINGOBJECT x JOIN sub ON x.ZPARENT = sub.pk
+         WHERE @subfolders <> 0 AND x.Z_ENT = ${entity("ICFolder")})
+       SELECT pk FROM sub` : "SELECT @folder";
+  const scopeWhere = `n.Z_ENT = ${entity("ICNote")} AND (
+      (@note <> 0 AND n.Z_PK = @note) OR
+      (@note = 0 AND ${activeNoteSql(columns, "n", "f")}
+        AND (@account = 0 OR a.Z_PK = @account)
+        AND (@folder = 0 OR n.ZFOLDER IN (${subtree}))))`;
+  const scope2 = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere}`;
+  return {
+    rows: [
+      "BEGIN;",
+      `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${c("n", "ZIDENTIFIER")},
+        'title', ${c("n", "ZTITLE1")}, 'folder', n.ZFOLDER, 'account', a.Z_PK,
+        'modified', ${c("n", "ZMODIFICATIONDATE1")})
+      FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere};`,
+      `SELECT json_object('k', 'card', 'pk', att.Z_PK, 'note', ${c("att", "ZNOTE")},
+        'identifier', ${c("att", "ZIDENTIFIER")}, 'url', ${c("att", "ZURLSTRING")},
+        'title', ${c("att", "ZTITLE")})
+      FROM ZICCLOUDSYNCINGOBJECT att
+      WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+        AND ${c("att", "ZTYPEUTI")} LIKE 'public.url%' AND ${c("att", "ZURLSTRING")} IS NOT NULL
+        AND ${c("att", "ZNOTE")} IN (${scope2});`,
+      `SELECT json_object('k', 'chip', 'note', ${c("i", "ZNOTE1")},
+        'identifier', ${c("i", "ZIDENTIFIER")}, 'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")},
+        'alt', ${c("i", "ZALTTEXT")})
+      FROM ZICCLOUDSYNCINGOBJECT i
+      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notTombstonedSql(columns, "i")}
+        AND ${c("i", "ZTYPEUTI1")} = '${NOTE_LINK_UTI}' AND ${c("i", "ZNOTE1")} IN (${scope2});`,
+      "COMMIT;"
+    ].join("\n"),
+    bodies: `SELECT json_object('note', d.ZNOTE, 'data', hex(d.ZDATA),
+        'encrypted', d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL)
+      FROM ZICNOTEDATA d WHERE d.ZNOTE IN (${scope2}) AND d.ZNOTE > @after
+      ORDER BY d.ZNOTE LIMIT ${BODY_BATCH};`
+  };
+}
+function decodeBodies(dbPath2, sql, params) {
+  const docs = /* @__PURE__ */ new Map();
+  let after = 0;
+  for (; ; ) {
+    const rows = parseJsonLines(
+      runReadOnlySql(dbPath2, sql, { ...params, after: { int: after } })
+    );
+    for (const row of rows) {
+      after = Math.max(after, row.note);
+      if (row.encrypted || !row.data) continue;
+      try {
+        docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
+      } catch {
+      }
+    }
+    if (rows.length < BODY_BATCH) return docs;
+  }
+}
+var KIND_ORDER2 = { inline: 0, card: 1, note: 2, section: 3 };
+function listNoteLinks(options = {}) {
+  const { dbPath: dbPath2 = NOTES_DB_PATH7, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
+  if (options.id && (options.account || options.folder))
+    throw new NoteStoreError("Pass either id or account/folder, not both.", "invalid_input");
+  const notePk = options.id ? parseNoteId2(options.id).pk : 0;
+  const columns = readColumns(dbPath2);
+  const sql = inventorySql(columns);
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const scope2 = {};
+  let accountPk = 0;
+  let folderPk = 0;
+  const includeSubfolders = options.includeSubfolders ?? true;
+  if (options.account) {
+    const account = resolveAccountName(context.accounts, options.account);
+    accountPk = account.pk;
+    scope2.account = account.name;
+    scope2.accountIdentifier = account.identifier;
+  }
+  if (options.folder) {
+    const { folder, path: path10 } = matchFolder(context.folders, options.folder, accountPk || void 0);
+    folderPk = folder.pk;
+    scope2.folder = folder.name;
+    scope2.folderPath = path10;
+    scope2.includeSubfolders = includeSubfolders;
+  }
+  if (options.id) scope2.note = options.id;
+  const params = {
+    note: { int: notePk },
+    account: { int: accountPk },
+    folder: { int: folderPk },
+    subfolders: { int: includeSubfolders ? 1 : 0 }
+  };
+  const rows = parseJsonLines(runReadOnlySql(dbPath2, sql.rows, params));
+  const notes = rows.filter((row) => row.k === "note");
+  if (options.id && !notes.length)
+    throw new NoteStoreError(`No note found for ID "${options.id}".`, "invalid_input");
+  const includeInline = options.includeInline ?? Boolean(options.id);
+  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params) : /* @__PURE__ */ new Map();
+  const noteById = new Map(notes.map((note) => [note.pk, note]));
+  const accountById = new Map(context.accounts.map((account) => [account.pk, account]));
+  const folderById = new Map(context.folders.map((folder) => [folder.pk, folder]));
+  const source = (pk) => {
+    const note = noteById.get(pk);
+    const account = accountById.get(note.account ?? -1);
+    const folder = folderById.get(note.folder ?? -1);
+    return {
+      noteId: noteIdFor(context.uuid, pk),
+      noteIdentifier: note.identifier,
+      noteTitle: note.title,
+      noteModified: coreDataToIso(note.modified),
+      folder: folder?.name ?? null,
+      folderPath: folder ? paths.get(folder.pk) : null,
+      account: account?.name ?? null,
+      accountIdentifier: account?.identifier ?? null
+    };
+  };
+  const containerDir = dirname5(dbPath2);
+  const previewEntries = /* @__PURE__ */ new Map();
+  const previewFor = (identifier, account) => {
+    const accountDir = identifier ? resolveAccountDir(containerDir, account) : null;
+    if (!accountDir || !identifier) return null;
+    if (!previewEntries.has(accountDir))
+      previewEntries.set(accountDir, listPreviewEntries(accountDir));
+    return previewPaths(accountDir, identifier, previewEntries.get(accountDir))[0] ?? null;
+  };
+  const all = [];
+  const add = (pk, link) => all.push({ pk, link: { ...link, ...source(pk) } });
+  for (const [pk, doc] of docs) for (const link of inlineLinks(doc)) add(pk, link);
+  for (const row of rows) {
+    if (row.k === "card") {
+      const noteId3 = noteIdFor(context.uuid, row.note);
+      const link = cardLink(
+        { pk: row.pk, identifier: row.identifier ?? "", url: row.url, title: row.title },
+        {
+          doc: docs.get(row.note),
+          noteId: noteId3,
+          previewPath: previewFor(row.identifier, source(row.note).accountIdentifier)
+        }
+      );
+      if (link) add(row.note, link);
+    } else if (row.k === "chip") {
+      const link = nativeLink(
+        { identifier: row.identifier ?? "", token: row.token, alt: row.alt },
+        docs.get(row.note)
+      );
+      if (link) add(row.note, link);
+    }
+  }
+  const wanted = options.kinds?.length ? new Set(options.kinds) : void 0;
+  const links = all.filter(({ link }) => !wanted || wanted.has(link.kind)).sort(
+    (a, b) => (b.link.noteModified ?? "").localeCompare(a.link.noteModified ?? "") || a.pk - b.pk || (a.link.start ?? Number.MAX_SAFE_INTEGER) - (b.link.start ?? Number.MAX_SAFE_INTEGER) || KIND_ORDER2[a.link.kind] - KIND_ORDER2[b.link.kind]
+  ).map(({ link }) => link);
+  const counts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) counts[link.kind]++;
+  const start = Math.min(Math.max(0, offset), links.length);
+  const page = [];
+  let bytes = 0;
+  for (let i = start; i < links.length && page.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(links[i]));
+    if (page.length && bytes + size > maxBytes) break;
+    page.push(links[i]);
+    bytes += size;
+  }
+  const next = start + page.length;
+  return {
+    scope: scope2,
+    inlineIncluded: includeInline,
+    notesInScope: notes.length,
+    notesWithoutBody: includeInline ? notes.length - docs.size : 0,
+    counts,
+    links: page,
+    page: {
+      offset: start,
+      returned: page.length,
+      total: links.length,
+      hasMore: next < links.length,
+      ...next < links.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function describeLinkInventory(result) {
+  const { counts, page } = result;
+  return `Found ${page.total} links in ${result.notesInScope} notes (inline ${counts.inline}${result.inlineIncluded ? "" : " not scanned"}, card ${counts.card}, note ${counts.note}, section ${counts.section}); returned ${page.returned} from offset ${page.offset}` + (page.hasMore ? `; more at offset ${page.nextOffset}` : "") + ".";
+}
+
 // src/utils/linkInsert.ts
 var MAX_LINK_URL_LENGTH = 4096;
 var MAX_LINK_LABEL_LENGTH = 2e3;
@@ -49180,7 +49916,7 @@ function insertLink(request, deps) {
 
 // src/services/notesExport.ts
 import { mkdirSync as mkdirSync5 } from "node:fs";
-import { basename as basename4, dirname as dirname4, extname as extname4, join as join21 } from "node:path";
+import { basename as basename4, dirname as dirname6, extname as extname4, join as join21 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -50503,7 +51239,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync5(dirname4(output), { recursive: true });
+  mkdirSync5(dirname6(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -50528,7 +51264,7 @@ function exportNotesMarkdown(request, deps) {
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = output ? openOutput(output) : void 0;
-  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname4(output) : void 0) : void 0;
+  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
     stats: emptyStats(),
     ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
@@ -50558,7 +51294,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join21(dirname4(output), `${basename4(output, extname4(output))}.assets`);
+  return join21(dirname6(output), `${basename4(output, extname4(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -50579,7 +51315,7 @@ function exportNotesHtml(request, deps) {
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
-  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname4(output)) : new DataUrlWriter();
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname6(output)) : new DataUrlWriter();
   const ctx = {
     stats: emptyStats(),
     writer,
@@ -53752,7 +54488,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname5, resolve as resolve4 } from "node:path";
+import { dirname as dirname7, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -53775,7 +54511,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve4(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve4(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
@@ -53856,7 +54592,7 @@ import { spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync14, readFileSync as readFileSync4 } from "node:fs";
 import { homedir as homedir19 } from "node:os";
-import { dirname as dirname6, join as join24, resolve as resolve5 } from "node:path";
+import { dirname as dirname8, join as join24, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -53881,7 +54617,7 @@ var manifestSchema = external_exports.object({
   osVersion: external_exports.string(),
   compiler: external_exports.string()
 });
-function packageRoot(fromDir = dirname6(fileURLToPath2(import.meta.url))) {
+function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
     const candidate = join24(dir, "package.json");
@@ -53892,7 +54628,7 @@ function packageRoot(fromDir = dirname6(fileURLToPath2(import.meta.url))) {
       } catch {
       }
     }
-    const parent = dirname6(dir);
+    const parent = dirname8(dir);
     if (parent === dir) return resolve5(fromDir, "..");
     dir = parent;
   }
@@ -54101,9 +54837,9 @@ function parseOrThrow(schema, value) {
     );
   return parsed.data;
 }
-var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+var UUID2 = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 function assertNoteIdentifier(identifier) {
-  if (!UUID.test(identifier))
+  if (!UUID2.test(identifier))
     throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID");
 }
 function probePrivateHelper(deps = defaultDeps2()) {
@@ -55513,6 +56249,177 @@ registerTool(
       { id: id2, ...page }
     );
   }, "Error reading note blocks")
+);
+var paragraphNoteSelector = {
+  id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
+  title: external_exports.string().min(1).max(MAX.TITLE).optional().describe("Exact note title; must match one note unless folder narrows it"),
+  folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("With title only: the note's folder name or full path as list-folders shows it")
+};
+registerTool(
+  "list-note-paragraphs",
+  {
+    description: "Use when: you need a note's paragraphs with their style and stored paragraph ID, for example to choose one to link to.\nReturns: one page of non-empty paragraphs in body order, each with blockIndex (as in get-note-blocks), text, style, paragraphId, paragraphIdStatus (unique, shared, missing) and, only when unique, a direct applenotes:// url that opens that paragraph; plus counts per status and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you need inline formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Paragraph IDs repeat often (Notes copies them when a paragraph is split), so shared IDs get no url. Title lookups ignore Recently Deleted. Password-protected notes are refused.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      linkableOnly: external_exports.boolean().optional().describe("Return only paragraphs that have a direct url (default false)"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      paragraphs: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, linkableOnly, offset, limit }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const page = pageParagraphs(note.paragraphs, {
+      offset,
+      limit,
+      linkableOnly,
+      maxBytes: blocksMaxResponseBytes()
+    });
+    const { unique, shared, missing } = note.counts;
+    return successResponse(
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + ".",
+      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+    );
+  }, "Error listing paragraphs")
+);
+registerTool(
+  "get-paragraph-link",
+  {
+    description: "Use when: you need a link that opens Notes at one paragraph (for example a heading) of a note.\nReturns: a direct applenotes://showNote?identifier=<note>&paragraphID=<paragraph> url and the selected paragraph, only when that paragraph's stored ID is present and appears in no other paragraph of the note. Otherwise an error whose structuredContent.reason says why: paragraph-id-shared, paragraph-id-missing, no-match, ambiguous-paragraph (pass occurrence or a longer snippet), occurrence-out-of-range, ambiguous-note, encrypted.\nDo not use when: you want a link to the whole note (get-note-link).\nSafety: read-only; never creates or changes a paragraph ID, so a paragraph without a unique ID cannot be linked. Requires Full Disk Access. A later edit in Notes can replace the ID and break the link.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: external_exports.string().min(1).max(MAX.CONTENT).optional().describe(
+        "Snippet of the paragraph (case, spacing and Unicode width are ignored); give one of contains, match, blockIndex"
+      ),
+      match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text, compared the same way"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+    },
+    outputSchema: {
+      url: external_exports.string().optional(),
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      paragraph: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, contains, match, blockIndex, occurrence }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+    return successResponse(`Paragraph link: ${result.url}`, {
+      url: result.url,
+      id: note.id,
+      identifier: note.identifier,
+      paragraph: { ...result.paragraph }
+    });
+  }, "No paragraph link")
+);
+registerTool(
+  "get-note-structure",
+  {
+    description: "Use when: you want one read-only overview of a note by exact id: decoded text, a block summary, every link with its kind (inline hyperlink, rich link card, native note link, native section link, with target note and paragraph UUIDs when the URL carries them), native tags, attachments with the same kind, body order and preview list-attachments reports (gallery and recording children nested), and metadata: deepLink, isShared, isLocked, isPinned, inRecentlyDeleted, lastViewed, wordCount, charCount, attachmentCount, checklistTotal/checklistDone, hasDrawing, firstImage.\nReturns: the structure object. For a password-protected note, metadata and attachment rows only (bodyDecoded false, body-derived fields null). lastViewed is null with lastViewedStatus never-viewed, not-recorded, malformed or unsupported when Notes holds no real view date.\nDo not use when: you need per-paragraph formatting (get-note-blocks) or the editable HTML body (get-note-content).\nSafety: read-only; reads the NoteStore database and the Notes data folder directly and requires Full Disk Access. Link URLs are returned as stored; check linkSafe before emitting them into HTML.",
+    inputSchema: {
+      id: noteIdInput,
+      includeText: external_exports.boolean().optional().describe(
+        "Include the decoded note text (default true). Text over APPLE_NOTES_MCP_BLOCKS_MAX_BYTES is omitted with textOmitted: true"
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      deepLink: external_exports.string().nullable().optional(),
+      title: external_exports.string().nullable().optional(),
+      folder: external_exports.string().nullable().optional(),
+      account: external_exports.string().nullable().optional(),
+      inRecentlyDeleted: external_exports.boolean().optional(),
+      isShared: external_exports.boolean().nullable().optional(),
+      isLocked: external_exports.boolean().optional(),
+      isPinned: external_exports.boolean().nullable().optional(),
+      lastViewed: external_exports.string().nullable().optional(),
+      lastViewedStatus: external_exports.string().optional(),
+      bodyDecoded: external_exports.boolean().optional(),
+      bodyError: external_exports.string().optional(),
+      text: external_exports.string().optional(),
+      textOmitted: external_exports.boolean().optional(),
+      textLength: external_exports.number().nullable().optional(),
+      wordCount: external_exports.number().nullable().optional(),
+      charCount: external_exports.number().nullable().optional(),
+      blockSummary: external_exports.record(external_exports.unknown()).nullable().optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      linkCounts: external_exports.record(external_exports.unknown()).optional(),
+      linksComplete: external_exports.boolean().optional(),
+      tags: external_exports.array(external_exports.string()).optional(),
+      attachments: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      attachmentCount: external_exports.number().optional(),
+      checklistTotal: external_exports.number().nullable().optional(),
+      checklistDone: external_exports.number().nullable().optional(),
+      hasDrawing: external_exports.boolean().optional(),
+      firstImage: external_exports.record(external_exports.unknown()).nullable().optional(),
+      undecodedFields: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, includeText }) => {
+    const structure = readNoteStructure(id2, {
+      includeText: includeText ?? true,
+      maxTextBytes: blocksMaxResponseBytes()
+    });
+    return successResponse(describeNoteStructure(structure), { ...structure });
+  }, "Error reading note structure")
+);
+registerTool(
+  "list-note-links",
+  {
+    description: "Use when: you need the links in one note (by exact id) or across a folder (with its subfolders by default), an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path (as list-folders prints it) and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Account name (exact or unique-prefix match)"),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe(
+        "Folder name or path as list-folders prints it, such as Work/Clients (escape a literal slash as \\/)"
+      ),
+      includeSubfolders: external_exports.boolean().optional().describe("With folder, also list notes in its subfolders (default true)"),
+      includeInline: external_exports.boolean().optional().describe(
+        "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+      ),
+      kinds: external_exports.array(external_exports.enum(["inline", "card", "note", "section"])).max(4).optional().describe("Only these link kinds"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(2e3).optional().describe("Maximum links to return (default 200, max 2000)")
+    },
+    outputSchema: {
+      scope: external_exports.record(external_exports.unknown()).optional(),
+      inlineIncluded: external_exports.boolean().optional(),
+      notesInScope: external_exports.number().optional(),
+      notesWithoutBody: external_exports.number().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(
+    ({ id: id2, account, folder, includeSubfolders, includeInline, kinds, offset, limit }) => {
+      const result = listNoteLinks({
+        id: id2,
+        account,
+        folder,
+        includeSubfolders,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes()
+      });
+      return successResponse(describeLinkInventory(result), { ...result });
+    },
+    "Error listing note links"
+  )
 );
 registerTool(
   "list-native-tags",
