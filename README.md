@@ -200,6 +200,35 @@ for the investigation and verification behind each:
 
 This section documents all available tools. AI agents should use these tool names and parameters exactly as specified.
 
+### Error results
+
+A failed call returns `isError: true` with the same human-readable text as
+before, plus `structuredContent` carrying a stable machine-readable `code`.
+Branch on `code`, not on the prose, which may be reworded.
+
+| `code` | Meaning |
+|--------|---------|
+| `not_found` | The note, folder, account, attachment, or checklist does not exist |
+| `ambiguous` | More than one item matched; use an exact id |
+| `permission_denied` | macOS refused Automation access to Notes.app |
+| `full_disk_access_missing` | The Notes database is not readable; grant Full Disk Access |
+| `shortcut_not_installed` | A native-write bridge Shortcut is not installed exactly once |
+| `timeout_indeterminate` | The operation timed out; for a write, the outcome is unknown |
+| `verification_failed` | The write ran, but exact-ID readback did not confirm it |
+| `revision_conflict` | The note changed since it was read |
+| `validation_error` | The request was rejected before anything ran |
+| `unsupported` | Not supported for this note or in this mode, such as a locked note |
+| `notes_unavailable` | Notes.app is not running, busy, or not responding |
+| `operation_failed` | The server could not classify the failure; read the text |
+
+Two optional booleans describe a write's outcome when it is known.
+`indeterminate: true` means the outcome is uncertain: read the target by exact
+id before any retry, and never retry blindly. `committed: true` means the write
+took effect even though its verification failed; `committed: false` means
+nothing was written (for example a `revision_conflict`). An absent flag means
+unknown. Errors the MCP SDK raises itself before a tool runs, such as an
+argument that fails the input schema, carry no `structuredContent`.
+
 ### Note Operations
 
 #### `create-note`

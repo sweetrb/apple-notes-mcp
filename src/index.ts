@@ -48,6 +48,7 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
+import { errorResult } from "@/utils/errorCodes.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import {
   enrichNoteRead,
@@ -131,13 +132,14 @@ function successResponse(message: string, structured?: Record<string, unknown>):
 }
 
 /**
- * Creates an error MCP tool response.
+ * Creates an error MCP tool response. The text is `message`, unchanged;
+ * `structuredContent` carries a stable machine-readable `code` (plus
+ * `committed`/`indeterminate` when a write's outcome is known or uncertain),
+ * classified centrally in utils/errorCodes. Pass the thrown `cause` when there
+ * is one so its own code (e.g. ETIMEDOUT) is honored.
  */
-function errorResponse(message: string): ToolResponse {
-  return {
-    content: [{ type: "text" as const, text: message }],
-    isError: true,
-  };
+function errorResponse(message: string, cause?: unknown): ToolResponse {
+  return errorResult(message, cause);
 }
 
 /**
@@ -152,7 +154,7 @@ function withErrorHandling<T extends Record<string, unknown>>(
       return handler(params);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      return errorResponse(`${errorPrefix}: ${message}`);
+      return errorResponse(`${errorPrefix}: ${message}`, error);
     }
   };
 }

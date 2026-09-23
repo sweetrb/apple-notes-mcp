@@ -1105,11 +1105,11 @@ var require_util = __commonJS({
       return false;
     }
     exports.schemaHasRules = schemaHasRules;
-    function schemaHasRulesButRef(schema, RULES) {
+    function schemaHasRulesButRef(schema, RULES2) {
       if (typeof schema == "boolean")
         return !schema;
       for (const key in schema)
-        if (key !== "$ref" && RULES.all[key])
+        if (key !== "$ref" && RULES2.all[key])
           return true;
       return false;
     }
@@ -2503,17 +2503,17 @@ var require_validate = __commonJS({
     }
     function schemaKeywords(it, types, typeErrors, errsCount) {
       const { gen, schema, data, allErrors, opts, self } = it;
-      const { RULES } = self;
-      if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES))) {
-        gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition));
+      const { RULES: RULES2 } = self;
+      if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES2))) {
+        gen.block(() => keywordCode(it, "$ref", RULES2.all.$ref.definition));
         return;
       }
       if (!opts.jtd)
         checkStrictTypes(it, types);
       gen.block(() => {
-        for (const group of RULES.rules)
+        for (const group of RULES2.rules)
           groupKeywords(group);
-        groupKeywords(RULES.post);
+        groupKeywords(RULES2.post);
       });
       function groupKeywords(group) {
         if (!(0, applicability_1.shouldUseGroup)(schema, group))
@@ -4600,10 +4600,10 @@ var require_core = __commonJS({
       }
       // Remove keyword
       removeKeyword(keyword) {
-        const { RULES } = this;
-        delete RULES.keywords[keyword];
-        delete RULES.all[keyword];
-        for (const group of RULES.rules) {
+        const { RULES: RULES2 } = this;
+        delete RULES2.keywords[keyword];
+        delete RULES2.all[keyword];
+        for (const group of RULES2.rules) {
           const i = group.rules.findIndex((rule) => rule.keyword === keyword);
           if (i >= 0)
             group.rules.splice(i, 1);
@@ -4771,9 +4771,9 @@ var require_core = __commonJS({
     }
     var KEYWORD_NAME = /^[a-z_$][a-z0-9_$:-]*$/i;
     function checkKeyword(keyword, def) {
-      const { RULES } = this;
+      const { RULES: RULES2 } = this;
       (0, util_1.eachItem)(keyword, (kwd) => {
-        if (RULES.keywords[kwd])
+        if (RULES2.keywords[kwd])
           throw new Error(`Keyword ${kwd} is already defined`);
         if (!KEYWORD_NAME.test(kwd))
           throw new Error(`Keyword ${kwd} has invalid name`);
@@ -4789,13 +4789,13 @@ var require_core = __commonJS({
       const post = definition === null || definition === void 0 ? void 0 : definition.post;
       if (dataType && post)
         throw new Error('keyword with "post" flag cannot have "type"');
-      const { RULES } = this;
-      let ruleGroup = post ? RULES.post : RULES.rules.find(({ type: t }) => t === dataType);
+      const { RULES: RULES2 } = this;
+      let ruleGroup = post ? RULES2.post : RULES2.rules.find(({ type: t }) => t === dataType);
       if (!ruleGroup) {
         ruleGroup = { type: dataType, rules: [] };
-        RULES.rules.push(ruleGroup);
+        RULES2.rules.push(ruleGroup);
       }
-      RULES.keywords[keyword] = true;
+      RULES2.keywords[keyword] = true;
       if (!definition)
         return;
       const rule = {
@@ -4810,7 +4810,7 @@ var require_core = __commonJS({
         addBeforeRule.call(this, ruleGroup, rule, definition.before);
       else
         ruleGroup.rules.push(rule);
-      RULES.all[keyword] = rule;
+      RULES2.all[keyword] = rule;
       (_a = definition.implements) === null || _a === void 0 ? void 0 : _a.forEach((kwd) => this.addKeyword(kwd));
     }
     function addBeforeRule(ruleGroup, rule, before) {
@@ -43656,6 +43656,77 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
+// src/utils/errorCodes.ts
+var CodedError = class extends Error {
+  envelope;
+  constructor(message, envelope) {
+    super(message);
+    this.name = "CodedError";
+    this.envelope = envelope;
+  }
+};
+var RULES = [
+  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  {
+    code: "verification_failed",
+    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
+  },
+  {
+    code: "revision_conflict",
+    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
+  },
+  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
+  {
+    code: "shortcut_not_installed",
+    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
+  },
+  {
+    code: "not_found",
+    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
+  },
+  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
+  {
+    code: "notes_unavailable",
+    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
+  },
+  {
+    code: "unsupported",
+    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
+  },
+  {
+    code: "validation_error",
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+  }
+];
+var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
+var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
+function classifyError(message, cause) {
+  if (cause instanceof CodedError) return { ...cause.envelope };
+  const text = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message;
+  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
+  let code = "operation_failed";
+  if (timeoutCause) code = "timeout_indeterminate";
+  else if (isPermissionDenied(text)) code = "permission_denied";
+  else code = RULES.find((rule) => rule.pattern.test(text))?.code ?? "operation_failed";
+  const envelope = { code };
+  if (code === "timeout_indeterminate" || code === "verification_failed") {
+    envelope.indeterminate = true;
+    if (WRITE_ACCEPTED.test(text)) envelope.committed = true;
+  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text)) {
+    envelope.committed = false;
+    envelope.indeterminate = false;
+  }
+  return envelope;
+}
+function errorResult(message, cause) {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: classifyError(message, cause),
+    isError: true
+  };
+}
+
 // src/utils/noteTables.ts
 import { gunzipSync as gunzipSync3 } from "node:zlib";
 var sub = (f, n) => {
@@ -43837,15 +43908,7 @@ function registerDirectOperations(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : String(error2)
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : String(error2), error2);
         }
       })
     );
@@ -43952,15 +44015,7 @@ function registerNativeTagsBridge(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : String(error2)
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : String(error2), error2);
         }
       })
     );
@@ -44081,15 +44136,7 @@ function registerNativeOperations(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : "Operation failed"
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : "Operation failed", error2);
         }
       })
     );
@@ -44468,11 +44515,8 @@ function successResponse(message, structured) {
   if (structured) res.structuredContent = structured;
   return res;
 }
-function errorResponse(message) {
-  return {
-    content: [{ type: "text", text: message }],
-    isError: true
-  };
+function errorResponse(message, cause) {
+  return errorResult(message, cause);
 }
 function withErrorHandling(handler, errorPrefix) {
   return async (params) => {
@@ -44480,7 +44524,7 @@ function withErrorHandling(handler, errorPrefix) {
       return handler(params);
     } catch (error2) {
       const message = error2 instanceof Error ? error2.message : "Unknown error";
-      return errorResponse(`${errorPrefix}: ${message}`);
+      return errorResponse(`${errorPrefix}: ${message}`, error2);
     }
   };
 }

@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- Every tool error result (`isError: true`) now carries a stable
+  machine-readable `code` in `structuredContent`, with its text unchanged:
+  `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`,
+  `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`,
+  `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`,
+  or `operation_failed`. Uncertain write outcomes also report
+  `indeterminate: true` (read by exact id before any retry), plus
+  `committed: true` when Notes accepted the write but readback did not confirm
+  it; definite refusals such as a revision conflict report `committed: false`.
+  Classification lives in one place, `src/utils/errorCodes.ts`, and every tool
+  wrapper uses it. The envelope validates against every advertised
+  outputSchema, which a test checks against the built server, so MCP clients
+  that validate `structuredContent` on error results accept it. Errors the MCP
+  SDK raises before a tool runs, such as input-schema failures, are unchanged.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

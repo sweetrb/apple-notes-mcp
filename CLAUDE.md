@@ -223,6 +223,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
 | "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
 
+Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections raised by the MCP SDK itself carry no code.
+
 ## Recurring macOS permission prompts → offer the official-Node fix
 
 If a user reports being **repeatedly** prompted for Full Disk Access or

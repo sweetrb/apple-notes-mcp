@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { errorResult } from "../utils/errorCodes.js";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import {
@@ -99,15 +100,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
             structuredContent: result,
           };
         } catch (error) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: error instanceof Error ? error.message : "Operation failed",
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(error instanceof Error ? error.message : "Operation failed", error);
         }
       }) as unknown as ToolCallback<S>
     );
