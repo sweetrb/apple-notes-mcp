@@ -788,3 +788,122 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+// =============================================================================
+// Query Language Types
+// =============================================================================
+
+/**
+ * One note matched by the query-notes tool.
+ */
+export interface QueryNotesHit {
+  /** CoreData note ID, accepted by get-note-content and every other id tool */
+  id: string;
+  /** Note title as stored in the database */
+  title: string;
+  /** Folder path in list-folders syntax; absent for folderless notes */
+  folder?: string;
+  /** Account name; absent when the folder's account cannot be resolved */
+  account?: string;
+  /** Last modification time, ISO 8601 (UTC) */
+  modified?: string;
+  /** Creation time, ISO 8601 (UTC) */
+  created?: string;
+  /** Short plain-text excerpt, centred on the first matched phrase when possible; empty for locked notes */
+  snippet: string;
+  /** Present and true when the note is password-protected */
+  locked?: boolean;
+}
+
+/**
+ * Result of the query-notes tool.
+ */
+export interface QueryNotesResult {
+  /** Matching notes, most recently modified first, at most `limit` */
+  notes: QueryNotesHit[];
+  /** Number of notes returned */
+  count: number;
+  /** Number of scanned notes that matched (may exceed `count`) */
+  matched: number;
+  /** Number of notes examined */
+  scanned: number;
+  /** Notes eligible for scanning (after deleted/folderless exclusion) */
+  eligible: number;
+  /** Scan window applied: the most recently modified N notes */
+  scanLimit: number;
+  /** True when older eligible notes were outside the scan window */
+  scanTruncated: boolean;
+  /** Result cap applied */
+  limit: number;
+  /** True when more notes matched than were returned */
+  truncated: boolean;
+  /** Notes whose body was needed but could not be decoded (locked notes excluded) */
+  unreadable: number;
+}
+
+// =============================================================================
+// Link Insertion Types
+// =============================================================================
+
+/**
+ * How insert-link writes a URL: `raw` shows the URL itself, `hyperlink`
+ * shows a label that links to the URL.
+ */
+export type LinkInsertMode = "raw" | "hyperlink";
+
+/** Where insert-link places the link paragraph. */
+export type LinkInsertPosition = "end" | "after-title";
+
+/**
+ * Parameters for inserting one web or Notes link into an existing note.
+ */
+export interface InsertLinkParams {
+  /** Exact CoreData note id */
+  id: string;
+  /** Revision token from get-note-content */
+  expectedContentHash: string;
+  /** Link destination (http, https, mailto, notes, applenotes) */
+  url: string;
+  /** raw (default) or hyperlink */
+  mode: LinkInsertMode;
+  /** Visible text for hyperlink mode */
+  label?: string;
+  /** Raw mode only: false writes the URL as plain text with no stored link */
+  linked?: boolean;
+  /** end (default) or after-title */
+  position: LinkInsertPosition;
+  /** Leave a blank line between existing text and the link paragraph (default true) */
+  blankLine: boolean;
+  /** Unique existing phrase, required when the note holds native objects */
+  scopeText?: string;
+}
+
+/**
+ * What the guarded append step reports back to insert-link.
+ */
+export interface LinkAppendOutcome {
+  /** "applescript" for ordinary notes, "native" for notes with native objects */
+  route: "applescript" | "native";
+  /** Revision token after the write */
+  contentHash: string;
+}
+
+/**
+ * Result of a verified link insertion.
+ */
+export interface InsertLinkResult {
+  ok: true;
+  id: string;
+  mode: LinkInsertMode;
+  url: string;
+  /** Visible text written (the URL in raw mode, the label in hyperlink mode) */
+  text: string;
+  position: LinkInsertPosition;
+  route: "applescript" | "native";
+  /** Whether the note stores a link attribute on the inserted text */
+  linkStored: boolean;
+  /** Destination read back from the note's stored links */
+  storedUrl?: string;
+  previousContentHash: string;
+  contentHash: string;
+}

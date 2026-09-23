@@ -1,6 +1,7 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
+import { errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { addNativeTags, nativeTagsStatus, runNativeTagsShortcut } from "../services/nativeTags.js";
 import { enrichNoteRead, readRichNote, richContentHash } from "../utils/noteRichText.js";
@@ -37,15 +38,7 @@ export function registerNativeTagsBridge(server: McpServer, manager: AppleNotesM
             structuredContent: result,
           };
         } catch (error) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: error instanceof Error ? error.message : String(error),
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(error instanceof Error ? error.message : String(error), error);
         }
       }) as unknown as ToolCallback<S>
     );
