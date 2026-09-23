@@ -42910,10 +42910,22 @@ function appendMarkdownHtml(markdown) {
 
 // src/utils/noteRevision.ts
 var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+var LEGACY_ENTITIES = {
+  nbsp: " ",
+  quot: '"',
+  lt: "<",
+  gt: ">",
+  amp: "&"
+};
 function comparableVisibleText(html) {
-  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint))).replace(
-    /&#x([0-9a-f]+);/gi,
-    (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
+  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(
+    /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
+    (_match, legacy, dec, hex2) => {
+      if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
+      if (dec) return String.fromCodePoint(Number(dec));
+      if (hex2) return String.fromCodePoint(Number.parseInt(hex2, 16));
+      return "'";
+    }
   ).replace(/\s+/g, " ").trim();
 }
 
