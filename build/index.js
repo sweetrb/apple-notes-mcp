@@ -3268,8 +3268,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path5) {
+          if (!path5) return path5;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path5.length > 0) {
+            if (path5 === "." || path5 === "..") {
+              path5 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path5.substring(0, 2);
+            var threechars = path5.substring(0, 3);
+            var fourchars = path5.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path5 = path5.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path5 = path5.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path5 = "/" + path5.substring(3);
+            } else if (twochars === "/." && path5.length === 2) {
+              path5 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path5.length === 3) {
+              path5 = "/" + path5.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path5.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path5 = path5.substring(segment.length);
             }
           }
           return output;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -39855,8 +39855,8 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path4) {
-  return realpathSync.native(path4);
+function canonicalize(path5) {
+  return realpathSync.native(path5);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -39878,9 +39878,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path4) {
+function entryExists(path5) {
   try {
-    lstatSync(path4);
+    lstatSync(path5);
     return true;
   } catch (e) {
     const code = e.code;
@@ -40195,6 +40195,35 @@ function buildAppLevelScript(command) {
       ${command}
     end tell
   `;
+}
+var FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i;
+function folderDeleteFactsScript(id2) {
+  if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
+  return `
+      set f to folder id "${id2}"
+      set folderName to name of f
+      set parentRef to container of f
+      set parentId to ""
+      if class of parentRef is folder then set parentId to id of parentRef
+      set sharedAny to (shared of f)
+      set acct to parentRef
+      repeat while class of acct is folder
+        if shared of acct then set sharedAny to true
+        set acct to container of acct
+      end repeat
+      set acctId to id of acct
+      set defaultId to ""
+      try
+        set defaultId to id of default folder of acct
+      end try
+      -- "folders of f" keeps listing a child deleted earlier in this Notes
+      -- session, while "exists folder id" reports it gone, so count only
+      -- children that still exist.
+      set childCount to 0
+      repeat with childRef in folders of f
+        if exists folder id (id of childRef) then set childCount to childCount + 1
+      end repeat
+      set noteCount to count of notes of f`;
 }
 function getNoteLinkFromDB(coreDataId) {
   const match = coreDataId.match(/\/p(\d+)$/);
@@ -41049,18 +41078,134 @@ var AppleNotesManager = class {
       );
     return { id: id2, name: newName, parentId: expectedParentId };
   }
-  /** Read the exact name and parent identity used by guarded folder rename. */
+  /** Read the exact name, parent, and account identity used by guarded folder writes. */
   getFolderById(id2) {
     if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id2))
       throw new Error("An exact folder ID is required");
     const result = executeAppleScript(`tell application "Notes"
       set f to folder id "${id2}"
-      return (name of f) & ${AS_FIELD_SEP} & (id of container of f)
+      set acct to container of f
+      repeat while class of acct is folder
+        set acct to container of acct
+      end repeat
+      return (name of f) & ${AS_FIELD_SEP} & (id of container of f) & ${AS_FIELD_SEP} & (id of acct)
     end tell`);
     if (!result.success) throw new Error(result.error || "Folder not found");
-    const [name, parentId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    const [name, parentId, accountId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
     if (!name || !parentId) throw new Error("Incomplete folder metadata");
-    return { id: id2, name, parentId };
+    return accountId ? { id: id2, name, parentId, accountId, isRoot: parentId === accountId } : { id: id2, name, parentId };
+  }
+  /**
+   * Reads, in one AppleScript, everything Notes.app itself knows about a folder
+   * that guarded deletion checks: name, parent (empty at an account root),
+   * account, the account's default folder, shared state of the folder or any
+   * ancestor, and the counts of direct child folders and notes.
+   */
+  readFolderForDelete(id2) {
+    if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(
+      buildAppLevelScript(`${folderDeleteFactsScript(id2)}
+      return folderName & ${AS_FIELD_SEP} & parentId & ${AS_FIELD_SEP} & acctId & ${AS_FIELD_SEP} & defaultId & ${AS_FIELD_SEP} & (sharedAny as text) & ${AS_FIELD_SEP} & (childCount as text) & ${AS_FIELD_SEP} & (noteCount as text)`)
+    );
+    if (!result.success) throw new Error(result.error || "Folder not found");
+    const parts = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    if (parts.length !== 7 || !parts[0] || !parts[2]) throw new Error("Incomplete folder metadata");
+    const count = (value) => {
+      const parsed = Number(value.trim());
+      if (!Number.isInteger(parsed) || parsed < 0) throw new Error("Incomplete folder metadata");
+      return parsed;
+    };
+    return {
+      id: id2,
+      name: parts[0],
+      parentId: parts[1] || null,
+      accountId: parts[2],
+      defaultFolderId: parts[3] || null,
+      shared: parts[4].trim() === "true",
+      childFolderCount: count(parts[5]),
+      noteCount: count(parts[6])
+    };
+  }
+  /**
+   * Deletes one empty folder by exact id, repeating every Notes.app-visible
+   * guard inside the same AppleScript as the `delete` command: exact name
+   * (case-sensitive), parent or account root, account, not the default folder,
+   * not shared (itself or an ancestor), no child folders, no notes.
+   *
+   * Store-only facts (folder type, stable identifier) are checked by the caller
+   * before this runs, so the whole guard is a pre-check followed by an
+   * AppleScript delete, not one atomic transaction.
+   */
+  deleteEmptyFolderIfUnchanged(id2, expected) {
+    if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
+    const literal2 = (value) => `"${escapePlainStringForAppleScript(value)}"`;
+    const script = buildAppLevelScript(`${folderDeleteFactsScript(id2)}
+      considering case
+        if folderName is not ${literal2(expected.name)} then return "SAFETY_CONFLICT:name"
+      end considering
+      if parentId is not ${literal2(expected.parentId ?? "")} then return "SAFETY_CONFLICT:parent"
+      if acctId is not ${literal2(expected.accountId)} then return "SAFETY_CONFLICT:account"
+      if defaultId is ${literal2(id2)} then return "SAFETY_REFUSED:default folder"
+      if sharedAny then return "SAFETY_REFUSED:shared folder"
+      if childCount is not 0 then return "SAFETY_REFUSED:folder has child folders"
+      if noteCount is not 0 then return "SAFETY_REFUSED:folder has notes"
+      delete f
+      return "SAFETY_DELETED"`);
+    const result = executeMutationAppleScript(script);
+    if (!result.success) {
+      console.error(`Failed guarded folder delete for "${id2}":`, result.error);
+      return { status: "failed", reason: result.error || "AppleScript failed" };
+    }
+    const output = result.output.trim();
+    const colon = output.indexOf(":");
+    const status = colon === -1 ? output : output.slice(0, colon);
+    const reason = colon === -1 ? "" : output.slice(colon + 1);
+    if (status === "SAFETY_DELETED") return { status: "deleted" };
+    if (status === "SAFETY_CONFLICT") return { status: "conflict", reason };
+    if (status === "SAFETY_REFUSED") return { status: "refused", reason };
+    return { status: "failed", reason: "Unexpected AppleScript result" };
+  }
+  /**
+   * Counts how many of the given notes Notes.app currently places outside the
+   * folder: in another folder, or in Recently Deleted (a note trashed this
+   * session reports a non-folder container). A note Notes.app cannot resolve
+   * is not counted, so the caller keeps treating it as present.
+   *
+   * The local store can keep a just-trashed note in its old folder for
+   * minutes; this lets guarded folder deletion discount such notes using
+   * Notes.app's live view instead of refusing until the store catches up.
+   */
+  countNotesOutsideFolder(folderId, noteIds) {
+    if (!FOLDER_ID_PATTERN.test(folderId)) throw new Error("An exact folder ID is required");
+    if (noteIds.length === 0) return 0;
+    const ids = noteIds.map((noteId3) => `"${sanitizeNoteId(noteId3)}"`).join(", ");
+    const result = executeAppleScript(
+      buildAppLevelScript(`
+      set movedCount to 0
+      repeat with noteIdRef in {${ids}}
+        try
+          set c to container of note id (contents of noteIdRef)
+          if class of c is not folder then
+            set movedCount to movedCount + 1
+          else if (id of c) is not "${folderId}" then
+            set movedCount to movedCount + 1
+          end if
+        end try
+      end repeat
+      return movedCount as text`)
+    );
+    if (!result.success) return 0;
+    const moved = Number(result.output.trim());
+    return Number.isInteger(moved) && moved >= 0 && moved <= noteIds.length ? moved : 0;
+  }
+  /** Whether Notes.app still resolves an exact folder id. */
+  folderExistsById(id2) {
+    if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(
+      buildAppLevelScript(`return (exists folder id "${id2}") as text`)
+    );
+    if (!result.success) throw new Error(result.error || "Could not check folder existence");
+    return result.output.trim() === "true";
   }
   /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
   addAttachmentById(id2, expectedBody, filePath) {
@@ -42831,9 +42976,9 @@ function runNativeTagsShortcut(input) {
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
   const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
-    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    const path5 = join7(directory, "request.json");
+    writeFileSync(path5, JSON.stringify(input), { mode: 384 });
+    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path5], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -43255,7 +43400,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+  const segments = (path5) => JSON.stringify(splitFolderPath(path5).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -43451,11 +43596,11 @@ function fileConfigPath(env = process.env) {
   if (override && override.trim()) return override.trim();
   return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path5 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync6(path4)) return applied;
-    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (!existsSync6(path5)) return applied;
+    const parsed = JSON.parse(readFileSync2(path5, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -43465,7 +43610,7 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path4}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path5}: ${String(e)}`);
   }
   return applied;
 }
@@ -43804,9 +43949,9 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path4) {
-  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+function localAttachment(path5) {
+  if (!isAbsolute2(path5)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync(path5, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
@@ -43875,13 +44020,13 @@ function registerDirectOperations(server2, manager) {
     "add-attachment",
     "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
     { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
+    ({ id: id2, expectedContentHash, path: path5 }) => {
       const before = readSnapshot(manager, id2);
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
+      const bytes = localAttachment(path5);
       const beforeAttachments = manager.listAttachmentsById(id2);
       const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const temporaryFile = join10(directory, basename(path5));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -43929,6 +44074,320 @@ function registerDirectOperations(server2, manager) {
         rmSync4(directory, { recursive: true, force: true });
       }
     }
+  );
+}
+
+// src/tools/folderDelete.ts
+import { createHash as createHash3 } from "node:crypto";
+
+// src/utils/folderStore.ts
+import { execFileSync as execFileSync8 } from "child_process";
+import * as os4 from "os";
+import * as path4 from "path";
+var NOTE_STORE_PATH = path4.join(
+  os4.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var NOTE_KEY_LIMIT = 50;
+var FolderStoreError = class extends Error {
+  constructor(message, reason) {
+    super(message);
+    this.reason = reason;
+    this.name = "FolderStoreError";
+  }
+  reason;
+};
+var REQUIRED_FOLDER_COLUMNS = [
+  "ZFOLDERTYPE",
+  "ZIDENTIFIER",
+  "ZMARKEDFORDELETION",
+  "ZPARENT",
+  "ZOWNER",
+  "ZFOLDER",
+  "ZSERVERSHAREDATA"
+];
+function buildFolderFactsSql(hasSmartQueryColumn) {
+  const smart = hasSmartQueryColumn ? "coalesce(f.ZSMARTFOLDERQUERYJSON, '') <> ''" : "0";
+  return `WITH RECURSIVE anc(pk, depth) AS (
+  SELECT ZPARENT, 1 FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk
+  UNION ALL
+  SELECT o.ZPARENT, anc.depth + 1 FROM ZICCLOUDSYNCINGOBJECT o JOIN anc ON o.Z_PK = anc.pk
+  WHERE anc.pk IS NOT NULL AND anc.depth < 64
+)
+SELECT json_object(
+  'pk', f.Z_PK,
+  'entity', e.Z_NAME,
+  'identifier', f.ZIDENTIFIER,
+  'folderType', f.ZFOLDERTYPE,
+  'markedForDeletion', coalesce(f.ZMARKEDFORDELETION, 0),
+  'parentPk', f.ZPARENT,
+  'accountPk', f.ZOWNER,
+  'hasSmartQuery', ${smart},
+  'sharedRecord', f.ZSERVERSHAREDATA IS NOT NULL,
+  'sharedAncestor', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT a JOIN anc ON a.Z_PK = anc.pk
+                     WHERE a.ZSERVERSHAREDATA IS NOT NULL) > 0,
+  'childFolderCount', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT c
+                       WHERE c.Z_ENT = f.Z_ENT AND c.ZPARENT = f.Z_PK
+                         AND coalesce(c.ZMARKEDFORDELETION, 0) = 0),
+  'noteCount', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n
+                WHERE n.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')
+                  AND n.ZFOLDER = f.Z_PK AND coalesce(n.ZMARKEDFORDELETION, 0) = 0),
+  'noteKeys', json((SELECT json_group_array(k.Z_PK) FROM (
+                SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n
+                WHERE n.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')
+                  AND n.ZFOLDER = f.Z_PK AND coalesce(n.ZMARKEDFORDELETION, 0) = 0
+                ORDER BY n.Z_PK LIMIT ${NOTE_KEY_LIMIT}) k))
+)
+FROM ZICCLOUDSYNCINGOBJECT f JOIN Z_PRIMARYKEY e ON e.Z_ENT = f.Z_ENT
+WHERE f.Z_PK = @pk;`;
+}
+function runSqlite2(dbPath2, sql, pk) {
+  const args = ["-readonly"];
+  if (pk !== void 0) args.push("-cmd", `.parameter set @pk ${pk}`);
+  args.push(dbPath2, sql);
+  return execFileSync8("sqlite3", args, {
+    encoding: "utf8",
+    timeout: 5e3,
+    stdio: ["pipe", "pipe", "pipe"]
+  }).trim();
+}
+function classify(error2) {
+  const message = error2 instanceof Error ? error2.message : String(error2);
+  if (/authorization denied|unable to open database|not authorized/i.test(message)) {
+    return new FolderStoreError(
+      "Full Disk Access is required to verify folder type and contents before deleting. Grant it to the app that launches this server, then relaunch it.",
+      "no_fda"
+    );
+  }
+  return new FolderStoreError(`Failed to read folder facts: ${message}`, "query_error");
+}
+function numberOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function readFolderStoreFacts(pk, dbPath2 = NOTE_STORE_PATH) {
+  if (!Number.isSafeInteger(pk) || pk <= 0) {
+    throw new FolderStoreError("Folder key must be a positive integer", "query_error");
+  }
+  let columns;
+  let row;
+  try {
+    columns = new Set(
+      runSqlite2(dbPath2, "PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);").split("\n").map((line) => line.split("|")[1]).filter(Boolean)
+    );
+    const missing = REQUIRED_FOLDER_COLUMNS.filter((column) => !columns.has(column));
+    if (missing.length > 0) {
+      throw new FolderStoreError(
+        `This macOS Notes schema lacks ${missing.join(", ")}; folder safety cannot be verified`,
+        "schema"
+      );
+    }
+    row = runSqlite2(dbPath2, buildFolderFactsSql(columns.has("ZSMARTFOLDERQUERYJSON")), pk);
+  } catch (error2) {
+    if (error2 instanceof FolderStoreError) throw error2;
+    throw classify(error2);
+  }
+  if (!row) return null;
+  const raw = JSON.parse(row);
+  if (raw.entity !== "ICFolder") {
+    throw new FolderStoreError("That identifier does not name a folder", "not_folder");
+  }
+  return {
+    pk,
+    identifier: typeof raw.identifier === "string" ? raw.identifier : null,
+    folderType: numberOrNull(raw.folderType),
+    markedForDeletion: raw.markedForDeletion === 1,
+    parentPk: numberOrNull(raw.parentPk),
+    accountPk: numberOrNull(raw.accountPk),
+    hasSmartQuery: raw.hasSmartQuery === 1,
+    sharedRecord: raw.sharedRecord === 1,
+    sharedAncestor: raw.sharedAncestor === 1,
+    childFolderCount: numberOrNull(raw.childFolderCount) ?? 0,
+    noteCount: numberOrNull(raw.noteCount) ?? 0,
+    noteKeys: Array.isArray(raw.noteKeys) ? raw.noteKeys.filter((key) => typeof key === "number") : []
+  };
+}
+
+// src/tools/folderDelete.ts
+var folderIdSchema = external_exports.string().max(2e3).regex(/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i, "An exact folder ID is required");
+var accountIdSchema = external_exports.string().max(2e3).regex(/^x-coredata:\/\/[0-9a-f-]+\/ICAccount\/p\d+$/i, "An exact account ID is required");
+var revisionSchema = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
+var defaultDeps = {
+  readStore: (pk) => readFolderStoreFacts(pk),
+  sleep: (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+};
+function coreDataPk(id2) {
+  const match = /\/p(\d+)$/.exec(id2);
+  if (!match) throw new Error(`Not an x-coredata id: ${id2}`);
+  return Number(match[1]);
+}
+function folderDeleteRefusal(app, store) {
+  if (store.folderType === 1 || store.identifier?.startsWith("TrashFolder-"))
+    return "Refusing to delete the Recently Deleted folder";
+  if (store.folderType === 2 || store.hasSmartQuery) return "Refusing to delete a smart folder";
+  if (store.folderType !== 0)
+    return `Refusing to delete a folder with unsupported folder type ${String(store.folderType)}`;
+  if (!store.identifier)
+    return "Refusing to delete a folder without a stable identifier (it cannot be verified)";
+  if (store.identifier.startsWith("DefaultFolder-") || app.defaultFolderId === app.id)
+    return "Refusing to delete a system or default folder";
+  if (app.shared || store.sharedRecord || store.sharedAncestor)
+    return "Refusing to delete a shared or collaborated folder";
+  return null;
+}
+function folderDeleteRevision(app, store) {
+  const state = [
+    app.id,
+    store.identifier,
+    app.name,
+    app.accountId,
+    app.parentId,
+    app.defaultFolderId === app.id,
+    app.shared,
+    app.childFolderCount,
+    app.noteCount,
+    store.folderType,
+    store.markedForDeletion,
+    store.hasSmartQuery,
+    store.sharedRecord,
+    store.sharedAncestor,
+    store.childFolderCount,
+    store.noteCount
+  ];
+  return `sha256:${createHash3("sha256").update(JSON.stringify(state)).digest("hex")}`;
+}
+function checkFolder(manager, args, deps) {
+  const app = manager.readFolderForDelete(args.id);
+  const store = deps.readStore(coreDataPk(args.id));
+  if (!store)
+    throw new Error(
+      "Conflict: the folder is not in the local Notes store yet; wait for Notes to save it and plan again"
+    );
+  if (store.markedForDeletion) throw new Error("Conflict: the folder is already deleted");
+  const expectedParentPk = app.parentId ? coreDataPk(app.parentId) : null;
+  if (store.accountPk !== coreDataPk(app.accountId) || store.parentPk !== expectedParentPk)
+    throw new Error(
+      "Conflict: Notes.app and the local store disagree about this folder's location; wait a moment and plan again"
+    );
+  if (app.name !== args.expectedName) throw new Error("Conflict: the folder name changed");
+  if (app.accountId !== args.expectedAccountId)
+    throw new Error("Conflict: the folder is in a different account");
+  if (args.expectedRoot ? app.parentId !== null : app.parentId !== args.expectedParentId)
+    throw new Error("Conflict: the folder's parent changed");
+  const refusal = folderDeleteRefusal(app, store);
+  if (refusal) throw new Error(`Refused: ${refusal}`);
+  let storeNotes = store.noteCount;
+  if (storeNotes > app.noteCount && store.noteKeys.length === storeNotes) {
+    const notePrefix = args.id.replace(/\/ICFolder\/p\d+$/, "/ICNote/p");
+    storeNotes -= manager.countNotesOutsideFolder(
+      args.id,
+      store.noteKeys.map((key) => `${notePrefix}${key}`)
+    );
+  }
+  const children = Math.max(app.childFolderCount, store.childFolderCount);
+  const notes = Math.max(app.noteCount, storeNotes);
+  if (children > 0 || notes > 0)
+    throw new Error(
+      `Refused: the folder is not empty (${children} child folder(s), ${notes} note(s)); move or delete them first`
+    );
+  return {
+    app,
+    store,
+    identifier: store.identifier,
+    revision: folderDeleteRevision(app, { ...store, noteCount: storeNotes })
+  };
+}
+function runFolderDelete(manager, args, deps = defaultDeps) {
+  if (Boolean(args.expectedRoot) === (args.expectedParentId !== void 0))
+    throw new Error("Pass exactly one of expectedParentId or expectedRoot: true");
+  if (args.dryRun && args.expectedRevision)
+    throw new Error("expectedRevision belongs to the apply call (dryRun: false)");
+  if (!args.dryRun && !args.expectedRevision)
+    throw new Error("Apply requires expectedRevision from a matching dry run");
+  const checked = checkFolder(manager, args, deps);
+  const base = {
+    ok: true,
+    id: args.id,
+    identifier: checked.identifier,
+    name: checked.app.name,
+    accountId: checked.app.accountId,
+    parentId: checked.app.parentId,
+    folderType: 0,
+    childFolderCount: 0,
+    noteCount: 0,
+    revision: checked.revision
+  };
+  if (args.dryRun)
+    return { ...base, status: "planned", dryRun: true, committed: false, wouldDelete: true };
+  if (checked.revision !== args.expectedRevision)
+    throw new Error("Conflict: the folder changed since the dry run; plan again");
+  const outcome = manager.deleteEmptyFolderIfUnchanged(args.id, {
+    name: checked.app.name,
+    parentId: checked.app.parentId,
+    accountId: checked.app.accountId
+  });
+  if (outcome.status === "conflict")
+    throw new Error(`Conflict: the folder ${outcome.reason} changed before deletion; plan again`);
+  if (outcome.status === "refused") throw new Error(`Refused: ${outcome.reason}`);
+  if (outcome.status === "failed")
+    throw new Error(
+      `The delete outcome is uncertain (${outcome.reason}); read folder ${args.id} before retrying`
+    );
+  if (manager.folderExistsById(args.id))
+    throw new Error(
+      `The delete outcome is uncertain: Notes.app still resolves folder ${args.id}; read it before retrying`
+    );
+  let storeTombstoned = false;
+  for (let attempt = 0; attempt < 5 && !storeTombstoned; attempt++) {
+    if (attempt > 0) deps.sleep(200);
+    const after = deps.readStore(coreDataPk(args.id));
+    storeTombstoned = !after || after.markedForDeletion;
+  }
+  return {
+    ...base,
+    status: "deleted",
+    dryRun: false,
+    committed: true,
+    wouldDelete: true,
+    verified: true,
+    storeTombstoned
+  };
+}
+function registerFolderDelete(server2, manager, deps = defaultDeps) {
+  const inputSchema = {
+    id: folderIdSchema.describe("Exact folder id (x-coredata://\u2026/ICFolder/pN) from list-folders"),
+    expectedName: external_exports.string().min(1).max(1e3).describe("Current folder name (not a path), matched case-sensitively"),
+    expectedAccountId: accountIdSchema.describe(
+      "Owning account id, from get-folder-by-id or list-accounts"
+    ),
+    expectedParentId: folderIdSchema.optional().describe("Current parent folder id; omit and pass expectedRoot for a top-level folder"),
+    expectedRoot: external_exports.literal(true).optional().describe("Pass true when the folder sits at the account root (no parent folder)"),
+    dryRun: external_exports.boolean().describe("true plans and returns a revision; false applies with expectedRevision"),
+    expectedRevision: revisionSchema.optional().describe("The revision returned by the dry run; required when dryRun is false")
+  };
+  server2.registerTool(
+    "delete-folder-by-id",
+    {
+      description: "Use when: deleting one exact, empty, ordinary folder by id, with a plan-then-apply handshake.\nReturns: a plan (status planned, wouldDelete, identity fields, zero counts, revision) or, on apply, status deleted with verified readback.\nDo not use when: the folder holds notes or subfolders, or you only have a name or path (delete-folder).\nSafety: requires the exact id plus expectedName, expectedAccountId, and expectedParentId or expectedRoot. Call with dryRun true, then repeat the same guards with dryRun false and expectedRevision. Always refuses Recently Deleted, smart folders, the account's default and other system folders, shared folders, and non-empty folders; there is no override. Not atomic: the guard is a pre-check followed by an AppleScript delete. The Notes.app-visible checks repeat inside the delete script, but folder type is read from the local store just before it. Needs Full Disk Access and fails closed without it.",
+      inputSchema,
+      outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough(),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false }
+    },
+    (async (args) => {
+      try {
+        const result = runFolderDelete(manager, args, deps);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result
+        };
+      } catch (error2) {
+        return {
+          content: [
+            { type: "text", text: error2 instanceof Error ? error2.message : String(error2) }
+          ],
+          isError: true
+        };
+      }
+    })
   );
 }
 
@@ -44379,15 +44838,15 @@ var shortcutFiles = [
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
   const exists = dependencies.exists || existsSync7;
-  const open = dependencies.open || ((path4) => {
-    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+  const open = dependencies.open || ((path5) => {
+    const result = spawnSync2("/usr/bin/open", [path5], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path4 = resolve2(baseDirectory, file);
+    const path5 = resolve2(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -44403,9 +44862,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else if (!exists(path5)) error2 = `Packaged Shortcut is missing: ${path5}`;
       else {
-        const result = open(path4);
+        const result = open(path5);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -44414,7 +44873,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path4,
+      file: path5,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -44461,6 +44920,7 @@ var server = new McpServer({
 });
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
+registerFolderDelete(server, notesManager);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 function successResponse(message, structured) {

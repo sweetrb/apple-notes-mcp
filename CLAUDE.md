@@ -147,6 +147,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
+### delete-folder-by-id
+- Prefer it over `delete-folder` when you have an exact folder id. Read the folder with `get-folder-by-id` (it returns `name`, `parentId`, `accountId`, and `isRoot`), call with `dryRun: true`, then apply with the same guards, `dryRun: false`, and `expectedRevision` set to the returned `revision`.
+- Pass `expectedRoot: true` for a top-level folder, otherwise `expectedParentId`; exactly one is required.
+- It refuses Recently Deleted, smart folders, default and system folders, shared folders, and non-empty folders, with no override. Move or delete the contents first.
+- It is not atomic: the guard is a pre-check followed by an AppleScript delete. Messages starting `Conflict:` mean something changed; read and plan again. It needs Full Disk Access.
+
 ### search-notes
 - Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive

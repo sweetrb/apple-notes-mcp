@@ -164,6 +164,55 @@ export interface Folder {
 }
 
 /**
+ * What Notes.app reports about one folder, read by exact id for guarded
+ * folder deletion (`delete-folder-by-id`).
+ */
+export interface FolderAppFacts {
+  /** Exact x-coredata folder id. */
+  id: string;
+  /** Current folder name (not a path). */
+  name: string;
+  /** Parent folder id, or null when the folder sits at an account root. */
+  parentId: string | null;
+  /** Owning account id. */
+  accountId: string;
+  /** The owning account's default folder id, when Notes.app reports one. */
+  defaultFolderId: string | null;
+  /** Whether the folder or any ancestor folder is shared. */
+  shared: boolean;
+  /** Direct child folders Notes.app lists. */
+  childFolderCount: number;
+  /** Notes Notes.app lists in the folder. */
+  noteCount: number;
+}
+
+/**
+ * Result of planning or applying `delete-folder-by-id`.
+ */
+export interface FolderDeleteResult {
+  [key: string]: unknown;
+  ok: true;
+  status: "planned" | "deleted";
+  dryRun: boolean;
+  committed: boolean;
+  wouldDelete: boolean;
+  id: string;
+  identifier: string;
+  name: string;
+  accountId: string;
+  parentId: string | null;
+  folderType: 0;
+  childFolderCount: 0;
+  noteCount: 0;
+  /** Revision token over the checked state; pass it back as expectedRevision. */
+  revision: string;
+  /** Apply only: Notes.app no longer resolves the folder id. */
+  verified?: boolean;
+  /** Apply only: the local store shows the row tombstoned or gone. */
+  storeTombstoned?: boolean;
+}
+
+/**
  * Represents a Notes account.
  *
  * Notes.app can sync with multiple account types:

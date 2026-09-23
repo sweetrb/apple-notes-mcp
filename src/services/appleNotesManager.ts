@@ -32,6 +32,7 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  FolderAppFacts,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -731,6 +732,45 @@ function buildAppLevelScript(command: string): string {
       ${command}
     end tell
   `;
+}
+
+/** Exact AppleScript folder id: `x-coredata://<store>/ICFolder/p<N>`. */
+export const FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i;
+
+/**
+ * AppleScript (inside `tell application "Notes"`) that binds the facts guarded
+ * folder deletion checks: `f`, `folderName`, `parentId` ("" at an account
+ * root), `acctId`, `defaultId`, `sharedAny` (folder or any ancestor shared),
+ * `childCount`, and `noteCount`. The id is validated by FOLDER_ID_PATTERN, so
+ * it cannot break out of the string literal.
+ */
+function folderDeleteFactsScript(id: string): string {
+  if (!FOLDER_ID_PATTERN.test(id)) throw new Error("An exact folder ID is required");
+  return `
+      set f to folder id "${id}"
+      set folderName to name of f
+      set parentRef to container of f
+      set parentId to ""
+      if class of parentRef is folder then set parentId to id of parentRef
+      set sharedAny to (shared of f)
+      set acct to parentRef
+      repeat while class of acct is folder
+        if shared of acct then set sharedAny to true
+        set acct to container of acct
+      end repeat
+      set acctId to id of acct
+      set defaultId to ""
+      try
+        set defaultId to id of default folder of acct
+      end try
+      -- "folders of f" keeps listing a child deleted earlier in this Notes
+      -- session, while "exists folder id" reports it gone, so count only
+      -- children that still exist.
+      set childCount to 0
+      repeat with childRef in folders of f
+        if exists folder id (id of childRef) then set childCount to childCount + 1
+      end repeat
+      set noteCount to count of notes of f`;
 }
 
 /**
@@ -1876,18 +1916,143 @@ export class AppleNotesManager {
     return { id, name: newName, parentId: expectedParentId };
   }
 
-  /** Read the exact name and parent identity used by guarded folder rename. */
+  /** Read the exact name, parent, and account identity used by guarded folder writes. */
   getFolderById(id: string) {
     if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(id))
       throw new Error("An exact folder ID is required");
     const result = executeAppleScript(`tell application "Notes"
       set f to folder id "${id}"
-      return (name of f) & ${AS_FIELD_SEP} & (id of container of f)
+      set acct to container of f
+      repeat while class of acct is folder
+        set acct to container of acct
+      end repeat
+      return (name of f) & ${AS_FIELD_SEP} & (id of container of f) & ${AS_FIELD_SEP} & (id of acct)
     end tell`);
     if (!result.success) throw new Error(result.error || "Folder not found");
-    const [name, parentId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    const [name, parentId, accountId] = result.output.replace(/\n$/, "").split(FIELD_SEP);
     if (!name || !parentId) throw new Error("Incomplete folder metadata");
-    return { id, name, parentId };
+    return accountId
+      ? { id, name, parentId, accountId, isRoot: parentId === accountId }
+      : { id, name, parentId };
+  }
+
+  /**
+   * Reads, in one AppleScript, everything Notes.app itself knows about a folder
+   * that guarded deletion checks: name, parent (empty at an account root),
+   * account, the account's default folder, shared state of the folder or any
+   * ancestor, and the counts of direct child folders and notes.
+   */
+  readFolderForDelete(id: string): FolderAppFacts {
+    if (!FOLDER_ID_PATTERN.test(id)) throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(
+      buildAppLevelScript(`${folderDeleteFactsScript(id)}
+      return folderName & ${AS_FIELD_SEP} & parentId & ${AS_FIELD_SEP} & acctId & ${AS_FIELD_SEP} & defaultId & ${AS_FIELD_SEP} & (sharedAny as text) & ${AS_FIELD_SEP} & (childCount as text) & ${AS_FIELD_SEP} & (noteCount as text)`)
+    );
+    if (!result.success) throw new Error(result.error || "Folder not found");
+    const parts = result.output.replace(/\n$/, "").split(FIELD_SEP);
+    if (parts.length !== 7 || !parts[0] || !parts[2]) throw new Error("Incomplete folder metadata");
+    const count = (value: string) => {
+      const parsed = Number(value.trim());
+      if (!Number.isInteger(parsed) || parsed < 0) throw new Error("Incomplete folder metadata");
+      return parsed;
+    };
+    return {
+      id,
+      name: parts[0],
+      parentId: parts[1] || null,
+      accountId: parts[2],
+      defaultFolderId: parts[3] || null,
+      shared: parts[4].trim() === "true",
+      childFolderCount: count(parts[5]),
+      noteCount: count(parts[6]),
+    };
+  }
+
+  /**
+   * Deletes one empty folder by exact id, repeating every Notes.app-visible
+   * guard inside the same AppleScript as the `delete` command: exact name
+   * (case-sensitive), parent or account root, account, not the default folder,
+   * not shared (itself or an ancestor), no child folders, no notes.
+   *
+   * Store-only facts (folder type, stable identifier) are checked by the caller
+   * before this runs, so the whole guard is a pre-check followed by an
+   * AppleScript delete, not one atomic transaction.
+   */
+  deleteEmptyFolderIfUnchanged(
+    id: string,
+    expected: { name: string; parentId: string | null; accountId: string }
+  ): { status: "deleted" } | { status: "conflict" | "refused" | "failed"; reason: string } {
+    if (!FOLDER_ID_PATTERN.test(id)) throw new Error("An exact folder ID is required");
+    const literal = (value: string) => `"${escapePlainStringForAppleScript(value)}"`;
+    const script = buildAppLevelScript(`${folderDeleteFactsScript(id)}
+      considering case
+        if folderName is not ${literal(expected.name)} then return "SAFETY_CONFLICT:name"
+      end considering
+      if parentId is not ${literal(expected.parentId ?? "")} then return "SAFETY_CONFLICT:parent"
+      if acctId is not ${literal(expected.accountId)} then return "SAFETY_CONFLICT:account"
+      if defaultId is ${literal(id)} then return "SAFETY_REFUSED:default folder"
+      if sharedAny then return "SAFETY_REFUSED:shared folder"
+      if childCount is not 0 then return "SAFETY_REFUSED:folder has child folders"
+      if noteCount is not 0 then return "SAFETY_REFUSED:folder has notes"
+      delete f
+      return "SAFETY_DELETED"`);
+    const result = executeMutationAppleScript(script);
+    if (!result.success) {
+      console.error(`Failed guarded folder delete for "${id}":`, result.error);
+      return { status: "failed", reason: result.error || "AppleScript failed" };
+    }
+    const output = result.output.trim();
+    const colon = output.indexOf(":");
+    const status = colon === -1 ? output : output.slice(0, colon);
+    const reason = colon === -1 ? "" : output.slice(colon + 1);
+    if (status === "SAFETY_DELETED") return { status: "deleted" };
+    if (status === "SAFETY_CONFLICT") return { status: "conflict", reason };
+    if (status === "SAFETY_REFUSED") return { status: "refused", reason };
+    return { status: "failed", reason: "Unexpected AppleScript result" };
+  }
+
+  /**
+   * Counts how many of the given notes Notes.app currently places outside the
+   * folder: in another folder, or in Recently Deleted (a note trashed this
+   * session reports a non-folder container). A note Notes.app cannot resolve
+   * is not counted, so the caller keeps treating it as present.
+   *
+   * The local store can keep a just-trashed note in its old folder for
+   * minutes; this lets guarded folder deletion discount such notes using
+   * Notes.app's live view instead of refusing until the store catches up.
+   */
+  countNotesOutsideFolder(folderId: string, noteIds: string[]): number {
+    if (!FOLDER_ID_PATTERN.test(folderId)) throw new Error("An exact folder ID is required");
+    if (noteIds.length === 0) return 0;
+    const ids = noteIds.map((noteId) => `"${sanitizeNoteId(noteId)}"`).join(", ");
+    const result = executeAppleScript(
+      buildAppLevelScript(`
+      set movedCount to 0
+      repeat with noteIdRef in {${ids}}
+        try
+          set c to container of note id (contents of noteIdRef)
+          if class of c is not folder then
+            set movedCount to movedCount + 1
+          else if (id of c) is not "${folderId}" then
+            set movedCount to movedCount + 1
+          end if
+        end try
+      end repeat
+      return movedCount as text`)
+    );
+    if (!result.success) return 0;
+    const moved = Number(result.output.trim());
+    return Number.isInteger(moved) && moved >= 0 && moved <= noteIds.length ? moved : 0;
+  }
+
+  /** Whether Notes.app still resolves an exact folder id. */
+  folderExistsById(id: string): boolean {
+    if (!FOLDER_ID_PATTERN.test(id)) throw new Error("An exact folder ID is required");
+    const result = executeAppleScript(
+      buildAppLevelScript(`return (exists folder id "${id}") as text`)
+    );
+    if (!result.success) throw new Error(result.error || "Could not check folder existence");
+    return result.output.trim() === "true";
   }
 
   /** Insert one file into an unchanged exact note and return Notes' attachment ID. */

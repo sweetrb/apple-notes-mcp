@@ -51,6 +51,7 @@ Use this skill when the user:
 | `list-folders` | List all folders in an account |
 | `create-folder` | Create a new folder |
 | `delete-folder` | Delete an empty folder |
+| `delete-folder-by-id` | Guarded delete of one exact empty folder: dry run returns a revision, apply requires it |
 | `show-folder` | Reveal a folder in the Notes.app UI by ID |
 
 ### Account Operations

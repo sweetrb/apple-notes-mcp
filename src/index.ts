@@ -60,6 +60,7 @@ import {
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
+import { registerFolderDelete } from "@/tools/folderDelete.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
   registerNativeOperations,
@@ -105,6 +106,7 @@ const server = new McpServer({
  */
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
+registerFolderDelete(server, notesManager);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 
