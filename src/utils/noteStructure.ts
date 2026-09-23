@@ -14,7 +14,15 @@
  */
 
 import { dirname } from "node:path";
-import { existsSync } from "node:fs";
+import {
+  assembleAttachmentAssets,
+  attachmentCoreDataId,
+  parseNoteId,
+  readNoteAttachmentRows,
+  selectFirstImage,
+  type AttachmentKind,
+  type FirstImage,
+} from "./attachmentAssets.js";
 import {
   decodeCompressedNoteBlocks,
   NoteBlocksError,
@@ -22,29 +30,25 @@ import {
   type NoteBlocksSummary,
 } from "./noteBlocks.js";
 import {
-  attachmentIdFor,
   cardLink,
-  classifyAttachmentKind,
   HASHTAG_UTI,
   inlineLinks,
-  isDrawingUti,
   markerPosition,
   nativeLink,
   NOTE_LINK_UTI,
-  resolvePreviewPath,
-  type AttachmentKind,
   type NoteLinkEntry,
-  type PreviewRow,
 } from "./noteLinks.js";
 import {
+  accountRef,
+  col,
   entity,
   NOTES_DB_PATH,
   NoteStoreError,
-  notePrimaryKey,
-  objectColumns,
-  parseJsonLine,
-  runStoreSql,
-  schemaHelpers,
+  notTombstonedSql,
+  parseJsonLines,
+  readColumns,
+  runReadOnlySql,
+  trashFolderSql,
 } from "./noteStoreSql.js";
 
 /** Seconds between the Unix epoch and Apple's reference date (2001-01-01). */
@@ -91,7 +95,11 @@ export const wordCount = (text: string): number =>
 /** Unicode code points of the visible text, newlines included. */
 export const charCount = (text: string): number => Array.from(visible(text)).length;
 
-/** One attachment of the note. Children are nested under their parent. */
+/**
+ * One attachment of the note, as list-attachments reports it (same kind,
+ * body order and preview), plus card details and its body position.
+ * Children are nested under their parent.
+ */
 export interface StructureAttachment {
   id: string;
   identifier: string;
@@ -106,21 +114,14 @@ export interface StructureAttachment {
   blockIndex?: number;
   /** False when the row exists but the body has no marker for it. */
   inBody?: boolean;
-  /** Largest rendered preview on disk; absent when Notes stored none. */
-  previewPath?: string | null;
+  /** Largest rendered preview image on disk, or null when Notes stored none. */
+  previewPath: string | null;
   parentId?: string;
   children?: StructureAttachment[];
 }
 
-/** The lead visual of a note. */
-export interface FirstImage {
-  id: string;
-  identifier: string;
-  uti: string | null;
-  kind: AttachmentKind;
-  parentId?: string;
-  previewPath?: string | null;
-}
+/** The note's lead visual (list-attachments' firstImage) with its attachment id. */
+export type StructureFirstImage = FirstImage & { id: string };
 
 /** Result of {@link readNoteStructure}. */
 export interface NoteStructure {
@@ -157,18 +158,18 @@ export interface NoteStructure {
   checklistTotal: number | null;
   checklistDone: number | null;
   hasDrawing: boolean;
-  firstImage: FirstImage | null;
+  firstImage: StructureFirstImage | null;
   undecodedFields?: NoteBlocksDocument["undecodedFields"];
 }
 
 interface NoteRow {
+  k: "note";
   isNote: number | null;
   identifier: string | null;
   title: string | null;
   folder: string | null;
-  folderType: number | null;
+  inTrash: number | null;
   account: string | null;
-  accountIdentifier: string | null;
   locked: number | null;
   pinned: number | null;
   shared: number | null;
@@ -176,120 +177,78 @@ interface NoteRow {
   data: string | null;
   encrypted: number | null;
 }
-interface AttachmentRow {
+interface DetailRow {
+  k: "attachment";
   pk: number;
-  identifier: string | null;
-  uti: string | null;
-  parent: number | null;
   title: string | null;
   url: string | null;
   fileSize: number | null;
-  filename: string | null;
-  account: string | null;
 }
 interface InlineRow {
+  k: "inline";
   identifier: string | null;
   uti: string | null;
   alt: string | null;
   token: string | null;
 }
+type StructureRow = NoteRow | DetailRow | InlineRow;
 
-/** Build the read-only SQL for one note. Only `@pk` is bound. */
-export function noteStructureSql(columns: Set<string>): string {
-  const { col, accountOf, notDeleted } = schemaHelpers(columns);
+/**
+ * Build the read-only SQL for one note, one JSON object per line tagged with
+ * `k`. Only `@pk` is bound. Attachment files, kinds and order come from
+ * attachmentAssets.ts; this adds the card title, URL and size that list does
+ * not read.
+ */
+export function noteStructureSql(columns: ReadonlySet<string>): string {
+  const c = (alias: string, name: string) => col(columns, alias, name);
   const sharedExpr = columns.has("ZSERVERSHAREDATA")
     ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
          WITH RECURSIVE up(pk, depth) AS (
            SELECT n.ZFOLDER, 0 UNION ALL
-           SELECT ${col("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
+           SELECT ${c("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
            WHERE depth < 64)
          SELECT 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT s ON s.Z_PK = up.pk WHERE s.ZSERVERSHAREDATA IS NOT NULL))`
     : "NULL";
-  const noteAttachments = `SELECT att.Z_PK FROM ZICCLOUDSYNCINGOBJECT att
-    WHERE att.Z_ENT = ${entity("ICAttachment")} AND att.ZNOTE = @pk AND ${notDeleted("att")}`;
+  const children = columns.has("ZPARENTATTACHMENT")
+    ? ` OR att.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE ${c("p", "ZNOTE")} = @pk)`
+    : "";
   return [
-    `SELECT json_object(
+    "BEGIN;",
+    `SELECT json_object('k', 'note',
       'isNote', n.Z_ENT = ${entity("ICNote")},
-      'identifier', ${col("n", "ZIDENTIFIER")},
-      'title', ${col("n", "ZTITLE1")},
-      'folder', ${col("f", "ZTITLE2")},
-      'folderType', ${col("f", "ZFOLDERTYPE")},
-      'account', ${col("a", "ZNAME")},
-      'accountIdentifier', ${col("a", "ZIDENTIFIER")},
-      'locked', ${col("n", "ZISPASSWORDPROTECTED")},
-      'pinned', ${col("n", "ZISPINNED")},
+      'identifier', ${c("n", "ZIDENTIFIER")},
+      'title', ${c("n", "ZTITLE1")},
+      'folder', ${c("f", "ZTITLE2")},
+      'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns, "f")} END,
+      'account', ${c("a", "ZNAME")},
+      'locked', ${c("n", "ZISPASSWORDPROTECTED")},
+      'pinned', ${c("n", "ZISPINNED")},
       'shared', ${sharedExpr},
-      'lastViewed', ${col("n", "ZLASTVIEWEDMODIFICATIONDATE")},
+      'lastViewed', ${c("n", "ZLASTVIEWEDMODIFICATIONDATE")},
       'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
       'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK))
     FROM ZICCLOUDSYNCINGOBJECT n
-    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${col("n", "ZFOLDER")}
-    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountOf("n")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${c("n", "ZFOLDER")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountRef(columns, "n")} AND a.Z_ENT = ${entity("ICAccount")}
     WHERE n.Z_PK = @pk;`,
-    `SELECT json_group_array(json_object(
+    `SELECT json_object('k', 'attachment',
       'pk', att.Z_PK,
-      'identifier', ${col("att", "ZIDENTIFIER")},
-      'uti', ${col("att", "ZTYPEUTI")},
-      'parent', ${col("att", "ZPARENTATTACHMENT")},
-      'title', ${col("att", "ZTITLE")},
-      'url', ${col("att", "ZURLSTRING")},
-      'fileSize', ${col("att", "ZFILESIZE")},
-      'filename', ${col("m", "ZFILENAME")},
-      'account', ${col("acc", "ZIDENTIFIER")}))
+      'title', ${c("att", "ZTITLE")},
+      'url', ${c("att", "ZURLSTRING")},
+      'fileSize', ${c("att", "ZFILESIZE")})
     FROM ZICCLOUDSYNCINGOBJECT att
-    LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON m.Z_PK = ${col("att", "ZMEDIA")}
-    LEFT JOIN ZICCLOUDSYNCINGOBJECT acc ON acc.Z_PK = ${accountOf("att")}
-    WHERE att.Z_PK IN (${noteAttachments});`,
-    `SELECT json_group_array(json_object(
-      'attachment', ${col("p", "ZATTACHMENT")},
-      'identifier', ${col("p", "ZIDENTIFIER")},
-      'width', ${col("p", "ZWIDTH")},
-      'height', ${col("p", "ZHEIGHT")},
-      'scale', ${col("p", "ZSCALE")},
-      'appearance', ${col("p", "ZAPPEARANCETYPE")}))
-    FROM ZICCLOUDSYNCINGOBJECT p
-    WHERE p.Z_ENT = ${entity("ICAttachmentPreviewImage")} AND ${notDeleted("p")}
-      AND ${col("p", "ZATTACHMENT")} IN (${noteAttachments});`,
-    `SELECT json_group_array(json_object(
-      'identifier', ${col("i", "ZIDENTIFIER")},
-      'uti', ${col("i", "ZTYPEUTI1")},
-      'alt', ${col("i", "ZALTTEXT")},
-      'token', ${col("i", "ZTOKENCONTENTIDENTIFIER")}))
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+      AND (${c("att", "ZNOTE")} = @pk${children});`,
+    `SELECT json_object('k', 'inline',
+      'identifier', ${c("i", "ZIDENTIFIER")},
+      'uti', ${c("i", "ZTYPEUTI1")},
+      'alt', ${c("i", "ZALTTEXT")},
+      'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")})
     FROM ZICCLOUDSYNCINGOBJECT i
-    WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${col("i", "ZNOTE1")} = @pk
-      AND ${notDeleted("i")} AND ${col("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI}', '${NOTE_LINK_UTI}');`,
+    WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${c("i", "ZNOTE1")} = @pk
+      AND ${notTombstonedSql(columns, "i")} AND ${c("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI}', '${NOTE_LINK_UTI}');`,
+    "COMMIT;",
   ].join("\n");
-}
-
-/** Body order of attachments: markers first, then unplaced rows by primary key. */
-function bodyOrder(rows: StructureAttachment[]): StructureAttachment[] {
-  return [...rows].sort(
-    (a, b) =>
-      (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER) ||
-      Number(/\d+$/.exec(a.id)![0]) - Number(/\d+$/.exec(b.id)![0])
-  );
-}
-
-/**
- * The note's lead visual: the first image in body order (a gallery's items
- * count right after the gallery), else the first scan or drawing.
- */
-export function selectFirstImage(attachments: StructureAttachment[]): FirstImage | null {
-  const ordered: StructureAttachment[] = [];
-  for (const item of attachments) ordered.push(item, ...(item.children ?? []));
-  for (const kinds of [["image"], ["image", "scan", "drawing"]]) {
-    const hit = ordered.find((item) => kinds.includes(item.kind));
-    if (hit)
-      return {
-        id: hit.id,
-        identifier: hit.identifier,
-        uti: hit.uti,
-        kind: hit.kind,
-        ...(hit.parentId ? { parentId: hit.parentId } : {}),
-        ...(hit.previewPath !== undefined ? { previewPath: hit.previewPath } : {}),
-      };
-  }
-  return null;
 }
 
 /** One-line text summary of a structure read, for the tool's text content. */
@@ -311,23 +270,25 @@ export function describeNoteStructure(s: NoteStructure): string {
 
 /**
  * Read one note's structure from the NoteStore database (read-only).
- * `dbPath` exists for tests against a fixture database; attachment previews
- * resolve under the database's directory.
+ * `id` must be the canonical x-coredata note id (the tool schema resolves a
+ * UUID or numeric key to it). `dbPath` exists for tests against a fixture
+ * database; attachment files resolve under the database's directory.
  */
 export function readNoteStructure(
   id: string,
   { dbPath = NOTES_DB_PATH, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}
 ): NoteStructure {
-  const pk = notePrimaryKey(id);
-  if (!existsSync(dbPath))
-    throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
-  const columns = objectColumns(dbPath);
-  const lines = runStoreSql(dbPath, noteStructureSql(columns), { pk });
-  const note = parseJsonLine<NoteRow | null>(lines[0], null);
-  if (!note || !note.isNote) throw new NoteStoreError("not-found", `No note found for ID "${id}"`);
-  const attachmentRows = parseJsonLine<AttachmentRow[]>(lines[1], []);
-  const previewRows = parseJsonLine<PreviewRow[]>(lines[2], []);
-  const inlineRows = parseJsonLine<InlineRow[]>(lines[3], []);
+  const { pk } = parseNoteId(id);
+  const columns = readColumns(dbPath);
+  const rows = parseJsonLines<StructureRow>(
+    runReadOnlySql(dbPath, noteStructureSql(columns), { pk: { int: pk } })
+  );
+  const note = rows.find((row): row is NoteRow => row.k === "note");
+  if (!note?.isNote) throw new NoteStoreError(`No note found for ID "${id}".`, "invalid_input");
+  const details = new Map(
+    rows.filter((row): row is DetailRow => row.k === "attachment").map((row) => [row.pk, row])
+  );
+  const inlineRows = rows.filter((row): row is InlineRow => row.k === "inline");
 
   let doc: NoteBlocksDocument | undefined;
   let bodyError: string | undefined;
@@ -341,57 +302,49 @@ export function readNoteStructure(
       bodyError = error.code;
     }
 
-  const storeDir = dirname(dbPath);
-  const previewsFor = (pkValue: number) => previewRows.filter((row) => row.attachment === pkValue);
-  const all = new Map<number, StructureAttachment>();
-  for (const row of attachmentRows) {
-    const previews = previewsFor(row.pk);
-    all.set(row.pk, {
-      id: attachmentIdFor(id, row.pk),
-      identifier: row.identifier ?? "",
-      uti: row.uti,
-      kind: classifyAttachmentKind(row.uti),
-      ...(row.title ? { title: row.title } : {}),
-      ...(row.filename ? { filename: row.filename } : {}),
-      ...(row.url ? { url: row.url } : {}),
-      ...(typeof row.fileSize === "number" ? { fileSize: row.fileSize } : {}),
-      ...(row.identifier ? markerPosition(doc, row.identifier) : {}),
-      ...(previews.length
-        ? {
-            previewPath: resolvePreviewPath(
-              storeDir,
-              row.account ?? note.accountIdentifier,
-              previews
-            ),
-          }
-        : {}),
-      ...(row.parent !== null && row.parent !== row.pk
-        ? { parentId: attachmentIdFor(id, row.parent) }
-        : {}),
-    });
-  }
-  const roots: StructureAttachment[] = [];
-  for (const row of attachmentRows) {
-    const item = all.get(row.pk)!;
-    const parent = row.parent !== null && row.parent !== row.pk ? all.get(row.parent) : undefined;
-    // A child whose parent is itself a child is promoted, which also breaks cycles.
-    if (parent && parent.parentId === undefined) (parent.children ||= []).push(item);
+  // The same rows, kinds, body order and previews list-attachments reports.
+  const { rows: attachmentRows, bodyOrder } = readNoteAttachmentRows(id, dbPath);
+  const assets = assembleAttachmentAssets(attachmentRows, bodyOrder, dirname(dbPath));
+  const roots = new Map<string, StructureAttachment>();
+  const attachments: StructureAttachment[] = [];
+  const pks = new Map<StructureAttachment, number>();
+  for (const record of assets.attachments) {
+    const detail = details.get(record.pk);
+    const parent =
+      record.parentIdentifier !== null ? roots.get(record.parentIdentifier) : undefined;
+    const item: StructureAttachment = {
+      id: attachmentCoreDataId(id, record.pk),
+      identifier: record.identifier,
+      uti: record.uti,
+      kind: record.kind,
+      ...(detail?.title ? { title: detail.title } : {}),
+      ...(record.filename ? { filename: record.filename } : {}),
+      ...(detail?.url ? { url: detail.url } : {}),
+      ...(typeof detail?.fileSize === "number" ? { fileSize: detail.fileSize } : {}),
+      ...markerPosition(doc, record.identifier),
+      previewPath: record.previewPath,
+      ...(parent ? { parentId: parent.id } : {}),
+    };
+    pks.set(item, record.pk);
+    if (parent) (parent.children ||= []).push(item);
     else {
-      delete item.parentId;
-      roots.push(item);
+      roots.set(record.identifier, item);
+      attachments.push(item);
     }
   }
-  const attachments = bodyOrder(roots).map((item) =>
-    item.children ? { ...item, children: bodyOrder(item.children) } : item
-  );
+  const flat = attachments.flatMap((item) => [item, ...(item.children ?? [])]);
 
   const links: NoteLinkEntry[] = doc ? inlineLinks(doc) : [];
-  for (const row of attachmentRows) {
-    const item = all.get(row.pk)!;
-    if (item.kind !== "url" || !row.identifier) continue;
+  for (const item of flat) {
+    if (item.kind !== "url") continue;
     const link = cardLink(
-      { pk: row.pk, identifier: row.identifier, url: row.url, title: row.title },
-      { doc, noteId: id, previewPath: item.previewPath ?? null }
+      {
+        pk: pks.get(item)!,
+        identifier: item.identifier,
+        url: item.url ?? null,
+        title: item.title ?? null,
+      },
+      { doc, noteId: id, previewPath: item.previewPath }
     );
     if (link) links.push(link);
   }
@@ -416,10 +369,10 @@ export function readNoteStructure(
     if (Buffer.byteLength(doc.text) <= maxTextBytes) text = doc.text;
     else textOmitted = true;
   }
-  const flat = attachments.flatMap((item) => [item, ...(item.children ?? [])]);
   const linkCounts = { inline: 0, card: 0, note: 0, section: 0 };
   for (const link of links) linkCounts[link.kind]++;
   const lastViewed = lastViewedOf(note.lastViewed, columns.has("ZLASTVIEWEDMODIFICATIONDATE"));
+  const first = selectFirstImage(assets);
 
   return {
     id,
@@ -428,7 +381,7 @@ export function readNoteStructure(
     title: note.title,
     folder: note.folder,
     account: note.account,
-    inRecentlyDeleted: note.folderType === 1,
+    inRecentlyDeleted: note.inTrash === 1,
     isShared: note.shared === null ? null : note.shared === 1,
     isLocked: note.locked === 1 || note.encrypted === 1,
     isPinned: note.pinned === null ? null : note.pinned === 1,
@@ -449,8 +402,8 @@ export function readNoteStructure(
     attachmentCount: attachments.length,
     checklistTotal: doc ? doc.summary.checklist.total : null,
     checklistDone: doc ? doc.summary.checklist.done : null,
-    hasDrawing: flat.some((item) => isDrawingUti(item.uti)),
-    firstImage: selectFirstImage(attachments),
+    hasDrawing: flat.some((item) => item.kind === "drawing"),
+    firstImage: first ? { ...first, id: attachmentCoreDataId(id, first.pk) } : null,
     ...(doc ? { undecodedFields: doc.undecodedFields } : {}),
   };
 }

@@ -35,34 +35,29 @@ export interface ProtoField {
 /**
  * Decodes a varint from the buffer at the given offset.
  *
- * Varints use 7 bits per byte with the high bit as a continuation flag.
- * Supports up to 64-bit values (though we only need small integers).
+ * Varints use 7 bits per byte with the high bit as a continuation flag. Values
+ * of up to 4 bytes (28 bits) take a 32-bit fast path; longer ones are read as
+ * the full 64-bit value (at most 10 bytes) and returned as a signed int64, so a
+ * negative int32 such as a subscript baseline offset of -1 (sign-extended to a
+ * 10-byte varint) decodes as -1 instead of throwing (#188). Values beyond
+ * 2^53 lose precision; Apple Notes stores nothing that large in a varint.
+ *
+ * Callers that treat the result as a length must reject negative values.
  *
  * @param buf - The protobuf binary data
  * @param offset - Starting byte position
  * @returns Tuple of [decoded value, new offset after the varint]
+ * @throws {ProtobufDecodeError} on a varint longer than 10 bytes or a truncated buffer
  */
 export function decodeVarint(buf: Uint8Array, offset: number): [number, number] {
   let result = 0;
-  let shift = 0;
-  let pos = offset;
-
-  while (pos < buf.length) {
-    const byte = buf[pos];
+  for (let pos = offset, shift = 0; pos < buf.length && shift < 28; shift += 7) {
+    const byte = buf[pos++];
     result |= (byte & 0x7f) << shift;
-    pos++;
-    if ((byte & 0x80) === 0) {
-      return [result, pos];
-    }
-    shift += 7;
-    if (shift > 35) {
-      // For our use case (small field numbers, small integers),
-      // values requiring more than 35 bits are unexpected
-      throw new Error(`Varint too long at offset ${offset}`);
-    }
+    if ((byte & 0x80) === 0) return [result, pos];
   }
-
-  throw new Error(`Unexpected end of buffer reading varint at offset ${offset}`);
+  const [value, next] = decodeVarint64(buf, offset);
+  return [Number(BigInt.asIntN(64, value)), next];
 }
 
 /**
@@ -71,10 +66,18 @@ export function decodeVarint(buf: Uint8Array, offset: number): [number, number] 
  * Iterates through the buffer, decoding tag-value pairs. Unknown wire types
  * cause parsing to stop (returns fields decoded so far).
  *
+ * Fixed-width fields (wire types 1 and 5) are skipped unless `keepFixed` is
+ * set, in which case their raw little-endian bytes are kept as the value (read
+ * a 64-bit float with {@link fixed64Double}).
+ *
  * @param buf - The protobuf binary data
+ * @param options - `keepFixed` keeps 32/64-bit fixed fields instead of skipping them
  * @returns Array of decoded fields in order
  */
-export function decodeMessage(buf: Uint8Array): ProtoField[] {
+export function decodeMessage(
+  buf: Uint8Array,
+  options: { keepFixed?: boolean } = {}
+): ProtoField[] {
   const fields: ProtoField[] = [];
   let offset = 0;
 
@@ -92,18 +95,20 @@ export function decodeMessage(buf: Uint8Array): ProtoField[] {
     } else if (wireType === WIRE_TYPE.LENGTH_DELIMITED) {
       let length: number;
       [length, offset] = decodeVarint(buf, offset);
-      if (offset + length > buf.length) {
+      if (length < 0 || offset + length > buf.length) {
         break; // Truncated data, return what we have
       }
       const value = buf.slice(offset, offset + length);
       fields.push({ fieldNumber, wireType, value });
       offset += length;
-    } else if (wireType === 5) {
-      // 32-bit fixed — skip 4 bytes
-      offset += 4;
-    } else if (wireType === 1) {
-      // 64-bit fixed — skip 8 bytes
-      offset += 8;
+    } else if (wireType === 5 || wireType === 1) {
+      // 32-bit (wire 5) or 64-bit (wire 1) fixed width
+      const width = wireType === 5 ? 4 : 8;
+      if (offset + width > buf.length) break; // Truncated data
+      if (options.keepFixed) {
+        fields.push({ fieldNumber, wireType, value: buf.slice(offset, offset + width) });
+      }
+      offset += width;
     } else {
       // Unknown wire type — stop parsing
       break;
@@ -167,6 +172,16 @@ export function embeddedMessage(field: ProtoField | undefined): ProtoField[] | u
   const bytes = bytesValue(field);
   if (!bytes) return undefined;
   return decodeMessage(bytes);
+}
+
+/**
+ * Reads a 64-bit fixed field (wire type 1, kept via `keepFixed`) as a
+ * little-endian IEEE 754 double. Returns undefined for any other field shape.
+ */
+export function fixed64Double(field: ProtoField | undefined): number | undefined {
+  if (!field || field.wireType !== 1 || !(field.value instanceof Uint8Array)) return undefined;
+  if (field.value.length !== 8) return undefined;
+  return new DataView(field.value.buffer, field.value.byteOffset, 8).getFloat64(0, true);
 }
 
 /**

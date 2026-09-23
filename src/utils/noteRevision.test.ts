@@ -34,13 +34,29 @@ describe("comparableVisibleText", () => {
 
   it("decodes common entities before comparing visible text", () => {
     expect(comparableVisibleText("<div>A &amp; B&nbsp;&#39;test&#39;</div>")).toBe("A & B 'test'");
+    expect(comparableVisibleText("<div>&apos;q&apos; &quot;d&quot; &lt;t&gt;</div>")).toBe(
+      "'q' \"d\" <t>"
+    );
+  });
+
+  it("decodes legacy references without a semicolon, as Notes emits inside links", () => {
+    // Observed live 2026-09-23: after writing the link text `?a=1&amp;b=2`,
+    // Notes' AppleScript body returned `?a=1&ampb=2`. Both spell `?a=1&b=2`.
+    const written = '<div><a href="https://example.com/?a=1&amp;b=2">?a=1&amp;b=2</a></div>';
+    const readback = '<div><u><a href="https://example.com/?a=1&b=2">?a=1&ampb=2</a></u></div>';
+    expect(comparableVisibleText(readback)).toBe("?a=1&b=2");
+    expect(comparableVisibleText(readback)).toBe(comparableVisibleText(written));
+    expect(comparableVisibleText("<div>&quotx&ltx&gtx&nbspx</div>")).toBe('"x<x>x x');
+  });
+
+  it("decodes one level only", () => {
+    expect(comparableVisibleText("<div>&amp;lt; &amp;#39; &amp;amp;</div>")).toBe(
+      "&lt; &#39; &amp;"
+    );
   });
 
   it("decodes numeric character references in either radix", () => {
-    // Not reachable through the named-entity cases above: &#39; is consumed by
-    // the &apos; rule before the numeric rules run, so the decimal and hex
-    // decoders are only exercised by code points that have no named form.
-    // Notes.app emits these for em dashes and accented text, and a false
+    // Code points with no named form, in both radixes. Notes.app emits these for em dashes and accented text, and a false
     // mismatch here would report a successful write as unverified.
     expect(comparableVisibleText("<div>caf&#233; &#8212; ok</div>")).toBe("café — ok");
     expect(comparableVisibleText("<div>caf&#xE9; &#x2014; ok</div>")).toBe("café — ok");

@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
+import { AttachmentStoreError } from "./attachmentAssets.js";
 import { NoteStoreError } from "./noteStoreSql.js";
 import {
   charCount,
@@ -18,10 +19,8 @@ import {
   lastViewedOf,
   noteStructureSql,
   readNoteStructure,
-  selectFirstImage,
   wordCount,
   type NoteStructure,
-  type StructureAttachment,
 } from "./noteStructure.js";
 
 // --- protobuf fixture encoder ---
@@ -90,7 +89,9 @@ const code = (fn: () => unknown) => {
   try {
     fn();
   } catch (error) {
-    return error instanceof NoteStoreError ? error.code : String(error);
+    if (error instanceof NoteStoreError) return error.kind;
+    if (error instanceof AttachmentStoreError) return error.code;
+    return String(error);
   }
   return "no error";
 };
@@ -170,6 +171,8 @@ beforeAll(() => {
     insert({ Z_PK: 3, Z_ENT: 7, ZTITLE2: "Parent", ZSERVERSHAREDATA: Buffer.from([1]) }),
     insert({ Z_PK: 2, Z_ENT: 7, ZTITLE2: "Folder A", ZFOLDERTYPE: 0, ZPARENT: 3 }),
     insert({ Z_PK: 4, Z_ENT: 7, ZTITLE2: "Recently Deleted", ZFOLDERTYPE: 1 }),
+    // A Recently Deleted folder known only by its identifier (no ZFOLDERTYPE value).
+    insert({ Z_PK: 5, Z_ENT: 7, ZTITLE2: "Trash", ZIDENTIFIER: "TrashFolder-ACCT-1" }),
     // Note 10: the full-featured note.
     insert({
       Z_PK: 10,
@@ -194,6 +197,8 @@ beforeAll(() => {
     }),
     // Note 12: no body row, no view date, shared directly.
     insert({ Z_PK: 12, Z_ENT: 3, ZFOLDER: 4, ZSERVERSHAREDATA: Buffer.from([1]) }),
+    // Note 15: in the identifier-only Recently Deleted folder.
+    insert({ Z_PK: 15, Z_ENT: 3, ZFOLDER: 5 }),
     // Note 14: a body that is not gzip, and a malformed view date.
     insert({ Z_PK: 14, Z_ENT: 3, ZLASTVIEWEDMODIFICATIONDATE: "abc" }),
     // Attachments of note 10.
@@ -259,54 +264,6 @@ beforeAll(() => {
     }),
     insert({ Z_PK: 28, Z_ENT: 4, ZIDENTIFIER: "CARD-EMPTY", ZTYPEUTI: "public.url", ZNOTE: 10 }),
     insert({ Z_PK: 30, Z_ENT: 9, ZFILENAME: "photo.jpg" }),
-    // Preview renditions.
-    insert({
-      Z_PK: 40,
-      Z_ENT: 6,
-      ZATTACHMENT: 20,
-      ZIDENTIFIER: "IMG-1-1-192x144-0",
-      ZWIDTH: 192,
-      ZHEIGHT: 144,
-      ZSCALE: 1,
-      ZAPPEARANCETYPE: 0,
-    }),
-    insert({
-      Z_PK: 41,
-      Z_ENT: 6,
-      ZATTACHMENT: 20,
-      ZIDENTIFIER: "IMG-1-1-384x288-0",
-      ZWIDTH: 384,
-      ZHEIGHT: 288,
-      ZSCALE: 1,
-      ZAPPEARANCETYPE: 0,
-    }),
-    insert({
-      Z_PK: 42,
-      Z_ENT: 6,
-      ZATTACHMENT: 20,
-      ZIDENTIFIER: "IMG-1-dark",
-      ZWIDTH: 999,
-      ZHEIGHT: 999,
-      ZSCALE: 1,
-      ZAPPEARANCETYPE: 1,
-    }),
-    insert({
-      Z_PK: 43,
-      Z_ENT: 6,
-      ZATTACHMENT: 25,
-      ZIDENTIFIER: "CARD-1-1-600x315-0",
-      ZWIDTH: 600,
-      ZHEIGHT: 315,
-      ZSCALE: 1,
-    }),
-    insert({
-      Z_PK: 44,
-      Z_ENT: 6,
-      ZATTACHMENT: 22,
-      ZIDENTIFIER: "MISSING-1",
-      ZWIDTH: 10,
-      ZHEIGHT: 10,
-    }),
     // Inline attachments of note 10.
     insert({
       Z_PK: 50,
@@ -425,40 +382,6 @@ describe("wordCount and charCount", () => {
   });
 });
 
-describe("selectFirstImage", () => {
-  const a = (id: string, kind: StructureAttachment["kind"], extra = {}): StructureAttachment => ({
-    id,
-    identifier: id,
-    uti: null,
-    kind,
-    ...extra,
-  });
-  it("prefers images in body order, gallery items right after their gallery", () => {
-    const pick = selectFirstImage([
-      a("scan", "scan"),
-      a("gallery", "gallery", { children: [a("g1", "image", { parentId: "gallery" })] }),
-      a("img", "image", { previewPath: null }),
-    ]);
-    expect(pick).toEqual({
-      id: "g1",
-      identifier: "g1",
-      uti: null,
-      kind: "image",
-      parentId: "gallery",
-    });
-  });
-  it("falls back to a scan or drawing, then to null", () => {
-    expect(selectFirstImage([a("pdf", "pdf"), a("d", "drawing", { previewPath: "/p" })])).toEqual({
-      id: "d",
-      identifier: "d",
-      uti: null,
-      kind: "drawing",
-      previewPath: "/p",
-    });
-    expect(selectFirstImage([a("pdf", "pdf")])).toBeNull();
-  });
-});
-
 describe("readNoteStructure (real sqlite3)", () => {
   let s: NoteStructure;
   beforeAll(() => {
@@ -514,17 +437,18 @@ describe("readNoteStructure (real sqlite3)", () => {
     expect(s.links[4].linkSafe).toBe(false);
   });
 
-  it("nests gallery children, promotes deeper rows and skips deleted ones", () => {
+  it("lists attachments as list-attachments does: kinds, body order, nesting", () => {
+    // Same classifier as list-attachments: a gallery is a scan. A child of a
+    // child (DEEP) is left out and a tombstoned row (GONE) is skipped.
     const kinds = s.attachments.map((a) => [a.identifier, a.kind, a.inBody]);
     expect(kinds).toEqual([
-      ["GAL-1", "gallery", true],
+      ["GAL-1", "scan", true],
       ["CARD-1", "url", true],
       ["IMG-1", "image", true],
-      ["DEEP", "file", false],
       ["PAPER-1", "drawing", false],
       ["CARD-EMPTY", "url", false],
     ]);
-    expect(s.attachmentCount).toBe(6);
+    expect(s.attachmentCount).toBe(5);
     const gallery = s.attachments[0];
     expect(gallery.children!.map((c) => [c.identifier, c.kind, c.parentId])).toEqual([
       ["GAL-A", "image", "x-coredata://F1C7-5E0A/ICAttachment/p21"],
@@ -535,7 +459,17 @@ describe("readNoteStructure (real sqlite3)", () => {
     expect(image).toMatchObject({ filename: "photo.jpg", fileSize: 1234 });
     expect(image.previewPath).toMatch(/IMG-1-1-384x288-0\.png$/);
     expect(s.attachments[1]).toMatchObject({ title: "Example card", url: "https://example.com/a" });
-    expect(s.firstImage).toMatchObject({ identifier: "GAL-A", kind: "image", previewPath: null });
+    expect(s.firstImage).toMatchObject({
+      id: "x-coredata://F1C7-5E0A/ICAttachment/p22",
+      pk: 22,
+      identifier: "GAL-A",
+      kind: "image",
+      path: null,
+      previewPath: null,
+      parentIdentifier: "GAL-1",
+      galleryIndex: 0,
+      orderSource: "body",
+    });
   });
 
   it("omits text on request or when it exceeds the byte cap", () => {
@@ -575,6 +509,14 @@ describe("readNoteStructure (real sqlite3)", () => {
     expect(broken).toMatchObject({ bodyError: "decompress-failed", lastViewedStatus: "malformed" });
     expect(broken.isShared).toBe(false);
     expect(broken.deepLink).toBeNull();
+    expect(broken.inRecentlyDeleted).toBe(false);
+  });
+
+  it("treats a TrashFolder identifier as Recently Deleted without ZFOLDERTYPE", () => {
+    expect(readNoteStructure(id(15), { dbPath: db })).toMatchObject({
+      folder: "Trash",
+      inRecentlyDeleted: true,
+    });
   });
 
   it("reads a store without the optional columns", () => {
@@ -593,13 +535,16 @@ describe("readNoteStructure (real sqlite3)", () => {
   });
 
   it("refuses bad ids, non-notes, missing notes and unreadable stores", () => {
-    expect(code(() => readNoteStructure(id(3), { dbPath: db }))).toBe("not-found");
-    expect(code(() => readNoteStructure(id(999), { dbPath: db }))).toBe("not-found");
+    expect(code(() => readNoteStructure(id(3), { dbPath: db }))).toBe("invalid_input");
+    expect(code(() => readNoteStructure(id(999), { dbPath: db }))).toBe("invalid_input");
+    // Only the canonical x-coredata form reaches the reader; the tool schema
+    // resolves a UUID or numeric key first.
     expect(code(() => readNoteStructure("x-coredata://X/ICNote/p1 OR 1", { dbPath: db }))).toBe(
-      "invalid-id"
+      "invalid_id"
     );
+    expect(code(() => readNoteStructure(NOTE_UUID, { dbPath: db }))).toBe("invalid_id");
     expect(code(() => readNoteStructure(id(10), { dbPath: join(dir, "none.sqlite") }))).toBe(
-      "no-full-disk-access"
+      "no_fda"
     );
   });
 
@@ -615,7 +560,7 @@ describe("describeNoteStructure", () => {
   it("summarizes decoded and undecoded notes", () => {
     const decoded = readNoteStructure(id(10), { dbPath: db });
     expect(describeNoteStructure(decoded)).toBe(
-      "Note structure: 9 blocks, 9 words; 5 links (inline 2, card 1, note 1, section 1); 6 attachments; 2 tags; checklist 1/2 done; has a drawing; shared."
+      "Note structure: 9 blocks, 9 words; 5 links (inline 2, card 1, note 1, section 1); 5 attachments; 2 tags; checklist 1/2 done; has a drawing; shared."
     );
     expect(describeNoteStructure(readNoteStructure(id(11), { dbPath: db }))).toBe(
       "Note structure: body not decoded (encrypted); 0 links (inline 0, card 0, note 0, section 0); 0 attachments; 0 tags; locked."
