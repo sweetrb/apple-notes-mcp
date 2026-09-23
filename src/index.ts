@@ -2686,7 +2686,14 @@ let _shuttingDown = false;
 const shutdown = (): void => {
   if (_shuttingDown) return;
   _shuttingDown = true;
-  process.exit(0);
+  // A response larger than the pipe buffer (64 KiB on macOS; tools/list is
+  // past that) is still being written when stdin closes. Exiting at once cuts
+  // it off mid-line, so let queued stdout drain first, with a short cap in
+  // case the reader is gone.
+  if (process.stdout.writableLength > 0) {
+    process.stdout.once("drain", () => process.exit(0));
+    setTimeout(() => process.exit(0), 2000).unref();
+  } else process.exit(0);
 };
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, shutdown);

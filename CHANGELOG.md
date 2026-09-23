@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Fixed
+
+- The server no longer cuts off a large response when the client closes
+  stdin right after sending its last request. Shutdown on stdin EOF exited at
+  once, so any reply bigger than the 64 KiB pipe buffer (such as `tools/list`
+  once the tool list grows past it) was truncated mid-line. It now lets queued
+  output drain first, capped at two seconds.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added
