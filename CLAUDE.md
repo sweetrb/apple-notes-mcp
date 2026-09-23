@@ -325,6 +325,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Falls back to plain list items if Full Disk Access is not granted (no error)
 - No action needed — enrichment happens transparently
 
+### Private helper tools (opt-in)
+- `native-helper-status` and `native-note-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).
+- Always call `native-helper-status` first. Do not suggest enabling the helper unprompted: it is unsupported API and can break on any macOS update.
+- The helper cannot write. Write support was deliberately deferred by the maintainer (#204): a second writer beside a running Notes.app, CRDT replica identity, and the iCloud upload lag are unresolved. Use the AppleScript or Shortcuts-bridge tools for edits. `cloudSync.uploadPending` in `native-note-state` shows whether Notes has an upload queued.
+
 ### Multi-account
 - Omitting `account` targets whatever Notes.app reports as its **`default account`** — which is often, but not necessarily, iCloud. Since 2.7.1 the server resolves that name at runtime instead of assuming the literal `"iCloud"`, so it is also correct for a localized account name, a non-iCloud default, or a name carrying a trailing U+F8FF ()
 - Use `list-accounts` to see available accounts
