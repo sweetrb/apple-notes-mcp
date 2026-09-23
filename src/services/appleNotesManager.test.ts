@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -56,6 +57,13 @@ const NO_RETRY_OPTIONS = { maxRetries: 1 };
 
 import { getChecklistItems } from "@/utils/checklistParser.js";
 const mockGetChecklistItems = vi.mocked(getChecklistItems);
+
+// Mock the transcript reader so the delegation test never touches SQLite.
+vi.mock("@/utils/audioTranscripts.js", () => ({
+  readAudioTranscripts: vi.fn(),
+}));
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+const mockReadAudioTranscripts = vi.mocked(readAudioTranscripts);
 
 // Result delimiters (#18) — must match appleNotesManager.ts.
 // FIELD_SEP (US, \x1f) separates fields within a record;
@@ -1551,6 +1559,38 @@ describe("AppleNotesManager", () => {
       expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Old body</div>")).toEqual({
         status: "conflict",
       });
+    });
+
+    it("reports a delete that left the note in its original folder", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_NOT_DELETED" });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Reviewed body</div>")).toEqual({
+        status: "not-deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      // The folder is captured before the delete and re-read after it.
+      expect(script.indexOf("container of noteRef")).toBeLessThan(script.indexOf("delete noteRef"));
+      expect(script.indexOf("delete noteRef")).toBeLessThan(
+        script.indexOf("id of notes of originalFolder")
+      );
+    });
+
+    it("generates a delete script that AppleScript compiles", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      manager.deleteNoteByIdIfUnchanged(id, '<div>Body with "quotes" and \\ slash</div>');
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
+      try {
+        writeFileSync(join(dir, "delete.applescript"), script);
+        expect(() =>
+          execFileSync(
+            "/usr/bin/osacompile",
+            ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
+            { stdio: "pipe" }
+          )
+        ).not.toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -4116,5 +4156,28 @@ describe("htmlToPlaintext (export helper)", () => {
     expect(toPlaintext("a<<i>>b")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("<x<y>z>")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("plain <b>text</b> here")).toBe("plain text here");
+  });
+});
+
+describe("getAudioTranscripts", () => {
+  it("delegates to the read-only transcript reader with the caller's options", () => {
+    const result = {
+      id: "x-coredata://S/ICNote/p1",
+      attachments: [],
+      bodyOrder: true,
+      truncated: false,
+    };
+    mockReadAudioTranscripts.mockReturnValueOnce(result);
+    const manager = new AppleNotesManager();
+    expect(
+      manager.getAudioTranscripts("x-coredata://S/ICNote/p1", {
+        includeSegments: true,
+        maxSegments: 5,
+      })
+    ).toBe(result);
+    expect(mockReadAudioTranscripts).toHaveBeenCalledWith("x-coredata://S/ICNote/p1", {
+      includeSegments: true,
+      maxSegments: 5,
+    });
   });
 });

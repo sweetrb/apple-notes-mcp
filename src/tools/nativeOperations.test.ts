@@ -9,7 +9,15 @@ vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
   nativeTagBridgeStatus: vi.fn(() => ({ installed: false })),
   markdownNoteStatus: vi.fn(() => ({ installed: false })),
 }));
-import { registerNativeOperations } from "./nativeOperations.js";
+// The matrix probe spawns sw_vers, sqlite3, and shortcuts; keep these tests hermetic.
+vi.mock(import("../services/capabilityMatrix.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCapabilityMatrix: vi.fn(() => ({
+    runtimeOS: { platform: "darwin" as const, macOSVersion: "26.0", darwinRelease: "25.0.0" },
+    features: {},
+  })),
+}));
+import { registerNativeOperations, requireValidated } from "./nativeOperations.js";
 import { backgroundStatus, markdownNoteStatus } from "../services/backgroundNotes.js";
 afterEach(() => vi.unstubAllEnvs());
 function fixture() {
@@ -65,6 +73,25 @@ describe("background capability boundaries", () => {
     expect(r.structuredContent.operations["append-native"].verified).toBe(true);
     expect(r.structuredContent.unavailable["set-checklist-item"]).toMatch(/unsupported features/);
   });
+  it("reports live-verified Markdown block import on the Create Markdown Note bridge", async () => {
+    const missing = await fixture()("get-capabilities")[2]({});
+    expect(missing.structuredContent.operations["create-note-markdown-blocks"]).toMatchObject({
+      implemented: true,
+      verified: true,
+      available: false,
+      reason: expect.stringMatching(/apple-notes-mcp setup/),
+    });
+    vi.mocked(markdownNoteStatus).mockReturnValueOnce({
+      installed: true,
+      shortcut: "Apple Notes MCP - Create Markdown Note",
+    });
+    const r = await fixture()("get-capabilities")[2]({});
+    expect(r.structuredContent.operations["create-note-markdown-blocks"]).toMatchObject({
+      verified: true,
+      available: true,
+    });
+    expect(() => requireValidated("create-note-markdown-blocks")).not.toThrow();
+  });
   it("reports live-verified native creation as available with v5 installed", async () => {
     vi.mocked(backgroundStatus).mockReturnValueOnce({
       installed: true,
@@ -79,6 +106,22 @@ describe("background capability boundaries", () => {
       verified: true,
       available: true,
     });
+  });
+  it("adds runtimeOS and the feature matrix while keeping every existing key", async () => {
+    const r = await fixture()("get-capabilities")[2]({});
+    expect(Object.keys(r.structuredContent)).toEqual(
+      expect.arrayContaining([
+        "bridge",
+        "nativeTagBridgeInstalled",
+        "markdownNoteBridgeInstalled",
+        "mode",
+        "operations",
+        "unavailable",
+        "runtimeOS",
+        "features",
+      ])
+    );
+    expect(r.structuredContent.runtimeOS.macOSVersion).toBe("26.0");
   });
   it("uses permissive output schemas for native tools", () => {
     expect(fixture()("append-native")[1].outputSchema.parse({ contentHash: "next" })).toMatchObject(

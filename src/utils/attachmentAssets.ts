@@ -736,7 +736,9 @@ export function isInsideNotesContainer(
  * Copy `src` to a new file `dest`. The source is opened without following a
  * final symlink and must be a regular file (checked on the open descriptor);
  * the destination is created exclusively, so an existing file is never
- * replaced (EEXIST is thrown instead). A partial copy is removed.
+ * replaced (EEXIST is thrown instead). A partial copy is removed. The copy
+ * is created owner-only (0600): attachments are private note content, and an
+ * export directory may sit under the temp dir.
  */
 export function copyFileExclusive(src: string, dest: string): void {
   const input = openSync(src, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -745,7 +747,7 @@ export function copyFileExclusive(src: string, dest: string): void {
     const output = openSync(
       dest,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-      0o644
+      0o600
     );
     try {
       const buffer = Buffer.allocUnsafe(1024 * 1024);
