@@ -280,6 +280,9 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `outputPath` is create-only; `[output_exists]` means choose a new path, never delete the old file on the user's behalf
 - Pass `assetsDir` to copy attachment files; without it attachments are placeholders like `\[Image: name\]`
 - Password-protected notes are listed in `skipped`; Full Disk Access is required
+- `template` (`standard-markdown`, `obsidian`) or `templateFile` (JSON, exclusive) renders through a Markdown template; the schema is in docs/markdown-templates.md. `standard-markdown` output equals the default export
+- `[invalid-template]` lists one `$.json.path: problem` per line: fix those fields, do not guess a new template
+- Templated `warnings` (for example `missing_asset`, `assets_dir_required`) do not fail the export; report them
 
 ### export-notes-html
 - Same selection as `export-notes-markdown`; `outputPath` is required (the HTML is never returned inline) and create-only

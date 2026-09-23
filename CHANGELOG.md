@@ -1,5 +1,37 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `export-notes-markdown` accepts `template` (built-in `standard-markdown` or
+  `obsidian`) or `templateFile` (a JSON template in an allowed location). A
+  template is portable, data-only JSON (schema version 1) with 43 rules for
+  every block style, inline format, highlight color, attachment kind,
+  per-note header and footer, and note separator; five rule modes (`wrap`,
+  `linePrefix`, `pattern`, `plain`, `omit`); line or paragraph joins; an
+  inline nesting order; `{{placeholder}}` tokens with `:raw` and `:yaml`
+  modifiers for YAML front matter (title, dates, folder, account, tags, ids);
+  rich-link images with italic captions; and asset modes `copy`,
+  `reference` and `omit` with relative or absolute links. Validation reports
+  every problem with a JSON path before any note is read
+  (`[invalid-template]`). Templated copies get stable content-hashed names,
+  are reused on repeat exports, and never replace a different file.
+  Templated receipts add `template`, `warnings` (seven codes, such as
+  `missing_asset`) and `assetFiles`. docs/markdown-templates.md documents the
+  schema.
+- `src/utils/markdownTemplate.ts` (schema, validation, built-ins),
+  `templateRender.ts` (renderer; `standard-markdown` output is tested equal
+  to the default renderer), `templateAssets.ts` (hashed and reference
+  writers, template file reads), and `readExportNoteMeta` in
+  `noteExportData.ts` (UUID, dates, folder and account, read-only, with
+  feature-detected columns and a bound note key).
+
+### Unchanged
+
+- `export-notes-markdown` without a template produces the same output as
+  2.8.49.
+
 ## [2.8.49] - 2026-09-23
 
 ### Fixed

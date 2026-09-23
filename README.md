@@ -1443,6 +1443,8 @@ single note.
 | `outputPath` | string | No | Absolute file to create. Create-only: an existing file (or symlink) is refused with `[output_exists]` |
 | `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
 | `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
+| `template` | string | No | Render through a template: `standard-markdown` or `obsidian`. Exclusive with `templateFile` |
+| `templateFile` | string | No | Render through the JSON template in this file (same path rules; at most 256 KiB) |
 
 Both paths follow the `save-attachment` rules (absolute, under the home
 directory, a temp directory, or `/Volumes`, no symlink escapes) and may not
@@ -1456,6 +1458,19 @@ receipt: `format`, `count`, `bytes`, `output`, and `assets` (`dir`, `files`).
 Both carry `stats` (attachments, placed, placeholders, unavailable, tables,
 unreadableTables, unreferenced) and `skipped`. Nothing already written is
 deleted if a later step fails.
+
+**Templates:** `template` or `templateFile` renders through a portable JSON
+template that sets how every block style, inline format, attachment,
+per-note header and footer (for YAML front matter with title, dates,
+folder, tags and id), and the note separator are written. The built-in
+`standard-markdown` reproduces the default output; `obsidian` adds front
+matter and copies attachments into `<file>.assets` beside `outputPath`.
+Templated asset copies get stable content-hashed names and are reused on a
+repeat export. An invalid template is refused with `[invalid-template]` and
+one JSON path per problem, before any note is read. A templated receipt adds
+`template`, `warnings` (such as `missing_asset`) and `assetFiles`. See
+[docs/markdown-templates.md](docs/markdown-templates.md) for the schema,
+every rule and placeholder, and examples.
 
 ---
 

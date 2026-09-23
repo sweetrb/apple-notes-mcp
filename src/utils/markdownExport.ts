@@ -40,7 +40,7 @@ export function escapeMarkdown(text: string): string {
 }
 
 /** Escape a line start that Markdown would read as a block marker. */
-function escapeLineStart(line: string): string {
+export function escapeLineStart(line: string): string {
   return line.replace(/^(\s*)([#>+-]|\d+[.)])(?=\s|$)/, (_, space: string, marker: string) =>
     /^\d/.test(marker)
       ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}`
@@ -75,7 +75,7 @@ const LAYERS: Array<[keyof Fmt, string, string]> = [
 type TextPiece = Extract<Piece, { type: "text" }>;
 
 /** Concatenate, separating delimiter runs that would otherwise merge. */
-function joinSafe(left: string, right: string): string {
+export function joinSafe(left: string, right: string): string {
   return left && right && /[*~=]$/.test(left) && left.at(-1) === right[0]
     ? `${left}<!-- -->${right}`
     : left + right;
