@@ -143,7 +143,7 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPINNED` | Pinned state (boolean) | AppleScript has no `pinned` property, so this is the only read path for pin state |
 | `ZHASCHECKLIST`, `ZHASCHECKLISTINPROGRESS` | Whether a note has a checklist, and whether any item is still unchecked | Cheap flags without decoding the body |
 | `ZISRECOVERINGFROMTRASH` | Trash / recovery state | Distinguishes a recently deleted note |
-| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | Smart Folders are otherwise not scriptable |
+| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | The rules are not scriptable. AppleScript can still list a smart folder's current notes by folder id (`notes of folder id "…/ICFolder/pN"`, verified macOS 27.2, Notes 4.13); `list-smart-folders` uses both |
 | `ZSNIPPET`, `ZWIDGETSNIPPET` | Preview snippet text | Fast preview without reading the full body |
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
@@ -152,6 +152,44 @@ Reading these is safe under the existing rules: copy the three database files fi
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
 To *change* pin state or tags, use the Shortcuts bridge (below), not a SQL `UPDATE`.
+
+### query-notes Data Sources
+
+`query-notes` (`src/utils/noteQuery.ts` for the grammar, `src/utils/noteQueryStore.ts`
+for the reader) evaluates every predicate from the database, read-only, in two
+`sqlite3 -readonly` calls: `PRAGMA table_info` for feature detection, then one
+`BEGIN … COMMIT` read transaction. Entity numbers are looked up by name in
+`Z_PRIMARYKEY` (`ICNote`, `ICFolder`, `ICAccount`) because they differ between
+stores. The sources below were checked against a live store on macOS 27.2 on
+2026-09-23:
+
+| Predicate | Source |
+|-----------|--------|
+| Note id | `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`; the UUID matched AppleScript's `id of note` |
+| Title, dates | `ZTITLE1`; `ZMODIFICATIONDATE1`; `COALESCE(ZCREATIONDATE3, ZCREATIONDATE1)` (Core Data seconds since 2001-01-01 UTC) |
+| Folder, path | note `ZFOLDER` → folder `ZTITLE2`, walked up `ZPARENT` |
+| Account | folder `ZOWNER` (inherited from the parent) → account `ZNAME` |
+| Recently Deleted | folder `ZFOLDERTYPE = 1` (identifier `TrashFolder-…`); also `ZMARKEDFORDELETION` and `ZFOLDER IS NULL` |
+| `pinned`, `locked` | `ZISPINNED`, `ZISPASSWORDPROTECTED` |
+| `shared` | `ZSERVERSHAREDATA IS NOT NULL` on the note or any ancestor folder. On the live store this set equalled AppleScript's `shared` set exactly |
+| Text, words, links, checklists, attachments | The gzipped `ZICNOTEDATA.ZDATA` document, decoded per note: text (field 2), attribute-run links (field 9), `AttachmentInfo` type UTIs (field 12.2), checklist style 103 with done state (field 2.5.2) |
+| `tag:` | `ICInlineAttachment` rows with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag'`, `ZNOTE1` = note, `ZALTTEXT` = `#tag`, counted only when their `ZIDENTIFIER` is still an object in the body |
+
+Facets come from the body's `AttachmentInfo` types rather than from `ICAttachment`
+rows, because rows outlive their objects: on the live store, some top-level
+attachment rows (tables and URL previews) were no longer referenced by any note
+body, while every referenced row's UTI equalled the body's UTI. The UTI mapping is
+`public.url` and inline note links → `has:link` (as are attribute-run links);
+`com.apple.notes.table` → `has:table`; `com.apple.paper.doc.scan` and the legacy
+`com.apple.notes.gallery` → `has:scan`; `com.adobe.pdf` and `com.apple.paper.doc.pdf`
+→ `has:pdf`; `com.apple.paper` and the legacy `com.apple.drawing*` /
+`com.apple.notes.sketch` → `has:drawing`; image, video, and audio UTIs → their
+facet. Every non-inline object except a table also counts as `has:attachment`.
+`has:video` and `tag:` are verified against fixtures only; the store used for
+live verification had no video attachments or native tags.
+
+Password-protected notes store an encrypted `ZDATA`, so only title and metadata
+predicates can match them.
 
 ---
 

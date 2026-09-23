@@ -132,6 +132,48 @@ describe("Notes rich text", () => {
       { id: Buffer.alloc(16, 1).toString("hex"), start: 0, text: "A", done: false },
     ]);
   });
+  describe("checklist line attribution (#187)", () => {
+    const id = (value: number) => Buffer.alloc(16, value);
+    const checklist = (length: number, item: number, done = 0) =>
+      Buffer.concat([
+        run(length),
+        b(2, Buffer.concat([n(1, 103), b(5, Buffer.concat([b(1, id(item)), n(2, done)]))])),
+      ]);
+    const items = (text: string, runs: Buffer[]) =>
+      parseRichNote(document(text, runs)).checklistItems;
+
+    it("gives a run that starts on the preceding newline to the line after it", () => {
+      // macOS 27.2 layout: "Title\nPlain" is plain, "\nNew item" is the checklist run.
+      expect(items("Title\nPlain\nNew item", [run(11), checklist(9, 1)])).toEqual([
+        { id: id(1).toString("hex"), start: 12, text: "New item", done: false },
+      ]);
+    });
+    it("keeps a run that starts at the line's first character on that line", () => {
+      // Long-standing layout: the run covers "Old item\n".
+      expect(items("Title\nOld item\nAfter", [run(6), checklist(9, 1), run(5)])).toEqual([
+        { id: id(1).toString("hex"), start: 6, text: "Old item", done: false },
+      ]);
+    });
+    it("attributes both layouts in one note and reads a checked newline-led item", () => {
+      expect(items("Title\nFirst\nSecond", [run(6), checklist(5, 1), checklist(7, 2, 1)])).toEqual([
+        { id: id(1).toString("hex"), start: 6, text: "First", done: false },
+        { id: id(2).toString("hex"), start: 12, text: "Second", done: true },
+      ]);
+    });
+    it("keeps a split-off newline-only run with the line it terminates", () => {
+      // A line whose characters carry different attributes is split into
+      // several runs; its terminating newline can be a run of its own.
+      expect(
+        items("Title\nBold item\nNext", [
+          run(6),
+          checklist(4, 1),
+          checklist(5, 1),
+          checklist(1, 1),
+          run(4),
+        ])
+      ).toEqual([{ id: id(1).toString("hex"), start: 6, text: "Bold item", done: false }]);
+    });
+  });
   it("blocks writes when the rich store is unavailable and rejects noncanonical IDs", () => {
     vi.mocked(execFileSync).mockImplementation(() => {
       throw new Error("access denied");

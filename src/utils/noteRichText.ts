@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { checklistRunLineStart } from "./checklistRuns.js";
 import {
   decodeMessage,
   decodeVarint,
@@ -151,7 +152,8 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
       const checklist = embeddedMessage(getField(paragraph, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
-      const start = text.lastIndexOf("\n", position - 1) + 1;
+      // A 27.2-style run can start on the previous line's newline (#187).
+      const start = checklistRunLineStart(text, position, length);
       if (itemId && !checklistItems.some((item) => item.id === itemId))
         checklistItems.push({
           id: itemId,
