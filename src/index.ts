@@ -48,6 +48,7 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
+import { createShutdown } from "@/utils/shutdown.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import {
   enrichNoteRead,
@@ -2618,17 +2619,14 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // Graceful shutdown. This server holds no persistent resources (AppleScript runs
-// are one-shot via execSync), so there's nothing to drain — but wiring SIGINT/
+// are one-shot via execSync), so the only thing to drain is stdout — and wiring SIGINT/
 // SIGTERM and stdin EOF/close to a clean exit keeps behavior tidy and consistent
 // with the sibling apple-mail server: when the parent kills us (signal) or the
 // MCP client disconnects (stdin 'end'/'close'), exit 0 promptly instead of
 // lingering as an orphan. Idempotent so multiple triggers don't double-exit.
-let _shuttingDown = false;
-const shutdown = (): void => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+// Pending stdout is drained first (bounded), so a response larger than the pipe
+// buffer isn't truncated when the client closes stdin right after a request.
+const shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, shutdown);
 }

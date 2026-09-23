@@ -42917,10 +42917,22 @@ function appendMarkdownHtml(markdown) {
 
 // src/utils/noteRevision.ts
 var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+var LEGACY_ENTITIES = {
+  nbsp: " ",
+  quot: '"',
+  lt: "<",
+  gt: ">",
+  amp: "&"
+};
 function comparableVisibleText(html) {
-  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint))).replace(
-    /&#x([0-9a-f]+);/gi,
-    (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
+  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(
+    /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
+    (_match, legacy, dec, hex2) => {
+      if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
+      if (dec) return String.fromCodePoint(Number(dec));
+      if (hex2) return String.fromCodePoint(Number.parseInt(hex2, 16));
+      return "'";
+    }
   ).replace(/\s+/g, " ").trim();
 }
 
@@ -43661,6 +43673,30 @@ function withJsonSchema2020_12(transport2) {
   const originalSend = transport2.send.bind(transport2);
   transport2.send = (message, options) => originalSend(normalizeOutgoingMessage(message), options);
   return transport2;
+}
+
+// src/utils/shutdown.ts
+var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
+function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
+  let shuttingDown = false;
+  let exited = false;
+  const exitOnce = () => {
+    if (exited) return;
+    exited = true;
+    clearTimeout(timer);
+    exit();
+  };
+  let timer;
+  const exitWhenDrained = () => {
+    if (stream.writableLength === 0) exitOnce();
+    else stream.once("drain", exitWhenDrained);
+  };
+  return () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    timer = setTimeout(exitOnce, timeoutMs);
+    setImmediate(exitWhenDrained);
+  };
 }
 
 // src/utils/noteTables.ts
@@ -46251,12 +46287,7 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
-var _shuttingDown = false;
-var shutdown = () => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+var shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
 }

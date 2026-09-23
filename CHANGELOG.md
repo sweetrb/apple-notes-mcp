@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.8.18] - 2026-09-23
+## [2.8.20] - 2026-09-23
 
 ### Fixed
 
@@ -16,6 +16,28 @@
   terminator as its own run when that line's characters carry different
   attributes. `revision` and `styleRuns`, which the write guards compare, are
   unchanged.
+
+## [2.8.19] - 2026-09-23
+
+### Fixed
+
+- A write whose visible text contains `&` inside a link no longer reports a
+  readback mismatch after saving correctly. Notes' AppleScript HTML writes the
+  text `a=1&b=2` inside a link as `a=1&ampb=2`, without the semicolon, and the
+  visible-text comparison only decoded `&amp;`. It now decodes the HTML legacy
+  references (`amp`, `lt`, `gt`, `quot`, `nbsp`) with or without the
+  semicolon, in a single pass so `&amp;lt;` still reads as the literal `&lt;`.
+
+## [2.8.18] - 2026-09-23
+
+### Fixed
+
+- The server no longer truncates a response when the client closes stdin right
+  after a request. Shutdown on stdin `end`/`close` (and SIGINT/SIGTERM) now
+  waits for pending stdout writes to drain, capped at two seconds, before
+  exiting. Before, any response larger than the 64 KiB pipe buffer was cut off
+  mid-message, which `tools/list` was close to reaching and which one-shot
+  clients such as `docsTruth.test.ts` hit as an unparseable line.
 
 ## [2.8.17] - 2026-09-17
 
