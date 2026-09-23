@@ -395,8 +395,9 @@ not interpret are counted in `undecodedFields` rather than guessed.
 
 ### Links, Attachments and Note State (verified 2026-09-23, macOS 27.2)
 
-`src/utils/noteLinks.ts` and `src/utils/noteStructure.ts` (the
-`get-note-structure` tool) read these, through the shared helpers in
+`src/utils/noteLinks.ts`, `src/utils/noteStructure.ts` (the
+`get-note-structure` tool) and `src/utils/noteLinkInventory.ts` (the
+`list-note-links` tool) read these, through the shared helpers in
 `noteStoreSql.ts` and `attachmentAssets.ts`. Counts come from a read-only survey of
 one live library with 843 note rows; no content was recorded.
 
@@ -451,9 +452,51 @@ when its own `ZSERVERSHAREDATA` or that of its folder (or an enclosing
 folder) is set. That rule selected 53 notes, the same 53 distinct notes
 AppleScript reports with `shared = true`.
 
+**Link inventory.** Cards and native chips are rows, so `list-note-links`
+lists them across a scope in one query. Inline links exist only inside note
+bodies (330 in the 448 notes outside Recently Deleted in the survey), so a
+folder, account or library scan decodes bodies only when asked, 100 rows per
+batch. The scope uses the same active-note predicate as the other listings
+(`activeNoteSql`, which also treats a `TrashFolder%` folder identifier as
+Recently Deleted). A folder scope walks the `ZPARENT` hierarchy with a
+recursive query bound only to the folder's primary key, so subfolders are
+included unless the caller turns that off.
+
 ### Embedded Objects
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.
+
+### Paragraph Links (verified 2026-09-23, macOS 27.2)
+
+`src/utils/noteParagraphs.ts` (the `list-note-paragraphs` and
+`get-paragraph-link` tools) builds and guards these links.
+
+**Format.** Notes opens a paragraph from
+`applenotes://showNote?identifier=<NOTE-UUID>&paragraphID=<PARAGRAPH-UUID>`.
+No note in the surveyed library held a Notes-generated section link to copy
+the format from, so it was confirmed from Notes itself without opening a
+link: Notes.app registers the `notes` and `applenotes` URL schemes
+(`CFBundleURLTypes`), its binary holds the literal
+`applenotes://showNote?identifier=`, and the URL handler's query-key string
+table in the system's shared library cache lists `paragraphID` (with
+`identifier`, `attachmentID` and `contentOffsetY`) beside the selectors
+`appURLForNote:paragraphID:` and `paragraphIDForURL`. The key is spelled
+exactly `paragraphID`. UUIDs are written uppercase, as `NSUUID` prints them.
+
+**Where the paragraph UUID lives.** ParagraphStyle field 9 (16 bytes) on each
+attribute run, as in the block model above. A run that crosses a paragraph
+break carries one UUID for both paragraphs, which is how Notes ends up with
+repeated IDs after a split.
+
+**When a link is safe.** The reader takes the UUID on the paragraph's first
+run and returns a link only if no run outside that paragraph (from its first
+character through its newline) carries the same UUID. Otherwise the link
+could open another paragraph, so the tools refuse. A survey of 738 decodable
+note bodies in one live library (counts only) found 30,362 non-empty
+paragraphs: 17,553 with a unique ID, 12,807 sharing one, and 2 with none.
+Every title (78), heading (18) and subheading (7) was unique; body text was
+roughly half and half. A paragraph whose runs carry more than one UUID is
+common and reported as `mixedParagraphIds`; its first-run UUID is still used.
 
 ### CRDT Implementation
 

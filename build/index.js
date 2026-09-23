@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve7.call(this, root, ref);
+      let _sch = resolve8.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve7(root, ref) {
+    function resolve8(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve7(baseURI, relativeURI, options) {
+    function resolve8(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve7,
+      resolve: resolve8,
       resolveComponent,
       equal,
       serialize,
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join27(output, replacement);
+        return join28(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join27(output, rule.append(self.options));
+          output = join28(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join27(output, replacement) {
+    function join28(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
+        await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve7, reject) => {
+    return new Promise((resolve8, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve7(parseResult.data);
+            resolve8(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve7, reject) => {
+    return new Promise((resolve8, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve7, interval);
+      const timeoutId = setTimeout(resolve8, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
+      await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve7) => {
+    return new Promise((resolve8) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve7();
+        resolve8();
       } else {
-        this._stdout.once("drain", resolve7);
+        this._stdout.once("drain", resolve8);
       }
     });
   }
@@ -47328,13 +47328,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve7 = (pk, seen) => {
+  const resolve8 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve8(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47348,7 +47348,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve8(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -49052,6 +49052,249 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
   };
 }
 
+// src/utils/noteParagraphs.ts
+import { gunzipSync as gunzipSync9 } from "node:zlib";
+var ENVELOPE_CODE = {
+  "invalid-argument": "validation_error",
+  "not-found": "not_found",
+  encrypted: "unsupported",
+  "no-body": "unsupported",
+  "ambiguous-note": "ambiguous",
+  "no-match": "not_found",
+  "ambiguous-paragraph": "ambiguous",
+  "occurrence-out-of-range": "validation_error",
+  "paragraph-id-missing": "unsupported",
+  "paragraph-id-shared": "unsupported"
+};
+var ParagraphLinkError = class extends CodedError {
+  reason;
+  constructor(reason, message) {
+    super(message, { code: ENVELOPE_CODE[reason], reason });
+    this.name = "ParagraphLinkError";
+    this.reason = reason;
+  }
+};
+var paragraphUrl = (noteIdentifier, paragraphId) => `applenotes://showNote?identifier=${noteIdentifier.toUpperCase()}&paragraphID=${paragraphId.toUpperCase()}`;
+var normalizeParagraphText = (text2) => text2.normalize("NFKC").replace(/\ufffc/g, "").split(/\s+/u).filter(Boolean).join(" ").toLowerCase();
+var bytesField = (fields, n) => fields.find((f) => f.fieldNumber === n && f.wireType === 2)?.bytes;
+var uuidOf = (bytes) => {
+  if (bytes?.length !== 16) return void 0;
+  const h = Buffer.from(bytes).toString("hex").toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+function runParagraphIds(data) {
+  const document = decodeWireFields(bytesField(decodeWireFields(data), 2));
+  const note = decodeWireFields(bytesField(document, 3));
+  const runs = [];
+  let start = 0;
+  for (const field of note.filter((f) => f.fieldNumber === 5)) {
+    const run = decodeWireFields(field.bytes);
+    const length = Number(run.find((f) => f.fieldNumber === 1).varint);
+    const style = bytesField(run, 2);
+    const paragraphId = style ? uuidOf(bytesField(decodeWireFields(style), 9)) : void 0;
+    runs.push({ start, length, ...paragraphId ? { paragraphId } : {} });
+    start += length;
+  }
+  return runs;
+}
+function classifyParagraphIds(doc, runs) {
+  const ranges = doc.blocks.map((block) => [block.start, block.start + block.length + 1]);
+  const blocksOfId = /* @__PURE__ */ new Map();
+  const idsOfBlock = doc.blocks.map(() => /* @__PURE__ */ new Set());
+  let b = 0;
+  for (const run of runs) {
+    const end = run.start + run.length;
+    while (b < ranges.length && ranges[b][1] <= run.start) b++;
+    for (let i = b; i < ranges.length && ranges[i][0] < end; i++) {
+      idsOfBlock[i].add(run.paragraphId);
+      if (run.paragraphId) {
+        const owners = blocksOfId.get(run.paragraphId) ?? /* @__PURE__ */ new Set();
+        owners.add(i);
+        blocksOfId.set(run.paragraphId, owners);
+      }
+    }
+  }
+  return doc.blocks.map((block, i) => {
+    const paragraphId = block.paragraphUuid ?? null;
+    const mixed = idsOfBlock[i].size > 1;
+    if (!paragraphId) return { status: "missing", paragraphId, mixed };
+    const owners = blocksOfId.get(paragraphId).size;
+    return owners === 1 ? { status: "unique", paragraphId, mixed } : { status: "shared", paragraphId, sharedWith: owners - 1, mixed };
+  });
+}
+function paragraphsOf(doc, runs, noteIdentifier) {
+  const ids = classifyParagraphIds(doc, runs);
+  const out = [];
+  doc.blocks.forEach((block, i) => {
+    if (!normalizeParagraphText(block.text)) return;
+    const { status, paragraphId, sharedWith, mixed } = ids[i];
+    out.push({
+      blockIndex: block.index,
+      text: block.text,
+      style: block.style,
+      styleType: block.styleType,
+      paragraphId,
+      paragraphIdStatus: status,
+      ...sharedWith !== void 0 ? { sharedWith } : {},
+      ...mixed ? { mixedParagraphIds: true } : {},
+      ...status === "unique" && noteIdentifier ? { url: paragraphUrl(noteIdentifier, paragraphId) } : {}
+    });
+  });
+  return out;
+}
+function selectParagraph(paragraphs, selector) {
+  const given = [selector.contains, selector.match, selector.blockIndex].filter(
+    (value) => value !== void 0
+  ).length;
+  if (given !== 1)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Choose exactly one paragraph selector: contains, match, or blockIndex"
+    );
+  if (selector.blockIndex !== void 0) {
+    const hit = paragraphs.find((p) => p.blockIndex === selector.blockIndex);
+    if (!hit)
+      throw new ParagraphLinkError(
+        "no-match",
+        `Block ${selector.blockIndex} is not a non-empty paragraph of this note`
+      );
+    return hit;
+  }
+  const wanted = normalizeParagraphText(selector.contains ?? selector.match);
+  if (!wanted)
+    throw new ParagraphLinkError("invalid-argument", "The paragraph selector has no visible text");
+  const matches = paragraphs.filter(
+    (p) => selector.match !== void 0 ? normalizeParagraphText(p.text) === wanted : normalizeParagraphText(p.text).includes(wanted)
+  );
+  if (!matches.length)
+    throw new ParagraphLinkError("no-match", "No paragraph matches the selector");
+  if (selector.occurrence === void 0 && matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-paragraph",
+      `The selector matches ${matches.length} paragraphs; use a longer snippet or pass occurrence (1-${matches.length})`
+    );
+  const occurrence = selector.occurrence ?? 1;
+  if (occurrence > matches.length)
+    throw new ParagraphLinkError(
+      "occurrence-out-of-range",
+      `Occurrence ${occurrence} requested but only ${matches.length} paragraphs match`
+    );
+  return matches[occurrence - 1];
+}
+var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+function titleMatchSql(columns) {
+  return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
+}
+function checkNoteSelector(selector) {
+  const given = [selector.id, selector.title].filter((value) => value !== void 0).length;
+  if (given !== 1)
+    throw new ParagraphLinkError("invalid-argument", "Choose exactly one of id or title");
+  if (selector.folder !== void 0 && selector.title === void 0)
+    throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
+  if (selector.id === void 0) return void 0;
+  const pk = NOTE_ID.exec(selector.id)?.[1];
+  if (!pk)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number> or a Notes UUID"
+    );
+  return Number(pk);
+}
+function resolveNote(dbPath2, columns, selector) {
+  const idPk = checkNoteSelector(selector);
+  if (idPk !== void 0) return { pk: idPk, id: selector.id };
+  requireColumns(columns, ["ZTITLE1", "ZFOLDER"], "title lookup");
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const names = new Map(context.folders.map((f) => [f.pk, escapeFolderName(f.name ?? "")]));
+  let matches = parseJsonLines(
+    runReadOnlySql(dbPath2, titleMatchSql(columns), {
+      title: { blob: Buffer.from(selector.title, "utf8") }
+    })
+  );
+  if (selector.folder !== void 0) {
+    const wanted = selector.folder;
+    matches = matches.filter(
+      (n) => paths.get(n.folder) === wanted || names.get(n.folder) === wanted
+    );
+  }
+  if (!matches.length) throw new ParagraphLinkError("not-found", "No note matches the selector");
+  if (matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-note",
+      `${matches.length} notes match; pass folder (a name or a path as list-folders shows it) or use the note id. Folders: ${matches.map((n) => paths.get(n.folder)).join(", ")}`
+    );
+  return { pk: matches[0].pk, id: noteIdFor(context.uuid, matches[0].pk) };
+}
+function noteBodySql(columns) {
+  return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
+}
+function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH7 } = {}) {
+  checkNoteSelector(selector);
+  const columns = readColumns(dbPath2);
+  const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
+  const [row] = parseJsonLines(runReadOnlySql(dbPath2, noteBodySql(columns), { pk: { int: pk } }));
+  if (!row?.isNote) throw new ParagraphLinkError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted || row.locked)
+    throw new ParagraphLinkError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new ParagraphLinkError("no-body", "No body data is stored for this note");
+  let doc;
+  let runs;
+  try {
+    const data = gunzipSync9(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    doc = decodeNoteBlocks(data);
+    runs = runParagraphIds(data);
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    throw new ParagraphLinkError("no-body", `The note body could not be decoded: ${message}`);
+  }
+  const paragraphs = paragraphsOf(doc, runs, row.identifier);
+  const counts = { unique: 0, shared: 0, missing: 0 };
+  for (const p of paragraphs) counts[p.paragraphIdStatus]++;
+  return { id: id2, identifier: row.identifier, paragraphs, counts };
+}
+function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 1024 * 1024, linkableOnly = false } = {}) {
+  const list = linkableOnly ? paragraphs.filter((p) => p.url) : paragraphs;
+  const start = Math.min(Math.max(0, offset), list.length);
+  const out = [];
+  let bytes = 0;
+  for (let i = start; i < list.length && out.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(list[i]));
+    if (out.length && bytes + size > maxBytes) break;
+    out.push(list[i]);
+    bytes += size;
+  }
+  const next = start + out.length;
+  return {
+    paragraphs: out,
+    page: {
+      offset: start,
+      returned: out.length,
+      total: list.length,
+      hasMore: next < list.length,
+      ...next < list.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function paragraphLink(note, selector) {
+  const paragraph = selectParagraph(note.paragraphs, selector);
+  if (paragraph.paragraphIdStatus === "shared")
+    throw new ParagraphLinkError(
+      "paragraph-id-shared",
+      `This paragraph's ID is shared with ${paragraph.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
+    );
+  if (!paragraph.url)
+    throw new ParagraphLinkError(
+      "paragraph-id-missing",
+      paragraph.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
+    );
+  return { url: paragraph.url, paragraph };
+}
+
 // src/utils/noteStructure.ts
 import { dirname as dirname4 } from "node:path";
 
@@ -49339,6 +49582,212 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
   };
 }
 
+// src/utils/noteLinkInventory.ts
+import { dirname as dirname5 } from "node:path";
+var BODY_BATCH = 100;
+function matchFolder(folders, wanted, account) {
+  const paths = folderPaths(folders);
+  const segments = splitFolderPath(wanted);
+  const key = (parts) => parts.join("\0");
+  const pool = folders.filter(
+    (f) => !f.tombstoned && !f.trash && (account === void 0 || f.account === account)
+  );
+  const byPath = segments.length === 1 ? pool.filter((f) => f.name === segments[0]) : pool.filter((f) => key(splitFolderPath(paths.get(f.pk))) === key(segments));
+  const matches = byPath.length ? byPath : pool.filter((f) => f.name === wanted);
+  if (!matches.length) throw new NoteStoreError(`No folder matches "${wanted}".`, "invalid_input");
+  if (matches.length > 1)
+    throw new NoteStoreError(
+      `Folder "${wanted}" is ambiguous; use one of these paths: ${matches.map((f) => paths.get(f.pk)).join(", ")}.`,
+      "invalid_input"
+    );
+  return { folder: matches[0], path: paths.get(matches[0].pk) };
+}
+function inventorySql(columns) {
+  requireColumns(columns, ["ZFOLDER"], "list-note-links");
+  const c = (alias, name) => col(columns, alias, name);
+  const subtree = columns.has("ZPARENT") ? `WITH RECURSIVE sub(pk) AS (SELECT @folder UNION
+         SELECT x.Z_PK FROM ZICCLOUDSYNCINGOBJECT x JOIN sub ON x.ZPARENT = sub.pk
+         WHERE @subfolders <> 0 AND x.Z_ENT = ${entity("ICFolder")})
+       SELECT pk FROM sub` : "SELECT @folder";
+  const scopeWhere = `n.Z_ENT = ${entity("ICNote")} AND (
+      (@note <> 0 AND n.Z_PK = @note) OR
+      (@note = 0 AND ${activeNoteSql(columns, "n", "f")}
+        AND (@account = 0 OR a.Z_PK = @account)
+        AND (@folder = 0 OR n.ZFOLDER IN (${subtree}))))`;
+  const scope2 = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere}`;
+  return {
+    rows: [
+      "BEGIN;",
+      `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${c("n", "ZIDENTIFIER")},
+        'title', ${c("n", "ZTITLE1")}, 'folder', n.ZFOLDER, 'account', a.Z_PK,
+        'modified', ${c("n", "ZMODIFICATIONDATE1")})
+      FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere};`,
+      `SELECT json_object('k', 'card', 'pk', att.Z_PK, 'note', ${c("att", "ZNOTE")},
+        'identifier', ${c("att", "ZIDENTIFIER")}, 'url', ${c("att", "ZURLSTRING")},
+        'title', ${c("att", "ZTITLE")})
+      FROM ZICCLOUDSYNCINGOBJECT att
+      WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+        AND ${c("att", "ZTYPEUTI")} LIKE 'public.url%' AND ${c("att", "ZURLSTRING")} IS NOT NULL
+        AND ${c("att", "ZNOTE")} IN (${scope2});`,
+      `SELECT json_object('k', 'chip', 'note', ${c("i", "ZNOTE1")},
+        'identifier', ${c("i", "ZIDENTIFIER")}, 'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")},
+        'alt', ${c("i", "ZALTTEXT")})
+      FROM ZICCLOUDSYNCINGOBJECT i
+      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notTombstonedSql(columns, "i")}
+        AND ${c("i", "ZTYPEUTI1")} = '${NOTE_LINK_UTI}' AND ${c("i", "ZNOTE1")} IN (${scope2});`,
+      "COMMIT;"
+    ].join("\n"),
+    bodies: `SELECT json_object('note', d.ZNOTE, 'data', hex(d.ZDATA),
+        'encrypted', d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL)
+      FROM ZICNOTEDATA d WHERE d.ZNOTE IN (${scope2}) AND d.ZNOTE > @after
+      ORDER BY d.ZNOTE LIMIT ${BODY_BATCH};`
+  };
+}
+function decodeBodies(dbPath2, sql, params) {
+  const docs = /* @__PURE__ */ new Map();
+  let after = 0;
+  for (; ; ) {
+    const rows = parseJsonLines(
+      runReadOnlySql(dbPath2, sql, { ...params, after: { int: after } })
+    );
+    for (const row of rows) {
+      after = Math.max(after, row.note);
+      if (row.encrypted || !row.data) continue;
+      try {
+        docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
+      } catch {
+      }
+    }
+    if (rows.length < BODY_BATCH) return docs;
+  }
+}
+var KIND_ORDER2 = { inline: 0, card: 1, note: 2, section: 3 };
+function listNoteLinks(options = {}) {
+  const { dbPath: dbPath2 = NOTES_DB_PATH7, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
+  if (options.id && (options.account || options.folder))
+    throw new NoteStoreError("Pass either id or account/folder, not both.", "invalid_input");
+  const notePk = options.id ? parseNoteId2(options.id).pk : 0;
+  const columns = readColumns(dbPath2);
+  const sql = inventorySql(columns);
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const scope2 = {};
+  let accountPk = 0;
+  let folderPk = 0;
+  const includeSubfolders = options.includeSubfolders ?? true;
+  if (options.account) {
+    const account = resolveAccountName(context.accounts, options.account);
+    accountPk = account.pk;
+    scope2.account = account.name;
+    scope2.accountIdentifier = account.identifier;
+  }
+  if (options.folder) {
+    const { folder, path: path10 } = matchFolder(context.folders, options.folder, accountPk || void 0);
+    folderPk = folder.pk;
+    scope2.folder = folder.name;
+    scope2.folderPath = path10;
+    scope2.includeSubfolders = includeSubfolders;
+  }
+  if (options.id) scope2.note = options.id;
+  const params = {
+    note: { int: notePk },
+    account: { int: accountPk },
+    folder: { int: folderPk },
+    subfolders: { int: includeSubfolders ? 1 : 0 }
+  };
+  const rows = parseJsonLines(runReadOnlySql(dbPath2, sql.rows, params));
+  const notes = rows.filter((row) => row.k === "note");
+  if (options.id && !notes.length)
+    throw new NoteStoreError(`No note found for ID "${options.id}".`, "invalid_input");
+  const includeInline = options.includeInline ?? Boolean(options.id);
+  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params) : /* @__PURE__ */ new Map();
+  const noteById = new Map(notes.map((note) => [note.pk, note]));
+  const accountById = new Map(context.accounts.map((account) => [account.pk, account]));
+  const folderById = new Map(context.folders.map((folder) => [folder.pk, folder]));
+  const source = (pk) => {
+    const note = noteById.get(pk);
+    const account = accountById.get(note.account ?? -1);
+    const folder = folderById.get(note.folder ?? -1);
+    return {
+      noteId: noteIdFor(context.uuid, pk),
+      noteIdentifier: note.identifier,
+      noteTitle: note.title,
+      noteModified: coreDataToIso(note.modified),
+      folder: folder?.name ?? null,
+      folderPath: folder ? paths.get(folder.pk) : null,
+      account: account?.name ?? null,
+      accountIdentifier: account?.identifier ?? null
+    };
+  };
+  const containerDir = dirname5(dbPath2);
+  const previewEntries = /* @__PURE__ */ new Map();
+  const previewFor = (identifier, account) => {
+    const accountDir = identifier ? resolveAccountDir(containerDir, account) : null;
+    if (!accountDir || !identifier) return null;
+    if (!previewEntries.has(accountDir))
+      previewEntries.set(accountDir, listPreviewEntries(accountDir));
+    return previewPaths(accountDir, identifier, previewEntries.get(accountDir))[0] ?? null;
+  };
+  const all = [];
+  const add = (pk, link) => all.push({ pk, link: { ...link, ...source(pk) } });
+  for (const [pk, doc] of docs) for (const link of inlineLinks(doc)) add(pk, link);
+  for (const row of rows) {
+    if (row.k === "card") {
+      const noteId3 = noteIdFor(context.uuid, row.note);
+      const link = cardLink(
+        { pk: row.pk, identifier: row.identifier ?? "", url: row.url, title: row.title },
+        {
+          doc: docs.get(row.note),
+          noteId: noteId3,
+          previewPath: previewFor(row.identifier, source(row.note).accountIdentifier)
+        }
+      );
+      if (link) add(row.note, link);
+    } else if (row.k === "chip") {
+      const link = nativeLink(
+        { identifier: row.identifier ?? "", token: row.token, alt: row.alt },
+        docs.get(row.note)
+      );
+      if (link) add(row.note, link);
+    }
+  }
+  const wanted = options.kinds?.length ? new Set(options.kinds) : void 0;
+  const links = all.filter(({ link }) => !wanted || wanted.has(link.kind)).sort(
+    (a, b) => (b.link.noteModified ?? "").localeCompare(a.link.noteModified ?? "") || a.pk - b.pk || (a.link.start ?? Number.MAX_SAFE_INTEGER) - (b.link.start ?? Number.MAX_SAFE_INTEGER) || KIND_ORDER2[a.link.kind] - KIND_ORDER2[b.link.kind]
+  ).map(({ link }) => link);
+  const counts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) counts[link.kind]++;
+  const start = Math.min(Math.max(0, offset), links.length);
+  const page = [];
+  let bytes = 0;
+  for (let i = start; i < links.length && page.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(links[i]));
+    if (page.length && bytes + size > maxBytes) break;
+    page.push(links[i]);
+    bytes += size;
+  }
+  const next = start + page.length;
+  return {
+    scope: scope2,
+    inlineIncluded: includeInline,
+    notesInScope: notes.length,
+    notesWithoutBody: includeInline ? notes.length - docs.size : 0,
+    counts,
+    links: page,
+    page: {
+      offset: start,
+      returned: page.length,
+      total: links.length,
+      hasMore: next < links.length,
+      ...next < links.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function describeLinkInventory(result) {
+  const { counts, page } = result;
+  return `Found ${page.total} links in ${result.notesInScope} notes (inline ${counts.inline}${result.inlineIncluded ? "" : " not scanned"}, card ${counts.card}, note ${counts.note}, section ${counts.section}); returned ${page.returned} from offset ${page.offset}` + (page.hasMore ? `; more at offset ${page.nextOffset}` : "") + ".";
+}
+
 // src/utils/linkInsert.ts
 var MAX_LINK_URL_LENGTH = 4096;
 var MAX_LINK_LABEL_LENGTH = 2e3;
@@ -49456,7 +49905,7 @@ function insertLink(request, deps) {
 
 // src/services/notesExport.ts
 import { mkdirSync as mkdirSync6 } from "node:fs";
-import { basename as basename4, dirname as dirname5, extname as extname5, join as join22 } from "node:path";
+import { basename as basename4, dirname as dirname6, extname as extname5, join as join22 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -50873,16 +51322,16 @@ var NOTE_PLACEHOLDERS = [
   "exportStem"
 ];
 var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join27) => ({
+var wrap2 = (before, after = "", join28) => ({
   mode: "wrap",
   before,
   after,
-  ...join27 ? { join: join27 } : {}
+  ...join28 ? { join: join28 } : {}
 });
-var pattern = (value, join27) => ({
+var pattern = (value, join28) => ({
   mode: "pattern",
   value,
-  ...join27 ? { join: join27 } : {}
+  ...join28 ? { join: join28 } : {}
 });
 var STANDARD = {
   schemaVersion: 1,
@@ -52021,7 +52470,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync6(dirname5(output), { recursive: true });
+  mkdirSync6(dirname6(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -52054,7 +52503,7 @@ function exportNotesMarkdown(request, deps) {
   if (chosen)
     return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
   const fd = output ? openOutput(output) : void 0;
-  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname5(output) : void 0) : void 0;
+  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
     stats: emptyStats(),
     ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
@@ -52084,7 +52533,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join22(dirname5(output), `${basename4(output, extname5(output))}.assets`);
+  return join22(dirname6(output), `${basename4(output, extname5(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -52105,7 +52554,7 @@ function exportNotesHtml(request, deps) {
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
-  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname5(output)) : new DataUrlWriter();
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname6(output)) : new DataUrlWriter();
   const ctx = {
     stats: emptyStats(),
     writer,
@@ -52137,7 +52586,7 @@ function pathValues(note, meta, exportStem) {
   return values;
 }
 function assetBindings(template, notes, meta, { output, assetsDir, exportStem }) {
-  const linkBase = template.assets.pathStyle === "relative" && output ? dirname5(output) : void 0;
+  const linkBase = template.assets.pathStyle === "relative" && output ? dirname6(output) : void 0;
   const writers = /* @__PURE__ */ new Map();
   const writerFor = (dir) => {
     let writer = writers.get(dir);
@@ -52156,7 +52605,7 @@ function assetBindings(template, notes, meta, { output, assetsDir, exportStem })
         try {
           dir = templateAssetsDir(
             template.assets.directory,
-            dirname5(output),
+            dirname6(output),
             pathValues(note, meta.get(note) ?? {}, exportStem)
           );
         } catch (error2) {
@@ -52210,7 +52659,7 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
     ...warnings.length > MAX_EXPORT_WARNINGS ? { warningsOmitted: warnings.length - MAX_EXPORT_WARNINGS } : {},
     ...used.length ? {
       assets: {
-        dir: used.length === 1 ? used[0].dir : dirname5(output),
+        dir: used.length === 1 ? used[0].dir : dirname6(output),
         files: files.length
       },
       assetFiles: files.slice(0, MAX_LISTED_ASSETS)
@@ -53314,7 +53763,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname6, resolve as resolve5 } from "node:path";
+import { dirname as dirname7, resolve as resolve5 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -53337,7 +53786,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve5(dirname6(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve5(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
@@ -53399,27 +53848,627 @@ function formatShortcutSetup(report) {
   return lines.join("\n");
 }
 
-// src/services/privateHelperBuild.ts
-import { spawnSync as spawnSync4 } from "node:child_process";
+// src/services/publicHelper.ts
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { createHash as createHash5 } from "node:crypto";
 import {
   chmodSync,
-  existsSync as existsSync15,
+  existsSync as existsSync14,
   mkdirSync as mkdirSync7,
   mkdtempSync as mkdtempSync5,
+  readFileSync as readFileSync4,
   renameSync,
   rmSync as rmSync5,
   writeFileSync as writeFileSync4
 } from "node:fs";
-import { release as release3 } from "node:os";
-import { join as join26 } from "node:path";
+import { homedir as homedir19, release as release3 } from "node:os";
+import { dirname as dirname8, join as join25, resolve as resolve6 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+var PUBLIC_HELPER_PROTOCOL = 1;
+var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
+var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
+var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
+var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
+var PUBLIC_HELPER_MANIFEST = "manifest.json";
+var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set(["hello", "decode_drawing"]);
+var DEFAULT_TIMEOUT_MS2 = 3e4;
+var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var publicManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join25(dir, "package.json");
+    if (existsSync14(candidate)) {
+      try {
+        if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
+          return dir;
+      } catch {
+      }
+    }
+    const parent = dirname8(dir);
+    if (parent === dir) return resolve6(fromDir, "..");
+    dir = parent;
+  }
+}
+function defaultPublicHelperDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
+    exists: existsSync14,
+    readFile: (path10) => readFileSync4(path10),
+    spawn: spawnSync3,
+    ...overrides
+  };
+}
+function publicHelperInstallDir(env = process.env) {
+  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+}
+function sha256Hex(data) {
+  return createHash5("sha256").update(data).digest("hex");
+}
+function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
+  const installDir = publicHelperInstallDir(deps.env);
+  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
+  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail(
+      "helper_manifest_invalid",
+      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
+    return {
+      ...fail(
+        "helper_stale",
+        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
+      ),
+      manifest
+    };
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return {
+      ...fail(
+        "helper_modified",
+        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
+      ),
+      manifest
+    };
+  return { ...base, manifest, ready: true, reason: null, detail: null };
+}
+var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid"
+]);
+var PublicHelperError = class extends CodedError {
+  constructor(code, message) {
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      helperCode: code
+    });
+    this.code = code;
+    this.name = "PublicHelperError";
+  }
+  code;
+};
+var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
+var publicHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || options.timeoutMs || DEFAULT_TIMEOUT_MS2;
+  const result = deps.spawn(binaryPath, [], {
+    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PublicHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  let parsed;
+  try {
+    parsed = JSON.parse(String(result.stdout ?? "").trim());
+  } catch {
+    throw new PublicHelperError(
+      "invalid_response",
+      `The helper exited with status ${result.status} and no JSON response.`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
+  const object3 = parsed;
+  if (result.status !== 0 || object3.status !== "ok") {
+    const error2 = errorSchema.safeParse(object3);
+    if (!error2.success)
+      throw new PublicHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized response (exit ${result.status}).`
+      );
+    throw new PublicHelperError(error2.data.code, error2.data.message);
+  }
+  return object3;
+}
+function defaultPublicHelperBuildDeps() {
+  return {
+    ...defaultPublicHelperDeps(),
+    osVersion: () => {
+      const r = spawnSync3("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function sourceDigestSwift(sourceSha) {
+  return `let helperSourceSHA256 = "${sourceSha}"
+`;
+}
+var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
+function publicHelperInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>apple-notes-mcp public helper</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "PencilKit",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
+  const steps = [];
+  const done = (ok) => ({
+    ok,
+    checkOnly,
+    steps,
+    installation: inspectPublicHelper(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectPublicHelper(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = publicHelperInstallDir(deps.env);
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync5(join25(installDir, ".staging-"));
+  try {
+    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join25(staging, "source-digest.swift");
+    const plistPath = join25(staging, "Info.plist");
+    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = publicHelloSchema.parse(
+        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync(stagedBinary, 448);
+    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync4(
+      join25(installDir, PUBLIC_HELPER_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync5(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPublicHelper(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatPublicHelperBuild(report) {
+  const lines = ["Apple Notes MCP public native helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
+  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+
+// src/utils/noteStoreQuery.ts
+function parseNoteObjectId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/.exec(noteId3);
+  if (!match)
+    throw new NoteStoreError(
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`,
+      "invalid_input"
+    );
+  return { store: match[1], pk: Number(match[2]) };
+}
+function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH7) {
+  return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
+}
+var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
+function assertNoteReadable(stateLine, noteId3) {
+  let state;
+  try {
+    state = JSON.parse(stateLine || "{}");
+  } catch {
+    throw new NoteStoreError("Unexpected response from the Notes database.", "query_error");
+  }
+  if (!state.found)
+    throw new CodedError(`No note found in the database for ID "${noteId3}".`, {
+      code: "not_found"
+    });
+  if (state.locked)
+    throw new CodedError(
+      "This note is password-protected; its attachments are encrypted and cannot be read.",
+      { code: "unsupported" }
+    );
+}
+
+// src/utils/noteDrawings.ts
+function drawingRowsSql(columns, dataColumn) {
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`
+  ].join("\n");
+}
+function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH7) {
+  const { store, pk } = parseNoteObjectId(noteId3);
+  const columns = readColumns(dbPath2);
+  const dataColumn = columns.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
+  if (!dataColumn)
+    throw new NoteStoreError(
+      "This macOS version's Notes database has no drawing data column.",
+      "schema"
+    );
+  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns, dataColumn), pk, dbPath2);
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  return rows.map((row) => ({
+    pk: row.pk,
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier ?? "",
+    typeUti: row.uti,
+    data: row.data ? Buffer.from(row.data, "hex") : null
+  }));
+}
+function svgNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+function escapeAttribute2(value) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+var clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value || 0)));
+var clampUnit = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+function drawingViewBox(strokes, fallback) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const stroke of strokes) {
+    const pad = stroke.width / 2;
+    const extend2 = (x, y, r) => {
+      minX = Math.min(minX, x - r);
+      minY = Math.min(minY, y - r);
+      maxX = Math.max(maxX, x + r);
+      maxY = Math.max(maxY, y + r);
+    };
+    if (stroke.points?.length) for (const p of stroke.points) extend2(p.x, p.y, pad);
+    else {
+      extend2(stroke.bounds.x, stroke.bounds.y, 0);
+      extend2(stroke.bounds.x + stroke.bounds.width, stroke.bounds.y + stroke.bounds.height, 0);
+    }
+  }
+  if (minX === Infinity) return fallback ?? { x: 0, y: 0, width: 1, height: 1 };
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+function drawingToSvg(strokes, fallback) {
+  const box = drawingViewBox(strokes, fallback);
+  const parts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${svgNumber(box.x)} ${svgNumber(box.y)} ${svgNumber(box.width)} ${svgNumber(box.height)}" width="${svgNumber(box.width)}" height="${svgNumber(box.height)}">`
+  ];
+  for (const stroke of strokes) {
+    const points = stroke.points ?? [];
+    if (points.length === 0) continue;
+    const c = stroke.color;
+    const color = `rgb(${clampChannel(c.red)},${clampChannel(c.green)},${clampChannel(c.blue)})`;
+    const shared = `stroke="${color}" stroke-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"`;
+    if (points.length === 1) {
+      parts.push(
+        `<circle cx="${svgNumber(points[0].x)}" cy="${svgNumber(points[0].y)}" r="${svgNumber(stroke.width / 2)}" fill="${color}" fill-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"/>`
+      );
+      continue;
+    }
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${svgNumber(p.x)} ${svgNumber(p.y)}`).join(" ");
+    parts.push(
+      `<path d="${d}" fill="none" ${shared} stroke-width="${svgNumber(stroke.width)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    );
+  }
+  parts.push("</svg>");
+  return parts.join("\n");
+}
+
+// src/services/noteDrawings.ts
+var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
+var strokeSchema = external_exports.object({
+  inkType: external_exports.string(),
+  color: external_exports.object({
+    red: external_exports.number(),
+    green: external_exports.number(),
+    blue: external_exports.number(),
+    alpha: external_exports.number()
+  }),
+  width: external_exports.number(),
+  pointCount: external_exports.number().int(),
+  bounds,
+  points: external_exports.array(
+    external_exports.object({
+      x: external_exports.number(),
+      y: external_exports.number(),
+      width: external_exports.number(),
+      opacity: external_exports.number(),
+      force: external_exports.number()
+    })
+  ).optional(),
+  transformApplied: external_exports.boolean().optional()
+}).strip();
+var decodedDrawingSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  strokeCount: external_exports.number().int(),
+  strokes: external_exports.array(strokeSchema),
+  truncated: external_exports.boolean(),
+  bounds
+});
+function decodeRow(row, format, includePoints, deps) {
+  const base = {
+    attachmentId: row.attachmentId,
+    identifier: row.identifier,
+    typeUti: row.typeUti,
+    status: "error"
+  };
+  if (!row.data || row.data.length === 0)
+    return { ...base, code: "no_data", message: "This drawing has no stored PencilKit data." };
+  let decoded;
+  try {
+    const needPoints = includePoints || format !== "json";
+    const raw = callPublicHelper(
+      "decode_drawing",
+      { dataBase64: row.data.toString("base64"), includePoints: needPoints },
+      deps
+    );
+    const parsed = decodedDrawingSchema.safeParse(raw);
+    if (!parsed.success)
+      return { ...base, code: "invalid_response", message: "Unexpected helper response." };
+    decoded = parsed.data;
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
+  }
+  const strokes = decoded.strokes;
+  const result = {
+    ...base,
+    status: "ok",
+    strokeCount: decoded.strokeCount,
+    bounds: decoded.bounds,
+    truncated: decoded.truncated
+  };
+  if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
+  if (format !== "svg")
+    result.strokes = includePoints ? strokes : strokes.map(({ points: _points, ...rest }) => rest);
+  return result;
+}
+function getNoteDrawings(noteId3, options = {}) {
+  const format = options.format ?? "json";
+  const includePoints = options.includePoints ?? true;
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  const rows = (options.readRows ?? readDrawingRows2)(noteId3, options.dbPath);
+  if (rows.length === 0) return { id: noteId3, drawingCount: 0, status: "none", drawings: [] };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
+  const ok = drawings.filter((d) => d.status === "ok").length;
+  return {
+    id: noteId3,
+    drawingCount: drawings.length,
+    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
+    drawings
+  };
+}
+function formatNoteDrawings(result) {
+  if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
+  const lines = [
+    `${result.drawingCount} classic drawing${result.drawingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}):`
+  ];
+  for (const d of result.drawings)
+    lines.push(
+      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
+    );
+  return lines.join("\n");
+}
+
+// src/services/privateHelperBuild.ts
+import { spawnSync as spawnSync5 } from "node:child_process";
+import {
+  chmodSync as chmodSync2,
+  existsSync as existsSync16,
+  mkdirSync as mkdirSync8,
+  mkdtempSync as mkdtempSync6,
+  renameSync as renameSync2,
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
+} from "node:fs";
+import { release as release4 } from "node:os";
+import { join as join27 } from "node:path";
 
 // src/services/privateHelper.ts
-import { spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash5 } from "node:crypto";
-import { existsSync as existsSync14, readFileSync as readFileSync4 } from "node:fs";
-import { homedir as homedir19 } from "node:os";
-import { dirname as dirname7, join as join25, resolve as resolve6 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { spawnSync as spawnSync4 } from "node:child_process";
+import { createHash as createHash6 } from "node:crypto";
+import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
+import { homedir as homedir20 } from "node:os";
+import { dirname as dirname9, join as join26, resolve as resolve7 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
 var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
@@ -53432,8 +54481,8 @@ var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
 var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
-var DEFAULT_TIMEOUT_MS2 = 2e4;
-var MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+var DEFAULT_TIMEOUT_MS3 = 2e4;
+var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -53443,19 +54492,19 @@ var manifestSchema = external_exports.object({
   osVersion: external_exports.string(),
   compiler: external_exports.string()
 });
-function packageRoot(fromDir = dirname7(fileURLToPath2(import.meta.url))) {
+function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
-    if (existsSync14(candidate)) {
+    const candidate = join26(dir, "package.json");
+    if (existsSync15(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync4(candidate, "utf8"));
+        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
         if (pkg.name === "apple-notes-mcp") return dir;
       } catch {
       }
     }
-    const parent = dirname7(dir);
-    if (parent === dir) return resolve6(fromDir, "..");
+    const parent = dirname9(dir);
+    if (parent === dir) return resolve7(fromDir, "..");
     dir = parent;
   }
 }
@@ -53463,10 +54512,10 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot(), HELPER_SOURCE_RELATIVE),
-    exists: existsSync14,
-    readFile: (path10) => readFileSync4(path10),
-    spawn: spawnSync3,
+    sourcePath: join26(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    exists: existsSync15,
+    readFile: (path10) => readFileSync5(path10),
+    spawn: spawnSync4,
     ...overrides
   };
 }
@@ -53476,14 +54525,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
-function sha256Hex(data) {
-  return createHash5("sha256").update(data).digest("hex");
+function sha256Hex2(data) {
+  return createHash6("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join26(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -53500,8 +54549,8 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  base.expectedSourceSha256 = sha256Hex(deps.readFile(deps.sourcePath));
-  const manifestPath = join25(installDir, MANIFEST_NAME);
+  base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
+  const manifestPath = join26(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -53522,7 +54571,7 @@ function inspectInstallation(deps = defaultDeps2()) {
       "helper_stale",
       "The installed helper was built from a different helper source or protocol than this apple-notes-mcp version ships. Run `apple-notes-mcp setup --native-helper` again."
     );
-  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+  if (sha256Hex2(deps.readFile(binaryPath)) !== manifest.binarySha256)
     return fail(
       "helper_modified",
       "The helper binary does not match the checksum recorded when it was built. Run `apple-notes-mcp setup --native-helper` to rebuild it."
@@ -53539,7 +54588,7 @@ var PrivateHelperError = class extends Error {
   code;
   details;
 };
-var errorSchema = external_exports.object({
+var errorSchema2 = external_exports.object({
   status: external_exports.literal("error"),
   code: external_exports.string(),
   message: external_exports.string()
@@ -53611,13 +54660,13 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
       throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS3;
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES,
+    maxBuffer: MAX_OUTPUT_BYTES2,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -53642,7 +54691,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
   const object3 = parsed;
   if (result.status !== 0 || object3.status === "error") {
-    const error2 = errorSchema.safeParse(object3);
+    const error2 = errorSchema2.safeParse(object3);
     if (!error2.success)
       throw new PrivateHelperError(
         "invalid_response",
@@ -53745,8 +54794,8 @@ function defaultBuildDeps() {
   return {
     ...defaultDeps2(),
     osVersion: () => {
-      const r = spawnSync4("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
-      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+      const r = spawnSync5("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release4()}`;
     },
     now: () => /* @__PURE__ */ new Date()
   };
@@ -53796,7 +54845,7 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
     return done(false);
   }
   const source = deps.readFile(deps.sourcePath);
-  const sourceSha = sha256Hex(source);
+  const sourceSha = sha256Hex2(source);
   steps.push({
     step: "locate source",
     ok: true,
@@ -53815,10 +54864,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join26(installDir, ".staging-"));
+  mkdirSync8(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join27(installDir, ".staging-"));
   try {
-    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join27(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -53889,19 +54938,19 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       schemaVersion: 1,
       protocolVersion: hello.protocolVersion,
       sourceSha256: sourceSha,
-      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      binarySha256: sha256Hex2(deps.readFile(stagedBinary)),
       builtAt: deps.now().toISOString(),
       osVersion: deps.osVersion(),
       compiler
     };
-    chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
-    writeFileSync4(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    chmodSync2(stagedBinary, 448);
+    renameSync2(stagedBinary, join27(installDir, HELPER_BINARY_NAME));
+    writeFileSync5(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync15(staging)) rmSync5(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
@@ -54041,6 +55090,11 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
   const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatHelperBuild(report) + "\n");
@@ -55075,6 +56129,77 @@ registerTool(
     );
   }, "Error reading note blocks")
 );
+var paragraphNoteSelector = {
+  id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
+  title: external_exports.string().min(1).max(MAX.TITLE).optional().describe("Exact note title; must match one note unless folder narrows it"),
+  folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("With title only: the note's folder name or full path as list-folders shows it")
+};
+registerTool(
+  "list-note-paragraphs",
+  {
+    description: "Use when: you need a note's paragraphs with their style and stored paragraph ID, for example to choose one to link to.\nReturns: one page of non-empty paragraphs in body order, each with blockIndex (as in get-note-blocks), text, style, paragraphId, paragraphIdStatus (unique, shared, missing) and, only when unique, a direct applenotes:// url that opens that paragraph; plus counts per status and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you need inline formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Paragraph IDs repeat often (Notes copies them when a paragraph is split), so shared IDs get no url. Title lookups ignore Recently Deleted. Password-protected notes are refused.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      linkableOnly: external_exports.boolean().optional().describe("Return only paragraphs that have a direct url (default false)"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      paragraphs: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, linkableOnly, offset, limit }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const page = pageParagraphs(note.paragraphs, {
+      offset,
+      limit,
+      linkableOnly,
+      maxBytes: blocksMaxResponseBytes()
+    });
+    const { unique, shared, missing } = note.counts;
+    return successResponse(
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + ".",
+      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+    );
+  }, "Error listing paragraphs")
+);
+registerTool(
+  "get-paragraph-link",
+  {
+    description: "Use when: you need a link that opens Notes at one paragraph (for example a heading) of a note.\nReturns: a direct applenotes://showNote?identifier=<note>&paragraphID=<paragraph> url and the selected paragraph, only when that paragraph's stored ID is present and appears in no other paragraph of the note. Otherwise an error whose structuredContent.reason says why: paragraph-id-shared, paragraph-id-missing, no-match, ambiguous-paragraph (pass occurrence or a longer snippet), occurrence-out-of-range, ambiguous-note, encrypted.\nDo not use when: you want a link to the whole note (get-note-link).\nSafety: read-only; never creates or changes a paragraph ID, so a paragraph without a unique ID cannot be linked. Requires Full Disk Access. A later edit in Notes can replace the ID and break the link.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: external_exports.string().min(1).max(MAX.CONTENT).optional().describe(
+        "Snippet of the paragraph (case, spacing and Unicode width are ignored); give one of contains, match, blockIndex"
+      ),
+      match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text, compared the same way"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+    },
+    outputSchema: {
+      url: external_exports.string().optional(),
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      paragraph: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, contains, match, blockIndex, occurrence }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+    return successResponse(`Paragraph link: ${result.url}`, {
+      url: result.url,
+      id: note.id,
+      identifier: note.identifier,
+      paragraph: { ...result.paragraph }
+    });
+  }, "No paragraph link")
+);
 registerTool(
   "get-note-structure",
   {
@@ -55127,6 +56252,53 @@ registerTool(
     });
     return successResponse(describeNoteStructure(structure), { ...structure });
   }, "Error reading note structure")
+);
+registerTool(
+  "list-note-links",
+  {
+    description: "Use when: you need the links in one note (by exact id) or across a folder (with its subfolders by default), an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path (as list-folders prints it) and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Account name (exact or unique-prefix match)"),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe(
+        "Folder name or path as list-folders prints it, such as Work/Clients (escape a literal slash as \\/)"
+      ),
+      includeSubfolders: external_exports.boolean().optional().describe("With folder, also list notes in its subfolders (default true)"),
+      includeInline: external_exports.boolean().optional().describe(
+        "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+      ),
+      kinds: external_exports.array(external_exports.enum(["inline", "card", "note", "section"])).max(4).optional().describe("Only these link kinds"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(2e3).optional().describe("Maximum links to return (default 200, max 2000)")
+    },
+    outputSchema: {
+      scope: external_exports.record(external_exports.unknown()).optional(),
+      inlineIncluded: external_exports.boolean().optional(),
+      notesInScope: external_exports.number().optional(),
+      notesWithoutBody: external_exports.number().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(
+    ({ id: id2, account, folder, includeSubfolders, includeInline, kinds, offset, limit }) => {
+      const result = listNoteLinks({
+        id: id2,
+        account,
+        folder,
+        includeSubfolders,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes()
+      });
+      return successResponse(describeLinkInventory(result), { ...result });
+    },
+    "Error listing note links"
+  )
 );
 registerTool(
   "list-native-tags",
@@ -56969,6 +58141,41 @@ ${lines.join("\n")}${more}`,
       structured
     );
   }, "Error listing notes")
+);
+registerTool(
+  "get-note-drawings",
+  {
+    description: "Use when: reading the strokes of a note's classic PencilKit drawings (com.apple.drawing / com.apple.drawing.2 attachments), by note id, as JSON or SVG.\nReturns: per drawing its attachment id, status (ok/error with a code), stroke count, bounds, and strokes (ink type, sRGB color, width, points) and/or a standalone SVG document; overall status ok/partial/error/none.\nDo not use when: the drawing is a modern Paper sketch (com.apple.paper is not decoded here) or you want the attachment file itself (save-attachment).\nNote: read-only. Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper` (compiled locally with PencilKit; no Notes writes).",
+    inputSchema: {
+      id: noteIdInput,
+      format: external_exports.enum(["json", "svg", "both"]).optional().describe(
+        '"json" (default) returns strokes, "svg" returns SVG documents, "both" returns both'
+      ),
+      includePoints: external_exports.boolean().optional().describe(
+        "Include per-point x/y/width/opacity/force in JSON strokes (default true). SVG output always uses the points."
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      drawingCount: external_exports.number().optional(),
+      status: external_exports.string().optional(),
+      drawings: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      pointsOmitted: external_exports.boolean().optional()
+    }
+  },
+  withErrorHandling(({ id: id2, format, includePoints }) => {
+    let result = getNoteDrawings(id2, { format, includePoints });
+    let pointsOmitted = false;
+    if (Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() && includePoints !== false && format !== "svg") {
+      result = getNoteDrawings(id2, { format, includePoints: false });
+      pointsOmitted = true;
+    }
+    const text2 = formatNoteDrawings(result) + (pointsOmitted ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "");
+    return successResponse(text2, {
+      ...result,
+      ...pointsOmitted ? { pointsOmitted } : {}
+    });
+  }, "Error reading drawings")
 );
 registerTool(
   "list-recent-notes",
