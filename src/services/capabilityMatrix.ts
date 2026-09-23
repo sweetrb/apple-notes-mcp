@@ -128,6 +128,7 @@ export const FEATURES: FeatureDefinition[] = [
       "get-note-content",
       "update-note",
       "append-to-note",
+      "insert-link",
       "delete-note",
       "move-note",
       "list-notes",
@@ -141,8 +142,9 @@ export const FEATURES: FeatureDefinition[] = [
   {
     name: "fullDiskAccessReads",
     description:
-      "Read-only reads of the Notes database: checklist state, note metadata, note links, native objects, native tags, and sync detail",
+      "Read-only reads of the Notes database: query-notes, checklist state, note metadata, note links, native objects, native tags, and sync detail",
     tools: [
+      "query-notes",
       "get-checklist-state",
       "get-note-metadata",
       "get-note-link",
@@ -168,6 +170,7 @@ export const FEATURES: FeatureDefinition[] = [
     tools: [
       "append-native",
       "create-checklist-item",
+      "create-checklist-items",
       "create-table",
       "insert-note-link",
       "set-note-pinned",
