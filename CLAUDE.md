@@ -162,6 +162,16 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes
 - Use `limit` to cap the number of notes returned
 
+### list-special-notes
+- Lists `kind: "pinned" | "quick-notes" | "recently-deleted" | "locked"` from the NoteStore database (read-only, needs Full Disk Access). AppleScript cannot enumerate any of these sets
+- Rows are metadata only, newest first, with the usual `x-coredata` `id`; `total` is the match count before `limit` (default 100, max 1000)
+- `locked` deliberately includes trashed and folderless locked notes; check `inRecentlyDeleted`, `markedForDeletion`, and `folder` before acting on a row
+- `supported: false` means this macOS version's database cannot answer that kind; it is not an error
+
+### list-native-tags
+- Pass `folder` for the per-folder tag → note-id map; omit `folder` for an account-wide inventory with `noteCount` per tag (all accounts unless `account` is given)
+- `complete: false` with `unverifiedNotes` means some tagged notes (usually locked ones) were counted without confirming the tag in their body
+
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
 - The destination folder must already exist (create it first with `create-folder`)

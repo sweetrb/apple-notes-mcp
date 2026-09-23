@@ -788,3 +788,75 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+// =============================================================================
+// Database-Backed Listings
+// =============================================================================
+
+/** Which set of notes `list-special-notes` returns. */
+export type SpecialNoteKind = "pinned" | "quick-notes" | "recently-deleted" | "locked";
+
+/**
+ * One note row from `list-special-notes`. Metadata only: no body text. Fields
+ * the store cannot answer on this macOS version are null or false.
+ */
+export interface SpecialNoteRow {
+  /** MCP note id (`x-coredata://<store>/ICNote/p<n>`). */
+  id: string;
+  /** The note's Notes UUID (ZIDENTIFIER). */
+  identifier: string | null;
+  title: string | null;
+  /** Folder path in list-folders syntax, or null for a folderless note. */
+  folder: string | null;
+  account: string | null;
+  created: string | null;
+  modified: string | null;
+  pinned: boolean;
+  locked: boolean;
+  quickNote: boolean;
+  inRecentlyDeleted: boolean;
+  /** A tombstone Notes has deleted and is waiting to sync away. */
+  markedForDeletion: boolean;
+  /** Stored preview snippet. Never returned for locked notes. */
+  snippet?: string | null;
+  /** Password hint, returned only by the `locked` listing when one is set. */
+  passwordHint?: string;
+}
+
+/** Result of `list-special-notes`. */
+export interface SpecialNotesResult {
+  kind: SpecialNoteKind;
+  notes: SpecialNoteRow[];
+  count: number;
+  /** Matching notes before `limit` was applied. */
+  total: number;
+  limit: number;
+  /** False when this macOS version's database cannot answer the listing. */
+  supported: boolean;
+  /** The resolved account name when the listing was scoped to one account. */
+  account?: string;
+}
+
+/** One tag in the account-wide native tag inventory. */
+export interface NativeTagInventoryEntry {
+  /** Display spelling (the most used one when notes spell it differently). */
+  tag: string;
+  /** Distinct notes that use the tag. */
+  noteCount: number;
+  /** Per-account note counts, keyed by account name. */
+  accounts: Record<string, number>;
+  /** Other spellings seen for the same tag (Notes matches tags case-insensitively). */
+  spellings?: string[];
+}
+
+/** Result of `list-native-tags` in account-wide mode. */
+export interface NativeTagInventory {
+  inventory: NativeTagInventoryEntry[];
+  tagCount: number;
+  /** False when some tagged notes could not be confirmed against their body. */
+  complete: boolean;
+  /** Notes counted from tag objects alone because their body could not be decoded. */
+  unverifiedNotes: number;
+  /** The resolved account name when the inventory was scoped to one account. */
+  account?: string;
+}

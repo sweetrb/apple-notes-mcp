@@ -3268,8 +3268,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7181,12 +7181,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs4, exportName) {
+    function addFormats(ajv, list, fs5, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs4[f]);
+        ajv.addFormat(f, fs5[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path5) {
+          if (!path5) return path5;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path5.length > 0) {
+            if (path5 === "." || path5 === "..") {
+              path5 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path5.substring(0, 2);
+            var threechars = path5.substring(0, 3);
+            var fourchars = path5.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path5 = path5.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path5 = path5.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path5 = "/" + path5.substring(3);
+            } else if (twochars === "/." && path5.length === 2) {
+              path5 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path5.length === 3) {
+              path5 = "/" + path5.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path5.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path5 = path5.substring(segment.length);
             }
           }
           return output;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -39855,8 +39855,8 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path4) {
-  return realpathSync.native(path4);
+function canonicalize(path5) {
+  return realpathSync.native(path5);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -39878,9 +39878,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path4) {
+function entryExists(path5) {
   try {
-    lstatSync(path4);
+    lstatSync(path5);
     return true;
   } catch (e) {
     const code = e.code;
@@ -42637,6 +42637,410 @@ function getNoteMetadata(noteId3) {
   }
 }
 
+// src/utils/noteListings.ts
+import { gunzipSync as gunzipSync3 } from "zlib";
+
+// src/utils/noteStoreSql.ts
+import { execFileSync as execFileSync6 } from "child_process";
+import * as fs4 from "fs";
+import * as os4 from "os";
+import * as path4 from "path";
+var NOTES_DB_PATH4 = path4.join(
+  os4.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
+var STORE_FDA_MESSAGE = `Full Disk Access is required to read the Notes database. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var NoteStoreError = class extends Error {
+  constructor(message, kind) {
+    super(message);
+    this.kind = kind;
+    this.name = "NoteStoreError";
+  }
+  kind;
+};
+function doubleToHex(value) {
+  if (!Number.isFinite(value)) throw new NoteStoreError("Not a finite number", "invalid_input");
+  const buffer = Buffer.alloc(8);
+  buffer.writeDoubleBE(value);
+  return buffer.toString("hex");
+}
+function hexToDouble(hex2) {
+  if (!/^[0-9a-f]{16}$/i.test(hex2))
+    throw new NoteStoreError("Invalid double bits", "invalid_input");
+  const value = Buffer.from(hex2, "hex").readDoubleBE();
+  if (!Number.isFinite(value)) throw new NoteStoreError("Invalid double bits", "invalid_input");
+  return value;
+}
+function renderValue(value) {
+  if ("int" in value) {
+    if (!Number.isSafeInteger(value.int)) {
+      throw new NoteStoreError("Bound integer out of range", "invalid_input");
+    }
+    return String(value.int);
+  }
+  if ("blob" in value) return `x'${Buffer.from(value.blob).toString("hex")}'`;
+  const double = "double" in value ? value.double : hexToDouble(value.doubleBits);
+  return `ieee754_from_blob(x'${doubleToHex(double)}')`;
+}
+function runReadOnlySql(dbPath2, sql, params = {}) {
+  if (!fs4.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+  const args = ["-readonly"];
+  const names = Object.keys(params);
+  if (names.length) args.push("-cmd", ".parameter init");
+  for (const name of names) {
+    if (!/^[a-z][a-z0-9_]*$/i.test(name)) {
+      throw new NoteStoreError(`Invalid parameter name ${name}`, "invalid_input");
+    }
+    args.push("-cmd", `.parameter set @${name} ${renderValue(params[name])}`);
+  }
+  args.push(dbPath2, sql);
+  try {
+    return execFileSync6("sqlite3", args, {
+      encoding: "utf8",
+      timeout: 3e4,
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message)) {
+      throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`Notes database query failed: ${message}`);
+    throw new NoteStoreError("Failed to query the Notes database.", "query_error");
+  }
+}
+function parseJsonLines(output) {
+  const rows = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      throw new NoteStoreError("Unexpected Notes database response.", "query_error");
+    }
+  }
+  return rows;
+}
+function readColumns(dbPath2) {
+  const out = runReadOnlySql(
+    dbPath2,
+    "SELECT json_object('name', name) FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  );
+  return new Set(parseJsonLines(out).map((row) => row.name));
+}
+function requireColumns(columns, required2, tool) {
+  const missing = required2.filter((column) => !columns.has(column));
+  if (missing.length) {
+    throw new NoteStoreError(
+      `This macOS version's Notes database lacks columns ${tool} needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+}
+function col(columns, alias, name, fallback = "NULL") {
+  return columns.has(name) ? `${alias}.${name}` : fallback;
+}
+function entity(name) {
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
+}
+function accountRef(columns, alias) {
+  const refs = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort().map((name) => `${alias}.${name}`);
+  if (!refs.length) return "NULL";
+  return refs.length === 1 ? refs[0] : `COALESCE(${refs.join(", ")})`;
+}
+function trashFolderSql(columns, f) {
+  const parts = [];
+  if (columns.has("ZFOLDERTYPE")) parts.push(`COALESCE(${f}.ZFOLDERTYPE, 0) = 1`);
+  if (columns.has("ZIDENTIFIER")) parts.push(`COALESCE(${f}.ZIDENTIFIER, '') LIKE 'TrashFolder%'`);
+  return parts.length ? `(${parts.join(" OR ")})` : "0";
+}
+function notTombstonedSql(columns, alias) {
+  return columns.has("ZMARKEDFORDELETION") ? `COALESCE(${alias}.ZMARKEDFORDELETION, 0) = 0` : "1";
+}
+function activeNoteSql(columns, n, f) {
+  return [
+    `${n}.ZFOLDER IS NOT NULL`,
+    `${f}.Z_PK IS NOT NULL`,
+    notTombstonedSql(columns, n),
+    notTombstonedSql(columns, f),
+    `NOT ${trashFolderSql(columns, f)}`
+  ].join(" AND ");
+}
+function coreDataToIso(seconds) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) return null;
+  const date3 = new Date(CORE_DATA_EPOCH_MS + seconds * 1e3);
+  return Number.isNaN(date3.getTime()) ? null : date3.toISOString();
+}
+function noteIdFor(storeUuid, pk) {
+  return `x-coredata://${storeUuid}/ICNote/p${pk}`;
+}
+function readStoreContext(dbPath2, columns) {
+  const sql = [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col(columns, "a", "ZNAME")}, 'identifier', ${col(columns, "a", "ZIDENTIFIER")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity("ICAccount")} AND ${notTombstonedSql(columns, "a")};`,
+    `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col(columns, "f", "ZTITLE2")}, 'identifier', ${col(columns, "f", "ZIDENTIFIER")}, 'parent', ${col(columns, "f", "ZPARENT")}, 'account', ${col(columns, "f", "ZOWNER", accountRef(columns, "f"))}, 'folderType', ${col(columns, "f", "ZFOLDERTYPE")}, 'trash', ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "f")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity("ICFolder")};`,
+    "COMMIT;"
+  ].join(" ");
+  const rows = parseJsonLines(runReadOnlySql(dbPath2, sql));
+  const meta = rows.find((row) => row.k === "meta");
+  if (typeof meta?.uuid !== "string" || !meta.uuid) {
+    throw new NoteStoreError("The Notes database has no store identifier.", "schema");
+  }
+  return {
+    uuid: meta.uuid,
+    accounts: rows.filter((row) => row.k === "account").map((row) => ({
+      pk: row.pk,
+      name: typeof row.name === "string" ? row.name : "",
+      identifier: row.identifier ?? null
+    })),
+    folders: rows.filter((row) => row.k === "folder").map((row) => ({
+      pk: row.pk,
+      name: row.name ?? null,
+      identifier: row.identifier ?? null,
+      parent: row.parent ?? null,
+      account: row.account ?? null,
+      folderType: row.folderType ?? null,
+      trash: row.trash ? 1 : 0,
+      tombstoned: row.tombstoned ? 1 : 0
+    }))
+  };
+}
+function folderPaths(folders) {
+  const byPk = new Map(folders.map((folder) => [folder.pk, folder]));
+  const paths = /* @__PURE__ */ new Map();
+  for (const folder of folders) {
+    const segments = [];
+    const seen = /* @__PURE__ */ new Set();
+    let current = folder;
+    while (current && !seen.has(current.pk)) {
+      seen.add(current.pk);
+      segments.unshift((current.name ?? "").replace(/\//g, "\\/"));
+      current = current.parent !== null ? byPk.get(current.parent) : void 0;
+    }
+    paths.set(folder.pk, segments.join("/"));
+  }
+  return paths;
+}
+function resolveAccountName(accounts, name) {
+  const wanted = name.trim().toLocaleLowerCase();
+  const exact = accounts.filter((account) => account.name.toLocaleLowerCase() === wanted);
+  if (exact.length === 1) return exact[0];
+  const prefix = accounts.filter((account) => account.name.toLocaleLowerCase().startsWith(wanted));
+  if (exact.length === 0 && prefix.length === 1) return prefix[0];
+  const names = accounts.map((account) => account.name).join(", ");
+  throw new NoteStoreError(
+    exact.length > 1 || prefix.length > 1 ? `Account "${name}" is ambiguous. Accounts: ${names}.` : `No account named "${name}". Accounts: ${names}.`,
+    "invalid_input"
+  );
+}
+
+// src/utils/noteListings.ts
+var SPECIAL_LIMIT = { DEFAULT: 100, MAX: 1e3 };
+var HASHTAG_UTI = "com.apple.notes.inlinetextattachment.hashtag";
+var KIND_COLUMN = {
+  pinned: ["ZISPINNED"],
+  "quick-notes": ["ZISSYSTEMPAPER"],
+  "recently-deleted": ["ZFOLDERTYPE", "ZIDENTIFIER"],
+  locked: ["ZISPASSWORDPROTECTED"]
+};
+function kindSupported(columns, kind) {
+  return KIND_COLUMN[kind].some((name) => columns.has(name));
+}
+var flag = (columns, alias, name) => columns.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
+function kindPredicate(columns, kind) {
+  switch (kind) {
+    case "pinned":
+      return `${flag(columns, "n", "ZISPINNED")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+    case "quick-notes":
+      return `${flag(columns, "n", "ZISSYSTEMPAPER")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+    case "recently-deleted":
+      return `f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")} AND ${notTombstonedSql(columns, "n")}`;
+    case "locked":
+      return `${flag(columns, "n", "ZISPASSWORDPROTECTED")} = 1`;
+  }
+}
+function folderAccountJoins(columns) {
+  const owner = col(columns, "f", "ZOWNER");
+  const account = owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;
+  return `LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")}`;
+}
+function noteFrom(columns) {
+  return `FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)}`;
+}
+var REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZTITLE1"];
+function buildSpecialNotesSql(columns, kind, scoped) {
+  requireColumns(columns, REQUIRED, "list-special-notes");
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
+  const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
+  const modified = col(columns, "n", "ZMODIFICATIONDATE1");
+  const locked = flag(columns, "n", "ZISPASSWORDPROTECTED");
+  const where = `WHERE n.Z_ENT = ${entity("ICNote")} AND ${kindPredicate(columns, kind)}` + (scoped ? " AND a.Z_PK = @account" : "");
+  const snippet = `CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns, "n", "ZSNIPPET")} END`;
+  const hint = kind === "locked" ? col(columns, "n", "ZPASSWORDHINT") : "NULL";
+  const row = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', ${modified}, 'pinned', ${flag(columns, "n", "ZISPINNED")}, 'locked', ${locked}, 'quick', ${flag(columns, "n", "ZISSYSTEMPAPER")}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "n")}, 'snippet', ${snippet}, 'hint', ${hint}) ${noteFrom(columns)} ${where} ORDER BY ${modified} DESC, n.Z_PK DESC LIMIT @limit;`;
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'total', 'n', COUNT(*)) ${noteFrom(columns)} ${where};`,
+    row,
+    "COMMIT;"
+  ].join(" ");
+}
+function listSpecialNotes(options) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH4;
+  const limit = Math.min(
+    Math.max(1, Math.trunc(options.limit ?? SPECIAL_LIMIT.DEFAULT)),
+    SPECIAL_LIMIT.MAX
+  );
+  const columns = readColumns(dbPath2);
+  const empty = {
+    kind: options.kind,
+    notes: [],
+    count: 0,
+    total: 0,
+    limit,
+    supported: false
+  };
+  if (!kindSupported(columns, options.kind)) return empty;
+  const context = readStoreContext(dbPath2, columns);
+  const scope = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const params = { limit: { int: limit } };
+  if (scope) params.account = { int: scope.pk };
+  const rows = parseJsonLines(
+    runReadOnlySql(dbPath2, buildSpecialNotesSql(columns, options.kind, Boolean(scope)), params)
+  );
+  const paths = folderPaths(context.folders);
+  const accountNames = new Map(context.accounts.map((account) => [account.pk, account.name]));
+  const notes = rows.filter((row) => row.k === "note").map((row) => toSpecialRow(row, context.uuid, paths, accountNames, options.kind));
+  return {
+    kind: options.kind,
+    notes,
+    count: notes.length,
+    total: rows.find((row) => row.k === "total")?.n ?? notes.length,
+    limit,
+    supported: true,
+    ...scope ? { account: scope.name } : {}
+  };
+}
+function toSpecialRow(row, uuid2, paths, accountNames, kind) {
+  const locked = Boolean(row.locked);
+  const note = {
+    id: noteIdFor(uuid2, row.pk),
+    identifier: row.identifier ?? null,
+    title: row.title ?? null,
+    folder: row.folder !== null ? paths.get(row.folder) ?? null : null,
+    account: row.account !== null ? accountNames.get(row.account) ?? null : null,
+    created: coreDataToIso(row.created),
+    modified: coreDataToIso(row.modified),
+    pinned: Boolean(row.pinned),
+    locked,
+    quickNote: Boolean(row.quick),
+    inRecentlyDeleted: Boolean(row.trash),
+    markedForDeletion: Boolean(row.tombstoned)
+  };
+  if (!locked) note.snippet = row.snippet ?? null;
+  if (kind === "locked" && row.hint) note.passwordHint = row.hint;
+  return note;
+}
+var TAG_REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"];
+function buildTagInventorySql(columns, scoped) {
+  requireColumns(columns, TAG_REQUIRED, "list-native-tags");
+  const accountFilter = scoped ? " AND a.Z_PK = @account" : "";
+  const uses = `FROM ZICCLOUDSYNCINGOBJECT i JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = i.ZNOTE1 AND n.Z_ENT = ${entity("ICNote")} ${folderAccountJoins(columns)} WHERE i.ZTYPEUTI1 = '${HASHTAG_UTI}' AND ${notTombstonedSql(columns, "i")} AND ${activeNoteSql(columns, "n", "f")}${accountFilter}`;
+  const tagAccount = accountRef(columns, "t");
+  const display = ["ZDISPLAYTEXT", "ZSTANDARDIZEDCONTENT", "ZNAME"].filter((name) => columns.has(name)).map((name) => `t.${name}`);
+  const displayExpr = display.length > 1 ? `COALESCE(${display.join(", ")})` : display[0] || "NULL";
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'tag', 'text', ${displayExpr}, 'account', ta.Z_PK) FROM ZICCLOUDSYNCINGOBJECT t LEFT JOIN ZICCLOUDSYNCINGOBJECT ta ON ta.Z_PK = ${tagAccount} AND ta.Z_ENT = ${entity("ICAccount")} WHERE t.Z_ENT = ${entity("ICHashtag")} AND ${notTombstonedSql(columns, "t")}${scoped ? " AND ta.Z_PK = @account" : ""};`,
+    `SELECT json_object('k', 'use', 'note', n.Z_PK, 'object', i.ZIDENTIFIER, 'text', i.ZALTTEXT, 'account', a.Z_PK, 'locked', ${flag(columns, "n", "ZISPASSWORDPROTECTED")}) ${uses};`,
+    `SELECT json_object('k', 'body', 'note', b.Z_PK, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = b.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT b WHERE b.Z_PK IN (SELECT n.Z_PK ${uses}) AND ${flag(columns, "b", "ZISPASSWORDPROTECTED")} = 0;`,
+    "COMMIT;"
+  ].join(" ");
+}
+var bareTag = (text) => text.replace(/^#/, "").trim();
+function referencedObjects(hex2) {
+  if (!hex2 || !/^[0-9a-f]+$/i.test(hex2)) return null;
+  try {
+    const data = gunzipSync3(Buffer.from(hex2, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
+    const body = wrapper && embeddedMessage(getField(wrapper, 3));
+    if (!body) return null;
+    const ids = /* @__PURE__ */ new Set();
+    for (const run of getFields(body, 5)) {
+      const attachment = embeddedMessage(getField(embeddedMessage(run) ?? [], 12));
+      const id2 = attachment && stringValue(getField(attachment, 1));
+      if (id2) ids.add(id2);
+    }
+    return ids;
+  } catch {
+    return null;
+  }
+}
+function nativeTagInventory(options = {}) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH4;
+  const columns = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns);
+  const scope = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const rows = parseJsonLines(
+    runReadOnlySql(
+      dbPath2,
+      buildTagInventorySql(columns, Boolean(scope)),
+      scope ? { account: { int: scope.pk } } : {}
+    )
+  );
+  return assembleInventory(rows, context.accounts, scope);
+}
+function assembleInventory(rows, accounts, scope) {
+  const accountNames = new Map(accounts.map((account) => [account.pk, account.name]));
+  const bodies = /* @__PURE__ */ new Map();
+  for (const row of rows) if (row.k === "body") bodies.set(row.note, referencedObjects(row.data));
+  const groups = /* @__PURE__ */ new Map();
+  const group = (text, weight) => {
+    const key = text.toLocaleLowerCase();
+    let found = groups.get(key);
+    if (!found) groups.set(key, found = { spellings: /* @__PURE__ */ new Map(), notes: /* @__PURE__ */ new Map() });
+    found.spellings.set(text, (found.spellings.get(text) ?? 0) + weight);
+    return found;
+  };
+  const unverified = /* @__PURE__ */ new Set();
+  for (const row of rows) {
+    if (row.k === "tag" && row.text && bareTag(row.text)) group(bareTag(row.text), 0);
+    if (row.k !== "use" || !row.text || !bareTag(row.text)) continue;
+    const referenced = row.locked ? null : bodies.get(row.note) ?? null;
+    if (referenced && !(row.object && referenced.has(row.object))) continue;
+    if (!referenced) unverified.add(row.note);
+    group(bareTag(row.text), 1).notes.set(row.note, row.account);
+  }
+  const inventory = [...groups.values()].map((entry) => {
+    const spellings = [...entry.spellings.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+    );
+    const perAccount = {};
+    for (const accountPk of entry.notes.values()) {
+      const name = accountPk !== null && accountNames.get(accountPk) || "unknown";
+      perAccount[name] = (perAccount[name] ?? 0) + 1;
+    }
+    const result = {
+      tag: spellings[0][0],
+      noteCount: entry.notes.size,
+      accounts: perAccount
+    };
+    if (spellings.length > 1) result.spellings = spellings.slice(1).map(([text]) => text);
+    return result;
+  });
+  inventory.sort((a, b) => b.noteCount - a.noteCount || a.tag.localeCompare(b.tag));
+  return {
+    inventory,
+    tagCount: inventory.length,
+    complete: unverified.size === 0,
+    unverifiedNotes: unverified.size,
+    ...scope ? { account: scope.name } : {}
+  };
+}
+
 // src/utils/contentWarnings.ts
 function detectChecklistAttempt(content) {
   if (!content) return null;
@@ -42730,10 +43134,10 @@ function describeSearchScope(searchContent, resultCount) {
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
+import { execFileSync as execFileSync7 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join7 } from "node:path";
+import { join as join8 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -42809,7 +43213,7 @@ function addNativeTags(request, deps) {
   };
 }
 function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  const lines = execFileSync7("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
@@ -42829,11 +43233,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join8(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
-    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    const path5 = join8(directory, "request.json");
+    writeFileSync(path5, JSON.stringify(input), { mode: 384 });
+    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path5], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -42852,10 +43256,10 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync8 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -43030,9 +43434,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join9(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join8(directory, "request.json");
+    const file = join9(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -43052,7 +43456,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync8("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
         timeout: 6e4,
         maxBuffer: 1024 * 1024,
@@ -43255,7 +43659,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+  const segments = (path5) => JSON.stringify(splitFolderPath(path5).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -43443,19 +43847,19 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join9 } from "path";
-import { homedir as homedir7 } from "os";
+import { existsSync as existsSync7, readFileSync as readFileSync2 } from "fs";
+import { join as join10 } from "path";
+import { homedir as homedir8 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join10(homedir8(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path5 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync6(path4)) return applied;
-    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (!existsSync7(path5)) return applied;
+    const parsed = JSON.parse(readFileSync2(path5, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -43465,7 +43869,7 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path4}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path5}: ${String(e)}`);
   }
   return applied;
 }
@@ -43657,7 +44061,7 @@ function withJsonSchema2020_12(transport2) {
 }
 
 // src/utils/noteTables.ts
-import { gunzipSync as gunzipSync3 } from "node:zlib";
+import { gunzipSync as gunzipSync4 } from "node:zlib";
 var sub = (f, n) => {
   const value = embeddedMessage(getField(f, n));
   if (!value) throw new Error(`Missing table field ${n}`);
@@ -43678,7 +44082,7 @@ var hex = (f) => {
   return Buffer.from(f.value).toString("hex");
 };
 function parseNoteTable(compressed) {
-  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const root = decodeMessage(gunzipSync4(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
   const data = sub(sub(root, 2), 3), entries = many(data, 3);
   if (entries.length > 1e5) throw new Error("Table too large");
   const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
@@ -43766,7 +44170,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43804,9 +44208,9 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path4) {
-  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+function localAttachment(path5) {
+  if (!isAbsolute2(path5)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync(path5, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
@@ -43875,13 +44279,13 @@ function registerDirectOperations(server2, manager) {
     "add-attachment",
     "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
     { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
+    ({ id: id2, expectedContentHash, path: path5 }) => {
       const before = readSnapshot(manager, id2);
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
+      const bytes = localAttachment(path5);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join11(directory, basename(path5));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44358,7 +44762,7 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 import { release } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44378,16 +44782,16 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync7;
-  const open = dependencies.open || ((path4) => {
-    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+  const exists = dependencies.exists || existsSync8;
+  const open = dependencies.open || ((path5) => {
+    const result = spawnSync2("/usr/bin/open", [path5], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path4 = resolve2(baseDirectory, file);
+    const path5 = resolve2(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -44403,9 +44807,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else if (!exists(path5)) error2 = `Packaged Shortcut is missing: ${path5}`;
       else {
-        const result = open(path4);
+        const result = open(path5);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -44414,7 +44818,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path4,
+      file: path5,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -45097,19 +45501,47 @@ registerTool(
 registerTool(
   "list-native-tags",
   {
-    description: "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
+    description: "Use when: listing actual native Notes tags, either in one folder (pass folder) or as an account-wide inventory with note counts (omit folder; account then optionally narrows it, else every account is counted).\nReturns: folder mode maps each tag to exact matching note IDs, plus completeness and per-note errors; inventory mode returns each tag with noteCount and per-account counts, sorted by count.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
     inputSchema: {
-      account: external_exports.string().min(1).max(MAX.ACCOUNT),
-      folder: external_exports.string().min(1).max(MAX.FOLDER)
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe(
+        "Account name (exact or unique prefix). Folder mode: defaults to Notes.app's default account. Inventory mode: omit to count every account."
+      ),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder to list tags in. Omit for the account-wide inventory with counts.")
     },
     outputSchema: {
       tags: external_exports.record(external_exports.array(external_exports.string())).optional(),
       complete: external_exports.boolean().optional(),
-      errors: external_exports.record(external_exports.string()).optional()
+      errors: external_exports.record(external_exports.string()).optional(),
+      inventory: external_exports.array(
+        external_exports.object({
+          tag: external_exports.string(),
+          noteCount: external_exports.number(),
+          accounts: external_exports.record(external_exports.number()),
+          spellings: external_exports.array(external_exports.string()).optional()
+        }).passthrough()
+      ).optional(),
+      tagCount: external_exports.number().optional(),
+      unverifiedNotes: external_exports.number().optional(),
+      account: external_exports.string().optional()
     },
     annotations: { readOnlyHint: true }
   },
   withErrorHandling(({ account, folder }) => {
+    if (!folder) {
+      const result = nativeTagInventory({ account });
+      const scope = result.account ? ` in ${result.account}` : " across all accounts";
+      const lines = result.inventory.map(
+        (entry) => `  - ${entry.tag}: ${entry.noteCount} note${entry.noteCount === 1 ? "" : "s"}`
+      );
+      const partial2 = result.complete ? "" : `
+
+${result.unverifiedNotes} note(s) could not be checked against their body (locked or unreadable) and were counted from tag objects alone.`;
+      return successResponse(
+        `${result.tagCount} native tag${result.tagCount === 1 ? "" : "s"}${scope}` + (lines.length ? `:
+${lines.join("\n")}` : ".") + partial2,
+        result
+      );
+    }
     const tags = {};
     const errors = {};
     for (const note of notesManager.listNoteRefs(account, folder)) {
@@ -46235,6 +46667,57 @@ registerTool(
     const summary = keys.length === 0 ? `No additional metadata is available for note "${id2}" on this macOS version.` : keys.map((k) => `${k}: ${String(metadata[k])}`).join("\n");
     return successResponse(summary, metadata);
   }, "Error reading note metadata")
+);
+var SPECIAL_KIND_LABEL = {
+  pinned: "pinned notes",
+  "quick-notes": "Quick Notes",
+  "recently-deleted": "notes in Recently Deleted",
+  locked: "password-protected notes"
+};
+registerTool(
+  "list-special-notes",
+  {
+    description: "Use when: listing pinned notes, Quick Notes, notes in Recently Deleted, or password-protected (locked) notes \u2014 sets AppleScript cannot enumerate.\nReturns: metadata rows newest first (id, identifier, title, folder path, account, created, modified, and pinned/locked/quickNote/inRecentlyDeleted flags; snippet except for locked notes; passwordHint for kind locked), plus total before limit. supported is false when this macOS version's database cannot answer that kind.\nDo not use when: you need note content (get-note-content) or a folder listing (list-notes).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. Pinned and Quick Notes listings cover notes in folders outside Recently Deleted; the locked listing includes trashed and folderless locked notes, flagged as such. Never reads locked note bodies.",
+    inputSchema: {
+      kind: external_exports.enum(["pinned", "quick-notes", "recently-deleted", "locked"]).describe("Which set of notes to list"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      limit: external_exports.number().int().min(1).max(SPECIAL_LIMIT.MAX).optional().describe(`Maximum notes to return (default ${SPECIAL_LIMIT.DEFAULT})`)
+    },
+    outputSchema: {
+      kind: external_exports.string().optional(),
+      notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      total: external_exports.number().optional(),
+      limit: external_exports.number().optional(),
+      supported: external_exports.boolean().optional(),
+      account: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ kind, account, limit }) => {
+    const result = listSpecialNotes({ kind, account, limit });
+    const label = SPECIAL_KIND_LABEL[kind];
+    const structured = result;
+    if (!result.supported) {
+      return successResponse(
+        `This macOS version's Notes database does not record ${label}.`,
+        structured
+      );
+    }
+    const scope = result.account ? ` in ${result.account}` : "";
+    if (result.count === 0) return successResponse(`No ${label}${scope}.`, structured);
+    const lines = result.notes.map(
+      (row) => `  - ${row.title ?? "(untitled)"}${row.folder ? ` (${row.folder})` : ""} [id: ${row.id}]`
+    );
+    const more = result.total > result.count ? `
+
+Showing ${result.count} of ${result.total}; pass a higher limit to see more.` : "";
+    return successResponse(
+      `Found ${result.total} ${label}${scope}:
+${lines.join("\n")}${more}`,
+      structured
+    );
+  }, "Error listing notes")
 );
 registerResourcesAndPrompts(server, notesManager);
 process.on("uncaughtException", (err) => {

@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `list-special-notes`, `list-native-tags`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -404,11 +404,25 @@ Disk Access.
 
 #### `list-native-tags`
 
-Lists actual native Notes tags used within one explicit `account` and `folder`,
-mapping each tag to its matching note IDs. This differs from textual hashtag
-search. The response reports `complete: false` and per-note errors when some
-native metadata is unavailable. This tool is read-only and requires Full Disk
-Access.
+Lists actual native Notes tags. This differs from textual hashtag search. It is
+read-only and requires Full Disk Access.
+
+- **Folder mode** (pass `folder`, optionally `account`): maps each tag used in that
+  folder to its matching note IDs. The response reports `complete: false` and per-note
+  errors when some native metadata is unavailable.
+- **Inventory mode** (omit `folder`): an account-wide inventory with counts, read in one
+  database transaction. `account` narrows it to one account; omit it to count every
+  account. Each `inventory` entry has `tag`, `noteCount` (distinct notes, Recently
+  Deleted excluded), per-account counts in `accounts`, and any other `spellings` Notes
+  treats as the same tag. Tags with no remaining notes are listed with `noteCount: 0`.
+  A tag counts for a note only while the note body still references it. Locked or
+  unreadable bodies are counted from the tag objects alone and reported through
+  `unverifiedNotes` and `complete: false`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `folder` | string | No | Folder to list (nested paths supported). Omit for the inventory |
+| `account` | string | No | Account name, exact or unique prefix |
 
 ---
 
@@ -1004,6 +1018,27 @@ Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQ
 
 ---
 
+#### `list-special-notes`
+
+Lists a set of notes that AppleScript cannot enumerate: pinned notes, Quick Notes, notes in Recently Deleted, or password-protected notes. It reads the NoteStore database read-only in one transaction and returns metadata only, never body text.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `kind` | string | Yes | `pinned`, `quick-notes`, `recently-deleted`, or `locked` |
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `limit` | number | No | Maximum rows, 1–1000 (default 100) |
+
+**Returns:** `notes`, newest first, each with `id`, `identifier` (Notes UUID), `title`, `folder` (path in `list-folders` syntax, or `null`), `account`, `created`, `modified`, and the flags `pinned`, `locked`, `quickNote`, `inRecentlyDeleted`, and `markedForDeletion`. Unlocked rows add the stored `snippet`. The `locked` listing adds `passwordHint` when one is set. Also returns `count`, `total` (matches before `limit`), `limit`, and `supported`.
+
+- `pinned` and `quick-notes` cover notes in folders outside Recently Deleted. Folderless Quick Note drafts, which Notes.app never shows, are left out.
+- `recently-deleted` lists notes in each account's Recently Deleted folder and skips tombstones already waiting to sync away.
+- `locked` lists every password-protected note, including trashed and folderless ones, so a misplaced locked note can still be found. Their flags and `folder` say where each one is.
+- `supported: false` means this macOS version's database has no column for that kind (for example, Quick Notes before macOS 12).
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -1360,7 +1395,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `list-special-notes`, `list-native-tags`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -1381,6 +1416,7 @@ Several tools read directly from the Apple Notes SQLite database, which lives in
 Every tool that does not read the Notes database works normally without Full Disk Access — that is the whole AppleScript surface (create, read, search, update, move, delete, folders, accounts, attachments, stats, export). The database-backed tools degrade like this:
 - `get-checklist-state` returns an error explaining that database access is needed
 - `get-note-metadata` returns the same kind of error — it has no non-database path
+- `list-special-notes` and the `list-native-tags` inventory return the same kind of error
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"

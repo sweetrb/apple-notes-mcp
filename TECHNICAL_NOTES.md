@@ -148,6 +148,34 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
 
+#### Listing special sets (`list-special-notes`, `list-native-tags` inventory)
+
+These listings are single read-only transactions over the same table. Findings from a
+live macOS 27 store (counts only):
+
+- **Quick Notes** carry `ZISSYSTEMPAPER = 1`. The column arrived with Quick Notes
+  (macOS 12); without it the listing reports `supported: false`. Many flagged rows have
+  no folder, a NULL title, and a NULL modification date. They are abandoned drafts
+  Notes.app never shows (111 folderless note rows on the test store, all untitled), so
+  every "active note" listing requires a folder. All 15 Quick Notes the listing returned
+  also appeared in AppleScript's `list-notes`, confirming the filter.
+- **Recently Deleted** is a folder, not a flag: `ZFOLDERTYPE = 1` with an identifier
+  that starts `TrashFolder`. The reader accepts either signal, so a store without
+  `ZFOLDERTYPE` still works. Rows with `ZMARKEDFORDELETION = 1` are tombstones awaiting
+  sync and are left out. `ZISRECOVERINGFROMTRASH` is not a trash marker.
+- **Accounts** hang off a numbered `ZACCOUNTn` column whose number differs by entity and
+  release (notes use `ZACCOUNT7` on macOS 27). The reader takes the folder's `ZOWNER`
+  first and otherwise coalesces every present `ZACCOUNTn`, joined against `ICAccount`
+  rows so a column belonging to another relation cannot match.
+- **Native tags** are `ICHashtag` rows plus one `ICInlineAttachment` per use
+  (`ZTYPEUTI1 = com.apple.notes.inlinetextattachment.hashtag`, `ZNOTE1` = note,
+  `ZALTTEXT` = `#tag`). A use counts only while the note body still references that
+  inline object's identifier (attribute run field 12). Locked or undecodable bodies are
+  counted from the object rows and reported as `unverifiedNotes`.
+- Values are bound with the sqlite3 shell's `.parameter set`; entity numbers come from
+  `Z_PRIMARYKEY`; note ids are rebuilt as `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`,
+  which matched every AppleScript id checked.
+
 Reading these is safe under the existing rules: copy the three database files first, open
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.

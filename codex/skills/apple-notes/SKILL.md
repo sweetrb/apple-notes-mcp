@@ -40,6 +40,8 @@ Use this skill when the user:
 | `move-note` | Move a note to a different folder |
 | `batch-move-notes` | Move multiple notes by ID (max 500 per call) |
 | `list-notes` | List all notes or notes in a folder |
+| `list-special-notes` | List pinned notes, Quick Notes, Recently Deleted, or locked notes (`kind`; metadata only, needs Full Disk Access) |
+| `list-native-tags` | Native tags in one folder, or omit `folder` for an account-wide inventory with note counts |
 | `show-note` | Reveal a note in the Notes.app UI by ID |
 | `get-selected-notes` | Read the notes currently selected in Notes.app |
 | `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |

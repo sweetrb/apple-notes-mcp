@@ -37,6 +37,8 @@ import {
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
+import { listSpecialNotes, nativeTagInventory, SPECIAL_LIMIT } from "@/utils/noteListings.js";
+import type { SpecialNoteKind } from "@/types.js";
 import { detectChecklistAttempt } from "@/utils/contentWarnings.js";
 import { parseHashtags } from "@/utils/hashtags.js";
 import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineImages.js";
@@ -1045,19 +1047,62 @@ registerTool(
   "list-native-tags",
   {
     description:
-      "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
+      "Use when: listing actual native Notes tags, either in one folder (pass folder) or as an account-wide inventory with note counts (omit folder; account then optionally narrows it, else every account is counted).\nReturns: folder mode maps each tag to exact matching note IDs, plus completeness and per-note errors; inventory mode returns each tag with noteCount and per-account counts, sorted by count.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
     inputSchema: {
-      account: z.string().min(1).max(MAX.ACCOUNT),
-      folder: z.string().min(1).max(MAX.FOLDER),
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe(
+          "Account name (exact or unique prefix). Folder mode: defaults to Notes.app's default account. Inventory mode: omit to count every account."
+        ),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe("Folder to list tags in. Omit for the account-wide inventory with counts."),
     },
     outputSchema: {
       tags: z.record(z.array(z.string())).optional(),
       complete: z.boolean().optional(),
       errors: z.record(z.string()).optional(),
+      inventory: z
+        .array(
+          z
+            .object({
+              tag: z.string(),
+              noteCount: z.number(),
+              accounts: z.record(z.number()),
+              spellings: z.array(z.string()).optional(),
+            })
+            .passthrough()
+        )
+        .optional(),
+      tagCount: z.number().optional(),
+      unverifiedNotes: z.number().optional(),
+      account: z.string().optional(),
     },
     annotations: { readOnlyHint: true },
   },
   withErrorHandling(({ account, folder }) => {
+    if (!folder) {
+      const result = nativeTagInventory({ account });
+      const scope = result.account ? ` in ${result.account}` : " across all accounts";
+      const lines = result.inventory.map(
+        (entry) => `  - ${entry.tag}: ${entry.noteCount} note${entry.noteCount === 1 ? "" : "s"}`
+      );
+      const partial = result.complete
+        ? ""
+        : `\n\n${result.unverifiedNotes} note(s) could not be checked against their body (locked or unreadable) and were counted from tag objects alone.`;
+      return successResponse(
+        `${result.tagCount} native tag${result.tagCount === 1 ? "" : "s"}${scope}` +
+          (lines.length ? `:\n${lines.join("\n")}` : ".") +
+          partial,
+        result as unknown as Record<string, unknown>
+      );
+    }
     const tags: Record<string, string[]> = {};
     const errors: Record<string, string> = {};
     for (const note of notesManager.listNoteRefs(account, folder)) {
@@ -2591,6 +2636,76 @@ registerTool(
 
     return successResponse(summary, metadata as Record<string, unknown>);
   }, "Error reading note metadata")
+);
+
+// --- list-special-notes ---
+
+const SPECIAL_KIND_LABEL: Record<SpecialNoteKind, string> = {
+  pinned: "pinned notes",
+  "quick-notes": "Quick Notes",
+  "recently-deleted": "notes in Recently Deleted",
+  locked: "password-protected notes",
+};
+
+registerTool(
+  "list-special-notes",
+  {
+    description:
+      "Use when: listing pinned notes, Quick Notes, notes in Recently Deleted, or password-protected (locked) notes — sets AppleScript cannot enumerate.\nReturns: metadata rows newest first (id, identifier, title, folder path, account, created, modified, and pinned/locked/quickNote/inRecentlyDeleted flags; snippet except for locked notes; passwordHint for kind locked), plus total before limit. supported is false when this macOS version's database cannot answer that kind.\nDo not use when: you need note content (get-note-content) or a folder listing (list-notes).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. Pinned and Quick Notes listings cover notes in folders outside Recently Deleted; the locked listing includes trashed and folderless locked notes, flagged as such. Never reads locked note bodies.",
+    inputSchema: {
+      kind: z
+        .enum(["pinned", "quick-notes", "recently-deleted", "locked"])
+        .describe("Which set of notes to list"),
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(SPECIAL_LIMIT.MAX)
+        .optional()
+        .describe(`Maximum notes to return (default ${SPECIAL_LIMIT.DEFAULT})`),
+    },
+    outputSchema: {
+      kind: z.string().optional(),
+      notes: z.array(z.object({}).passthrough()).optional(),
+      count: z.number().optional(),
+      total: z.number().optional(),
+      limit: z.number().optional(),
+      supported: z.boolean().optional(),
+      account: z.string().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ kind, account, limit }) => {
+    const result = listSpecialNotes({ kind, account, limit });
+    const label = SPECIAL_KIND_LABEL[kind];
+    const structured = result as unknown as Record<string, unknown>;
+    if (!result.supported) {
+      return successResponse(
+        `This macOS version's Notes database does not record ${label}.`,
+        structured
+      );
+    }
+    const scope = result.account ? ` in ${result.account}` : "";
+    if (result.count === 0) return successResponse(`No ${label}${scope}.`, structured);
+    const lines = result.notes.map(
+      (row) =>
+        `  - ${row.title ?? "(untitled)"}${row.folder ? ` (${row.folder})` : ""} [id: ${row.id}]`
+    );
+    const more =
+      result.total > result.count
+        ? `\n\nShowing ${result.count} of ${result.total}; pass a higher limit to see more.`
+        : "";
+    return successResponse(
+      `Found ${result.total} ${label}${scope}:\n${lines.join("\n")}${more}`,
+      structured
+    );
+  }, "Error listing notes")
 );
 
 // =============================================================================

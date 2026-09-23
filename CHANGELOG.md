@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `list-special-notes` lists sets AppleScript cannot enumerate: pinned notes,
+  Quick Notes, notes in Recently Deleted, and password-protected notes
+  (`kind`). It reads NoteStore read-only in one transaction and returns
+  metadata only, newest first: id, Notes UUID, title, folder path, account,
+  dates, state flags, and the stored snippet (never for locked notes). The
+  `locked` listing adds any password hint and deliberately includes trashed
+  and folderless locked notes. `account` and `limit` (default 100, max 1000)
+  are optional, and `total` reports matches before the limit. Detection is
+  feature-tested per macOS version: a kind whose column is missing answers
+  `supported: false`, and Recently Deleted is recognized by folder type or by
+  its `TrashFolder` identifier. Folderless Quick Note drafts, which Notes.app
+  never shows, are excluded.
+- `list-native-tags` gains an account-wide inventory: omit `folder` to get
+  every native tag with its distinct `noteCount` and per-account counts,
+  across all accounts or one `account`. A tag counts only while the note body
+  still references it; locked or unreadable bodies are counted from the tag
+  objects and reported as `unverifiedNotes`. `account` is now optional in
+  folder mode as well and defaults to Notes.app's default account.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
