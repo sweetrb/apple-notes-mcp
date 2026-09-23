@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [2.9.10] - 2026-09-23
+
+### Fixed
+
+- A body read that times out on a note holding a very large image now says
+  why (#237). Notes.app returns images inside `body of note` as base64, so a
+  multi-megabyte image can make the read outlast the timeout; the error used
+  to be a bare "Failed to read content", which also left `delete-note` with
+  no way forward. When the read times out or overflows the output buffer,
+  `get-note-content` and every tool that verifies a note's revision first
+  (such as `delete-note`) now return the underlying error, the likely cause,
+  and the remedy, and with Full Disk Access they name the note's attachments
+  of 5 MB or more. `get-note-content` now accepts `timeoutSeconds` (1-120),
+  so the read can be given the same extra time `delete-note` already
+  allowed. A title lookup now reads the body of the exact note it resolved.
+  Thanks to @oliverames for the report.
+
 ## [2.9.9] - 2026-09-23
 
 ### Fixed

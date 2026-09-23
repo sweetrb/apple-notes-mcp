@@ -42825,15 +42825,27 @@ var AppleNotesManager = class {
    * @returns HTML content of the note, or empty string if not found
    */
   getNoteContentById(id2) {
+    return this.readNoteBodyById(id2).body;
+  }
+  /**
+   * Like {@link getNoteContentById}, but keeps the automation error so a
+   * caller can explain a failed read (for example a timeout on a note whose
+   * body carries a very large inline image, #237) instead of reporting a bare
+   * failure.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The HTML body, or an empty body plus the error that stopped the read
+   */
+  readNoteBodyById(id2) {
     const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id2}":`, result.error);
-      return "";
+      return { body: "", error: result.error };
     }
-    return result.output;
+    return { body: result.output };
   }
   /**
    * Retrieves the plain-text content of a note by its exact title.
@@ -49593,6 +49605,37 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
   };
 }
 
+// src/utils/bodyReadFailure.ts
+var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+function classifyBodyReadError(error2) {
+  if (!error2) return "other";
+  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
+  return "other";
+}
+function formatBytes2(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} bytes`;
+}
+function largeAttachments(attachments, threshold = LARGE_ATTACHMENT_BYTES) {
+  const flat = attachments.flatMap((a) => [a, ...a.children ?? []]);
+  return flat.filter((a) => typeof a.fileSize === "number" && a.fileSize >= threshold).map((a) => ({ name: a.filename || a.title || "attachment", bytes: a.fileSize })).sort((a, b) => b.bytes - a.bytes);
+}
+function describeBodyReadFailure(title, error2, attachments) {
+  const base = `Failed to read content of note "${title}"${error2 ? `: ${error2}` : ""}`;
+  const kind = classifyBodyReadError(error2);
+  if (kind === "other") return base;
+  const large = attachments ? largeAttachments(attachments) : [];
+  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
+    "; "
+  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  return `${base}
+
+${cause} ${remedy}`;
+}
+
 // src/utils/noteLinkInventory.ts
 import { dirname as dirname5 } from "node:path";
 var BODY_BATCH = 100;
@@ -56010,10 +56053,24 @@ function readExactNoteSnapshot(id2) {
       error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`
     };
   }
-  const body = notesManager.getNoteContentById(id2);
-  if (!body) return { error: `Failed to read content of note "${note.title}"` };
+  const { body, error: error2 } = notesManager.readNoteBodyById(id2);
+  if (!body) {
+    const reason = bodyReadFailureMessage(id2, note.title, error2);
+    return { error: `${reason}${error2 ? "\n\nNothing was changed." : ""}` };
+  }
   const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
+}
+function bodyReadFailureMessage(id2, title, error2) {
+  let attachments;
+  if (classifyBodyReadError(error2) !== "other") {
+    try {
+      attachments = readNoteStructure(id2, { includeText: false }).attachments;
+    } catch {
+      attachments = void 0;
+    }
+  }
+  return describeBodyReadFailure(title, error2, attachments);
 }
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 function containerUnknownMessage(title) {
@@ -56428,13 +56485,14 @@ ${lines}${footer}`,
 registerTool(
   "get-note-content",
   {
-    description: "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
+    description: "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app. Notes.app returns images inside the body as base64, so a note with a very large image can time out; the error then names the cause, and a larger timeoutSeconds gives the read more time.",
     inputSchema: {
       id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
-      )
+      ),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       id: external_exports.string().optional(),
@@ -56467,9 +56525,9 @@ registerTool(
           `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const rawContent2 = notesManager.getNoteContentById(id2);
+      const { body: rawContent2, error: readError2 } = notesManager.readNoteBodyById(id2);
       if (!rawContent2) {
-        return errorResponse(`Failed to read content of note "${note2.title}"`);
+        return errorResponse(bodyReadFailureMessage(id2, note2.title, readError2));
       }
       const rich2 = enrichNoteRead(id2, rawContent2);
       const stripped2 = stripLargeInlineImages(rich2.content);
@@ -56509,9 +56567,9 @@ registerTool(
         `Note "${title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
       );
     }
-    const rawContent = notesManager.getNoteContent(title, account);
+    const { body: rawContent, error: readError } = notesManager.readNoteBodyById(note.id);
     if (!rawContent) {
-      return errorResponse(`Failed to read content of note "${title}"`);
+      return errorResponse(bodyReadFailureMessage(note.id, title, readError));
     }
     const rich = enrichNoteRead(note.id, rawContent);
     const stripped = stripLargeInlineImages(rich.content);

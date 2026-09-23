@@ -121,6 +121,7 @@ import {
 } from "@/utils/noteBlocks.js";
 import { pageParagraphs, paragraphLink, readNoteParagraphs } from "@/utils/noteParagraphs.js";
 import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
+import { classifyBodyReadError, describeBodyReadFailure } from "@/utils/bodyReadFailure.js";
 import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
 import { MAX_LINK_LABEL_LENGTH, MAX_LINK_URL_LENGTH } from "@/utils/linkInsert.js";
 import { insertLink } from "@/services/linkInsert.js";
@@ -452,10 +453,32 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
       error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`,
     };
   }
-  const body = notesManager.getNoteContentById(id);
-  if (!body) return { error: `Failed to read content of note "${note.title}"` };
+  const { body, error } = notesManager.readNoteBodyById(id);
+  if (!body) {
+    // The read comes before any write, so a failure here changed nothing.
+    const reason = bodyReadFailureMessage(id, note.title, error);
+    return { error: `${reason}${error ? "\n\nNothing was changed." : ""}` };
+  }
   const rich = enrichNoteRead(id, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
+}
+
+/**
+ * Error text for a failed body read. When the read timed out or overflowed the
+ * output buffer, the note's attachment sizes are looked up in the NoteStore
+ * database (needs Full Disk Access; skipped quietly without it) so the message
+ * can name an oversized image as the likely cause (#237).
+ */
+function bodyReadFailureMessage(id: string, title: string, error: string | undefined): string {
+  let attachments;
+  if (classifyBodyReadError(error) !== "other") {
+    try {
+      attachments = readNoteStructure(id, { includeText: false }).attachments;
+    } catch {
+      attachments = undefined;
+    }
+  }
+  return describeBodyReadFailure(title, error, attachments);
 }
 
 /** Notes.app accepted a delete event but the note stayed in its folder. */
@@ -1089,7 +1112,7 @@ registerTool(
   "get-note-content",
   {
     description:
-      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
+      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app. Notes.app returns images inside the body as base64, so a note with a very large image can time out; the error then names the cause, and a larger timeoutSeconds gives the read more time.",
     inputSchema: {
       id: looseNoteId(z.string())
         .optional()
@@ -1106,6 +1129,7 @@ registerTool(
         .describe(
           "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
         ),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       id: z.string().optional(),
@@ -1142,9 +1166,9 @@ registerTool(
           `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const rawContent = notesManager.getNoteContentById(id);
+      const { body: rawContent, error: readError } = notesManager.readNoteBodyById(id);
       if (!rawContent) {
-        return errorResponse(`Failed to read content of note "${note.title}"`);
+        return errorResponse(bodyReadFailureMessage(id, note.title, readError));
       }
       // Cap inline base64 images so an image-heavy note cannot produce a
       // response large enough to blow the client's MCP message limit.
@@ -1191,9 +1215,9 @@ registerTool(
       );
     }
 
-    const rawContent = notesManager.getNoteContent(title, account);
+    const { body: rawContent, error: readError } = notesManager.readNoteBodyById(note.id);
     if (!rawContent) {
-      return errorResponse(`Failed to read content of note "${title}"`);
+      return errorResponse(bodyReadFailureMessage(note.id, title, readError));
     }
 
     const rich = enrichNoteRead(note.id, rawContent);

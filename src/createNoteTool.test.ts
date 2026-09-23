@@ -7,13 +7,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<unknown>>());
 const configs = vi.hoisted(() => new Map<string, unknown>());
-const manager = vi.hoisted(() => ({
-  createNote: vi.fn(),
-  getNoteById: vi.fn(),
-  getNoteContentById: vi.fn(),
-  deleteNoteByIdIfUnchanged: vi.fn(),
-  listNoteRefsDetailed: vi.fn(),
-}));
+const manager = vi.hoisted(() => {
+  const m = {
+    createNote: vi.fn(),
+    getNoteById: vi.fn(),
+    getNoteContentById: vi.fn(),
+    deleteNoteByIdIfUnchanged: vi.fn(),
+    listNoteRefsDetailed: vi.fn(),
+    // readNoteBodyById is the error-keeping form of getNoteContentById (#237).
+    readNoteBodyById: vi.fn((id: string) => ({ body: m.getNoteContentById(id) ?? "" })),
+  };
+  return m;
+});
 
 vi.mock(import("@modelcontextprotocol/sdk/server/mcp.js"), async (importOriginal) => ({
   ...(await importOriginal()),
