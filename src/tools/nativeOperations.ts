@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
+import { errorResult } from "../utils/errorCodes.js";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import {
@@ -12,10 +14,12 @@ import {
   assertPreserved,
   setNativeTag,
   NATIVE_APPEND_HTML_SUBSET,
+  type BackgroundDependencies,
 } from "../services/backgroundNotes.js";
 import { normalizeNativeTags } from "../services/nativeTags.js";
+import { getCapabilityMatrix } from "../services/capabilityMatrix.js";
 import { parseNoteTable } from "../utils/noteTables.js";
-import { readRichNote } from "../utils/noteRichText.js";
+import { readRichNote, type RichNote } from "../utils/noteRichText.js";
 
 // Enabled only after a live exact-ID preservation test on this build.
 export const VERIFIED_BACKGROUND = new Set<string>([
@@ -27,6 +31,7 @@ export const VERIFIED_BACKGROUND = new Set<string>([
   "remove-native-tags",
   "replace-native-tag",
   "create-note-markdown",
+  "create-note-markdown-blocks",
 ]);
 const LIVE_VALIDATION_BLOCKERS: Record<string, string> = {};
 const signingRefusal =
@@ -58,7 +63,9 @@ export function requireValidated(name: string) {
         `${name} has not passed live background validation in this build; see get-capabilities`
     );
 }
-const id = z.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+// Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
+// Core Data key, resolved to the x-coredata id before the handler runs.
+const id = exactIdInput("ICNote", /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i, NOTE_ID_MESSAGE);
 const revision = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const common = {
   id,
@@ -71,8 +78,110 @@ const common = {
       "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
     ),
 };
+/**
+ * Cells for create-table when rows is omitted: an empty 2 x 2 table, matching
+ * what Format > Table inserts in Notes on Mac
+ * (https://support.apple.com/guide/notes/add-a-table-apd0a136b9cc/mac).
+ */
+export const EMPTY_TABLE_ROWS: readonly string[][] = [
+  ["", ""],
+  ["", ""],
+];
 const htmlEscape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * Most items create-checklist-items appends in one call. Each item is one
+ * synchronous Shortcuts bridge run of a few seconds, so the cap keeps a full
+ * call well inside common MCP client request timeouts: a client that times out
+ * and retries the whole batch never sees the landed/stoppedAt report and would
+ * append duplicates.
+ */
+export const MAX_CHECKLIST_BATCH = 20;
+
+type ChecklistItem = NonNullable<RichNote["checklistItems"]>[number];
+const byPosition = (items: ChecklistItem[] = []) => [...items].sort((a, b) => a.start - b.start);
+
+/**
+ * Append checklist items one bridge run at a time, verifying after every run
+ * that exactly one new unchecked item with the requested text and a new native
+ * identity appeared and that every earlier item kept its identity and text.
+ * The first uncertain result stops the batch; the report says which items
+ * landed, which one is uncertain, and which were never attempted.
+ */
+export function appendChecklistItems(
+  args: { id: string; expectedContentHash: string; scopeText: string; items: string[] },
+  deps: BackgroundDependencies,
+  readRich: (id: string) => RichNote
+): Record<string, unknown> {
+  const existing = new Set(byPosition(readRich(args.id).checklistItems).map((item) => item.id));
+  const landed: Array<{ index: number; id: string; text: string }> = [];
+  let contentHash = args.expectedContentHash;
+  for (const [index, text] of args.items.entries()) {
+    let wrote = false;
+    try {
+      const result = mutateBackground(
+        { ...args, expectedContentHash: contentHash },
+        "create-checklist-item",
+        { text },
+        (before, after) => {
+          wrote = true;
+          assertPreserved(before, after, { append: true });
+          const added = after.checklist.slice(before.checklist.length);
+          if (added.length !== 1 || added[0].text !== text || added[0].done)
+            throw new Error("Native checklist item not verified");
+        },
+        deps
+      );
+      const items = byPosition(readRich(args.id).checklistItems);
+      const fresh = items.filter(
+        (item) => !existing.has(item.id) && !landed.some((done) => done.id === item.id)
+      );
+      if (fresh.length !== 1 || fresh[0].text !== text || fresh[0].done)
+        throw new Error("Native checklist identity not verified");
+      for (const done of landed) {
+        const current = items.find((item) => item.id === done.id);
+        if (!current || current.text !== done.text || current.done)
+          throw new Error("An earlier appended item changed identity or text");
+      }
+      landed.push({ index, id: fresh[0].id, text });
+      contentHash = result.contentHash;
+    } catch (error) {
+      return {
+        ok: false,
+        id: args.id,
+        landed,
+        stoppedAt: {
+          index,
+          text,
+          outcome: wrote ? "uncertain" : "not-written",
+          error: error instanceof Error ? error.message : String(error),
+        },
+        notAttempted: args.items.slice(index + 1),
+        contentHash,
+        message: `Stopped at item ${index + 1} of ${args.items.length}; ${landed.length} item(s) landed and were verified. Read the exact note before retrying, and retry only items that are not present.`,
+      };
+    }
+  }
+  const finalItems = byPosition(readRich(args.id).checklistItems);
+  const tail = finalItems.slice(finalItems.length - landed.length);
+  const orderVerified =
+    tail.length === landed.length &&
+    tail.every((item, i) => item.id === landed[i].id && item.text === landed[i].text);
+  return {
+    ok: orderVerified,
+    id: args.id,
+    contentHash,
+    items: landed,
+    orderVerified,
+    ...(orderVerified
+      ? {}
+      : {
+          message:
+            "Every item landed and was verified, but they are not the note's last checklist items in the requested order. Read the note before editing it further.",
+        }),
+  };
+}
 
 /** Register verified native editing and capability tools on the MCP server. */
 export function registerNativeOperations(server: McpServer, manager: AppleNotesManager) {
@@ -99,22 +208,14 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
             structuredContent: result,
           };
         } catch (error) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: error instanceof Error ? error.message : "Operation failed",
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(error instanceof Error ? error.message : "Operation failed", error);
         }
       }) as unknown as ToolCallback<S>
     );
   }
   tool(
     "get-capabilities",
-    "Use when: checking native background-edit support before calling a write tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
+    "Use when: checking native background-edit support or which feature groups this Mac supports before calling a tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation; plus runtimeOS and an OS-version-aware features matrix (available, osSupported, minimumMacOSVersion, requirements, missing, unverified, machine reason code) per feature group.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
     {},
     () => {
       let bridge: { installed: boolean; shortcut: string; identifier?: string; error?: string };
@@ -136,6 +237,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
         "replace-native-tag",
         "insert-note-link",
         "create-note-markdown",
+        "create-note-markdown-blocks",
       ];
       let tagBridgeInstalled = false;
       try {
@@ -151,7 +253,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
       }
       // create-note's Markdown format runs on its own bridge; the rest share Background Operations.
       const installed = (name: string) =>
-        name === "create-note-markdown" ? markdownBridgeInstalled : bridge.installed;
+        name.startsWith("create-note-markdown") ? markdownBridgeInstalled : bridge.installed;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
@@ -180,6 +282,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
           ])
         ),
         unavailable: UNAVAILABLE,
+        ...getCapabilityMatrix(),
       };
     },
     true
@@ -230,17 +333,44 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
     }
   );
   tool(
+    "create-checklist-items",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
+    {
+      ...common,
+      items: z
+        .array(
+          z
+            .string()
+            .min(1)
+            .max(10000)
+            .refine((s) => !/[\r\n\0]/u.test(s), "One line per checklist item")
+        )
+        .min(1)
+        .max(MAX_CHECKLIST_BATCH)
+        .describe(`Item texts in the order they should appear (1-${MAX_CHECKLIST_BATCH})`),
+    },
+    (args) => {
+      requireValidated("create-checklist-item");
+      return appendChecklistItems(args, backgroundDependencies(manager), readRichNote);
+    }
+  );
+  tool(
     "create-table",
-    "Use when: appending one native Notes table from a rectangular array of strings.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    "Use when: appending one native Notes table from a rectangular array of strings, or an empty table when rows is omitted.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
     {
       ...common,
       rows: z
         .array(z.array(z.string().max(10000)).min(1).max(100))
         .min(1)
-        .max(1000),
+        .max(1000)
+        .optional()
+        .describe(
+          "Cell text, row by row. Omit for an empty 2 x 2 table, the size Notes itself inserts."
+        ),
     },
-    (args) => {
+    (input) => {
       requireValidated("create-table");
+      const args = { ...input, rows: input.rows ?? EMPTY_TABLE_ROWS };
       if (args.rows.some((row) => row.length !== args.rows[0].length))
         throw new Error("Table rows must have equal cell counts");
       const before = readRichNote(args.id);

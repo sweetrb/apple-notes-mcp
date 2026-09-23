@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
+import { renderMarkdown } from "../utils/appendMarkdown.js";
+import type { RichNote } from "../utils/noteRichText.js";
 import {
   assertPreserved,
   assertAppendedHtmlLinks,
   assertAppendedVisibleText,
+  assertMarkdownBlocks,
+  DIVIDER_UTI,
   headingLevels,
   mutateBackground,
   validateAppendContent,
@@ -436,4 +440,100 @@ describe("rich append input", () => {
     "refuses unsafe Markdown content %s",
     (markdown) => expect(() => validateAppendContent(markdown, "markdown")).toThrow()
   );
+});
+
+describe("Markdown blocks for Notes' own importer", () => {
+  it("leaves literal code out of the syntax checks only when blocks are allowed", () => {
+    const content = "```\n_x_ \\* <div> &amp;\n```\n\nSee `a_` too\n\n---";
+    expect(() => validateAppendContent(content, "markdown", { blocks: true })).not.toThrow();
+    expect(() => validateAppendContent(content, "markdown")).toThrow(/raw HTML/);
+    expect(() => validateAppendContent("_x_ outside code", "markdown", { blocks: true })).toThrow(
+      /underscores outside a word/
+    );
+    expect(() => validateAppendContent("----", "markdown", { blocks: true })).toThrow(
+      /underline or rule lines/
+    );
+    expect(() => validateAppendContent("<b>x</b>", "markdown", { blocks: true })).toThrow(
+      /raw HTML/
+    );
+  });
+
+  // Synthetic readback of the importer's native result for:
+  // "> quoted *line*\n\n```\ncode 1\ncode 2\n```\n\n- [ ] open\n- [x] done\n\n---\n\nUse `x`"
+  const markdown =
+    "> quoted *line*\n\n```\ncode 1\ncode 2\n```\n\n- [ ] open\n- [x] done\n\n---\n\nUse `x`";
+  function imported(overrides: Partial<RichNote> = {}): RichNote {
+    const text = "Title\nquoted line\ncode 1\ncode 2\nopen\ndone\n\ufffc\nUse x";
+    const runs: Array<[string, Partial<NonNullable<RichNote["styleRuns"]>[number]>]> = [
+      ["Title\n", { paragraphStyle: 0 }],
+      ["quoted ", { paragraphStyle: 3, blockQuote: true }],
+      ["line\n", { paragraphStyle: 3, blockQuote: true }],
+      ["code 1\ncode 2\n", { paragraphStyle: 4 }],
+      ["open\ndone\n", { paragraphStyle: 103 }],
+      ["\ufffc\nUse ", { paragraphStyle: 3 }],
+      ["x", { paragraphStyle: 3, highlight: true }],
+    ];
+    let start = 0;
+    const styleRuns = runs.map(([slice, style]) => {
+      const run = { start, length: slice.length, signature: "", ...style };
+      start += slice.length;
+      return run;
+    });
+    return {
+      text,
+      links: [],
+      nativeTags: [],
+      nativeObjectIds: ["divider"],
+      hasNativeObjects: true,
+      hasChecklist: true,
+      revision: "r1",
+      styleRuns,
+      objects: [{ id: "divider", type: DIVIDER_UTI, start: text.indexOf("\ufffc"), length: 1 }],
+      checklistItems: [
+        { id: "a", text: "open", done: false, start: 0 },
+        { id: "b", text: "done", done: true, start: 0 },
+      ],
+      ...overrides,
+    };
+  }
+  const { expect: expected } = renderMarkdown(markdown, { blocks: true });
+
+  it("accepts a readback with every native construct the Markdown asked for", () =>
+    expect(() => assertMarkdownBlocks(imported(), expected)).not.toThrow());
+  it.each([
+    [
+      "a quote Notes left as plain text",
+      (r: RichNote) => ({ styleRuns: r.styleRuns!.map((x) => ({ ...x, blockQuote: false })) }),
+      /Block quotes not verified/,
+    ],
+    [
+      "code Notes left in Body",
+      (r: RichNote) => ({
+        styleRuns: r.styleRuns!.map((x) => ({
+          ...x,
+          paragraphStyle: x.paragraphStyle === 4 ? 3 : x.paragraphStyle,
+        })),
+      }),
+      /Monospaced code blocks not verified/,
+    ],
+    [
+      "inline code that did not become a highlight",
+      (r: RichNote) => ({ styleRuns: r.styleRuns!.map((x) => ({ ...x, highlight: false })) }),
+      /Inline code highlights not verified/,
+    ],
+    [
+      "a checklist item with the wrong done state",
+      (r: RichNote) => ({ checklistItems: r.checklistItems!.map((x) => ({ ...x, done: false })) }),
+      /Checklist items or their done state/,
+    ],
+    [
+      "checklist items Notes rendered as a bulleted list",
+      () => ({ checklistItems: [] }),
+      /Checklist items or their done state/,
+    ],
+    ["a divider Notes dropped", () => ({ objects: [] }), /Dividers not verified/],
+  ])("rejects %s", (_name, change, error) => {
+    const base = imported();
+    expect(() => assertMarkdownBlocks({ ...base, ...change(base) }, expected)).toThrow(error);
+  });
 });

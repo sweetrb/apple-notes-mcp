@@ -32,6 +32,10 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  AudioTranscriptOptions,
+  AudioTranscriptsResult,
+  NoteTablesResult,
+  SmartFolder,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -41,6 +45,9 @@ import {
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+import { collectNoteTables } from "@/utils/tableMarkdown.js";
+import { readSmartFolders } from "@/utils/smartFolders.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -56,6 +63,13 @@ import {
   selectDrawing,
 } from "@/utils/paperAttachments.js";
 import type { DrawingAttachment, DrawingRasterExport } from "@/types.js";
+import {
+  assembleAttachmentAssets,
+  exportAttachmentAssets,
+  readNoteAttachmentRows,
+  selectFirstImage,
+} from "@/utils/attachmentAssets.js";
+import type { AttachmentExportResult, FirstImage, NoteAttachmentAssets } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { existsSync } from "fs";
 import { homedir } from "os";
@@ -568,7 +582,7 @@ export function splitFolderPath(folderPath: string): string[] {
  * @param name - Raw folder name (may contain `/`)
  * @returns Folder name with `/` escaped as `\/`
  */
-function escapeFolderName(name: string): string {
+export function escapeFolderName(name: string): string {
   return name.replace(/\//g, "\\/");
 }
 
@@ -1377,6 +1391,22 @@ export class AppleNotesManager {
   }
 
   /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id: string): NoteTablesResult {
+    return collectNoteTables(readRichNote(id), id);
+  }
+
+  /**
    * Retrieves detailed metadata for a note by title.
    *
    * Similar to getNoteContent but returns structured metadata
@@ -1500,17 +1530,29 @@ export class AppleNotesManager {
   deleteNoteByIdIfUnchanged(
     id: string,
     expectedBody: string
-  ): { status: "deleted" | "conflict" | "failed" } {
+  ): { status: "deleted" | "conflict" | "not-deleted" | "failed" } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    // Notes can accept a scripting `delete` without acting on it, so the script
+    // re-reads the note's original folder afterwards: a note still listed there
+    // was not moved to Recently Deleted and must not be reported as deleted.
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"
+      set originalFolder to missing value
+      try
+        set originalFolder to container of noteRef
+      end try
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      if originalFolder is not missing value then
+        try
+          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        end try
+      end if
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -1521,6 +1563,7 @@ export class AppleNotesManager {
     }
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
 
@@ -1629,6 +1672,65 @@ export class AppleNotesManager {
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
       `;
+  }
+
+  /**
+   * Lists every smart folder with its decoded query, read-only.
+   *
+   * Folder metadata and queries come from the NoteStore database (Full Disk
+   * Access). With `includeMatchingNotes`, Notes.app itself is asked which notes
+   * each smart folder currently shows, so membership reflects Notes' own
+   * evaluation of the query rather than a reimplementation of it.
+   *
+   * @param options.includeMatchingNotes - Also list the notes each folder shows
+   * @param options.limit - Maximum matching notes per folder (default 50)
+   * @throws Error when the database cannot be read (message says why)
+   */
+  listSmartFolders(
+    options: { includeMatchingNotes?: boolean; limit?: number } = {}
+  ): SmartFolder[] {
+    const result = readSmartFolders();
+    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!options.includeMatchingNotes) return result.folders;
+    const limit = options.limit ?? 50;
+    return result.folders.map((folder) => {
+      try {
+        const { total, notes } = this.listSmartFolderNoteRefs(folder.id, limit);
+        return { ...folder, matchingNoteCount: total, matchingNotes: notes };
+      } catch (error) {
+        return {
+          ...folder,
+          matchingNotesError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+  }
+
+  /**
+   * Asks Notes.app for the notes one smart folder currently shows.
+   *
+   * @returns The folder's total note count and up to `limit` (title, id) pairs
+   */
+  listSmartFolderNoteRefs(
+    folderId: string,
+    limit: number
+  ): { total: number; notes: { title: string; id: string }[] } {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId))
+      throw new Error("An exact folder ID is required");
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const script = buildAppLevelScript(
+      this.buildBulkListCommand({ folderRef: `folder id "${folderId}"`, sliceLimit: safeLimit })
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list smart folder notes: ${result.error ?? "unknown error"}`);
+    }
+    const sepIdx = result.output.indexOf(RECORD_SEP);
+    const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+    const total = Number.parseInt(header.trim(), 10);
+    if (Number.isNaN(total)) throw new Error("Unexpected smart folder listing output");
+    const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
+    return { total, notes: this.parseBulkListOutput(records, safeLimit) };
   }
 
   /**
@@ -3101,6 +3203,48 @@ export class AppleNotesManager {
     return { drawing, ...exportDrawingRaster(drawing, savePath) };
   }
 
+  /**
+   * Reads one note's attachments with their on-disk asset and preview paths,
+   * in body order, from the NoteStore database and the Notes group container
+   * (both read-only). Requires Full Disk Access.
+   *
+   * @param noteId - canonical CoreData note id
+   * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  getAttachmentAssetsById(noteId: string): NoteAttachmentAssets {
+    const { rows, bodyOrder } = readNoteAttachmentRows(noteId);
+    return assembleAttachmentAssets(rows, bodyOrder);
+  }
+
+  /**
+   * The note's lead visual: the first image in body order (even when its asset
+   * has not downloaded), else the first scan or drawing, else null.
+   */
+  getFirstImageById(noteId: string): FirstImage | null {
+    return selectFirstImage(this.getAttachmentAssetsById(noteId));
+  }
+
+  /**
+   * Copies a note's attachment files into a directory. Each attachment exports
+   * its real asset; its rendered preview only when no asset exists. Existing
+   * files are never replaced: name collisions get `-2`, `-3`, ... suffixes.
+   * The directory must satisfy the same allowlist as save-attachment and may
+   * not be inside the Notes group container.
+   */
+  exportAttachmentsById(
+    noteId: string,
+    exportDir: string,
+    firstImageOnly = false
+  ): {
+    exportDir: string;
+    results: AttachmentExportResult[];
+    firstImage?: FirstImage | null;
+  } {
+    return exportAttachmentAssets(this.getAttachmentAssetsById(noteId), exportDir, {
+      firstImageOnly,
+    });
+  }
+
   // ===========================================================================
   // Batch Operations
   // ===========================================================================
@@ -3608,5 +3752,19 @@ export class AppleNotesManager {
     }
 
     return markdown;
+  }
+
+  /**
+   * Reads the transcripts Notes has stored for a note's top-level audio
+   * recordings, one entry per attachment in body order. Read-only: queries the
+   * NoteStore database with `sqlite3 -readonly` and needs Full Disk Access.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param options - word-level segment inclusion and cap
+   * @throws AudioTranscriptError for an invalid id, a missing or locked note,
+   *   missing Full Disk Access, or a database read failure
+   */
+  getAudioTranscripts(id: string, options: AudioTranscriptOptions = {}): AudioTranscriptsResult {
+    return readAudioTranscripts(id, options);
   }
 }

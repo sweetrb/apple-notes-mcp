@@ -38,19 +38,23 @@ import {
   openSync,
   readdirSync,
   readSync,
-  realpathSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { assertSafeSavePath } from "./attachmentFs.js";
-
-/** The Notes group container (never written by this module). */
-export const NOTES_CONTAINER_DIR = join(
-  homedir(),
-  "Library/Group Containers/group.com.apple.notes"
-);
+import {
+  AttachmentStoreError,
+  NOTES_CONTAINER_DIR,
+  attachmentCoreDataId,
+  generationRank,
+  isInsideNotesContainer,
+  parseNoteId,
+  previewPixelArea,
+  realInside,
+  resolveAccountDir,
+  safeComponent,
+} from "./attachmentAssets.js";
 
 /** Largest raster dimension accepted from a header (guards against corrupt or hostile files). */
 const MAX_AXIS = 32_768;
@@ -96,17 +100,6 @@ export interface DrawingAttachment {
   raster: ({ path: string; source: "fallback" | "preview" } & ImageInfo) | null;
 }
 
-/** Error with a classification the tool layer turns into guidance. */
-export class PaperStoreError extends Error {
-  constructor(
-    message: string,
-    readonly code: "no_fda" | "invalid_id" | "not_found" | "query_error"
-  ) {
-    super(message);
-    this.name = "PaperStoreError";
-  }
-}
-
 // -----------------------------------------------------------------------------
 // Image header validation
 // -----------------------------------------------------------------------------
@@ -150,6 +143,14 @@ export function parseImageHeader(buf: Buffer): ImageInfo | null {
   return null;
 }
 
+/** Validate the image header of an open descriptor (must be a regular file). */
+export function readImageInfoFd(fd: number): ImageInfo | null {
+  if (!fstatSync(fd).isFile()) return null;
+  const buf = Buffer.alloc(HEADER_BYTES);
+  const read = readSync(fd, buf, 0, buf.length, 0);
+  return parseImageHeader(buf.subarray(0, read));
+}
+
 /** Read and validate an image header through a descriptor opened without following symlinks. */
 export function readImageInfo(path: string): ImageInfo | null {
   let fd: number;
@@ -159,10 +160,7 @@ export function readImageInfo(path: string): ImageInfo | null {
     return null;
   }
   try {
-    if (!fstatSync(fd).isFile()) return null;
-    const buf = Buffer.alloc(HEADER_BYTES);
-    const read = readSync(fd, buf, 0, buf.length, 0);
-    return parseImageHeader(buf.subarray(0, read));
+    return readImageInfoFd(fd);
   } finally {
     closeSync(fd);
   }
@@ -171,23 +169,6 @@ export function readImageInfo(path: string): ImageInfo | null {
 // -----------------------------------------------------------------------------
 // SQL
 // -----------------------------------------------------------------------------
-
-/** Parse a canonical note id into its store UUID and primary key. */
-export function parseNoteId(noteId: string): { store: string; pk: number } {
-  const m = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d+)$/.exec(noteId);
-  if (!m) {
-    throw new PaperStoreError(
-      `Invalid note ID format: "${noteId}". Expected x-coredata://UUID/ICNote/pNNN`,
-      "invalid_id"
-    );
-  }
-  return { store: m[1], pk: Number(m[2]) };
-}
-
-/** The AppleScript-style attachment id for a row of the given note. */
-export function attachmentCoreDataId(noteId: string, pk: number): string {
-  return noteId.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
-}
 
 /**
  * One read-only transaction for a note's drawings. Output lines: (1) 1 when
@@ -234,12 +215,12 @@ function runSqlite(dbPath: string, sql: string): string {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/authorization denied|unable to open database/i.test(message)) {
-      throw new PaperStoreError(
+      throw new AttachmentStoreError(
         "Full Disk Access is required to read drawing attachments. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
         "no_fda"
       );
     }
-    throw new PaperStoreError(`Failed to read drawing attachments: ${message}`, "query_error");
+    throw new AttachmentStoreError(`Failed to read drawing attachments: ${message}`, "query_error");
   }
 }
 
@@ -285,38 +266,25 @@ export function readDrawingRows(
       .filter(Boolean)
   );
   if (!columns.has("ZIDENTIFIER") || !columns.has("ZTYPEUTI") || !columns.has("ZNOTE")) {
-    throw new PaperStoreError("Unsupported Notes database schema", "query_error");
+    throw new AttachmentStoreError("Unsupported Notes database schema", "query_error");
   }
   const lines = runSqlite(dbPath, buildDrawingRowsSql(pk, columns)).split("\n");
   if (lines[0]?.trim() !== "1") {
-    throw new PaperStoreError(`No note found in the database for ID "${noteId}".`, "not_found");
+    throw new AttachmentStoreError(
+      `No note found in the database for ID "${noteId}".`,
+      "not_found"
+    );
   }
   try {
     return parseDrawingRows(lines[1] ?? "[]");
   } catch {
-    throw new PaperStoreError("Drawing rows could not be parsed", "query_error");
+    throw new AttachmentStoreError("Drawing rows could not be parsed", "query_error");
   }
 }
 
 // -----------------------------------------------------------------------------
 // Filesystem (read-only)
 // -----------------------------------------------------------------------------
-
-/** One literal path component from stored data, or null for anything that could traverse. */
-export function safeComponent(value: string | null | undefined): string | null {
-  if (typeof value !== "string" || !value || value.length > 255) return null;
-  if (value === "." || value === ".." || value.includes("/") || value.includes("\0")) return null;
-  return value;
-}
-
-function realInside(path: string, rootReal: string): string | null {
-  try {
-    const real = realpathSync.native(path);
-    return real === rootReal || real.startsWith(rootReal + sep) ? real : null;
-  } catch {
-    return null;
-  }
-}
 
 function kindOf(path: string): "file" | "dir" | null {
   try {
@@ -334,29 +302,6 @@ function entries(dir: string, limit: number): string[] {
   } catch {
     return [];
   }
-}
-
-/** The canonical account directory, by identifier or as the only account present. */
-export function resolveAccountDir(containerDir: string, account: string | null): string | null {
-  let accountsReal: string;
-  try {
-    accountsReal = realpathSync.native(join(containerDir, "Accounts"));
-  } catch {
-    return null;
-  }
-  const id = safeComponent(account);
-  const direct = id ? realInside(join(accountsReal, id), accountsReal) : null;
-  if (direct && kindOf(direct) === "dir") return direct;
-  const dirs = entries(accountsReal, MAX_DIR_ENTRIES).filter(
-    (e) => kindOf(join(accountsReal, e)) === "dir"
-  );
-  return dirs.length === 1 ? realInside(join(accountsReal, dirs[0]), accountsReal) : null;
-}
-
-/** Numeric generation prefix (`3_<uuid>` -> 3); 0 when absent. */
-export function generationRank(name: string): number {
-  const m = /^(\d+)_/.exec(name);
-  return m ? Number(m[1]) : 0;
 }
 
 const byGenerationDesc = (a: string, b: string) =>
@@ -392,12 +337,6 @@ export function findFallbackImage(
   return null;
 }
 
-/** Pixel area from the last `-<W>x<H>` token in a preview entry name; 0 when absent. */
-export function previewPixelArea(name: string): number {
-  const last = [...name.matchAll(/-(\d{1,6})x(\d{1,6})(?=-|\.|$)/g)].at(-1);
-  return last ? Number(last[1]) * Number(last[2]) : 0;
-}
-
 /** The largest rendered preview image file for `identifier`, or null. */
 export function findLargestPreview(accountDir: string, identifier: string): string | null {
   const id = safeComponent(identifier);
@@ -406,7 +345,10 @@ export function findLargestPreview(accountDir: string, identifier: string): stri
   const prefix = `${id}-`.toLowerCase();
   const names = entries(dir, MAX_PREVIEW_DIR_ENTRIES)
     .filter((n) => n.toLowerCase().startsWith(prefix))
-    .filter((n) => !extname(n) || IMAGE_SUFFIXES.has(extname(n).toLowerCase()))
+    .filter((n) => {
+      const ext = extname(n).toLowerCase();
+      return !ext || IMAGE_SUFFIXES.has(ext) || /^\.\d+$/.test(ext);
+    })
     .sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
   for (const name of names) {
     const real = realInside(join(dir, name), accountDir);
@@ -472,33 +414,15 @@ export function describeDrawings(
 // Export
 // -----------------------------------------------------------------------------
 
-function canonicalTail(p: string): string {
-  let current = resolve(p);
-  const tail: string[] = [];
-  for (;;) {
-    try {
-      return join(realpathSync.native(current), ...tail);
-    } catch {
-      const parent = dirname(current);
-      if (parent === current) return join(current, ...tail);
-      tail.unshift(basename(current));
-      current = parent;
-    }
-  }
-}
-
-/** True when `p` is, or would be created, inside the Notes group container. */
-export function isInsideNotesContainer(p: string, containerDir = NOTES_CONTAINER_DIR): boolean {
-  const rel = relative(canonicalTail(containerDir).toLowerCase(), canonicalTail(p).toLowerCase());
-  return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
-}
-
 /**
- * Re-read a written image and confirm it matches the source header (magic,
- * format, dimensions). A mismatch removes the file and throws.
+ * Re-read a written image through its still-open descriptor and confirm it
+ * matches the source header (magic, format, dimensions). A mismatch removes
+ * `path` (the file the descriptor was created at) and throws. Reading the
+ * descriptor, not the path, means a file swapped in after the write cannot
+ * pass the check in place of the one written.
  */
-export function verifyWrittenImage(path: string, expected: ImageInfo): ImageInfo {
-  const check = readImageInfo(path);
+export function verifyWrittenImage(fd: number, path: string, expected: ImageInfo): ImageInfo {
+  const check = readImageInfoFd(fd);
   if (
     !check ||
     check.format !== expected.format ||
@@ -583,10 +507,12 @@ export function exportDrawingRaster(
     }
     let output: number;
     try {
+      // Owner-only, like export-attachments: a drawing is private note
+      // content and savePath may sit under the temp dir.
       output = openSync(
         abs,
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-        0o644
+        constants.O_RDWR | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        0o600
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "EEXIST") {
@@ -605,14 +531,18 @@ export function exportDrawingRaster(
         while (written < read) written += writeSync(output, buffer, written, read - written);
       }
       bytes = position;
+      const check = verifyWrittenImage(output, abs, info);
+      return { savedPath: abs, bytes, source: drawing.raster.source, ...check };
     } catch (error) {
-      closeSync(output);
-      unlinkSync(abs);
+      try {
+        unlinkSync(abs);
+      } catch {
+        // already removed by verifyWrittenImage
+      }
       throw error;
+    } finally {
+      closeSync(output);
     }
-    closeSync(output);
-    const check = verifyWrittenImage(abs, info);
-    return { savedPath: abs, bytes, source: drawing.raster.source, ...check };
   } finally {
     closeSync(input);
   }

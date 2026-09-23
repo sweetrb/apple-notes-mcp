@@ -9,39 +9,44 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import {
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
-  PaperStoreError,
-  attachmentCoreDataId,
   buildDrawingRowsSql,
   describeDrawings,
   exportDrawingRaster,
   findFallbackImage,
   findLargestPreview,
-  generationRank,
-  isInsideNotesContainer,
   parseDrawingRows,
   parseImageHeader,
-  parseNoteId,
-  previewPixelArea,
   readDrawingRows,
   readImageInfo,
-  resolveAccountDir,
-  safeComponent,
   selectDrawing,
   verifyWrittenImage,
   type DrawingAttachment,
 } from "./paperAttachments.js";
+import {
+  AttachmentStoreError,
+  attachmentCoreDataId,
+  generationRank,
+  isInsideNotesContainer,
+  parseNoteId,
+  previewPixelArea,
+  resolveAccountDir,
+  safeComponent,
+} from "./attachmentAssets.js";
 
 // -----------------------------------------------------------------------------
 // Synthetic images
@@ -219,7 +224,9 @@ describe("readDrawingRows (real sqlite3)", () => {
     expect(() => readDrawingRows(note(999), dbPath)).toThrow(
       expect.objectContaining({ code: "not_found" })
     );
-    expect(() => readDrawingRows("x-coredata://X/ICFolder/p1", dbPath)).toThrow(PaperStoreError);
+    expect(() => readDrawingRows("x-coredata://X/ICFolder/p1", dbPath)).toThrow(
+      AttachmentStoreError
+    );
     expect(() => readDrawingRows(note(10), join(root, "none", "db.sqlite"))).toThrow(
       expect.objectContaining({ code: "no_fda" })
     );
@@ -386,6 +393,7 @@ describe("exportDrawingRaster", () => {
     });
     expect(readFileSync(dest).equals(readFileSync(paper.raster!.path))).toBe(true);
     expect(r.bytes).toBe(readFileSync(dest).length);
+    expect(statSync(dest).mode & 0o777).toBe(0o600);
     expect(() => exportDrawingRaster(paper, dest, container)).toThrow(/already exists/);
   });
 
@@ -446,30 +454,38 @@ describe("exportDrawingRaster", () => {
   });
 
   it("verifies a written image and removes one that does not match", () => {
+    const verifyAt = (path: string, expected: { format: "png"; width: number; height: number }) => {
+      const fd = openSync(path, "r");
+      try {
+        return verifyWrittenImage(fd, path, expected);
+      } finally {
+        closeSync(fd);
+      }
+    };
     const good = join(root, "verify-good.png");
     file(good, png(5, 6));
-    expect(verifyWrittenImage(good, { format: "png", width: 5, height: 6 })).toEqual({
+    expect(verifyAt(good, { format: "png", width: 5, height: 6 })).toEqual({
       format: "png",
       width: 5,
       height: 6,
     });
     const wrongSize = join(root, "verify-size.png");
     file(wrongSize, png(5, 7));
-    expect(() => verifyWrittenImage(wrongSize, { format: "png", width: 5, height: 6 })).toThrow(
+    expect(() => verifyAt(wrongSize, { format: "png", width: 5, height: 6 })).toThrow(
       /failed validation/
     );
     expect(existsSync(wrongSize)).toBe(false);
     const wrongFormat = join(root, "verify-format.png");
     file(wrongFormat, jpeg(5, 6));
-    expect(() => verifyWrittenImage(wrongFormat, { format: "png", width: 5, height: 6 })).toThrow(
+    expect(() => verifyAt(wrongFormat, { format: "png", width: 5, height: 6 })).toThrow(
       /failed validation/
     );
     const wrongWidth = join(root, "verify-width.png");
     file(wrongWidth, png(4, 6));
-    expect(() => verifyWrittenImage(wrongWidth, { format: "png", width: 5, height: 6 })).toThrow();
+    expect(() => verifyAt(wrongWidth, { format: "png", width: 5, height: 6 })).toThrow();
     const garbage = join(root, "verify-garbage.png");
     file(garbage, "garbage");
-    expect(() => verifyWrittenImage(garbage, { format: "png", width: 5, height: 6 })).toThrow();
+    expect(() => verifyAt(garbage, { format: "png", width: 5, height: 6 })).toThrow();
     expect(existsSync(garbage)).toBe(false);
   });
 });
