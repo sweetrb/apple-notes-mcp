@@ -11,7 +11,9 @@
   strikethrough, superscript, subscript, color, emphasis highlight, links and
   fonts, and attachment markers in body order. Responses page by block
   (`offset`/`limit`) and stay under `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`
-  (default 4 MB). Errors carry a stable code such as `[encrypted]`.
+  (default 4 MB). Errors carry a stable code such as `[encrypted]`; an id
+  that names a folder or attachment rather than a note is `[not-found]`. Like
+  the other note tools, `id` also accepts a Notes UUID or numeric key.
 - `src/utils/noteBlocks.ts` exposes the block model (`decodeNoteBlocks`,
   `decodeCompressedNoteBlocks`, `readNoteBlocks`, `pageNoteBlocks`) for later
   Markdown, HTML and link features. `protobuf.ts` gains a lossless wire

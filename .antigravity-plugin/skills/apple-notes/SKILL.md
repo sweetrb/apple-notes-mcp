@@ -76,6 +76,7 @@ Use this skill when the user:
 | `get-checklist-state`    | Read checked/unchecked state for existing checklists                                                                                                |
 | `create-checklist-items` | Append several unchecked native checklist items in order (needs the Background Operations bridge; on `ok: false`, only `landed` items are verified) |
 | `get-note-metadata`      | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB                                                                                     |
+| `get-note-blocks`        | Read a note's paragraph styles, inline formatting, and attachment positions as typed blocks                                                         |
 | `list-shared-notes`      | List notes shared with collaborators                                                                                                                |
 | `get-sync-status`        | Check whether iCloud sync is active                                                                                                                 |
 | `health-check`           | Quickly verify Notes.app access                                                                                                                     |
