@@ -164,6 +164,55 @@ export interface Folder {
 }
 
 /**
+ * What Notes.app reports about one folder, read by exact id for guarded
+ * folder deletion (`delete-folder-by-id`).
+ */
+export interface FolderAppFacts {
+  /** Exact x-coredata folder id. */
+  id: string;
+  /** Current folder name (not a path). */
+  name: string;
+  /** Parent folder id, or null when the folder sits at an account root. */
+  parentId: string | null;
+  /** Owning account id. */
+  accountId: string;
+  /** The owning account's default folder id, when Notes.app reports one. */
+  defaultFolderId: string | null;
+  /** Whether the folder or any ancestor folder is shared. */
+  shared: boolean;
+  /** Direct child folders Notes.app lists. */
+  childFolderCount: number;
+  /** Notes Notes.app lists in the folder. */
+  noteCount: number;
+}
+
+/**
+ * Result of planning or applying `delete-folder-by-id`.
+ */
+export interface FolderDeleteResult {
+  [key: string]: unknown;
+  ok: true;
+  status: "planned" | "deleted";
+  dryRun: boolean;
+  committed: boolean;
+  wouldDelete: boolean;
+  id: string;
+  identifier: string;
+  name: string;
+  accountId: string;
+  parentId: string | null;
+  folderType: 0;
+  childFolderCount: 0;
+  noteCount: 0;
+  /** Revision token over the checked state; pass it back as expectedRevision. */
+  revision: string;
+  /** Apply only: Notes.app no longer resolves the folder id. */
+  verified?: boolean;
+  /** Apply only: the local store shows the row tombstoned or gone. */
+  storeTombstoned?: boolean;
+}
+
+/**
  * Represents a Notes account.
  *
  * Notes.app can sync with multiple account types:
@@ -555,6 +604,38 @@ export interface Attachment {
   shared?: boolean;
 }
 
+/**
+ * Paper and classic drawing attachments with Notes' rendered raster
+ * (read-only NoteStore + Notes group container). Defined next to the reader in
+ * utils/paperAttachments and re-exported here with the other public types.
+ */
+import type { DrawingAttachment } from "@/utils/paperAttachments.js";
+export type { DrawingAttachment, ImageInfo } from "@/utils/paperAttachments.js";
+
+/** Result of exporting one drawing's rendered raster. */
+export interface DrawingRasterExport {
+  drawing: DrawingAttachment;
+  savedPath: string;
+  bytes: number;
+  source: "fallback" | "preview";
+  format: "png" | "jpeg";
+  width: number;
+  height: number;
+}
+
+/**
+ * Attachment asset/preview discovery, first-image, and batch-export shapes
+ * (read-only NoteStore + Notes group container). Defined next to the reader in
+ * utils/attachmentAssets and re-exported here with the other public types.
+ */
+export type {
+  AttachmentKind,
+  AttachmentAssetRecord,
+  NoteAttachmentAssets,
+  FirstImage,
+  AttachmentExportResult,
+} from "@/utils/attachmentAssets.js";
+
 // =============================================================================
 // Notes Statistics
 // =============================================================================
@@ -787,4 +868,433 @@ export interface ExportNotesOptions {
   modifiedSince?: string;
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
+}
+
+// =============================================================================
+// Database-Backed Listings
+// =============================================================================
+
+/** Which set of notes `list-special-notes` returns. */
+export type SpecialNoteKind = "pinned" | "quick-notes" | "recently-deleted" | "locked";
+
+/**
+ * One note row from `list-special-notes`. Metadata only: no body text. Fields
+ * the store cannot answer on this macOS version are null or false.
+ */
+export interface SpecialNoteRow {
+  /** MCP note id (`x-coredata://<store>/ICNote/p<n>`). */
+  id: string;
+  /** The note's Notes UUID (ZIDENTIFIER). */
+  identifier: string | null;
+  title: string | null;
+  /** Folder path in list-folders syntax, or null for a folderless note. */
+  folder: string | null;
+  account: string | null;
+  created: string | null;
+  modified: string | null;
+  pinned: boolean;
+  locked: boolean;
+  quickNote: boolean;
+  inRecentlyDeleted: boolean;
+  /** A tombstone Notes has deleted and is waiting to sync away. */
+  markedForDeletion: boolean;
+  /** Stored preview snippet. Never returned for locked notes. */
+  snippet?: string | null;
+  /** Password hint, returned only by the `locked` listing when one is set. */
+  passwordHint?: string;
+}
+
+/** Result of `list-special-notes`. */
+export interface SpecialNotesResult {
+  kind: SpecialNoteKind;
+  notes: SpecialNoteRow[];
+  count: number;
+  /** Matching notes before `limit` was applied. */
+  total: number;
+  limit: number;
+  /** False when this macOS version's database cannot answer the listing. */
+  supported: boolean;
+  /** The resolved account name when the listing was scoped to one account. */
+  account?: string;
+}
+
+/** One tag in the account-wide native tag inventory. */
+export interface NativeTagInventoryEntry {
+  /** Display spelling (the most used one when notes spell it differently). */
+  tag: string;
+  /** Distinct notes that use the tag. */
+  noteCount: number;
+  /** Per-account note counts, keyed by account name. */
+  accounts: Record<string, number>;
+  /** Other spellings seen for the same tag (Notes matches tags case-insensitively). */
+  spellings?: string[];
+}
+
+/** Result of `list-native-tags` in account-wide mode. */
+export interface NativeTagInventory {
+  inventory: NativeTagInventoryEntry[];
+  tagCount: number;
+  /** False when some tagged notes could not be confirmed against their body. */
+  complete: boolean;
+  /** Notes counted from tag objects alone because their body could not be decoded. */
+  unverifiedNotes: number;
+  /** The resolved account name when the inventory was scoped to one account. */
+  account?: string;
+}
+
+// =============================================================================
+// Stored audio transcripts (get-audio-transcripts)
+// =============================================================================
+
+/** One recognized word with its position in the recording. */
+export interface TranscriptSegment {
+  text: string;
+  /** Seconds from the start of its fragment. */
+  start?: number;
+  /** Seconds. */
+  duration?: number;
+  speaker?: string;
+  /** 0-based fragment index, present only when the recording has several fragments. */
+  fragment?: number;
+}
+
+export type TranscriptStatus = "ok" | "none" | "undecodable";
+
+/** One top-level audio attachment of a note, in body order. */
+export interface AudioTranscript {
+  attachmentId: string;
+  identifier: string;
+  typeUti: string;
+  status: TranscriptStatus;
+  reason?: string;
+  durationSeconds?: number;
+  needsTranscription?: boolean;
+  fragmentCount?: number;
+  wordCount?: number;
+  text?: string;
+  textTruncated?: boolean;
+  speakers?: string[];
+  summary?: string;
+  topLineSummary?: string;
+  segments?: TranscriptSegment[];
+  segmentsTruncated?: boolean;
+}
+
+export interface AudioTranscriptsResult {
+  id: string;
+  attachments: AudioTranscript[];
+  /** False when the body could not be parsed and attachments are in database order. */
+  bodyOrder: boolean;
+  /** True when segments or text were dropped to fit the response size limit. */
+  truncated: boolean;
+}
+
+/** Options for AppleNotesManager.getAudioTranscripts. */
+export interface AudioTranscriptOptions {
+  /** Include word-level segments (default false). */
+  includeSegments?: boolean;
+  /** Cap on segments returned per attachment (default 2000, at most 20000). */
+  maxSegments?: number;
+}
+
+/**
+ * One native table read by get-note-tables, in note body order.
+ *
+ * `complete` is false when the table could not be decoded at all (`reason` says
+ * why, and no rows are returned) or when some cells could not be decoded
+ * (listed in `incompleteCells`, and `null` in `rows`). Cell text is never guessed.
+ */
+export interface NoteTable {
+  /** 1-based position among the note's tables, in body order */
+  index: number;
+  /** Native attachment identifier (UUID) of the table */
+  id: string;
+  /** CoreData id of the table attachment, when known */
+  attachmentId?: string;
+  /** True only when every cell was decoded */
+  complete: boolean;
+  /** Why the table or some of its cells could not be decoded */
+  reason?: string;
+  /** Cell text by row then column, in display order; null marks an undecoded cell */
+  rows?: Array<Array<string | null>>;
+  /** Stable CRDT row identifiers, parallel to `rows` */
+  rowIds?: string[];
+  /** Stable CRDT column identifiers, parallel to each row */
+  columnIds?: string[];
+  /** Number of rows */
+  rowCount?: number;
+  /** Number of columns */
+  columnCount?: number;
+  /** Cells that could not be decoded (zero-based display positions) */
+  incompleteCells?: Array<{ row: number; column: number; reason: string }>;
+  /** GitHub-flavored Markdown rendering; the first row is the header row */
+  markdown?: string;
+}
+
+/**
+ * Result of reading every native table in one note.
+ */
+export interface NoteTablesResult {
+  /** Tables in body order */
+  tables: NoteTable[];
+  /** True when every table and every cell was decoded */
+  tableCellsComplete: boolean;
+  /** All tables as Markdown in body order, separated by blank lines */
+  markdown: string;
+}
+
+/**
+ * How a smart folder's top-level filters combine: every filter ("all"), at
+ * least one ("any"), or none of them ("none").
+ */
+export type SmartFolderMatch = "all" | "any" | "none";
+
+/**
+ * One decoded smart folder filter.
+ *
+ * `type` is the stored clause key (for example `folder`, `tag`, `checklist`,
+ * `creationDateRelativeRange`), `"group"` for a nested all/any group, or
+ * `"unknown"` for a clause this server does not recognize (kept verbatim in
+ * `value`). `excluded` marks a negated filter.
+ */
+export interface SmartFolderFilter {
+  type: string;
+  /** Stored value of the clause */
+  value?: unknown;
+  /** Stored clause key, set only for `unknown` filters */
+  key?: string;
+  /** True when the filter is negated (an Exclude rule) */
+  excluded?: boolean;
+  /** Human-readable summary of the filter */
+  description: string;
+  /** Display name: folder title, tag display text, or attachment category */
+  name?: string;
+  /** CoreData id of a referenced folder (folder filters) */
+  folderId?: string;
+  /** ISO 8601 bounds of an absolute date range */
+  from?: string;
+  to?: string;
+  /** How a nested group's filters combine */
+  match?: "all" | "any";
+  /** Filters of a nested group */
+  filters?: SmartFolderFilter[];
+}
+
+/**
+ * A smart folder read from the NoteStore database.
+ */
+export interface SmartFolder {
+  /** CoreData id (x-coredata://…/ICFolder/pN) */
+  id: string;
+  /** Stable CloudKit identifier (ZIDENTIFIER) */
+  identifier: string | null;
+  name: string | null;
+  account: string | null;
+  /** CoreData id of the owning account */
+  accountId: string | null;
+  accountIdentifier: string | null;
+  /** Parent folder name; null at the account root */
+  parent: string | null;
+  parentId: string | null;
+  parentIdentifier: string | null;
+  /** How the top-level filters combine; null when no query is stored */
+  match: SmartFolderMatch | null;
+  filters: SmartFolderFilter[];
+  /** From the stored wrapper: false when Recently Deleted is excluded */
+  includesRecentlyDeleted?: boolean;
+  /** False when a clause was not recognized or the query could not be parsed */
+  fullyDecoded: boolean;
+  /** Stored query with the outer `deleted` wrapper removed */
+  query: unknown;
+  /** Stored query JSON, verbatim */
+  rawQuery: string | null;
+  /** Notes Notes.app lists in this smart folder (only when requested) */
+  matchingNotes?: Array<{ title: string; id: string }>;
+  /** Total notes Notes.app lists in this smart folder (only when requested) */
+  matchingNoteCount?: number;
+  /** Why matching notes could not be listed (only when requested) */
+  matchingNotesError?: string;
+}
+
+// =============================================================================
+// Query Language Types
+// =============================================================================
+
+/**
+ * One note matched by the query-notes tool.
+ */
+export interface QueryNotesHit {
+  /** CoreData note ID, accepted by get-note-content and every other id tool */
+  id: string;
+  /** Note title as stored in the database */
+  title: string;
+  /** Folder path in list-folders syntax; absent for folderless notes */
+  folder?: string;
+  /** Account name; absent when the folder's account cannot be resolved */
+  account?: string;
+  /** Last modification time, ISO 8601 (UTC) */
+  modified?: string;
+  /** Creation time, ISO 8601 (UTC) */
+  created?: string;
+  /** Short plain-text excerpt, centred on the first matched phrase when possible; empty for locked notes */
+  snippet: string;
+  /** Present and true when the note is password-protected */
+  locked?: boolean;
+}
+
+/**
+ * Result of the query-notes tool.
+ */
+export interface QueryNotesResult {
+  /** Matching notes, most recently modified first, at most `limit` */
+  notes: QueryNotesHit[];
+  /** Number of notes returned */
+  count: number;
+  /** Number of scanned notes that matched (may exceed `count`) */
+  matched: number;
+  /** Number of notes examined */
+  scanned: number;
+  /** Notes eligible for scanning (after deleted/folderless exclusion) */
+  eligible: number;
+  /** Scan window applied: the most recently modified N notes */
+  scanLimit: number;
+  /** True when older eligible notes were outside the scan window */
+  scanTruncated: boolean;
+  /** Result cap applied */
+  limit: number;
+  /** True when more notes matched than were returned */
+  truncated: boolean;
+  /** Notes whose body was needed but could not be decoded (locked notes excluded) */
+  unreadable: number;
+}
+
+// =============================================================================
+// Link Insertion Types
+// =============================================================================
+
+/**
+ * How insert-link writes a URL: `raw` shows the URL itself, `hyperlink`
+ * shows a label that links to the URL.
+ */
+export type LinkInsertMode = "raw" | "hyperlink";
+
+/** Where insert-link places the link paragraph. */
+export type LinkInsertPosition = "end" | "after-title";
+
+/**
+ * Parameters for inserting one web or Notes link into an existing note.
+ */
+export interface InsertLinkParams {
+  /** Exact CoreData note id */
+  id: string;
+  /** Revision token from get-note-content */
+  expectedContentHash: string;
+  /** Link destination (http, https, mailto, notes, applenotes) */
+  url: string;
+  /** raw (default) or hyperlink */
+  mode: LinkInsertMode;
+  /** Visible text for hyperlink mode */
+  label?: string;
+  /** Raw mode only: false writes the URL as plain text with no stored link */
+  linked?: boolean;
+  /** end (default) or after-title */
+  position: LinkInsertPosition;
+  /** Leave a blank line between existing text and the link paragraph (default true) */
+  blankLine: boolean;
+  /** Unique existing phrase, required when the note holds native objects */
+  scopeText?: string;
+}
+
+/**
+ * What the guarded append step reports back to insert-link.
+ */
+export interface LinkAppendOutcome {
+  /** "applescript" for ordinary notes, "native" for notes with native objects */
+  route: "applescript" | "native";
+  /** Revision token after the write */
+  contentHash: string;
+}
+
+/**
+ * Result of a verified link insertion.
+ */
+export interface InsertLinkResult {
+  ok: true;
+  id: string;
+  mode: LinkInsertMode;
+  url: string;
+  /** Visible text written (the URL in raw mode, the label in hyperlink mode) */
+  text: string;
+  position: LinkInsertPosition;
+  route: "applescript" | "native";
+  /** Whether the note stores a link attribute on the inserted text */
+  linkStored: boolean;
+  /** Destination read back from the note's stored links */
+  storedUrl?: string;
+  previousContentHash: string;
+  contentHash: string;
+}
+
+/**
+ * A request to export one note or one folder as a presentation document
+ * (export-notes-markdown, export-notes-html). Exactly one of `id` or `folder`
+ * is set.
+ */
+export interface NotesExportRequest {
+  /** Exact CoreData note id. */
+  id?: string;
+  /** Folder path, as accepted by list-notes. */
+  folder?: string;
+  /** Account holding `folder` (defaults to Notes.app's default account). */
+  account?: string;
+  /** Maximum notes read from `folder`. */
+  limit?: number;
+  /** Absolute file to create. Create-only: an existing file is refused. */
+  outputPath?: string;
+  /** Absolute directory that receives copies of attachment files. */
+  assetsDir?: string;
+  /** Hard-wrap prose at this many columns (Markdown only; 0 disables). */
+  wrap?: number;
+  /**
+   * HTML only: embed assets as data URLs (default true unless `assetsDir` is
+   * set). False copies them to a sidecar directory.
+   */
+  embedAssets?: boolean;
+}
+
+/** Counts of how attachments were rendered in an export. */
+export interface NotesExportAttachmentStats {
+  attachments: number;
+  placed: number;
+  placeholders: number;
+  unavailable: number;
+  tables: number;
+  unreadableTables: number;
+  unreferenced: number;
+}
+
+/** A note that was selected but could not be exported. */
+export interface NotesExportSkip {
+  id: string;
+  /** Stable reason code, such as `encrypted` or `not-found`. */
+  code: string;
+}
+
+/** The bounded result of an export. */
+export interface NotesExportReceipt {
+  format: "markdown" | "html";
+  /** Notes rendered into the document. */
+  count: number;
+  /** UTF-8 size of the document. */
+  bytes: number;
+  /** The document itself, only when no outputPath was given. */
+  markdown?: string;
+  /** Absolute path of the file written. */
+  output?: string;
+  /** Sidecar directory and the number of files copied into it. */
+  assets?: { dir: string; files: number };
+  /** HTML only: assets embedded as data URLs. */
+  embedded?: number;
+  stats: NotesExportAttachmentStats;
+  skipped: NotesExportSkip[];
 }

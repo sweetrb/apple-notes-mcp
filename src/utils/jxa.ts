@@ -15,6 +15,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { callTimeoutMs } from "@/utils/callTimeout.js";
 
 /**
  * Output cap for osascript (JXA). Mirrors the AppleScript executor — Node's 1 MB
@@ -106,7 +107,7 @@ function isTimeoutError(error: unknown): boolean {
  * ```
  */
 export function executeJXA(script: string, options: JXAOptions = {}): JXAResult {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? DEFAULT_TIMEOUT_MS;
 
   if (!script || !script.trim()) {
     return {

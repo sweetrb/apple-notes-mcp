@@ -79,12 +79,24 @@ describe("parseRichNote compatibility", () => {
     const outputs = Object.fromEntries(
       Object.entries(corpus).map(([name, bytes]) => {
         const rich = parseRichNote(bytes);
+        // The guards read only each run's start, length and signature. The
+        // decoded paragraphStyle / blockQuote / highlight fields are additive
+        // (derived from bytes the signature already covers), so they are
+        // projected out and the golden values stay the unmodified reader's.
+        const guardRuns = rich.styleRuns?.map(({ start, length, signature }) => ({
+          start,
+          length,
+          signature,
+        }));
+        // htmlLossyFormatting (#189) is additive in the same way and projected out.
+        const legacy: Partial<typeof rich> = { ...rich };
+        delete legacy.htmlLossyFormatting;
         return [
           name,
           {
             revision: rich.revision.slice(0, 16),
-            styleRuns: digest(rich.styleRuns),
-            all: digest(rich),
+            styleRuns: digest(guardRuns),
+            all: digest({ ...legacy, styleRuns: guardRuns }),
           },
         ];
       })
@@ -135,12 +147,26 @@ describe("parseRichNote compatibility", () => {
     `);
   });
 
-  it("still fails closed on subscript runs (legacy 35-bit varint limit)", () => {
-    // Documented existing behavior, not endorsed: a 10-byte varint throws in the
-    // legacy decoder, so such notes read as non-writable. The block model decodes it.
+  it("reads subscript runs (10-byte varint) and flags them as HTML-lossy (#188, #189)", () => {
     const bytes = doc("x", [run(1, n(8, -1))]);
-    expect(() => parseRichNote(bytes)).toThrow(/Varint too long/);
+    const rich = parseRichNote(bytes);
+    expect(rich.text).toBe("x");
+    expect(rich.styleRuns?.[0].signature).toBe("[[8,-1]]");
+    expect(rich.htmlLossyFormatting).toEqual(["subscript"]);
     expect(decodeNoteBlocks(bytes).blocks[0].runs[0].subscript).toBe(true);
+  });
+
+  it("flags superscript, alignment and highlight, ignoring newline-only runs (#189)", () => {
+    expect(parseRichNote(corpus.inline).htmlLossyFormatting).toEqual(["superscript", "highlight"]);
+    expect(parseRichNote(corpus.layout).htmlLossyFormatting).toEqual(["alignment"]);
+    for (const name of ["plain", "styled", "lists", "links", "attachment", "unknownFields"])
+      expect(parseRichNote(corpus[name]).htmlLossyFormatting).toBeUndefined();
+    // Explicit left alignment (0) is the default and is not lossy.
+    expect(parseRichNote(doc("a", [run(1, b(2, n(2, 0)))])).htmlLossyFormatting).toBeUndefined();
+    // Formatting left on a trailing newline alone cannot be lost by a rewrite.
+    expect(
+      parseRichNote(doc("a\n", [run(1), run(1, n(8, 1))])).htmlLossyFormatting
+    ).toBeUndefined();
   });
 
   it("decodes every corpus document into blocks whose text matches the legacy reader", () => {
