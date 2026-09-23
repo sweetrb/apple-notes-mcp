@@ -294,9 +294,16 @@ export function readAllowedTextFile(
     throw new Error(
       `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
     );
-  if (lstatSync(abs).isSymbolicLink())
-    throw new Error(`Refusing to read the symbolic link "${abs}".`);
-  const descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  // O_NOFOLLOW refuses a symbolic link at open time (ELOOP), so there is no
+  // separate path check that a swap could slip between.
+  let descriptor: number;
+  try {
+    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ELOOP")
+      throw new Error(`Refusing to read the symbolic link "${abs}".`);
+    throw error;
+  }
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);

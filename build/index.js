@@ -39997,9 +39997,14 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
     throw new Error(
       `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
     );
-  if (lstatSync(abs).isSymbolicLink())
-    throw new Error(`Refusing to read the symbolic link "${abs}".`);
-  const descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let descriptor;
+  try {
+    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error2) {
+    if (error2.code === "ELOOP")
+      throw new Error(`Refusing to read the symbolic link "${abs}".`);
+    throw error2;
+  }
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
