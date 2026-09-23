@@ -30,6 +30,7 @@ import {
   stringValue,
   varintValue,
 } from "@/utils/protobuf.js";
+import { escapeFolderName } from "@/services/appleNotesManager.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import {
   evaluateNoteQuery,
@@ -369,8 +370,8 @@ interface FolderInfo {
   shared: boolean;
 }
 
-/** Escapes a literal `/` in one folder name, matching list-folders' path syntax. */
-const escapeSegment = (name: string) => name.replace(/\//g, "\\/");
+/** Escapes a literal `/` in one folder name with list-folders' own helper, so paths match. */
+const escapeSegment = escapeFolderName;
 
 /** Resolves every folder's path, account, and inherited shared state. */
 export function resolveFolders(rows: FolderRow[]): Map<number, FolderInfo> {

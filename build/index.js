@@ -43328,7 +43328,7 @@ function presentColumns2(dbPath2) {
   }
   return cols;
 }
-var escapeSegment = (name) => name.replace(/\//g, "\\/");
+var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
