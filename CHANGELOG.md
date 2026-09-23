@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.0] - 2026-09-23
+## [2.8.21] - 2026-09-23
 
 ### Added
 
@@ -14,7 +14,24 @@
   Rich URL preview cards are not produced: no public automation route creates
   one.
 
-## [2.8.18] - 2026-09-23
+## [2.8.20] - 2026-09-23
+
+### Fixed
+
+- `create-checklist-item` no longer reports "Operation outcome uncertain…
+  Native checklist item not verified" after a successful append on macOS 27.2
+  (#187). Notes there stores an appended item's checklist style starting at
+  the newline before the new line (`"\nItem"`), not at its first character
+  (`"Item\n"`). Both checklist parsers gave a style run to the line holding its
+  first character, so `get-native-objects`, `get-checklist-state` and the
+  tool's own readback named the line above the item. They now attribute a run
+  to the line of its first non-newline character. A run made only of newlines
+  still belongs to the line it ends, because Notes splits off a line's
+  terminator as its own run when that line's characters carry different
+  attributes. `revision` and `styleRuns`, which the write guards compare, are
+  unchanged.
+
+## [2.8.19] - 2026-09-23
 
 ### Fixed
 
@@ -24,6 +41,17 @@
   visible-text comparison only decoded `&amp;`. It now decodes the HTML legacy
   references (`amp`, `lt`, `gt`, `quot`, `nbsp`) with or without the
   semicolon, in a single pass so `&amp;lt;` still reads as the literal `&lt;`.
+
+## [2.8.18] - 2026-09-23
+
+### Fixed
+
+- The server no longer truncates a response when the client closes stdin right
+  after a request. Shutdown on stdin `end`/`close` (and SIGINT/SIGTERM) now
+  waits for pending stdout writes to drain, capped at two seconds, before
+  exiting. Before, any response larger than the 64 KiB pipe buffer was cut off
+  mid-message, which `tools/list` was close to reaching and which one-shot
+  clients such as `docsTruth.test.ts` hit as an unparseable line.
 
 ## [2.8.17] - 2026-09-17
 

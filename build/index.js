@@ -39331,6 +39331,15 @@ function embeddedMessage(field) {
   return decodeMessage(bytes);
 }
 
+// src/utils/checklistRuns.ts
+function checklistRunLineStart(text, position, length) {
+  const end = position + length;
+  let anchor = position;
+  while (anchor < end && text[anchor] === "\n") anchor++;
+  if (anchor === end) anchor = position;
+  return anchor === 0 ? 0 : text.lastIndexOf("\n", anchor - 1) + 1;
+}
+
 // src/utils/checklistParser.ts
 var CHECKLIST_STYLE_TYPE = 103;
 var NOTES_DB_PATH = path.join(
@@ -39398,6 +39407,9 @@ function parseChecklistFromProtobuf(data) {
     const attributeRuns = getFields(noteBodyFields, 5);
     if (attributeRuns.length === 0) return null;
     const lines = noteText.split("\n");
+    const lineStarts = [];
+    for (let i = 0, start = 0; i < lines.length; start += lines[i].length + 1, i++)
+      lineStarts.push(start);
     const items = [];
     let charPos = 0;
     const seenLines = /* @__PURE__ */ new Set();
@@ -39414,18 +39426,13 @@ function parseChecklistFromProtobuf(data) {
           const checklistField = getField(styleFields, 5);
           const checklistFields = embeddedMessage(checklistField);
           const done = checklistFields ? varintValue(getField(checklistFields, 2)) ?? 0 : 0;
-          let lineStart = 0;
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const lineEnd = lineStart + lines[lineIdx].length;
-            if (charPos >= lineStart && charPos < lineEnd + 1 && !seenLines.has(lineIdx)) {
-              seenLines.add(lineIdx);
-              items.push({
-                text: lines[lineIdx],
-                done: done === 1
-              });
-              break;
-            }
-            lineStart = lineEnd + 1;
+          const lineIdx = charPos <= noteText.length ? lineStarts.indexOf(checklistRunLineStart(noteText, charPos, runLength)) : -1;
+          if (lineIdx !== -1 && !seenLines.has(lineIdx)) {
+            seenLines.add(lineIdx);
+            items.push({
+              text: lines[lineIdx],
+              done: done === 1
+            });
           }
         }
       }
@@ -39616,7 +39623,7 @@ function parseRichNote(data, nativeTags = []) {
       const checklist = embeddedMessage(getField(paragraph, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
-      const start = text.lastIndexOf("\n", position - 1) + 1;
+      const start = checklistRunLineStart(text, position, length);
       if (itemId && !checklistItems.some((item) => item.id === itemId))
         checklistItems.push({
           id: itemId,
@@ -43668,6 +43675,30 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
+// src/utils/shutdown.ts
+var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
+function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
+  let shuttingDown = false;
+  let exited = false;
+  const exitOnce = () => {
+    if (exited) return;
+    exited = true;
+    clearTimeout(timer);
+    exit();
+  };
+  let timer;
+  const exitWhenDrained = () => {
+    if (stream.writableLength === 0) exitOnce();
+    else stream.once("drain", exitWhenDrained);
+  };
+  return () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    timer = setTimeout(exitOnce, timeoutMs);
+    setImmediate(exitWhenDrained);
+  };
+}
+
 // src/utils/noteTables.ts
 import { gunzipSync as gunzipSync3 } from "node:zlib";
 var sub = (f, n) => {
@@ -46438,12 +46469,7 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
-var _shuttingDown = false;
-var shutdown = () => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+var shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
 }
