@@ -40961,6 +40961,9 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
+function deniedSaveRoots() {
+  return [join6(homedir6(), "Library/Group Containers/group.com.apple.notes")];
+}
 function canonicalize(path9) {
   return realpathSync.native(path9);
 }
@@ -41002,11 +41005,11 @@ function deepestExistingAncestor(abs) {
     current = parent;
   }
 }
-function ensureParentDir(abs, roots = allowedSaveRoots()) {
-  assertSafeSavePath(abs, roots);
+function ensureParentDir(abs, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
+  assertSafeSavePath(abs, roots, denied);
   mkdirSync(dirname(abs), { recursive: true });
 }
-function assertSafeSavePath(p, roots = allowedSaveRoots()) {
+function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
@@ -41033,6 +41036,12 @@ function assertSafeSavePath(p, roots = allowedSaveRoots()) {
     throw new Error(
       `Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonicalDest}" through a symbolic link.`
     );
+  }
+  const deniedForms = [
+    .../* @__PURE__ */ new Set([...denied.map((d) => resolve(d)), ...canonicalRoots(denied)])
+  ].map((d) => d.toLowerCase());
+  if ([abs, canonicalDest].some((form) => isWithinRoots(form.toLowerCase(), deniedForms))) {
+    throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
   return abs;
 }
@@ -52764,13 +52773,15 @@ registerTool(
 registerTool(
   "save-attachment",
   {
-    description: "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes. Get the ids from list-attachments first.",
+    description: "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Get the ids from list-attachments first.",
     inputSchema: {
       noteId: looseNoteId(external_exports.string().min(1, "noteId is required")).describe(
         `Note id (from search/list): ${NOTE_ID_FORMS}`
       ),
       attachmentId: external_exports.string().min(1, "attachmentId is required").max(MAX.ATTACHMENT_ID).describe("Attachment id (from list-attachments)"),
-      savePath: external_exports.string().min(1, "savePath is required").max(MAX.SAVE_PATH).describe("Absolute destination file path (must be under home, temp, or /Volumes)")
+      savePath: external_exports.string().min(1, "savePath is required").max(MAX.SAVE_PATH).describe(
+        "Absolute destination file path (must be under home, temp, or /Volumes; never inside the Notes data folder)"
+      )
     },
     outputSchema: {
       savedPath: external_exports.string().optional(),

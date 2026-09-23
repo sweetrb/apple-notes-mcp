@@ -3002,7 +3002,7 @@ registerTool(
   "save-attachment",
   {
     description:
-      "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes. Get the ids from list-attachments first.",
+      "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Get the ids from list-attachments first.",
     inputSchema: {
       noteId: looseNoteId(z.string().min(1, "noteId is required")).describe(
         `Note id (from search/list): ${NOTE_ID_FORMS}`
@@ -3016,7 +3016,9 @@ registerTool(
         .string()
         .min(1, "savePath is required")
         .max(MAX.SAVE_PATH)
-        .describe("Absolute destination file path (must be under home, temp, or /Volumes)"),
+        .describe(
+          "Absolute destination file path (must be under home, temp, or /Volumes; never inside the Notes data folder)"
+        ),
     },
     outputSchema: {
       savedPath: z.string().optional(),

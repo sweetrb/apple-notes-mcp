@@ -43,6 +43,15 @@ export function allowedSaveRoots(): string[] {
 }
 
 /**
+ * Locations no save may land in even though they sit inside an allowed root
+ * (#208). The Notes group container holds Notes' own database and media;
+ * writing an export there could confuse Notes or corrupt its storage.
+ */
+export function deniedSaveRoots(): string[] {
+  return [join(homedir(), "Library/Group Containers/group.com.apple.notes")];
+}
+
+/**
  * Canonicalize with the platform call, not the JS emulation.
  *
  * `fs.realpathSync` resolves symlinks but preserves whatever casing the caller
@@ -139,8 +148,12 @@ function deepestExistingAncestor(abs: string): string {
  * the boundary check would plant the escape it is meant to prevent. Re-checking
  * here (callers already validate) keeps that ordering true no matter who calls.
  */
-export function ensureParentDir(abs: string, roots: string[] = allowedSaveRoots()): void {
-  assertSafeSavePath(abs, roots);
+export function ensureParentDir(
+  abs: string,
+  roots: string[] = allowedSaveRoots(),
+  denied: string[] = deniedSaveRoots()
+): void {
+  assertSafeSavePath(abs, roots, denied);
   mkdirSync(dirname(abs), { recursive: true });
 }
 
@@ -158,11 +171,21 @@ export function ensureParentDir(abs: string, roots: string[] = allowedSaveRoots(
  * already exists as a symlink is refused outright: following it is how a file
  * outside the roots gets clobbered.
  *
+ * After the allowlist, the destination is checked against `denied` (by default
+ * the Notes group container, #208): both the lexical and the canonical form of
+ * the destination, compared case-insensitively against both the lexical and
+ * canonical form of each denied root, so neither a symlink nor a respelled
+ * segment can reach inside it.
+ *
  * The returned path is the caller's own spelling (`resolve(p)`), not the
  * canonical one, so `/tmp/x` still writes to `/tmp/x` — validated to be the same
  * file as the canonical `/private/tmp/x`.
  */
-export function assertSafeSavePath(p: string, roots: string[] = allowedSaveRoots()): string {
+export function assertSafeSavePath(
+  p: string,
+  roots: string[] = allowedSaveRoots(),
+  denied: string[] = deniedSaveRoots()
+): string {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
@@ -194,6 +217,13 @@ export function assertSafeSavePath(p: string, roots: string[] = allowedSaveRoots
       `Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}" ` +
         `resolves to "${canonicalDest}" through a symbolic link.`
     );
+  }
+
+  const deniedForms = [
+    ...new Set([...denied.map((d) => resolve(d)), ...canonicalRoots(denied)]),
+  ].map((d) => d.toLowerCase());
+  if ([abs, canonicalDest].some((form) => isWithinRoots(form.toLowerCase(), deniedForms))) {
+    throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
 
   return abs;

@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [2.8.42] - 2026-09-23
+
+### Security
+
+- `save-attachment` no longer accepts a destination inside the Notes library
+  folder, `~/Library/Group Containers/group.com.apple.notes` (#208). The home
+  folder is on the save allowlist, so a path in Notes' own storage passed it;
+  writing there could confuse Notes or corrupt its media. The shared save-path
+  check now refuses any destination inside the container after the allowlist,
+  comparing both the path as given and its symlink-resolved form, without
+  regard to letter case, against both spellings of the container. The check
+  runs before any directory is created, and covers every tool that writes
+  through it.
+
 ## [2.8.41] - 2026-09-23
 
 ### Fixed
