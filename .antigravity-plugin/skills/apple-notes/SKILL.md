@@ -96,6 +96,18 @@ Use this skill when the user:
 | `get-capabilities`            | Check native-write operations and the OS-aware feature matrix (`features.<name>.available` / `reason`) before calling a tool that depends on them   |
 | `get-notes-stats`             | Summarize note counts and recent activity                                                                                                           |
 
+### Private Helper (opt-in, read-only, unsupported Apple API)
+
+Off unless the user built it (`apple-notes-mcp setup --native-helper`) and set
+`APPLE_NOTES_MCP_ENABLE_PRIVATE=1`. Call `native-helper-status` first; use
+`native-note-state` only when it reports the feature `available`. The helper is
+read-only: write support was deliberately deferred by the maintainer.
+
+| Tool                   | Purpose                                                                   |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `native-helper-status` | Report opt-in, build, and live-probe state with a reason code (read-only) |
+| `native-note-state`    | Read a note's native state and `revision` change token (read-only)        |
+
 ## Usage Patterns
 
 ### Creating Notes

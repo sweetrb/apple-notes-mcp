@@ -9,6 +9,7 @@ This document contains research findings on Apple Notes internals, programmatic 
 - [Direct Database Access](#direct-database-access)
 - [Protobuf Data Format](#protobuf-data-format)
 - [Alternative Approaches](#alternative-approaches)
+- [Private helper (NotesShared)](#private-helper-notesshared)
 - [Known Issues & Limitations](#known-issues--limitations)
 - [Related Tools & Projects](#related-tools--projects)
 - [Sources](#sources)
@@ -517,6 +518,170 @@ not to need a bridge at all, and the verdict above is narrowed accordingly:
   read-only from `NoteStore.sqlite`, needs Full Disk Access; AppleScript `note link`
   fallback on macOS 12–15). Inserting a link into a body, and enumerating the links
   already in one, remain unavailable.
+
+---
+
+## Private helper (NotesShared)
+
+An opt-in, **read-only** native helper
+(`native/private-helper/apple-notes-private-helper.m`) reads note state through
+Notes' own Core Data model. It is the foundation for features that have no
+AppleScript or Shortcuts interface (checklist state, highlights, structured
+edits, Smart Folders), but it **cannot write**: write support was deliberately
+deferred by the maintainer (see "Why writes were deferred" below). It is
+**unsupported Apple API**.
+The findings below were verified on macOS 27.2 (build 26B5091g) with Notes 4.13
+(3195.41.8.101.1) on 2026-09-23, by runtime introspection
+(`objc_copyClassNamesForImage`, `class_copyMethodList`,
+`class_copyPropertyList`) and by running the helper.
+
+### Why Objective-C, and how it loads the framework
+
+The helper is one Objective-C file compiled on the user's Mac with
+`xcrun clang` from the Command Line Tools and ad-hoc signed. Objective-C needs
+no Swift runtime or package manifest and calls private classes by name
+naturally. Linking `-framework NotesShared` is refused for ordinary clients
+("not an allowed client"), so the helper links only Foundation, CoreData, and
+AppKit, `dlopen`s
+`/System/Library/PrivateFrameworks/NotesShared.framework/NotesShared`, and
+resolves everything with `objc_getClass` / `objc_msgSend`. Selectors are
+compile-time constants; no request field ever becomes a selector.
+
+### Opening the store the way Notes does
+
+`ICNoteContext` (the object Notes.app uses) does not build its store in a
+headless process and has no way to point at another file. The helper instead:
+
+1. takes the model from `+[ICPersistentContainer managedObjectModel]` and the
+   options from `+[ICPersistentContainer standardStoreOptions]` (on 27.2:
+   automatic migration, inferred mapping, persistent history tracking, and
+   remote-change notifications);
+2. turns migration **off** (a model/store mismatch means the helper is out of
+   date, never a reason to migrate the user's library) and always adds
+   `NSReadOnlyPersistentStoreOption`: there is one store opener,
+   `OpenReadOnlyContext()`, and no read-write variant;
+3. attaches `NoteStore.sqlite` to its own `NSPersistentStoreCoordinator`, then
+   refuses with `read_only_violation` if Core Data reports any attached store
+   as writable;
+4. fetches real `ICNote` objects by `identifier`.
+
+Opening a store that is not the live one needs only a different file URL
+(`APPLE_NOTES_MCP_PRIVATE_STORE`, for reading a copy; the helper refuses any
+path that resolves to the live store, including symlinks and hard links).
+
+### API surface used
+
+| Kind | Name | Used for |
+|------|------|----------|
+| class methods | `+[ICPersistentContainer managedObjectModel]`, `+standardStoreOptions` | model and store options |
+| model properties | `ICNote.identifier/title/modificationDate/creationDate/folder/account/noteData/cloudState/isPasswordProtected/markedForDeletion/needsInitialFetchFromCloud`, `ICNoteData.data`, `ICCloudState.currentLocalVersion/latestVersionSyncedToCloud`, `ICFolder.identifier` | reads, flags, change token |
+| instance methods | `-[ICNote mergeableString]`, `-isDeletedOrInTrash`, `-isSharedViaICloud`, `-isEditable` | body length and flags |
+| instance methods | `-[ICTTMergeableString attributedString]` | body text (read) |
+
+Core Data attributes are `@dynamic`, so `respondsToSelector:` is false for
+them until Core Data generates accessors. The probe therefore checks model
+properties against the entity descriptions and real methods with
+`instancesRespondToSelector:`. On 27.2 the mergeable string is an
+`ICTTMergeableAttributedString` whose `-string` returns an attributed string;
+the helper reads text from `-attributedString`. Paragraph style lives in the
+`TTStyle` attribute (`ICTTParagraphStyle`) and rides on each paragraph's
+terminating newline.
+
+Fetching an `ICNote` logs a `+[ICNoteContext sharedContext]` backtrace from
+`ICAuthenticationState` because no shared context exists in the helper. It is
+a log line, not a failure; reads proceed.
+
+### Protocol
+
+One JSON object on stdin (1 MiB cap), one on stdout, exit 0 on success and 1
+on error with `{status:"error", code, message}`. Every request carries
+`protocol: 1`; a mismatch is `protocol_mismatch`. Unknown actions and unknown
+request fields are refused. Actions: `hello` (context-free handshake,
+reports the source SHA-256 compiled in and `readOnly: true`), `probe`, and
+`read_note_state`. There is no write action; `append_plain_text` or any other
+name is `unknown_action`, and the TypeScript client refuses anything outside
+its read-only whitelist before spawning. Error codes: `input_too_large`,
+`invalid_json`, `protocol_mismatch`, `unknown_action`, `invalid_request`,
+`disabled`, `store_unavailable`, `read_only_violation`,
+`private_api_unavailable`, `not_found`, `unsupported_note`, `internal_error`.
+The MCP tools map these onto the shared error envelope (`code`, plus the raw
+`helperCode`). Adding an action is a handler plus one row in `kActions` and,
+when it needs new selectors, one requirement table the probe reports; it
+must be read-only (`src/services/privateHelperReadOnly.test.ts` fails on a
+save or write path).
+
+### Safety contract
+
+- **Off by default.** Both the server and the helper refuse to open the live
+  store unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`.
+- **Fail closed on install drift.** Setup records the source and binary
+  SHA-256 in `manifest.json`; the server re-checks both, and the protocol,
+  before every call.
+- **Read-only by construction.** Every store is opened with
+  `NSReadOnlyPersistentStoreOption` and migration disabled, a writable store
+  is refused after opening, and no code path saves a context. Setup refuses
+  to install a helper whose `hello` does not report `readOnly: true` or lists
+  any action outside the read-only whitelist.
+- **Change token, not a lock.** `revision` (`r1:` + SHA-256) covers the note
+  identifier, folder identifier, deletion and lock flags, modification date,
+  and a digest of the serialized body (`ICNoteData.data`). Compare two reads
+  to detect a persisted change; nothing accepts it back.
+- **Never SQL, never a shell, never a caller-chosen selector.**
+
+### Build, distribution, and TCC
+
+`apple-notes-mcp setup --native-helper` compiles the packaged source
+(`native/` ships in the npm package; no binary is committed or published),
+signs it ad hoc, runs `hello` against the staged binary (which must report
+`readOnly: true` and only read-only actions), and installs it with
+its manifest under `~/Library/Application Support/apple-notes-mcp/private-helper`
+(`APPLE_NOTES_MCP_PRIVATE_HELPER_DIR` overrides). Upgrading apple-notes-mcp
+with a changed helper source makes the installed helper `helper_stale` until
+setup runs again.
+
+The helper opens `NoteStore.sqlite` itself, so it needs Full Disk Access.
+macOS attributes a command-line child process to the app responsible for it
+(Claude Desktop, Terminal), so in practice the helper uses the same grant as
+the server's existing `sqlite3` reads. That was observed here only in the
+positive case (a host with Full Disk Access; the helper opened the store); a
+host without it gets `store_unavailable`. Because the helper is ad-hoc
+signed and rebuilt on upgrade, it should not be added to Full Disk Access by
+itself.
+
+### Why writes were deferred
+
+PR #204 originally included an `append_plain_text` action (a CRDT insert
+through `ICTTMergeableString`, saved with `-saveNoteData` and
+`-updateChangeCountWithReason:`, guarded by an `ifRevision` compare-and-swap
+and verified by a fresh read-back). The maintainer accepted the helper
+read-only and removed that path before merge, because three things are
+unresolved:
+
+1. **A second writer beside a running Notes.app.** The helper saved through
+   its own coordinator while Notes.app held the same store; persistent history
+   carried the change into Notes.app, but concurrent-save behaviour beyond one
+   optimistic save was not characterised.
+2. **CRDT replica identity.** The helper edits the note's CRDT as its own
+   replica, like a new device. How NotesShared assigns that identity in a
+   process with no bundle identifier was not inspected; repeated edits may
+   add replica entries to the note.
+3. **iCloud upload lag.** In the contributor's live test on macOS 27.2 the
+   edit appeared in the running Notes.app at once and raised
+   `currentLocalVersion` above `latestVersionSyncedToCloud`, but was not
+   uploaded in 13 minutes of polling; it uploaded only when Notes.app next
+   saved its own change to that note. The helper cannot upload itself
+   (CloudKit needs Notes.app's private entitlements).
+
+A future write PR needs evidence on all three first.
+
+### Risks
+
+- Any macOS update can rename or remove a class, selector, or model property.
+  The probe then reports `private_api_unavailable` with the missing names; a
+  changed model without migration makes the store fail to open
+  (`store_unavailable`) rather than migrate.
+- Reads go through a private model; a field's meaning can change without
+  notice. Treat `native-note-state` as diagnostic, not as a contract.
 
 ---
 
