@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve6.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve6(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve6(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve6,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join25(output, replacement);
+        return join27(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join25(output, rule.append(self.options));
+          output = join27(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join25(output, replacement) {
+    function join27(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve6(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve6, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve6();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve6);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
@@ -40820,13 +40820,13 @@ function buildSmartFolders(output) {
   if (lines.length < 4) throw new Error("Unexpected smart folder query output");
   const [storeUuid, rowsJson, foldersJson, tagsJson] = lines;
   if (!/^[0-9A-F-]+$/i.test(storeUuid)) throw new Error("Unexpected Notes store identifier");
-  const coreDataId2 = (entity3, pk) => `x-coredata://${storeUuid}/${entity3}/p${pk}`;
+  const coreDataId3 = (entity3, pk) => `x-coredata://${storeUuid}/${entity3}/p${pk}`;
   const rows = JSON.parse(rowsJson);
   const folderRows = JSON.parse(foldersJson || "{}");
   const tagRows = JSON.parse(tagsJson || "[]");
   const folders = {};
   for (const [identifier, row] of Object.entries(folderRows)) {
-    folders[identifier] = { id: coreDataId2("ICFolder", row.pk), title: row.title };
+    folders[identifier] = { id: coreDataId3("ICFolder", row.pk), title: row.title };
   }
   const tags = {};
   for (const tag of tagRows) {
@@ -40837,14 +40837,14 @@ function buildSmartFolders(output) {
   return rows.map((row) => {
     const decoded = decodeSmartFolderQuery(row.query, { folders, tags });
     return {
-      id: coreDataId2("ICFolder", row.pk),
+      id: coreDataId3("ICFolder", row.pk),
       identifier: row.identifier,
       name: row.title,
       account: row.accountName,
-      accountId: row.accountPk === null ? null : coreDataId2("ICAccount", row.accountPk),
+      accountId: row.accountPk === null ? null : coreDataId3("ICAccount", row.accountPk),
       accountIdentifier: row.accountIdentifier,
       parent: row.parentTitle,
-      parentId: row.parentPk === null ? null : coreDataId2("ICFolder", row.parentPk),
+      parentId: row.parentPk === null ? null : coreDataId3("ICFolder", row.parentPk),
       parentIdentifier: row.parentIdentifier,
       match: decoded.match,
       filters: decoded.filters,
@@ -42140,6 +42140,19 @@ function trashFolderIdList() {
   const ids = readTrashFolderIds().filter((id2) => FOLDER_ID_PATTERN.test(id2));
   return `{${ids.map((id2) => `"${id2}"`).join(", ")}}`;
 }
+function inRecentlyDeletedScript(containerVar, flagVar, trashIds) {
+  return `
+      set ${flagVar} to true
+      try
+        if (class of ${containerVar}) is folder then set ${flagVar} to false
+      end try
+      try
+        if ${trashIds} contains (id of ${containerVar}) then set ${flagVar} to true
+      end try
+      try
+        if (name of ${containerVar}) is "${RECENTLY_DELETED_FOLDER_NAME}" then set ${flagVar} to true
+      end try`;
+}
 function buildTrashNoteIdsCollector() {
   return `
         set __trashNoteIds to {}
@@ -42453,8 +42466,8 @@ function folderDeleteFactsScript(id2) {
       end repeat
       set noteCount to count of notes of f`;
 }
-function getNoteLinkFromDB(coreDataId2) {
-  const match = coreDataId2.match(/\/p(\d+)$/);
+function getNoteLinkFromDB(coreDataId3) {
+  const match = coreDataId3.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
   const dbPath2 = join9(homedir8(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
@@ -43024,29 +43037,53 @@ var AppleNotesManager = class {
    * Deletes one exact note only when its complete body still matches the body
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
+   *
+   * `guards` are other notes that must still be active when the delete runs
+   * (the copy-then-retire guard of delete-note): each must exist, be unlocked,
+   * and sit in a folder other than Recently Deleted, and one with
+   * `expectedBody` must still have that body. They are checked in the same
+   * script, just before the delete; `index` in a guard outcome points into
+   * `guards`.
    */
-  deleteNoteByIdIfUnchanged(id2, expectedBody, scope2) {
+  deleteNoteByIdIfUnchanged(id2, expectedBody, scope2, guards = []) {
     const safeId = sanitizeNoteId(id2);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const trashIds = trashFolderIdList();
+    const guardChecks = guards.map((guard, index) => {
+      const safeGuardId = sanitizeNoteId(guard.id);
+      const ref = `__guardRef${index}`;
+      const folderVar = `__guardFolder${index}`;
+      const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+      let bodyCheck = "";
+      if (guard.expectedBody !== void 0) {
+        validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
+        const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
+        bodyCheck = `
+      set __guardBody to body of ${ref}
+      considering case
+        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+      end considering`;
+      }
+      return `
+      if not (exists note id "${safeGuardId}") then ${inactive("missing")}
+      set ${ref} to note id "${safeGuardId}"
+      if password protected of ${ref} then ${inactive("locked")}
+      set ${folderVar} to missing value
+      try
+        set ${folderVar} to container of ${ref}
+      end try
+      if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
+      if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
+    }).join("");
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
-      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"
-      set __inTrash to true
-      try
-        if (class of originalFolder) is folder then set __inTrash to false
-      end try
-      try
-        if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
-      end try
-      try
-        if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
-      end try
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
@@ -43065,6 +43102,11 @@ var AppleNotesManager = class {
     const deleteScopeFailure = parseScopeFailure(result.output);
     if (deleteScopeFailure) return { status: "scope_conflict", reason: deleteScopeFailure };
     const status = result.output.trim();
+    const guardOutcome = /^SAFETY_GUARD_(CONFLICT|INACTIVE):(\d+)(?::(.+))?$/.exec(status);
+    if (guardOutcome && Number(guardOutcome[2]) < guards.length) {
+      const index = Number(guardOutcome[2]);
+      return guardOutcome[1] === "CONFLICT" ? { status: "guard-conflict", index } : { status: "guard-inactive", index, reason: guardOutcome[3] ?? "inactive" };
+    }
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
@@ -45568,6 +45610,23 @@ function toSpecialRow(row, uuid2, paths, accountNames, kind) {
   if (kind === "locked" && row.hint) note.passwordHint = row.hint;
   return note;
 }
+var EXACT_NOTE_ID = /^x-coredata:\/\/([0-9A-F-]+)\/ICNote\/p(\d+)$/i;
+function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH7) {
+  const match = EXACT_NOTE_ID.exec(noteId3);
+  if (!match) throw new NoteStoreError(`Not an exact note id: ${noteId3}`, "invalid_input");
+  const columns = readColumns(dbPath2);
+  const sql = `SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'quick', (SELECT ${flag(columns, "n", "ZISSYSTEMPAPER")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}));`;
+  const [row] = parseJsonLines(
+    runReadOnlySql(dbPath2, sql, { pk: { int: Number(match[2]) } })
+  );
+  if (row?.uuid?.toUpperCase() !== match[1].toUpperCase()) {
+    throw new NoteStoreError(
+      `Note id ${noteId3} belongs to a different Notes database.`,
+      "invalid_input"
+    );
+  }
+  return row.quick === null ? null : row.quick === 1;
+}
 var TAG_REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"];
 function buildTagInventorySql(columns, scoped) {
   requireColumns(columns, TAG_REQUIRED, "list-native-tags");
@@ -46600,13 +46659,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve6 = (pk, seen) => {
+  const resolve7 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve6(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -46620,7 +46679,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve6(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -47742,35 +47801,37 @@ var FEATURES = [
       { kind: "shortcut", name: markdownShortcutName }
     ]
   },
-  // Placeholders for features that need a native helper this server does not
-  // ship. They always report `not_implemented` so clients can detect them.
+  // Placeholders for features that need a native WRITE helper, which this
+  // server does not ship. The opt-in private helper is read-only (write
+  // support was deliberately deferred), so enabling or installing it changes
+  // nothing here: these always report `not_implemented`.
   {
     name: "checklistToggle",
     description: "Check or uncheck an existing checklist item in place",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "smartFolders",
     description: "Create or edit Smart Folders and their tag rules",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "paragraphLinks",
     description: "Link to a specific paragraph or heading inside a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "audioTranscription",
     description: "Transcribe audio recordings attached to a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   }
 ];
 function requirementLabel(requirement) {
@@ -47818,7 +47879,7 @@ function evaluateFeature(feature, env) {
           failures.add("shortcut_not_installed");
         }
         break;
-      case "native_helper":
+      case "native_write_helper":
         missing.push(label);
         failures.add("not_implemented");
         break;
@@ -52019,6 +52080,644 @@ function formatNoteDrawings(result) {
   return lines.join("\n");
 }
 
+// src/services/privateHelperBuild.ts
+import { spawnSync as spawnSync5 } from "node:child_process";
+import {
+  chmodSync as chmodSync2,
+  existsSync as existsSync16,
+  mkdirSync as mkdirSync7,
+  mkdtempSync as mkdtempSync6,
+  renameSync as renameSync2,
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
+} from "node:fs";
+import { release as release4 } from "node:os";
+import { join as join26 } from "node:path";
+
+// src/services/privateHelper.ts
+import { spawnSync as spawnSync4 } from "node:child_process";
+import { createHash as createHash5 } from "node:crypto";
+import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
+import { homedir as homedir20 } from "node:os";
+import { dirname as dirname7, join as join25, resolve as resolve6 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+var PRIVATE_HELPER_PROTOCOL = 1;
+var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
+var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
+var TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
+var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "probe",
+  "read_note_state"
+]);
+var HELPER_BINARY_NAME = "apple-notes-private-helper";
+var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
+var MANIFEST_NAME = "manifest.json";
+var DEFAULT_TIMEOUT_MS3 = 2e4;
+var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var manifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot2(fromDir = dirname7(fileURLToPath3(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join25(dir, "package.json");
+    if (existsSync15(candidate)) {
+      try {
+        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
+        if (pkg.name === "apple-notes-mcp") return dir;
+      } catch {
+      }
+    }
+    const parent = dirname7(dir);
+    if (parent === dir) return resolve6(fromDir, "..");
+    dir = parent;
+  }
+}
+function defaultDeps2(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join25(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    exists: existsSync15,
+    readFile: (path10) => readFileSync5(path10),
+    spawn: spawnSync4,
+    ...overrides
+  };
+}
+function privateHelperEnabled(env = process.env) {
+  return env[ENABLE_ENV] === "1";
+}
+function helperInstallDir(env = process.env) {
+  const override = env[HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join25(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+}
+function sha256Hex2(data) {
+  return createHash5("sha256").update(data).digest("hex");
+}
+function inspectInstallation(deps = defaultDeps2()) {
+  const installDir = helperInstallDir(deps.env);
+  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
+  const base = {
+    installDir,
+    binaryPath,
+    sourcePath: deps.sourcePath,
+    expectedSourceSha256: null,
+    manifest: null
+  };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
+  const manifestPath = join25(installDir, MANIFEST_NAME);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      "The private helper is not built. Run `apple-notes-mcp setup --native-helper`."
+    );
+  let manifest;
+  try {
+    manifest = manifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch (error2) {
+    return fail(
+      "helper_manifest_invalid",
+      `Unreadable helper manifest (${error2 instanceof Error ? error2.message : String(error2)}). Run \`apple-notes-mcp setup --native-helper\`.`
+    );
+  }
+  base.manifest = manifest;
+  if (manifest.sourceSha256 !== base.expectedSourceSha256 || manifest.protocolVersion !== PRIVATE_HELPER_PROTOCOL)
+    return fail(
+      "helper_stale",
+      "The installed helper was built from a different helper source or protocol than this apple-notes-mcp version ships. Run `apple-notes-mcp setup --native-helper` again."
+    );
+  if (sha256Hex2(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return fail(
+      "helper_modified",
+      "The helper binary does not match the checksum recorded when it was built. Run `apple-notes-mcp setup --native-helper` to rebuild it."
+    );
+  return { ...base, ready: true, reason: null, detail: null };
+}
+var PrivateHelperError = class extends Error {
+  constructor(code, message, details = {}) {
+    super(message);
+    this.code = code;
+    this.details = details;
+    this.name = "PrivateHelperError";
+  }
+  code;
+  details;
+};
+var errorSchema2 = external_exports.object({
+  status: external_exports.literal("error"),
+  code: external_exports.string(),
+  message: external_exports.string()
+}).passthrough();
+var featureSchema = external_exports.object({
+  available: external_exports.boolean(),
+  reason: external_exports.string().nullable(),
+  missing: external_exports.array(external_exports.string())
+});
+var helloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  readOnly: external_exports.literal(true),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+var probeSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  readOnly: external_exports.literal(true),
+  os: external_exports.object({ version: external_exports.string(), notesAppVersion: external_exports.string().nullable() }).passthrough(),
+  framework: external_exports.object({ loaded: external_exports.boolean(), error: external_exports.string().nullable() }).passthrough(),
+  store: external_exports.object({
+    kind: external_exports.enum(["live", "copy"]).nullable(),
+    opened: external_exports.boolean(),
+    reason: external_exports.string().nullable(),
+    noteRows: external_exports.number().int().nullable()
+  }).passthrough(),
+  syncHostRunning: external_exports.boolean(),
+  features: external_exports.object({ readNoteState: featureSchema }).passthrough()
+}).passthrough();
+var cloudSyncSchema = external_exports.object({
+  available: external_exports.boolean(),
+  inICloudAccount: external_exports.boolean(),
+  currentLocalVersion: external_exports.number().int().optional(),
+  latestVersionSyncedToCloud: external_exports.number().int().optional(),
+  uploadPending: external_exports.boolean().optional()
+}).passthrough();
+var noteStateSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  identifier: external_exports.string(),
+  objectURI: external_exports.string(),
+  title: external_exports.string().nullable(),
+  modificationDate: external_exports.string().nullable(),
+  folderIdentifier: external_exports.string().nullable(),
+  passwordProtected: external_exports.boolean(),
+  deletedOrInTrash: external_exports.boolean(),
+  sharedViaICloud: external_exports.boolean(),
+  editable: external_exports.boolean(),
+  revision: external_exports.string().regex(/^r1:[a-f0-9]{64}$/),
+  cloudSync: cloudSyncSchema,
+  syncHostRunning: external_exports.boolean()
+}).passthrough();
+function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options = {}) {
+  if (!READ_ONLY_ACTIONS.has(action))
+    throw new PrivateHelperError(
+      "unknown_action",
+      `The private helper is read-only; "${action}" is not a supported action.`
+    );
+  if (!options.allowDisabled && !privateHelperEnabled(deps.env))
+    throw new PrivateHelperError(
+      "disabled",
+      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectInstallation(deps);
+    if (!install.ready)
+      throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS3;
+  const result = deps.spawn(binaryPath, [], {
+    input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES2,
+    env: deps.env
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PrivateHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PrivateHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  const stdout = String(result.stdout ?? "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new PrivateHelperError(
+      "invalid_response",
+      `The helper exited with status ${result.status} and no JSON response.`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
+  const object3 = parsed;
+  if (result.status !== 0 || object3.status === "error") {
+    const error2 = errorSchema2.safeParse(object3);
+    if (!error2.success)
+      throw new PrivateHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized error shape (exit ${result.status})`
+      );
+    const { status: _status, code, message, ...details } = error2.data;
+    void _status;
+    throw new PrivateHelperError(code, message, details);
+  }
+  return object3;
+}
+function parseOrThrow(schema, value) {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success)
+    throw new PrivateHelperError(
+      "invalid_response",
+      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
+    );
+  return parsed.data;
+}
+var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+function assertNoteIdentifier(identifier) {
+  if (!UUID.test(identifier))
+    throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID");
+}
+function probePrivateHelper(deps = defaultDeps2()) {
+  return parseOrThrow(probeSchema, callPrivateHelper("probe", {}, deps));
+}
+function readNoteState(identifier, deps = defaultDeps2()) {
+  assertNoteIdentifier(identifier);
+  return parseOrThrow(noteStateSchema, callPrivateHelper("read_note_state", { identifier }, deps));
+}
+function featureFromProbe(feature) {
+  if (!feature) return { available: false, reason: "private_api_unavailable", detail: null };
+  if (feature.available) return { available: true, reason: null, detail: null };
+  const reason = feature.reason === "store_unavailable" || feature.reason === "disabled" ? feature.reason : "private_api_unavailable";
+  return {
+    available: false,
+    reason,
+    detail: feature.missing.length ? `missing: ${feature.missing.join(", ")}` : feature.reason
+  };
+}
+function privateHelperCapabilities(deps = defaultDeps2()) {
+  const enabled = privateHelperEnabled(deps.env);
+  const installation = inspectInstallation(deps);
+  const off = (reason, detail) => ({
+    available: false,
+    reason,
+    detail
+  });
+  const both = (status) => ({ readNoteState: status });
+  if (installation.reason === "unsupported_platform")
+    return {
+      enabled,
+      readOnly: true,
+      installation,
+      probe: null,
+      features: both(off("unsupported_platform", null))
+    };
+  if (!enabled)
+    return {
+      enabled,
+      readOnly: true,
+      installation,
+      probe: null,
+      features: both(off("disabled", `Set ${ENABLE_ENV}=1 to opt in to the private helper.`))
+    };
+  if (!installation.ready)
+    return {
+      enabled,
+      readOnly: true,
+      installation,
+      probe: null,
+      features: both(off(installation.reason || "helper_not_installed", installation.detail))
+    };
+  let probe;
+  try {
+    probe = probePrivateHelper(deps);
+  } catch (error2) {
+    const detail = error2 instanceof Error ? error2.message : String(error2);
+    return {
+      enabled,
+      readOnly: true,
+      installation,
+      probe: null,
+      features: both(off("helper_unreachable", detail))
+    };
+  }
+  return {
+    enabled,
+    readOnly: true,
+    installation,
+    probe,
+    features: { readNoteState: featureFromProbe(probe.features.readNoteState) }
+  };
+}
+
+// src/services/privateHelperBuild.ts
+function defaultBuildDeps() {
+  return {
+    ...defaultDeps2(),
+    osVersion: () => {
+      const r = spawnSync5("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release4()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function compileArguments(sourcePath, outputPath, sourceSha) {
+  return [
+    "clang",
+    "-fobjc-arc",
+    "-O2",
+    "-Wall",
+    "-framework",
+    "Foundation",
+    "-framework",
+    "CoreData",
+    "-framework",
+    "AppKit",
+    // Embedded so `hello` can prove which source the binary came from.
+    `-DHELPER_SOURCE_SHA256="${sourceSha}"`,
+    "-o",
+    outputPath,
+    sourcePath
+  ];
+}
+function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
+  const steps = [];
+  const done = (ok) => ({
+    ok,
+    checkOnly,
+    steps,
+    installation: inspectInstallation(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectInstallation(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail || void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const source = deps.readFile(deps.sourcePath);
+  const sourceSha = sha256Hex2(source);
+  steps.push({
+    step: "locate source",
+    ok: true,
+    detail: `${deps.sourcePath} (sha256 ${sourceSha})`
+  });
+  const clang = deps.spawn("/usr/bin/xcrun", ["--find", "clang"], { encoding: "utf8" });
+  if (clang.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No clang found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const clangVersion = deps.spawn("/usr/bin/xcrun", ["clang", "--version"], { encoding: "utf8" });
+  const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = helperInstallDir(deps.env);
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join26(installDir, ".staging-"));
+  try {
+    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      compileArguments(deps.sourcePath, stagedBinary, sourceSha),
+      {
+        encoding: "utf8",
+        timeout: 18e4
+      }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "clang failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", "apple-notes-mcp.private-helper", stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = helloSchema.parse(
+        callPrivateHelper("hello", {}, deps, { allowDisabled: true, binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PRIVATE_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    const writeActions = hello.actions.filter((action) => !READ_ONLY_ACTIONS.has(action));
+    if (writeActions.length) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper offers non-read-only actions (${writeActions.join(", ")}); refusing to install`
+      });
+      return done(false);
+    }
+    steps.push({
+      step: "handshake",
+      ok: true,
+      detail: `protocol ${hello.protocolVersion}, read-only`
+    });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex2(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync2(stagedBinary, 448);
+    renameSync2(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
+    writeFileSync5(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+      mode: 384
+    });
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
+  }
+  const installation = inspectInstallation(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail || void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatHelperBuild(report) {
+  const lines = ["Apple Notes MCP private helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) {
+    lines.push(`Installed at ${report.installation.binaryPath}.`);
+    lines.push(
+      "The helper stays off until you set APPLE_NOTES_MCP_ENABLE_PRIVATE=1 for the MCP server, and it needs the same Full Disk Access grant as the server's database reads."
+    );
+  } else if (report.checkOnly) {
+    lines.push("Run `apple-notes-mcp setup --native-helper` to build it.");
+  } else {
+    lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  }
+  return lines.join("\n");
+}
+
+// src/tools/privateHelperTools.ts
+var coreDataId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i);
+var notesUuid = external_exports.string().regex(UUID_PATTERN);
+function resolveIdentifier(manager, args) {
+  if (args.identifier && args.id)
+    throw new PrivateHelperError("invalid_request", "Pass identifier or id, not both");
+  if (args.identifier) return args.identifier;
+  if (!args.id) throw new PrivateHelperError("invalid_request", "identifier or id is required");
+  const link = manager.getNoteLinkById(args.id);
+  const match = link?.match(/identifier=([0-9A-F-]{36})$/i);
+  if (!match)
+    throw new PrivateHelperError(
+      "not_found",
+      "Could not resolve that id to a Notes UUID (needs Full Disk Access); pass identifier instead"
+    );
+  return match[1];
+}
+function envelopeCode(helperCode, message) {
+  switch (helperCode) {
+    case "not_found":
+      return "not_found";
+    case "timeout":
+      return "timeout_indeterminate";
+    case "invalid_request":
+    case "invalid_json":
+    case "input_too_large":
+    case "unknown_action":
+      return "validation_error";
+    case "store_unavailable":
+      return /Full Disk Access/i.test(message) ? "full_disk_access_missing" : "operation_failed";
+    case "disabled":
+    case "unsupported_platform":
+    case "unsupported_note":
+    case "private_api_unavailable":
+    case "protocol_mismatch":
+    case "helper_not_installed":
+    case "helper_stale":
+    case "helper_modified":
+    case "helper_manifest_invalid":
+      return "unsupported";
+    default:
+      return "operation_failed";
+  }
+}
+function helperErrorResult(error2) {
+  if (!(error2 instanceof PrivateHelperError)) {
+    const message2 = error2 instanceof Error ? error2.message : String(error2);
+    return errorResult(`native helper: ${message2}`, error2);
+  }
+  const message = `native helper (${error2.code}): ${error2.message}`;
+  return errorResult(
+    message,
+    new CodedError(message, {
+      ...error2.details,
+      code: envelopeCode(error2.code, error2.message),
+      helperCode: error2.code,
+      committed: false
+    })
+  );
+}
+function registerPrivateHelperTools(server2, manager, depsFactory = () => defaultDeps2()) {
+  function tool(name, description, inputSchema, annotations, handler) {
+    server2.registerTool(
+      name,
+      {
+        description,
+        inputSchema,
+        annotations,
+        outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough()
+      },
+      (async (args) => {
+        try {
+          const result = { ok: true, ...handler(args, depsFactory()) };
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
+          };
+        } catch (error2) {
+          return helperErrorResult(error2);
+        }
+      })
+    );
+  }
+  tool(
+    "native-helper-status",
+    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state.\nReturns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\nDo not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\nSafety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
+    {},
+    { readOnlyHint: true, openWorldHint: false },
+    (_args, deps) => {
+      const capabilities = privateHelperCapabilities(deps);
+      return {
+        ...capabilities,
+        ...capabilities.installation.ready ? {} : { setupCommand: "apple-notes-mcp setup --native-helper" }
+      };
+    }
+  );
+  tool(
+    "native-note-state",
+    "Use when: you need a note's native title, modification date, folder identifier, lock/trash/shared/editable flags, or iCloud upload state as Notes' own data model reports them.\nReturns: identifier, title, modificationDate, folderIdentifier, lock/trash/shared/editable flags, `revision` (an opaque change token; compare two reads to detect a change), and cloudSync versions.\nDo not use when: reading note content (get-note-content, get-note-markdown).\nSafety: read-only; the helper opens the store with Core Data's read-only option and has no write action. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and a built helper.",
+    {
+      identifier: notesUuid.optional().describe("Notes UUID (the notes://showNote identifier)"),
+      id: coreDataId2.optional().describe("x-coredata note id; resolved to a UUID via the database")
+    },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readNoteState(resolveIdentifier(manager, args), deps) })
+  );
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
@@ -52026,6 +52725,11 @@ var { version: version2 } = require2("../package.json");
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
   const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
+  const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
 if (process.argv[2] === "setup") {
@@ -52043,6 +52747,7 @@ registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
+registerPrivateHelperTools(server, notesManager);
 function successResponse(message, structured) {
   const res = { content: [{ type: "text", text: message }] };
   if (structured) res.structuredContent = structured;
@@ -52162,6 +52867,59 @@ function inRecentlyDeletedMessage(title) {
 }
 function revisionConflictMessage(title) {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
+}
+function quickNoteGuardRefusal(label, id2) {
+  let quick;
+  try {
+    quick = quickNoteFlag(id2);
+  } catch (error2) {
+    const detail = error2 instanceof Error ? error2.message : String(error2);
+    if (error2 instanceof NoteStoreError && error2.kind === "no_fda") {
+      return `${label} note cannot be checked: the delete-note guard needs Full Disk Access to rule out a Quick Note. Nothing was deleted. ${detail}`;
+    }
+    return `${label} note could not be checked (${detail}). Nothing was deleted.`;
+  }
+  return quick ? `${label} note is a Quick Note; a guard must be an ordinary note. Nothing was deleted.` : null;
+}
+function prepareDeleteGuards(args) {
+  const { id: id2, guardNoteId, expectedGuardContentHash, requireActiveNoteId } = args;
+  if (guardNoteId === void 0 !== (expectedGuardContentHash === void 0)) {
+    return { error: "Pass guardNoteId and expectedGuardContentHash together." };
+  }
+  if (guardNoteId === id2 || requireActiveNoteId === id2) {
+    return { error: "A guard note must be a different note from the one being deleted." };
+  }
+  if (guardNoteId !== void 0 && guardNoteId === requireActiveNoteId) {
+    return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId." };
+  }
+  const prepared = { guards: [], labels: [] };
+  if (guardNoteId !== void 0) {
+    const refusal = quickNoteGuardRefusal("Guard", guardNoteId);
+    if (refusal) return { error: refusal };
+    const guard = readExactNoteSnapshot(guardNoteId);
+    if ("error" in guard) return { error: `Guard note: ${guard.error}` };
+    if (guard.contentHash !== expectedGuardContentHash) {
+      return {
+        error: `Guard note "${guard.note.title}" changed after it was read. Verify the copy again before retiring the original. Nothing was deleted.`
+      };
+    }
+    prepared.guards.push({ id: guardNoteId, expectedBody: guard.body });
+    prepared.labels.push("Guard");
+    prepared.guardContentHash = guard.contentHash;
+  }
+  if (requireActiveNoteId !== void 0) {
+    const refusal = quickNoteGuardRefusal("Required active", requireActiveNoteId);
+    if (refusal) return { error: refusal };
+    const active = notesManager.getNoteById(requireActiveNoteId);
+    if (!active)
+      return { error: `Required active note with ID "${requireActiveNoteId}" not found.` };
+    if (active.passwordProtected) {
+      return { error: `Required active note "${active.title}" is password-protected.` };
+    }
+    prepared.guards.push({ id: requireActiveNoteId });
+    prepared.labels.push("Required active");
+  }
+  return prepared;
 }
 var folderNameSchema = {
   name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER),
@@ -53398,10 +54156,17 @@ registerTool(
 registerTool(
   "delete-note",
   {
-    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
+    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too. Copy-then-retire: pass guardNoteId and expectedGuardContentHash (the verified copy's contentHash) to delete only while the copy still has that revision, is unlocked, is outside Recently Deleted, and is not a Quick Note; requireActiveNoteId requires the same of a second note without fingerprinting it. The guard needs Full Disk Access to rule out a Quick Note. The copy's body, lock state, and folder are checked again inside the delete AppleScript, but the pair is not one transaction.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput.optional().describe(
+        "A second note (usually the verified copy) that must still match expectedGuardContentHash, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Needs Full Disk Access"
+      ),
+      expectedGuardContentHash: expectedContentHashInput.optional().describe("get-note-content contentHash of guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput.optional().describe(
+        "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted. Needs Full Disk Access"
+      ),
       timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
@@ -53410,48 +54175,85 @@ registerTool(
       id: external_exports.string().optional(),
       title: external_exports.string().optional(),
       wasShared: external_exports.boolean().optional(),
-      previousContentHash: external_exports.string().optional()
+      previousContentHash: external_exports.string().optional(),
+      guardNoteId: external_exports.string().optional(),
+      guardContentHash: external_exports.string().optional(),
+      requireActiveNoteId: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id: id2, expectedContentHash, ...scopeArgs }) => {
-    const snapshot = readExactNoteSnapshot(id2);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body, scopeFrom(scopeArgs));
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status === "scope_conflict") {
-      return errorResponse(scopeConflictMessage(result.reason));
-    }
-    if (result.status === "in-recently-deleted") {
-      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
-    }
-    if (result.status === "container-unknown") {
-      return errorResponse(containerUnknownMessage(snapshot.note.title));
-    }
-    if (result.status === "not-deleted") {
-      return errorResponse(NOT_DELETED_MESSAGE);
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
-      );
-    }
-    const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
+  withErrorHandling(
+    ({
+      id: id2,
+      expectedContentHash,
+      guardNoteId,
+      expectedGuardContentHash,
+      requireActiveNoteId,
+      ...scopeArgs
+    }) => {
+      const prepared = prepareDeleteGuards({
         id: id2,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash
+        guardNoteId,
+        expectedGuardContentHash,
+        requireActiveNoteId
+      });
+      if ("error" in prepared) return errorResponse(prepared.error);
+      const snapshot = readExactNoteSnapshot(id2);
+      if ("error" in snapshot) return errorResponse(snapshot.error);
+      if (snapshot.contentHash !== expectedContentHash) {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-    );
-  }, "Error deleting note")
+      const result = notesManager.deleteNoteByIdIfUnchanged(
+        id2,
+        snapshot.body,
+        scopeFrom(scopeArgs),
+        prepared.guards
+      );
+      if (result.status === "guard-conflict") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note changed just before the delete. Nothing was deleted; verify it again before retrying.`
+        );
+      }
+      if (result.status === "guard-inactive") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note is no longer active (${result.reason}). Nothing was deleted.`
+        );
+      }
+      if (result.status === "conflict") {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
+      }
+      if (result.status === "scope_conflict") {
+        return errorResponse(scopeConflictMessage(result.reason));
+      }
+      if (result.status === "in-recently-deleted") {
+        return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
+      }
+      if (result.status === "container-unknown") {
+        return errorResponse(containerUnknownMessage(snapshot.note.title));
+      }
+      if (result.status === "not-deleted") {
+        return errorResponse(NOT_DELETED_MESSAGE);
+      }
+      if (result.status !== "deleted") {
+        return errorResponse(
+          `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
+        );
+      }
+      const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
+      return successResponse(
+        `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
+        {
+          ok: true,
+          id: id2,
+          title: snapshot.note.title,
+          wasShared: snapshot.note.shared ?? false,
+          previousContentHash: expectedContentHash,
+          ...guardNoteId ? { guardNoteId, guardContentHash: prepared.guardContentHash } : {},
+          ...requireActiveNoteId ? { requireActiveNoteId } : {}
+        }
+      );
+    },
+    "Error deleting note"
+  )
 );
 registerTool(
   "move-note",

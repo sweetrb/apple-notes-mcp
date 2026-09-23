@@ -99,6 +99,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **`timeoutSeconds`** (1–120) on `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` sets the timeout of each Notes.app automation step for that call. A timed-out write is uncertain: read the note by id before retrying.
 - **`delete-note` checks placement.** If Notes.app accepts the delete but the note is still in its original folder, the call reports that nothing was deleted.
 - **`delete-note` and `batch-delete-notes` refuse a note already in Recently Deleted**, where a delete is permanent. The folder is read live from Notes.app; the database only identifies which folder is Recently Deleted.
+- **Copy-then-retire with `delete-note`:** after copying note A to note B and verifying B, read both with `get-note-content`, then call `delete-note` on A with `guardNoteId` = B and `expectedGuardContentHash` = B's `contentHash`. The delete stops if B changed, was locked, moved to Recently Deleted, or is a Quick Note. It needs Full Disk Access (the Quick Note flag is only in the database); a B the database has not saved yet still passes on Notes.app's live checks. It is a guard, not a transaction. `requireActiveNoteId` only requires the other note to stay active; it does not fingerprint its content.
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
 - Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
@@ -317,6 +318,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Needs Full Disk Access and the public native helper, built once by the user with `apple-notes-mcp setup --public-helper`. An error mentioning `setup --public-helper` means it is not built or is stale after an upgrade; tell the user to run that command rather than retrying.
 - Overall `status` is `none` when the note has no classic drawing. A per-drawing `status: "error"` carries a `code` (`no_data`, `undecodable`, `timeout`, ...) and does not fail the call.
 - For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points itself (`pointsOmitted`) past the response size limit.
+
+### Private helper tools (opt-in)
+- `native-helper-status` and `native-note-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).
+- Always call `native-helper-status` first. Do not suggest enabling the helper unprompted: it is unsupported API and can break on any macOS update.
+- The helper cannot write. Write support was deliberately deferred by the maintainer (#204): a second writer beside a running Notes.app, CRDT replica identity, and the iCloud upload lag are unresolved. Use the AppleScript or Shortcuts-bridge tools for edits. `cloudSync.uploadPending` in `native-note-state` shows whether Notes has an upload queued.
 
 ### Multi-account
 - Omitting `account` targets whatever Notes.app reports as its **`default account`** — which is often, but not necessarily, iCloud. Since 2.7.1 the server resolves that name at runtime instead of assuming the literal `"iCloud"`, so it is also correct for a localized account name, a non-iCloud default, or a name carrying a trailing U+F8FF ()
