@@ -143,15 +143,84 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPINNED` | Pinned state (boolean) | AppleScript has no `pinned` property, so this is the only read path for pin state |
 | `ZHASCHECKLIST`, `ZHASCHECKLISTINPROGRESS` | Whether a note has a checklist, and whether any item is still unchecked | Cheap flags without decoding the body |
 | `ZISRECOVERINGFROMTRASH` | Trash / recovery state | Distinguishes a recently deleted note |
-| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | Smart Folders are otherwise not scriptable |
+| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | The rules are not scriptable. AppleScript can still list a smart folder's current notes by folder id (`notes of folder id "…/ICFolder/pN"`, verified macOS 27.2, Notes 4.13); `list-smart-folders` uses both |
 | `ZSNIPPET`, `ZWIDGETSNIPPET` | Preview snippet text | Fast preview without reading the full body |
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
+
+#### Listing special sets (`list-special-notes`, `list-native-tags` inventory)
+
+Each listing is one read-only transaction over the same table. Column detection
+(`PRAGMA table_info`) and the folder/account context used to label rows are
+separate `sqlite3 -readonly` runs, so paths and account names can come from a
+slightly different snapshot than the rows. Findings from a
+live macOS 27 store (counts only):
+
+- **Quick Notes** carry `ZISSYSTEMPAPER = 1`. The column arrived with Quick Notes
+  (macOS 12); without it the listing reports `supported: false`. Many flagged rows have
+  no folder, a NULL title, and a NULL modification date. They are abandoned drafts
+  Notes.app never shows (111 folderless note rows on the test store, all untitled), so
+  every "active note" listing requires a folder. All 15 Quick Notes the listing returned
+  also appeared in AppleScript's `list-notes`, confirming the filter.
+- **Recently Deleted** is a folder, not a flag: `ZFOLDERTYPE = 1` with an identifier
+  that starts `TrashFolder`. The reader accepts either signal, so a store without
+  `ZFOLDERTYPE` still works. Rows with `ZMARKEDFORDELETION = 1` are tombstones awaiting
+  sync and are left out. `ZISRECOVERINGFROMTRASH` is not a trash marker.
+- **Accounts** hang off a numbered `ZACCOUNTn` column whose number differs by entity and
+  release (notes use `ZACCOUNT7` on macOS 27). The reader takes the folder's `ZOWNER`
+  first and otherwise coalesces every present `ZACCOUNTn`, joined against `ICAccount`
+  rows so a column belonging to another relation cannot match.
+- **Native tags** are `ICHashtag` rows plus one `ICInlineAttachment` per use
+  (`ZTYPEUTI1 = com.apple.notes.inlinetextattachment.hashtag`, `ZNOTE1` = note,
+  `ZALTTEXT` = `#tag`). A use counts only while the note body still references that
+  inline object's identifier (attribute run field 12). Locked or undecodable bodies are
+  counted from the object rows and reported as `unverifiedNotes`.
+- Values are bound with the sqlite3 shell's `.parameter set`; entity numbers come from
+  `Z_PRIMARYKEY`; note ids are rebuilt as `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`,
+  which matched every AppleScript id checked.
 
 Reading these is safe under the existing rules: copy the three database files first, open
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
 To *change* pin state or tags, use the Shortcuts bridge (below), not a SQL `UPDATE`.
+
+### query-notes Data Sources
+
+`query-notes` (`src/utils/noteQuery.ts` for the grammar, `src/utils/noteQueryStore.ts`
+for the reader) evaluates every predicate from the database, read-only, in two
+`sqlite3 -readonly` calls: `PRAGMA table_info` for feature detection, then one
+`BEGIN … COMMIT` read transaction. Entity numbers are looked up by name in
+`Z_PRIMARYKEY` (`ICNote`, `ICFolder`, `ICAccount`) because they differ between
+stores. The sources below were checked against a live store on macOS 27.2 on
+2026-09-23:
+
+| Predicate | Source |
+|-----------|--------|
+| Note id | `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`; the UUID matched AppleScript's `id of note` |
+| Title, dates | `ZTITLE1`; `ZMODIFICATIONDATE1`; `COALESCE(ZCREATIONDATE3, ZCREATIONDATE1)` (Core Data seconds since 2001-01-01 UTC) |
+| Folder, path | note `ZFOLDER` → folder `ZTITLE2`, walked up `ZPARENT` |
+| Account | folder `ZOWNER` (inherited from the parent) → account `ZNAME` |
+| Recently Deleted | folder `ZFOLDERTYPE = 1` (identifier `TrashFolder-…`); also `ZMARKEDFORDELETION` and `ZFOLDER IS NULL` |
+| `pinned`, `locked` | `ZISPINNED`, `ZISPASSWORDPROTECTED` |
+| `shared` | `ZSERVERSHAREDATA IS NOT NULL` on the note or any ancestor folder. On the live store this set equalled AppleScript's `shared` set exactly |
+| Text, words, links, checklists, attachments | The gzipped `ZICNOTEDATA.ZDATA` document, decoded per note: text (field 2), attribute-run links (field 9), `AttachmentInfo` type UTIs (field 12.2), checklist style 103 with done state (field 2.5.2) |
+| `tag:` | `ICInlineAttachment` rows with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag'`, `ZNOTE1` = note, `ZALTTEXT` = `#tag`, counted only when their `ZIDENTIFIER` is still an object in the body |
+
+Facets come from the body's `AttachmentInfo` types rather than from `ICAttachment`
+rows, because rows outlive their objects: on the live store, some top-level
+attachment rows (tables and URL previews) were no longer referenced by any note
+body, while every referenced row's UTI equalled the body's UTI. The UTI mapping is
+`public.url` and inline note links → `has:link` (as are attribute-run links);
+`com.apple.notes.table` → `has:table`; `com.apple.paper.doc.scan` and the legacy
+`com.apple.notes.gallery` → `has:scan`; `com.adobe.pdf` and `com.apple.paper.doc.pdf`
+→ `has:pdf`; `com.apple.paper` and the legacy `com.apple.drawing*` /
+`com.apple.notes.sketch` → `has:drawing`; image, video, and audio UTIs → their
+facet. Every non-inline object except a table also counts as `has:attachment`.
+`has:video` and `tag:` are verified against fixtures only; the store used for
+live verification had no video attachments or native tags.
+
+Password-protected notes store an encrypted `ZDATA`, so only title and metadata
+predicates can match them.
 
 ---
 
@@ -269,6 +338,18 @@ The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Eac
 ### CRDT Implementation
 
 Tables and collaborative editing use Conflict-Free Replicated Data Types (CRDTs). Apple uses "topotext" for synchronization with first-write-wins conflict resolution via iCloud.
+
+### Stored Audio Transcripts (verified macOS 27)
+
+Notes stores the transcript it computes for an audio recording on the recording's attachment row (`ZTYPEUTI = 'com.apple.m4a-audio'`, `ZPARENTATTACHMENT IS NULL`) in `ZICCLOUDSYNCINGOBJECT.ZMERGEABLEDATA1`. Unlike table data, the blob is plain protobuf, not gzipped. Its root holds the object entries (field 3), the key names (4), the type names (5) and the UUIDs (6). The dedicated columns `ZTEMPORARYTRANSCRIPTDATA` and `ZSUMMARY` were empty on every audio row checked. `get-audio-transcripts` decodes the blob as follows:
+
+- One `com.apple.notes.ICTTAudioRecording` custom map (entry field 13). Its `fragments` key points to a list (entry field 5) of `ICTTAudioRecording.Fragment` maps.
+- Each fragment's `identity` is the `ZIDENTIFIER` of a child attachment (`public.mpeg-4-audio`, `ZPARENTATTACHMENT` = the recording). The child row carries that take's `ZDURATION`. The parent's `ZDURATION` was 0 on some recordings, so the tool falls back to the sum of the child durations.
+- A fragment's `transcript` points to an ordered set in entry field 15. Field 15.1 holds a topotext note plus `{1: index, 2: 16-byte UUID}` pairs that give the order. Field 15.2 is a dictionary from an `NSUUID` map (whose `UUIDIndex` points into root field 6) to a segment object.
+- Each `ICTTTranscriptSegment` is one recognized word. `text` and `speaker` are registers (entry field 1) that point to an `NSString` map (`self`, field 4). `timestamp` and `duration` point to an `NSNumber` map (`doubleValue`, a little-endian fixed64 double in field 3, in seconds). Words usually carry their own leading space.
+- `summary` and `topLineSummary` are registers that point to a topotext note (entry field 10). They are empty unless Notes generated a summary.
+
+On the test library, 6 of 6 recordings decoded, each with one fragment. Timestamps in ordering-index order are mostly monotonic, with small backward steps where speakers overlap. Recordings with several fragments were not available, so fragment concatenation in list order is covered by synthetic fixtures only.
 
 ---
 

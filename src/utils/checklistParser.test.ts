@@ -7,7 +7,11 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as zlib from "zlib";
-import { getChecklistItems, hasFullDiskAccess } from "./checklistParser.js";
+import {
+  getChecklistItems,
+  hasFullDiskAccess,
+  parseChecklistFromProtobuf,
+} from "./checklistParser.js";
 
 // Mock child_process to avoid actual database access
 vi.mock("child_process", () => ({
@@ -291,5 +295,96 @@ describe("getChecklistItems", () => {
       expect.arrayContaining([expect.stringContaining("Z_PK = 42")]),
       expect.any(Object)
     );
+  });
+});
+
+/**
+ * Builds a note body from explicit attribute runs, so a fixture can place a
+ * checklist run's boundary exactly where a given Notes version stores it.
+ */
+function buildRunsProtobuf(
+  text: string,
+  runs: Array<{ length: number; done?: boolean }>
+): Uint8Array {
+  const varint = (value: number): number[] => {
+    const bytes: number[] = [];
+    while (value > 0x7f) {
+      bytes.push((value & 0x7f) | 0x80);
+      value >>>= 7;
+    }
+    bytes.push(value);
+    return bytes;
+  };
+  const field = (num: number, data: number[]) => [
+    ...varint((num << 3) | 2),
+    ...varint(data.length),
+    ...data,
+  ];
+  const int = (num: number, value: number) => [...varint(num << 3), ...varint(value)];
+  const encodedRuns = runs.flatMap((run) =>
+    field(5, [
+      ...int(1, run.length),
+      ...(run.done === undefined
+        ? []
+        : field(2, [...int(1, 103), ...field(5, int(2, run.done ? 1 : 0))])),
+    ])
+  );
+  const body = field(3, [...field(2, Array.from(new TextEncoder().encode(text))), ...encodedRuns]);
+  return new Uint8Array(field(2, body));
+}
+
+describe("parseChecklistFromProtobuf line attribution (#187)", () => {
+  it("gives a run that starts on the preceding newline to the line after it", () => {
+    // macOS 27.2 layout: "Title\nPlain" is plain, "\nNew item" is the checklist run.
+    const data = buildRunsProtobuf("Title\nPlain\nNew item", [
+      { length: 11 },
+      { length: 9, done: false },
+    ]);
+    expect(parseChecklistFromProtobuf(data)).toEqual([{ text: "New item", done: false }]);
+  });
+
+  it("keeps a run that starts at the line's first character on that line", () => {
+    const data = buildRunsProtobuf("Title\nOld item\nAfter", [
+      { length: 6 },
+      { length: 9, done: true },
+      { length: 5 },
+    ]);
+    expect(parseChecklistFromProtobuf(data)).toEqual([{ text: "Old item", done: true }]);
+  });
+
+  it("attributes both layouts in one note and reads a checked newline-led item", () => {
+    const data = buildRunsProtobuf("Title\nFirst\nSecond", [
+      { length: 6 },
+      { length: 5, done: false },
+      { length: 7, done: true },
+    ]);
+    expect(parseChecklistFromProtobuf(data)).toEqual([
+      { text: "First", done: false },
+      { text: "Second", done: true },
+    ]);
+  });
+
+  it("keeps a split-off newline-only run with the line it terminates", () => {
+    const data = buildRunsProtobuf("Title\nBold item\nNext", [
+      { length: 6 },
+      { length: 4, done: false },
+      { length: 5, done: false },
+      { length: 1, done: false },
+      { length: 4 },
+    ]);
+    expect(parseChecklistFromProtobuf(data)).toEqual([{ text: "Bold item", done: false }]);
+  });
+
+  it("reports the appended line through getChecklistItems", () => {
+    const data = buildRunsProtobuf("Title\nPlain\nNew item", [
+      { length: 11 },
+      { length: 9, done: false },
+    ]);
+    mockExecSync.mockReturnValue(
+      (Buffer.from(zlib.gzipSync(Buffer.from(data))).toString("hex") + "\n") as never
+    );
+    expect(getChecklistItems("x-coredata://ABC/ICNote/p7").items).toEqual([
+      { text: "New item", done: false },
+    ]);
   });
 });
