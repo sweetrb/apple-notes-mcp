@@ -179,6 +179,19 @@ response says when older notes were left out. Recently Deleted is excluded
 unless `includeDeleted` is true. Locked notes match on title and metadata only.
 The returned ids work with every id-based tool.
 
+Both search tools can say where a note matched and how long it is. Results
+whose text came from the database carry `matchedIn` (`title`, `body`, or both);
+`query-notes` always has it for readable notes, and `search-notes` has it for a
+database body search. Pass `includeWordCount: true` to either tool for a
+`wordCount` per result (null for locked notes). On a `search-notes` title search
+it reads the bodies in one database query and adds `matchedIn` too, which
+answers "does this note also mention it in the body?" without opening each note.
+
+```
+User: "Which of my budget notes are long, and do they mention it in the body?"
+Action: Use query-notes with query='budget' and includeWordCount=true
+```
+
 ### Reading Notes
 
 When the user wants to see note contents:

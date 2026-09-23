@@ -579,20 +579,84 @@ export function evaluateNoteQuery(node: QueryNode, note: QueryableNote): boolean
   }
 }
 
+/** One positive text predicate: the phrase and the part of the note it targets. */
+export interface TextPredicate {
+  field: "any" | "title" | "body";
+  value: string;
+}
+
+/**
+ * Collects the text predicates that a matching note is expected to satisfy
+ * (predicates under an odd number of NOTs are skipped).
+ */
+export function positiveTextPredicates(node: QueryNode, negated = false): TextPredicate[] {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.flatMap((child) => positiveTextPredicates(child, negated));
+    case "not":
+      return positiveTextPredicates(node.child, !negated);
+    case "text":
+      return negated ? [] : [{ field: node.field, value: node.value }];
+    default:
+      return [];
+  }
+}
+
 /**
  * Collects the text terms that a matching note is expected to contain (terms
  * under an odd number of NOTs are skipped), used to centre result snippets.
  */
 export function positiveTextTerms(node: QueryNode, negated = false): string[] {
-  switch (node.type) {
-    case "and":
-    case "or":
-      return node.children.flatMap((child) => positiveTextTerms(child, negated));
-    case "not":
-      return positiveTextTerms(node.child, !negated);
-    case "text":
-      return negated ? [] : [node.value];
-    default:
-      return [];
+  return positiveTextPredicates(node, negated).map((predicate) => predicate.value);
+}
+
+/** A part of a note where a search phrase was found. */
+export type MatchLocation = "title" | "body";
+
+/**
+ * Reports where a matched note contains its positive text predicates: in the
+ * title, in the body (the text after the first line), or both.
+ *
+ * Each predicate is only looked for where its field points: `title:` only in
+ * the title, `body:` only in the body, a bare word in both. The title is the
+ * stored title or the first line of the text, since Notes derives one from the
+ * other and a query matches either.
+ *
+ * Returns undefined when there is nothing to report or it cannot be known:
+ * the query has no positive text predicate, or a predicate can match the body
+ * and the body text is unavailable (a locked or undecodable note). It returns
+ * an empty array when the text is known and no predicate occurs in it, which
+ * happens when a note matched through a metadata branch such as `pinned OR x`.
+ *
+ * @param predicates - from {@link positiveTextPredicates}
+ * @param title - the note's stored title
+ * @param text - the note's full decoded text, title line included; null when unavailable
+ */
+export function matchLocations(
+  predicates: TextPredicate[],
+  title: string,
+  text: string | null
+): MatchLocation[] | undefined {
+  if (predicates.length === 0) return undefined;
+  if (text === null && predicates.some((p) => p.field !== "title")) return undefined;
+  const firstBreak = text === null ? -1 : text.indexOf("\n");
+  const titleLower = normalizeForMatch(title);
+  const firstLineLower =
+    text === null ? "" : normalizeForMatch(firstBreak === -1 ? text : text.slice(0, firstBreak));
+  const bodyLower =
+    text === null || firstBreak === -1 ? "" : normalizeForMatch(text.slice(firstBreak + 1));
+  let inTitle = false;
+  let inBody = false;
+  for (const predicate of predicates) {
+    const needle = normalizeForMatch(predicate.value);
+    if (predicate.field !== "body" && !inTitle) {
+      inTitle = titleLower.includes(needle) || firstLineLower.includes(needle);
+    }
+    if (predicate.field !== "title" && !inBody) inBody = bodyLower.includes(needle);
   }
+  const locations: MatchLocation[] = [];
+  if (inTitle) locations.push("title");
+  if (inBody) locations.push("body");
+  return locations;
 }

@@ -193,6 +193,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `limit` to cap the number of results returned. **`limit` defaults to 50** — a broad query (e.g. a single common letter) reads several properties per match via AppleScript, so an unbounded search over hundreds of matches times out; the default keeps it useful. The response discloses the applied limit and warns when results were truncated — pass a higher `limit`, or narrow with `folder`/`modifiedSince`, to see more.
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 - With Full Disk Access, `searchContent: true` reads the Notes database instead of asking Notes.app (`source: "database"` in the response): it matches the full plain text, title line included, scans the 5000 most recently modified notes, and excludes Recently Deleted. Without Full Disk Access it falls back to AppleScript (`source: "applescript"`), which scans every body before `limit` applies and can time out on a broad term; the timeout error then says how to fix it
+- `matchedIn` (`["title"]`, `["body"]`, or both; body = text after the first line) appears when the note text came from the database: always on a database body search, and on any search with `includeWordCount`. It is absent for locked notes and for AppleScript searches without `includeWordCount`; its absence is not evidence either way
+- `includeWordCount: true` adds `wordCount` (null = locked or unreadable). An AppleScript search reads the bodies in one batched read-only database query, never per note; without Full Disk Access the results stay unchanged and `wordCountUnavailable` says why
 
 ### query-notes
 - Boolean search read straight from the NoteStore database (read-only, needs Full Disk Access). Prefer it over `search-notes` when Full Disk Access is available: one call matches title **or** body, and it returns in well under a second instead of ~200ms per result
@@ -200,6 +202,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Scans the 500 most recently modified notes by default (`scanLimit` up to 5000). When `scanTruncated` is true, older notes were not examined — raise `scanLimit` before concluding a note does not exist
 - Excludes Recently Deleted and folderless notes unless `includeDeleted: true`
 - Locked notes match on title and metadata only; body predicates never match them
+- Each hit has `matchedIn` (where the positive text terms occur: `title`, `body`, or both) when the query has a text term and the body is readable; a `title:` term only counts toward the title and a `body:` term only toward the body. An empty list means the note matched through a non-text branch (`pinned OR x`)
+- `includeWordCount: true` adds `wordCount`, the same count `words:` filters on (null = locked or unreadable). A metadata-only query reads just the returned notes' bodies in one extra query
 - Result ids chain directly into `get-note-content` and every other id-based tool
 
 ### list-notes

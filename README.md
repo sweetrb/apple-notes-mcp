@@ -425,6 +425,7 @@ Searches for notes by title or content.
 | `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of results to return. **Defaults to 50** — a broad query reads several properties per match via AppleScript (~200ms/note), so an unbounded search over hundreds of matches can exceed Notes' 30s timeout and return an error instead of results. Pass a higher value to see more; the applied limit (and whether it truncated the results) is disclosed in the response. |
+| `includeWordCount` | boolean | No | Add `wordCount` to each result (`null` when the note is locked or its body unreadable). A database content search already has the text. Otherwise the bodies are read in one batched read-only database query, never one AppleScript call per note; that needs Full Disk Access and also adds `matchedIn`. Without it, the response carries `wordCountUnavailable` and the results are unchanged. |
 
 **Example - Search titles:**
 ```json
@@ -453,6 +454,17 @@ Searches for notes by title or content.
 
 **Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc. A content search also returns `source` (`"database"` or `"applescript"`), and `scanTruncated` when the database path left older notes unsearched.
 
+When the note text came from the database (a database content search, or any search with `includeWordCount`), each result also carries `matchedIn`: `["title"]`, `["body"]`, or `["title", "body"]`, saying where the query text occurs. The body is the text after the first line. `matchedIn` is absent for locked notes and for AppleScript searches without `includeWordCount`. The text output appends the same details to each line, for example `· matched in title, body · 245 words`.
+
+**Example - Content search with word counts:**
+```json
+{
+  "query": "budget",
+  "searchContent": true,
+  "includeWordCount": true
+}
+```
+
 ---
 
 #### `query-notes`
@@ -470,6 +482,7 @@ can match titles and bodies together.
 | `limit` | number | No | Maximum notes to return. Defaults to 50, maximum 500. The response reports the total match count. |
 | `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 5000. The response says when older notes were left unscanned. |
 | `includeDeleted` | boolean | No | Also scan notes in Recently Deleted, notes pending deletion, and folderless notes. Defaults to `false`. |
+| `includeWordCount` | boolean | No | Add `wordCount` to each returned note, the same count `words:` filters on (`null` when locked or unreadable). Free when the query already reads bodies; a metadata-only query (for example `pinned`) reads just the returned notes' bodies in one extra read-only query. Defaults to `false`. |
 
 **Syntax:**
 
@@ -514,7 +527,11 @@ Their snippets are always empty.
 
 **Returns:** Matching notes, most recently modified first, each with `id`,
 `title`, `folder`, `account`, `modified`, `created`, and a `snippet` centred on
-the first matched phrase. The ids are the same `x-coredata://…/ICNote/p…` form
+the first matched phrase. Each note also has `matchedIn` when the query has a
+positive text term: `["title"]`, `["body"]`, or both, saying where those terms
+occur (a `title:` term is only looked for in the title, a `body:` term only in
+the body). It is absent for locked or undecodable notes, and an empty list
+means the note matched through a non-text branch such as `pinned OR x`. The ids are the same `x-coredata://…/ICNote/p…` form
 every other tool accepts. `structuredContent` also reports `matched` (total
 matches), `scanned`, `eligible`, `scanTruncated`, `truncated`, and `unreadable`
 (bodies that could not be decoded). A malformed query returns an error naming

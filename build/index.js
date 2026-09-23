@@ -46724,13 +46724,6 @@ function describeSearchScope(searchContent, resultCount) {
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
 
-// src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync14 } from "child_process";
-import * as fs8 from "fs";
-import * as os8 from "os";
-import * as path8 from "path";
-import { gunzipSync as gunzipSync8 } from "zlib";
-
 // src/utils/noteQuery.ts
 var QUERY_LIMITS = {
   /** Maximum number of tokens (terms, operators, parentheses). */
@@ -47162,21 +47155,50 @@ function evaluateNoteQuery(node, note) {
     }
   }
 }
-function positiveTextTerms(node, negated = false) {
+function positiveTextPredicates(node, negated = false) {
   switch (node.type) {
     case "and":
     case "or":
-      return node.children.flatMap((child) => positiveTextTerms(child, negated));
+      return node.children.flatMap((child) => positiveTextPredicates(child, negated));
     case "not":
-      return positiveTextTerms(node.child, !negated);
+      return positiveTextPredicates(node.child, !negated);
     case "text":
-      return negated ? [] : [node.value];
+      return negated ? [] : [{ field: node.field, value: node.value }];
     default:
       return [];
   }
 }
+function positiveTextTerms(node, negated = false) {
+  return positiveTextPredicates(node, negated).map((predicate) => predicate.value);
+}
+function matchLocations(predicates, title, text2) {
+  if (predicates.length === 0) return void 0;
+  if (text2 === null && predicates.some((p) => p.field !== "title")) return void 0;
+  const firstBreak = text2 === null ? -1 : text2.indexOf("\n");
+  const titleLower = normalizeForMatch(title);
+  const firstLineLower = text2 === null ? "" : normalizeForMatch(firstBreak === -1 ? text2 : text2.slice(0, firstBreak));
+  const bodyLower = text2 === null || firstBreak === -1 ? "" : normalizeForMatch(text2.slice(firstBreak + 1));
+  let inTitle = false;
+  let inBody = false;
+  for (const predicate of predicates) {
+    const needle = normalizeForMatch(predicate.value);
+    if (predicate.field !== "body" && !inTitle) {
+      inTitle = titleLower.includes(needle) || firstLineLower.includes(needle);
+    }
+    if (predicate.field !== "title" && !inBody) inBody = bodyLower.includes(needle);
+  }
+  const locations = [];
+  if (inTitle) locations.push("title");
+  if (inBody) locations.push("body");
+  return locations;
+}
 
 // src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync14 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
+import { gunzipSync as gunzipSync8 } from "zlib";
 var NOTES_DB_PATH10 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
@@ -47258,6 +47280,15 @@ function decodeNoteBody(data) {
     objectIds
   };
 }
+function decodeBodyHex(hex3) {
+  try {
+    return decodeNoteBody(
+      new Uint8Array(gunzipSync8(Buffer.from(hex3, "hex"), { maxOutputLength: 32 * 1024 * 1024 }))
+    );
+  } catch {
+    return null;
+  }
+}
 function countWords(text2) {
   let count = 0;
   for (const word of text2.replace(/\ufffc/gu, " ").split(/\s+/u)) {
@@ -47328,6 +47359,67 @@ function presentColumns2(dbPath2) {
   }
   return cols;
 }
+function readStore(dbPath2, build) {
+  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  try {
+    return runSqlite6(dbPath2, build(presentColumns2(dbPath2)));
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+}
+var NOTE_TEXT_BATCH_MAX = QUERY_RESULTS.MAX;
+function buildNoteTextsSql(available, pks) {
+  const missing = ["Z_PK", "Z_ENT"].filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns search enrichment needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const keys = [...new Set(pks)];
+  if (keys.length > NOTE_TEXT_BATCH_MAX) {
+    throw new NoteQueryStoreError(
+      `At most ${NOTE_TEXT_BATCH_MAX} notes can be read at once.`,
+      "query_error"
+    );
+  }
+  for (const pk of keys) {
+    if (!Number.isSafeInteger(pk) || pk < 1) {
+      throw new NoteQueryStoreError(`Invalid note key ${String(pk)}`, "query_error");
+    }
+  }
+  const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'locked', ${locked}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity2("ICNote")} AND n.Z_PK IN (${keys.length ? keys.join(", ") : "NULL"});`,
+    "COMMIT;"
+  ].join(" ");
+}
+function readNoteTexts(pks, options = {}) {
+  const output = readStore(
+    options.dbPath ?? NOTES_DB_PATH10,
+    (available) => buildNoteTextsSql(available, pks)
+  );
+  let uuid2;
+  const texts = /* @__PURE__ */ new Map();
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line);
+    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    else if (row.k === "note" && typeof row.pk === "number") {
+      const body = row.locked || !row.data ? null : decodeBodyHex(row.data);
+      texts.set(row.pk, body ? body.text : null);
+    }
+  }
+  return { uuid: uuid2, texts };
+}
 var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
@@ -47384,23 +47476,10 @@ function runNoteQuery(ast, options = {}) {
   const withBodies = needsContent(ast);
   const withTags = needsTags(ast);
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH10;
-  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-  let output;
-  try {
-    const available = presentColumns2(dbPath2);
-    output = runSqlite6(
-      dbPath2,
-      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
-    );
-  } catch (error2) {
-    if (error2 instanceof NoteQueryStoreError) throw error2;
-    const message = error2 instanceof Error ? error2.message : String(error2);
-    if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-    }
-    console.error(`query-notes: database read failed: ${message}`);
-    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
-  }
+  const output = readStore(
+    dbPath2,
+    (available) => buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+  );
   let uuid2;
   let eligible = 0;
   const folderRows = [];
@@ -47424,6 +47503,8 @@ function runNoteQuery(ast, options = {}) {
   }
   const folders = resolveFolders(folderRows);
   const textTerms = positiveTextTerms(ast);
+  const textPredicates = positiveTextPredicates(ast);
+  const pendingWordCounts = [];
   const hits = [];
   let matched = 0;
   let unreadable = 0;
@@ -47441,15 +47522,7 @@ function runNoteQuery(ast, options = {}) {
         if (withBodies) unreadable++;
         return decoded;
       }
-      try {
-        decoded = decodeNoteBody(
-          new Uint8Array(
-            gunzipSync8(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
-          )
-        );
-      } catch {
-        decoded = null;
-      }
+      decoded = decodeBodyHex(row.data);
       if (!decoded) unreadable++;
       return decoded;
     };
@@ -47490,6 +47563,8 @@ function runNoteQuery(ast, options = {}) {
     matched++;
     if (hits.length >= limit) continue;
     const body = locked ? null : decode2();
+    const matchedIn = matchLocations(textPredicates, row.title ?? "", body ? body.text : null);
+    if (options.includeWordCount && !withBodies) pendingWordCounts.push(row.pk);
     hits.push({
       id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
       title: row.title ?? "",
@@ -47498,7 +47573,16 @@ function runNoteQuery(ast, options = {}) {
       ...note.modified !== void 0 ? { modified: new Date(note.modified).toISOString() } : {},
       ...note.created !== void 0 ? { created: new Date(note.created).toISOString() } : {},
       snippet: locked ? "" : body ? buildSnippet(body.text, textTerms) : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
-      ...locked ? { locked: true } : {}
+      ...locked ? { locked: true } : {},
+      ...matchedIn ? { matchedIn } : {},
+      ...options.includeWordCount && withBodies ? { wordCount: body ? countWords(body.text) : null } : {}
+    });
+  }
+  if (pendingWordCounts.length) {
+    const { texts } = readNoteTexts(pendingWordCounts, { dbPath: dbPath2 });
+    pendingWordCounts.forEach((pk, index) => {
+      const text2 = texts.get(pk);
+      hits[index].wordCount = typeof text2 === "string" ? countWords(text2) : null;
     });
   }
   return {
@@ -47541,6 +47625,7 @@ function searchContentViaDatabase(options) {
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
     scanLimit: QUERY_SCAN.MAX,
+    includeWordCount: options.includeWordCount,
     dbPath: options.dbPath
   });
   const notes = result.notes.map((hit) => ({
@@ -47551,7 +47636,9 @@ function searchContentViaDatabase(options) {
     created: hit.created ? new Date(hit.created) : /* @__PURE__ */ new Date(0),
     modified: hit.modified ? new Date(hit.modified) : /* @__PURE__ */ new Date(0),
     ...hit.folder !== void 0 ? { folder: hit.folder } : {},
-    ...hit.account !== void 0 ? { account: hit.account } : {}
+    ...hit.account !== void 0 ? { account: hit.account } : {},
+    ...hit.matchedIn ? { matchedIn: hit.matchedIn } : {},
+    ...hit.wordCount !== void 0 ? { wordCount: hit.wordCount } : {}
   }));
   return {
     notes,
@@ -47573,6 +47660,51 @@ function contentSearchFailureHint(message, dbUnavailable) {
   if (!/timed out/i.test(message)) return message;
   const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
   return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
+}
+var NOTE_ID = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/;
+function addWordCountsFromDatabase(notes, query2, options = {}) {
+  const keys = /* @__PURE__ */ new Map();
+  for (const note of notes) {
+    const match = NOTE_ID.exec(note.id ?? "");
+    if (match) keys.set(note, { store: match[1].toUpperCase(), pk: Number(match[2]) });
+  }
+  const pks = [...new Set([...keys.values()].map((key) => key.pk))];
+  let store;
+  const texts = /* @__PURE__ */ new Map();
+  try {
+    for (let start = 0; start < pks.length; start += NOTE_TEXT_BATCH_MAX) {
+      const read = readNoteTexts(pks.slice(start, start + NOTE_TEXT_BATCH_MAX), options);
+      store = read.uuid?.toUpperCase();
+      for (const [pk, text2] of read.texts) texts.set(pk, text2);
+    }
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) return { notes, unavailable: error2.kind };
+    throw error2;
+  }
+  const predicates = [{ field: "any", value: query2 }];
+  return {
+    notes: notes.map((note) => {
+      const key = keys.get(note);
+      const text2 = key && key.store === store ? texts.get(key.pk) : void 0;
+      if (typeof text2 !== "string") return { ...note, wordCount: null };
+      const matchedIn = matchLocations(predicates, note.title, text2);
+      return { ...note, ...matchedIn ? { matchedIn } : {}, wordCount: countWords(text2) };
+    })
+  };
+}
+function describeMatchDetails(hit) {
+  const parts = [];
+  if (hit.matchedIn) {
+    parts.push(
+      hit.matchedIn.length ? `matched in ${hit.matchedIn.join(", ")}` : "no text match (metadata)"
+    );
+  }
+  if (hit.wordCount !== void 0) {
+    parts.push(
+      hit.wordCount === null ? "word count unavailable" : `${hit.wordCount} word${hit.wordCount === 1 ? "" : "s"}`
+    );
+  }
+  return parts.map((part) => ` \xB7 ${part}`).join("");
 }
 
 // src/tools/doctor.ts
@@ -49192,7 +49324,7 @@ function selectParagraph(paragraphs, selector) {
     );
   return matches[occurrence - 1];
 }
-var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+var NOTE_ID2 = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
 function titleMatchSql(columns) {
   return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
 }
@@ -49203,7 +49335,7 @@ function checkNoteSelector(selector) {
   if (selector.folder !== void 0 && selector.title === void 0)
     throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
   if (selector.id === void 0) return void 0;
-  const pk = NOTE_ID.exec(selector.id)?.[1];
+  const pk = NOTE_ID2.exec(selector.id)?.[1];
   if (!pk)
     throw new ParagraphLinkError(
       "invalid-argument",
@@ -56172,7 +56304,7 @@ registerTool(
 registerTool(
   "search-notes",
   {
-    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
+    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript. When the note text came from the database, each result has matchedIn (title, body, or both); includeWordCount adds wordCount.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: external_exports.string().min(1, "Search query is required").max(MAX.QUERY),
       searchContent: external_exports.boolean().optional().describe(
@@ -56185,112 +56317,132 @@ registerTool(
       ),
       limit: external_exports.number().int().positive().optional().describe(
         "Maximum number of results to return. Defaults to 50 \u2014 a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each result (null when locked or unreadable). A database body search already has the text; otherwise the bodies are read in one batched read-only database query (needs Full Disk Access), which also adds matchedIn"
       )
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
       count: external_exports.number().optional(),
       source: external_exports.enum(["database", "applescript"]).optional(),
-      scanTruncated: external_exports.boolean().optional()
+      scanTruncated: external_exports.boolean().optional(),
+      wordCountUnavailable: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
-    const effectiveLimit = resolveSearchLimit(limit);
-    const limitWasDefault = limit === void 0;
-    let source;
-    let dbScan;
-    let dbUnavailable;
-    const runSearch = () => {
-      if (searchContent) {
+  withErrorHandling(
+    ({ query: query2, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
+      const effectiveLimit = resolveSearchLimit(limit);
+      const limitWasDefault = limit === void 0;
+      let source;
+      let dbScan;
+      let dbUnavailable;
+      const runSearch = () => {
+        if (searchContent) {
+          try {
+            const db = searchContentViaDatabase({
+              query: query2,
+              account: notesManager.searchAccountScope(account),
+              folder,
+              modifiedSince,
+              limit: effectiveLimit,
+              includeWordCount
+            });
+            source = "database";
+            dbScan = db.scan;
+            return db.notes;
+          } catch (error2) {
+            if (!(error2 instanceof NoteQueryStoreError)) throw error2;
+            dbUnavailable = error2.kind;
+          }
+          source = "applescript";
+        }
         try {
-          const db = searchContentViaDatabase({
-            query: query2,
-            account: notesManager.searchAccountScope(account),
+          return notesManager.searchNotes(
+            query2,
+            searchContent,
+            account,
             folder,
             modifiedSince,
-            limit: effectiveLimit
-          });
-          source = "database";
-          dbScan = db.scan;
-          return db.notes;
+            effectiveLimit
+          );
         } catch (error2) {
-          if (!(error2 instanceof NoteQueryStoreError)) throw error2;
-          dbUnavailable = error2.kind;
+          if (!searchContent || !(error2 instanceof Error)) throw error2;
+          throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
         }
-        source = "applescript";
+      };
+      const {
+        result: found,
+        syncBefore,
+        syncInterference
+      } = withSyncAwarenessSync("search-notes", runSearch);
+      let notes = found;
+      let wordCountUnavailable;
+      if (includeWordCount && source !== "database" && found.length > 0) {
+        const enriched = addWordCountsFromDatabase(found, query2);
+        notes = enriched.notes;
+        wordCountUnavailable = enriched.unavailable;
       }
-      try {
-        return notesManager.searchNotes(
-          query2,
-          searchContent,
-          account,
-          folder,
-          modifiedSince,
-          effectiveLimit
-        );
-      } catch (error2) {
-        if (!searchContent || !(error2 instanceof Error)) throw error2;
-        throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
+      const wordCountFields = wordCountUnavailable ? { wordCountUnavailable } : {};
+      const wordCountNote = wordCountUnavailable ? `
+
+\u2139\uFE0F Word counts were not added: ${wordCountUnavailable === "no_fda" ? "they are read from the Notes database, which needs Full Disk Access (run the doctor tool)" : "the Notes database could not be read"}.` : "";
+      const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
+      const sourceFields = source ? { source } : {};
+      const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+      const scanNote = describeContentScan(dbScan);
+      const folderInfo = folder ? ` in folder "${folder}"` : "";
+      const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+      const { info: limitInfo, truncationNote } = describeSearchLimit(
+        effectiveLimit,
+        limitWasDefault,
+        notes.length
+      );
+      const syncWarnings = [];
+      if (syncBefore.syncDetected) {
+        syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
       }
-    };
-    const {
-      result: notes,
-      syncBefore,
-      syncInterference
-    } = withSyncAwarenessSync("search-notes", runSearch);
-    const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
-    const sourceFields = source ? { source } : {};
-    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
-    const scanNote = describeContentScan(dbScan);
-    const folderInfo = folder ? ` in folder "${folder}"` : "";
-    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const { info: limitInfo, truncationNote } = describeSearchLimit(
-      effectiveLimit,
-      limitWasDefault,
-      notes.length
-    );
-    const syncWarnings = [];
-    if (syncBefore.syncDetected) {
-      syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
-    }
-    if (syncInterference) {
-      syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
-    }
-    const syncNote = syncWarnings.length > 0 ? `
+      if (syncInterference) {
+        syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
+      }
+      const syncNote = syncWarnings.length > 0 ? `
 
 ${syncWarnings.join(" ")}` : "";
-    if (notes.length === 0) {
-      const scopeHint = describeSearchScope(searchContent, notes.length);
+      if (notes.length === 0) {
+        const scopeHint = describeSearchScope(searchContent, notes.length);
+        return successResponse(
+          `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+          { notes: [], count: 0, ...sourceFields, ...scanFields }
+        );
+      }
+      const noteList = notes.map((n) => {
+        const idSuffix = `${n.id ? ` [id: ${n.id}]` : ""}${describeMatchDetails(n)}`;
+        if (n.folder === "Recently Deleted") {
+          return `  - ${n.title} [DELETED]${idSuffix}`;
+        } else if (n.folder) {
+          return `  - ${n.title} (${n.folder})${idSuffix}`;
+        }
+        return `  - ${n.title}${idSuffix}`;
+      }).join("\n");
       return successResponse(
-        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
-        { notes: [], count: 0, ...sourceFields, ...scanFields }
+        `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
+${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
+        {
+          notes: withStableIdentifiers(notes, "ICNote"),
+          count: notes.length,
+          ...sourceFields,
+          ...scanFields,
+          ...wordCountFields
+        }
       );
-    }
-    const noteList = notes.map((n) => {
-      const idSuffix = n.id ? ` [id: ${n.id}]` : "";
-      if (n.folder === "Recently Deleted") {
-        return `  - ${n.title} [DELETED]${idSuffix}`;
-      } else if (n.folder) {
-        return `  - ${n.title} (${n.folder})${idSuffix}`;
-      }
-      return `  - ${n.title}${idSuffix}`;
-    }).join("\n");
-    return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${truncationNote}${scanNote}${syncNote}`,
-      {
-        notes: withStableIdentifiers(notes, "ICNote"),
-        count: notes.length,
-        ...sourceFields,
-        ...scanFields
-      }
-    );
-  }, "Error searching notes")
+    },
+    "Error searching notes"
+  )
 );
 registerTool(
   "query-notes",
   {
-    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
     inputSchema: {
       query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
         'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
@@ -56303,6 +56455,9 @@ registerTool(
       ),
       includeDeleted: external_exports.boolean().optional().describe(
         "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each returned note (the count words: filters on; null when locked or unreadable). Free when the query reads bodies; a metadata-only query reads just the returned notes' bodies in one extra query (default false)"
       )
     },
     outputSchema: {
@@ -56319,10 +56474,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted }) => {
+  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted, includeWordCount }) => {
     let result;
     try {
-      result = queryNotes(query2, { limit, scanLimit, includeDeleted });
+      result = queryNotes(query2, { limit, scanLimit, includeDeleted, includeWordCount });
     } catch (error2) {
       if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -56353,7 +56508,7 @@ ${notes.join("\n")}` : "";
       const where = [n.account, n.folder].filter(Boolean).join(" / ");
       const snippet = n.snippet ? `
       ${n.snippet}` : "";
-      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${describeMatchDetails(n)}${snippet}`;
     }).join("\n");
     return successResponse(
       `Found ${result.matched} matching notes (${scope2}):

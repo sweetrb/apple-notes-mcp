@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `search-notes` and `query-notes` results report `matchedIn`: `["title"]`,
+  `["body"]`, or `["title", "body"]`, saying where the search text occurs
+  (the body is the text after the first line). It is computed from note text
+  the search already decoded, with no extra AppleScript call. `query-notes`
+  looks for a `title:` term only in the title and a `body:` term only in the
+  body, and returns an empty list when a note matched only through a non-text
+  branch such as `pinned OR x`. The field is omitted when the text is not
+  available: locked or undecodable notes, queries without a text term, and
+  AppleScript searches without `includeWordCount`.
+- `includeWordCount` on `search-notes` and `query-notes` adds `wordCount` per
+  result (`null` for locked or unreadable notes), the same count the
+  `words:` filter uses. When a search did not already read bodies (an
+  AppleScript title or content search, or a metadata-only query), the
+  returned notes' bodies are read in one batched read-only database query.
+  For `search-notes` that read also adds `matchedIn`; without Full Disk
+  Access the results are unchanged and `wordCountUnavailable` says why.
+- The text output appends these details to each result line, for example
+  `· matched in title, body · 245 words`.
+
 ## [2.9.8] - 2026-09-23
 
 ### Added
