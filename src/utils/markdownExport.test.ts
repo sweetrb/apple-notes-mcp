@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { emptyStats, type ExportContext } from "./exportRender.js";
 import type { AssetLocator, AssetWriter } from "./exportAssets.js";
 import {
+  escapeLineStart,
   escapeMarkdown,
   linkDestination,
   NOTE_SEPARATOR,
@@ -29,6 +30,105 @@ describe("escaping", () => {
     );
     expect(escapeMarkdown("AT&T &amp; ==x==")).toBe("AT&T &amp;amp; \\=\\=x\\=\\=");
     expect(linkDestination("https://x.test/a b(c)<d>")).toBe("https://x.test/a%20b%28c%29%3Cd%3E");
+  });
+});
+
+describe("escapeLineStart (#232)", () => {
+  it.each([
+    ["# h1", "\\# h1"],
+    ["## h2", "\\## h2"],
+    ["### h3", "\\### h3"],
+    ["###### h6", "\\###### h6"],
+    ["#", "\\#"],
+    ["##", "\\##"],
+    ["##\tx", "\\##\tx"],
+    ["> quote", "\\> quote"],
+    ["- dash", "\\- dash"],
+    ["-", "\\-"],
+    ["+ plus", "\\+ plus"],
+    ["1. one", "1\\. one"],
+    ["12) twelve", "12\\) twelve"],
+    ["---", "\\---"],
+    ["- - -", "\\- - -"],
+    ["-----", "\\-----"],
+  ])("escapes %j", (line, escaped) => {
+    expect(escapeLineStart(line)).toBe(escaped);
+  });
+
+  it.each(["####### seven", "#tag", "--x", "-- two", "1.5 kg", "2026", "a ## b", "x - y"])(
+    "leaves %j alone",
+    (line) => {
+      expect(escapeLineStart(line)).toBe(line);
+    }
+  );
+});
+
+describe("plain body lines that look like block syntax (#232)", () => {
+  it("escapes body paragraphs but not Notes' own headings and lists", () => {
+    const note = exportNote([
+      block("T", "title"),
+      block("Real heading", "heading"),
+      block("Real sub", "subheading"),
+      block("## not a heading"),
+      block("### not a subheading"),
+      block("> not a quote"),
+      block("- not a bullet"),
+      block("* not a bullet"),
+      block("+ not a bullet"),
+      block("1. not a list"),
+      block("3) not a list"),
+      block("```not a fence"),
+      block("~~~"),
+      block("---"),
+      block("***"),
+      block("___"),
+      block("| not | a table |"),
+      block("<div>not html</div>"),
+      block("[ref]: https://x.test"),
+      block("item", "bulleted"),
+      block("## item text", "dashed"),
+      block("1. item text", "numbered"),
+      block("- item text", "checklist", { checklist: { id: "a", done: false } }),
+    ]);
+    expect(renderNoteMarkdown(note, ctx())).toBe(
+      [
+        "# T",
+        "## Real heading",
+        "### Real sub",
+        "\\## not a heading",
+        "\\### not a subheading",
+        "\\> not a quote",
+        "\\- not a bullet",
+        "\\* not a bullet",
+        "\\+ not a bullet",
+        "1\\. not a list",
+        "3\\) not a list",
+        "\\`\\`\\`not a fence",
+        "\\~\\~\\~",
+        "\\---",
+        "\\*\\*\\*",
+        "\\_\\_\\_",
+        "\\| not \\| a table \\|",
+        "\\<div\\>not html\\</div\\>",
+        "\\[ref\\]: https://x.test",
+      ].join("\n\n") +
+        "\n\n" +
+        ["- item", "- \\## item text", "1. 1\\. item text", "- [ ] \\- item text"].join("\n")
+    );
+  });
+
+  it("escapes heading markers inside a quoted body paragraph", () => {
+    const note = exportNote([block("T", "title"), block("## q", "body", { blockQuote: true })]);
+    expect(renderNoteMarkdown(note, ctx())).toBe("# T\n\n> \\## q");
+  });
+
+  it("never wraps a block marker onto the start of a continuation line", () => {
+    expect(wrapMarkdown("alpha beta ## gamma delta", 10)).toBe("alpha beta ##\ngamma\ndelta");
+    expect(wrapMarkdown("alpha beta - gamma", 10)).toBe("alpha beta -\ngamma");
+    expect(wrapMarkdown("alpha beta 1. gamma", 10)).toBe("alpha beta 1.\ngamma");
+    expect(wrapMarkdown("alpha beta === gamma", 10)).toBe("alpha beta ===\ngamma");
+    expect(wrapMarkdown("- item text - more", 12)).toBe("- item text -\n  more");
+    expect(wrapMarkdown("> quoted text # more", 14)).toBe("> quoted text #\n> more");
   });
 });
 
