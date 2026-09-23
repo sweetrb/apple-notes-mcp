@@ -225,7 +225,7 @@ const KNOWN_RUN_FIELDS = new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
 const KNOWN_PARAGRAPH_FIELDS = new Set([1, 2, 4, 5, 8, 9]);
 
 /** Same allowlist noteRichText.ts uses before re-emitting a link into HTML. */
-const isSafeLink = (url: string) =>
+export const isSafeLink = (url: string): boolean =>
   /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) &&
   !Array.from(url).some((char) => char.charCodeAt(0) < 32);
 

@@ -124,6 +124,7 @@ const field = (tool: string, name: string): z.ZodTypeAny => {
 const STRICT_NOTE_ID: Array<[string, string]> = [
   ["get-native-objects", "id"],
   ["get-note-blocks", "id"],
+  ["get-note-structure", "id"],
   ["get-note-tables", "id"],
   ["get-audio-transcripts", "id"],
   ["export-notes-markdown", "id"],
@@ -249,7 +250,9 @@ describe("id inputs accept Notes UUIDs and numeric keys", () => {
     covered.add("batch-delete-notes.notes").add("batch-move-notes.ids");
     covered.add("replace-native-tag.notes");
     // show-account takes an account id, which the bridge does not resolve.
-    const exempt = new Set(["show-account.id"]);
+    // The private-helper tools take a Notes UUID in their own `identifier`
+    // field, so their `id` field is x-coredata only and needs no bridge.
+    const exempt = new Set(["show-account.id", "native-note-state.id"]);
     const idFields: string[] = [];
     for (const [tool, { config }] of registered) {
       for (const name of Object.keys(config.inputSchema ?? {})) {

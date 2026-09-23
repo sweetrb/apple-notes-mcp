@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -634,6 +634,50 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `get-note-structure`
+
+Returns a read-only overview of one note from the NoteStore database, in one
+call:
+
+- `text` (decoded body), `textLength`, `wordCount`, `charCount` (Unicode
+  characters, attachment placeholders excluded), and `blockSummary` (the
+  `get-note-blocks` summary counts).
+- `links`, each with a `kind`: `inline` (a hyperlink on text), `card` (a rich
+  link preview attachment, with `attachmentId` and `previewPath`), `note` (a
+  native link chip to another note), or `section` (a native link chip to a
+  heading or paragraph, with `section`). Notes deep links also carry
+  `targetNote` and `paragraphId`. `linkCounts` totals them.
+- `tags` (native tags in body order) and `attachments`, listed the way
+  [`list-attachments`](#list-attachments) with `includePaths` lists them: the
+  same `kind` (`image`, `scan`, `drawing`, `pdf`, `audio`, `video`, `url`,
+  `table`, `other`), the same body order, and the same `previewPath`, plus the
+  card `title`/`url`, `fileSize`, and body position. Gallery items and
+  recording parts are nested under `children`; `attachmentCount` counts
+  top-level attachments only.
+- `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `inRecentlyDeleted`, `lastViewed`,
+  `checklistTotal`, `checklistDone`, `hasDrawing` (classic sketches and Paper
+  drawings), and `firstImage` (the same lead visual `list-attachments`
+  returns with `firstImage`, plus its attachment `id`).
+
+`lastViewed` is an ISO date, or null with `lastViewedStatus` set to
+`never-viewed`, `not-recorded`, `malformed`, or `unsupported` (the column
+does not exist on this macOS version). A password-protected note returns its
+metadata and attachment rows with `bodyDecoded: false` and the body-derived
+fields null.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact note ID: the `x-coredata://` id, or the note's Notes UUID or numeric key (see [Identifier forms](#identifier-forms)) |
+| `includeText` | boolean | No | Include the decoded text (default true). Text larger than `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` is omitted with `textOmitted: true` |
+
+Link URLs are returned as stored; check `linkSafe` before emitting one into
+HTML.
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags. This differs from textual hashtag search. It is
@@ -809,9 +853,25 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
 | `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
+| `guardNoteId` | string | No | A second note (usually a verified copy) that must still be intact; needs Full Disk Access |
+| `expectedGuardContentHash` | string | With `guardNoteId` | `contentHash` of the guard note from `get-note-content` |
+| `requireActiveNoteId` | string | No | A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note; its content is not fingerprinted. Needs Full Disk Access |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
+
+**Copy-then-retire.** To delete an original only while its copy is still good,
+read both notes, verify the copy, and pass the copy as `guardNoteId` with its
+`contentHash` as `expectedGuardContentHash`. The copy's revision is re-read just
+before the delete, and its body, lock state, and folder are checked again
+inside the delete AppleScript, with the same fail-closed Recently Deleted test
+as the note being deleted. The guard note must not be a Quick Note, a flag only
+the database holds, so the guard needs Full Disk Access. A copy the database
+has not saved yet passes on the live checks alone. The pair is still not one
+transaction: the rich revision (which also covers checklists and attachments)
+is a pre-check, and the in-script check covers the body and state Notes.app
+exposes. `requireActiveNoteId` is the narrower form for a destination you
+wrote yourself rather than copied.
 
 **Example - Using ID (recommended):**
 ```json
@@ -1080,6 +1140,46 @@ Use the returned `id` for any follow-up read/update/move/delete rather than re-r
 
 > **Changed in 2.7.0:** `notes` was previously `string[]` (titles only). Callers that treated the array as strings must now read `.title`.
 
+For date order, incremental sync cursors, Recently Deleted, or word counts, use [`list-recent-notes`](#list-recent-notes).
+
+---
+
+#### `list-recent-notes`
+
+Lists notes from the NoteStore database (read-only) by stored modification time, with an exact cursor for incremental sync. With `since`, it pages through changes oldest first; without it, it shows the newest notes first. Unlike `list-notes`, it can include Recently Deleted and can count words.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `folder` | string | No | Only notes directly in this folder: a full path in `list-folders` syntax, or a unique folder name |
+| `since` | string | No | Return notes after this point, **oldest first**. A `modifiedCheckpoint` cursor (from a row or `nextSince`), or an ISO 8601 date (local midnight) or date-time (local time unless it carries `Z` or an offset), meaning modified strictly after it |
+| `limit` | number | No | Maximum rows, 1–1000 (default 50) |
+| `includeDeleted` | boolean | No | Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default `false`) |
+| `wordCounts` | boolean | No | Decode each body and add `wordCount` and `charCount` (default `false`) |
+| `bodyPreview` | boolean | No | Add `bodyPreview` (up to 180 characters) and `textDecoded` (default `false`) |
+
+**Returns:** `notes`, each with `id`, `identifier`, `title`, `folder`, `account`, `created`, `modified`, `modifiedCheckpoint`, `pinned`, `locked`, `inRecentlyDeleted`, and `markedForDeletion`. Also `count`, `limit`, `order` (`oldest-first` or `newest-first`), `saturated`, and `nextSince`.
+
+- **Cursors.** `modifiedCheckpoint` is an opaque token (`cdts1:`, 16 hex digits, `:`, the note's database key). It carries the exact stored timestamp bits, so it never loses precision the way an ISO string can, and the key orders notes that share one timestamp. Pass it back as `since`.
+- **Syncing.** Call with `since`, store `nextSince`, and pass it as the next `since`. `nextSince` is the last returned row's cursor, or the incoming boundary when nothing matched, so every call advances. `saturated` is `true` when `count` equals `limit`: more changes may follow, so call again right away. When it is `false`, you are caught up. Notes that share a timestamp are split across pages by key, so none is skipped or repeated.
+- **First sync.** Start with `since: "1970-01-01"` and page the same way. A library larger than the 1000-row maximum is reached in full.
+- **Browsing.** Without `since`, rows come newest first. `nextSince` is then the newest row's cursor, set only when the call returned every matching note (`saturated` is `false`); otherwise it is `null`.
+- **Late edits.** A modification-date cursor can miss an edit that iCloud delivers later from another device with an older timestamp, for example after that device was offline. The row then sorts before the cursor. Run a full pass from the start now and then to catch these.
+- **Deletions.** Deleted notes are invisible unless `includeDeleted` is `true`. With it, notes in Recently Deleted and notes awaiting deletion appear, flagged, when their modification date is after the cursor. A note purged from the database leaves no row, so compare ids against a full pass to detect it.
+- **Word counts.** A word is a whitespace-separated token containing a letter or digit; `charCount` counts Unicode code points. Attachment markers are not counted. Both are `null` for locked notes and bodies that are not downloaded or cannot be decoded, and `0` for a body known to be empty.
+- **Previews.** With `wordCounts`, `bodyPreview` comes from the decoded body and `textDecoded` is `true`. Otherwise it is the stored snippet. Locked notes never get a preview.
+- Folderless notes (abandoned Quick Note drafts Notes.app never shows) and Recently Deleted appear only with `includeDeleted`. Notes without a stored modification date never match a `since` query.
+
+**Example - incremental sync:**
+```json
+{
+  "since": "cdts1:41c7e0ef438fcd6f:4312",
+  "limit": 200
+}
+```
+
 ---
 
 #### `get-selected-notes`
@@ -1149,6 +1249,21 @@ With `includeMatchingNotes`, each folder also carries `matchingNoteCount` and
 evaluates the folder's rules, so they need Automation permission. The server
 does not re-evaluate the rules on its own. A folder whose notes cannot be read
 carries `matchingNotesError` instead.
+
+---
+
+#### `list-folder-tree`
+
+Returns the folder hierarchy with note counts for each account, read from the NoteStore database in one pass.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `includeDeleted` | boolean | No | Include folders marked for deletion (flagged `markedForDeletion`) and folders whose account no longer exists (default `false`) |
+
+**Returns:** `accounts`, each with `account`, `identifier`, `noteCount`, and `folders`. Each folder node has `id`, `identifier`, `name`, `path` (in `list-folders` syntax), `kind` (`folder`, `smart`, or `trash`), `noteCount` (notes directly inside), `totalNoteCount` (including subfolders), and `children`. Regular folders sort by name, then smart folders, then Recently Deleted. An account's `noteCount` sums its regular folders. Smart folders report 0 because their contents are a saved search. Also returns `folderCount`.
 
 ---
 
@@ -1864,7 +1979,9 @@ It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
 `applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
 `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
 placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
-`audioTranscription`, which need a native helper this server does not ship.
+`audioTranscription`, which need a native *write* helper this server does not
+ship (requirement `native_write_helper`). The opt-in private helper below is
+read-only, so enabling it does not change them: they stay `not_implemented`.
 Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
 `requirements`, `missing`, `unverified`, `tools`, and a machine-readable
 `reason` that is `null` when available and otherwise the first that applies:
@@ -1969,6 +2086,55 @@ not changed.
 
 Retrieves another note's real deep link and appends it with a static label while
 preserving the target note's native objects.
+
+### Private helper (opt-in, unsupported Apple API)
+
+An optional, **read-only** native helper reads note state through Notes' own
+data model (Apple's private NotesShared framework) instead of AppleScript or
+Shortcuts. It is **off by default** and nothing in the rest of the server
+depends on it. It cannot write: every store it opens is opened read-only, and
+write support was deliberately deferred by the maintainer until a second
+writer beside a running Notes.app, CRDT replica identity, and the iCloud
+upload lag are understood.
+Private API can break on any macOS update; see
+[TECHNICAL_NOTES.md](TECHNICAL_NOTES.md#private-helper-notesshared) for the
+API surface, risks, and safety contract.
+
+To use it:
+
+1. Build it on your Mac from the packaged source (needs the Command Line
+   Tools, `xcode-select --install`). No prebuilt binary ships with the package.
+
+   ```bash
+   apple-notes-mcp setup --native-helper          # build, ad-hoc sign, install
+   apple-notes-mcp setup --native-helper --check  # report only
+   ```
+
+2. Set `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` in the server's environment (or in
+   the [config file](#configuration-file-when-the-host-strips-env)).
+3. Give the app that launches the server Full Disk Access, the same grant the
+   database reads already need.
+
+The server checks the helper's recorded source and binary SHA-256 before every
+call and refuses a missing, stale, or modified helper with a machine-readable
+`code`. Rerun setup after upgrading apple-notes-mcp.
+
+#### `native-helper-status`
+
+Reports whether the helper is enabled, built, and current, and runs its live
+probe: macOS and Notes versions, whether NotesShared loads, whether every
+required class, selector, and model property exists, and whether the Notes
+store opens. Each feature reports `available` plus a `reason` code
+(`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`,
+`private_api_unavailable`, `store_unavailable`, …). Read-only; the response
+carries `readOnly: true`.
+
+#### `native-note-state`
+
+Reads one note's native state by Notes UUID (`identifier`) or x-coredata `id`:
+title, modification date, folder identifier, lock/trash/shared/editable
+flags, iCloud version counters, and a `revision` change token (compare two
+reads to detect a change). Opens the store with Core Data's read-only option.
 
 ## Usage Patterns
 
@@ -2107,9 +2273,13 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
+| `APPLE_NOTES_MCP_ENABLE_PRIVATE` | unset | Set to `1` to allow the opt-in [private helper](#private-helper-opt-in-unsupported-apple-api). Any other value keeps it off. |
+| `APPLE_NOTES_MCP_PRIVATE_HELPER_DIR` | `~/Library/Application Support/apple-notes-mcp/private-helper` | Where `setup --native-helper` installs the helper and its checksum manifest. |
+| `APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS` | `20000` (20 s) | Per-call helper timeout. A timed-out write is indeterminate. |
+| `APPLE_NOTES_MCP_PRIVATE_STORE` | unset | Testing only: points the helper at a **copy** of `NoteStore.sqlite`. The helper refuses a path that resolves to the live store. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
 ### Configuration file (when the host strips `env`)
@@ -2136,7 +2306,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-structure`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -2158,6 +2328,7 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-checklist-state` returns an error explaining that database access is needed
 - `get-note-metadata` returns the same kind of error — it has no non-database path
 - `list-special-notes` and the `list-native-tags` inventory return the same kind of error
+- `list-recent-notes` and `list-folder-tree` return the same kind of error
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
