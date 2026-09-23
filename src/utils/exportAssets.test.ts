@@ -25,6 +25,7 @@ import {
   DataUrlWriter,
   encodePathUrl,
   MAX_EMBED_BYTES,
+  MAX_EMBED_TOTAL_BYTES,
   NOTES_CONTAINER,
   openCreateOnly,
   OutputExistsError,
@@ -292,6 +293,11 @@ describe("DataUrlWriter", () => {
     expect(writer.place(asset)).toBe(placed);
     expect(writer.count).toBe(1);
     expect(new DataUrlWriter(4).place(asset)).toEqual({ error: "too-large" });
+    const budget = new DataUrlWriter(MAX_EMBED_BYTES, PDF.length + 1);
+    expect(budget.place(asset)).toMatchObject({ mime: "application/pdf" });
+    const png = new AssetLocator(container).locate({ id: PAPER, kind: "paper" }).primary!;
+    expect(budget.place(png)).toEqual({ error: "too-large" });
+    expect(MAX_EMBED_TOTAL_BYTES).toBe(256 * 1024 * 1024);
     expect(writer.place({ path: join(root, "nope"), name: "x", role: "original" })).toEqual({
       error: "unreadable",
     });

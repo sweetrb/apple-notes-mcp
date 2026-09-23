@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DEFAULT_FOLDER_EXPORT_LIMIT,
+  defaultSidecarDir,
+  exportNotesHtml,
   exportNotesMarkdown,
   MAX_FOLDER_EXPORT_LIMIT,
   NotesExportError,
@@ -201,5 +203,80 @@ describe("exportNotesMarkdown", () => {
     expect(
       code(() => exportNotesMarkdown({ id: ID(1), outputPath: join(blocker, "x.md") }, deps()))
     ).toMatch(/ENOTDIR|EEXIST/);
+  });
+});
+
+describe("exportNotesHtml", () => {
+  it("requires an output file and consistent asset options", () => {
+    expect(code(() => exportNotesHtml({ id: ID(1) }, deps()))).toBe("invalid-request");
+    expect(
+      code(() =>
+        exportNotesHtml(
+          {
+            id: ID(1),
+            outputPath: join(dir, "h0.html"),
+            embedAssets: true,
+            assetsDir: join(dir, "a"),
+          },
+          deps()
+        )
+      )
+    ).toBe("invalid-request");
+    const same = join(dir, "same.html");
+    expect(
+      code(() =>
+        exportNotesHtml(
+          { id: ID(1), outputPath: same, embedAssets: false, assetsDir: same },
+          deps()
+        )
+      )
+    ).toBe("invalid-path");
+    expect(existsSync(join(dir, "h0.html"))).toBe(false);
+  });
+
+  it("embeds assets as data URLs by default", () => {
+    const output = join(dir, "html", "one.html");
+    const receipt = exportNotesHtml({ id: ID(3), outputPath: output }, deps());
+    expect(receipt).toMatchObject({ format: "html", count: 1, output, embedded: 1 });
+    expect(receipt.assets).toBeUndefined();
+    const html = readFileSync(output, "utf8");
+    expect(receipt.bytes).toBe(Buffer.byteLength(html));
+    expect(html).toContain("<title>Three</title>");
+    expect(html).toContain('src="data:image/png;base64,');
+    expect(code(() => exportNotesHtml({ id: ID(3), outputPath: output }, deps()))).toBe(
+      "output_exists"
+    );
+  });
+
+  it("copies assets to a default sidecar directory with relative URLs", () => {
+    const output = join(dir, "html", "side.html");
+    const receipt = exportNotesHtml({ id: ID(3), outputPath: output, embedAssets: false }, deps());
+    const sidecar = defaultSidecarDir(output);
+    expect(sidecar).toBe(join(dir, "html", "side.assets"));
+    expect(receipt).toMatchObject({ assets: { dir: sidecar, files: 1 } });
+    expect(readFileSync(output, "utf8")).toContain('src="side.assets/pic.png"');
+    const custom = join(dir, "html", "custom-assets");
+    const second = exportNotesHtml(
+      { id: ID(3), outputPath: join(dir, "html", "side2.html"), assetsDir: custom },
+      deps()
+    );
+    expect(second.assets).toEqual({ dir: custom, files: 1 });
+  });
+
+  it("titles a folder document with the folder path and skips unreadable notes", () => {
+    const output = join(dir, "html", "folder.html");
+    const receipt = exportNotesHtml({ folder: "Work/Plans", outputPath: output }, deps());
+    expect(receipt.count).toBe(2);
+    expect(receipt.skipped).toEqual([{ id: ID(2), code: "encrypted" }]);
+    const html = readFileSync(output, "utf8");
+    expect(html).toContain("<title>Work/Plans</title>");
+    expect(html.match(/<hr class="note-separator">/g)).toHaveLength(1);
+  });
+
+  it("uses a generic title when a single note cannot be named", () => {
+    const output = join(dir, "html", "untitled.html");
+    const empty = exportNote([]);
+    exportNotesHtml({ id: ID(1), outputPath: output }, deps({ readNote: () => empty }));
+    expect(readFileSync(output, "utf8")).toContain("<title>Note</title>");
   });
 });

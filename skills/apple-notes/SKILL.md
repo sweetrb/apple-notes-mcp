@@ -44,6 +44,7 @@ Use this skill when the user:
 | `get-selected-notes` | Read the notes currently selected in Notes.app |
 | `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
 | `export-notes-markdown` | Export one note or a folder as one Markdown document from the decoded body; optional create-only `outputPath` and `assetsDir` for attachment copies (presentation format, not a backup) |
+| `export-notes-html` | Export one note or a folder as one standalone HTML file (semantic tables, attachments in body order); `outputPath` required and create-only; assets embedded (10 MiB each) or in a sidecar directory with `embedAssets: false` |
 
 ### Folder Operations
 

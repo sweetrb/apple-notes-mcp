@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join14(output, replacement);
+        return join15(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join14(output, rule.append(self.options));
+          output = join15(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join14(output, replacement) {
+    function join15(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -44237,7 +44237,7 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH4 } = {}) {
 
 // src/services/notesExport.ts
 import { mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname as dirname2 } from "node:path";
+import { basename as basename2, dirname as dirname2, extname as extname2, join as join13 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -44256,6 +44256,7 @@ import { homedir as homedir9 } from "node:os";
 import { basename, extname, join as join11, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
 var NOTES_CONTAINER = join11(homedir9(), "Library/Group Containers/group.com.apple.notes");
 var MAX_EMBED_BYTES = 10 * 1024 * 1024;
+var MAX_EMBED_TOTAL_BYTES = 256 * 1024 * 1024;
 var MAX_DIRECTORY_ENTRIES = 2e4;
 var MAX_BUNDLE_ENTRIES = 64;
 var IMAGE_EXTENSIONS = /* @__PURE__ */ new Set([".png", ".jpg", ".jpeg", ".heic", ".gif", ".tiff", ".webp"]);
@@ -44615,6 +44616,49 @@ var SidecarWriter = class {
     }
   }
 };
+var DataUrlWriter = class {
+  constructor(maxBytes = MAX_EMBED_BYTES, totalBytes = MAX_EMBED_TOTAL_BYTES) {
+    this.maxBytes = maxBytes;
+    this.totalBytes = totalBytes;
+  }
+  maxBytes;
+  totalBytes;
+  placed = /* @__PURE__ */ new Map();
+  embeddedBytes = 0;
+  count = 0;
+  place(asset) {
+    const done = this.placed.get(asset.path);
+    if (done) return done;
+    let source;
+    try {
+      source = openSource(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      if (source.size > this.maxBytes || this.embeddedBytes + source.size > this.totalBytes)
+        return { error: "too-large" };
+      const data = Buffer.alloc(source.size);
+      let read = 0;
+      while (read < source.size) {
+        const n = readSync(source.fd, data, read, source.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      const mime = sniffMime(data.subarray(0, 16), asset.name);
+      const result = {
+        url: `data:${mime};base64,${data.subarray(0, read).toString("base64")}`,
+        mime
+      };
+      this.count++;
+      this.embeddedBytes += read;
+      this.placed.set(asset.path, result);
+      return result;
+    } finally {
+      closeSync(source.fd);
+    }
+  }
+};
 
 // src/utils/exportRender.ts
 var emptyStats = () => ({
@@ -44781,6 +44825,289 @@ function unreferencedAttachments(note) {
   );
 }
 
+// src/utils/htmlExport.ts
+function escapeHtml(text2) {
+  return text2.replace(
+    /[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+  );
+}
+var HIGHLIGHT_CLASSES = /* @__PURE__ */ new Set(["purple", "pink", "orange", "mint", "blue"]);
+var ALIGN = /* @__PURE__ */ new Set(["center", "right", "justify"]);
+var REASONS = {
+  "too-large": " (too large to embed; export with embedAssets false)",
+  unreadable: " (unreadable)",
+  undecodable: " (could not be decoded)"
+};
+function wrapText(text2, fmt) {
+  let out = escapeHtml(text2).replace(/\n/g, "<br>");
+  if (fmt.subscript) out = `<sub>${out}</sub>`;
+  if (fmt.superscript) out = `<sup>${out}</sup>`;
+  if (fmt.highlight)
+    out = `<mark class="hl-${HIGHLIGHT_CLASSES.has(fmt.highlight) ? fmt.highlight : "other"}">${out}</mark>`;
+  if (fmt.strikethrough) out = `<s>${out}</s>`;
+  if (fmt.underline) out = `<u>${out}</u>`;
+  if (fmt.italic) out = `<em>${out}</em>`;
+  if (fmt.bold) out = `<strong>${out}</strong>`;
+  if (fmt.color && /^#[0-9A-F]{6}(?:[0-9A-F]{2})?$/i.test(fmt.color))
+    out = `<span style="color:${fmt.color}">${out}</span>`;
+  return out;
+}
+var bracket = (label, name) => escapeHtml(`[${name ? `${label}: ${name}` : label}]`);
+function domainOf(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+function isHtmlBlockPlan(plan) {
+  switch (plan.type) {
+    case "table":
+    case "divider":
+    case "gallery":
+    case "card":
+      return true;
+    case "asset":
+      return plan.display !== "link" || !!plan.previewUrl;
+    default:
+      return false;
+  }
+}
+function inlinePlanHtml(plan) {
+  switch (plan.type) {
+    case "inline":
+      return plan.link ? `<a href="${escapeHtml(plan.link)}">${escapeHtml(plan.text)}</a>` : escapeHtml(plan.text);
+    case "placeholder":
+      return `<span class="attachment-placeholder">${bracket(plan.label, plan.name)}</span>`;
+    case "unavailable":
+      return `<span class="attachment-unavailable" role="note">${bracket(
+        `${plan.label} unavailable${REASONS[plan.reason] ?? ""}`,
+        plan.name
+      )}</span>`;
+    case "asset":
+      return `<a class="attachment attachment-file" href="${escapeHtml(plan.url)}">${escapeHtml(
+        plan.name ?? plan.label
+      )}</a>`;
+    default:
+      return blockPlanHtml(plan);
+  }
+}
+function blockPlanHtml(plan) {
+  switch (plan.type) {
+    case "table":
+      return tableHtml(plan.rows);
+    case "divider":
+      return "<hr>";
+    case "gallery":
+      return `<div class="attachment-gallery">${plan.items.map((item) => isHtmlBlockPlan(item) ? blockPlanHtml(item) : inlinePlanHtml(item)).join("")}</div>`;
+    case "card": {
+      const image = plan.previewUrl ? `<img src="${escapeHtml(plan.previewUrl)}" alt="" loading="lazy">` : "";
+      const text2 = `<span class="link-card-text"><span class="link-card-title">${escapeHtml(plan.title)}</span><span class="link-card-domain">${escapeHtml(domainOf(plan.displayUrl))}</span></span>`;
+      return plan.url ? `<a class="link-card" href="${escapeHtml(plan.url)}">${image}${text2}</a>` : `<div class="link-card">${image}${text2}</div>`;
+    }
+    case "asset": {
+      const name = escapeHtml(plan.name ?? plan.label);
+      const src = escapeHtml(plan.url);
+      const caption = plan.name ? `<figcaption>${name}</figcaption>` : "";
+      if (plan.display === "image")
+        return `<figure class="attachment attachment-image"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      if (plan.display === "audio" || plan.display === "video")
+        return `<figure class="attachment attachment-${plan.display}"><${plan.display} controls preload="metadata" src="${src}"></${plan.display}>${caption}</figure>`;
+      return `<figure class="attachment attachment-document"><a href="${src}"><img src="${escapeHtml(plan.previewUrl)}" alt="${name}" loading="lazy"></a><figcaption><a href="${src}">${name}</a></figcaption></figure>`;
+    }
+    default:
+      return `<p>${inlinePlanHtml(plan)}</p>`;
+  }
+}
+function tableHtml(rows) {
+  const width = Math.max(1, ...rows.map((row) => row.length));
+  const cells = (row, tag) => Array.from(
+    { length: width },
+    (_, i) => `<${tag}>${escapeHtml(row[i] ?? "").replace(/\r?\n/g, "<br>")}</${tag}>`
+  ).join("");
+  const [head = [], ...body] = rows;
+  return `<table><thead><tr>${cells(head, "th")}</tr></thead><tbody>${body.map((row) => `<tr>${cells(row, "td")}</tr>`).join("")}</tbody></table>`;
+}
+function inlineHtml(pieces) {
+  let out = "";
+  for (let i = 0; i < pieces.length; ) {
+    const piece = pieces[i];
+    if (piece.type === "attachment") {
+      out += inlinePlanHtml(piece.plan);
+      i++;
+      continue;
+    }
+    const link = piece.fmt.link;
+    let inner = "";
+    let j = i;
+    for (; j < pieces.length; j++) {
+      const next = pieces[j];
+      if (next.type !== "text" || next.fmt.link !== link) break;
+      inner += wrapText(next.text, next.fmt);
+    }
+    out += link ? `<a href="${escapeHtml(link)}">${inner}</a>` : inner;
+    i = j;
+  }
+  return out;
+}
+function blockParts(pieces) {
+  const parts = [];
+  let segment = [];
+  const flush = () => {
+    const html = inlineHtml(segment).trim();
+    if (html) parts.push({ inline: html });
+    segment = [];
+  };
+  for (const piece of pieces) {
+    if (piece.type === "attachment" && isHtmlBlockPlan(piece.plan)) {
+      flush();
+      parts.push({ block: blockPlanHtml(piece.plan) });
+    } else segment.push(piece);
+  }
+  flush();
+  return parts;
+}
+var LIST_TAGS = {
+  bulleted: "ul",
+  dashed: "ul",
+  checklist: "ul",
+  numbered: "ol"
+};
+var alignAttr = (block) => ALIGN.has(block.alignment) ? ` style="text-align:${block.alignment}"` : "";
+function renderNoteHtml(note, ctx) {
+  const plan = (id2) => planAttachment(note.attachments.get(id2), ctx);
+  const titleIndex = titleBlockIndex(note);
+  const out = [];
+  const lists = [];
+  let quote = false;
+  let code;
+  const closeLists = (depth = 0) => {
+    while (lists.length > depth) {
+      const list = lists.pop();
+      out.push(`${list.open ? "</li>" : ""}</${list.tag}>`);
+    }
+  };
+  const flushCode = () => {
+    if (code) out.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+    code = void 0;
+  };
+  const setQuote = (on) => {
+    if (on === quote) return;
+    flushCode();
+    closeLists();
+    out.push(on ? "<blockquote>" : "</blockquote>");
+    quote = on;
+  };
+  if (titleIndex === -1 && note.title.trim()) out.push(`<h1>${escapeHtml(note.title.trim())}</h1>`);
+  for (const block of note.doc.blocks) {
+    setQuote(block.blockQuote);
+    if (block.style === "monospaced") {
+      closeLists();
+      (code ??= []).push(block.text.replace(/￼/g, ""));
+      continue;
+    }
+    flushCode();
+    const listTag = LIST_TAGS[block.style];
+    if (!listTag) closeLists();
+    if (!block.text.trim()) continue;
+    const parts = blockParts(blockPieces(block, plan));
+    if (!parts.length) continue;
+    if (listTag) {
+      const level = Math.min(block.indent, 20);
+      const cls = block.style === "checklist" || block.style === "dashed" ? block.style : "";
+      closeLists(level + 1);
+      const top = lists[level];
+      if (top && (top.tag !== listTag || top.cls !== cls)) closeLists(level);
+      if (lists[level]?.open) out.push("</li>");
+      while (lists.length < level) {
+        out.push(`<${listTag}><li class="nest">`);
+        lists.push({ tag: listTag, cls: "", open: true });
+      }
+      if (lists.length === level) {
+        out.push(`<${listTag}${cls ? ` class="${cls}"` : ""}>`);
+        lists.push({ tag: listTag, cls, open: false });
+      }
+      lists[level].open = true;
+      const box = block.style === "checklist" ? `<input type="checkbox" disabled${block.checklist?.done ? " checked" : ""}> ` : "";
+      const done = block.style === "checklist" && block.checklist?.done ? ` class="done"` : "";
+      const body = parts.map((part) => "inline" in part ? part.inline : part.block).join("");
+      out.push(`<li${done}${alignAttr(block)}>${box}${body}`);
+      continue;
+    }
+    const tag = block.index === titleIndex || block.style === "title" ? "h1" : block.style === "heading" ? "h2" : block.style === "subheading" ? "h3" : "p";
+    for (const part of parts)
+      out.push(
+        "inline" in part ? `<${tag}${alignAttr(block)}>${part.inline}</${tag}>` : part.block
+      );
+  }
+  flushCode();
+  closeLists();
+  setQuote(false);
+  for (const attachment of unreferencedAttachments(note)) {
+    ctx.stats.unreferenced++;
+    out.push(blockPlanHtml(planAttachment(attachment, ctx)));
+  }
+  return `<article class="note">
+${out.filter(Boolean).join("\n")}
+</article>`;
+}
+var CSS = `
+:root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fff; --muted: #6e6e73; --line: #d2d2d7; --card: #f5f5f7; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --bg: #1d1d1f; --muted: #a1a1a6; --line: #424245; --card: #2c2c2e; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem; }
+h1, h2, h3 { line-height: 1.25; }
+blockquote { margin: 1rem 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--muted); }
+pre { background: var(--card); padding: .75rem 1rem; overflow-x: auto; border-radius: 6px; }
+code { font: 14px/1.4 ui-monospace, Menlo, monospace; }
+ul.dashed { list-style-type: "\u2013 "; }
+ul.checklist { list-style: none; padding-left: 1.25rem; }
+ul.checklist li.done { color: var(--muted); text-decoration: line-through; }
+li.nest { list-style: none; }
+table { border-collapse: collapse; margin: 1rem 0; }
+th, td { border: 1px solid var(--line); padding: .35rem .6rem; text-align: left; vertical-align: top; }
+th { background: var(--card); }
+figure { margin: 1rem 0; }
+figure img, figure video { max-width: 100%; height: auto; border-radius: 6px; }
+figcaption { color: var(--muted); font-size: .875rem; }
+.attachment-gallery { display: flex; flex-wrap: wrap; gap: .5rem; }
+.attachment-gallery figure { margin: 0; flex: 1 1 12rem; }
+.link-card { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; padding: .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
+.link-card img { width: 4rem; height: 4rem; object-fit: cover; border-radius: 4px; }
+.link-card-text { display: flex; flex-direction: column; min-width: 0; }
+.link-card-title { font-weight: 600; }
+.link-card-domain { color: var(--muted); font-size: .875rem; }
+.attachment-unavailable, .attachment-placeholder { display: inline-block; padding: 0 .35rem; border: 1px dashed var(--muted); border-radius: 4px; color: var(--muted); font-size: .875rem; }
+mark { border-radius: 2px; padding: 0 .1em; }
+mark.hl-purple { background: #e5d4ff; } mark.hl-pink { background: #ffd1e3; } mark.hl-orange { background: #ffe0b8; }
+mark.hl-mint { background: #c8f2de; } mark.hl-blue { background: #cfe3ff; } mark.hl-other { background: #fff3a8; }
+hr.note-separator { margin: 3rem 0; border: 0; border-top: 2px solid var(--line); }
+`.trim();
+function renderNotesHtml(notes, ctx, { title }) {
+  const body = notes.map((note) => renderNoteHtml(note, ctx)).join('\n<hr class="note-separator">\n');
+  return [
+    "<!DOCTYPE html>",
+    "<html>",
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<meta name="generator" content="apple-notes-mcp">',
+    `<title>${escapeHtml(title)}</title>`,
+    `<style>
+${CSS}
+</style>`,
+    "</head>",
+    "<body>",
+    "<main>",
+    body,
+    "</main>",
+    "</body>",
+    "</html>",
+    ""
+  ].join("\n");
+}
+
 // src/utils/markdownExport.ts
 var NOTE_SEPARATOR = "\n\n---\n\n";
 function escapeMarkdown(text2) {
@@ -44829,7 +45156,7 @@ function layered(pieces, depth = 0) {
   }
   return out;
 }
-var bracket = (label, name) => `\\[${escapeMarkdown(name ? `${label}: ${name}` : label)}\\]`;
+var bracket2 = (label, name) => `\\[${escapeMarkdown(name ? `${label}: ${name}` : label)}\\]`;
 function planMarkdown(plan) {
   switch (plan.type) {
     case "inline":
@@ -44839,9 +45166,9 @@ function planMarkdown(plan) {
     case "table":
       return tableMarkdown(plan.rows);
     case "placeholder":
-      return bracket(plan.label, plan.name);
+      return bracket2(plan.label, plan.name);
     case "unavailable":
-      return bracket(`${plan.label} unavailable`, plan.name);
+      return bracket2(`${plan.label} unavailable`, plan.name);
     case "asset": {
       const text2 = escapeMarkdown(plan.name ?? plan.label);
       if (plan.display === "image") return `![${text2}](${linkDestination(plan.url)})`;
@@ -45232,6 +45559,24 @@ function loadNotes(ids, single, read) {
   }
   return { notes, skipped };
 }
+function openOutput(output) {
+  mkdirSync3(dirname2(output), { recursive: true });
+  try {
+    return openCreateOnly(output);
+  } catch (error2) {
+    if (error2 instanceof OutputExistsError)
+      throw new NotesExportError("output_exists", error2.message);
+    throw error2;
+  }
+}
+function renderInto(fd, render) {
+  try {
+    return render();
+  } catch (error2) {
+    if (fd !== void 0) writeAllAndClose(fd, "");
+    throw error2;
+  }
+}
 function exportNotesMarkdown(request, deps) {
   const output = request.outputPath ? validPath(request.outputPath, "outputPath") : void 0;
   const assetsDir = request.assetsDir ? validPath(request.assetsDir, "assetsDir") : void 0;
@@ -45239,29 +45584,16 @@ function exportNotesMarkdown(request, deps) {
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
-  let fd;
-  if (output) {
-    mkdirSync3(dirname2(output), { recursive: true });
-    try {
-      fd = openCreateOnly(output);
-    } catch (error2) {
-      if (error2 instanceof OutputExistsError)
-        throw new NotesExportError("output_exists", error2.message);
-      throw error2;
-    }
-  }
+  const fd = output ? openOutput(output) : void 0;
   const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname2(output) : void 0) : void 0;
   const ctx = {
     stats: emptyStats(),
     ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
   };
-  let markdown;
-  try {
-    markdown = renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 });
-  } catch (error2) {
-    if (fd !== void 0) writeAllAndClose(fd, "");
-    throw error2;
-  }
+  const markdown = renderInto(
+    fd,
+    () => renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 })
+  );
   const bytes = Buffer.byteLength(markdown);
   const receipt = {
     format: "markdown",
@@ -45282,6 +45614,47 @@ function exportNotesMarkdown(request, deps) {
     );
   return { ...receipt, markdown };
 }
+function defaultSidecarDir(output) {
+  return join13(dirname2(output), `${basename2(output, extname2(output))}.assets`);
+}
+function exportNotesHtml(request, deps) {
+  if (!request.outputPath)
+    throw new NotesExportError(
+      "invalid-request",
+      "outputPath is required for HTML export; the document is written to a file."
+    );
+  const embed = request.embedAssets ?? !request.assetsDir;
+  if (embed && request.assetsDir)
+    throw new NotesExportError(
+      "invalid-request",
+      "assetsDir applies only with embedAssets false (sidecar assets)."
+    );
+  const output = validPath(request.outputPath, "outputPath");
+  const assetsDir = embed ? void 0 : validPath(request.assetsDir ?? defaultSidecarDir(output), "assetsDir");
+  if (assetsDir === output)
+    throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
+  const ids = selectNotes(request, deps);
+  const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  const fd = openOutput(output);
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname2(output)) : new DataUrlWriter();
+  const ctx = {
+    stats: emptyStats(),
+    writer,
+    locator: deps.locator ?? new AssetLocator()
+  };
+  const title = request.id ? notes[0]?.title || "Note" : request.folder;
+  const html = renderInto(fd, () => renderNotesHtml(notes, ctx, { title }));
+  const bytes = writeAllAndClose(fd, html);
+  return {
+    format: "html",
+    count: notes.length,
+    bytes,
+    output,
+    stats: ctx.stats,
+    skipped,
+    ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count }
+  };
+}
 
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -45296,7 +45669,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename as basename2, isAbsolute as isAbsolute2, join as join13 } from "node:path";
+import { basename as basename3, isAbsolute as isAbsolute2, join as join14 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -45410,8 +45783,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join13(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join13(directory, basename2(path4));
+      const directory = mkdtempSync4(join14(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join14(directory, basename3(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -47797,6 +48170,57 @@ registerTool(
       );
     return successResponse(receipt.markdown ?? "", { ...receipt });
   }, "Error exporting Markdown")
+);
+registerTool(
+  "export-notes-html",
+  {
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.",
+    inputSchema: {
+      id: noteIdInput.optional(),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account holding the folder (defaults to Notes.app's default account)"),
+      limit: external_exports.number().int().min(1).max(MAX_FOLDER_EXPORT_LIMIT).optional().describe(
+        `Maximum notes read from the folder (default 100, max ${MAX_FOLDER_EXPORT_LIMIT})`
+      ),
+      outputPath: external_exports.string().min(1).max(MAX.SAVE_PATH).describe(
+        "HTML file to create (absolute; under home, a temp dir, or /Volumes; never inside the Notes library)"
+      ),
+      embedAssets: external_exports.boolean().optional().describe("Embed assets as data URLs (default true). False writes a sidecar directory"),
+      assetsDir: exportPathInput(
+        "Sidecar directory when embedAssets is false (default <stem>.assets)"
+      )
+    },
+    outputSchema: {
+      format: external_exports.string().optional(),
+      count: external_exports.number().optional(),
+      bytes: external_exports.number().optional(),
+      output: external_exports.string().optional(),
+      assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
+      embedded: external_exports.number().optional(),
+      stats: exportStatsSchema.optional(),
+      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+  },
+  withErrorHandling((request) => {
+    let receipt;
+    try {
+      receipt = exportNotesHtml(request, {
+        listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        maxInlineBytes: 0
+      });
+    } catch (error2) {
+      if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`);
+    }
+    const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    return successResponse(
+      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
+      { ...receipt }
+    );
+  }, "Error exporting HTML")
 );
 registerTool(
   "get-checklist-state",

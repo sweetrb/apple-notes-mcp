@@ -791,7 +791,8 @@ export interface ExportNotesOptions {
 
 /**
  * A request to export one note or one folder as a presentation document
- * (export-notes-markdown). Exactly one of `id` or `folder` is set.
+ * (export-notes-markdown, export-notes-html). Exactly one of `id` or `folder`
+ * is set.
  */
 export interface NotesExportRequest {
   /** Exact CoreData note id. */
@@ -808,6 +809,11 @@ export interface NotesExportRequest {
   assetsDir?: string;
   /** Hard-wrap prose at this many columns (Markdown only; 0 disables). */
   wrap?: number;
+  /**
+   * HTML only: embed assets as data URLs (default true unless `assetsDir` is
+   * set). False copies them to a sidecar directory.
+   */
+  embedAssets?: boolean;
 }
 
 /** Counts of how attachments were rendered in an export. */
@@ -841,6 +847,8 @@ export interface NotesExportReceipt {
   output?: string;
   /** Sidecar directory and the number of files copied into it. */
   assets?: { dir: string; files: number };
+  /** HTML only: assets embedded as data URLs. */
+  embedded?: number;
   stats: NotesExportAttachmentStats;
   skipped: NotesExportSkip[];
 }

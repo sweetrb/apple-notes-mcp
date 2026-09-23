@@ -1039,6 +1039,50 @@ deleted if a later step fails.
 
 ---
 
+#### `export-notes-html`
+
+Exports one note, or the notes of one folder, as one standalone HTML file
+rendered from the decoded note body. It uses the same block model and
+attachment handling as [`export-notes-markdown`](#export-notes-markdown).
+Headings become `h1`-`h3`, lists nest by indent as `ul`/`ol`, checklists show
+disabled checkboxes, block quotes and monospaced paragraphs become
+`blockquote` and `pre`, and inline runs keep bold, italic, underline,
+strikethrough, highlight, superscript, subscript, text color and safe links.
+Tables are semantic `<table>` elements with a header row. Images, drawings
+(Notes' fallback image, or its preview), scans (PDF with preview), audio,
+video, files and link cards (title, domain and preview thumbnail) appear in
+body order. Attachments with no body marker are appended in creation order.
+An attachment with no usable source renders a visible
+`[Image unavailable: name]` marker. The document contains no script, no
+`file:` URL and no Notes library path.
+
+A folder export is one presentation document with notes separated by
+`<hr class="note-separator">`. It is not a backup or restore format.
+
+**Requires:** Full Disk Access. Password-protected notes are skipped in a
+folder export and refused for a single note.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`/`folder` | Exact note ID |
+| `folder` | string | One of `id`/`folder` | Folder path, as for `list-notes` |
+| `account` | string | No | Account holding `folder` |
+| `limit` | number | No | Maximum notes read from the folder (default 100, max 1000) |
+| `outputPath` | string | Yes | Absolute HTML file to create. Create-only: an existing file is refused with `[output_exists]` |
+| `embedAssets` | boolean | No | Embed assets as data URLs (default `true`). Each asset is capped at 10 MiB and a document at 256 MiB of embedded assets; a larger one renders as unavailable with a hint to use `embedAssets: false` |
+| `assetsDir` | string | No | With `embedAssets: false`, the sidecar directory (default `<output stem>.assets` beside the file). Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
+
+The HTML is always written to a file, because an embedded document is too
+large for an MCP message. Paths follow the `save-attachment` rules and may not
+point inside the Notes library container. Sidecar URLs are relative to the
+HTML file, so the file and its `.assets` directory can be moved together.
+
+**Returns:** `format`, `count`, `bytes`, `output`, either `embedded` (assets
+embedded) or `assets` (`dir`, `files`), `stats`, and `skipped`. Nothing
+already written is deleted if a later step fails.
+
+---
+
 #### `get-checklist-state`
 
 Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
@@ -1440,7 +1484,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `export-notes-html`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

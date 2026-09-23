@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-23
+
+### Added
+
+- `export-notes-html` writes one note (by exact id) or a folder's notes to one
+  standalone HTML file rendered from the decoded note body. Tables are
+  semantic `<table>` elements; images, drawings (fallback image or preview),
+  scans, audio, video, files and link cards (title, domain, preview) appear
+  in body order, and anything without a usable source shows a visible
+  "unavailable" marker. Assets are embedded as data URLs by default (each up
+  to 10 MiB, 256 MiB per document), or copied with `embedAssets: false` to a
+  sidecar directory (`assetsDir`, default `<output stem>.assets`) and linked
+  by relative URL. `outputPath` is required and create-only
+  (`[output_exists]`), sidecar copies never replace existing files, and the
+  document never contains a `file:` URL, a Notes library path or a script. A
+  folder document is a presentation format, not a restore format.
+- `src/utils/htmlExport.ts` renders the HTML from the shared attachment plans
+  in `exportRender.ts`.
+
 ## [2.10.0] - 2026-09-23
 
 ### Added

@@ -1,5 +1,6 @@
 /**
- * Note exports as presentation documents (export-notes-markdown).
+ * Note exports as presentation documents (export-notes-markdown and
+ * export-notes-html).
  *
  * Selects one note by exact id or the notes of one folder, loads each body
  * read-only from the NoteStore database, renders it, and either returns the
@@ -13,11 +14,12 @@
  * @module services/notesExport
  */
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import type { NotesExportReceipt, NotesExportRequest, NotesExportSkip } from "../types.js";
 import {
   AssetLocator,
   assertExportPath,
+  DataUrlWriter,
   openCreateOnly,
   OutputExistsError,
   SidecarWriter,
@@ -25,6 +27,7 @@ import {
   type AssetWriter,
 } from "../utils/exportAssets.js";
 import { emptyStats, type ExportContext } from "../utils/exportRender.js";
+import { renderNotesHtml } from "../utils/htmlExport.js";
 import { renderNotesMarkdown } from "../utils/markdownExport.js";
 import { NoteBlocksError } from "../utils/noteBlocks.js";
 import { readExportNote, type ExportNote } from "../utils/noteExportData.js";
@@ -117,6 +120,28 @@ function loadNotes(
   return { notes, skipped };
 }
 
+/** Create the output file (and its parent) before any asset is written. */
+function openOutput(output: string): number {
+  mkdirSync(dirname(output), { recursive: true });
+  try {
+    return openCreateOnly(output);
+  } catch (error) {
+    if (error instanceof OutputExistsError)
+      throw new NotesExportError("output_exists", error.message);
+    throw error;
+  }
+}
+
+/** Render into an open output file; on failure close it and leave it in place. */
+function renderInto(fd: number | undefined, render: () => string): string {
+  try {
+    return render();
+  } catch (error) {
+    if (fd !== undefined) writeAllAndClose(fd, "");
+    throw error;
+  }
+}
+
 /** Export notes as one Markdown document. */
 export function exportNotesMarkdown(
   request: NotesExportRequest,
@@ -129,18 +154,7 @@ export function exportNotesMarkdown(
 
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
-
-  let fd: number | undefined;
-  if (output) {
-    mkdirSync(dirname(output), { recursive: true });
-    try {
-      fd = openCreateOnly(output);
-    } catch (error) {
-      if (error instanceof OutputExistsError)
-        throw new NotesExportError("output_exists", error.message);
-      throw error;
-    }
-  }
+  const fd = output ? openOutput(output) : undefined;
 
   const writer: AssetWriter | undefined = assetsDir
     ? new SidecarWriter(assetsDir, output ? dirname(output) : undefined)
@@ -149,13 +163,9 @@ export function exportNotesMarkdown(
     stats: emptyStats(),
     ...(writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}),
   };
-  let markdown: string;
-  try {
-    markdown = renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 });
-  } catch (error) {
-    if (fd !== undefined) writeAllAndClose(fd, "");
-    throw error;
-  }
+  const markdown = renderInto(fd, () =>
+    renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 })
+  );
   const bytes = Buffer.byteLength(markdown);
   const receipt: NotesExportReceipt = {
     format: "markdown",
@@ -175,4 +185,65 @@ export function exportNotesMarkdown(
       `The Markdown is ${bytes} bytes, over the ${deps.maxInlineBytes}-byte inline limit. Pass outputPath to write it to a file, or export fewer notes.`
     );
   return { ...receipt, markdown };
+}
+
+/** `<dir>/<stem>.assets` beside an output file. */
+export function defaultSidecarDir(output: string): string {
+  return join(dirname(output), `${basename(output, extname(output))}.assets`);
+}
+
+/**
+ * Export notes as one standalone HTML document written to `outputPath`
+ * (required: an embedded document is too large for an MCP message). Assets
+ * are embedded as data URLs by default (each up to 10 MiB) or, with
+ * `embedAssets: false`, copied to a sidecar directory (`assetsDir`, default
+ * `<stem>.assets`) and linked by relative URL.
+ */
+export function exportNotesHtml(
+  request: NotesExportRequest,
+  deps: NotesExportDeps
+): NotesExportReceipt {
+  if (!request.outputPath)
+    throw new NotesExportError(
+      "invalid-request",
+      "outputPath is required for HTML export; the document is written to a file."
+    );
+  const embed = request.embedAssets ?? !request.assetsDir;
+  if (embed && request.assetsDir)
+    throw new NotesExportError(
+      "invalid-request",
+      "assetsDir applies only with embedAssets false (sidecar assets)."
+    );
+  const output = validPath(request.outputPath, "outputPath");
+  const assetsDir = embed
+    ? undefined
+    : validPath(request.assetsDir ?? defaultSidecarDir(output), "assetsDir");
+  if (assetsDir === output)
+    throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
+
+  const ids = selectNotes(request, deps);
+  const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  const fd = openOutput(output);
+  const writer: AssetWriter = assetsDir
+    ? new SidecarWriter(assetsDir, dirname(output))
+    : new DataUrlWriter();
+  const ctx: ExportContext = {
+    stats: emptyStats(),
+    writer,
+    locator: deps.locator ?? new AssetLocator(),
+  };
+  const title = request.id ? notes[0]?.title || "Note" : request.folder!;
+  const html = renderInto(fd, () => renderNotesHtml(notes, ctx, { title }));
+  const bytes = writeAllAndClose(fd, html);
+  return {
+    format: "html",
+    count: notes.length,
+    bytes,
+    output,
+    stats: ctx.stats,
+    skipped,
+    ...(assetsDir
+      ? { assets: { dir: assetsDir, files: writer.count } }
+      : { embedded: writer.count }),
+  };
 }

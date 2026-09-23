@@ -197,6 +197,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Pass `assetsDir` to copy attachment files; without it attachments are placeholders like `\[Image: name\]`
 - Password-protected notes are listed in `skipped`; Full Disk Access is required
 
+### export-notes-html
+- Same selection as `export-notes-markdown`; `outputPath` is required (the HTML is never returned inline) and create-only
+- Assets are embedded as data URLs by default. Use `embedAssets: false` (optionally with `assetsDir`) for large media: embedded assets over 10 MiB render as an unavailable marker
+- A sidecar directory defaults to `<output stem>.assets`; keep it next to the HTML when moving the file
+- Presentation format only: not a backup and not something to import back
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

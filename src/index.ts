@@ -62,6 +62,7 @@ import {
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { NoteBlocksError, pageNoteBlocks, readNoteBlocks } from "@/utils/noteBlocks.js";
 import {
+  exportNotesHtml,
   exportNotesMarkdown,
   MAX_FOLDER_EXPORT_LIMIT,
   NotesExportError,
@@ -2667,6 +2668,89 @@ registerTool(
       );
     return successResponse(receipt.markdown ?? "", { ...receipt });
   }, "Error exporting Markdown")
+);
+
+// --- export-notes-html ---
+
+registerTool(
+  "export-notes-html",
+  {
+    description:
+      "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.",
+    inputSchema: {
+      id: noteIdInput.optional(),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe("Folder path to export instead of one note (nested paths use '/')"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account holding the folder (defaults to Notes.app's default account)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_FOLDER_EXPORT_LIMIT)
+        .optional()
+        .describe(
+          `Maximum notes read from the folder (default 100, max ${MAX_FOLDER_EXPORT_LIMIT})`
+        ),
+      outputPath: z
+        .string()
+        .min(1)
+        .max(MAX.SAVE_PATH)
+        .describe(
+          "HTML file to create (absolute; under home, a temp dir, or /Volumes; never inside the Notes library)"
+        ),
+      embedAssets: z
+        .boolean()
+        .optional()
+        .describe("Embed assets as data URLs (default true). False writes a sidecar directory"),
+      assetsDir: exportPathInput(
+        "Sidecar directory when embedAssets is false (default <stem>.assets)"
+      ),
+    },
+    outputSchema: {
+      format: z.string().optional(),
+      count: z.number().optional(),
+      bytes: z.number().optional(),
+      output: z.string().optional(),
+      assets: z.object({ dir: z.string(), files: z.number() }).optional(),
+      embedded: z.number().optional(),
+      stats: exportStatsSchema.optional(),
+      skipped: z.array(z.object({ id: z.string(), code: z.string() })).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  },
+  withErrorHandling((request) => {
+    let receipt;
+    try {
+      receipt = exportNotesHtml(request, {
+        listNoteRefs: (account, folder, since, limit) =>
+          notesManager.listNoteRefs(account, folder, since, limit),
+        maxInlineBytes: 0,
+      });
+    } catch (error) {
+      if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
+      const hint =
+        error.code === "no-full-disk-access"
+          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          : "";
+      return errorResponse(`Error exporting HTML [${error.code}]: ${error.message}${hint}`);
+    }
+    const assets = receipt.assets
+      ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}`
+      : `; embedded ${receipt.embedded ?? 0} asset(s)`;
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    return successResponse(
+      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
+      { ...receipt }
+    );
+  }, "Error exporting HTML")
 );
 
 // --- get-checklist-state ---

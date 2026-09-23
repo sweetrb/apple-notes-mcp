@@ -43,6 +43,9 @@ export const NOTES_CONTAINER = join(homedir(), "Library/Group Containers/group.c
 /** Largest asset embedded as a data URL (10 MiB). */
 export const MAX_EMBED_BYTES = 10 * 1024 * 1024;
 
+/** Total source bytes one document may embed (256 MiB), bounding memory. */
+export const MAX_EMBED_TOTAL_BYTES = 256 * 1024 * 1024;
+
 const MAX_DIRECTORY_ENTRIES = 20000;
 const MAX_BUNDLE_ENTRIES = 64;
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".heic", ".gif", ".tiff", ".webp"]);
@@ -522,12 +525,19 @@ export class SidecarWriter implements AssetWriter {
   }
 }
 
-/** Embeds assets as base64 data URLs, refusing any larger than `maxBytes`. */
+/**
+ * Embeds assets as base64 data URLs. An asset over `maxBytes`, or one that
+ * would take the document past `totalBytes`, is refused with `too-large`.
+ */
 export class DataUrlWriter implements AssetWriter {
   private readonly placed = new Map<string, { url: string; mime: string }>();
+  private embeddedBytes = 0;
   count = 0;
 
-  constructor(private readonly maxBytes: number = MAX_EMBED_BYTES) {}
+  constructor(
+    private readonly maxBytes: number = MAX_EMBED_BYTES,
+    private readonly totalBytes: number = MAX_EMBED_TOTAL_BYTES
+  ) {}
 
   place(asset: ResolvedAsset): PlacedAsset {
     const done = this.placed.get(asset.path);
@@ -539,7 +549,8 @@ export class DataUrlWriter implements AssetWriter {
       return { error: "unreadable" };
     }
     try {
-      if (source.size > this.maxBytes) return { error: "too-large" };
+      if (source.size > this.maxBytes || this.embeddedBytes + source.size > this.totalBytes)
+        return { error: "too-large" };
       const data = Buffer.alloc(source.size);
       let read = 0;
       while (read < source.size) {
@@ -553,6 +564,7 @@ export class DataUrlWriter implements AssetWriter {
         mime,
       };
       this.count++;
+      this.embeddedBytes += read;
       this.placed.set(asset.path, result);
       return result;
     } finally {
