@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.9] - 2026-09-23
+## [2.9.10] - 2026-09-23
 
 ### Added
 
@@ -31,6 +31,8 @@
 
 - `export-notes-markdown` without a template produces the same output as
   2.8.49.
+
+## [2.9.9] - 2026-09-23
 
 ### Fixed
 
