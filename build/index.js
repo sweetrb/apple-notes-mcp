@@ -44563,6 +44563,30 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
+// src/utils/shutdown.ts
+var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
+function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
+  let shuttingDown = false;
+  let exited = false;
+  const exitOnce = () => {
+    if (exited) return;
+    exited = true;
+    clearTimeout(timer);
+    exit();
+  };
+  let timer;
+  const exitWhenDrained = () => {
+    if (stream.writableLength === 0) exitOnce();
+    else stream.once("drain", exitWhenDrained);
+  };
+  return () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    timer = setTimeout(exitOnce, timeoutMs);
+    setImmediate(exitWhenDrained);
+  };
+}
+
 // src/utils/noteTables.ts
 import { gunzipSync as gunzipSync4 } from "node:zlib";
 var sub2 = (f, n) => {
@@ -47278,12 +47302,7 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
-var _shuttingDown = false;
-var shutdown = () => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+var shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
 }

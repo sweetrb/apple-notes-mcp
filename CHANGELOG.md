@@ -30,6 +30,15 @@
   date-ordered, checkpointed, or deleted-note listings. Its behavior is
   unchanged.
 
+### Fixed
+
+- The server no longer truncates a response when the client closes stdin right
+  after a request. Shutdown on stdin `end`/`close` (and SIGINT/SIGTERM) now
+  waits for pending stdout writes to drain, capped at two seconds, before
+  exiting. Before, any response larger than the 64 KiB pipe buffer was cut off
+  mid-message, which `tools/list` was close to reaching and which one-shot
+  clients such as `docsTruth.test.ts` hit as an unparseable line.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added
