@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1551,6 +1552,38 @@ describe("AppleNotesManager", () => {
       expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Old body</div>")).toEqual({
         status: "conflict",
       });
+    });
+
+    it("reports a delete that left the note in its original folder", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_NOT_DELETED" });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Reviewed body</div>")).toEqual({
+        status: "not-deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      // The folder is captured before the delete and re-read after it.
+      expect(script.indexOf("container of noteRef")).toBeLessThan(script.indexOf("delete noteRef"));
+      expect(script.indexOf("delete noteRef")).toBeLessThan(
+        script.indexOf("id of notes of originalFolder")
+      );
+    });
+
+    it("generates a delete script that AppleScript compiles", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      manager.deleteNoteByIdIfUnchanged(id, '<div>Body with "quotes" and \\ slash</div>');
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
+      try {
+        writeFileSync(join(dir, "delete.applescript"), script);
+        expect(() =>
+          execFileSync(
+            "/usr/bin/osacompile",
+            ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
+            { stdio: "pipe" }
+          )
+        ).not.toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 

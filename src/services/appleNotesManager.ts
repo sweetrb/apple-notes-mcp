@@ -1493,17 +1493,29 @@ export class AppleNotesManager {
   deleteNoteByIdIfUnchanged(
     id: string,
     expectedBody: string
-  ): { status: "deleted" | "conflict" | "failed" } {
+  ): { status: "deleted" | "conflict" | "not-deleted" | "failed" } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    // Notes can accept a scripting `delete` without acting on it, so the script
+    // re-reads the note's original folder afterwards: a note still listed there
+    // was not moved to Recently Deleted and must not be reported as deleted.
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"
+      set originalFolder to missing value
+      try
+        set originalFolder to container of noteRef
+      end try
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      if originalFolder is not missing value then
+        try
+          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        end try
+      end if
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -1514,6 +1526,7 @@ export class AppleNotesManager {
     }
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
 

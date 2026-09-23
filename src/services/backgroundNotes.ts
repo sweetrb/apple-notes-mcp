@@ -17,6 +17,7 @@ import { getNoteMetadata } from "../utils/noteMetadata.js";
 import { getChecklistItems } from "../utils/checklistParser.js";
 import { appendMarkdownHtml } from "../utils/appendMarkdown.js";
 import { comparableVisibleText } from "../utils/noteRevision.js";
+import { callTimeoutMs } from "../utils/callTimeout.js";
 
 export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
 /** Report whether the configured background-operations bridge is installed uniquely. */
@@ -229,7 +230,7 @@ export function runBackgroundShortcut(
     try {
       execFileSync("/usr/bin/shortcuts", ["run", status.identifier!, "--input-path", file], {
         encoding: "utf8",
-        timeout: 60000,
+        timeout: callTimeoutMs() ?? 60000,
         maxBuffer: 1024 * 1024,
         stdio: ["ignore", "pipe", "pipe"],
       });

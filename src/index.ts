@@ -49,6 +49,13 @@ import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
+import { CALL_TIMEOUT_SECONDS, runWithCallTimeout } from "@/utils/callTimeout.js";
+import { readAllowedTextFile } from "@/utils/attachmentFs.js";
+import {
+  appendMarkdownHtml,
+  countTaskItems,
+  stripDuplicateTitleHeading,
+} from "@/utils/appendMarkdown.js";
 import {
   enrichNoteRead,
   richContentHash,
@@ -149,7 +156,12 @@ function withErrorHandling<T extends Record<string, unknown>>(
 ) {
   return async (params: T): Promise<ToolResponse> => {
     try {
-      return handler(params);
+      // Tools that declare timeoutSeconds run every automation step under it;
+      // zod strips the key from every other tool's params.
+      const seconds = params.timeoutSeconds;
+      return runWithCallTimeout(typeof seconds === "number" ? seconds : undefined, () =>
+        handler(params)
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return errorResponse(`${errorPrefix}: ${message}`);
@@ -182,6 +194,12 @@ const MAX = {
   TAGS: 100,
   BATCH_IDS: 500,
 } as const;
+
+/**
+ * Largest file create-note reads through contentPath. Matches the bounded
+ * Markdown import limit, which is the tighter of the two content paths.
+ */
+const MAX_CONTENT_FILE_BYTES = 1024 * 1024;
 
 // =============================================================================
 // Schema Definitions
@@ -218,6 +236,16 @@ const expectedContentHashInput = z
     "Revision token returned by get-note-content for this exact ID. The mutation stops if the note changed since that read."
   );
 
+const timeoutSecondsInput = z
+  .number()
+  .int()
+  .min(CALL_TIMEOUT_SECONDS.min)
+  .max(CALL_TIMEOUT_SECONDS.max)
+  .optional()
+  .describe(
+    `Per-call timeout in seconds (${CALL_TIMEOUT_SECONDS.min}-${CALL_TIMEOUT_SECONDS.max}) for each Notes.app automation step this call runs, overriding APPLE_NOTES_MCP_TIMEOUT_MS. A timed-out write is uncertain, not failed: read the note by id before any retry.`
+  );
+
 type ExactNoteSnapshot = {
   note: NonNullable<ReturnType<AppleNotesManager["getNoteById"]>>;
   body: string;
@@ -243,6 +271,10 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
   const rich = enrichNoteRead(id, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
+
+/** Notes.app accepted a delete event but the note stayed in its folder. */
+const NOT_DELETED_MESSAGE =
+  "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 
 function revisionConflictMessage(title: string): string {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
@@ -324,15 +356,31 @@ registerTool(
         .string()
         .min(1, "Content is required")
         .max(MAX.CONTENT)
+        .optional()
         .describe(
-          'Note body. AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L.'
+          'Note body; required unless contentPath is given (pass exactly one). AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L.'
+        ),
+      contentPath: z
+        .string()
+        .min(1)
+        .max(MAX.SAVE_PATH)
+        .optional()
+        .describe(
+          `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
         ),
       format: z
         .enum(["plaintext", "html", "markdown"])
         .optional()
         .default("plaintext")
         .describe(
-          "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
+          "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."
+        ),
+      markdownRoute: z
+        .enum(["shortcut", "html"])
+        .optional()
+        .default("shortcut")
+        .describe(
+          "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities); task items (`- [ ]`) are refused there. 'html' converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible ☐ / ☑ character — not native, checkable checklist items."
         ),
       tags: z
         .array(z.string().max(MAX.TAG))
@@ -355,6 +403,7 @@ registerTool(
         .describe(
           "Account name (defaults to the account Notes.app itself reports as default). Matched exactly, or by a unique prefix; an ambiguous prefix is refused. Must be an account Notes.app already has configured — see list-accounts."
         ),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -364,9 +413,68 @@ registerTool(
       account: z.string().optional(),
       contentHash: z.string().optional(),
       verified: z.boolean().optional(),
+      strippedDuplicateTitle: z.boolean().optional(),
+      taskItemsRendered: z.number().optional(),
     },
   },
-  withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
+  withErrorHandling((params) => {
+    const {
+      title,
+      contentPath,
+      format = "plaintext",
+      markdownRoute = "shortcut",
+      tags = [],
+      folder,
+      account,
+    } = params;
+    if ((params.content === undefined) === (contentPath === undefined))
+      return errorResponse("Provide exactly one of content or contentPath");
+    let content =
+      params.content ?? readAllowedTextFile(contentPath as string, MAX_CONTENT_FILE_BYTES);
+    if (format !== "markdown" && markdownRoute !== "shortcut")
+      return errorResponse('markdownRoute applies to format "markdown" only');
+    let strippedDuplicateTitle = false;
+    if (format === "markdown") {
+      const stripped = stripDuplicateTitleHeading(content, title);
+      strippedDuplicateTitle = stripped.stripped;
+      content = stripped.content;
+      if (!content.trim())
+        return errorResponse(
+          "The Markdown holds only the title heading; add body content, or use format 'plaintext' for a title-only note"
+        );
+    }
+    const titleNote = strippedDuplicateTitle ? { strippedDuplicateTitle: true } : {};
+    if (format === "markdown" && markdownRoute === "html") {
+      const taskItemsRendered = countTaskItems(content);
+      const html = appendMarkdownHtml(content, { taskGlyphs: true });
+      const note = notesManager.createNote(title, html, tags, folder, account, "html");
+      if (!note)
+        return errorResponse(
+          `Failed to create note "${title}". Check that the folder and account exist (list-folders, list-accounts) and that this server has Automation access (run the doctor tool).`
+        );
+      const createdBody = notesManager.getNoteContentById(note.id);
+      if (!notesManager.getNoteById(note.id) || !createdBody)
+        return errorResponse(
+          `A note may have been created, but its exact ID could not be verified. Do not retry automatically. Returned ID: ${note.id}`
+        );
+      const glyphNote = taskItemsRendered
+        ? ` ${taskItemsRendered} task item(s) were rendered as visible ☐ / ☑ text, not native checklist items.`
+        : "";
+      return successResponse(
+        `Note created from Markdown: "${note.title}" [id: ${note.id}]${glyphNote}`,
+        {
+          ok: true,
+          id: note.id,
+          title: note.title,
+          folder,
+          account,
+          contentHash: richContentHash(createdBody, enrichNoteRead(note.id, createdBody)),
+          verified: true,
+          taskItemsRendered,
+          ...titleNote,
+        }
+      );
+    }
     if (format === "markdown") {
       if (account)
         return errorResponse(
@@ -380,7 +488,10 @@ registerTool(
         );
       requireValidated("create-note-markdown");
       const result = createMarkdownNote(notesManager, { title, content, folder });
-      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
+      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, {
+        ...result,
+        ...titleNote,
+      });
     }
     const note = notesManager.createNote(title, content, tags, folder, account, format);
 
@@ -1109,6 +1220,7 @@ registerTool(
         .optional()
         .default("plaintext")
         .describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1244,7 +1356,7 @@ registerTool(
         .optional()
         .default("after")
         .describe(
-          "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+          "Where to insert: 'after' appends to the end (default); 'before' inserts directly below the note's title line, so the title stays first"
         ),
       separator: z
         .string()
@@ -1257,6 +1369,7 @@ registerTool(
         .optional()
         .default("plaintext")
         .describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1422,6 +1535,7 @@ registerTool(
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1441,6 +1555,9 @@ registerTool(
     const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
     if (result.status === "conflict") {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+    if (result.status === "not-deleted") {
+      return errorResponse(NOT_DELETED_MESSAGE);
     }
     if (result.status !== "deleted") {
       return errorResponse(
@@ -1479,6 +1596,7 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe("Account containing the note/folder"),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -2129,6 +2247,8 @@ registerTool(
       if (result.status === "conflict") {
         return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
+      if (result.status === "not-deleted")
+        return { id, success: false, error: NOT_DELETED_MESSAGE };
       return { id, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;

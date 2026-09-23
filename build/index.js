@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants2);
+          this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants2);
+        this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants2) {
-        this.code = optimizeExpr(this.code, names, constants2);
+      optimizeNames(names, constants3) {
+        this.code = optimizeExpr(this.code, names, constants3);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants2))
+          if (n.optimizeNames(names, constants3))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
-        if (!(super.optimizeNames(names, constants2) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants3);
+        if (!(super.optimizeNames(names, constants3) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants2);
+        this.condition = optimizeExpr(this.condition, names, constants3);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants2);
+        this.iteration = optimizeExpr(this.iteration, names, constants3);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants2);
+        this.iterable = optimizeExpr(this.iterable, names, constants3);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a, _b;
-        super.optimizeNames(names, constants2);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants2);
+        super.optimizeNames(names, constants3);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants3);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants3);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants2) {
+    function optimizeExpr(expr, names, constants3) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants2[n.str];
+        const c = constants3[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants2[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants3[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants2 = {
+    var constants3 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants2) {
-      v = { value: constants2[c] };
+    for (c in constants3) {
+      v = { value: constants3[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -9872,9 +9872,9 @@ var require_select = __commonJS({
     var makeSubject = function() {
       var target;
       function subject(el) {
-        var node = el.ownerDocument, scope = node.getElementsByTagName(subject.lname), i = scope.length;
+        var node = el.ownerDocument, scope2 = node.getElementsByTagName(subject.lname), i = scope2.length;
         while (i--) {
-          if (subject.test(scope[i]) && target === el) {
+          if (subject.test(scope2[i]) && target === el) {
             target = null;
             return true;
           }
@@ -9902,16 +9902,16 @@ var require_select = __commonJS({
       };
     };
     var find = function(sel, node) {
-      var results = [], test = compile(sel), scope = node.getElementsByTagName(test.qname), i = 0, el;
-      while (el = scope[i++]) {
+      var results = [], test = compile(sel), scope2 = node.getElementsByTagName(test.qname), i = 0, el;
+      while (el = scope2[i++]) {
         if (test(el)) results.push(el);
       }
       if (test.sel) {
         while (test.sel) {
           test = compile(test.sel);
-          scope = node.getElementsByTagName(test.qname);
+          scope2 = node.getElementsByTagName(test.qname);
           i = 0;
-          while (el = scope[i++]) {
+          while (el = scope2[i++]) {
             if (test(el) && indexOf.call(results, el) === -1) {
               results.push(el);
             }
@@ -38990,6 +38990,22 @@ var NODE_RUNTIME_TCC_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blo
 var AUTOMATION_PERMISSION_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp#permission-denied";
 var AUTOMATION_REMEDIATION = `Grant automation access in System Settings > Privacy & Security > Automation to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it \u2014 run the doctor tool to verify. See: ${AUTOMATION_PERMISSION_GUIDE_URL}`;
 
+// src/utils/callTimeout.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+var CALL_TIMEOUT_SECONDS = { min: 1, max: 120 };
+var scope = new AsyncLocalStorage();
+function runWithCallTimeout(seconds, fn) {
+  if (seconds === void 0) return fn();
+  if (!Number.isInteger(seconds) || seconds < CALL_TIMEOUT_SECONDS.min || seconds > CALL_TIMEOUT_SECONDS.max)
+    throw new Error(
+      `timeoutSeconds must be a whole number from ${CALL_TIMEOUT_SECONDS.min} to ${CALL_TIMEOUT_SECONDS.max}`
+    );
+  return scope.run(seconds * 1e3, fn);
+}
+function callTimeoutMs() {
+  return scope.getStore();
+}
+
 // src/utils/applescript.ts
 var DEFAULT_TIMEOUT_MS = 3e4;
 var DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
@@ -39146,7 +39162,7 @@ function parseErrorMessage(errorOutput) {
   return coreError.trim() || "Unknown AppleScript error";
 }
 function executeAppleScript(script, options = {}) {
-  const timeoutMs = options.timeoutMs ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
   if (!script || !script.trim()) {
@@ -39834,10 +39850,14 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
 
 // src/utils/attachmentFs.ts
 import {
+  closeSync,
+  constants,
   existsSync as existsSync2,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -39960,6 +39980,43 @@ function fileSize(p) {
 }
 function makeTempDir() {
   return mkdtempSync(resolve(tmpdir(), "apple-notes-att-"));
+}
+function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
+  if (!p || !p.trim()) throw new Error("A content file path is required.");
+  if (!isAbsolute(p)) throw new Error(`Content file path must be absolute: "${p}"`);
+  const abs = resolve(p);
+  if (!isWithinRoots(abs, roots))
+    throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  let canonical;
+  try {
+    canonical = canonicalize(abs);
+  } catch {
+    throw new Error(`Content file does not exist or cannot be resolved: "${abs}"`);
+  }
+  if (!isWithinRoots(canonical, canonicalRoots(roots)))
+    throw new Error(
+      `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
+    );
+  if (lstatSync(abs).isSymbolicLink())
+    throw new Error(`Refusing to read the symbolic link "${abs}".`);
+  const descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
+    if (stat.size === 0) throw new Error(`Content file is empty: "${abs}"`);
+    if (stat.size > maxBytes)
+      throw new Error(`Content file is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
+    const bytes = readFileSync(descriptor);
+    if (bytes.length !== stat.size)
+      throw new Error("Content file changed while it was being read; try again");
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+    } catch {
+      throw new Error(`Content file is not valid UTF-8 text: "${abs}"`);
+    }
+  } finally {
+    closeSync(descriptor);
+  }
 }
 function cleanupTempDir(dir) {
   try {
@@ -40179,10 +40236,10 @@ function buildAccountResolution(account) {
     if ${AS_ACCOUNT_REF} is missing value then error "${ACCOUNT_RESOLUTION_ERROR} Account \\"${safeAccount}\\" not found"
   `;
 }
-function buildAccountScopedScript(scope, command) {
+function buildAccountScopedScript(scope2, command) {
   return `
     tell application "Notes"
-      ${buildAccountResolution(scope.account)}
+      ${buildAccountResolution(scope2.account)}
       tell ${AS_ACCOUNT_REF}
         ${command}
       end tell
@@ -40747,11 +40804,20 @@ var AppleNotesManager = class {
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"
+      set originalFolder to missing value
+      try
+        set originalFolder to container of noteRef
+      end try
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      if originalFolder is not missing value then
+        try
+          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        end try
+      end if
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -40761,6 +40827,7 @@ var AppleNotesManager = class {
     }
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
   /**
@@ -42859,7 +42926,22 @@ import { join as join8 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function appendMarkdownHtml(markdown) {
+var TASK_GLYPHS = { open: "\u2610", done: "\u2611" };
+var TASK_ITEM = /^\[([ xX])\][ \t]+(\S.*)$/;
+function stripDuplicateTitleHeading(markdown, title) {
+  const normalized2 = markdown.replace(/^\uFEFF/, "");
+  const lines = normalized2.split(/\r?\n/);
+  if (lines[0] !== `# ${title}`) return { content: markdown, stripped: false };
+  const rest = lines.slice(lines.length > 1 && lines[1] === "" ? 2 : 1);
+  return { content: rest.join("\n"), stripped: true };
+}
+function countTaskItems(markdown) {
+  return markdown.replace(/\r\n/g, "\n").split("\n").filter((line) => {
+    const item = /^[-+*]\s+(.+)$/.exec(line);
+    return item !== null && TASK_ITEM.test(item[1]);
+  }).length;
+}
+function appendMarkdownHtml(markdown, options = {}) {
   if (markdown.includes("\uE000") || markdown.includes("\uE001"))
     throw new Error("Unsupported reserved characters");
   if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
@@ -42898,7 +42980,8 @@ function appendMarkdownHtml(markdown) {
         list = kind;
         html += `<${kind}>`;
       }
-      html += `<li>${inline(item[2])}</li>`;
+      const task = options.taskGlyphs && item[1] ? TASK_ITEM.exec(item[2]) : null;
+      html += task ? `<li>${task[1] === " " ? TASK_GLYPHS.open : TASK_GLYPHS.done} ${inline(task[2])}</li>` : `<li>${inline(item[2])}</li>`;
       continue;
     }
     close();
@@ -43054,7 +43137,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     try {
       execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
-        timeout: 6e4,
+        timeout: callTimeoutMs() ?? 6e4,
         maxBuffer: 1024 * 1024,
         stdio: ["ignore", "pipe", "pipe"]
       });
@@ -43069,9 +43152,9 @@ function backgroundDependencies(manager) {
   return {
     read: (id2) => readBackgroundSnapshot(manager, id2),
     run: runBackgroundShortcut,
-    candidates: (title, scope) => manager.listAccounts().flatMap(
+    candidates: (title, scope2) => manager.listAccounts().flatMap(
       (account) => manager.searchNotes(title, false, account.name).filter(
-        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope)
+        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope2)
       ).map((note) => note.id)
     )
   };
@@ -43756,11 +43839,11 @@ function parseNoteTable(compressed) {
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
-  closeSync,
-  constants,
-  fstatSync,
+  closeSync as closeSync2,
+  constants as constants2,
+  fstatSync as fstatSync2,
   mkdtempSync as mkdtempSync4,
-  openSync,
+  openSync as openSync2,
   readFileSync as readFileSync3,
   rmSync as rmSync4,
   writeFileSync as writeFileSync3
@@ -43806,9 +43889,9 @@ function assertExistingContentPreserved(before, after) {
 }
 function localAttachment(path4) {
   if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const descriptor = openSync2(path4, constants2.O_RDONLY | constants2.O_NOFOLLOW);
   try {
-    const stat = fstatSync(descriptor);
+    const stat = fstatSync2(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync3(descriptor);
@@ -43816,7 +43899,7 @@ function localAttachment(path4) {
       throw new Error("Attachment changed while it was being read; try again");
     return bytes;
   } finally {
-    closeSync(descriptor);
+    closeSync2(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -44006,9 +44089,9 @@ function registerNativeTagsBridge(server2, manager) {
         { id: id2, expectedContentHash, scopeText, tags, title: initial.title },
         {
           read,
-          candidates: (title, scope) => manager.listAccounts().flatMap(
+          candidates: (title, scope2) => manager.listAccounts().flatMap(
             (account) => manager.searchNotes(title, false, account.name).filter(
-              (note) => !note.passwordProtected && manager.getNotePlaintextById(note.id).toLocaleLowerCase().includes(scope.toLocaleLowerCase())
+              (note) => !note.passwordProtected && manager.getNotePlaintextById(note.id).toLocaleLowerCase().includes(scope2.toLocaleLowerCase())
             ).map((note) => note.id)
           ),
           run: runNativeTagsShortcut
@@ -44477,7 +44560,11 @@ function errorResponse(message) {
 function withErrorHandling(handler, errorPrefix) {
   return async (params) => {
     try {
-      return handler(params);
+      const seconds = params.timeoutSeconds;
+      return runWithCallTimeout(
+        typeof seconds === "number" ? seconds : void 0,
+        () => handler(params)
+      );
     } catch (error2) {
       const message = error2 instanceof Error ? error2.message : "Unknown error";
       return errorResponse(`${errorPrefix}: ${message}`);
@@ -44497,6 +44584,7 @@ var MAX = {
   TAGS: 100,
   BATCH_IDS: 500
 };
+var MAX_CONTENT_FILE_BYTES = 1024 * 1024;
 var noteTitleSchema = {
   title: external_exports.string().min(1, "Note title is required").max(MAX.TITLE),
   account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
@@ -44509,6 +44597,9 @@ var noteIdInput = external_exports.string().min(1, "Note ID is required").max(MA
 ).describe("Exact CoreData note ID returned by search-notes, list-notes, or create-note");
 var expectedContentHashInput = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/, "expectedContentHash must come from get-note-content").describe(
   "Revision token returned by get-note-content for this exact ID. The mutation stops if the note changed since that read."
+);
+var timeoutSecondsInput = external_exports.number().int().min(CALL_TIMEOUT_SECONDS.min).max(CALL_TIMEOUT_SECONDS.max).optional().describe(
+  `Per-call timeout in seconds (${CALL_TIMEOUT_SECONDS.min}-${CALL_TIMEOUT_SECONDS.max}) for each Notes.app automation step this call runs, overriding APPLE_NOTES_MCP_TIMEOUT_MS. A timed-out write is uncertain, not failed: read the note by id before any retry.`
 );
 function readExactNoteSnapshot(id2) {
   const note = notesManager.getNoteById(id2);
@@ -44523,6 +44614,7 @@ function readExactNoteSnapshot(id2) {
   const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
+var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 function revisionConflictMessage(title) {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
 }
@@ -44546,11 +44638,17 @@ registerTool(
     description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it.",
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
-      content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).describe(
-        'Note body. AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L.'
+      content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).optional().describe(
+        'Note body; required unless contentPath is given (pass exactly one). AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L.'
+      ),
+      contentPath: external_exports.string().min(1).max(MAX.SAVE_PATH).optional().describe(
+        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
-        "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
+        "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."
+      ),
+      markdownRoute: external_exports.enum(["shortcut", "html"]).optional().default("shortcut").describe(
+        "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities); task items (`- [ ]`) are refused there. 'html' converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible \u2610 / \u2611 character \u2014 not native, checkable checklist items."
       ),
       tags: external_exports.array(external_exports.string().max(MAX.TAG)).max(MAX.TAGS).optional().describe(
         "Returned-only metadata \u2014 NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action. Refused with format 'markdown': add tags afterwards with add-native-tags."
@@ -44560,7 +44658,8 @@ registerTool(
       ),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to the account Notes.app itself reports as default). Matched exactly, or by a unique prefix; an ambiguous prefix is refused. Must be an account Notes.app already has configured \u2014 see list-accounts."
-      )
+      ),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -44569,10 +44668,66 @@ registerTool(
       folder: external_exports.string().optional(),
       account: external_exports.string().optional(),
       contentHash: external_exports.string().optional(),
-      verified: external_exports.boolean().optional()
+      verified: external_exports.boolean().optional(),
+      strippedDuplicateTitle: external_exports.boolean().optional(),
+      taskItemsRendered: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
+  withErrorHandling((params) => {
+    const {
+      title,
+      contentPath,
+      format = "plaintext",
+      markdownRoute = "shortcut",
+      tags = [],
+      folder,
+      account
+    } = params;
+    if (params.content === void 0 === (contentPath === void 0))
+      return errorResponse("Provide exactly one of content or contentPath");
+    let content = params.content ?? readAllowedTextFile(contentPath, MAX_CONTENT_FILE_BYTES);
+    if (format !== "markdown" && markdownRoute !== "shortcut")
+      return errorResponse('markdownRoute applies to format "markdown" only');
+    let strippedDuplicateTitle = false;
+    if (format === "markdown") {
+      const stripped = stripDuplicateTitleHeading(content, title);
+      strippedDuplicateTitle = stripped.stripped;
+      content = stripped.content;
+      if (!content.trim())
+        return errorResponse(
+          "The Markdown holds only the title heading; add body content, or use format 'plaintext' for a title-only note"
+        );
+    }
+    const titleNote = strippedDuplicateTitle ? { strippedDuplicateTitle: true } : {};
+    if (format === "markdown" && markdownRoute === "html") {
+      const taskItemsRendered = countTaskItems(content);
+      const html = appendMarkdownHtml(content, { taskGlyphs: true });
+      const note2 = notesManager.createNote(title, html, tags, folder, account, "html");
+      if (!note2)
+        return errorResponse(
+          `Failed to create note "${title}". Check that the folder and account exist (list-folders, list-accounts) and that this server has Automation access (run the doctor tool).`
+        );
+      const createdBody2 = notesManager.getNoteContentById(note2.id);
+      if (!notesManager.getNoteById(note2.id) || !createdBody2)
+        return errorResponse(
+          `A note may have been created, but its exact ID could not be verified. Do not retry automatically. Returned ID: ${note2.id}`
+        );
+      const glyphNote = taskItemsRendered ? ` ${taskItemsRendered} task item(s) were rendered as visible \u2610 / \u2611 text, not native checklist items.` : "";
+      return successResponse(
+        `Note created from Markdown: "${note2.title}" [id: ${note2.id}]${glyphNote}`,
+        {
+          ok: true,
+          id: note2.id,
+          title: note2.title,
+          folder,
+          account,
+          contentHash: richContentHash(createdBody2, enrichNoteRead(note2.id, createdBody2)),
+          verified: true,
+          taskItemsRendered,
+          ...titleNote
+        }
+      );
+    }
     if (format === "markdown") {
       if (account)
         return errorResponse(
@@ -44584,7 +44739,10 @@ registerTool(
         );
       requireValidated("create-note-markdown");
       const result = createMarkdownNote(notesManager, { title, content, folder });
-      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
+      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, {
+        ...result,
+        ...titleNote
+      });
     }
     const note = notesManager.createNote(title, content, tags, folder, account, format);
     if (!note) {
@@ -45142,7 +45300,8 @@ registerTool(
       newContent: external_exports.string().min(1, "New content is required").max(MAX.CONTENT).describe(
         "New note body. AppleScript cannot produce true Apple Notes checklists; checkbox inputs and `- [ ]` markdown do not render as checkable items. Use a plain list and convert in Notes.app with \u21E7\u2318L."
       ),
-      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Content format: 'plaintext' (default) or 'html' for rich formatting")
+      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -45244,10 +45403,11 @@ registerTool(
       content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
       scopeText: external_exports.string().min(12).max(500).optional().describe("Existing unique phrase required for native append to protected notes"),
       position: external_exports.enum(["after", "before"]).optional().default("after").describe(
-        "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+        "Where to insert: 'after' appends to the end (default); 'before' inserts directly below the note's title line, so the title stays first"
       ),
       separator: external_exports.string().max(20).optional().default("\n\n").describe("String placed between existing content and new content (default: two newlines)"),
-      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'")
+      format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -45378,7 +45538,8 @@ registerTool(
     description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
     inputSchema: {
       id: noteIdInput,
-      expectedContentHash: expectedContentHashInput
+      expectedContentHash: expectedContentHashInput,
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -45397,6 +45558,9 @@ registerTool(
     const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
     if (result.status === "conflict") {
       return errorResponse(revisionConflictMessage(snapshot.note.title));
+    }
+    if (result.status === "not-deleted") {
+      return errorResponse(NOT_DELETED_MESSAGE);
     }
     if (result.status !== "deleted") {
       return errorResponse(
@@ -45423,7 +45587,8 @@ registerTool(
     inputSchema: {
       id: noteIdInput,
       folder: external_exports.string().min(1, "Destination folder is required").max(MAX.FOLDER),
-      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note/folder")
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note/folder"),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -45922,6 +46087,8 @@ registerTool(
       if (result.status === "conflict") {
         return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
+      if (result.status === "not-deleted")
+        return { id: id2, success: false, error: NOT_DELETED_MESSAGE };
       return { id: id2, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;

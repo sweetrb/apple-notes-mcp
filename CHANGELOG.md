@@ -1,5 +1,39 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- `create-note` takes `contentPath`, an absolute path to a local UTF-8 file, as
+  an alternative to `content`. The read is bounded by the same roots as
+  `save-attachment` (home, temp, `/Volumes`), refuses symbolic links,
+  non-regular files, invalid UTF-8 and files over 1 MiB, and happens before
+  anything is written.
+- `create-note` takes `markdownRoute: "html"` with `format: "markdown"`. It
+  converts the bounded Markdown subset to HTML and creates the note through
+  AppleScript, so it works in any account, accepts `tags`, and needs no
+  Shortcut, at the cost of real Heading styles. On this route `- [ ]` and
+  `- [x]` task items become list rows that start with a visible `☐` or `☑`
+  character, counted in `taskItemsRendered`. They are text, not native
+  checklist items. The default Shortcut route is unchanged.
+- `create-note`, `update-note`, `append-to-note`, `delete-note` and
+  `move-note` accept `timeoutSeconds` (1-120). It sets the timeout of each
+  AppleScript, JXA or Shortcuts step the call runs, overriding
+  `APPLE_NOTES_MCP_TIMEOUT_MS` for that call only.
+
+### Changed
+
+- `format: "markdown"` removes a first line that is exactly `# <title>`, plus
+  one blank line after it, because the title is supplied separately. Such a
+  note used to start with the title twice. A different first heading is kept,
+  and the response reports `strippedDuplicateTitle: true` when it applies.
+- `delete-note` and `batch-delete-notes` check, in the same AppleScript as the
+  delete, that the note left its original folder. A delete that Notes.app
+  accepts without moving the note is now reported as "nothing was deleted"
+  instead of success.
+- `append-to-note`'s `position: "before"` is documented as inserting directly
+  below the title line, which is what it has always done.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
