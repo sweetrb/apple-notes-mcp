@@ -809,9 +809,25 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
 | `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
+| `guardNoteId` | string | No | A second note (usually a verified copy) that must still be intact; needs Full Disk Access |
+| `expectedGuardContentHash` | string | With `guardNoteId` | `contentHash` of the guard note from `get-note-content` |
+| `requireActiveNoteId` | string | No | A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note; its content is not fingerprinted. Needs Full Disk Access |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
+
+**Copy-then-retire.** To delete an original only while its copy is still good,
+read both notes, verify the copy, and pass the copy as `guardNoteId` with its
+`contentHash` as `expectedGuardContentHash`. The copy's revision is re-read just
+before the delete, and its body, lock state, and folder are checked again
+inside the delete AppleScript, with the same fail-closed Recently Deleted test
+as the note being deleted. The guard note must not be a Quick Note, a flag only
+the database holds, so the guard needs Full Disk Access. A copy the database
+has not saved yet passes on the live checks alone. The pair is still not one
+transaction: the rich revision (which also covers checklists and attachments)
+is a pre-check, and the in-script check covers the body and state Notes.app
+exposes. `requireActiveNoteId` is the narrower form for a destination you
+wrote yourself rather than copied.
 
 **Example - Using ID (recommended):**
 ```json
@@ -1892,7 +1908,9 @@ It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
 `applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
 `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
 placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
-`audioTranscription`, which need a native helper this server does not ship.
+`audioTranscription`, which need a native *write* helper this server does not
+ship (requirement `native_write_helper`). The opt-in private helper below is
+read-only, so enabling it does not change them: they stay `not_implemented`.
 Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
 `requirements`, `missing`, `unverified`, `tools`, and a machine-readable
 `reason` that is `null` when available and otherwise the first that applies:
@@ -1997,6 +2015,55 @@ not changed.
 
 Retrieves another note's real deep link and appends it with a static label while
 preserving the target note's native objects.
+
+### Private helper (opt-in, unsupported Apple API)
+
+An optional, **read-only** native helper reads note state through Notes' own
+data model (Apple's private NotesShared framework) instead of AppleScript or
+Shortcuts. It is **off by default** and nothing in the rest of the server
+depends on it. It cannot write: every store it opens is opened read-only, and
+write support was deliberately deferred by the maintainer until a second
+writer beside a running Notes.app, CRDT replica identity, and the iCloud
+upload lag are understood.
+Private API can break on any macOS update; see
+[TECHNICAL_NOTES.md](TECHNICAL_NOTES.md#private-helper-notesshared) for the
+API surface, risks, and safety contract.
+
+To use it:
+
+1. Build it on your Mac from the packaged source (needs the Command Line
+   Tools, `xcode-select --install`). No prebuilt binary ships with the package.
+
+   ```bash
+   apple-notes-mcp setup --native-helper          # build, ad-hoc sign, install
+   apple-notes-mcp setup --native-helper --check  # report only
+   ```
+
+2. Set `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` in the server's environment (or in
+   the [config file](#configuration-file-when-the-host-strips-env)).
+3. Give the app that launches the server Full Disk Access, the same grant the
+   database reads already need.
+
+The server checks the helper's recorded source and binary SHA-256 before every
+call and refuses a missing, stale, or modified helper with a machine-readable
+`code`. Rerun setup after upgrading apple-notes-mcp.
+
+#### `native-helper-status`
+
+Reports whether the helper is enabled, built, and current, and runs its live
+probe: macOS and Notes versions, whether NotesShared loads, whether every
+required class, selector, and model property exists, and whether the Notes
+store opens. Each feature reports `available` plus a `reason` code
+(`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`,
+`private_api_unavailable`, `store_unavailable`, …). Read-only; the response
+carries `readOnly: true`.
+
+#### `native-note-state`
+
+Reads one note's native state by Notes UUID (`identifier`) or x-coredata `id`:
+title, modification date, folder identifier, lock/trash/shared/editable
+flags, iCloud version counters, and a `revision` change token (compare two
+reads to detect a change). Opens the store with Core Data's read-only option.
 
 ## Usage Patterns
 
@@ -2138,6 +2205,10 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
+| `APPLE_NOTES_MCP_ENABLE_PRIVATE` | unset | Set to `1` to allow the opt-in [private helper](#private-helper-opt-in-unsupported-apple-api). Any other value keeps it off. |
+| `APPLE_NOTES_MCP_PRIVATE_HELPER_DIR` | `~/Library/Application Support/apple-notes-mcp/private-helper` | Where `setup --native-helper` installs the helper and its checksum manifest. |
+| `APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS` | `20000` (20 s) | Per-call helper timeout. A timed-out write is indeterminate. |
+| `APPLE_NOTES_MCP_PRIVATE_STORE` | unset | Testing only: points the helper at a **copy** of `NoteStore.sqlite`. The helper refuses a path that resolves to the live store. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
 ### Configuration file (when the host strips `env`)

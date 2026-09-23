@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.10.0] - 2026-09-23
+## [2.9.3] - 2026-09-23
 
 ### Added
 
@@ -29,7 +29,7 @@
   `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, which remains the default for
   other calls.
 
-## [2.9.0] - 2026-09-23
+## [2.9.2] - 2026-09-23
 
 ### Added
 
@@ -54,6 +54,54 @@
   per-call timeout.
 - `scripts/test-public-helper.mjs` checks an installed helper against the
   synthetic PencilKit fixture used by the unit tests.
+
+## [2.9.1] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). The guard's revision is re-read just before the delete, and
+  its body, lock state, and folder are checked again inside the delete
+  AppleScript, with the same fail-closed Recently Deleted test as the note
+  being deleted. `requireActiveNoteId` requires a second note to stay active
+  without fingerprinting its content. The Quick Note check reads the database,
+  so the guard needs Full Disk Access; a guard note the database has not saved
+  yet passes on the live checks. The pair is not one transaction.
+
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- Opt-in, **read-only** native private helper (#181, #204, thanks
+  @oliverames). A small Objective-C program, shipped as source in
+  `native/private-helper/` and built on the user's Mac with
+  `apple-notes-mcp setup --native-helper`, opens the Notes store through
+  Apple's private NotesShared model and speaks a versioned JSON protocol with
+  a fixed action list (`hello`, `probe`, `read_note_state`). It is off unless
+  `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`, and the server checks the helper's
+  source and binary SHA-256 before every call. Two tools:
+  - `native-helper-status`: build and opt-in state plus a live probe of the
+    framework, required selectors, model properties, and store access, with
+    a reason code.
+  - `native-note-state`: a note's native title, dates, flags, iCloud version
+    counters, and an opaque change token.
+- The helper is read-only by construction: every store it opens uses
+  `NSReadOnlyPersistentStoreOption` with migration disabled, it refuses to
+  continue if Core Data reports a writable store, no code path saves a
+  context, and setup refuses to install a helper that does not report
+  `readOnly: true` or offers any action outside the read-only whitelist. A
+  source test fails the build if a save or write path reappears. Helper
+  errors use the shared `code`/`committed` error envelope (#185).
+- Write support was deliberately deferred by the maintainer. The proposed
+  `native-append-plain-text` action was removed before merge: a second writer
+  beside a running Notes.app, CRDT replica identity, and the iCloud upload lag
+  (a helper-written change was not uploaded until Notes.app next saved that
+  note) are unresolved. The capability matrix's write-dependent placeholders
+  (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`)
+  stay `not_implemented`; their requirement is now labelled
+  `native_write_helper`.
 
 ## [2.8.49] - 2026-09-23
 

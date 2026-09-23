@@ -34,14 +34,20 @@ export type Requirement =
   | { kind: "full_disk_access" }
   | { kind: "shortcuts_cli" }
   | { kind: "shortcut"; name: () => string }
-  | { kind: "native_helper" };
+  /**
+   * A native helper that can WRITE to Notes. None ships: the opt-in private
+   * helper (native-helper-status) is read-only, and write support was
+   * deliberately deferred by the maintainer (#181, #204). Always unmet.
+   */
+  | { kind: "native_write_helper" };
 
 /**
  * Machine-readable reasons, in the order they are checked. `reason` is the
  * first one that applies, or `null` when the feature is available.
  *
  * - `unsupported_platform`: not running on macOS.
- * - `not_implemented`: the server has no implementation for this feature yet.
+ * - `not_implemented`: the server has no implementation for this feature yet (every feature
+ *   that needs a native write helper; the opt-in private helper is read-only).
  * - `unknown_os_version`: the feature has a macOS floor and the version could not be read.
  * - `requires_macos_<major>`: the running macOS is older than the feature's floor.
  * - `full_disk_access_missing`: the Notes database is not readable by this process.
@@ -209,35 +215,37 @@ export const FEATURES: FeatureDefinition[] = [
       { kind: "shortcut", name: markdownShortcutName },
     ],
   },
-  // Placeholders for features that need a native helper this server does not
-  // ship. They always report `not_implemented` so clients can detect them.
+  // Placeholders for features that need a native WRITE helper, which this
+  // server does not ship. The opt-in private helper is read-only (write
+  // support was deliberately deferred), so enabling or installing it changes
+  // nothing here: these always report `not_implemented`.
   {
     name: "checklistToggle",
     description: "Check or uncheck an existing checklist item in place",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }],
+    requirements: [{ kind: "native_write_helper" }],
   },
   {
     name: "smartFolders",
     description: "Create or edit Smart Folders and their tag rules",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }],
+    requirements: [{ kind: "native_write_helper" }],
   },
   {
     name: "paragraphLinks",
     description: "Link to a specific paragraph or heading inside a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }],
+    requirements: [{ kind: "native_write_helper" }],
   },
   {
     name: "audioTranscription",
     description: "Transcribe audio recordings attached to a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }],
+    requirements: [{ kind: "native_write_helper" }],
   },
 ];
 
@@ -301,7 +309,7 @@ export function evaluateFeature(
           failures.add("shortcut_not_installed");
         }
         break;
-      case "native_helper":
+      case "native_write_helper":
         missing.push(label);
         failures.add("not_implemented");
         break;

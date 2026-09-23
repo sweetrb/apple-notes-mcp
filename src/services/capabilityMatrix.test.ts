@@ -116,8 +116,26 @@ describe("evaluateFeature", () => {
         available: false,
         osSupported: true,
         reason: "not_implemented",
-        missing: ["native_helper"],
+        missing: ["native_write_helper"],
       });
+  });
+
+  it("keeps write-dependent features not_implemented even with the read-only helper enabled", () => {
+    const saved = process.env.APPLE_NOTES_MCP_ENABLE_PRIVATE;
+    process.env.APPLE_NOTES_MCP_ENABLE_PRIVATE = "1";
+    try {
+      for (const f of FEATURES.filter((x) =>
+        x.requirements.some((r) => r.kind === "native_write_helper")
+      ))
+        expect(evaluateFeature(f, env())).toMatchObject({
+          available: false,
+          reason: "not_implemented",
+        });
+      expect(FEATURES.flatMap((f) => f.tools)).not.toContain("native-append-plain-text");
+    } finally {
+      if (saved === undefined) delete process.env.APPLE_NOTES_MCP_ENABLE_PRIVATE;
+      else process.env.APPLE_NOTES_MCP_ENABLE_PRIVATE = saved;
+    }
   });
 
   it("gates the Markdown bridge on macOS 26", () => {
