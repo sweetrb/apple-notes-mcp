@@ -111,6 +111,24 @@ describe("error codes through tool wrappers", () => {
     });
   });
 
+  it("returns paragraph-tool refusals in the envelope with a reason", async () => {
+    // The selector is checked before the Notes database is opened.
+    const r = await call("get-paragraph-link", { id: ID, title: "Synthetic", contains: "x" });
+    expect(r).toEqual({
+      content: [{ type: "text", text: "No paragraph link: Choose exactly one of id or title" }],
+      structuredContent: { code: "validation_error", reason: "invalid-argument" },
+      isError: true,
+    });
+    const list = await call("list-note-paragraphs", { id: ID, folder: "Work" });
+    expect(list.structuredContent).toEqual({
+      code: "validation_error",
+      reason: "invalid-argument",
+    });
+    expect(list.content[0].text).toBe(
+      "Error listing paragraphs: folder only narrows a title lookup"
+    );
+  });
+
   it("leaves success results without an error code", async () => {
     manager.listAccounts.mockReturnValue([{ name: "Synthetic" }]);
     const r = await call("list-accounts", {});
