@@ -59,7 +59,14 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
-import { NoteBlocksError, pageNoteBlocks, readNoteBlocks } from "@/utils/noteBlocks.js";
+import {
+  blocksMaxResponseBytes,
+  NoteBlocksError,
+  pageNoteBlocks,
+  readNoteBlocks,
+} from "@/utils/noteBlocks.js";
+import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
+import { NoteStoreError } from "@/utils/noteStoreSql.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -1098,6 +1105,88 @@ registerTool(
       { id, ...page }
     );
   }, "Error reading note blocks")
+);
+
+// --- list-note-links ---
+
+registerTool(
+  "list-note-links",
+  {
+    description:
+      "Use when: you need the links in one note (by exact id) or across a folder, an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account name (case-insensitive) or account identifier"),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe("Folder name or path such as Work/Clients (escape a literal slash as \\/)"),
+      includeInline: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+        ),
+      kinds: z
+        .array(z.enum(["inline", "card", "note", "section"]))
+        .max(4)
+        .optional()
+        .describe("Only these link kinds"),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(2000)
+        .optional()
+        .describe("Maximum links to return (default 200, max 2000)"),
+    },
+    outputSchema: {
+      scope: z.record(z.unknown()).optional(),
+      inlineIncluded: z.boolean().optional(),
+      notesInScope: z.number().optional(),
+      notesWithoutBody: z.number().optional(),
+      counts: z.record(z.unknown()).optional(),
+      links: z.array(z.record(z.unknown())).optional(),
+      page: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, account, folder, includeInline, kinds, offset, limit }) => {
+    let result;
+    try {
+      result = listNoteLinks({
+        id,
+        account,
+        folder,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes(),
+      });
+    } catch (error) {
+      if (!(error instanceof NoteStoreError)) throw error;
+      const hint =
+        error.code === "no-full-disk-access"
+          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          : "";
+      return errorResponse(`Error listing note links [${error.code}]: ${error.message}${hint}`);
+    }
+    return successResponse(describeLinkInventory(result), { ...result });
+  }, "Error listing note links")
 );
 
 registerTool(

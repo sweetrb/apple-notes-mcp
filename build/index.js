@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join12(output, replacement);
+        return join14(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join12(output, rule.append(self.options));
+          output = join14(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join12(output, replacement) {
+    function join14(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -44211,6 +44211,455 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH4 } = {}) {
   return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
 }
 
+// src/utils/noteLinkInventory.ts
+import { dirname as dirname2 } from "node:path";
+import { existsSync as existsSync9 } from "node:fs";
+
+// src/utils/noteLinks.ts
+import { existsSync as existsSync8, readdirSync, realpathSync as realpathSync2, statSync as statSync3 } from "node:fs";
+import { join as join11, sep as sep2 } from "node:path";
+var NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
+var SAFE_LINK = /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i;
+var isSafeLink2 = (url) => SAFE_LINK.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+function parseNotesShowUrl(url) {
+  const match = /^(?:apple)?notes:\/\/showNote\?(.*)$/i.exec(url);
+  if (!match) return void 0;
+  const query = new URLSearchParams(match[1]);
+  const note = query.get("identifier") ?? "";
+  const paragraph = query.get("paragraphID") ?? "";
+  const result = {};
+  if (UUID.test(note)) result.targetNote = note.toUpperCase();
+  if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
+  return result;
+}
+function inlineLinks(doc) {
+  const links = [];
+  let last;
+  for (const block of doc.blocks)
+    for (const run of block.runs) {
+      if (!run.link) {
+        last = void 0;
+        continue;
+      }
+      if (last && last.url === run.link && last.start + last.length === run.start) {
+        last.length += run.length;
+        last.text += run.text;
+        continue;
+      }
+      last = {
+        kind: "inline",
+        url: run.link,
+        linkSafe: run.linkSafe === true,
+        text: run.text,
+        start: run.start,
+        length: run.length,
+        blockIndex: block.index,
+        ...parseNotesShowUrl(run.link)
+      };
+      links.push(last);
+    }
+  return links;
+}
+function markerPosition(doc, identifier) {
+  if (!doc) return {};
+  const wanted = identifier.toUpperCase();
+  const marker = doc.attachments.find((item) => item.id.toUpperCase() === wanted);
+  return marker ? { start: marker.start, blockIndex: marker.blockIndex, inBody: true } : { inBody: false };
+}
+function nativeLink(row, doc) {
+  if (!row.token) return void 0;
+  const target = parseNotesShowUrl(row.token) ?? {};
+  const kind = target.paragraphId ? "section" : "note";
+  return {
+    kind,
+    url: row.token,
+    linkSafe: isSafeLink2(row.token),
+    ...row.alt ? { text: row.alt } : {},
+    ...markerPosition(doc, row.identifier),
+    ...target,
+    ...kind === "section" && row.alt ? { section: row.alt } : {},
+    attachmentIdentifier: row.identifier
+  };
+}
+function cardLink(row, {
+  doc,
+  noteId: noteId3,
+  previewPath
+} = {}) {
+  if (!row.url) return void 0;
+  return {
+    kind: "card",
+    url: row.url,
+    linkSafe: isSafeLink2(row.url),
+    ...row.title ? { text: row.title } : {},
+    ...markerPosition(doc, row.identifier),
+    ...parseNotesShowUrl(row.url),
+    attachmentIdentifier: row.identifier,
+    ...noteId3 ? { attachmentId: attachmentIdFor(noteId3, row.pk) } : {},
+    ...previewPath !== void 0 ? { previewPath } : {}
+  };
+}
+var attachmentIdFor = (noteId3, pk) => noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
+function rankPreviews(rows) {
+  const area = (row) => (row.width ?? 0) * (row.height ?? 0) * (row.scale ?? 1) ** 2;
+  return [...rows].sort((a, b) => (a.appearance ?? 0) - (b.appearance ?? 0) || area(b) - area(a));
+}
+var SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+var MAX_BUNDLE_ENTRIES = 64;
+function confined(path4, root) {
+  try {
+    const real = realpathSync2(path4);
+    return real.startsWith(root + sep2) ? real : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolvePreviewPath(storeDir, accountIdentifier, previews) {
+  if (!accountIdentifier || !SAFE_COMPONENT.test(accountIdentifier)) return null;
+  const accountDir = join11(storeDir, "Accounts", accountIdentifier);
+  if (!existsSync8(accountDir)) return null;
+  const root = realpathSync2(accountDir);
+  for (const preview of rankPreviews(previews)) {
+    const id2 = preview.identifier;
+    if (!id2 || !SAFE_COMPONENT.test(id2)) continue;
+    const base = join11(accountDir, "Previews", id2);
+    for (const candidate of [`${base}.png`, base]) {
+      const real = confined(candidate, root);
+      if (!real) continue;
+      const stat = statSync3(real);
+      if (stat.isFile()) return real;
+      const inner = stat.isDirectory() ? previewInBundle(real, root) : void 0;
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+function previewInBundle(bundle, root) {
+  const children = readdirSync(bundle).sort();
+  if (children.length > MAX_BUNDLE_ENTRIES) return void 0;
+  for (const child of children) {
+    const file = confined(join11(bundle, child, "Preview.png"), root);
+    if (file && statSync3(file).isFile()) return file;
+  }
+  return void 0;
+}
+
+// src/utils/noteStoreSql.ts
+import { execFileSync as execFileSync9 } from "node:child_process";
+import { homedir as homedir9 } from "node:os";
+import { join as join12 } from "node:path";
+var NOTES_DB_PATH5 = join12(
+  homedir9(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var NoteStoreError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteStoreError";
+    this.code = code;
+  }
+};
+function notePrimaryKey(id2) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteStoreError(
+      "invalid-id",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number>"
+    );
+  return Number(pk);
+}
+function runStoreSql(dbPath2, sql, params = {}) {
+  const args = ["-readonly", "-cmd", ".parameter init"];
+  for (const [name, value] of Object.entries(params)) {
+    if (!/^[a-z]\w*$/i.test(name) || !Number.isSafeInteger(value))
+      throw new NoteStoreError("invalid-argument", "Invalid query parameter");
+    args.push("-cmd", `.parameter set @${name} ${value}`);
+  }
+  let output;
+  try {
+    output = execFileSync9("/usr/bin/sqlite3", [...args, dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 15e3,
+      maxBuffer: 128 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteStoreError("query-failed", "Failed to query the Notes database");
+  }
+  return output.split("\n").filter((line) => line !== "");
+}
+function parseJsonLine(line, fallback) {
+  if (line === void 0 || line === "") return fallback;
+  try {
+    return JSON.parse(line);
+  } catch {
+    throw new NoteStoreError("query-failed", "Unexpected Notes database response");
+  }
+}
+function objectColumns(dbPath2) {
+  const [line] = runStoreSql(
+    dbPath2,
+    "SELECT json_group_array(name) FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  );
+  const names = parseJsonLine(line, []);
+  if (!names.length)
+    throw new NoteStoreError("unsupported-schema", "The Notes database has no object table");
+  return new Set(names);
+}
+function schemaHelpers(columns) {
+  const col = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort();
+  const accountOf = (alias) => accountColumns.length ? `COALESCE(${accountColumns.map((name) => `${alias}.${name}`).join(", ")})` : "NULL";
+  const notDeleted = (alias) => `COALESCE(${col(alias, "ZMARKEDFORDELETION")}, 0) = 0`;
+  return { col, accountOf, notDeleted, has: (name) => columns.has(name) };
+}
+var entity = (name) => {
+  if (!/^IC[A-Za-z]+$/.test(name)) throw new NoteStoreError("invalid-argument", "Invalid entity");
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${name}')`;
+};
+
+// src/utils/noteLinkInventory.ts
+var APPLE_EPOCH_OFFSET = 978307200;
+var BODY_BATCH = 100;
+function splitFolderPath2(path4) {
+  return path4.split(/(?<!\\)\//).map((segment) => segment.replace(/\\\//g, "/")).filter((segment) => segment !== "");
+}
+function folderPaths(folders) {
+  const byPk = new Map(folders.map((f) => [f.pk, f]));
+  const paths = /* @__PURE__ */ new Map();
+  for (const folder of folders) {
+    const parts = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (let f = folder; f && !seen.has(f.pk); f = byPk.get(f.parent ?? -1)) {
+      seen.add(f.pk);
+      parts.unshift((f.title ?? "").replace(/\//g, "\\/"));
+    }
+    paths.set(folder.pk, parts.join("/"));
+  }
+  return paths;
+}
+function matchFolder(folders, wanted, account) {
+  const paths = folderPaths(folders);
+  const segments = splitFolderPath2(wanted);
+  const pool = folders.filter((f) => account === void 0 || f.account === account);
+  const byPath = segments.length === 1 ? pool.filter((f) => f.title === segments[0]) : pool.filter(
+    (f) => splitFolderPath2(paths.get(f.pk)).join("\0") === segments.join("\0")
+  );
+  const matches = byPath.length ? byPath : pool.filter((f) => f.title === wanted);
+  if (!matches.length) throw new NoteStoreError("not-found", `No folder matches "${wanted}"`);
+  if (matches.length > 1)
+    throw new NoteStoreError(
+      "invalid-argument",
+      `Folder "${wanted}" is ambiguous; use one of these paths: ${matches.map((f) => paths.get(f.pk)).join(", ")}`
+    );
+  return { pk: matches[0].pk, path: paths.get(matches[0].pk) };
+}
+function matchAccount(accounts, wanted) {
+  const byId = accounts.filter((a) => a.identifier === wanted);
+  const matches = byId.length ? byId : accounts.filter((a) => (a.name ?? "").toLowerCase() === wanted.toLowerCase());
+  if (!matches.length) throw new NoteStoreError("not-found", `No account matches "${wanted}"`);
+  if (matches.length > 1)
+    throw new NoteStoreError(
+      "invalid-argument",
+      `Account "${wanted}" is ambiguous; pass its identifier instead`
+    );
+  return matches[0];
+}
+function inventorySql(columns) {
+  const { col, accountOf, notDeleted } = schemaHelpers(columns);
+  const scope = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${col("n", "ZFOLDER")}
+    WHERE n.Z_ENT = ${entity("ICNote")} AND (
+      (@note <> 0 AND n.Z_PK = @note) OR
+      (@note = 0 AND ${notDeleted("n")} AND ${col("n", "ZFOLDER")} IS NOT NULL
+        AND ${notDeleted("f")} AND COALESCE(${col("f", "ZFOLDERTYPE")}, 0) <> 1
+        AND (@account = 0 OR ${accountOf("n")} = @account)
+        AND (@folder = 0 OR ${col("n", "ZFOLDER")} = @folder)))`;
+  const cards = `SELECT att.Z_PK FROM ZICCLOUDSYNCINGOBJECT att
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notDeleted("att")}
+      AND ${col("att", "ZURLSTRING")} IS NOT NULL AND att.ZNOTE IN (${scope})`;
+  return {
+    folders: `SELECT json_group_array(json_object('pk', Z_PK, 'title', ${col("x", "ZTITLE2")},
+        'parent', ${col("x", "ZPARENT")}, 'account', ${accountOf("x")}, 'type', ${col("x", "ZFOLDERTYPE")}))
+      FROM ZICCLOUDSYNCINGOBJECT x WHERE x.Z_ENT = ${entity("ICFolder")} AND ${notDeleted("x")};
+      SELECT json_group_array(json_object('pk', Z_PK, 'name', ${col("x", "ZNAME")}, 'identifier', ${col("x", "ZIDENTIFIER")}))
+      FROM ZICCLOUDSYNCINGOBJECT x WHERE x.Z_ENT = ${entity("ICAccount")};
+      SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));`,
+    rows: `SELECT json_group_array(json_object('pk', n.Z_PK, 'identifier', ${col("n", "ZIDENTIFIER")},
+        'title', ${col("n", "ZTITLE1")}, 'folder', ${col("n", "ZFOLDER")}, 'account', ${accountOf("n")},
+        'modified', ${col("n", "ZMODIFICATIONDATE1")}))
+      FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK IN (${scope});
+      SELECT json_group_array(json_object('pk', att.Z_PK, 'note', att.ZNOTE,
+        'identifier', ${col("att", "ZIDENTIFIER")}, 'url', ${col("att", "ZURLSTRING")},
+        'title', ${col("att", "ZTITLE")}, 'account', ${col("acc", "ZIDENTIFIER")}))
+      FROM ZICCLOUDSYNCINGOBJECT att LEFT JOIN ZICCLOUDSYNCINGOBJECT acc ON acc.Z_PK = ${accountOf("att")}
+      WHERE att.Z_PK IN (${cards});
+      SELECT json_group_array(json_object('attachment', ${col("p", "ZATTACHMENT")},
+        'identifier', ${col("p", "ZIDENTIFIER")}, 'width', ${col("p", "ZWIDTH")},
+        'height', ${col("p", "ZHEIGHT")}, 'scale', ${col("p", "ZSCALE")},
+        'appearance', ${col("p", "ZAPPEARANCETYPE")}))
+      FROM ZICCLOUDSYNCINGOBJECT p
+      WHERE p.Z_ENT = ${entity("ICAttachmentPreviewImage")} AND ${notDeleted("p")}
+        AND ${col("p", "ZATTACHMENT")} IN (${cards});
+      SELECT json_group_array(json_object('note', ${col("i", "ZNOTE1")},
+        'identifier', ${col("i", "ZIDENTIFIER")}, 'token', ${col("i", "ZTOKENCONTENTIDENTIFIER")},
+        'alt', ${col("i", "ZALTTEXT")}))
+      FROM ZICCLOUDSYNCINGOBJECT i
+      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notDeleted("i")}
+        AND ${col("i", "ZTYPEUTI1")} = '${NOTE_LINK_UTI}' AND ${col("i", "ZNOTE1")} IN (${scope});`,
+    bodies: `SELECT json_object('note', d.ZNOTE, 'data', hex(d.ZDATA),
+        'encrypted', d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL)
+      FROM ZICNOTEDATA d WHERE d.ZNOTE IN (${scope}) AND d.ZNOTE > @after
+      ORDER BY d.ZNOTE LIMIT ${BODY_BATCH};`
+  };
+}
+function decodeBodies(dbPath2, sql, params) {
+  const docs = /* @__PURE__ */ new Map();
+  let after = 0;
+  for (; ; ) {
+    const lines = runStoreSql(dbPath2, sql, { ...params, after });
+    for (const line of lines) {
+      const row = parseJsonLine(line, {
+        note: 0,
+        data: null,
+        encrypted: 0
+      });
+      after = Math.max(after, row.note);
+      if (row.encrypted || !row.data) continue;
+      try {
+        docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
+      } catch {
+      }
+    }
+    if (lines.length < BODY_BATCH) return docs;
+  }
+}
+var KIND_ORDER = { inline: 0, card: 1, note: 2, section: 3 };
+function listNoteLinks(options = {}) {
+  const { dbPath: dbPath2 = NOTES_DB_PATH5, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
+  if (options.id && (options.account || options.folder))
+    throw new NoteStoreError("invalid-argument", "Pass either id or account/folder, not both");
+  const notePk = options.id ? notePrimaryKey(options.id) : 0;
+  if (!existsSync9(dbPath2))
+    throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+  const columns = objectColumns(dbPath2);
+  const sql = inventorySql(columns);
+  const [folderLine, accountLine, storeLine] = runStoreSql(dbPath2, sql.folders);
+  const folders = parseJsonLine(folderLine, []);
+  const accounts = parseJsonLine(accountLine, []);
+  const storeId = options.id && /^x-coredata:\/\/([^/]+)\//.exec(options.id)[1] || parseJsonLine(storeLine, { uuid: null }).uuid;
+  const paths = folderPaths(folders);
+  const scope = {};
+  let accountPk = 0;
+  let folderPk = 0;
+  if (options.account) {
+    const account = matchAccount(accounts, options.account);
+    accountPk = account.pk;
+    scope.account = account.name;
+    scope.accountIdentifier = account.identifier;
+  }
+  if (options.folder) {
+    const folder = matchFolder(folders, options.folder, accountPk || void 0);
+    folderPk = folder.pk;
+    scope.folder = folders.find((f) => f.pk === folder.pk).title;
+    scope.folderPath = folder.path;
+  }
+  if (options.id) scope.note = options.id;
+  const params = { note: notePk, account: accountPk, folder: folderPk };
+  const [noteLine, cardLine, previewLine, chipLine] = runStoreSql(dbPath2, sql.rows, params);
+  const notes = parseJsonLine(noteLine, []);
+  if (options.id && !notes.length)
+    throw new NoteStoreError("not-found", `No note found for ID "${options.id}"`);
+  const cards = parseJsonLine(cardLine, []);
+  const previews = parseJsonLine(previewLine, []);
+  const chips = parseJsonLine(chipLine, []);
+  const includeInline = options.includeInline ?? Boolean(options.id);
+  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params) : /* @__PURE__ */ new Map();
+  const noteIdOf = (pk) => storeId ? `x-coredata://${storeId}/ICNote/p${pk}` : null;
+  const noteById = new Map(notes.map((note) => [note.pk, note]));
+  const accountById = new Map(accounts.map((account) => [account.pk, account]));
+  const folderById = new Map(folders.map((folder) => [folder.pk, folder]));
+  const source = (pk) => {
+    const note = noteById.get(pk);
+    const account = accountById.get(note.account ?? -1);
+    const folder = folderById.get(note.folder ?? -1);
+    return {
+      noteId: noteIdOf(pk),
+      noteIdentifier: note.identifier,
+      noteTitle: note.title,
+      noteModified: typeof note.modified === "number" ? new Date((note.modified + APPLE_EPOCH_OFFSET) * 1e3).toISOString() : null,
+      folder: folder?.title ?? null,
+      folderPath: folder ? paths.get(folder.pk) : null,
+      account: account?.name ?? null,
+      accountIdentifier: account?.identifier ?? null
+    };
+  };
+  const storeDir = dirname2(dbPath2);
+  const all = [];
+  const add = (pk, link) => all.push({ pk, link: { ...link, ...source(pk) } });
+  for (const [pk, doc] of docs) for (const link of inlineLinks(doc)) add(pk, link);
+  for (const card of cards) {
+    const rows = previews.filter((row) => row.attachment === card.pk);
+    const noteId3 = noteIdOf(card.note);
+    const link = cardLink(
+      { pk: card.pk, identifier: card.identifier ?? "", url: card.url, title: card.title },
+      {
+        doc: docs.get(card.note),
+        ...noteId3 ? { noteId: noteId3 } : {},
+        previewPath: rows.length ? resolvePreviewPath(storeDir, card.account, rows) : null
+      }
+    );
+    if (link) add(card.note, link);
+  }
+  for (const chip of chips) {
+    const link = nativeLink(
+      { identifier: chip.identifier ?? "", token: chip.token, alt: chip.alt },
+      docs.get(chip.note)
+    );
+    if (link) add(chip.note, link);
+  }
+  const wanted = options.kinds?.length ? new Set(options.kinds) : void 0;
+  const links = all.filter(({ link }) => !wanted || wanted.has(link.kind)).sort(
+    (a, b) => (b.link.noteModified ?? "").localeCompare(a.link.noteModified ?? "") || a.pk - b.pk || (a.link.start ?? Number.MAX_SAFE_INTEGER) - (b.link.start ?? Number.MAX_SAFE_INTEGER) || KIND_ORDER[a.link.kind] - KIND_ORDER[b.link.kind]
+  ).map(({ link }) => link);
+  const counts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) counts[link.kind]++;
+  const start = Math.min(Math.max(0, offset), links.length);
+  const page = [];
+  let bytes = 0;
+  for (let i = start; i < links.length && page.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(links[i]));
+    if (page.length && bytes + size > maxBytes) break;
+    page.push(links[i]);
+    bytes += size;
+  }
+  const next = start + page.length;
+  return {
+    scope,
+    inlineIncluded: includeInline,
+    notesInScope: notes.length,
+    notesWithoutBody: includeInline ? notes.length - docs.size : 0,
+    counts,
+    links: page,
+    page: {
+      offset: start,
+      returned: page.length,
+      total: links.length,
+      hasMore: next < links.length,
+      ...next < links.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function describeLinkInventory(result) {
+  const { counts, page } = result;
+  return `Found ${page.total} links in ${result.notesInScope} notes (inline ${counts.inline}${result.inlineIncluded ? "" : " not scanned"}, card ${counts.card}, note ${counts.note}, section ${counts.section}); returned ${page.returned} from offset ${page.offset}` + (page.hasMore ? `; more at offset ${page.nextOffset}` : "") + ".";
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -44224,7 +44673,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join13 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -44338,8 +44787,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join11(directory, basename(path4));
+      const directory = mkdtempSync4(join13(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join13(directory, basename(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44816,9 +45265,9 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync8 } from "node:fs";
+import { existsSync as existsSync10 } from "node:fs";
 import { release } from "node:os";
-import { dirname as dirname2, resolve as resolve2 } from "node:path";
+import { dirname as dirname3, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -44836,12 +45285,12 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync8;
+  const exists = dependencies.exists || existsSync10;
   const open = dependencies.open || ((path4) => {
     const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve2(dirname3(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
@@ -45589,6 +46038,53 @@ registerTool(
   }, "Error reading note blocks")
 );
 registerTool(
+  "list-note-links",
+  {
+    description: "Use when: you need the links in one note (by exact id) or across a folder, an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Account name (case-insensitive) or account identifier"),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder name or path such as Work/Clients (escape a literal slash as \\/)"),
+      includeInline: external_exports.boolean().optional().describe(
+        "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+      ),
+      kinds: external_exports.array(external_exports.enum(["inline", "card", "note", "section"])).max(4).optional().describe("Only these link kinds"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(2e3).optional().describe("Maximum links to return (default 200, max 2000)")
+    },
+    outputSchema: {
+      scope: external_exports.record(external_exports.unknown()).optional(),
+      inlineIncluded: external_exports.boolean().optional(),
+      notesInScope: external_exports.number().optional(),
+      notesWithoutBody: external_exports.number().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, account, folder, includeInline, kinds, offset, limit }) => {
+    let result;
+    try {
+      result = listNoteLinks({
+        id: id2,
+        account,
+        folder,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes()
+      });
+    } catch (error2) {
+      if (!(error2 instanceof NoteStoreError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error listing note links [${error2.code}]: ${error2.message}${hint}`);
+    }
+    return successResponse(describeLinkInventory(result), { ...result });
+  }, "Error listing note links")
+);
+registerTool(
   "list-native-tags",
   {
     description: "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
@@ -45770,10 +46266,10 @@ registerTool(
           return `<div>${escaped || "<br>"}</div>`;
         }).join("");
       };
-      const separatorToHtml = (sep2) => {
-        if (format === "html") return sep2;
-        if (sep2 === "\n\n") return "<div><br></div>";
-        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const separatorToHtml = (sep3) => {
+        if (format === "html") return sep3;
+        if (sep3 === "\n\n") return "<div><br></div>";
+        const escaped = sep3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         return `<div>${escaped}</div>`;
       };
       const snapshot = readExactNoteSnapshot(id2);

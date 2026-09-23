@@ -432,6 +432,55 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `list-note-links`
+
+Lists links, read-only from the NoteStore database, in one note (`id`) or
+across a `folder`, an `account`, or the whole library (no selector). Each link
+has a `kind`:
+
+| Kind | What it is | Where Notes stores it |
+|------|------------|-----------------------|
+| `inline` | A hyperlink on text | Inside the note body |
+| `card` | A rich link preview | An attachment row with the URL and title |
+| `note` | A native link chip to another note | An inline-attachment row with a Notes deep link |
+| `section` | A native link chip to a heading or paragraph | Same, with `paragraphID` in the deep link |
+
+Each row has `url`, `text` (label), `linkSafe`, `targetNote` and `paragraphId`
+for Notes deep links, `section` for section chips, and for cards
+`attachmentId` and `previewPath` (Notes' largest cached preview image, or null
+when Notes has none). Each row also names its source: `noteId`,
+`noteIdentifier`, `noteTitle`, `noteModified`, `folder`, `folderPath`,
+`account`, and `accountIdentifier`. When bodies were decoded, `start` and
+`blockIndex` give the link's position, and `inBody: false` marks a card or chip
+row with no marker left in the body.
+
+Inline links need every body in scope decompressed and decoded, so a folder,
+account, or library scan includes them only with `includeInline: true`
+(slower). A single note always includes them. Scans skip Recently Deleted and
+folderless notes; a note requested by `id` is read wherever it is. Links come
+newest-modified note first, in body order within a note.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | One exact note ID. Do not combine with `account` or `folder` |
+| `account` | string | No | Account name (case-insensitive) or identifier |
+| `folder` | string | No | Folder name (any depth, must be unique) or path from the top level, such as `Work/Clients`; escape a literal slash as `\/` |
+| `includeInline` | boolean | No | Decode bodies for inline links (default true for `id`, false otherwise) |
+| `kinds` | string[] | No | Only these kinds: `inline`, `card`, `note`, `section` |
+| `offset` | number | No | First link to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum links per page (default 200, max 2000) |
+
+The response also reports `counts` per kind, `notesInScope`,
+`notesWithoutBody` (locked, empty or undecodable bodies when inline links were
+requested), and `page`. A page stops early to stay under
+`APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`. Errors carry a stable code in brackets,
+such as `[not-found]`, or `[invalid-argument]` for an ambiguous folder name
+(the message lists the matching paths).
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags used within one explicit `account` and `folder`,
@@ -1362,7 +1411,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. A [`list-note-links`](#list-note-links) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
@@ -1391,7 +1440,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-links`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

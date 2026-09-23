@@ -270,6 +270,39 @@ The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Eac
 
 Tables and collaborative editing use Conflict-Free Replicated Data Types (CRDTs). Apple uses "topotext" for synchronization with first-write-wins conflict resolution via iCloud.
 
+### Link Storage and Card Previews (verified 2026-09-23, macOS 27.2)
+
+`src/utils/noteLinks.ts` and `src/utils/noteLinkInventory.ts` (the
+`list-note-links` tool) read these. Counts come from a read-only survey of one
+live library (843 note rows, 448 of them outside Recently Deleted and with a
+folder); no content was recorded.
+
+| Kind | Storage | Survey |
+|---|---|---|
+| inline | AttributeRun field 9 on the text run, inside the note body | 330 in the 448 active notes |
+| card | `ICAttachment` with `ZTYPEUTI = 'public.url'`; destination in `ZURLSTRING`, card title in `ZTITLE` | 39, every one with both |
+| note / section | `ICInlineAttachment` with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.link'`; URL in `ZTOKENCONTENTIDENTIFIER`, chip label in `ZALTTEXT`. A section chip's URL carries `paragraphID` | 0 (from the Core Data model, not observed) |
+
+Entity numbers differ between OS releases, so `Z_ENT` is looked up by class
+name in `Z_PRIMARYKEY`. Each entity keeps its account in a different
+`ZACCOUNT<n>` column, so the reader coalesces all of them. The store part of an
+`x-coredata://<store>/ICNote/p<n>` id is `Z_METADATA.Z_UUID`.
+
+**Notes deep links.** Notes.app registers the `notes` and `applenotes` URL
+schemes, its binary holds the literal `applenotes://showNote?identifier=`, and
+the URL handler's query-key strings include `identifier` and `paragraphID`
+(next to the selector `appURLForNote:paragraphID:`). A section target is
+therefore `applenotes://showNote?identifier=<NOTE-UUID>&paragraphID=<PARAGRAPH-UUID>`.
+
+**Card previews.** Each `ICAttachmentPreviewImage` row points at its
+attachment through `ZATTACHMENT` and records `ZWIDTH`, `ZHEIGHT`, `ZSCALE`
+and `ZAPPEARANCETYPE` (0 light, 1 dark). Its `ZIDENTIFIER`
+(`<attachment-uuid>-<n>-<W>x<H>-<n>`) names the rendition under
+`Accounts/<account-identifier>/Previews/`, either as a flat `<id>.png` file or
+as a bundle directory holding `<n>_<uuid>/Preview.png`. The reader picks the
+largest light rendition and checks only those named paths, so it never lists
+the Previews directory. 38 of 39 cards resolved to a file.
+
 ---
 
 ## Alternative Approaches

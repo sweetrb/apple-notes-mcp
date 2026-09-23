@@ -1,5 +1,26 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `list-note-links` lists links in one note (by exact id), or across a
+  folder, an account or the whole library, read-only from the NoteStore
+  database. Each link has a `kind`: `inline` (a hyperlink on text), `card` (a
+  rich link preview), `note` (a native link chip to another note) or
+  `section` (a native link chip to a heading or paragraph). Rows carry the
+  URL, label, `linkSafe`, target note and paragraph UUIDs parsed from Notes
+  deep links, the card's `previewPath` (Notes' largest cached rendition), and
+  the source `noteId`, note title and modification date, folder path and
+  account. Inline links need every body in scope decoded, so a folder,
+  account or library scan includes them only with `includeInline: true`.
+  Results page with `offset`/`limit` and can be filtered by `kinds`.
+- `src/utils/noteLinks.ts` (link kinds, Notes deep-link parsing, attachment
+  kinds, preview resolution) and `src/utils/noteStoreSql.ts` (read-only,
+  integer-bound, schema-tolerant sqlite3 access).
+- TECHNICAL_NOTES.md documents where Notes stores each link kind and how
+  card previews map to files.
+
 ### Fixed
 
 - The server no longer cuts off a large response when the client closes

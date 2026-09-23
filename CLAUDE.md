@@ -189,6 +189,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `link` is the stored URL; check `linkSafe` before emitting it into HTML
 - Read-only view: do not build a full-body update from it
 
+### list-note-links
+- Lists links with `kind` (`inline`, `card`, `note`, `section`) in one note (`id`), a `folder`, an `account`, or the whole library, each with its source note id, title, folder path and account
+- Requires Full Disk Access. Folder, account and library scans skip inline links unless `includeInline: true` (it decodes every body in scope); `counts.inline` is 0 then, which does not mean there are none
+- A bare folder name must be unique; on `[invalid-argument]` retry with one of the paths the message lists
+- `previewPath` on a card is Notes' cached preview image; it is null when Notes has not rendered one
+- Page with `offset: page.nextOffset` while `page.hasMore` is true
+- Check `linkSafe` before emitting a link into HTML
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.
