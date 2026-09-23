@@ -20,6 +20,21 @@
   is inserted but reported as uncertain on macOS 27, because AppleScript does
   not list PDF attachments.
 
+### Fixed
+
+- `add-attachment` (and `create-note-with-attachment`) can verify a PDF on
+  macOS 27 (#236). The attachment was created, but Notes' AppleScript never
+  lists PDF attachments there, so every PDF attach ended "insertion outcome
+  uncertain" and a caller that retried got duplicates. When AppleScript shows
+  no new attachment and Full Disk Access is available, the tool now reads the
+  note's attachment rows from the read-only NoteStore database: it reports
+  success, with `verifiedBy: "database"`, only when exactly one new
+  top-level row appeared for that note and its media file matches the source
+  bytes. A new row whose bytes do not match is an error that names the
+  attachment and says not to attach the file again. With no new row, or
+  without Full Disk Access, the result stays uncertain; the no-access message
+  now says why. Thanks to @oliverames for the diagnosis.
+
 ## [2.9.8] - 2026-09-23
 
 ### Added

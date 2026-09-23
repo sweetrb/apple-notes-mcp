@@ -1873,6 +1873,14 @@ fetched attachment bytes with the source before reporting success.
 that exact name. A mismatch is a warning (`filenameWarning`), not a failure,
 because the attachment and its bytes are already verified.
 
+On macOS 27, Notes' AppleScript does not list PDF attachments, so it cannot see
+a PDF this tool just added. When that happens and the server has Full Disk
+Access, it verifies through the read-only NoteStore database instead: success
+requires exactly one new attachment row on the note whose media file matches
+the source bytes, and the result carries `verifiedBy: "database"`. Without Full
+Disk Access a PDF attach reports "insertion outcome uncertain"; read the note
+before retrying, because the attachment was probably created.
+
 ---
 
 #### `create-note-with-attachment`
