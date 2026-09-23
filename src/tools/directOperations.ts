@@ -21,6 +21,7 @@ import {
 } from "../utils/noteIdentifiers.js";
 import { errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
+import { attachmentCoreDataId, type AttachmentAssetRecord } from "../utils/attachmentAssets.js";
 import {
   enrichNoteRead,
   linkSignature,
@@ -180,7 +181,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
 
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
@@ -277,6 +278,84 @@ export function attachmentName(path: string, filename?: string): string {
   return filename;
 }
 
+const UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const sha256 = (data: Buffer) => createHash("sha256").update(data).digest("hex");
+
+/**
+ * Identifiers of a note's top-level attachment rows in NoteStore, or null when
+ * the database cannot be read (no Full Disk Access, or any other failure).
+ */
+function storedAttachmentIds(manager: AppleNotesManager, id: string): Set<string> | null {
+  try {
+    return new Set(
+      manager
+        .getAttachmentAssetsById(id)
+        .attachments.filter((item) => item.parentIdentifier === null)
+        .map((item) => item.identifier.toLowerCase())
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find the one attachment row this insertion added to the note in NoteStore
+ * and check its media file against the source bytes (#236). Notes' AppleScript
+ * on macOS 27 never lists PDF attachments, so this is the only way to see a
+ * new PDF. Returns null when no new row appears; throws when a row appears but
+ * its bytes cannot be verified, so the caller does not attach a duplicate.
+ */
+function storedInsertion(
+  manager: AppleNotesManager,
+  id: string,
+  before: Set<string>,
+  bytes: Buffer,
+  returnedId: string | undefined
+): { attachmentId: string; name: string | null } | null {
+  let added: AttachmentAssetRecord[] = [];
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) pause(250);
+    try {
+      added = manager
+        .getAttachmentAssetsById(id)
+        .attachments.filter(
+          (item) => item.parentIdentifier === null && !before.has(item.identifier.toLowerCase())
+        );
+    } catch {
+      added = [];
+    }
+    if (added.length === 1 && added[0].assetPaths.length > 0) break;
+  }
+  if (added.length === 0) return null;
+  if (added.length > 1) throw new Error(UNCERTAIN);
+  const row = added[0];
+  const attachmentId = attachmentCoreDataId(id, row.pk);
+  if (returnedId && /\/ICAttachment\/p\d+$/.test(returnedId) && returnedId !== attachmentId)
+    throw new Error(UNCERTAIN);
+  const expected = sha256(bytes);
+  const matches = row.assetPaths.some((path) => {
+    // One descriptor for the size check and the read, so both see the same file.
+    let descriptor: number | undefined;
+    try {
+      descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const stat = fstatSync(descriptor);
+      return (
+        stat.isFile() && stat.size === bytes.length && sha256(readFileSync(descriptor)) === expected
+      );
+    } catch {
+      return false;
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+  });
+  if (!matches)
+    throw new Error(
+      `Notes' database shows new attachment ${attachmentId} on this note, but its file bytes could not be verified; read the exact note and do not attach the file again`
+    );
+  return { attachmentId, name: row.filename };
+}
+
 /** Insert one verified local file into an exact, unchanged note. */
 function attachFile(
   manager: AppleNotesManager,
@@ -288,6 +367,8 @@ function attachFile(
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path);
   const beforeAttachments = manager.listAttachmentsById(id);
+  // Taken only to verify through the database if AppleScript cannot (#236).
+  const beforeStored = storedAttachmentIds(manager, id);
   const directory = mkdtempSync(join(tmpdir(), "notes-attachment-add-"));
   const temporaryFile = join(directory, name);
   try {
@@ -312,32 +393,47 @@ function attachFile(
       attempt < 4 && (inserted.length !== 1 || (returnedId && returnedId !== inserted[0].id));
       attempt++
     ) {
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      pause(250);
       inserted = readInserted();
     }
     const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
-    if (inserted.length !== 1 || (persistentReturnedId && returnedId !== inserted[0].id))
-      throw new Error(
-        "Attachment insertion outcome uncertain; read the exact note before retrying"
-      );
-    const attachmentId = inserted[0].id;
-    const fetched = manager.getAttachmentBase64ById(id, attachmentId);
-    const actual =
-      typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-    if (
-      !actual ||
-      createHash("sha256").update(actual).digest("hex") !==
-        createHash("sha256").update(bytes).digest("hex")
-    )
-      throw new Error("Attachment bytes were not verified; read the exact note before retrying");
-    const nameVerified = inserted[0].name === name;
+    let attachmentId: string;
+    let reportedName: string | null;
+    let verifiedBy: "applescript" | "database" = "applescript";
+    if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
+      attachmentId = inserted[0].id;
+      reportedName = inserted[0].name;
+      const fetched = manager.getAttachmentBase64ById(id, attachmentId);
+      const actual =
+        typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+      if (!actual || sha256(actual) !== sha256(bytes))
+        throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+    } else {
+      // AppleScript saw nothing usable. On macOS 27 it never lists a PDF
+      // attachment, so check the read-only NoteStore database instead.
+      const stored =
+        inserted.length === 0 && beforeStored
+          ? storedInsertion(manager, id, beforeStored, bytes, returnedId)
+          : null;
+      if (!stored)
+        throw new Error(
+          inserted.length === 0 && !beforeStored
+            ? `${UNCERTAIN}. Notes' AppleScript does not list some attachments (PDFs on macOS 27); grant Full Disk Access so the server can verify through the Notes database`
+            : UNCERTAIN
+        );
+      attachmentId = stored.attachmentId;
+      reportedName = stored.name;
+      verifiedBy = "database";
+    }
+    const nameVerified = reportedName === name;
     return {
       ok: true,
       id,
       attachmentId,
       contentHash: after.hash,
       bytes: bytes.length,
-      name: inserted[0].name,
+      name: reportedName,
+      ...(verifiedBy === "database" ? { verifiedBy } : {}),
       ...(args.filename === undefined
         ? {}
         : {

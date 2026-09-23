@@ -77,7 +77,7 @@ Use this skill when the user:
 | Tool                          | Purpose                                                                                                                                             |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list-attachments`            | List attachments in a note; `includePaths` adds on-disk `assetPaths`/`previewPath`, `firstImage` returns the lead visual in body order              |
-| `add-attachment`              | Attach one local file to an exact note (optional `filename` renames it in Notes)                                                                    |
+| `add-attachment`              | Attach one local file to an exact note (`filename` renames it); a macOS 27 PDF "outcome uncertain": read the note before retrying                   |
 | `create-note-with-attachment` | Create a note and attach one local file in one call; on a failed attach, reuse the named note id with `add-attachment`                              |
 | `save-attachment`             | Save an attachment to disk                                                                                                                          |
 | `list-paper-attachments`      | List Paper and classic drawings in a note, with Notes' rendered image size and any recognized handwriting text                                      |

@@ -51463,7 +51463,7 @@ function registerDirectOperations(server2, manager) {
   };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
@@ -51532,6 +51532,56 @@ function attachmentName(path10, filename) {
     );
   return filename;
 }
+var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
+var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+var sha256 = (data) => createHash2("sha256").update(data).digest("hex");
+function storedAttachmentIds(manager, id2) {
+  try {
+    return new Set(
+      manager.getAttachmentAssetsById(id2).attachments.filter((item) => item.parentIdentifier === null).map((item) => item.identifier.toLowerCase())
+    );
+  } catch {
+    return null;
+  }
+}
+function storedInsertion(manager, id2, before, bytes, returnedId) {
+  let added = [];
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) pause(250);
+    try {
+      added = manager.getAttachmentAssetsById(id2).attachments.filter(
+        (item) => item.parentIdentifier === null && !before.has(item.identifier.toLowerCase())
+      );
+    } catch {
+      added = [];
+    }
+    if (added.length === 1 && added[0].assetPaths.length > 0) break;
+  }
+  if (added.length === 0) return null;
+  if (added.length > 1) throw new Error(UNCERTAIN);
+  const row = added[0];
+  const attachmentId = attachmentCoreDataId(id2, row.pk);
+  if (returnedId && /\/ICAttachment\/p\d+$/.test(returnedId) && returnedId !== attachmentId)
+    throw new Error(UNCERTAIN);
+  const expected = sha256(bytes);
+  const matches = row.assetPaths.some((path10) => {
+    let descriptor;
+    try {
+      descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+      const stat = fstatSync5(descriptor);
+      return stat.isFile() && stat.size === bytes.length && sha256(readFileSync3(descriptor)) === expected;
+    } catch {
+      return false;
+    } finally {
+      if (descriptor !== void 0) closeSync5(descriptor);
+    }
+  });
+  if (!matches)
+    throw new Error(
+      `Notes' database shows new attachment ${attachmentId} on this note, but its file bytes could not be verified; read the exact note and do not attach the file again`
+    );
+  return { attachmentId, name: row.filename };
+}
 function attachFile(manager, args) {
   const { id: id2, expectedContentHash, path: path10 } = args;
   const name = attachmentName(path10, args.filename);
@@ -51539,6 +51589,7 @@ function attachFile(manager, args) {
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
+  const beforeStored = storedAttachmentIds(manager, id2);
   const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
   const temporaryFile = join22(directory, name);
   try {
@@ -51558,27 +51609,39 @@ function attachFile(manager, args) {
     );
     let inserted = readInserted();
     for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      pause(250);
       inserted = readInserted();
     }
     const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
-    if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
-      throw new Error(
-        "Attachment insertion outcome uncertain; read the exact note before retrying"
-      );
-    const attachmentId = inserted[0].id;
-    const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
-    const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-    if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
-      throw new Error("Attachment bytes were not verified; read the exact note before retrying");
-    const nameVerified = inserted[0].name === name;
+    let attachmentId;
+    let reportedName;
+    let verifiedBy = "applescript";
+    if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
+      attachmentId = inserted[0].id;
+      reportedName = inserted[0].name;
+      const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
+      const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+      if (!actual || sha256(actual) !== sha256(bytes))
+        throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+    } else {
+      const stored = inserted.length === 0 && beforeStored ? storedInsertion(manager, id2, beforeStored, bytes, returnedId) : null;
+      if (!stored)
+        throw new Error(
+          inserted.length === 0 && !beforeStored ? `${UNCERTAIN}. Notes' AppleScript does not list some attachments (PDFs on macOS 27); grant Full Disk Access so the server can verify through the Notes database` : UNCERTAIN
+        );
+      attachmentId = stored.attachmentId;
+      reportedName = stored.name;
+      verifiedBy = "database";
+    }
+    const nameVerified = reportedName === name;
     return {
       ok: true,
       id: id2,
       attachmentId,
       contentHash: after.hash,
       bytes: bytes.length,
-      name: inserted[0].name,
+      name: reportedName,
+      ...verifiedBy === "database" ? { verifiedBy } : {},
       ...args.filename === void 0 ? {} : {
         filenameVerified: nameVerified,
         ...nameVerified ? {} : {
@@ -53000,7 +53063,7 @@ function canonicalJson(value) {
     return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(",")}}`;
   return JSON.stringify(value);
 }
-function sha256(text2) {
+function sha2562(text2) {
   return createHash4("sha256").update(text2).digest("hex");
 }
 var round = (v, digits) => {
@@ -53840,7 +53903,7 @@ function analysisFor(source, analyzer, viewport) {
   const classification = !importable || requiredLosses.includes("drop-content") ? "unsupported" : requiredLosses.length ? "lossy" : "safe";
   const analysis = {
     analyzer: SVG_ANALYZER_VERSION,
-    source: { sha256: sha256(source), bytes: source.length },
+    source: { sha256: sha2562(source), bytes: source.length },
     classification,
     importable,
     defaultWriteAllowed: importable && classification === "safe",
@@ -53861,7 +53924,7 @@ function analysisFor(source, analyzer, viewport) {
     issues: analyzer.issues,
     issuesTruncated: analyzer.issuesTruncated
   };
-  const analysisDigest = "sha256:" + sha256(canonicalJson({ analysis, drawing }));
+  const analysisDigest = "sha256:" + sha2562(canonicalJson({ analysis, drawing }));
   return { analysis: { ...analysis, analysisDigest }, drawing };
 }
 function analyzeSvgBuffer(source) {
