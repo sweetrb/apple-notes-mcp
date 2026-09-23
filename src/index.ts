@@ -60,6 +60,14 @@ import {
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
+import {
+  IN_TRASH_MESSAGE,
+  revisionConflictMessage,
+  runGuardedNoteDelete,
+  trashFolderIdsFor,
+  type GuardedDeleteDeps,
+} from "@/tools/guardedDelete.js";
+import { readIsQuickNote, readTrashFolderPks } from "@/utils/noteGuardStore.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
   registerNativeOperations,
@@ -244,9 +252,14 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
 
-function revisionConflictMessage(title: string): string {
-  return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
-}
+/** Live dependencies for the guarded note delete (delete-note, batch-delete-notes). */
+const guardedDeleteDeps: GuardedDeleteDeps = {
+  readSnapshot: readExactNoteSnapshot,
+  deleteIfUnchanged: (id, body, options) =>
+    notesManager.deleteNoteByIdIfUnchanged(id, body, options),
+  readTrashFolderPks: () => readTrashFolderPks(),
+  readIsQuickNote: (pk) => readIsQuickNote(pk),
+};
 
 /**
  * Common schema for operations requiring a folder name.
@@ -1418,10 +1431,29 @@ registerTool(
   "delete-note",
   {
     description:
-      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
+      "Use when: moving one exact note to Recently Deleted after reading and reviewing it, optionally only while a second note (a verified copy or destination) is still intact.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. A note already in Recently Deleted is refused unless permanent is true, because deleting it again removes it for good. For copy-then-retire, pass guardNoteId and expectedGuardContentHash: both revisions are re-read just before the delete, and the guard note's body, lock state, and folder are checked again inside the delete script. The pair is still not one transaction.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note (for example the verified copy) that must still match expectedGuardContentHash and be active: unlocked, outside Recently Deleted, not a Quick Note"
+        ),
+      expectedGuardContentHash: expectedContentHashInput
+        .optional()
+        .describe("get-note-content contentHash for guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted"
+        ),
+      permanent: z
+        .boolean()
+        .optional()
+        .describe(
+          "Allow deleting a note that is already in Recently Deleted, which removes it permanently. Pass true only when the user explicitly asked for permanent deletion"
+        ),
     },
     outputSchema: {
       ok: z.boolean().optional(),
@@ -1429,38 +1461,21 @@ registerTool(
       title: z.string().optional(),
       wasShared: z.boolean().optional(),
       previousContentHash: z.string().optional(),
+      permanent: z.boolean().optional(),
+      guardNoteId: z.string().optional(),
+      guardContentHash: z.string().optional(),
+      requireActiveNoteId: z.string().optional(),
     },
   },
-  withErrorHandling(({ id, expectedContentHash }) => {
-    const snapshot = readExactNoteSnapshot(id);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
+  withErrorHandling((args) => {
+    const result = runGuardedNoteDelete(guardedDeleteDeps, args);
+    if ("error" in result) return errorResponse(result.error);
 
-    const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
-      );
-    }
-
-    const sharedWarning = snapshot.note.shared
+    const sharedWarning = result.wasShared
       ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
       : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
-        id,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash,
-      }
-    );
+    const action = result.permanent ? "Note permanently deleted" : "Note moved to Recently Deleted";
+    return successResponse(`${action}: "${result.title}"${sharedWarning}`, result);
   }, "Error deleting note")
 );
 
@@ -2092,7 +2107,7 @@ registerTool(
   "batch-delete-notes",
   {
     description:
-      "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
+      "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict. A note already in Recently Deleted is refused (deleting it again would be permanent); use delete-note with permanent: true for that.",
     inputSchema: {
       notes: z
         .array(
@@ -2117,18 +2132,23 @@ registerTool(
     }
 
     // Guard each note independently. The manager performs the decisive body
-    // comparison and delete atomically for each exact ID.
+    // comparison, the Recently Deleted check, and the delete atomically for
+    // each exact ID.
+    const trashFolderIds = trashFolderIdsFor(notes[0].id, guardedDeleteDeps);
     const results = notes.map(({ id, expectedContentHash }) => {
       const snapshot = readExactNoteSnapshot(id);
       if ("error" in snapshot) return { id, success: false, error: snapshot.error };
       if (snapshot.contentHash !== expectedContentHash) {
         return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
-      const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body);
+      const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body, {
+        trashFolderIds,
+      });
       if (result.status === "deleted") return { id, success: true };
       if (result.status === "conflict") {
         return { id, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
+      if (result.status === "in_trash") return { id, success: false, error: IN_TRASH_MESSAGE };
       return { id, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;

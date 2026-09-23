@@ -3268,8 +3268,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path5) {
+          if (!path5) return path5;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path5.length > 0) {
+            if (path5 === "." || path5 === "..") {
+              path5 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path5.substring(0, 2);
+            var threechars = path5.substring(0, 3);
+            var fourchars = path5.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path5 = path5.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path5 = path5.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path5 = "/" + path5.substring(3);
+            } else if (twochars === "/." && path5.length === 2) {
+              path5 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path5.length === 3) {
+              path5 = "/" + path5.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path5.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path5 = path5.substring(segment.length);
             }
           }
           return output;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -39855,8 +39855,8 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path4) {
-  return realpathSync.native(path4);
+function canonicalize(path5) {
+  return realpathSync.native(path5);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -39878,9 +39878,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path4) {
+function entryExists(path5) {
   try {
-    lstatSync(path4);
+    lstatSync(path5);
     return true;
   } catch (e) {
     const code = e.code;
@@ -40741,26 +40741,66 @@ var AppleNotesManager = class {
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
    */
-  deleteNoteByIdIfUnchanged(id2, expectedBody) {
+  deleteNoteByIdIfUnchanged(id2, expectedBody, options = {}) {
     const safeId = sanitizeNoteId(id2);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const trashIds = (options.trashFolderIds ?? []).map((folderId) => {
+      if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId))
+        throw new Error("Invalid trash folder id");
+      return `"${folderId}"`;
+    });
+    const trashList = `{${trashIds.join(", ")}}`;
+    const inTrash = (container) => `(class of ${container} is not folder) or ((id of ${container}) is in ${trashList}) or ((name of ${container}) is "Recently Deleted")`;
+    const sourceTrashCheck = options.allowPermanent ? `
+      set srcContainer to container of noteRef
+      set deletedResult to "SAFETY_DELETED"
+      if ${inTrash("srcContainer")} then set deletedResult to "SAFETY_DELETED:permanent"` : `
+      set srcContainer to container of noteRef
+      if ${inTrash("srcContainer")} then return "SAFETY_IN_TRASH"
+      set deletedResult to "SAFETY_DELETED"`;
+    const activeChecks = (options.activeNotes ?? []).map((active, index2) => {
+      const safeActiveId = sanitizeNoteId(active.id);
+      const ref = `activeRef${index2}`;
+      const bodyCheck = active.expectedBody === void 0 ? "" : (() => {
+        validateLength(active.expectedBody, MAX_CONTENT_LENGTH, "Expected guard content");
+        const safeGuardBody = escapeHtmlForAppleScript(active.expectedBody);
+        return `
+      considering case
+        set guardBody to body of ${ref}
+        if guardBody is not "${safeGuardBody}" and guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index2}"
+      end considering`;
+      })();
+      return `
+      if not (exists note id "${safeActiveId}") then return "SAFETY_GUARD_INACTIVE:${index2}:missing"
+      set ${ref} to note id "${safeActiveId}"
+      if password protected of ${ref} then return "SAFETY_GUARD_INACTIVE:${index2}:locked"
+      set activeContainer to container of ${ref}
+      if ${inTrash("activeContainer")} then return "SAFETY_GUARD_INACTIVE:${index2}:in Recently Deleted"${bodyCheck}`;
+    }).join("");
     const script = buildAppLevelScript(`
-      set noteRef to note id "${safeId}"
+      set noteRef to note id "${safeId}"${sourceTrashCheck}${activeChecks}
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
-      return "SAFETY_DELETED"
+      return deletedResult
     `);
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       console.error(`Failed guarded delete for note ID "${id2}":`, result.error);
       return { status: "failed" };
     }
-    const status = result.output.trim();
+    const [status, index, reason] = result.output.trim().split(":");
+    if (status === "SAFETY_DELETED" && index === "permanent")
+      return { status: "deleted", permanent: true };
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_TRASH") return { status: "in_trash" };
+    if (status === "SAFETY_GUARD_CONFLICT")
+      return { status: "guard_conflict", index: Number(index) };
+    if (status === "SAFETY_GUARD_INACTIVE")
+      return { status: "guard_inactive", index: Number(index), reason: reason ?? "inactive" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
   /**
@@ -42831,9 +42871,9 @@ function runNativeTagsShortcut(input) {
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
   const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
-    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    const path5 = join7(directory, "request.json");
+    writeFileSync(path5, JSON.stringify(input), { mode: 384 });
+    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path5], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -43255,7 +43295,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+  const segments = (path5) => JSON.stringify(splitFolderPath(path5).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -43451,11 +43491,11 @@ function fileConfigPath(env = process.env) {
   if (override && override.trim()) return override.trim();
   return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path5 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync6(path4)) return applied;
-    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (!existsSync6(path5)) return applied;
+    const parsed = JSON.parse(readFileSync2(path5, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -43465,7 +43505,7 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path4}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path5}: ${String(e)}`);
   }
   return applied;
 }
@@ -43804,9 +43844,9 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path4) {
-  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+function localAttachment(path5) {
+  if (!isAbsolute2(path5)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync(path5, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
@@ -43875,13 +43915,13 @@ function registerDirectOperations(server2, manager) {
     "add-attachment",
     "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
     { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
+    ({ id: id2, expectedContentHash, path: path5 }) => {
       const before = readSnapshot(manager, id2);
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
+      const bytes = localAttachment(path5);
       const beforeAttachments = manager.listAttachmentsById(id2);
       const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const temporaryFile = join10(directory, basename(path5));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -43930,6 +43970,172 @@ function registerDirectOperations(server2, manager) {
       }
     }
   );
+}
+
+// src/tools/guardedDelete.ts
+function revisionConflictMessage(title) {
+  return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
+}
+var IN_TRASH_MESSAGE = "This note is already in Recently Deleted, so deleting it again would remove it permanently. Pass permanent: true only when the user explicitly asked for permanent deletion.";
+function trashFolderIdsFor(noteId3, deps) {
+  const store = /^(x-coredata:\/\/[0-9a-f-]+)\//i.exec(noteId3)?.[1];
+  if (!store) return [];
+  try {
+    return deps.readTrashFolderPks().map((pk) => `${store}/ICFolder/p${pk}`);
+  } catch {
+    return [];
+  }
+}
+function notePk(id2) {
+  return Number(/\/p(\d+)$/.exec(id2)?.[1]);
+}
+function assertNotQuickNote(label, id2, deps) {
+  let quick;
+  try {
+    quick = deps.readIsQuickNote(notePk(id2));
+  } catch (error2) {
+    return `${label} note could not be checked: ${error2 instanceof Error ? error2.message : String(error2)}`;
+  }
+  if (quick === null) return `${label} note is not in the local Notes store yet; try again shortly`;
+  if (quick) return `${label} note is a Quick Note; a destination must be an ordinary note`;
+  return null;
+}
+function runGuardedNoteDelete(deps, args) {
+  const { id: id2, expectedContentHash, guardNoteId, expectedGuardContentHash, requireActiveNoteId } = args;
+  if (guardNoteId === void 0 !== (expectedGuardContentHash === void 0))
+    return { error: "Pass guardNoteId and expectedGuardContentHash together" };
+  if (guardNoteId === id2 || requireActiveNoteId === id2)
+    return { error: "A guard note must be a different note from the one being deleted" };
+  if (guardNoteId !== void 0 && guardNoteId === requireActiveNoteId)
+    return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId" };
+  for (const [label, guardId] of [
+    ["Guard", guardNoteId],
+    ["Required active", requireActiveNoteId]
+  ]) {
+    if (!guardId) continue;
+    const refusal = assertNotQuickNote(label, guardId, deps);
+    if (refusal) return { error: refusal };
+  }
+  const trashFolderIds = trashFolderIdsFor(id2, deps);
+  const snapshot = deps.readSnapshot(id2);
+  if ("error" in snapshot) return { error: snapshot.error };
+  if (snapshot.contentHash !== expectedContentHash)
+    return { error: revisionConflictMessage(snapshot.note.title) };
+  const activeNotes = [];
+  const labels = [];
+  let guardContentHash;
+  if (guardNoteId) {
+    const guard = deps.readSnapshot(guardNoteId);
+    if ("error" in guard) return { error: `Guard note: ${guard.error}` };
+    if (guard.contentHash !== expectedGuardContentHash)
+      return {
+        error: `Guard note "${guard.note.title}" changed after it was read; verify the copy again before retiring the original`
+      };
+    guardContentHash = guard.contentHash;
+    activeNotes.push({ id: guardNoteId, expectedBody: guard.body });
+    labels.push("Guard");
+  }
+  if (requireActiveNoteId) {
+    const active = deps.readSnapshot(requireActiveNoteId);
+    if ("error" in active) return { error: `Required active note: ${active.error}` };
+    activeNotes.push({ id: requireActiveNoteId });
+    labels.push("Required active");
+  }
+  const outcome = deps.deleteIfUnchanged(id2, snapshot.body, {
+    allowPermanent: args.permanent === true,
+    trashFolderIds,
+    activeNotes
+  });
+  switch (outcome.status) {
+    case "deleted":
+      return {
+        ok: true,
+        id: id2,
+        title: snapshot.note.title,
+        wasShared: snapshot.note.shared ?? false,
+        previousContentHash: expectedContentHash,
+        permanent: outcome.permanent === true,
+        ...guardNoteId ? { guardNoteId, guardContentHash } : {},
+        ...requireActiveNoteId ? { requireActiveNoteId } : {}
+      };
+    case "conflict":
+      return { error: revisionConflictMessage(snapshot.note.title) };
+    case "in_trash":
+      return { error: IN_TRASH_MESSAGE };
+    case "guard_conflict":
+      return {
+        error: `${labels[outcome.index] ?? "Guard"} note changed just before the delete; nothing was deleted`
+      };
+    case "guard_inactive":
+      return {
+        error: `${labels[outcome.index] ?? "Guard"} note is no longer active (${outcome.reason}); nothing was deleted`
+      };
+    default:
+      return {
+        error: `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
+      };
+  }
+}
+
+// src/utils/noteGuardStore.ts
+import { execFileSync as execFileSync8 } from "child_process";
+import * as os4 from "os";
+import * as path4 from "path";
+var NOTE_STORE_PATH = path4.join(
+  os4.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var NoteGuardStoreError = class extends Error {
+  constructor(message, reason) {
+    super(message);
+    this.reason = reason;
+    this.name = "NoteGuardStoreError";
+  }
+  reason;
+};
+var TRASH_FOLDERS_SQL = `SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT
+WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder')
+  AND ZFOLDERTYPE = 1
+ORDER BY Z_PK;`;
+var QUICK_NOTE_SQL = `SELECT coalesce(ZISSYSTEMPAPER, 0) FROM ZICCLOUDSYNCINGOBJECT
+WHERE Z_PK = @pk
+  AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote');`;
+var NOTE_EXISTS_SQL = `SELECT 0 FROM ZICCLOUDSYNCINGOBJECT
+WHERE Z_PK = @pk
+  AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote');`;
+function runSqlite2(dbPath2, sql, pk) {
+  const args = ["-readonly"];
+  if (pk !== void 0) args.push("-cmd", `.parameter set @pk ${pk}`);
+  args.push(dbPath2, sql);
+  try {
+    return execFileSync8("sqlite3", args, {
+      encoding: "utf8",
+      timeout: 5e3,
+      stdio: ["pipe", "pipe", "pipe"]
+    }).trim();
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database|not authorized/i.test(message)) {
+      throw new NoteGuardStoreError(
+        "Full Disk Access is required to check this guard. Grant it to the app that launches this server, then relaunch it.",
+        "no_fda"
+      );
+    }
+    throw new NoteGuardStoreError(`Failed to read the Notes store: ${message}`, "query_error");
+  }
+}
+function readTrashFolderPks(dbPath2 = NOTE_STORE_PATH) {
+  const out = runSqlite2(dbPath2, TRASH_FOLDERS_SQL);
+  return out.split("\n").map((line) => Number(line.trim())).filter((pk) => Number.isSafeInteger(pk) && pk > 0);
+}
+function readIsQuickNote(pk, dbPath2 = NOTE_STORE_PATH) {
+  if (!Number.isSafeInteger(pk) || pk <= 0)
+    throw new NoteGuardStoreError("Note key must be a positive integer", "query_error");
+  const columns = runSqlite2(dbPath2, "PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);");
+  const hasColumn = columns.split("\n").some((line) => line.split("|")[1] === "ZISSYSTEMPAPER");
+  const out = runSqlite2(dbPath2, hasColumn ? QUICK_NOTE_SQL : NOTE_EXISTS_SQL, pk);
+  if (out === "") return null;
+  return out === "1";
 }
 
 // src/tools/nativeTagsBridge.ts
@@ -44379,15 +44585,15 @@ var shortcutFiles = [
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
   const exists = dependencies.exists || existsSync7;
-  const open = dependencies.open || ((path4) => {
-    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+  const open = dependencies.open || ((path5) => {
+    const result = spawnSync2("/usr/bin/open", [path5], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path4 = resolve2(baseDirectory, file);
+    const path5 = resolve2(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -44403,9 +44609,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else if (!exists(path5)) error2 = `Packaged Shortcut is missing: ${path5}`;
       else {
-        const result = open(path4);
+        const result = open(path5);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -44414,7 +44620,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path4,
+      file: path5,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -44523,9 +44729,12 @@ function readExactNoteSnapshot(id2) {
   const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
 }
-function revisionConflictMessage(title) {
-  return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
-}
+var guardedDeleteDeps = {
+  readSnapshot: readExactNoteSnapshot,
+  deleteIfUnchanged: (id2, body, options) => notesManager.deleteNoteByIdIfUnchanged(id2, body, options),
+  readTrashFolderPks: () => readTrashFolderPks(),
+  readIsQuickNote: (pk) => readIsQuickNote(pk)
+};
 var folderNameSchema = {
   name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER),
   account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
@@ -45375,45 +45584,39 @@ registerTool(
 registerTool(
   "delete-note",
   {
-    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved.",
+    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it, optionally only while a second note (a verified copy or destination) is still intact.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. A note already in Recently Deleted is refused unless permanent is true, because deleting it again removes it for good. For copy-then-retire, pass guardNoteId and expectedGuardContentHash: both revisions are re-read just before the delete, and the guard note's body, lock state, and folder are checked again inside the delete script. The pair is still not one transaction.",
     inputSchema: {
       id: noteIdInput,
-      expectedContentHash: expectedContentHashInput
+      expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput.optional().describe(
+        "A second note (for example the verified copy) that must still match expectedGuardContentHash and be active: unlocked, outside Recently Deleted, not a Quick Note"
+      ),
+      expectedGuardContentHash: expectedContentHashInput.optional().describe("get-note-content contentHash for guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput.optional().describe(
+        "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted"
+      ),
+      permanent: external_exports.boolean().optional().describe(
+        "Allow deleting a note that is already in Recently Deleted, which removes it permanently. Pass true only when the user explicitly asked for permanent deletion"
+      )
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
       id: external_exports.string().optional(),
       title: external_exports.string().optional(),
       wasShared: external_exports.boolean().optional(),
-      previousContentHash: external_exports.string().optional()
+      previousContentHash: external_exports.string().optional(),
+      permanent: external_exports.boolean().optional(),
+      guardNoteId: external_exports.string().optional(),
+      guardContentHash: external_exports.string().optional(),
+      requireActiveNoteId: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id: id2, expectedContentHash }) => {
-    const snapshot = readExactNoteSnapshot(id2);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
-      );
-    }
-    const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
-        id: id2,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash
-      }
-    );
+  withErrorHandling((args) => {
+    const result = runGuardedNoteDelete(guardedDeleteDeps, args);
+    if ("error" in result) return errorResponse(result.error);
+    const sharedWarning = result.wasShared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
+    const action = result.permanent ? "Note permanently deleted" : "Note moved to Recently Deleted";
+    return successResponse(`${action}: "${result.title}"${sharedWarning}`, result);
   }, "Error deleting note")
 );
 registerTool(
@@ -45891,7 +46094,7 @@ ${attachmentList}`,
 registerTool(
   "batch-delete-notes",
   {
-    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
+    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict. A note already in Recently Deleted is refused (deleting it again would be permanent); use delete-note with permanent: true for that.",
     inputSchema: {
       notes: external_exports.array(
         external_exports.object({
@@ -45911,17 +46114,21 @@ registerTool(
     if (notes.length === 0) {
       return errorResponse("No reviewed notes provided");
     }
+    const trashFolderIds = trashFolderIdsFor(notes[0].id, guardedDeleteDeps);
     const results = notes.map(({ id: id2, expectedContentHash }) => {
       const snapshot = readExactNoteSnapshot(id2);
       if ("error" in snapshot) return { id: id2, success: false, error: snapshot.error };
       if (snapshot.contentHash !== expectedContentHash) {
         return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
-      const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body);
+      const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body, {
+        trashFolderIds
+      });
       if (result.status === "deleted") return { id: id2, success: true };
       if (result.status === "conflict") {
         return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
+      if (result.status === "in_trash") return { id: id2, success: false, error: IN_TRASH_MESSAGE };
       return { id: id2, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;

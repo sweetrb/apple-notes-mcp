@@ -147,6 +147,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
+### delete-note
+- A note already in Recently Deleted is refused: deleting it again removes it permanently. Pass `permanent: true` only when the user explicitly asked for that. `batch-delete-notes` always refuses such notes.
+- Copy-then-retire: after copying note A to note B and verifying B, read both with `get-note-content`, then call `delete-note` on A with `guardNoteId` = B and `expectedGuardContentHash` = B's `contentHash`. The delete stops if B changed, was locked, moved to Recently Deleted, or is a Quick Note. It is a guard, not a transaction.
+- `requireActiveNoteId` only requires the other note to stay active; it does not fingerprint its content.
+
 ### search-notes
 - Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive

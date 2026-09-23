@@ -32,6 +32,8 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  GuardedDeleteOptions,
+  GuardedDeleteOutcome,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -1492,19 +1494,65 @@ export class AppleNotesManager {
    */
   deleteNoteByIdIfUnchanged(
     id: string,
-    expectedBody: string
-  ): { status: "deleted" | "conflict" | "failed" } {
+    expectedBody: string,
+    options: GuardedDeleteOptions = {}
+  ): GuardedDeleteOutcome {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const trashIds = (options.trashFolderIds ?? []).map((folderId) => {
+      if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId))
+        throw new Error("Invalid trash folder id");
+      return `"${folderId}"`;
+    });
+    const trashList = `{${trashIds.join(", ")}}`;
+    // A note trashed earlier in this Notes session reports a non-folder
+    // container; older trashed notes report the Recently Deleted folder, which
+    // the store identifies by type. The name is a last resort when the store
+    // is unreadable.
+    const inTrash = (container: string) =>
+      `(class of ${container} is not folder) or ((id of ${container}) is in ${trashList}) or ((name of ${container}) is "Recently Deleted")`;
+    const sourceTrashCheck = options.allowPermanent
+      ? `
+      set srcContainer to container of noteRef
+      set deletedResult to "SAFETY_DELETED"
+      if ${inTrash("srcContainer")} then set deletedResult to "SAFETY_DELETED:permanent"`
+      : `
+      set srcContainer to container of noteRef
+      if ${inTrash("srcContainer")} then return "SAFETY_IN_TRASH"
+      set deletedResult to "SAFETY_DELETED"`;
+    const activeChecks = (options.activeNotes ?? [])
+      .map((active, index) => {
+        const safeActiveId = sanitizeNoteId(active.id);
+        const ref = `activeRef${index}`;
+        const bodyCheck =
+          active.expectedBody === undefined
+            ? ""
+            : (() => {
+                validateLength(active.expectedBody, MAX_CONTENT_LENGTH, "Expected guard content");
+                const safeGuardBody = escapeHtmlForAppleScript(active.expectedBody);
+                return `
+      considering case
+        set guardBody to body of ${ref}
+        if guardBody is not "${safeGuardBody}" and guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+      end considering`;
+              })();
+        return `
+      if not (exists note id "${safeActiveId}") then return "SAFETY_GUARD_INACTIVE:${index}:missing"
+      set ${ref} to note id "${safeActiveId}"
+      if password protected of ${ref} then return "SAFETY_GUARD_INACTIVE:${index}:locked"
+      set activeContainer to container of ${ref}
+      if ${inTrash("activeContainer")} then return "SAFETY_GUARD_INACTIVE:${index}:in Recently Deleted"${bodyCheck}`;
+      })
+      .join("");
     const script = buildAppLevelScript(`
-      set noteRef to note id "${safeId}"
+      set noteRef to note id "${safeId}"${sourceTrashCheck}${activeChecks}
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
-      return "SAFETY_DELETED"
+      return deletedResult
     `);
     const result = executeMutationAppleScript(script);
 
@@ -1512,8 +1560,15 @@ export class AppleNotesManager {
       console.error(`Failed guarded delete for note ID "${id}":`, result.error);
       return { status: "failed" };
     }
-    const status = result.output.trim();
+    const [status, index, reason] = result.output.trim().split(":");
+    if (status === "SAFETY_DELETED" && index === "permanent")
+      return { status: "deleted", permanent: true };
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_TRASH") return { status: "in_trash" };
+    if (status === "SAFETY_GUARD_CONFLICT")
+      return { status: "guard_conflict", index: Number(index) };
+    if (status === "SAFETY_GUARD_INACTIVE")
+      return { status: "guard_inactive", index: Number(index), reason: reason ?? "inactive" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
 

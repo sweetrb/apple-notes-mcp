@@ -561,9 +561,29 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
+| `guardNoteId` | string | No | A second note (for example a verified copy) that must still be intact |
+| `expectedGuardContentHash` | string | With `guardNoteId` | `contentHash` of the guard note from `get-note-content` |
+| `requireActiveNoteId` | string | No | A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note; its content is not fingerprinted |
+| `permanent` | boolean | No | Allow deleting a note that is already in Recently Deleted, which removes it for good |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
+
+A note that is already in Recently Deleted is refused unless `permanent: true`
+is passed, because deleting it again removes it permanently. The check reads
+the note's live folder from Notes.app inside the delete script, since the local
+database can keep a just-deleted note in its old folder for minutes.
+
+**Copy-then-retire.** To delete an original only while its copy is still good,
+read both notes, verify the copy, and pass the copy as `guardNoteId` with its
+`contentHash` as `expectedGuardContentHash`. Both revisions are re-read just
+before the delete, and the copy's body, lock state, and folder are checked
+again inside the delete script. The guard note must be active: unlocked,
+outside Recently Deleted, and not a Quick Note (this last check needs Full Disk
+Access). The pair is still not one transaction: the rich revision (which also
+covers checklists and attachments) is a pre-check, and the in-script check
+covers the body and state Notes.app exposes. `requireActiveNoteId` is the
+narrower form for a destination you wrote yourself rather than copied.
 
 **Example - Using ID (recommended):**
 ```json
@@ -883,7 +903,9 @@ Deletes multiple notes at once by ID.
 |-----------|------|----------|-------------|
 | `notes` | object[] | Yes | Array of `{id, expectedContentHash}` snapshots to delete (max 500 per request) |
 
-**Returns:** Summary of successes and failures.
+**Returns:** Summary of successes and failures. A note that is already in
+Recently Deleted is reported as a failure, because deleting it again would be
+permanent; use `delete-note` with `permanent: true` when that is intended.
 
 **⚠️ Safety:** Irreversible — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact ids being deleted.
 

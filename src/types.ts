@@ -124,6 +124,34 @@ export interface Note {
 }
 
 /**
+ * Extra in-script guards for `deleteNoteByIdIfUnchanged`.
+ */
+export interface GuardedDeleteOptions {
+  /**
+   * Allow deleting a note that is already in Recently Deleted, which removes
+   * it permanently. Without it such a delete is refused.
+   */
+  allowPermanent?: boolean;
+  /** Exact ids of Recently Deleted folders, read from the local store. */
+  trashFolderIds?: string[];
+  /**
+   * Other notes that must still exist, be unlocked, and be outside Recently
+   * Deleted when the delete runs. With `expectedBody`, the note's body must
+   * also still match (the copy-then-retire guard).
+   */
+  activeNotes?: Array<{ id: string; expectedBody?: string }>;
+}
+
+/**
+ * Outcome of a guarded note delete. `index` points into `activeNotes`.
+ */
+export type GuardedDeleteOutcome =
+  | { status: "deleted"; permanent?: boolean }
+  | { status: "conflict" | "failed" | "in_trash" }
+  | { status: "guard_conflict"; index: number }
+  | { status: "guard_inactive"; index: number; reason: string };
+
+/**
  * Represents a folder in Apple Notes.
  *
  * Folders provide hierarchical organization for notes within an account.

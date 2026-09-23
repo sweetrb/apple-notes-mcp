@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). Both revisions are re-read immediately before the delete, and
+  the second note's body, lock state, and folder are checked again inside the
+  delete AppleScript. `requireActiveNoteId` requires a second note to stay
+  active without fingerprinting its content. The pair is not one transaction.
+
+### Fixed
+
+- `delete-note` and `batch-delete-notes` no longer delete a note that is
+  already in Recently Deleted, which would remove it permanently (#198).
+  `delete-note` allows it only with `permanent: true`. The check runs inside
+  the delete AppleScript against the note's live container, because the local
+  store can keep a just-trashed note in its old folder for minutes; a note
+  trashed in the current Notes session reports a non-folder container, and
+  older trashed notes report the Recently Deleted folder.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
