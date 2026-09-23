@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
 ### Added
 
 - `create-note` with `format: "markdown"` accepts the block constructs Notes'

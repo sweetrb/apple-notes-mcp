@@ -123,9 +123,20 @@ export function renderMarkdown(
       .replace(/(\d+)/g, (_s, i: string) => links[Number(i)])
       .replace(/(\d+)/g, (_s, i: string) => spans[Number(i)]);
   };
+  // Visible text of the markup built above, for readback comparison only. A
+  // character scan drops tags; the result is compared, never emitted as HTML.
+  const withoutTags = (html: string) => {
+    let text = "",
+      inTag = false;
+    for (const ch of html) {
+      if (ch === "<") inTag = true;
+      else if (ch === ">" && inTag) inTag = false;
+      else if (!inTag) text += ch;
+    }
+    return text;
+  };
   const visible = (html: string) =>
-    html
-      .replace(/<[^>]*>/g, "")
+    withoutTags(html)
       .replace(/&quot;/g, '"')
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")

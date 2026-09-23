@@ -42918,7 +42918,16 @@ function renderMarkdown(markdown, options = {}) {
       throw new Error("Unsupported or unbalanced Markdown inline syntax");
     return value.replace(/(\d+)/g, (_s, i) => links[Number(i)]).replace(/(\d+)/g, (_s, i) => spans[Number(i)]);
   };
-  const visible = (html2) => html2.replace(/<[^>]*>/g, "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const withoutTags = (html2) => {
+    let text = "", inTag = false;
+    for (const ch of html2) {
+      if (ch === "<") inTag = true;
+      else if (ch === ">" && inTag) inTag = false;
+      else if (!inTag) text += ch;
+    }
+    return text;
+  };
+  const visible = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
   let html = "", list, quote = false, code, previousBlank = true;
   const close = () => {
     if (list) {
