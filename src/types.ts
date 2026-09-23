@@ -788,3 +788,55 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+// =============================================================================
+// Query Language Types
+// =============================================================================
+
+/**
+ * One note matched by the query-notes tool.
+ */
+export interface QueryNotesHit {
+  /** CoreData note ID, accepted by get-note-content and every other id tool */
+  id: string;
+  /** Note title as stored in the database */
+  title: string;
+  /** Folder path in list-folders syntax; absent for folderless notes */
+  folder?: string;
+  /** Account name; absent when the folder's account cannot be resolved */
+  account?: string;
+  /** Last modification time, ISO 8601 (UTC) */
+  modified?: string;
+  /** Creation time, ISO 8601 (UTC) */
+  created?: string;
+  /** Short plain-text excerpt, centred on the first matched phrase when possible; empty for locked notes */
+  snippet: string;
+  /** Present and true when the note is password-protected */
+  locked?: boolean;
+}
+
+/**
+ * Result of the query-notes tool.
+ */
+export interface QueryNotesResult {
+  /** Matching notes, most recently modified first, at most `limit` */
+  notes: QueryNotesHit[];
+  /** Number of notes returned */
+  count: number;
+  /** Number of scanned notes that matched (may exceed `count`) */
+  matched: number;
+  /** Number of notes examined */
+  scanned: number;
+  /** Notes eligible for scanning (after deleted/folderless exclusion) */
+  eligible: number;
+  /** Scan window applied: the most recently modified N notes */
+  scanLimit: number;
+  /** True when older eligible notes were outside the scan window */
+  scanTruncated: boolean;
+  /** Result cap applied */
+  limit: number;
+  /** True when more notes matched than were returned */
+  truncated: boolean;
+  /** Notes whose body was needed but could not be decoded (locked notes excluded) */
+  unreadable: number;
+}

@@ -160,6 +160,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 |---------|-------------|
 | **Create Notes** | Create notes with titles, content, and optional folder/account targeting |
 | **Search Notes** | Find notes by title or search within note content |
+| **Query Language** | `query-notes` combines text, folder, account, tag, attachment, checklist, flag, word-count, and date conditions with AND/OR/NOT, read from the Notes database (requires Full Disk Access) |
 | **Read Notes** | Retrieve note content and metadata |
 | **Update Notes** | Modify existing notes (title and/or content) |
 | **Delete Notes** | Remove notes (moves to Recently Deleted) |
@@ -344,6 +345,73 @@ Searches for notes by title or content.
 ```
 
 **Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc.
+
+---
+
+#### `query-notes`
+
+Finds notes with a boolean query expression evaluated against the NoteStore
+database, read-only. Because it does not go through AppleScript, a query over
+several hundred notes typically returns in well under a second, and one call
+can match titles and bodies together.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)). Without it, use `search-notes`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Query expression (syntax below), at most 2000 characters |
+| `limit` | number | No | Maximum notes to return. Defaults to 50, maximum 500. The response reports the total match count. |
+| `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 5000. The response says when older notes were left unscanned. |
+| `includeDeleted` | boolean | No | Also scan notes in Recently Deleted, notes pending deletion, and folderless notes. Defaults to `false`. |
+
+**Syntax:**
+
+| Form | Matches |
+|------|---------|
+| `budget`, `"quarterly budget"` | Title or body contains the word or phrase (case-insensitive substring) |
+| `title:x`, `body:x`, `text:x` | Title only, body only (text after the first line), or either |
+| `folder:Work`, `folder:"Work/Clients"` | The note's own folder, by name or full path, case-insensitive (notes in subfolders are not included); a literal `/` in a name can be written `\/` as in `list-folders` |
+| `account:iCloud` | Account name, case-insensitive |
+| `tag:finance` | Native Notes tag (with or without `#`); textual hashtags are ordinary words |
+| `has:link`, `has:attachment`, `has:checklist`, `has:drawing`, `has:image`, `has:video`, `has:audio`, `has:pdf`, `has:table`, `has:scan`, `has:tag` | The note body contains that kind of object |
+| `checklist:open`, `checklist:done` | At least one unchecked item; or items present and all checked |
+| `pinned`, `locked`, `shared` (or `is:pinned` …) | Note flags; `shared` includes notes in a shared folder |
+| `words:>250` | Word count, with `=`, `>`, `>=`, `<`, `<=` |
+| `created:>=2026-07-01`, `modified:<2026-09-01` | Dates as `YYYY-MM-DD` in local time, with the same operators; `=` means that whole day |
+| `a b`, `a AND b`, `a OR b`, `NOT a`, `-a`, `( … )` | AND is implicit and binds tighter than OR |
+
+Operators are case-insensitive. Quote an operator or flag word to search it
+literally, for example `"and"` or `"pinned"`. Queries are capped at 256 tokens
+and 64 levels of nesting. An unknown field such as `titel:x` is an error rather
+than a silent text search; quote it to search the literal text.
+
+Password-protected notes match on title and metadata only. Their bodies are
+encrypted, so body predicates never match them, and `-body:x` therefore does.
+Their snippets are always empty.
+
+**Example - Open to-dos in a folder:**
+```json
+{
+  "query": "folder:\"Work Projects\" has:checklist -checklist:done"
+}
+```
+
+**Example - Invoices or finance-tagged notes since July, scanning more history:**
+```json
+{
+  "query": "(title:invoice OR tag:finance) modified:>=2026-07-01",
+  "scanLimit": 2000,
+  "limit": 20
+}
+```
+
+**Returns:** Matching notes, most recently modified first, each with `id`,
+`title`, `folder`, `account`, `modified`, `created`, and a `snippet` centred on
+the first matched phrase. The ids are the same `x-coredata://…/ICNote/p…` form
+every other tool accepts. `structuredContent` also reports `matched` (total
+matches), `scanned`, `eligible`, `scanTruncated`, `truncated`, and `unreadable`
+(bodies that could not be decoded). A malformed query returns an error naming
+the problem and its position.
 
 ---
 

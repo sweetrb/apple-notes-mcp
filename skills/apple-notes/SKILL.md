@@ -27,6 +27,7 @@ Use this skill when the user:
 |------|---------|
 | `create-note` | Create a new note with title and content |
 | `search-notes` | Find notes by title or content |
+| `query-notes` | Find notes with a boolean expression over text, folders, tags, attachments, checklists, flags, word counts, and dates (reads the database; needs Full Disk Access) |
 | `get-note-content` | Read the full content of a note |
 | `get-note-plaintext` | Read a note's body as plain text (no HTML) |
 | `get-note-markdown` | Read note content as Markdown |
@@ -108,6 +109,33 @@ Action: Use search-notes with query="project"
 User: "Search for notes containing budget information"
 Action: Use search-notes with query="budget" and searchContent=true
 ```
+
+When Full Disk Access is available, prefer `query-notes` for anything beyond a
+single keyword. It matches title or body in one call, runs in well under a
+second, and combines conditions:
+
+```
+User: "Which work notes still have open to-dos?"
+Action: Use query-notes with query='folder:Work checklist:open'
+
+User: "Find invoices or anything tagged finance since July"
+Action: Use query-notes with query='(title:invoice OR tag:finance) modified:>=2026-07-01'
+
+User: "Long notes with a PDF that aren't in Archive"
+Action: Use query-notes with query='words:>250 has:pdf -folder:Archive'
+```
+
+Bare words and "quoted phrases" match title or body. Fields are `title:`,
+`body:`, `text:`, `folder:`, `account:`, and `tag:`; facets are
+`has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`;
+`checklist:open|done`; flags `pinned`, `locked`, `shared`; and `words:`,
+`created:`, `modified:` take `=`, `>`, `>=`, `<`, `<=` with `YYYY-MM-DD` local
+dates. AND is implicit; use `OR`, `NOT` or a leading `-`, and parentheses.
+Quote an operator word (`"and"`) to search it literally. It scans the 500 most
+recently modified notes unless `scanLimit` is raised (max 5000), and the
+response says when older notes were left out. Recently Deleted is excluded
+unless `includeDeleted` is true. Locked notes match on title and metadata only.
+The returned ids work with every id-based tool.
 
 ### Reading Notes
 

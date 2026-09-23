@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `query-notes`, a boolean query language evaluated against the Notes database
+  read-only (#100). Bare words and quoted phrases match title or body in one
+  call; fields `title:`, `body:`, `text:`, `folder:`, `account:`, and `tag:`
+  take quoted values; `has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`,
+  `checklist:open|done`, and the `pinned`, `locked`, and `shared` flags test
+  note structure; `words:`, `created:`, and `modified:` compare with `=`, `>`,
+  `>=`, `<`, `<=` against numbers or local `YYYY-MM-DD` dates. AND is implicit,
+  and `OR`, `NOT`, a leading `-`, and parentheses combine terms. Quoting an
+  operator searches it literally, and an unknown field is an error rather than a
+  silent text search. Queries are capped at 256 tokens and 64 nesting levels.
+  The tool scans the 500 most recently modified notes by default (`scanLimit`
+  up to 5000) and returns up to `limit` notes (default 50, max 500) with id,
+  title, folder path, account, dates, and a snippet, plus the total match count
+  and whether older notes were left unscanned. Recently Deleted and folderless
+  notes are excluded unless `includeDeleted` is set. Locked notes match on
+  title and metadata only. Requires Full Disk Access; the database is never
+  written. A broad body query returns in about a tenth of a second, where
+  `search-notes` with `searchContent: true` can exceed its 30 s timeout.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

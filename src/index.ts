@@ -43,6 +43,14 @@ import { stripLargeInlineImages, strippedImagesWarning } from "@/utils/inlineIma
 import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
 import { resolveSearchLimit, describeSearchLimit } from "@/utils/searchLimit.js";
 import { describeSearchScope } from "@/utils/searchScope.js";
+import { NoteQueryError } from "@/utils/noteQuery.js";
+import {
+  NoteQueryStoreError,
+  QUERY_RESULTS,
+  QUERY_SCAN,
+  queryNotes,
+} from "@/utils/noteQueryStore.js";
+import type { QueryNotesResult } from "@/types.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
@@ -520,6 +528,112 @@ registerTool(
       { notes, count: notes.length }
     );
   }, "Error searching notes")
+);
+
+// --- query-notes ---
+
+registerTool(
+  "query-notes",
+  {
+    description:
+      "Use when: finding notes with a boolean expression over text and metadata — e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\n" +
+      'Syntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\n' +
+      "Returns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\n" +
+      "Do not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\n" +
+      "Safety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.",
+    inputSchema: {
+      query: z
+        .string()
+        .min(1, "A query expression is required")
+        .max(MAX.QUERY)
+        .describe(
+          'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
+        ),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(QUERY_RESULTS.MAX)
+        .optional()
+        .describe(
+          `Maximum notes to return (default ${QUERY_RESULTS.DEFAULT}, max ${QUERY_RESULTS.MAX}). The response reports how many matched in total.`
+        ),
+      scanLimit: z
+        .number()
+        .int()
+        .positive()
+        .max(QUERY_SCAN.MAX)
+        .optional()
+        .describe(
+          `How many of the most recently modified notes to examine (default ${QUERY_SCAN.DEFAULT}, max ${QUERY_SCAN.MAX}). The response says when older notes were left unscanned.`
+        ),
+      includeDeleted: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+        ),
+    },
+    outputSchema: {
+      notes: z.array(z.object({}).passthrough()).optional(),
+      count: z.number().optional(),
+      matched: z.number().optional(),
+      scanned: z.number().optional(),
+      eligible: z.number().optional(),
+      scanLimit: z.number().optional(),
+      scanTruncated: z.boolean().optional(),
+      limit: z.number().optional(),
+      truncated: z.boolean().optional(),
+      unreadable: z.number().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ query, limit, scanLimit, includeDeleted }) => {
+    let result: QueryNotesResult;
+    try {
+      result = queryNotes(query, { limit, scanLimit, includeDeleted });
+    } catch (error) {
+      if (error instanceof NoteQueryError || error instanceof NoteQueryStoreError) {
+        return errorResponse(
+          error instanceof NoteQueryError ? `Invalid query: ${error.message}` : error.message
+        );
+      }
+      throw error;
+    }
+
+    const scope =
+      `scanned ${result.scanned} of ${result.eligible} notes` +
+      (result.scanTruncated
+        ? `, the most recent ${result.scanLimit}; pass a higher scanLimit to include older notes`
+        : "");
+    const notes: string[] = [];
+    if (result.truncated) {
+      notes.push(
+        `ℹ️ ${result.matched} notes matched; showing the first ${result.count}. Pass a higher limit or narrow the query.`
+      );
+    }
+    if (result.unreadable > 0) {
+      notes.push(
+        `⚠️ ${result.unreadable} note bodies could not be decoded, so body predicates did not match them.`
+      );
+    }
+    const footer = notes.length ? `\n\n${notes.join("\n")}` : "";
+
+    if (result.count === 0) {
+      return successResponse(`No notes matched (${scope}).${footer}`, { ...result });
+    }
+    const lines = result.notes
+      .map((n) => {
+        const where = [n.account, n.folder].filter(Boolean).join(" / ");
+        const snippet = n.snippet ? `\n      ${n.snippet}` : "";
+        return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+      })
+      .join("\n");
+    return successResponse(
+      `Found ${result.matched} matching notes (${scope}):\n${lines}${footer}`,
+      { ...result }
+    );
+  }, "Error querying notes")
 );
 
 // --- get-note-content ---

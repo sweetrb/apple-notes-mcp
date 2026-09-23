@@ -3268,8 +3268,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -6883,12 +6883,12 @@ var require_formats = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
-    function fmtDef(validate, compare) {
-      return { validate, compare };
+    function fmtDef(validate, compare2) {
+      return { validate, compare: compare2 };
     }
     exports.fullFormats = {
       // date: http://tools.ietf.org/html/rfc3339#section-5.6
-      date: fmtDef(date3, compareDate),
+      date: fmtDef(date3, compareDate2),
       // date-time: http://tools.ietf.org/html/rfc3339#section-5.6
       time: fmtDef(getTime(true), compareTime),
       "date-time": fmtDef(getDateTime(true), compareDateTime),
@@ -6935,7 +6935,7 @@ var require_formats = __commonJS({
     };
     exports.fastFormats = {
       ...exports.fullFormats,
-      date: fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d$/, compareDate),
+      date: fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d$/, compareDate2),
       time: fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareTime),
       "date-time": fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\dt(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareDateTime),
       "iso-time": fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)?$/i, compareIsoTime),
@@ -6963,7 +6963,7 @@ var require_formats = __commonJS({
       const day = +matches[3];
       return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
     }
-    function compareDate(d1, d2) {
+    function compareDate2(d1, d2) {
       if (!(d1 && d2))
         return void 0;
       if (d1 > d2)
@@ -7040,7 +7040,7 @@ var require_formats = __commonJS({
         return void 0;
       const [d1, t1] = dt1.split(DATE_TIME_SEPARATOR);
       const [d2, t2] = dt2.split(DATE_TIME_SEPARATOR);
-      const res = compareDate(d1, d2);
+      const res = compareDate2(d1, d2);
       if (res === void 0)
         return void 0;
       return res || compareTime(t1, t2);
@@ -7181,12 +7181,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs4, exportName) {
+    function addFormats(ajv, list, fs5, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs4[f]);
+        ajv.addFormat(f, fs5[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path5) {
+          if (!path5) return path5;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path5.length > 0) {
+            if (path5 === "." || path5 === "..") {
+              path5 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path5.substring(0, 2);
+            var threechars = path5.substring(0, 3);
+            var fourchars = path5.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path5 = path5.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path5 = path5.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path5 = "/" + path5.substring(3);
+            } else if (twochars === "/." && path5.length === 2) {
+              path5 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path5.length === 3) {
+              path5 = "/" + path5.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path5.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path5 = path5.substring(segment.length);
             }
           }
           return output;
@@ -24232,10 +24232,10 @@ var require_turndown_cjs = __commonJS({
     }
     var root = typeof window !== "undefined" ? window : {};
     function canParseHTMLNatively() {
-      var Parser = root.DOMParser;
+      var Parser2 = root.DOMParser;
       var canParse = false;
       try {
-        if (new Parser().parseFromString("", "text/html")) {
+        if (new Parser2().parseFromString("", "text/html")) {
           canParse = true;
         }
       } catch (e) {
@@ -24243,15 +24243,15 @@ var require_turndown_cjs = __commonJS({
       return canParse;
     }
     function createHTMLParser() {
-      var Parser = function() {
+      var Parser2 = function() {
       };
       {
         var domino = require_lib();
-        Parser.prototype.parseFromString = function(string3) {
+        Parser2.prototype.parseFromString = function(string3) {
           return domino.createDocument(string3);
         };
       }
-      return Parser;
+      return Parser2;
     }
     var HTMLParser = canParseHTMLNatively() ? root.DOMParser : createHTMLParser();
     function RootNode(input, options) {
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -39855,8 +39855,8 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path4) {
-  return realpathSync.native(path4);
+function canonicalize(path5) {
+  return realpathSync.native(path5);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -39878,9 +39878,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path4) {
+function entryExists(path5) {
   try {
-    lstatSync(path4);
+    lstatSync(path5);
     return true;
   } catch (e) {
     const code = e.code;
@@ -42726,14 +42726,797 @@ function describeSearchScope(searchContent, resultCount) {
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
 
+// src/utils/noteQuery.ts
+var QUERY_LIMITS = {
+  /** Maximum number of tokens (terms, operators, parentheses). */
+  MAX_TOKENS: 256,
+  /** Maximum nesting depth of parentheses and NOT operators combined. */
+  MAX_DEPTH: 64
+};
+var FACETS = [
+  "link",
+  "attachment",
+  "checklist",
+  "drawing",
+  "image",
+  "video",
+  "audio",
+  "pdf",
+  "table",
+  "scan",
+  "tag"
+];
+var FLAGS = ["pinned", "locked", "shared"];
+var NoteQueryError = class extends Error {
+  constructor(message, position) {
+    super(position === void 0 ? message : `${message} (at position ${position + 1})`);
+    this.position = position;
+    this.name = "NoteQueryError";
+  }
+  position;
+};
+var FIELDS = /* @__PURE__ */ new Set([
+  "title",
+  "body",
+  "text",
+  "folder",
+  "account",
+  "tag",
+  "has",
+  "is",
+  "checklist",
+  "words",
+  "created",
+  "modified"
+]);
+function readQuoted(input, start) {
+  let value = "";
+  let i = start + 1;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === "\\" && (input[i + 1] === '"' || input[i + 1] === "\\")) {
+      value += input[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === '"') return [value, i + 1];
+    value += ch;
+    i++;
+  }
+  throw new NoteQueryError("Unterminated quoted phrase", start);
+}
+var isSpace = (ch) => /\s/u.test(ch);
+function tokenize(input) {
+  const tokens = [];
+  const push = (token) => {
+    if (tokens.length >= QUERY_LIMITS.MAX_TOKENS) {
+      throw new NoteQueryError(
+        `Query has more than ${QUERY_LIMITS.MAX_TOKENS} tokens; simplify it`,
+        token.pos
+      );
+    }
+    tokens.push(token);
+  };
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (isSpace(ch)) {
+      i++;
+      continue;
+    }
+    if (ch === "(" || ch === ")") {
+      push({ kind: ch === "(" ? "lparen" : "rparen", pos: i });
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      const [value, next] = readQuoted(input, i);
+      push({ kind: "term", pos: i, value, quoted: true });
+      i = next;
+      continue;
+    }
+    if (ch === "-" && i + 1 < input.length && !isSpace(input[i + 1]) && input[i + 1] !== ")") {
+      push({ kind: "not", pos: i });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < input.length && !isSpace(input[j]) && !'()"'.includes(input[j])) j++;
+    const word = input.slice(i, j);
+    const colon = word.indexOf(":");
+    if (colon > 0) {
+      const prefix = word.slice(0, colon);
+      const field = prefix.toLowerCase();
+      let value = word.slice(colon + 1);
+      if (FIELDS.has(field)) {
+        let quoted = false;
+        if (value === "" && input[j] === '"') {
+          [value, j] = readQuoted(input, j);
+          quoted = true;
+        }
+        push({ kind: "term", pos: i, field, value, quoted });
+        i = j;
+        continue;
+      }
+      if (/^[a-z]+$/i.test(prefix) && !value.startsWith("//")) {
+        throw new NoteQueryError(
+          `Unknown field "${prefix}:". Known fields: ${[...FIELDS].join(", ")}. Quote the term to search it literally`,
+          i
+        );
+      }
+    }
+    const upper = word.toUpperCase();
+    if (upper === "AND" || upper === "OR" || upper === "NOT") {
+      push({ kind: upper.toLowerCase(), pos: i });
+    } else {
+      push({ kind: "term", pos: i, value: word, quoted: false });
+    }
+    i = j;
+  }
+  return tokens;
+}
+var COMPARE_RE = /^(>=|<=|>|<|=)?(.*)$/s;
+function splitComparison(value) {
+  const match = COMPARE_RE.exec(value);
+  return [match[1] ?? "=", match[2]];
+}
+function parseLocalDate(text, pos) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) {
+    throw new NoteQueryError(`Expected a date as YYYY-MM-DD, got "${text}"`, pos);
+  }
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const start = new Date(year, month - 1, day);
+  if (start.getFullYear() !== year || start.getMonth() !== month - 1 || start.getDate() !== day) {
+    throw new NoteQueryError(`"${text}" is not a valid calendar date`, pos);
+  }
+  return { start: start.getTime(), end: new Date(year, month - 1, day + 1).getTime() };
+}
+function termNode(token) {
+  const { field, value, quoted, pos } = token;
+  if (field === void 0) {
+    if (value === "") throw new NoteQueryError("Empty quoted phrase", pos);
+    const lower2 = value.toLowerCase();
+    if (!quoted && FLAGS.includes(lower2)) {
+      return { type: "flag", flag: lower2 };
+    }
+    return { type: "text", field: "any", value };
+  }
+  if (value === "") throw new NoteQueryError(`"${field}:" needs a value`, pos);
+  const lower = value.toLowerCase();
+  switch (field) {
+    case "title":
+    case "body":
+      return { type: "text", field, value };
+    case "text":
+      return { type: "text", field: "any", value };
+    case "folder":
+    case "account":
+      return { type: field, value };
+    case "tag": {
+      const tag = value.replace(/^#/, "");
+      if (!tag) throw new NoteQueryError(`"tag:" needs a tag name`, pos);
+      return { type: "tag", value: tag };
+    }
+    case "has":
+      if (!FACETS.includes(lower)) {
+        throw new NoteQueryError(
+          `Unknown facet "has:${value}". Supported: ${FACETS.map((f) => `has:${f}`).join(", ")}`,
+          pos
+        );
+      }
+      return { type: "has", facet: lower };
+    case "is":
+      if (!FLAGS.includes(lower)) {
+        throw new NoteQueryError(`Unknown flag "is:${value}". Supported: ${FLAGS.join(", ")}`, pos);
+      }
+      return { type: "flag", flag: lower };
+    case "checklist":
+      if (lower !== "open" && lower !== "done") {
+        throw new NoteQueryError(`"checklist:" accepts open or done, got "${value}"`, pos);
+      }
+      return { type: "checklist", state: lower };
+    case "words": {
+      const [op, number3] = splitComparison(value);
+      if (!/^\d{1,9}$/.test(number3)) {
+        throw new NoteQueryError(`"words:" needs a whole number, e.g. words:>250`, pos);
+      }
+      return { type: "words", op, value: Number(number3) };
+    }
+    case "created":
+    case "modified": {
+      const [op, date3] = splitComparison(value);
+      return { type: "date", field, op, date: date3, ...parseLocalDate(date3, pos) };
+    }
+  }
+  throw new NoteQueryError(`Unknown field "${field}:"`, pos);
+}
+var Parser = class {
+  constructor(tokens, length) {
+    this.tokens = tokens;
+    this.length = length;
+  }
+  tokens;
+  length;
+  index = 0;
+  depth = 0;
+  parse() {
+    if (this.tokens.length === 0) throw new NoteQueryError("Query is empty");
+    const node = this.parseOr();
+    const extra = this.peek();
+    if (extra) {
+      throw new NoteQueryError(
+        extra.kind === "rparen" ? "Unmatched closing parenthesis" : "Unexpected token",
+        extra.pos
+      );
+    }
+    return node;
+  }
+  peek() {
+    return this.tokens[this.index];
+  }
+  enter(pos) {
+    this.depth++;
+    if (this.depth > QUERY_LIMITS.MAX_DEPTH) {
+      throw new NoteQueryError(
+        `Query nests deeper than ${QUERY_LIMITS.MAX_DEPTH} levels; simplify it`,
+        pos
+      );
+    }
+  }
+  missingOperand(after) {
+    const next = this.peek();
+    throw new NoteQueryError(`${after} needs a search term after it`, next?.pos ?? this.length);
+  }
+  parseOr() {
+    const children = [this.parseAnd()];
+    while (this.peek()?.kind === "or") {
+      this.index++;
+      children.push(this.parseAnd());
+    }
+    return children.length === 1 ? children[0] : { type: "or", children };
+  }
+  parseAnd() {
+    const children = [this.parseUnary()];
+    for (; ; ) {
+      const next = this.peek();
+      if (next?.kind === "and") {
+        this.index++;
+        children.push(this.parseUnary());
+      } else if (next && (next.kind === "term" || next.kind === "not" || next.kind === "lparen")) {
+        children.push(this.parseUnary());
+      } else {
+        break;
+      }
+    }
+    return children.length === 1 ? children[0] : { type: "and", children };
+  }
+  parseUnary() {
+    const token = this.peek();
+    if (token?.kind === "not") {
+      this.index++;
+      this.enter(token.pos);
+      const child = this.parseUnary();
+      this.depth--;
+      return { type: "not", child };
+    }
+    return this.parsePrimary();
+  }
+  parsePrimary() {
+    const token = this.peek();
+    if (!token) {
+      const previous2 = this.tokens[this.index - 1];
+      this.missingOperand(previous2 ? previous2.kind.toUpperCase().replace("LPAREN", "(") : "Query");
+    }
+    if (token.kind === "lparen") {
+      this.index++;
+      this.enter(token.pos);
+      if (this.peek()?.kind === "rparen") {
+        throw new NoteQueryError("Empty parentheses", token.pos);
+      }
+      const node = this.parseOr();
+      if (this.peek()?.kind !== "rparen") {
+        throw new NoteQueryError("Missing closing parenthesis", token.pos);
+      }
+      this.index++;
+      this.depth--;
+      return node;
+    }
+    if (token.kind === "term") {
+      this.index++;
+      return termNode(token);
+    }
+    if (token.kind === "rparen") {
+      throw new NoteQueryError("Unexpected closing parenthesis", token.pos);
+    }
+    const previous = this.tokens[this.index - 1];
+    if (!previous || previous.kind === "lparen") {
+      throw new NoteQueryError(
+        `${token.kind.toUpperCase()} needs a search term before it`,
+        token.pos
+      );
+    }
+    this.missingOperand(previous.kind === "term" ? "Operator" : previous.kind.toUpperCase());
+  }
+};
+function parseNoteQuery(input) {
+  return new Parser(tokenize(input), input.length).parse();
+}
+function normalizeForMatch(text) {
+  return text.normalize("NFC").replace(/[\ufffc\u00a0]/gu, " ").toLowerCase();
+}
+function needsContent(node) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.some(needsContent);
+    case "not":
+      return needsContent(node.child);
+    case "text":
+      return node.field !== "title";
+    case "tag":
+    case "has":
+    case "checklist":
+    case "words":
+      return true;
+    default:
+      return false;
+  }
+}
+function needsTags(node) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.some(needsTags);
+    case "not":
+      return needsTags(node.child);
+    case "tag":
+      return true;
+    case "has":
+      return node.facet === "tag";
+    default:
+      return false;
+  }
+}
+function compare(actual, op, expected) {
+  switch (op) {
+    case "=":
+      return actual === expected;
+    case ">":
+      return actual > expected;
+    case ">=":
+      return actual >= expected;
+    case "<":
+      return actual < expected;
+    case "<=":
+      return actual <= expected;
+  }
+}
+function compareDate(actual, node) {
+  if (actual === void 0) return false;
+  switch (node.op) {
+    case "=":
+      return actual >= node.start && actual < node.end;
+    case ">":
+      return actual >= node.end;
+    case ">=":
+      return actual >= node.start;
+    case "<":
+      return actual < node.start;
+    case "<=":
+      return actual < node.end;
+  }
+}
+var orderCache = /* @__PURE__ */ new WeakMap();
+function cheapFirst(children) {
+  let ordered = orderCache.get(children);
+  if (!ordered) {
+    ordered = [...children].sort((a, b) => Number(needsContent(a)) - Number(needsContent(b)));
+    orderCache.set(children, ordered);
+  }
+  return ordered;
+}
+function evaluateNoteQuery(node, note) {
+  switch (node.type) {
+    case "and":
+      return cheapFirst(node.children).every((child) => evaluateNoteQuery(child, note));
+    case "or":
+      return cheapFirst(node.children).some((child) => evaluateNoteQuery(child, note));
+    case "not":
+      return !evaluateNoteQuery(node.child, note);
+    case "text": {
+      const needle = normalizeForMatch(node.value);
+      if (node.field === "title") return note.titleLower.includes(needle);
+      if (node.field === "any" && note.titleLower.includes(needle)) return true;
+      const content = note.content();
+      if (!content) return false;
+      return (node.field === "body" ? content.bodyLower : content.textLower).includes(needle);
+    }
+    case "folder":
+      return note.folderKeys.includes(normalizeForMatch(node.value));
+    case "account":
+      return note.accountLower === normalizeForMatch(node.value);
+    case "flag":
+      return note[node.flag];
+    case "date":
+      return compareDate(node.field === "created" ? note.created : note.modified, node);
+    case "tag": {
+      const content = note.content();
+      return Boolean(content?.tags.includes(normalizeForMatch(node.value)));
+    }
+    case "has":
+      return Boolean(note.content()?.facets.has(node.facet));
+    case "checklist": {
+      const content = note.content();
+      if (!content || content.checklist.total === 0) return false;
+      return node.state === "open" ? content.checklist.open > 0 : content.checklist.open === 0;
+    }
+    case "words": {
+      const content = note.content();
+      return content ? compare(content.words, node.op, node.value) : false;
+    }
+  }
+}
+function positiveTextTerms(node, negated = false) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.flatMap((child) => positiveTextTerms(child, negated));
+    case "not":
+      return positiveTextTerms(node.child, !negated);
+    case "text":
+      return negated ? [] : [node.value];
+    default:
+      return [];
+  }
+}
+
+// src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync6 } from "child_process";
+import * as fs4 from "fs";
+import * as os4 from "os";
+import * as path4 from "path";
+import { gunzipSync as gunzipSync3 } from "zlib";
+var NOTES_DB_PATH4 = path4.join(
+  os4.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var QUERY_SCAN = { DEFAULT: 500, MAX: 5e3 };
+var QUERY_RESULTS = { DEFAULT: 50, MAX: 500 };
+var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
+var SNIPPET_BEFORE = 60;
+var SNIPPET_LENGTH = 180;
+var QUERY_FDA_MESSAGE = `Full Disk Access is required to query notes. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var NoteQueryStoreError = class extends Error {
+  constructor(message, kind) {
+    super(message);
+    this.kind = kind;
+    this.name = "NoteQueryStoreError";
+  }
+  kind;
+};
+function facetsForAttachmentType(uti) {
+  const type = uti.toLowerCase();
+  if (type === "com.apple.notes.inlinetextattachment.hashtag") return [];
+  if (type === "com.apple.notes.inlinetextattachment.link") return ["link"];
+  if (type.startsWith("com.apple.notes.inlinetextattachment.")) return [];
+  if (type === "com.apple.notes.table") return ["table"];
+  const facets = ["attachment"];
+  if (type === "public.url") facets.push("link");
+  else if (type === "com.apple.paper.doc.scan" || type === "com.apple.notes.gallery")
+    facets.push("scan");
+  else if (type === "com.adobe.pdf" || type === "com.apple.paper.doc.pdf") facets.push("pdf");
+  else if (type === "com.apple.paper" || type === "com.apple.drawing" || type === "com.apple.drawing.2" || type === "com.apple.notes.sketch")
+    facets.push("drawing");
+  else if (/^public\.(jpeg|png|heic|heif|tiff|gif|image|camera-raw-image|webp|bmp|svg-image)$/.test(
+    type
+  ) || type === "com.adobe.raw-image" || type === "com.compuserve.gif" || type === "org.webmproject.webp" || type === "com.microsoft.bmp")
+    facets.push("image");
+  else if (/^public\.(movie|video|mpeg-4|mpeg|avi|3gpp|3gpp2)$/.test(type) || type === "com.apple.quicktime-movie" || type === "com.apple.m4v-video")
+    facets.push("video");
+  else if (/^public\.(audio|mp3|mpeg-4-audio|aiff-audio|aifc-audio)$/.test(type) || type === "com.apple.m4a-audio" || type === "com.apple.coreaudio-format" || type === "com.microsoft.waveform-audio")
+    facets.push("audio");
+  return facets;
+}
+var CHECKLIST_STYLE = 103;
+function decodeNoteBody(data) {
+  const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
+  const body = wrapper && embeddedMessage(getField(wrapper, 3));
+  const text = body && stringValue(getField(body, 2));
+  if (!body || text === void 0) return null;
+  const facets = /* @__PURE__ */ new Set();
+  const objectIds = /* @__PURE__ */ new Set();
+  const checklist = /* @__PURE__ */ new Map();
+  let position = 0;
+  for (const run of getFields(body, 5)) {
+    const fields = embeddedMessage(run);
+    if (!fields) continue;
+    const length = varintValue(getField(fields, 1)) ?? 0;
+    if (stringValue(getField(fields, 9))) facets.add("link");
+    const attachment = embeddedMessage(getField(fields, 12));
+    if (attachment) {
+      const id2 = stringValue(getField(attachment, 1));
+      if (id2) objectIds.add(id2);
+      for (const facet of facetsForAttachmentType(stringValue(getField(attachment, 2)) ?? ""))
+        facets.add(facet);
+    }
+    const paragraph = embeddedMessage(getField(fields, 2));
+    if (paragraph && varintValue(getField(paragraph, 1)) === CHECKLIST_STYLE) {
+      const item = embeddedMessage(getField(paragraph, 5));
+      const rawId = item && getField(item, 1)?.value;
+      const key = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : `line:${text.lastIndexOf("\n", position - 1) + 1}`;
+      checklist.set(key, (item && varintValue(getField(item, 2))) === 1);
+    }
+    position += length;
+  }
+  if (checklist.size > 0) facets.add("checklist");
+  const done = [...checklist.values()].filter(Boolean).length;
+  return {
+    text,
+    facets,
+    checklist: { total: checklist.size, open: checklist.size - done },
+    objectIds
+  };
+}
+function countWords(text) {
+  let count = 0;
+  for (const word of text.replace(/\ufffc/gu, " ").split(/\s+/u)) {
+    if (/[\p{L}\p{N}]/u.test(word)) count++;
+  }
+  return count;
+}
+var REQUIRED_COLUMNS = ["Z_PK", "Z_ENT", "ZTITLE1", "ZFOLDER", "ZMODIFICATIONDATE1"];
+function col(available, alias, name) {
+  return available.has(name) ? `${alias}.${name}` : "NULL";
+}
+var entity = (name) => `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
+function buildScanSql(available, options) {
+  const missing = REQUIRED_COLUMNS.filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns query-notes needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const scan = Math.trunc(options.scanLimit);
+  if (!Number.isInteger(scan) || scan < 1 || scan > QUERY_SCAN.MAX) {
+    throw new NoteQueryStoreError(`scanLimit must be 1\u2013${QUERY_SCAN.MAX}`, "query_error");
+  }
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((c) => available.has(c)).map((c) => `n.${c}`).join(", ") || "NULL";
+  const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
+  const bool = (name) => available.has(name) ? `COALESCE(n.${name}, 0)` : "0";
+  const notNull = (alias, name) => available.has(name) ? `${alias}.${name} IS NOT NULL` : "0";
+  const tagsExpr = options.withTags && ["ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"].every((c) => available.has(c)) ? `(SELECT json_group_array(json_array(t.ZIDENTIFIER, t.ZALTTEXT)) FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE1 = n.Z_PK AND t.ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag')` : "NULL";
+  const where = [`n.Z_ENT = ${entity("ICNote")}`];
+  if (!options.includeDeleted) {
+    where.push("n.ZFOLDER IS NOT NULL");
+    if (available.has("ZMARKEDFORDELETION")) where.push("COALESCE(n.ZMARKEDFORDELETION, 0) = 0");
+    if (available.has("ZFOLDERTYPE")) {
+      where.push(
+        `n.ZFOLDER NOT IN (SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT WHERE Z_ENT = ${entity("ICFolder")} AND ZFOLDERTYPE = 1)`
+      );
+    }
+  }
+  const whereSql = where.join(" AND ");
+  const folderRow = `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col(available, "f", "ZTITLE2")}, 'parent', ${col(available, "f", "ZPARENT")}, 'type', ${col(available, "f", "ZFOLDERTYPE")}, 'owner', ${col(available, "f", "ZOWNER")}, 'shared', ${notNull("f", "ZSERVERSHAREDATA")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity("ICFolder")};`;
+  const accountRow = `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col(available, "a", "ZNAME")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity("ICAccount")};`;
+  const dataExpr = options.withBodies ? "(SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)" : "NULL";
+  const noteRow = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'title', n.ZTITLE1, 'folder', n.ZFOLDER, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'pinned', ${bool("ZISPINNED")}, 'locked', ${bool("ZISPASSWORDPROTECTED")}, 'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'snippet', ${col(available, "n", "ZSNIPPET")}, 'data', ${dataExpr}, 'tags', ${tagsExpr}) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql} ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT ${scan};`;
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'total', 'n', COUNT(*)) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql};`,
+    folderRow,
+    accountRow,
+    noteRow,
+    "COMMIT;"
+  ].join(" ");
+}
+function runSqlite2(dbPath2, query) {
+  return execFileSync6("sqlite3", ["-readonly", dbPath2, query], {
+    encoding: "utf8",
+    timeout: 3e4,
+    maxBuffer: 512 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function presentColumns2(dbPath2) {
+  const cols = /* @__PURE__ */ new Set();
+  for (const line of runSqlite2(dbPath2, "PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);").split("\n")) {
+    const name = line.split("|")[1];
+    if (name) cols.add(name);
+  }
+  return cols;
+}
+var escapeSegment = (name) => name.replace(/\//g, "\\/");
+function resolveFolders(rows) {
+  const byPk = new Map(rows.map((row) => [row.pk, row]));
+  const resolved = /* @__PURE__ */ new Map();
+  const resolve3 = (pk, seen) => {
+    const cached2 = resolved.get(pk);
+    if (cached2) return cached2;
+    const row = byPk.get(pk);
+    if (!row || seen.has(pk)) return void 0;
+    seen.add(pk);
+    const parent = row.parent !== null ? resolve3(row.parent, seen) : void 0;
+    const name = row.name ?? "";
+    const path5 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
+    const plainPath = parent ? `${parent.plainPath}/${name}` : name;
+    const info = {
+      path: path5,
+      plainPath,
+      keys: [...new Set([name, plainPath, path5].map(normalizeForMatch))],
+      accountPk: row.owner ?? parent?.accountPk ?? null,
+      shared: Boolean(row.shared) || Boolean(parent?.shared)
+    };
+    resolved.set(pk, info);
+    return info;
+  };
+  for (const row of rows) resolve3(row.pk, /* @__PURE__ */ new Set());
+  return resolved;
+}
+var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS + seconds * 1e3;
+function buildSnippet(text, terms) {
+  const clean = text.replace(/\ufffc/gu, " ");
+  const firstBreak = clean.indexOf("\n");
+  const body = firstBreak === -1 ? clean : clean.slice(firstBreak + 1);
+  const lower = normalizeForMatch(body);
+  let start = 0;
+  if (lower.length === body.length) {
+    const hits = terms.map((term) => lower.indexOf(normalizeForMatch(term))).filter((index) => index >= 0);
+    if (hits.length) start = Math.max(0, Math.min(...hits) - SNIPPET_BEFORE);
+  }
+  const slice = body.slice(start, start + SNIPPET_LENGTH).replace(/\s+/gu, " ").trim();
+  if (!slice) return "";
+  return `${start > 0 ? "\u2026" : ""}${slice}${start + SNIPPET_LENGTH < body.length ? "\u2026" : ""}`;
+}
+function queryNotes(expression, options = {}) {
+  const ast = parseNoteQuery(expression);
+  const limit = Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX);
+  const scanLimit = Math.min(options.scanLimit ?? QUERY_SCAN.DEFAULT, QUERY_SCAN.MAX);
+  const includeDeleted = options.includeDeleted ?? false;
+  const withBodies = needsContent(ast);
+  const withTags = needsTags(ast);
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH4;
+  if (!fs4.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  let output;
+  try {
+    const available = presentColumns2(dbPath2);
+    output = runSqlite2(
+      dbPath2,
+      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+    );
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+  let uuid2;
+  let eligible = 0;
+  const folderRows = [];
+  const accounts = /* @__PURE__ */ new Map();
+  const notes = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line);
+    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    else if (row.k === "total") eligible = Number(row.n) || 0;
+    else if (row.k === "folder") folderRows.push(row);
+    else if (row.k === "account" && typeof row.name === "string")
+      accounts.set(Number(row.pk), row.name);
+    else if (row.k === "note") notes.push(row);
+  }
+  if (!uuid2 || !/^[0-9A-Fa-f-]+$/.test(uuid2)) {
+    throw new NoteQueryStoreError(
+      "The Notes database has no store identifier, so note IDs cannot be formed.",
+      "schema"
+    );
+  }
+  const folders = resolveFolders(folderRows);
+  const textTerms = positiveTextTerms(ast);
+  const hits = [];
+  let matched = 0;
+  let unreadable = 0;
+  for (const row of notes) {
+    const folder = row.folder !== null ? folders.get(row.folder) : void 0;
+    const account = folder?.accountPk !== null && folder?.accountPk !== void 0 ? accounts.get(folder.accountPk) : void 0;
+    const locked = Boolean(row.locked);
+    let decoded;
+    let content;
+    const decode = () => {
+      if (decoded !== void 0) return decoded;
+      decoded = null;
+      if (locked) return decoded;
+      if (!row.data) {
+        if (withBodies) unreadable++;
+        return decoded;
+      }
+      try {
+        decoded = decodeNoteBody(
+          new Uint8Array(
+            gunzipSync3(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
+          )
+        );
+      } catch {
+        decoded = null;
+      }
+      if (!decoded) unreadable++;
+      return decoded;
+    };
+    const note = {
+      titleLower: normalizeForMatch(row.title ?? ""),
+      folderKeys: folder?.keys ?? [],
+      accountLower: account !== void 0 ? normalizeForMatch(account) : void 0,
+      pinned: Boolean(row.pinned),
+      locked,
+      shared: Boolean(row.shared) || Boolean(folder?.shared),
+      created: coreDataMs(row.created),
+      modified: coreDataMs(row.modified),
+      content: () => {
+        if (content !== void 0) return content;
+        const body2 = decode();
+        if (!body2) return content = null;
+        const text = body2.text;
+        const firstBreak = text.indexOf("\n");
+        const tags = /* @__PURE__ */ new Set();
+        for (const [id2, alt] of row.tags ?? []) {
+          if (id2 && alt && body2.objectIds.has(id2))
+            tags.add(normalizeForMatch(alt.replace(/^#/, "")));
+        }
+        const facets = new Set(body2.facets);
+        if (tags.size) facets.add("tag");
+        content = {
+          textLower: normalizeForMatch(text),
+          bodyLower: normalizeForMatch(firstBreak === -1 ? "" : text.slice(firstBreak + 1)),
+          words: countWords(text),
+          facets,
+          checklist: body2.checklist,
+          tags: [...tags]
+        };
+        return content;
+      }
+    };
+    if (!evaluateNoteQuery(ast, note)) continue;
+    matched++;
+    if (hits.length >= limit) continue;
+    const body = locked ? null : decode();
+    hits.push({
+      id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
+      title: row.title ?? "",
+      ...folder ? { folder: folder.path } : {},
+      ...account !== void 0 ? { account } : {},
+      ...note.modified !== void 0 ? { modified: new Date(note.modified).toISOString() } : {},
+      ...note.created !== void 0 ? { created: new Date(note.created).toISOString() } : {},
+      snippet: locked ? "" : body ? buildSnippet(body.text, textTerms) : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
+      ...locked ? { locked: true } : {}
+    });
+  }
+  return {
+    notes: hits,
+    count: hits.length,
+    matched,
+    scanned: notes.length,
+    eligible,
+    scanLimit,
+    scanTruncated: eligible > notes.length,
+    limit,
+    truncated: matched > hits.length,
+    unreadable
+  };
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
+import { execFileSync as execFileSync7 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join7 } from "node:path";
+import { join as join8 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -42809,7 +43592,7 @@ function addNativeTags(request, deps) {
   };
 }
 function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  const lines = execFileSync7("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
@@ -42829,11 +43612,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join8(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
-    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    const path5 = join8(directory, "request.json");
+    writeFileSync(path5, JSON.stringify(input), { mode: 384 });
+    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path5], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -42852,10 +43635,10 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync8 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -43030,9 +43813,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join9(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join8(directory, "request.json");
+    const file = join9(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -43052,7 +43835,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync8("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
         timeout: 6e4,
         maxBuffer: 1024 * 1024,
@@ -43255,7 +44038,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+  const segments = (path5) => JSON.stringify(splitFolderPath(path5).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -43443,19 +44226,19 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join9 } from "path";
-import { homedir as homedir7 } from "os";
+import { existsSync as existsSync7, readFileSync as readFileSync2 } from "fs";
+import { join as join10 } from "path";
+import { homedir as homedir8 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join10(homedir8(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path5 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync6(path4)) return applied;
-    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (!existsSync7(path5)) return applied;
+    const parsed = JSON.parse(readFileSync2(path5, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -43465,7 +44248,7 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path4}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path5}: ${String(e)}`);
   }
   return applied;
 }
@@ -43657,7 +44440,7 @@ function withJsonSchema2020_12(transport2) {
 }
 
 // src/utils/noteTables.ts
-import { gunzipSync as gunzipSync3 } from "node:zlib";
+import { gunzipSync as gunzipSync4 } from "node:zlib";
 var sub = (f, n) => {
   const value = embeddedMessage(getField(f, n));
   if (!value) throw new Error(`Missing table field ${n}`);
@@ -43678,7 +44461,7 @@ var hex = (f) => {
   return Buffer.from(f.value).toString("hex");
 };
 function parseNoteTable(compressed) {
-  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const root = decodeMessage(gunzipSync4(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
   const data = sub(sub(root, 2), 3), entries = many(data, 3);
   if (entries.length > 1e5) throw new Error("Table too large");
   const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
@@ -43766,7 +44549,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43804,9 +44587,9 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path4) {
-  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+function localAttachment(path5) {
+  if (!isAbsolute2(path5)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync(path5, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
@@ -43875,13 +44658,13 @@ function registerDirectOperations(server2, manager) {
     "add-attachment",
     "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
     { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
+    ({ id: id2, expectedContentHash, path: path5 }) => {
       const before = readSnapshot(manager, id2);
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
+      const bytes = localAttachment(path5);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join11(directory, basename(path5));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44358,7 +45141,7 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 import { release } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44378,16 +45161,16 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync7;
-  const open = dependencies.open || ((path4) => {
-    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+  const exists = dependencies.exists || existsSync8;
+  const open = dependencies.open || ((path5) => {
+    const result = spawnSync2("/usr/bin/open", [path5], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path4 = resolve2(baseDirectory, file);
+    const path5 = resolve2(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -44403,9 +45186,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else if (!exists(path5)) error2 = `Packaged Shortcut is missing: ${path5}`;
       else {
-        const result = open(path4);
+        const result = open(path5);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -44414,7 +45197,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path4,
+      file: path5,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -44685,6 +45468,81 @@ ${noteList}${truncationNote}${syncNote}`,
       { notes, count: notes.length }
     );
   }, "Error searching notes")
+);
+registerTool(
+  "query-notes",
+  {
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    inputSchema: {
+      query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
+        'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
+      ),
+      limit: external_exports.number().int().positive().max(QUERY_RESULTS.MAX).optional().describe(
+        `Maximum notes to return (default ${QUERY_RESULTS.DEFAULT}, max ${QUERY_RESULTS.MAX}). The response reports how many matched in total.`
+      ),
+      scanLimit: external_exports.number().int().positive().max(QUERY_SCAN.MAX).optional().describe(
+        `How many of the most recently modified notes to examine (default ${QUERY_SCAN.DEFAULT}, max ${QUERY_SCAN.MAX}). The response says when older notes were left unscanned.`
+      ),
+      includeDeleted: external_exports.boolean().optional().describe(
+        "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+      )
+    },
+    outputSchema: {
+      notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      matched: external_exports.number().optional(),
+      scanned: external_exports.number().optional(),
+      eligible: external_exports.number().optional(),
+      scanLimit: external_exports.number().optional(),
+      scanTruncated: external_exports.boolean().optional(),
+      limit: external_exports.number().optional(),
+      truncated: external_exports.boolean().optional(),
+      unreadable: external_exports.number().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ query, limit, scanLimit, includeDeleted }) => {
+    let result;
+    try {
+      result = queryNotes(query, { limit, scanLimit, includeDeleted });
+    } catch (error2) {
+      if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
+        return errorResponse(
+          error2 instanceof NoteQueryError ? `Invalid query: ${error2.message}` : error2.message
+        );
+      }
+      throw error2;
+    }
+    const scope = `scanned ${result.scanned} of ${result.eligible} notes` + (result.scanTruncated ? `, the most recent ${result.scanLimit}; pass a higher scanLimit to include older notes` : "");
+    const notes = [];
+    if (result.truncated) {
+      notes.push(
+        `\u2139\uFE0F ${result.matched} notes matched; showing the first ${result.count}. Pass a higher limit or narrow the query.`
+      );
+    }
+    if (result.unreadable > 0) {
+      notes.push(
+        `\u26A0\uFE0F ${result.unreadable} note bodies could not be decoded, so body predicates did not match them.`
+      );
+    }
+    const footer = notes.length ? `
+
+${notes.join("\n")}` : "";
+    if (result.count === 0) {
+      return successResponse(`No notes matched (${scope}).${footer}`, { ...result });
+    }
+    const lines = result.notes.map((n) => {
+      const where = [n.account, n.folder].filter(Boolean).join(" / ");
+      const snippet = n.snippet ? `
+      ${n.snippet}` : "";
+      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+    }).join("\n");
+    return successResponse(
+      `Found ${result.matched} matching notes (${scope}):
+${lines}${footer}`,
+      { ...result }
+    );
+  }, "Error querying notes")
 );
 registerTool(
   "get-note-content",
