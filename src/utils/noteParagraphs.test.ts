@@ -10,11 +10,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
+import { CodedError, errorResult } from "./errorCodes.js";
 import { decodeNoteBlocks } from "./noteBlocks.js";
 import { NoteStoreError } from "./noteStoreSql.js";
 import {
   classifyParagraphIds,
-  noteListSql,
+  noteBodySql,
   normalizeParagraphText,
   pageParagraphs,
   paragraphLink,
@@ -25,6 +26,7 @@ import {
   resolveNote,
   runParagraphIds,
   selectParagraph,
+  titleMatchSql,
   type NoteParagraph,
 } from "./noteParagraphs.js";
 
@@ -162,7 +164,7 @@ describe("selectParagraph and paragraphLink", () => {
     try {
       fn();
     } catch (error) {
-      if (error instanceof ParagraphLinkError || error instanceof NoteStoreError) return error.code;
+      if (error instanceof ParagraphLinkError) return error.reason;
       return String(error);
     }
     return "no error";
@@ -229,6 +231,23 @@ describe("selectParagraph and paragraphLink", () => {
   });
 });
 
+describe("ParagraphLinkError envelope", () => {
+  it("carries the shared error code and the specific reason", () => {
+    const error = new ParagraphLinkError("paragraph-id-shared", "shared");
+    expect(error).toBeInstanceOf(CodedError);
+    expect(errorResult(`No paragraph link: ${error.message}`, error)).toEqual({
+      content: [{ type: "text", text: "No paragraph link: shared" }],
+      structuredContent: { code: "unsupported", reason: "paragraph-id-shared" },
+      isError: true,
+    });
+    expect(new ParagraphLinkError("ambiguous-note", "x").envelope.code).toBe("ambiguous");
+    expect(new ParagraphLinkError("no-match", "x").envelope.code).toBe("not_found");
+    expect(new ParagraphLinkError("occurrence-out-of-range", "x").envelope.code).toBe(
+      "validation_error"
+    );
+  });
+});
+
 describe("readNoteParagraphs (real sqlite3)", () => {
   let dir: string;
   let db: string;
@@ -238,33 +257,52 @@ describe("readNoteParagraphs (real sqlite3)", () => {
     try {
       fn();
     } catch (error) {
-      if (error instanceof ParagraphLinkError || error instanceof NoteStoreError) return error.code;
+      if (error instanceof ParagraphLinkError) return error.reason;
+      if (error instanceof NoteStoreError) return error.kind;
       return String(error);
     }
     return "no error";
   };
+  const sql = (statements: string[]) =>
+    execFileSync("/usr/bin/sqlite3", [db, statements.join("\n")]);
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), "note-paragraphs-"));
     db = join(dir, "NoteStore.sqlite");
     const hex = (buf: Buffer) => `X'${buf.toString("hex")}'`;
-    execFileSync("/usr/bin/sqlite3", [
-      db,
+    sql([
+      "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, ZIDENTIFIER TEXT, ZTITLE1 TEXT, ZTITLE2 TEXT, ZNAME TEXT, ZFOLDER INTEGER, ZPARENT INTEGER, ZOWNER INTEGER, ZFOLDERTYPE INTEGER, ZISPASSWORDPROTECTED INTEGER, ZMARKEDFORDELETION INTEGER);",
+      "CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER, Z_NAME TEXT);",
+      "CREATE TABLE Z_METADATA (Z_UUID TEXT);",
+      "CREATE TABLE ZICNOTEDATA (Z_PK INTEGER PRIMARY KEY, ZNOTE INTEGER, ZCRYPTOINITIALIZATIONVECTOR BLOB, ZDATA BLOB);",
+      "INSERT INTO Z_PRIMARYKEY VALUES (3, 'ICNote'), (7, 'ICFolder'), (9, 'ICAccount');",
+      `INSERT INTO Z_METADATA VALUES ('${STORE}');`,
+      "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZNAME) VALUES (90, 9, 'Synthetic');",
+      // Work/Clients, Home, a trash folder by type, a trash folder known only by
+      // its identifier, a tombstoned folder, and a folder whose name holds a slash.
       [
-        "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, ZIDENTIFIER TEXT, ZTITLE1 TEXT, ZTITLE2 TEXT, ZFOLDER INTEGER, ZPARENT INTEGER, ZFOLDERTYPE INTEGER, ZISPASSWORDPROTECTED INTEGER, ZMARKEDFORDELETION INTEGER);",
-        "CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER, Z_NAME TEXT);",
-        "CREATE TABLE Z_METADATA (Z_UUID TEXT);",
-        "CREATE TABLE ZICNOTEDATA (Z_PK INTEGER PRIMARY KEY, ZNOTE INTEGER, ZCRYPTOINITIALIZATIONVECTOR BLOB, ZDATA BLOB);",
-        "INSERT INTO Z_PRIMARYKEY VALUES (3, 'ICNote'), (7, 'ICFolder');",
-        `INSERT INTO Z_METADATA VALUES ('${STORE}');`,
-        "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZTITLE2, ZPARENT, ZFOLDERTYPE) VALUES (1, 7, 'Work', NULL, 0), (2, 7, 'Clients', 1, 0), (3, 7, 'Home', NULL, 0), (4, 7, 'Recently Deleted', NULL, 1);",
-        `INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZIDENTIFIER, ZTITLE1, ZFOLDER) VALUES (10, 3, '${NOTE_UUID}', 'Plan', 2), (11, 3, 'N11', 'Plan', 3), (12, 3, 'N12', 'Plan', 4), (13, 3, 'N13', 'Locked', 3), (14, 3, 'N14', 'Empty', 3), (15, 3, 'N15', 'Broken', 3);`,
-        "UPDATE ZICCLOUDSYNCINGOBJECT SET ZISPASSWORDPROTECTED = 1 WHERE Z_PK = 13;",
-        `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (10, ${hex(gzipSync(data))});`,
-        `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (11, ${hex(gzipSync(raw([["Other\n", 1, 0x99]])))});`,
-        "INSERT INTO ZICNOTEDATA (ZNOTE, ZCRYPTOINITIALIZATIONVECTOR, ZDATA) VALUES (13, X'00', X'0102');",
-        "INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (15, X'0102');",
-      ].join("\n"),
+        "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZIDENTIFIER, ZTITLE2, ZPARENT, ZOWNER, ZFOLDERTYPE, ZMARKEDFORDELETION) VALUES",
+        "(1, 7, 'F1', 'Work', NULL, 90, 0, 0), (2, 7, 'F2', 'Clients', 1, 90, 0, 0),",
+        "(3, 7, 'F3', 'Home', NULL, 90, 0, 0), (4, 7, 'F4', 'Recently Deleted', NULL, 90, 1, 0),",
+        "(5, 7, 'TrashFolder-Synthetic', 'Bin', NULL, 90, NULL, 0),",
+        "(6, 7, 'F6', 'Old', NULL, 90, 0, 1), (8, 7, 'F8', 'A/B', NULL, 90, 0, 0);",
+      ].join(" "),
+      [
+        "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZIDENTIFIER, ZTITLE1, ZFOLDER, ZMARKEDFORDELETION) VALUES",
+        `(10, 3, '${NOTE_UUID}', 'Plan', 2, 0), (11, 3, 'N11', 'Plan', 3, 0),`,
+        "(12, 3, 'N12', 'Plan', 4, 0), (13, 3, 'N13', 'Locked', 3, 0), (14, 3, 'N14', 'Empty', 3, 0),",
+        "(15, 3, 'N15', 'Broken', 3, 0), (16, 3, 'N16', 'Plan', 5, 0), (17, 3, 'N17', 'Plan', 6, 0),",
+        "(18, 3, 'N18', 'Plan', 3, 1), (19, 3, 'N19', 'Plan', NULL, 0), (20, 3, 'N20', 'Slash', 8, 0),",
+        "(21, 3, 'N21', 'Only trash', 4, 0), (22, 3, 'N22', 'Plan''s \"quote\"', 3, 0);",
+      ].join(" "),
+      "UPDATE ZICCLOUDSYNCINGOBJECT SET ZISPASSWORDPROTECTED = 1 WHERE Z_PK = 13;",
+      `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (10, ${hex(gzipSync(data))});`,
+      `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (11, ${hex(gzipSync(raw([["Other\n", 1, 0x99]])))});`,
+      `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (20, ${hex(gzipSync(raw([["Slash\n", 0, 0x98]])))});`,
+      `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (22, ${hex(gzipSync(raw([["Quote\n", 0, 0x97]])))});`,
+      "INSERT INTO ZICNOTEDATA (ZNOTE, ZCRYPTOINITIALIZATIONVECTOR, ZDATA) VALUES (13, X'00', X'0102');",
+      "INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (15, X'0102');",
+      `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (21, ${hex(gzipSync(raw([["Gone\n", 0, 0x96]])))});`,
     ]);
   });
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -279,24 +317,47 @@ describe("readNoteParagraphs (real sqlite3)", () => {
     );
   });
 
-  it("selects a note by identifier or by title narrowed with a folder name or path", () => {
-    expect(readNoteParagraphs({ identifier: NOTE_UUID.toLowerCase() }, { dbPath: db }).id).toBe(
-      id(10)
-    );
+  it("selects a note by title narrowed with a folder name or list-folders path", () => {
     expect(readNoteParagraphs({ title: "Plan", folder: "Work/Clients" }, { dbPath: db }).id).toBe(
       id(10)
     );
-    expect(
-      readNoteParagraphs({ title: "Plan", folder: "Home" }, { dbPath: db }).paragraphs
-    ).toHaveLength(1);
-    // The copy in Recently Deleted is ignored for title lookups.
-    expect(code(() => readNoteParagraphs({ title: "Plan" }, { dbPath: db }))).toBe(
-      "ambiguous-note"
+    expect(readNoteParagraphs({ title: "Plan", folder: "Clients" }, { dbPath: db }).id).toBe(
+      id(10)
+    );
+    expect(readNoteParagraphs({ title: "Plan", folder: "Home" }, { dbPath: db }).id).toBe(id(11));
+    // A literal slash in a folder name is written \/ as list-folders does.
+    expect(readNoteParagraphs({ title: "Slash", folder: "A\\/B" }, { dbPath: db }).id).toBe(id(20));
+    expect(code(() => readNoteParagraphs({ title: "Slash", folder: "A/B" }, { dbPath: db }))).toBe(
+      "not-found"
+    );
+    // Quotes in a title are bound, not spliced into SQL.
+    expect(readNoteParagraphs({ title: `Plan's "quote"` }, { dbPath: db }).id).toBe(id(22));
+  });
+
+  it("never resolves a title to Recently Deleted, tombstoned or folderless notes", () => {
+    // Notes 12 (trash by type), 16 (TrashFolder identifier), 17 (tombstoned
+    // folder), 18 (tombstoned note) and 19 (no folder) are all ignored, so
+    // only 10 and 11 compete.
+    let message = "";
+    try {
+      readNoteParagraphs({ title: "Plan" }, { dbPath: db });
+    } catch (error) {
+      message = (error as Error).message;
+      expect((error as ParagraphLinkError).reason).toBe("ambiguous-note");
+    }
+    expect(message).toMatch(/^2 notes match; .* Folders: Work\/Clients, Home$/);
+    expect(code(() => readNoteParagraphs({ title: "Plan", folder: "Bin" }, { dbPath: db }))).toBe(
+      "not-found"
+    );
+    expect(code(() => readNoteParagraphs({ title: "Only trash" }, { dbPath: db }))).toBe(
+      "not-found"
     );
     expect(code(() => readNoteParagraphs({ title: "Nope" }, { dbPath: db }))).toBe("not-found");
     expect(code(() => readNoteParagraphs({ title: "Plan", folder: "Nope" }, { dbPath: db }))).toBe(
       "not-found"
     );
+    // An exact id still reads a note wherever it is.
+    expect(readNoteParagraphs({ id: id(21) }, { dbPath: db }).paragraphs).toHaveLength(1);
   });
 
   it("refuses locked, empty, undecodable and missing notes", () => {
@@ -306,7 +367,7 @@ describe("readNoteParagraphs (real sqlite3)", () => {
     expect(code(() => readNoteParagraphs({ id: id(1) }, { dbPath: db }))).toBe("not-found");
     expect(code(() => readNoteParagraphs({ id: id(99) }, { dbPath: db }))).toBe("not-found");
     expect(code(() => readNoteParagraphs({ id: id(10) }, { dbPath: join(dir, "x.sqlite") }))).toBe(
-      "no-full-disk-access"
+      "no_fda"
     );
   });
 
@@ -320,18 +381,22 @@ describe("readNoteParagraphs (real sqlite3)", () => {
       "invalid-argument"
     );
     expect(code(() => resolveNote(db, columns, { id: "x-coredata://X/ICNote/p1 OR 1" }))).toBe(
-      "invalid-id"
+      "invalid-argument"
     );
+    expect(code(() => resolveNote(db, columns, { title: "Plan" }))).toBe("schema");
   });
 
-  it("returns a null id when the store UUID is unknown", () => {
-    execFileSync("/usr/bin/sqlite3", [db, "DELETE FROM Z_METADATA;"]);
-    expect(readNoteParagraphs({ identifier: NOTE_UUID }, { dbPath: db }).id).toBeNull();
+  it("needs the store UUID to build an id from a title", () => {
+    sql(["DELETE FROM Z_METADATA;"]);
+    expect(code(() => readNoteParagraphs({ title: "Slash" }, { dbPath: db }))).toBe("schema");
+    expect(readNoteParagraphs({ id: id(20) }, { dbPath: db }).id).toBe(id(20));
   });
 
   it("generates SQL without user text", () => {
-    const sql = noteListSql(new Set(["Z_PK", "Z_ENT", "ZTITLE1"]));
-    expect(sql).toContain("n.ZTITLE1");
-    expect(sql).not.toContain("Plan");
+    const columns = new Set(["Z_PK", "Z_ENT", "ZTITLE1", "ZFOLDER"]);
+    expect(titleMatchSql(columns)).toContain("CAST(@title AS TEXT)");
+    expect(titleMatchSql(columns)).not.toContain("Plan");
+    expect(noteBodySql(columns)).toContain("n.Z_PK = @pk");
+    expect(noteBodySql(columns)).toContain("NULL)");
   });
 });

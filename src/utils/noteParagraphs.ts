@@ -16,24 +16,23 @@
  * @module utils/noteParagraphs
  */
 
-import { existsSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import {
-  decodeCompressedNoteBlocks,
-  NoteBlocksError,
-  type BlockStyle,
-  type NoteBlocksDocument,
-} from "./noteBlocks.js";
+import { escapeFolderName } from "@/services/appleNotesManager.js";
+import { CodedError, type ErrorCode } from "./errorCodes.js";
+import { decodeNoteBlocks, type BlockStyle, type NoteBlocksDocument } from "./noteBlocks.js";
 import { decodeWireFields, type WireField } from "./protobuf.js";
 import {
+  activeNoteSql,
+  col,
   entity,
+  folderPaths,
   NOTES_DB_PATH,
-  NoteStoreError,
-  notePrimaryKey,
-  objectColumns,
-  parseJsonLine,
-  runStoreSql,
-  schemaHelpers,
+  noteIdFor,
+  parseJsonLines,
+  readColumns,
+  readStoreContext,
+  requireColumns,
+  runReadOnlySql,
 } from "./noteStoreSql.js";
 
 /** Why a paragraph can or cannot be linked. */
@@ -57,8 +56,15 @@ export interface NoteParagraph {
   url?: string;
 }
 
-/** Stable refusal codes for paragraph selection and linking. */
+/**
+ * Stable reasons for refusing a paragraph selection or link. Each maps to one
+ * code of the shared error envelope (utils/errorCodes); the reason travels
+ * beside it in `structuredContent.reason` so callers can tell, for example, a
+ * shared paragraph ID from a missing one.
+ */
 export type ParagraphLinkErrorCode =
+  | "invalid-argument"
+  | "not-found"
   | "encrypted"
   | "no-body"
   | "ambiguous-note"
@@ -68,12 +74,26 @@ export type ParagraphLinkErrorCode =
   | "paragraph-id-missing"
   | "paragraph-id-shared";
 
-export class ParagraphLinkError extends Error {
-  readonly code: ParagraphLinkErrorCode;
-  constructor(code: ParagraphLinkErrorCode, message: string) {
-    super(message);
+const ENVELOPE_CODE: Record<ParagraphLinkErrorCode, ErrorCode> = {
+  "invalid-argument": "validation_error",
+  "not-found": "not_found",
+  encrypted: "unsupported",
+  "no-body": "unsupported",
+  "ambiguous-note": "ambiguous",
+  "no-match": "not_found",
+  "ambiguous-paragraph": "ambiguous",
+  "occurrence-out-of-range": "validation_error",
+  "paragraph-id-missing": "unsupported",
+  "paragraph-id-shared": "unsupported",
+};
+
+/** A refusal from the paragraph tools, carrying its own error envelope. */
+export class ParagraphLinkError extends CodedError {
+  readonly reason: ParagraphLinkErrorCode;
+  constructor(reason: ParagraphLinkErrorCode, message: string) {
+    super(message, { code: ENVELOPE_CODE[reason], reason });
     this.name = "ParagraphLinkError";
-    this.code = code;
+    this.reason = reason;
   }
 }
 
@@ -217,7 +237,7 @@ export function selectParagraph(
     (value) => value !== undefined
   ).length;
   if (given !== 1)
-    throw new NoteStoreError(
+    throw new ParagraphLinkError(
       "invalid-argument",
       "Choose exactly one paragraph selector: contains, match, or blockIndex"
     );
@@ -232,7 +252,7 @@ export function selectParagraph(
   }
   const wanted = normalizeParagraphText((selector.contains ?? selector.match)!);
   if (!wanted)
-    throw new NoteStoreError("invalid-argument", "The paragraph selector has no visible text");
+    throw new ParagraphLinkError("invalid-argument", "The paragraph selector has no visible text");
   const matches = paragraphs.filter((p) =>
     selector.match !== undefined
       ? normalizeParagraphText(p.text) === wanted
@@ -254,134 +274,127 @@ export function selectParagraph(
   return matches[occurrence - 1];
 }
 
-/** Selects one note. Give exactly one of `id`, `identifier`, `title`. */
+/**
+ * Selects one note: exactly one of `id` (already resolved to the x-coredata
+ * form by the tool schema, which also accepts a Notes UUID) or `title`.
+ */
 export interface NoteSelector {
   id?: string;
-  /** The note's UUID (ZIDENTIFIER). */
-  identifier?: string;
   /** Exact title; with `folder` (name or path) to disambiguate duplicates. */
   title?: string;
   folder?: string;
 }
 
-interface NoteListRow {
-  pk: number;
-  identifier: string | null;
-  title: string | null;
-  folder: number | null;
-  active: number;
-}
-interface FolderRow {
-  pk: number;
-  title: string | null;
-  parent: number | null;
+const NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+
+/**
+ * SQL listing the notes whose title equals the bound `@title` blob, limited to
+ * notes list-notes shows: not in Recently Deleted (by folder type or the
+ * `TrashFolder` identifier prefix) and neither the note nor its folder
+ * tombstoned. The title is bound as a blob, never spliced into the SQL.
+ */
+export function titleMatchSql(columns: ReadonlySet<string>): string {
+  return (
+    `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) ` +
+    `FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER ` +
+    `WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) ` +
+    `AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`
+  );
 }
 
-/** `/`-joined folder path, with a literal `/` in a name escaped as `\/`. */
-function folderPath(folders: Map<number, FolderRow>, pk: number | null): string | null {
-  const parts: string[] = [];
-  const seen = new Set<number>();
-  for (let f = folders.get(pk ?? -1); f && !seen.has(f.pk); f = folders.get(f.parent ?? -1)) {
-    seen.add(f.pk);
-    parts.unshift((f.title ?? "").replace(/\//g, "\\/"));
-  }
-  return parts.length ? parts.join("/") : null;
-}
-
-/** SQL for the note list used by identifier and title selection. */
-export function noteListSql(columns: Set<string>): string {
-  const { col, notDeleted } = schemaHelpers(columns);
-  return `SELECT json_group_array(json_object('pk', n.Z_PK, 'identifier', ${col("n", "ZIDENTIFIER")},
-      'title', ${col("n", "ZTITLE1")}, 'folder', ${col("n", "ZFOLDER")},
-      'active', ${notDeleted("n")} AND ${col("n", "ZFOLDER")} IS NOT NULL
-        AND COALESCE(${col("f", "ZFOLDERTYPE")}, 0) <> 1))
-    FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${col("n", "ZFOLDER")}
-    WHERE n.Z_ENT = ${entity("ICNote")};
-    SELECT json_group_array(json_object('pk', x.Z_PK, 'title', ${col("x", "ZTITLE2")}, 'parent', ${col("x", "ZPARENT")}))
-    FROM ZICCLOUDSYNCINGOBJECT x WHERE x.Z_ENT = ${entity("ICFolder")};
-    SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));`;
+/**
+ * Validate a note selector without touching the database. Returns the primary
+ * key for an `id` selector, or undefined for a `title` selector.
+ */
+export function checkNoteSelector(selector: NoteSelector): number | undefined {
+  const given = [selector.id, selector.title].filter((value) => value !== undefined).length;
+  if (given !== 1)
+    throw new ParagraphLinkError("invalid-argument", "Choose exactly one of id or title");
+  if (selector.folder !== undefined && selector.title === undefined)
+    throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
+  if (selector.id === undefined) return undefined;
+  const pk = NOTE_ID.exec(selector.id)?.[1];
+  if (!pk)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number> or a Notes UUID"
+    );
+  return Number(pk);
 }
 
 /** Resolve a note selector to a primary key and canonical id. */
 export function resolveNote(
   dbPath: string,
-  columns: Set<string>,
+  columns: ReadonlySet<string>,
   selector: NoteSelector
-): { pk: number; id: string | null } {
-  const given = [selector.id, selector.identifier, selector.title].filter(
-    (value) => value !== undefined
-  ).length;
-  if (given !== 1)
-    throw new NoteStoreError("invalid-argument", "Choose exactly one of id, identifier, or title");
-  if (selector.folder !== undefined && selector.title === undefined)
-    throw new NoteStoreError("invalid-argument", "folder only narrows a title lookup");
-  if (selector.id) return { pk: notePrimaryKey(selector.id), id: selector.id };
-  const [noteLine, folderLine, storeLine] = runStoreSql(dbPath, noteListSql(columns));
-  const notes = parseJsonLine<NoteListRow[]>(noteLine, []);
-  const folders = new Map(parseJsonLine<FolderRow[]>(folderLine, []).map((f) => [f.pk, f]));
-  const store = parseJsonLine<{ uuid: string | null }>(storeLine, { uuid: null }).uuid;
-  let matches: NoteListRow[];
-  if (selector.identifier !== undefined) {
-    const wanted = selector.identifier.toUpperCase();
-    matches = notes.filter((n) => (n.identifier ?? "").toUpperCase() === wanted);
-  } else {
-    matches = notes.filter((n) => n.active && n.title === selector.title);
-    if (selector.folder !== undefined) {
-      const wanted = selector.folder;
-      matches = matches.filter((n) => {
-        const path = folderPath(folders, n.folder);
-        return path === wanted || folders.get(n.folder ?? -1)?.title === wanted;
-      });
-    }
+): { pk: number; id: string } {
+  const idPk = checkNoteSelector(selector);
+  if (idPk !== undefined) return { pk: idPk, id: selector.id! };
+  requireColumns(columns, ["ZTITLE1", "ZFOLDER"], "title lookup");
+  const context = readStoreContext(dbPath, columns);
+  const paths = folderPaths(context.folders);
+  const names = new Map(context.folders.map((f) => [f.pk, escapeFolderName(f.name ?? "")]));
+  let matches = parseJsonLines<{ pk: number; folder: number }>(
+    runReadOnlySql(dbPath, titleMatchSql(columns), {
+      title: { blob: Buffer.from(selector.title!, "utf8") },
+    })
+  );
+  if (selector.folder !== undefined) {
+    const wanted = selector.folder;
+    matches = matches.filter(
+      (n) => paths.get(n.folder) === wanted || names.get(n.folder) === wanted
+    );
   }
-  if (!matches.length) throw new NoteStoreError("not-found", "No note matches the selector");
+  if (!matches.length) throw new ParagraphLinkError("not-found", "No note matches the selector");
   if (matches.length > 1)
     throw new ParagraphLinkError(
       "ambiguous-note",
-      `${matches.length} notes match; pass folder (name or path) or use the note id. Folders: ${matches
-        .map((n) => folderPath(folders, n.folder) ?? "(none)")
+      `${matches.length} notes match; pass folder (a name or a path as list-folders shows it) or use the note id. Folders: ${matches
+        .map((n) => paths.get(n.folder))
         .join(", ")}`
     );
-  const pk = matches[0].pk;
-  return { pk, id: store ? `x-coredata://${store}/ICNote/p${pk}` : null };
+  return { pk: matches[0].pk, id: noteIdFor(context.uuid, matches[0].pk) };
 }
 
 /** Everything the paragraph tools need about one note. */
 export interface NoteParagraphs {
-  id: string | null;
+  id: string;
   identifier: string | null;
   paragraphs: NoteParagraph[];
   counts: Record<ParagraphIdStatus, number>;
 }
 
-/** Read and classify one note's paragraphs (read-only). */
+/** SQL for one note's identifier, body and lock state, keyed by the bound `@pk`. */
+export function noteBodySql(columns: ReadonlySet<string>): string {
+  return (
+    `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, ` +
+    `'identifier', ${col(columns, "n", "ZIDENTIFIER")}, ` +
+    `'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), ` +
+    `'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), ` +
+    `'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) ` +
+    `FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`
+  );
+}
+
+/**
+ * Read and classify one note's paragraphs (read-only). The body is gunzipped
+ * once, and the block decoder and the run reader share the result.
+ */
 export function readNoteParagraphs(
   selector: NoteSelector,
   { dbPath = NOTES_DB_PATH }: { dbPath?: string } = {}
 ): NoteParagraphs {
-  if (!existsSync(dbPath))
-    throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
-  const columns = objectColumns(dbPath);
+  checkNoteSelector(selector);
+  const columns = readColumns(dbPath);
   const { pk, id } = resolveNote(dbPath, columns, selector);
-  const { col } = schemaHelpers(columns);
-  const [line] = runStoreSql(
-    dbPath,
-    `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")},
-        'identifier', ${col("n", "ZIDENTIFIER")},
-        'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
-        'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
-        'locked', ${col("n", "ZISPASSWORDPROTECTED")})
-      FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`,
-    { pk }
-  );
-  const row = parseJsonLine<{
+  const [row] = parseJsonLines<{
     isNote: number;
     identifier: string | null;
     data: string | null;
     encrypted: number | null;
     locked: number | null;
-  } | null>(line, null);
-  if (!row || !row.isNote) throw new NoteStoreError("not-found", "No note found for the selector");
+  }>(runReadOnlySql(dbPath, noteBodySql(columns), { pk: { int: pk } }));
+  if (!row?.isNote) throw new ParagraphLinkError("not-found", `No note found for ID "${id}"`);
   if (row.encrypted || row.locked)
     throw new ParagraphLinkError(
       "encrypted",
@@ -389,15 +402,16 @@ export function readNoteParagraphs(
     );
   if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
     throw new ParagraphLinkError("no-body", "No body data is stored for this note");
-  const compressed = Buffer.from(row.data, "hex");
   let doc: NoteBlocksDocument;
+  let runs: ReturnType<typeof runParagraphIds>;
   try {
-    doc = decodeCompressedNoteBlocks(compressed);
+    const data = gunzipSync(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    doc = decodeNoteBlocks(data);
+    runs = runParagraphIds(data);
   } catch (error) {
-    const message = error instanceof NoteBlocksError ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     throw new ParagraphLinkError("no-body", `The note body could not be decoded: ${message}`);
   }
-  const runs = runParagraphIds(gunzipSync(compressed, { maxOutputLength: 32 * 1024 * 1024 }));
   const paragraphs = paragraphsOf(doc, runs, row.identifier);
   const counts: Record<ParagraphIdStatus, number> = { unique: 0, shared: 0, missing: 0 };
   for (const p of paragraphs) counts[p.paragraphIdStatus]++;

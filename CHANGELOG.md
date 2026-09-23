@@ -1,5 +1,26 @@
 ## [Unreleased]
 
+## [2.8.50] - 2026-09-23
+
+### Added
+
+- `list-note-paragraphs` lists a note's non-empty paragraphs, read-only from
+  the NoteStore database, with `blockIndex`, text, style, the stored
+  `paragraphId`, and `paragraphIdStatus` (`unique`, `shared`, `missing`).
+  A `unique` paragraph also gets a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link. The
+  note is chosen by `id` (including a Notes UUID) or by exact `title`,
+  optionally narrowed by `folder` as list-folders writes it. Title lookups
+  skip Recently Deleted, as list-notes does.
+- `get-paragraph-link` selects one paragraph by snippet (`contains`), whole
+  text (`match`) or `blockIndex`, with `occurrence` for repeated text, and
+  returns its direct link only when the paragraph's ID appears in no other
+  paragraph of the note. Notes copies paragraph IDs when a paragraph is split,
+  so a shared ID is refused rather than risk opening the wrong paragraph.
+  Refusals use the standard error envelope, with the specific cause in
+  `structuredContent.reason` (for example `paragraph-id-shared`). The tool
+  never creates or repairs an ID.
+
 ## [2.8.49] - 2026-09-23
 
 ### Fixed
