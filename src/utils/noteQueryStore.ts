@@ -64,8 +64,8 @@ const SNIPPET_LENGTH = 180;
 
 export const QUERY_FDA_MESSAGE =
   "Full Disk Access is required to query notes. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
-  "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
+  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
   `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
 
 /** Raised for conditions the tool reports verbatim (permission, schema, parse). */

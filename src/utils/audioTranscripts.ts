@@ -372,8 +372,8 @@ export function readAudioTranscripts(
     if (/authorization denied|unable to open database/i.test(message))
       throw new AudioTranscriptError(
         "no_fda",
-        "Full Disk Access is required to read stored transcripts. Grant it to the app that " +
-          `launches this server, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+        "Full Disk Access is required to read stored transcripts. Grant it to the Node binary " +
+          `running this server (or the terminal that launches it), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
       );
     throw new AudioTranscriptError("query_error", "Failed to read the Notes database.");
   }

@@ -34,8 +34,8 @@ const NOTES_DB_PATH = path.join(
 
 const FDA_MESSAGE =
   "Full Disk Access is required to read smart folders. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
-  "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
+  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
   `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
 
 /** Seconds between the Unix epoch and the Cocoa reference date (2001-01-01). */

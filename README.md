@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -1035,7 +1035,7 @@ Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The U
 
 **Returns:** `notes://showNote?identifier=<uuid>` URL string, plus the note id and title.
 
-**Note:** Requires Full Disk Access for the app that launches the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
+**Note:** Requires Full Disk Access for the process that runs the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
 
 ---
 
@@ -2127,12 +2127,12 @@ Several tools read directly from the Apple Notes SQLite database, which lives in
 1. Open **System Settings** (or System Preferences on older macOS)
 2. Go to **Privacy & Security > Full Disk Access**
 3. Click the **+** button
-4. Add the application that hosts the MCP server:
-   - **Claude Desktop**: Add `/Applications/Claude.app`
+4. Add the entry that matches how the server runs:
+   - **Claude Desktop**: add the **Node binary** that runs the server (the `doctor` tool prints its path, e.g. `~/.nvm/versions/node/v24.11.1/bin/node`; press ⌘⇧G in the file picker to paste it). Claude Desktop launches MCP servers as their own responsible process, so a grant on `/Applications/Claude.app` alone does not reach them ([#220](https://github.com/sweetrb/apple-notes-mcp/issues/220)).
    - **Terminal**: Add `/Applications/Utilities/Terminal.app`
    - **VS Code**: Add `/Applications/Visual Studio Code.app`
    - **iTerm**: Add `/Applications/iTerm.app`
-5. Restart the application after granting access
+5. Fully quit (⌘Q) and relaunch the host app after granting access; if `doctor` still reports it missing, restart the Mac
 
 ### Without Full Disk Access
 

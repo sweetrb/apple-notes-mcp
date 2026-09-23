@@ -33,8 +33,8 @@ export const CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
 
 export const STORE_FDA_MESSAGE =
   "Full Disk Access is required to read the Notes database. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
-  "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
+  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
   `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
 
 /** Raised for conditions a tool reports verbatim. */

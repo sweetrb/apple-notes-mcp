@@ -285,7 +285,7 @@ function runSqlite(dbPath: string, sql: string): string {
     const message = error instanceof Error ? error.message : String(error);
     if (/authorization denied|unable to open database/i.test(message)) {
       throw new AttachmentStoreError(
-        "Full Disk Access is required to read attachment paths. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
+        "Full Disk Access is required to read attachment paths. Grant it to the Node binary running this server (or the terminal that launches it), then relaunch it (run the doctor tool to verify).",
         "no_fda"
       );
     }

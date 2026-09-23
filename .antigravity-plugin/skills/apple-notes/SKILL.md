@@ -259,7 +259,7 @@ User: "Send me a link to that note"
 Action: Use get-note-link with the note ID → notes://showNote?identifier=<uuid>
 ```
 
-Hand out that deep link, not the `x-coredata://` id — the link opens the note in Notes.app on macOS and iOS and can be pasted into a Reminders task or a message. It needs Full Disk Access for the app that launches the server (it reads the note's identifier from the Notes database; macOS 12–15 has an AppleScript fallback), and password-protected notes cannot be linked.
+Hand out that deep link, not the `x-coredata://` id — the link opens the note in Notes.app on macOS and iOS and can be pasted into a Reminders task or a message. It needs Full Disk Access for the process that runs the server (under Claude Desktop, the Node binary itself) (it reads the note's identifier from the Notes database; macOS 12–15 has an AppleScript fallback), and password-protected notes cannot be linked.
 
 ```
 User: "Open that note for me" / "What note am I looking at?"

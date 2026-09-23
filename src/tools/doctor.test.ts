@@ -62,7 +62,12 @@ vi.mock("child_process", () => ({
 }));
 
 import { spawnSync } from "child_process";
-import { runDoctor, formatDoctorReport, checkNodeRuntimeSignature } from "@/tools/doctor.js";
+import {
+  runDoctor,
+  formatDoctorReport,
+  checkNodeRuntimeSignature,
+  fdaRemediation,
+} from "@/tools/doctor.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { nativeTagsStatus } from "@/services/nativeTags.js";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
@@ -95,7 +100,22 @@ describe("runDoctor (#22)", () => {
     const fda = r.checks.find((c) => c.name === "Full Disk Access");
     expect(fda?.status).toBe("warn");
     expect(fda?.detail).toMatch(/Full Disk Access/);
+    // #220: names the Node binary, not just the launching app.
+    expect(fda?.detail).toContain(process.execPath);
     expect(r.healthy).toBe(true);
+  });
+
+  it("fdaRemediation says Claude Desktop needs the Node binary itself (#220)", () => {
+    const msg = fdaRemediation("/opt/node/bin/node");
+    expect(msg).toContain("/opt/node/bin/node");
+    expect(msg).toMatch(/Claude Desktop/);
+    expect(msg).toMatch(/does not reach them/);
+    expect(msg).not.toMatch(/version manager/);
+  });
+
+  it("fdaRemediation warns that a version-manager Node path changes per version (#220)", () => {
+    const msg = fdaRemediation("/Users/x/.nvm/versions/node/v24.11.1/bin/node");
+    expect(msg).toMatch(/version manager/);
   });
 
   it("is unhealthy when a Notes.app check fails", () => {

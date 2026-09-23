@@ -69,7 +69,7 @@ import {
   queryNotes,
 } from "@/utils/noteQueryStore.js";
 import type { QueryNotesResult } from "@/types.js";
-import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
+import { runDoctor, formatDoctorReport, fdaRemediation } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
@@ -1292,7 +1292,7 @@ registerTool(
   "get-note-link",
   {
     description:
-      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the app that launches this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
+      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the Node binary running this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
       id: looseNoteId(z.string())
         .optional()
@@ -1328,7 +1328,7 @@ registerTool(
       const url = notesManager.getNoteLinkById(id);
       if (!url) {
         return errorResponse(
-          `Failed to get note link for "${note.title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+          `Failed to get note link for "${note.title}". The Notes database may not be accessible — grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
         );
       }
       return successResponse(`Note link: ${url}`, { id, title: note.title, url });
@@ -1350,7 +1350,7 @@ registerTool(
     const url = notesManager.getNoteLink(title, account);
     if (!url) {
       return errorResponse(
-        `Failed to get note link for "${title}". The Notes database may not be accessible — grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+        `Failed to get note link for "${title}". The Notes database may not be accessible — grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
       );
     }
     return successResponse(`Note link: ${url}`, { title, url });
@@ -1567,7 +1567,7 @@ registerTool(
       if (!(error instanceof NoteBlocksError)) throw error;
       const hint =
         error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
       return errorResponse(`Error reading note blocks [${error.code}]: ${error.message}${hint}`);
     }
@@ -2769,9 +2769,7 @@ registerTool(
       : "  ⓘ full_disk_access: Not granted — get-checklist-state, get-note-metadata, and the checklist annotations in " +
         "get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); " +
         "get-sync-status cannot see pending uploads. The rest of the server is pure AppleScript and is unaffected. " +
-        "In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server " +
-        "(Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. " +
-        `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
+        fdaRemediation();
 
     return successResponse(`${statusIcon} ${statusText}\n\n${checkLines}\n${fdaLine}`, {
       healthy: result.healthy,
@@ -3678,7 +3676,7 @@ registerTool(
       if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
       const hint =
         error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
       return errorResponse(`Error exporting Markdown [${error.code}]: ${error.message}${hint}`);
     }
@@ -3764,7 +3762,7 @@ registerTool(
       if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
       const hint =
         error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
       return errorResponse(`Error exporting HTML [${error.code}]: ${error.message}${hint}`);
     }

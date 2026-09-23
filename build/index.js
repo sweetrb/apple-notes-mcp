@@ -39536,7 +39536,7 @@ function getChecklistItems(noteId3) {
     return {
       items: null,
       error: "no_fda",
-      message: `Full Disk Access is required to read checklist state. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`
+      message: `Full Disk Access is required to read checklist state. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`
     };
   }
   if (!hexData) {
@@ -40199,7 +40199,7 @@ function readAudioTranscripts(noteId3, options = {}) {
     if (/authorization denied|unable to open database/i.test(message))
       throw new AudioTranscriptError(
         "no_fda",
-        `Full Disk Access is required to read stored transcripts. Grant it to the app that launches this server, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+        `Full Disk Access is required to read stored transcripts. Grant it to the Node binary running this server (or the terminal that launches it), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
       );
     throw new AudioTranscriptError("query_error", "Failed to read the Notes database.");
   }
@@ -40516,7 +40516,7 @@ var NOTES_DB_PATH3 = path2.join(
   os2.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var FDA_MESSAGE = `Full Disk Access is required to read smart folders. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var FDA_MESSAGE = `Full Disk Access is required to read smart folders. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var COCOA_EPOCH_OFFSET = 978307200;
 var MAX_DEPTH = 32;
 var RELATIVE_RANGES = {
@@ -41275,7 +41275,7 @@ function runSqlite3(dbPath2, sql) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     if (/authorization denied|unable to open database/i.test(message)) {
       throw new AttachmentStoreError(
-        "Full Disk Access is required to read attachment paths. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
+        "Full Disk Access is required to read attachment paths. Grant it to the Node binary running this server (or the terminal that launches it), then relaunch it (run the doctor tool to verify).",
         "no_fda"
       );
     }
@@ -41809,7 +41809,7 @@ function runSqlite4(dbPath2, sql) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     if (/authorization denied|unable to open database/i.test(message)) {
       throw new AttachmentStoreError(
-        "Full Disk Access is required to read drawing attachments. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
+        "Full Disk Access is required to read drawing attachments. Grant it to the Node binary running this server (or the terminal that launches it), then relaunch it (run the doctor tool to verify).",
         "no_fda"
       );
     }
@@ -45180,7 +45180,7 @@ var NOTES_DB_PATH6 = path5.join(
   os5.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var FDA_MESSAGE2 = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var FDA_MESSAGE2 = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var COLUMN_MAP = [
   { key: "pinned", column: "ZISPINNED", type: "bool" },
   { key: "hasChecklist", column: "ZHASCHECKLIST", type: "bool" },
@@ -45273,7 +45273,7 @@ var NOTES_DB_PATH7 = path6.join(
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
-var STORE_FDA_MESSAGE = `Full Disk Access is required to read the Notes database. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var STORE_FDA_MESSAGE = `Full Disk Access is required to read the Notes database. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var NoteStoreError = class extends Error {
   constructor(message, kind) {
     super(message);
@@ -45697,7 +45697,7 @@ var ENTITY_LABEL = {
   ICFolder: "folder",
   ICAccount: "account"
 };
-var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access for the app that launches this server (System Settings > Privacy & Security > Full Disk Access, then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
+var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access for the Node binary running this server, or the terminal that launches it (System Settings > Privacy & Security > Full Disk Access, then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
 function canonicalKey(value) {
   return BigInt(value).toString();
 }
@@ -46453,7 +46453,7 @@ var QUERY_RESULTS = { DEFAULT: 50, MAX: 500 };
 var CORE_DATA_EPOCH_MS2 = Date.UTC(2001, 0, 1);
 var SNIPPET_BEFORE = 60;
 var SNIPPET_LENGTH = 180;
-var QUERY_FDA_MESSAGE = `Full Disk Access is required to query notes. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var QUERY_FDA_MESSAGE = `Full Disk Access is required to query notes. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var NoteQueryStoreError = class extends Error {
   constructor(message, kind) {
     super(message);
@@ -46838,7 +46838,7 @@ function describeContentScan(scan) {
 }
 function contentSearchFailureHint(message, dbUnavailable) {
   if (!/timed out/i.test(message)) return message;
-  const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the app that launches this server (run the doctor tool) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
+  const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
   return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
 }
 
@@ -47930,7 +47930,7 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
   checks.push({
     name: "Full Disk Access",
     status: fda ? "ok" : "warn",
-    detail: fda ? "granted \u2014 the Notes database is readable (checklist state, note metadata, note links, sync detail)" : `not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else is pure AppleScript and is unaffected. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+    detail: fda ? "granted \u2014 the Notes database is readable (checklist state, note metadata, note links, sync detail)" : "not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else is pure AppleScript and is unaffected. " + fdaRemediation()
   });
   const consentReminder = "After install or upgrade, run each bridge Shortcut once in the foreground in Shortcuts.app and choose Always Allow: a background run cannot display a first-run consent prompt, so an unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
@@ -47960,6 +47960,10 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
     matrix = void 0;
   }
   return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features } : { healthy, checks };
+}
+function fdaRemediation(execPath = process.execPath) {
+  const versioned = /\/(\.nvm|\.fnm|\.volta|\.asdf|\.local\/share\/mise|\.nodenv|n\/versions)\//.test(execPath);
+  return `In System Settings > Privacy & Security > Full Disk Access, click + and add the Node binary running this server: ${execPath} (press Cmd+Shift+G in the file picker to paste the path). Under Claude Desktop that entry is required: Claude Desktop launches servers as their own responsible process, so a grant on Claude.app does not reach them. When the server runs from a terminal (Terminal, iTerm2) or an editor, granting that app is enough. Then fully quit (Cmd+Q) and relaunch the host app and re-run doctor; if it still reports not granted, restart the Mac. ` + (versioned ? "This Node lives under a version manager, so the path changes with each Node version and the grant has to be added again after switching; pointing the MCP config at one fixed Node path avoids that. " : "") + `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
 }
 function markdownBridgeDetail() {
   const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
@@ -50584,7 +50588,7 @@ function classify(error2) {
   const message = error2 instanceof Error ? error2.message : String(error2);
   if (/authorization denied|unable to open database|not authorized/i.test(message)) {
     return new FolderStoreError(
-      "Full Disk Access is required to verify folder type and contents before deleting. Grant it to the app that launches this server, then relaunch it.",
+      "Full Disk Access is required to verify folder type and contents before deleting. Grant it to the Node binary running this server (or the terminal that launches it), then relaunch it.",
       "no_fda"
     );
   }
@@ -52166,7 +52170,7 @@ registerTool(
 registerTool(
   "get-note-link",
   {
-    description: "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the app that launches this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
+    description: "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the Node binary running this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
       id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
@@ -52192,7 +52196,7 @@ registerTool(
       const url2 = notesManager.getNoteLinkById(id2);
       if (!url2) {
         return errorResponse(
-          `Failed to get note link for "${note2.title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
+          `Failed to get note link for "${note2.title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
         );
       }
       return successResponse(`Note link: ${url2}`, { id: id2, title: note2.title, url: url2 });
@@ -52212,7 +52216,7 @@ registerTool(
     const url = notesManager.getNoteLink(title, account);
     if (!url) {
       return errorResponse(
-        `Failed to get note link for "${title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the app that launches the server, fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
+        `Failed to get note link for "${title}". The Notes database may not be accessible \u2014 grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12\u201315 this also falls back to the AppleScript note link property.)`
       );
     }
     return successResponse(`Note link: ${url}`, { title, url });
@@ -52385,7 +52389,7 @@ registerTool(
       page = pageNoteBlocks(readNoteBlocks(id2), { offset, limit });
     } catch (error2) {
       if (!(error2 instanceof NoteBlocksError)) throw error2;
-      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
       return errorResponse(`Error reading note blocks [${error2.code}]: ${error2.message}${hint}`);
     }
     const { summary } = page;
@@ -53269,7 +53273,7 @@ registerTool(
       return `  ${icon} ${c.name}: ${c.message}`;
     }).join("\n");
     const fdaAvailable = hasFullDiskAccess();
-    const fdaLine = fdaAvailable ? "  \u2713 full_disk_access: Granted (Notes database readable \u2014 checklist state, note metadata, note links, sync detail)" : `  \u24D8 full_disk_access: Not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status cannot see pending uploads. The rest of the server is pure AppleScript and is unaffected. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+    const fdaLine = fdaAvailable ? "  \u2713 full_disk_access: Granted (Notes database readable \u2014 checklist state, note metadata, note links, sync detail)" : "  \u24D8 full_disk_access: Not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status cannot see pending uploads. The rest of the server is pure AppleScript and is unaffected. " + fdaRemediation();
     return successResponse(`${statusIcon} ${statusText}
 
 ${checkLines}
@@ -53949,7 +53953,7 @@ registerTool(
       });
     } catch (error2) {
       if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
-      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
       return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
     }
     const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
@@ -54001,7 +54005,7 @@ registerTool(
       });
     } catch (error2) {
       if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
-      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
       return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`);
     }
     const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;

@@ -93,7 +93,7 @@ const ENTITY_LABEL: Record<IdentifierEntity, string> = {
 
 const NO_FDA_MESSAGE =
   "Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access " +
-  "for the app that launches this server (System Settings > Privacy & Security > Full Disk Access, " +
+  "for the Node binary running this server, or the terminal that launches it (System Settings > Privacy & Security > Full Disk Access, " +
   "then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders " +
   `work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
 

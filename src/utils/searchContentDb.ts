@@ -131,7 +131,7 @@ export function contentSearchFailureHint(
   if (!/timed out/i.test(message)) return message;
   const remedy =
     dbUnavailable === "no_fda"
-      ? " Grant Full Disk Access to the app that launches this server (run the doctor tool) so search-notes can search note bodies through the Notes database instead, which takes well under a second."
+      ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second."
       : "";
   return (
     `${message} Body search through AppleScript scans every note body before the result limit applies, ` +
