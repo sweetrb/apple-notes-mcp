@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `list-paper-attachments` reports a note's Paper drawings (`com.apple.paper`)
+  and classic drawings (`com.apple.drawing`, `com.apple.drawing.2`): whether
+  the Paper bundle is on disk, the path of Notes' full rendering
+  (`FallbackImages/<id>/<generation>/FallbackImage.png`, or the older flat
+  shape) and of its largest thumbnail in `Previews/`, the validated format and
+  size of the image an export would copy, and the handwriting text Notes
+  stored in `ZHANDWRITINGSUMMARY`, when there is any. Read-only; needs Full Disk
+  Access.
+- `export-paper-image` saves that rendering to a new file. It prefers Notes'
+  full rendering over the thumbnail, requires the matching extension, checks
+  the PNG signature and IHDR (or JPEG frame) before and after copying, never
+  overwrites, follows the `save-attachment` path allowlist, and refuses the
+  Notes data folder. Strokes are not decoded: Notes' Paper bundle has no public
+  reader.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

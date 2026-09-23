@@ -555,6 +555,25 @@ export interface Attachment {
   shared?: boolean;
 }
 
+/**
+ * Paper and classic drawing attachments with Notes' rendered raster
+ * (read-only NoteStore + Notes group container). Defined next to the reader in
+ * utils/paperAttachments and re-exported here with the other public types.
+ */
+import type { DrawingAttachment } from "@/utils/paperAttachments.js";
+export type { DrawingAttachment, ImageInfo } from "@/utils/paperAttachments.js";
+
+/** Result of exporting one drawing's rendered raster. */
+export interface DrawingRasterExport {
+  drawing: DrawingAttachment;
+  savedPath: string;
+  bytes: number;
+  source: "fallback" | "preview";
+  format: "png" | "jpeg";
+  width: number;
+  height: number;
+}
+
 // =============================================================================
 // Notes Statistics
 // =============================================================================

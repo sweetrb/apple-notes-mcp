@@ -59,6 +59,8 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import { attachmentCoreDataId as drawingAttachmentId } from "@/utils/paperAttachments.js";
+import type { DrawingAttachment } from "@/types.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -2259,6 +2261,106 @@ registerTool(
       contentType: r.contentType,
     });
   }, "Error saving attachment")
+);
+
+// --- list-paper-attachments / export-paper-image ---
+
+/** Public view of one drawing (AppleScript-format id, no raw pk). */
+function drawingView(noteId: string, d: DrawingAttachment) {
+  const { pk, raster, ...rest } = d;
+  return {
+    attachmentId: drawingAttachmentId(noteId, pk),
+    ...rest,
+    raster: raster
+      ? { source: raster.source, format: raster.format, width: raster.width, height: raster.height }
+      : null,
+  };
+}
+
+registerTool(
+  "list-paper-attachments",
+  {
+    description:
+      "Use when: finding the Paper drawings (com.apple.paper) and classic drawings in one note, and whether Notes has a rendered image of each.\nReturns: per drawing its attachmentId, identifier, uti, kind (paper or drawing), handwritingSummary (Notes' recognized handwriting text, or null), bundlePresent, fallbackImagePath, previewPath, and raster {source, format, width, height} (the validated image export-paper-image would copy, or null).\nDo not use when: you want every attachment (list-attachments) or the image file itself (export-paper-image).\nSafety: read-only; reads NoteStore and the Notes data folder without opening Notes.app and requires Full Disk Access. Strokes are not decoded: Notes' Paper bundle has no public reader, so the raster is Notes' own rendering.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      attachments: z.array(z.object({}).passthrough()).optional(),
+      count: z.number().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id }) => {
+    const drawings = notesManager.listPaperAttachmentsById(id).map((d) => drawingView(id, d));
+    if (drawings.length === 0) {
+      return successResponse("This note has no Paper or drawing attachments.", {
+        attachments: [],
+        count: 0,
+      });
+    }
+    const lines = drawings.map(
+      (d) =>
+        `  - ${d.kind} ${d.attachmentId}: ${d.raster ? `${d.raster.format.toUpperCase()} ${d.raster.width}x${d.raster.height} (${d.raster.source})` : "no rendered image on disk"}${d.handwritingSummary ? "; handwriting text stored" : ""}`
+    );
+    return successResponse(
+      `Found ${drawings.length} Paper or drawing attachment(s):\n${lines.join("\n")}`,
+      { attachments: drawings, count: drawings.length }
+    );
+  }, "Error listing Paper attachments")
+);
+
+registerTool(
+  "export-paper-image",
+  {
+    description:
+      "Use when: saving Notes' rendered image of a Paper drawing or classic drawing to a file.\nReturns: savedPath, format (png or jpeg), width, height, bytes, source (fallback: Notes' full rendering; preview: its largest thumbnail, used only when no full rendering exists), and the drawing's attachmentId and handwritingSummary.\nDo not use when: the attachment is a photo or file (save-attachment or export-attachments).\nSafety: writes one new file; savePath must be absolute, under the home directory, a temp dir, or /Volumes, outside the Notes data folder, must not exist yet, and must end in the image's extension (.png, or .jpg/.jpeg). The image header is validated before and after copying. Pass attachmentId (from list-paper-attachments) when the note has more than one drawing. Requires Full Disk Access; Notes.app is not opened.",
+    inputSchema: {
+      noteId: noteIdInput,
+      savePath: z
+        .string()
+        .min(1, "savePath is required")
+        .max(MAX.SAVE_PATH)
+        .describe(
+          "Absolute path for the new image file (.png, or .jpg/.jpeg for a JPEG rendering)"
+        ),
+      attachmentId: z
+        .string()
+        .max(MAX.ATTACHMENT_ID)
+        .optional()
+        .describe(
+          "Drawing to export (attachmentId or identifier from list-paper-attachments); required when the note has more than one"
+        ),
+    },
+    outputSchema: {
+      savedPath: z.string().optional(),
+      format: z.enum(["png", "jpeg"]).optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+      bytes: z.number().optional(),
+      source: z.enum(["fallback", "preview"]).optional(),
+      attachmentId: z.string().optional(),
+      identifier: z.string().optional(),
+      kind: z.enum(["paper", "drawing"]).optional(),
+      handwritingSummary: z.string().nullable().optional(),
+    },
+  },
+  withErrorHandling(({ noteId, savePath, attachmentId }) => {
+    const r = notesManager.exportPaperImageById(noteId, savePath, attachmentId);
+    return successResponse(
+      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}`,
+      {
+        savedPath: r.savedPath,
+        format: r.format,
+        width: r.width,
+        height: r.height,
+        bytes: r.bytes,
+        source: r.source,
+        attachmentId: drawingAttachmentId(noteId, r.drawing.pk),
+        identifier: r.drawing.identifier,
+        kind: r.drawing.kind,
+        handwritingSummary: r.drawing.handwritingSummary,
+      }
+    );
+  }, "Error exporting Paper image")
 );
 
 // --- fetch-attachment ---

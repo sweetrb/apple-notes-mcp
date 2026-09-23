@@ -1043,6 +1043,36 @@ Saves a note attachment to disk.
 
 ---
 
+#### `list-paper-attachments`
+
+Lists the Paper drawings (`com.apple.paper`) and classic drawings (`com.apple.drawing`, `com.apple.drawing.2`) in one note, and whether Notes has a rendered image of each. Read-only; needs Full Disk Access and does not open Notes.app.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+
+**Returns:** Per drawing: `attachmentId`, `identifier`, `uti`, `kind` (`paper` or `drawing`), `handwritingSummary` (the handwriting text Notes recognized, or `null` when it stored none), `bundlePresent` (the Paper data bundle is on disk), `fallbackImagePath` (Notes' full rendering), `previewPath` (its largest thumbnail), and `raster` `{source, format, width, height}`: the validated image `export-paper-image` would copy, or `null`.
+
+Strokes are not decoded. Notes' Paper bundle has no public reader, so the image is Notes' own rendering.
+
+---
+
+#### `export-paper-image`
+
+Saves Notes' rendered image of one Paper drawing or classic drawing to a new file.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | Exact CoreData note ID |
+| `savePath` | string | Yes | Absolute path for the new file. It must end in the image's extension (`.png`, or `.jpg`/`.jpeg` for a JPEG rendering) |
+| `attachmentId` | string | No | The drawing to export (`attachmentId` or `identifier` from `list-paper-attachments`). Required when the note has more than one |
+
+**Returns:** `savedPath`, `format`, `width`, `height`, `bytes`, `source` (`fallback` for Notes' full rendering, `preview` for its largest thumbnail when no full rendering exists), and the drawing's `attachmentId`, `identifier`, `kind`, and `handwritingSummary`.
+
+**⚠️ Safety:** Writes one new file. `savePath` follows the `save-attachment` allowlist (home, temp, or `/Volumes`), may not be inside the Notes data folder, and must not exist yet. The image header (PNG signature and IHDR, or JPEG frame) is checked before copying and the written file is checked again; a file that fails is removed.
+
+---
+
 #### `fetch-attachment`
 
 Returns a note attachment's bytes as base64, without writing to disk (the read counterpart to `save-attachment`).
@@ -1360,7 +1390,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

@@ -184,6 +184,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.
 
+### Paper and drawings
+- `list-paper-attachments` (note `id`, Full Disk Access) reports each Paper (`com.apple.paper`) or classic drawing with `raster` (format and size of Notes' own rendering) and `handwritingSummary` when Notes stored recognized text.
+- `export-paper-image` copies that rendering to a new file. The `savePath` extension must match the format (`.png` for Paper). Pass `attachmentId` when a note has more than one drawing. It never overwrites.
+- Strokes are not decoded; there is no public reader for Notes' Paper bundles. Do not describe the export as vector data.
+
 ### get-note-link
 - Returns the shareable `notes://showNote?identifier=<uuid>` deep link — use this, not the `x-coredata://` id, whenever a link is meant to be handed to a person, stored in a Reminders task, or opened on iOS
 - Primary path reads `ZIDENTIFIER` from the NoteStore database, so it needs Full Disk Access; on macOS 12–15 it can fall back to the AppleScript `note link` property, which macOS 26+ no longer exposes

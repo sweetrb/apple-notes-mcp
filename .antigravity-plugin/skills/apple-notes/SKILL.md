@@ -67,6 +67,8 @@ Use this skill when the user:
 |------|---------|
 | `list-attachments` | List attachments in a note |
 | `save-attachment` | Save an attachment to disk |
+| `list-paper-attachments` | List Paper and classic drawings in a note, with Notes' rendered image size and any recognized handwriting text |
+| `export-paper-image` | Save Notes' rendered PNG (or JPEG) of one drawing to a new file |
 | `fetch-attachment` | Fetch attachment bytes as base64 |
 | `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |

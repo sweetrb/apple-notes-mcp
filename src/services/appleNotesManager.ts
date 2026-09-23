@@ -49,6 +49,13 @@ import {
   cleanupTempDir,
   ensureParentDir,
 } from "@/utils/attachmentFs.js";
+import {
+  describeDrawings,
+  exportDrawingRaster,
+  readDrawingRows,
+  selectDrawing,
+} from "@/utils/paperAttachments.js";
+import type { DrawingAttachment, DrawingRasterExport } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { existsSync } from "fs";
 import { homedir } from "os";
@@ -3068,6 +3075,30 @@ export class AppleNotesManager {
     } finally {
       cleanupTempDir(dir);
     }
+  }
+
+  /**
+   * Lists a note's Paper (`com.apple.paper`) and classic drawing attachments
+   * with Notes' rendered raster, read-only from NoteStore and the Notes group
+   * container. Requires Full Disk Access.
+   *
+   * @throws PaperStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  listPaperAttachmentsById(noteId: string): DrawingAttachment[] {
+    return describeDrawings(readDrawingRows(noteId));
+  }
+
+  /**
+   * Copies Notes' rendered raster of one drawing to a new file. `attachmentId`
+   * (identifier or AppleScript id) is required when the note has more than one.
+   */
+  exportPaperImageById(
+    noteId: string,
+    savePath: string,
+    attachmentId?: string
+  ): DrawingRasterExport {
+    const drawing = selectDrawing(this.listPaperAttachmentsById(noteId), noteId, attachmentId);
+    return { drawing, ...exportDrawingRaster(drawing, savePath) };
   }
 
   // ===========================================================================
