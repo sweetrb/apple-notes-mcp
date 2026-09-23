@@ -3,6 +3,9 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/utils/checklistParser.js", () => ({ hasFullDiskAccess: vi.fn(() => true) }));
 vi.mock("@/services/nativeTags.js", () => ({
   NATIVE_TAGS_SHORTCUT: "Apple Notes MCP - Native Tags",
+  nativeTagsShortcutName: () => "Apple Notes MCP - Native Tags",
+  listInstalledShortcuts: vi.fn(() => []),
+  resolveShortcut: vi.fn(),
   nativeTagsStatus: vi.fn((shortcut: string) => ({
     shortcut,
     installed: true,
@@ -12,6 +15,41 @@ vi.mock("@/services/nativeTags.js", () => ({
 vi.mock("@/services/backgroundNotes.js", () => ({
   BACKGROUND_SHORTCUT: "Apple Notes MCP - Background Operations v5",
   MARKDOWN_NOTE_SHORTCUT: "Apple Notes MCP - Create Markdown Note",
+  backgroundShortcutName: () => "Apple Notes MCP - Background Operations v5",
+  markdownShortcutName: () => "Apple Notes MCP - Create Markdown Note",
+}));
+const { matrix } = vi.hoisted(() => ({
+  matrix: {
+    runtimeOS: { platform: "darwin", macOSVersion: "26.1", darwinRelease: "25.1.0" },
+    features: {
+      applescriptCore: {
+        description: "core",
+        tools: [],
+        available: true,
+        osSupported: true,
+        minimumMacOSVersion: null,
+        requirements: ["notes_automation"],
+        missing: [],
+        unverified: ["notes_automation"],
+        reason: null,
+      },
+      smartFolders: {
+        description: "placeholder",
+        tools: [],
+        available: false,
+        osSupported: true,
+        minimumMacOSVersion: null,
+        requirements: ["native_helper"],
+        missing: ["native_helper"],
+        unverified: [],
+        reason: "not_implemented",
+      },
+    },
+  },
+}));
+vi.mock("@/services/capabilityMatrix.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/capabilityMatrix.js")>()),
+  getCapabilityMatrix: vi.fn(() => matrix),
 }));
 vi.mock("child_process", () => ({
   spawnSync: vi.fn(() => ({
@@ -163,6 +201,30 @@ describe("runDoctor (#22)", () => {
     expect(check).toMatchObject({ status: "warn" });
     expect(check?.detail).toMatch(/^missing: Native Tags\. Run apple-notes-mcp setup/);
     expect(check?.detail).toContain("Create Markdown Note bridge: not installed");
+  });
+});
+
+describe("runDoctor feature matrix", () => {
+  it("adds runtimeOS and features without changing checks or health", () => {
+    const r = runDoctor(fakeMgr());
+    expect(r.runtimeOS).toEqual(matrix.runtimeOS);
+    expect(r.features?.smartFolders.reason).toBe("not_implemented");
+    expect(r.healthy).toBe(true);
+    expect(r.checks.some((c) => /matrix/i.test(c.name))).toBe(false);
+    const text = formatDoctorReport(r);
+    expect(text).toMatch(/Feature matrix \(macOS 26\.1, Darwin 25\.1\.0\)/);
+    expect(text).toMatch(/✓ applescriptCore: available \(unverified: notes_automation\)/);
+    expect(text).toMatch(/✗ smartFolders: not_implemented \(missing: native_helper\)/);
+  });
+
+  it("keeps the original report when the matrix probe throws", () => {
+    const r = runDoctor(fakeMgr(), () => {
+      throw new Error("probe failed");
+    });
+    expect(r.runtimeOS).toBeUndefined();
+    expect(r.features).toBeUndefined();
+    expect(r.checks.length).toBeGreaterThan(0);
+    expect(formatDoctorReport(r)).not.toMatch(/Feature matrix/);
   });
 });
 

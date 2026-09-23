@@ -13,6 +13,11 @@ import {
   stringValue,
   embeddedMessage,
   WIRE_TYPE,
+  decodeVarint64,
+  decodeWireFields,
+  fixed32Float,
+  ProtobufDecodeError,
+  signedVarint,
 } from "./protobuf.js";
 
 describe("decodeVarint", () => {
@@ -168,5 +173,41 @@ describe("field accessors", () => {
     expect(nested).toBeDefined();
     expect(nested!).toHaveLength(1);
     expect(varintValue(getField(nested!, 1))).toBe(7);
+  });
+});
+
+describe("decodeWireFields (lossless)", () => {
+  const minusOne = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+
+  it("reads 10-byte varints that the legacy decoder rejects", () => {
+    expect(() => decodeVarint(new Uint8Array(minusOne), 0)).toThrow(/too long/);
+    const [value, offset] = decodeVarint64(new Uint8Array(minusOne), 0);
+    expect(offset).toBe(10);
+    expect(signedVarint(value)).toBe(-1);
+  });
+
+  it("keeps fixed32 and fixed64 fields that decodeMessage skips", () => {
+    const float = Buffer.alloc(4);
+    float.writeFloatLE(0.5);
+    const buf = new Uint8Array([0x0d, ...float, 0x11, 1, 2, 3, 4, 5, 6, 7, 8, 0x18, ...minusOne]);
+    const fields = decodeWireFields(buf);
+    expect(fields.map((f) => [f.fieldNumber, f.wireType])).toEqual([
+      [1, 5],
+      [2, 1],
+      [3, 0],
+    ]);
+    expect(fixed32Float(fields[0])).toBe(0.5);
+    expect(fields[1].bytes).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+    expect(signedVarint(fields[2].varint!)).toBe(-1);
+    // The legacy decoder drops both fixed-width fields.
+    expect(decodeMessage(buf.subarray(0, 14))).toEqual([]);
+  });
+
+  it("throws instead of returning partial results on malformed input", () => {
+    expect(() => decodeWireFields(new Uint8Array([0x0a, 0x05, 0x01]))).toThrow(ProtobufDecodeError);
+    expect(() => decodeWireFields(new Uint8Array([0x0d, 0x01]))).toThrow(ProtobufDecodeError);
+    expect(() => decodeWireFields(new Uint8Array([0x0b]))).toThrow(/wire type 3/);
+    expect(() => decodeWireFields(new Uint8Array([0x00, 0x01]))).toThrow(/field number/);
+    expect(() => decodeVarint64(new Uint8Array(11).fill(0xff), 0)).toThrow(/too long/);
   });
 });

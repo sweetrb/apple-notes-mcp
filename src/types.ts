@@ -834,3 +834,195 @@ export interface NoteTablesResult {
   /** All tables as Markdown in body order, separated by blank lines */
   markdown: string;
 }
+
+/**
+ * How a smart folder's top-level filters combine: every filter ("all"), at
+ * least one ("any"), or none of them ("none").
+ */
+export type SmartFolderMatch = "all" | "any" | "none";
+
+/**
+ * One decoded smart folder filter.
+ *
+ * `type` is the stored clause key (for example `folder`, `tag`, `checklist`,
+ * `creationDateRelativeRange`), `"group"` for a nested all/any group, or
+ * `"unknown"` for a clause this server does not recognize (kept verbatim in
+ * `value`). `excluded` marks a negated filter.
+ */
+export interface SmartFolderFilter {
+  type: string;
+  /** Stored value of the clause */
+  value?: unknown;
+  /** Stored clause key, set only for `unknown` filters */
+  key?: string;
+  /** True when the filter is negated (an Exclude rule) */
+  excluded?: boolean;
+  /** Human-readable summary of the filter */
+  description: string;
+  /** Display name: folder title, tag display text, or attachment category */
+  name?: string;
+  /** CoreData id of a referenced folder (folder filters) */
+  folderId?: string;
+  /** ISO 8601 bounds of an absolute date range */
+  from?: string;
+  to?: string;
+  /** How a nested group's filters combine */
+  match?: "all" | "any";
+  /** Filters of a nested group */
+  filters?: SmartFolderFilter[];
+}
+
+/**
+ * A smart folder read from the NoteStore database.
+ */
+export interface SmartFolder {
+  /** CoreData id (x-coredata://…/ICFolder/pN) */
+  id: string;
+  /** Stable CloudKit identifier (ZIDENTIFIER) */
+  identifier: string | null;
+  name: string | null;
+  account: string | null;
+  /** CoreData id of the owning account */
+  accountId: string | null;
+  accountIdentifier: string | null;
+  /** Parent folder name; null at the account root */
+  parent: string | null;
+  parentId: string | null;
+  parentIdentifier: string | null;
+  /** How the top-level filters combine; null when no query is stored */
+  match: SmartFolderMatch | null;
+  filters: SmartFolderFilter[];
+  /** From the stored wrapper: false when Recently Deleted is excluded */
+  includesRecentlyDeleted?: boolean;
+  /** False when a clause was not recognized or the query could not be parsed */
+  fullyDecoded: boolean;
+  /** Stored query with the outer `deleted` wrapper removed */
+  query: unknown;
+  /** Stored query JSON, verbatim */
+  rawQuery: string | null;
+  /** Notes Notes.app lists in this smart folder (only when requested) */
+  matchingNotes?: Array<{ title: string; id: string }>;
+  /** Total notes Notes.app lists in this smart folder (only when requested) */
+  matchingNoteCount?: number;
+  /** Why matching notes could not be listed (only when requested) */
+  matchingNotesError?: string;
+}
+
+// =============================================================================
+// Query Language Types
+// =============================================================================
+
+/**
+ * One note matched by the query-notes tool.
+ */
+export interface QueryNotesHit {
+  /** CoreData note ID, accepted by get-note-content and every other id tool */
+  id: string;
+  /** Note title as stored in the database */
+  title: string;
+  /** Folder path in list-folders syntax; absent for folderless notes */
+  folder?: string;
+  /** Account name; absent when the folder's account cannot be resolved */
+  account?: string;
+  /** Last modification time, ISO 8601 (UTC) */
+  modified?: string;
+  /** Creation time, ISO 8601 (UTC) */
+  created?: string;
+  /** Short plain-text excerpt, centred on the first matched phrase when possible; empty for locked notes */
+  snippet: string;
+  /** Present and true when the note is password-protected */
+  locked?: boolean;
+}
+
+/**
+ * Result of the query-notes tool.
+ */
+export interface QueryNotesResult {
+  /** Matching notes, most recently modified first, at most `limit` */
+  notes: QueryNotesHit[];
+  /** Number of notes returned */
+  count: number;
+  /** Number of scanned notes that matched (may exceed `count`) */
+  matched: number;
+  /** Number of notes examined */
+  scanned: number;
+  /** Notes eligible for scanning (after deleted/folderless exclusion) */
+  eligible: number;
+  /** Scan window applied: the most recently modified N notes */
+  scanLimit: number;
+  /** True when older eligible notes were outside the scan window */
+  scanTruncated: boolean;
+  /** Result cap applied */
+  limit: number;
+  /** True when more notes matched than were returned */
+  truncated: boolean;
+  /** Notes whose body was needed but could not be decoded (locked notes excluded) */
+  unreadable: number;
+}
+
+// =============================================================================
+// Link Insertion Types
+// =============================================================================
+
+/**
+ * How insert-link writes a URL: `raw` shows the URL itself, `hyperlink`
+ * shows a label that links to the URL.
+ */
+export type LinkInsertMode = "raw" | "hyperlink";
+
+/** Where insert-link places the link paragraph. */
+export type LinkInsertPosition = "end" | "after-title";
+
+/**
+ * Parameters for inserting one web or Notes link into an existing note.
+ */
+export interface InsertLinkParams {
+  /** Exact CoreData note id */
+  id: string;
+  /** Revision token from get-note-content */
+  expectedContentHash: string;
+  /** Link destination (http, https, mailto, notes, applenotes) */
+  url: string;
+  /** raw (default) or hyperlink */
+  mode: LinkInsertMode;
+  /** Visible text for hyperlink mode */
+  label?: string;
+  /** Raw mode only: false writes the URL as plain text with no stored link */
+  linked?: boolean;
+  /** end (default) or after-title */
+  position: LinkInsertPosition;
+  /** Leave a blank line between existing text and the link paragraph (default true) */
+  blankLine: boolean;
+  /** Unique existing phrase, required when the note holds native objects */
+  scopeText?: string;
+}
+
+/**
+ * What the guarded append step reports back to insert-link.
+ */
+export interface LinkAppendOutcome {
+  /** "applescript" for ordinary notes, "native" for notes with native objects */
+  route: "applescript" | "native";
+  /** Revision token after the write */
+  contentHash: string;
+}
+
+/**
+ * Result of a verified link insertion.
+ */
+export interface InsertLinkResult {
+  ok: true;
+  id: string;
+  mode: LinkInsertMode;
+  url: string;
+  /** Visible text written (the URL in raw mode, the label in hyperlink mode) */
+  text: string;
+  position: LinkInsertPosition;
+  route: "applescript" | "native";
+  /** Whether the note stores a link attribute on the inserted text */
+  linkStored: boolean;
+  /** Destination read back from the note's stored links */
+  storedUrl?: string;
+  previousContentHash: string;
+  contentHash: string;
+}

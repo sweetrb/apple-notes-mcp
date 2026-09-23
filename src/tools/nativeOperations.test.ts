@@ -9,6 +9,14 @@ vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
   nativeTagBridgeStatus: vi.fn(() => ({ installed: false })),
   markdownNoteStatus: vi.fn(() => ({ installed: false })),
 }));
+// The matrix probe spawns sw_vers, sqlite3, and shortcuts; keep these tests hermetic.
+vi.mock(import("../services/capabilityMatrix.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCapabilityMatrix: vi.fn(() => ({
+    runtimeOS: { platform: "darwin" as const, macOSVersion: "26.0", darwinRelease: "25.0.0" },
+    features: {},
+  })),
+}));
 import { registerNativeOperations } from "./nativeOperations.js";
 import { backgroundStatus, markdownNoteStatus } from "../services/backgroundNotes.js";
 afterEach(() => vi.unstubAllEnvs());
@@ -79,6 +87,22 @@ describe("background capability boundaries", () => {
       verified: true,
       available: true,
     });
+  });
+  it("adds runtimeOS and the feature matrix while keeping every existing key", async () => {
+    const r = await fixture()("get-capabilities")[2]({});
+    expect(Object.keys(r.structuredContent)).toEqual(
+      expect.arrayContaining([
+        "bridge",
+        "nativeTagBridgeInstalled",
+        "markdownNoteBridgeInstalled",
+        "mode",
+        "operations",
+        "unavailable",
+        "runtimeOS",
+        "features",
+      ])
+    );
+    expect(r.structuredContent.runtimeOS.macOSVersion).toBe("26.0");
   });
   it("uses permissive output schemas for native tools", () => {
     expect(fixture()("append-native")[1].outputSchema.parse({ contentHash: "next" })).toMatchObject(
