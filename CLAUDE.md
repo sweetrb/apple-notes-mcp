@@ -236,6 +236,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
 - The destination folder must already exist (create it first with `create-folder`)
+- **Smart folders are refused as destinations** by `move-note`, `batch-move-notes`, `create-note`, `create-note-with-attachment`, and `create-folder` (any path segment): `code: "unsupported"`, `committed: false`, `reason: "smart_folder_destination"`, nothing written. Notes.app would otherwise move the note to Recently Deleted. Pick an ordinary folder from `list-folders`. Needs Full Disk Access to detect; without it the guard is off
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### add-attachment / create-note-with-attachment

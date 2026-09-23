@@ -39569,6 +39569,77 @@ function getChecklistItems(noteId3) {
   return { items };
 }
 
+// src/utils/errorCodes.ts
+var CodedError = class extends Error {
+  envelope;
+  constructor(message, envelope) {
+    super(message);
+    this.name = "CodedError";
+    this.envelope = envelope;
+  }
+};
+var RULES = [
+  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  {
+    code: "verification_failed",
+    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
+  },
+  {
+    code: "revision_conflict",
+    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
+  },
+  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
+  {
+    code: "shortcut_not_installed",
+    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
+  },
+  {
+    code: "not_found",
+    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
+  },
+  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
+  {
+    code: "notes_unavailable",
+    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
+  },
+  {
+    code: "unsupported",
+    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
+  },
+  {
+    code: "validation_error",
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+  }
+];
+var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
+var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
+function classifyError(message, cause) {
+  if (cause instanceof CodedError) return { ...cause.envelope };
+  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message;
+  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
+  let code = "operation_failed";
+  if (timeoutCause) code = "timeout_indeterminate";
+  else if (isPermissionDenied(text2)) code = "permission_denied";
+  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
+  const envelope = { code };
+  if (code === "timeout_indeterminate" || code === "verification_failed") {
+    envelope.indeterminate = true;
+    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
+  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
+    envelope.committed = false;
+    envelope.indeterminate = false;
+  }
+  return envelope;
+}
+function errorResult(message, cause) {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: classifyError(message, cause),
+    isError: true
+  };
+}
+
 // src/utils/inlineImages.ts
 var DEFAULT_MAX_INLINE_IMAGE_BYTES = 256 * 1024;
 function maxInlineImageBytes(env = process.env) {
@@ -42339,6 +42410,24 @@ function buildFolderReference(folderPath) {
 }
 var AS_ACCOUNT_REF = "__acctRef";
 var LIVE_FOLDER_NOT_FOUND = "Folder not found";
+var SMART_FOLDER_DESTINATION = "SMART_FOLDER_DESTINATION";
+function readSmartFolderIds(read = readSmartFolders) {
+  return (read().folders ?? []).map((folder) => folder.id).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+}
+function smartFolderDestinationError(folderPath) {
+  return new CodedError(
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false,
+      reason: "smart_folder_destination"
+    }
+  );
+}
+function throwIfSmartFolderDestination(error2, folderPath) {
+  if (error2?.includes(SMART_FOLDER_DESTINATION)) throw smartFolderDestinationError(folderPath);
+}
 function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) throw new Error("Invalid AppleScript variable");
   buildFolderReference(folderPath);
@@ -42347,10 +42436,26 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   const cid = `${varName}_cid`;
   const any = `${varName}_any`;
   const parent = `${varName}_p`;
-  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${escapePlainStringForAppleScript(folderPath)}" number -1728`;
-  const lines = [];
+  const quotedPath = escapePlainStringForAppleScript(folderPath);
+  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${quotedPath}" number -1728`;
+  const excluded = (opts.excludeFolderIds ?? []).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+  const skipIds = `${varName}_sx`;
+  const skipped = `${varName}_sh`;
+  const candidateTest = excluded.length ? [
+    `    if ${skipIds} contains ${cid} then`,
+    `      set ${skipped} to true`,
+    `    else if exists folder id ${cid} then`
+  ] : [`    if exists folder id ${cid} then`];
+  const unresolved = excluded.length ? [
+    `if ${varName} is missing value then`,
+    `  if ${skipped} then error "${SMART_FOLDER_DESTINATION}: ${quotedPath}" number -1728`,
+    `  ${notFound}`,
+    `end if`
+  ] : [`if ${varName} is missing value then ${notFound}`];
+  const lines = excluded.length ? [`set ${skipIds} to {${excluded.map((id2) => `"${id2}"`).join(", ")}}`] : [];
   parts.forEach((part, i) => {
     const name = escapePlainStringForAppleScript(part);
+    if (excluded.length) lines.push(`set ${skipped} to false`);
     if (i === 0) {
       lines.push(
         `set ${varName} to missing value`,
@@ -42358,7 +42463,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${AS_ACCOUNT_REF} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      if class of (container of ${c}) is not folder then`,
         `        set ${varName} to folder id ${cid}`,
         `        exit repeat`,
@@ -42378,7 +42483,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${parent} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      set ${varName} to folder id ${cid}`,
         `      exit repeat`,
         `    end if`,
@@ -42386,7 +42491,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `end repeat`
       );
     }
-    lines.push(`if ${varName} is missing value then ${notFound}`);
+    lines.push(...unresolved);
   });
   return lines.join("\n");
 }
@@ -42619,7 +42724,9 @@ var AppleNotesManager = class {
     const safeBody = escapeHtmlForAppleScript(`<h1>${htmlTitle}</h1>${bodyContent}`);
     let createCommand;
     if (folder) {
-      createCommand = `${buildLiveFolderResolution(folder, "__folder")}
+      createCommand = `${buildLiveFolderResolution(folder, "__folder", {
+        excludeFolderIds: this.smartFolderIds()
+      })}
       make new note at __folder with properties {body:"${safeBody}"}`;
     } else {
       createCommand = `
@@ -42631,6 +42738,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      if (folder) throwIfSmartFolderDestination(result.error, folder);
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
     }
@@ -43220,6 +43328,35 @@ var AppleNotesManager = class {
       `;
   }
   /**
+   * Smart folder ids that a destination folder must never resolve to. Read
+   * fresh on every write (a smart folder can be added at any time); empty
+   * without Full Disk Access. See {@link readSmartFolderIds}.
+   */
+  smartFolderIds() {
+    return readSmartFolderIds();
+  }
+  /**
+   * Read-only preflight: throws the smart-folder refusal when `folderPath`
+   * resolves in `account` only to a smart folder. For write paths that create
+   * something before they reach their own destination check (the Markdown
+   * bridge creates first and moves second). Other failures are left to the
+   * write itself, which reports them as before.
+   *
+   * @param folderPath - Destination folder path (list-folders syntax)
+   * @param account - Account to resolve in (defaults to Notes' default)
+   */
+  assertNotSmartFolderDestination(folderPath, account) {
+    const excludeFolderIds = this.smartFolderIds();
+    if (excludeFolderIds.length === 0) return;
+    const script = buildAccountScopedScript(
+      { account: this.resolveAccount(account) },
+      `${buildLiveFolderResolution(folderPath, "__folder", { excludeFolderIds })}
+      return id of __folder`
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) throwIfSmartFolderDestination(result.error, folderPath);
+  }
+  /**
    * Lists every smart folder with its decoded query, read-only.
    *
    * Folder metadata and queries come from the NoteStore database (Full Disk
@@ -43760,37 +43897,40 @@ var AppleNotesManager = class {
       console.error(`Invalid folder name: "${name}"`);
       return null;
     }
+    const smart = { rootOnly: true, excludeFolderIds: this.smartFolderIds() };
     for (let i = 0; i < parts.length; i++) {
       const currentPath = parts.slice(0, i + 1).map((p) => escapeFolderName(p)).join("/");
       const checkScript = buildAccountScopedScript(
         { account: targetAccount },
-        `${buildLiveFolderResolution(currentPath, "__folder", { rootOnly: true })}
+        `${buildLiveFolderResolution(currentPath, "__folder", smart)}
         return id of __folder`
       );
       const checkResult = executeAppleScript(checkScript);
       if (checkResult.success) {
         continue;
       }
+      throwIfSmartFolderDestination(checkResult.error, currentPath);
       const segmentName = escapePlainStringForAppleScript(parts[i]);
       let createCommand;
       if (i === 0) {
         createCommand = `make new folder with properties {name:"${segmentName}"}`;
       } else {
         const parentPath = parts.slice(0, i).map((p) => escapeFolderName(p)).join("/");
-        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", { rootOnly: true })}
+        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", smart)}
         make new folder at __parent with properties {name:"${segmentName}"}`;
       }
       const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
       const result = executeMutationAppleScript(script);
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
+        throwIfSmartFolderDestination(result.error, name);
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
       }
     }
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `${buildLiveFolderResolution(name, "__folder", { rootOnly: true })}
+      `${buildLiveFolderResolution(name, "__folder", smart)}
       return (id of __folder) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
@@ -43849,7 +43989,9 @@ var AppleNotesManager = class {
   moveNoteById(id2, destinationFolder, account, scope2) {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeNoteId(id2);
-    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
       ${destFolderSetup}
@@ -43864,6 +44006,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      throwIfSmartFolderDestination(result.error, destinationFolder);
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
@@ -44758,7 +44901,9 @@ var AppleNotesManager = class {
   batchMoveNotes(ids, folder, account) {
     if (ids.length === 0) return [];
     const targetAccount = this.resolveAccount(account);
-    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const results = new Array(ids.length);
     const runnable = [];
     ids.forEach((id2, i) => {
@@ -44814,6 +44959,7 @@ var AppleNotesManager = class {
       const res = executeMutationAppleScript(script);
       if (!res.success) {
         throwIfAccountResolutionFailed(res.error);
+        throwIfSmartFolderDestination(res.error, folder);
         for (const r of runnable) {
           results[r.index] = this.createBatchResult(
             ids[r.index],
@@ -48295,12 +48441,15 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   const segments = (path10) => JSON.stringify(splitFolderPath(path10).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
-    if (!manager.listAccounts().some(
-      (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+    const accounts = manager.listAccounts().filter((account) => account.defaultFolder);
+    if (!accounts.some(
+      (account) => manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
     ))
       throw new Error(
         `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
       );
+    for (const account of accounts)
+      manager.assertNotSmartFolderDestination(request.folder, account.name);
   }
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(
@@ -48966,77 +49115,6 @@ function withJsonSchema2020_12(transport2) {
   const originalSend = transport2.send.bind(transport2);
   transport2.send = (message, options) => originalSend(normalizeOutgoingMessage(message), options);
   return transport2;
-}
-
-// src/utils/errorCodes.ts
-var CodedError = class extends Error {
-  envelope;
-  constructor(message, envelope) {
-    super(message);
-    this.name = "CodedError";
-    this.envelope = envelope;
-  }
-};
-var RULES = [
-  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
-  {
-    code: "verification_failed",
-    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
-  },
-  {
-    code: "revision_conflict",
-    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
-  },
-  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
-  {
-    code: "shortcut_not_installed",
-    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
-  },
-  {
-    code: "not_found",
-    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
-  },
-  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
-  {
-    code: "notes_unavailable",
-    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
-  },
-  {
-    code: "unsupported",
-    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
-  },
-  {
-    code: "validation_error",
-    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
-  }
-];
-var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
-var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
-function classifyError(message, cause) {
-  if (cause instanceof CodedError) return { ...cause.envelope };
-  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
-${cause.message}` : message;
-  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
-  let code = "operation_failed";
-  if (timeoutCause) code = "timeout_indeterminate";
-  else if (isPermissionDenied(text2)) code = "permission_denied";
-  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
-  const envelope = { code };
-  if (code === "timeout_indeterminate" || code === "verification_failed") {
-    envelope.indeterminate = true;
-    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
-  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
-    envelope.committed = false;
-    envelope.indeterminate = false;
-  }
-  return envelope;
-}
-function errorResult(message, cause) {
-  return {
-    content: [{ type: "text", text: message }],
-    structuredContent: classifyError(message, cause),
-    isError: true
-  };
 }
 
 // src/utils/shutdown.ts
@@ -51473,7 +51551,9 @@ function registerDirectOperations(server2, manager) {
     {
       title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
       content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
-      folder: external_exports.string().max(1e3).optional().describe("Existing folder or nested path; create it first with create-folder"),
+      folder: external_exports.string().max(1e3).optional().describe(
+        "Existing folder or nested path; create it first with create-folder. A smart folder is refused before the note is created"
+      ),
       account: external_exports.string().max(200).optional().describe("Account name; defaults to Notes' default"),
       ...attachmentInput
     },
@@ -56032,7 +56112,7 @@ function registerTool(name, config2, cb) {
 registerTool(
   "create-note",
   {
-    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it.",
+    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it. A smart folder is refused (code unsupported); it cannot hold notes.",
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
       content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).optional().describe(
@@ -57523,7 +57603,7 @@ registerTool(
 registerTool(
   "move-note",
   {
-    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
+    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist and cannot be a smart folder (refused with code unsupported before the move). Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
     inputSchema: {
       id: noteIdInput,
       folder: external_exports.string().min(1, "Destination folder is required").max(MAX.FOLDER),
@@ -57765,7 +57845,7 @@ ${lines.join("\n")}${fullyDecoded ? "" : '\n\nSome rules were not recognized; se
 registerTool(
   "create-folder",
   {
-    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nDo not use when: creating a note (create-note).",
+    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nNote: a path segment that names a smart folder is refused (code unsupported) before anything is created; smart folders cannot hold folders.\nDo not use when: creating a note (create-note).",
     inputSchema: {
       name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER).describe(
         'Folder name or nested path separated by "/". E.g., "Retro Tech/PC/CPUs" creates all intermediate folders. Existing segments are skipped.'
@@ -58206,7 +58286,7 @@ registerTool(
 registerTool(
   "batch-move-notes",
   {
-    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
+    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
     inputSchema: {
       ids: noteIdArrayInput.describe(
         `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`

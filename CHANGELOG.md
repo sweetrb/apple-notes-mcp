@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [2.9.9] - 2026-09-23
+
+### Fixed
+
+- Smart folders are refused as destinations. AppleScript resolves a smart
+  folder by name like any other folder and Notes.app accepts `move` and
+  `make` against it: `move-note` and `batch-move-notes` sent the note to
+  Recently Deleted while reporting that the folder may not exist, and
+  `create-note` stored the new note inside the smart folder, where no folder
+  shows it, while reporting failure. `create-note` (every route),
+  `create-note-with-attachment`, `move-note`, `batch-move-notes`, and
+  `create-folder` (any path segment) now refuse a destination that names only
+  a smart folder with `Refused: "<path>" is a smart folder…` and
+  `structuredContent` `{ code: "unsupported", committed: false, reason:
+  "smart_folder_destination" }`, before anything is written. An ordinary
+  folder with the same name as a smart folder is still found. Smart folders
+  are identified read-only from the NoteStore database with the
+  `list-smart-folders` reader, so the guard needs Full Disk Access; without
+  it, destinations resolve as before.
+
 ## [2.9.8] - 2026-09-23
 
 ### Added

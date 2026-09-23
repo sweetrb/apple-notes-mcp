@@ -270,7 +270,7 @@ User: "Create a Work folder"
 Action: Use create-folder with name="Work"
 ```
 
-`create-folder` takes a whole nested path (`name="Work/Clients/Omnia"`) and creates every missing segment, skipping ones that already exist — so it is idempotent and safe to call unconditionally. Do call it first: `create-note`, `move-note`, and `batch-move-notes` all require the destination folder to already exist, and `create-note` reports a missing folder with a generic "check that Notes.app is configured and accessible" message that looks like a permissions problem but is not.
+`create-folder` takes a whole nested path (`name="Work/Clients/Omnia"`) and creates every missing segment, skipping ones that already exist — so it is idempotent and safe to call unconditionally. Do call it first: `create-note`, `move-note`, and `batch-move-notes` all require the destination folder to already exist (and never a smart folder: those are refused with `reason: "smart_folder_destination"`, since Notes would send a moved note to Recently Deleted), and `create-note` reports a missing folder with a generic "check that Notes.app is configured and accessible" message that looks like a permissions problem but is not.
 
 ### Sharing and Revealing Notes
 

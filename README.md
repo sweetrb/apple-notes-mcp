@@ -257,7 +257,7 @@ Creates a new note in Apple Notes.
 | `content` | string | One of `content`/`contentPath` | The body content of the note (do not repeat the title here) |
 | `contentPath` | string | One of `content`/`contentPath` | Absolute path of a local UTF-8 file to use as the body instead of `content`. Allowed in the same places [`save-attachment`](#save-attachment) may write (home, temp, `/Volumes`); symbolic links, non-regular files, invalid UTF-8 and files over 1 MiB are refused before anything is written. A leading byte-order mark is dropped |
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags). Refused with `format: "markdown"` |
-| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
+| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). A smart folder is refused (see [`move-note`](#move-note)). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
 | `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
@@ -1022,6 +1022,8 @@ such a note for good, do it in Notes.app.
 
 Moves a note to a different folder. The note is relocated in place via Notes.app's native `move`, so its id, creation date, and all embedded attachments (files, images, scans, PDFs, audio) are preserved. The destination folder must already exist — create it first with [`create-folder`](#create-folder).
 
+A smart folder is never a destination: it only gathers notes by its rules, and Notes.app would move the note to Recently Deleted or store a created note where no folder shows it. `create-note`, `create-note-with-attachment`, `move-note`, `batch-move-notes`, and `create-folder` refuse one before writing anything, with `code: "unsupported"`, `committed: false`, and `reason: "smart_folder_destination"`. An ordinary folder that shares a smart folder's name is still found. Detection reads the NoteStore database, so it needs Full Disk Access; without it, destinations resolve as before.
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
@@ -1392,7 +1394,7 @@ Creates a new folder, including a whole nested hierarchy in one call.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped |
+| `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped. A segment that names a smart folder is refused before anything is created |
 | `account` | string | No | Account to create folder in (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
@@ -1580,7 +1582,7 @@ Moves multiple notes to a folder.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ids` | string[] | Yes | Array of note IDs to move (max 500 per request) |
-| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder) |
+| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder). A smart folder is refused for the whole call before any note moves |
 | `account` | string | No | Account containing the folder |
 
 **Returns:** Summary of successes and failures. Each success is reported only

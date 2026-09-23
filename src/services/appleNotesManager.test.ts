@@ -74,6 +74,13 @@ vi.mock("@/utils/trashFolders.js", async (importOriginal) => ({
 }));
 import { readTrashFolderIds } from "@/utils/trashFolders.js";
 const mockReadTrashFolderIds = vi.mocked(readTrashFolderIds);
+
+// Smart folder ids come from the database too; none here, so destination
+// scripts are exactly what they were. smartFolderDestination.test.ts covers them.
+vi.mock("@/utils/smartFolders.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/smartFolders.js")>()),
+  readSmartFolders: vi.fn(() => ({ folders: [] })),
+}));
 const G = "\x1d";
 const TRASH_FOLDER = "x-coredata://ABC-123/ICFolder/p9";
 

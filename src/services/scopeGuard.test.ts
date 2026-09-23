@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/utils/applescript.js", () => ({ executeAppleScript: vi.fn() }));
+// Keep the live NoteStore out of this test: no smart folders.
+vi.mock("@/utils/smartFolders.js", () => ({ readSmartFolders: vi.fn(() => ({ folders: [] })) }));
 vi.mock("@/utils/noteRichText.js", async (original) => ({
   ...(await original<typeof import("@/utils/noteRichText.js")>()),
   readRichNote: vi.fn(),

@@ -45,6 +45,7 @@ import {
   isPermissionDenied,
 } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
+import { CodedError } from "@/utils/errorCodes.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
@@ -709,6 +710,52 @@ const AS_ACCOUNT_REF = "__acctRef";
 export const LIVE_FOLDER_NOT_FOUND = "Folder not found";
 
 /**
+ * Error text raised by {@link buildLiveFolderResolution} when a path segment
+ * names only excluded (smart) folders.
+ */
+export const SMART_FOLDER_DESTINATION = "SMART_FOLDER_DESTINATION";
+
+/**
+ * Core Data ids of every smart folder, read-only from the NoteStore database
+ * with the same reader as list-smart-folders. Empty when the database cannot
+ * be read (no Full Disk Access, unknown schema): Notes.app's scripting
+ * dictionary has no folder-type property, so without the database a smart
+ * folder cannot be told from an ordinary one and resolution behaves as before.
+ *
+ * @param read - Smart folder reader (tests pass a fixture-backed one)
+ */
+export function readSmartFolderIds(
+  read: () => { folders: { id: string }[] | null } = readSmartFolders
+): string[] {
+  return (read().folders ?? [])
+    .map((folder) => folder.id)
+    .filter((id) => FOLDER_ID_PATTERN.test(id));
+}
+
+/**
+ * The refusal for a destination that is a smart folder. A smart folder only
+ * gathers notes by its rules: Notes.app accepts `move` and `make` against one,
+ * but a moved note lands in Recently Deleted and a created note is stored where
+ * no folder shows it, while the call reports failure. Thrown before any write.
+ */
+export function smartFolderDestinationError(folderPath: string): CodedError {
+  return new CodedError(
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false,
+      reason: "smart_folder_destination",
+    }
+  );
+}
+
+/** Throws {@link smartFolderDestinationError} when an AppleScript error is the smart-folder refusal. */
+export function throwIfSmartFolderDestination(error: string | undefined, folderPath: string): void {
+  if (error?.includes(SMART_FOLDER_DESTINATION)) throw smartFolderDestinationError(folderPath);
+}
+
+/**
  * Builds AppleScript that binds `varName` to a folder reference by id, walking
  * `folderPath` one segment at a time and accepting only folders that still
  * exist by id.
@@ -725,6 +772,12 @@ export const LIVE_FOLDER_NOT_FOUND = "Folder not found";
  * live same-named folder elsewhere in the account is the fallback, as a bare
  * name lookup has always allowed.
  *
+ * `excludeFolderIds` (smart folder ids from {@link readSmartFolderIds}) are
+ * never bound. AppleScript lists smart folders among `folders` and resolves
+ * them by name, so without this a destination named like a smart folder binds
+ * to it. When a segment's only live candidates are excluded, the script raises
+ * {@link SMART_FOLDER_DESTINATION}, before any statement after the fragment.
+ *
  * The fragment must run inside `tell application "Notes"` after
  * `buildAccountResolution` has bound the account variable, either at app level
  * or inside `tell` that account.
@@ -732,12 +785,13 @@ export const LIVE_FOLDER_NOT_FOUND = "Folder not found";
  * @param folderPath - Slash-separated path, validated like buildFolderReference
  * @param varName - AppleScript variable to bind (also prefixes the temporaries)
  * @param opts.rootOnly - Match the first segment only at the account root
+ * @param opts.excludeFolderIds - Folder ids never to bind (smart folders)
  * @returns AppleScript statements
  */
 export function buildLiveFolderResolution(
   folderPath: string,
   varName: string,
-  opts: { rootOnly?: boolean } = {}
+  opts: { rootOnly?: boolean; excludeFolderIds?: readonly string[] } = {}
 ): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) throw new Error("Invalid AppleScript variable");
   buildFolderReference(folderPath); // validates length, depth, emptiness
@@ -746,11 +800,35 @@ export function buildLiveFolderResolution(
   const cid = `${varName}_cid`;
   const any = `${varName}_any`;
   const parent = `${varName}_p`;
-  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${escapePlainStringForAppleScript(folderPath)}" number -1728`;
+  const quotedPath = escapePlainStringForAppleScript(folderPath);
+  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${quotedPath}" number -1728`;
+  // Ids are interpolated into the script, so only exact Core Data ids pass.
+  const excluded = (opts.excludeFolderIds ?? []).filter((id) => FOLDER_ID_PATTERN.test(id));
+  const skipIds = `${varName}_sx`;
+  const skipped = `${varName}_sh`;
+  // Without exclusions the generated script is exactly what it was before.
+  const candidateTest = excluded.length
+    ? [
+        `    if ${skipIds} contains ${cid} then`,
+        `      set ${skipped} to true`,
+        `    else if exists folder id ${cid} then`,
+      ]
+    : [`    if exists folder id ${cid} then`];
+  const unresolved = excluded.length
+    ? [
+        `if ${varName} is missing value then`,
+        `  if ${skipped} then error "${SMART_FOLDER_DESTINATION}: ${quotedPath}" number -1728`,
+        `  ${notFound}`,
+        `end if`,
+      ]
+    : [`if ${varName} is missing value then ${notFound}`];
 
-  const lines: string[] = [];
+  const lines: string[] = excluded.length
+    ? [`set ${skipIds} to {${excluded.map((id) => `"${id}"`).join(", ")}}`]
+    : [];
   parts.forEach((part, i) => {
     const name = escapePlainStringForAppleScript(part);
+    if (excluded.length) lines.push(`set ${skipped} to false`);
     if (i === 0) {
       lines.push(
         `set ${varName} to missing value`,
@@ -758,7 +836,7 @@ export function buildLiveFolderResolution(
         `repeat with ${c} in (folders of ${AS_ACCOUNT_REF} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      if class of (container of ${c}) is not folder then`,
         `        set ${varName} to folder id ${cid}`,
         `        exit repeat`,
@@ -778,7 +856,7 @@ export function buildLiveFolderResolution(
         `repeat with ${c} in (folders of ${parent} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      set ${varName} to folder id ${cid}`,
         `      exit repeat`,
         `    end if`,
@@ -786,7 +864,7 @@ export function buildLiveFolderResolution(
         `end repeat`
       );
     }
-    lines.push(`if ${varName} is missing value then ${notFound}`);
+    lines.push(...unresolved);
   });
   return lines.join("\n");
 }
@@ -1226,8 +1304,10 @@ export class AppleNotesManager {
       // fails to resolve the note reference in deeply nested folder contexts (-1728).
       // The implicit return from `make new note` includes the ID which we parse.
       // The folder is resolved to a live id first, so a folder deleted earlier
-      // in this Notes session is never the target (#213).
-      createCommand = `${buildLiveFolderResolution(folder, "__folder")}
+      // in this Notes session is never the target (#213), nor a smart folder.
+      createCommand = `${buildLiveFolderResolution(folder, "__folder", {
+        excludeFolderIds: this.smartFolderIds(),
+      })}
       make new note at __folder with properties {body:"${safeBody}"}`;
     } else {
       // Create note in default location
@@ -1243,6 +1323,7 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      if (folder) throwIfSmartFolderDestination(result.error, folder);
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
     }
@@ -1999,6 +2080,37 @@ export class AppleNotesManager {
   }
 
   /**
+   * Smart folder ids that a destination folder must never resolve to. Read
+   * fresh on every write (a smart folder can be added at any time); empty
+   * without Full Disk Access. See {@link readSmartFolderIds}.
+   */
+  smartFolderIds(): string[] {
+    return readSmartFolderIds();
+  }
+
+  /**
+   * Read-only preflight: throws the smart-folder refusal when `folderPath`
+   * resolves in `account` only to a smart folder. For write paths that create
+   * something before they reach their own destination check (the Markdown
+   * bridge creates first and moves second). Other failures are left to the
+   * write itself, which reports them as before.
+   *
+   * @param folderPath - Destination folder path (list-folders syntax)
+   * @param account - Account to resolve in (defaults to Notes' default)
+   */
+  assertNotSmartFolderDestination(folderPath: string, account?: string): void {
+    const excludeFolderIds = this.smartFolderIds();
+    if (excludeFolderIds.length === 0) return;
+    const script = buildAccountScopedScript(
+      { account: this.resolveAccount(account) },
+      `${buildLiveFolderResolution(folderPath, "__folder", { excludeFolderIds })}
+      return id of __folder`
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) throwIfSmartFolderDestination(result.error, folderPath);
+  }
+
+  /**
    * Lists every smart folder with its decoded query, read-only.
    *
    * Folder metadata and queries come from the NoteStore database (Full Disk
@@ -2647,7 +2759,11 @@ export class AppleNotesManager {
     // Create each segment of the path, checking existence first to avoid duplicates.
     // For "A/B/C": ensure "A" exists, then "A/B", then "A/B/C". Existence is
     // decided by id, never by a name reference alone: a name reference still
-    // resolves a folder deleted earlier in this Notes session (#213).
+    // resolves a folder deleted earlier in this Notes session (#213). A segment
+    // that names only a smart folder is refused before anything is created: a
+    // smart folder cannot hold folders, and treating it as the existing folder
+    // would hand its id back as if it were an ordinary one.
+    const smart = { rootOnly: true, excludeFolderIds: this.smartFolderIds() };
     for (let i = 0; i < parts.length; i++) {
       const currentPath = parts
         .slice(0, i + 1)
@@ -2657,7 +2773,7 @@ export class AppleNotesManager {
       // Check if this folder already exists
       const checkScript = buildAccountScopedScript(
         { account: targetAccount },
-        `${buildLiveFolderResolution(currentPath, "__folder", { rootOnly: true })}
+        `${buildLiveFolderResolution(currentPath, "__folder", smart)}
         return id of __folder`
       );
       const checkResult = executeAppleScript(checkScript);
@@ -2665,6 +2781,7 @@ export class AppleNotesManager {
         // Folder exists, move to next segment
         continue;
       }
+      throwIfSmartFolderDestination(checkResult.error, currentPath);
 
       // Folder doesn't exist — create it
       const segmentName = escapePlainStringForAppleScript(parts[i]);
@@ -2677,7 +2794,7 @@ export class AppleNotesManager {
           .slice(0, i)
           .map((p) => escapeFolderName(p))
           .join("/");
-        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", { rootOnly: true })}
+        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", smart)}
         make new folder at __parent with properties {name:"${segmentName}"}`;
       }
 
@@ -2686,6 +2803,7 @@ export class AppleNotesManager {
 
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
+        throwIfSmartFolderDestination(result.error, name);
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
       }
@@ -2698,7 +2816,7 @@ export class AppleNotesManager {
     // id counts, so a create that silently did nothing is reported as failure.
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `${buildLiveFolderResolution(name, "__folder", { rootOnly: true })}
+      `${buildLiveFolderResolution(name, "__folder", smart)}
       return (id of __folder) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
@@ -2781,8 +2899,11 @@ export class AppleNotesManager {
     // a precondition error, so let it throw. The destination folder must already
     // exist — Notes.app's `move` does not create it.
     // The destination resolves to a live folder id, never a folder deleted
-    // earlier in this Notes session (#213).
-    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder");
+    // earlier in this Notes session (#213), and never a smart folder: moving a
+    // note "into" one sends it to Recently Deleted.
+    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds(),
+    });
 
     // Optional folder preconditions run in the same script, just before `move`.
     const moveCommand = `
@@ -2800,6 +2921,7 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      throwIfSmartFolderDestination(result.error, destinationFolder);
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
@@ -3886,8 +4008,10 @@ export class AppleNotesManager {
     // buildFolderReference validates the (single, shared) destination path; a
     // malformed folder is a precondition error for the whole call, so let it throw.
     // The destination resolves to a live folder id, never a folder deleted
-    // earlier in this Notes session (#213).
-    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder");
+    // earlier in this Notes session (#213), and never a smart folder.
+    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds(),
+    });
 
     const results: { id: string; success: boolean; error?: string }[] = new Array(ids.length);
     const runnable: { index: number; safe: string }[] = [];
@@ -3948,8 +4072,10 @@ export class AppleNotesManager {
       if (!res.success) {
         // An unresolvable/ambiguous account is a precondition error for the
         // whole call, not a per-note outcome — surface it rather than reporting
-        // N identical "batch move failed" rows that hide the real cause.
+        // N identical "batch move failed" rows that hide the real cause. A
+        // smart-folder destination is refused for the whole call the same way.
         throwIfAccountResolutionFailed(res.error);
+        throwIfSmartFolderDestination(res.error, folder);
         // Whole-batch failure (e.g. destination folder unresolved, Notes not
         // responding): can't isolate, so fail every runnable note.
         for (const r of runnable) {
