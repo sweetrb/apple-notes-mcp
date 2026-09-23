@@ -114,6 +114,25 @@ describe("parseNoteTableCells", () => {
       { row: 1, column: 1, reason: "Cell contains an embedded object" },
     ]);
   });
+  it("lists several incomplete cells in row, then column order", () => {
+    // Replace two same-length cells so both carry an embedded object.
+    const raw = gunzipSync(withCellText("Готово", "Гото\ufffcx"));
+    const from = Buffer.from("Статус", "utf8");
+    const to = Buffer.from("Стат\ufffcx", "utf8");
+    expect(to.length).toBe(from.length);
+    const at = raw.indexOf(from);
+    expect(at).toBeGreaterThanOrEqual(0);
+    to.copy(raw, at);
+    const detailed = parseNoteTableCells(gzipSync(raw));
+    expect(detailed.rows).toEqual([
+      ["Имя", null],
+      ["Проба 🧭", null],
+    ]);
+    expect(detailed.incompleteCells).toEqual([
+      { row: 0, column: 1, reason: "Cell contains an embedded object" },
+      { row: 1, column: 1, reason: "Cell contains an embedded object" },
+    ]);
+  });
   it("still throws on structural damage", () => {
     expect(() => parseNoteTableCells(fixture.subarray(0, fixture.length / 2))).toThrow();
   });
