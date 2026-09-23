@@ -44175,11 +44175,10 @@ var VERIFIED_BACKGROUND = /* @__PURE__ */ new Set([
   "set-note-pinned",
   "remove-native-tags",
   "replace-native-tag",
-  "create-note-markdown"
+  "create-note-markdown",
+  "create-note-markdown-blocks"
 ]);
-var LIVE_VALIDATION_BLOCKERS = {
-  "create-note-markdown-blocks": "Markdown block quotes, fenced code, checklist items, dividers and inline code in create-note await a live readback of the Create Markdown Note Shortcut on this build"
-};
+var LIVE_VALIDATION_BLOCKERS = {};
 var signingRefusal = "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";
 var UNAVAILABLE = {
   "set-checklist-item": signingRefusal,
@@ -44697,7 +44696,7 @@ registerTool(
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
       content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).describe(
-        'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles once get-capabilities reports create-note-markdown-blocks available.'
+        'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles (see create-note-markdown-blocks in get-capabilities).'
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"

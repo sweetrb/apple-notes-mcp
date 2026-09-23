@@ -216,8 +216,7 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
   emphasis outside a word or backslash escapes; underscores inside a link
   destination are fine.
 - `create-note` with `format: "markdown"` also maps block constructs to native
-  Notes styles once `get-capabilities` reports `create-note-markdown-blocks`
-  available: `- [ ]`/`- [x]` → native checklist items with that done state,
+  Notes styles (`create-note-markdown-blocks` in `get-capabilities`): `- [ ]`/`- [x]` → native checklist items with that done state,
   `> text` → a block quote, a bare ```` ``` ```` fence (no language) →
   Monospaced paragraphs, a `---` line after a blank line → a divider, and
   `` `inline code` `` → **highlighted** text (not monospace). Code content is
@@ -244,7 +243,7 @@ notes, or create a separate formatted note.
 
 Some Notes UI features cannot be created by the current AppleScript-backed create/update tools:
 
-- Interactive checklists: in plaintext or HTML, create a plain list instead; `create-note` with `format: "markdown"` and `- [ ]`/`- [x]` lines creates real ones when `create-note-markdown-blocks` is available, and `create-checklist-item` appends one unchecked item. Use `get-checklist-state` to read checklist state.
+- Interactive checklists: in plaintext or HTML, create a plain list instead; `create-note` with `format: "markdown"` and `- [ ]`/`- [x]` lines creates real ones, and `create-checklist-item` appends one unchecked item. Use `get-checklist-state` to read checklist state.
 - Collapsible headings: API-created headings look like headings, but may not get Notes' native collapse controls.
 - Block quotes, dashed lists, and background highlights: these require manual Notes UI formatting.
 

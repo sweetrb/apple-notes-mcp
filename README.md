@@ -292,9 +292,9 @@ title line, with no seed line.
   existing one), which keeps the characters but not the Heading and Subheading
   styles. Markdown punctuation in `title` is escaped, so the title stays literal.
 - Notes' importer also maps these block constructs to native styles. They are
-  gated separately: `get-capabilities` reports them as
-  `create-note-markdown-blocks`, and they are refused until that operation is
-  live-verified on the build (or `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` is set).
+  gated separately, and `get-capabilities` reports them as
+  `create-note-markdown-blocks`. Each mapping below was live-verified on
+  macOS 27.2 by reading the created note's stored styles.
 
   | Markdown | Native result |
   |----------|---------------|
@@ -1452,7 +1452,7 @@ Apple Notes stores checklists as a paragraph style (`style_type=103`) inside a g
 **Workarounds:**
 
 1. **Create the note with bulleted list items, then convert manually in Notes.app.** Select the items and press <kbd>⇧⌘L</kbd> (or **Format → Checklist**). This converts the list in place and the resulting checklist will be readable by `get-checklist-state` and annotated by `get-note-markdown`.
-2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript. This server does that for you in two ways: [`create-checklist-item`](#create-checklist-item) appends one unchecked item to an existing note, and [`create-note`](#create-note) with `format: "markdown"` turns `- [ ]` / `- [x]` lines into checklist items with that done state through Notes' own Markdown importer, once `get-capabilities` reports `create-note-markdown-blocks` available (see [Markdown notes](#markdown-notes)).
+2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript. This server does that for you in two ways: [`create-checklist-item`](#create-checklist-item) appends one unchecked item to an existing note, and [`create-note`](#create-note) with `format: "markdown"` turns `- [ ]` / `- [x]` lines into checklist items with that done state through Notes' own Markdown importer, (see [Markdown notes](#markdown-notes)).
 3. **Read-only checklist support is fully implemented** — once a checklist exists (created manually or by another app), `get-checklist-state` and `get-note-markdown` will read its done/undone state correctly (with Full Disk Access).
 
 If you need to *track* todos programmatically and don't strictly need them rendered as Apple Notes checklist UI, plain markdown-style `- [ ] item` / `- [x] item` lines in a `plaintext` note are a reasonable alternative — they are searchable, human-readable, and can be parsed by downstream tooling.

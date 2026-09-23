@@ -326,7 +326,7 @@ registerTool(
         .min(1, "Content is required")
         .max(MAX.CONTENT)
         .describe(
-          'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles once get-capabilities reports create-note-markdown-blocks available.'
+          'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles (see create-note-markdown-blocks in get-capabilities).'
         ),
       format: z
         .enum(["plaintext", "html", "markdown"])
@@ -381,7 +381,7 @@ registerTool(
         );
       requireValidated("create-note-markdown");
       // Block quotes, fenced code, checklist items, dividers and inline code
-      // have their own gate until a live readback on this build confirms them.
+      // have their own gate, so they can be withdrawn without the rest.
       if (usesMarkdownBlocks(content)) requireValidated("create-note-markdown-blocks");
       const result = createMarkdownNote(notesManager, { title, content, folder });
       return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);

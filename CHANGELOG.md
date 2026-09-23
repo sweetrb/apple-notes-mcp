@@ -16,8 +16,10 @@
   under text, `[X]` or `*`/`+` checklist markers, checklist items next to
   ordinary list items, padded inline code, tables and strikethrough). These
   constructs have their own gate, `create-note-markdown-blocks` in
-  `get-capabilities`, which stays unverified until a live readback of the
-  Create Markdown Note Shortcut passes on this build.
+  `get-capabilities`, live-verified on macOS 27.2: one created note carried
+  the quote flag on the quoted lines, Monospaced style on the code lines
+  (indentation and literal `*`/`_` kept), two checklist items with done
+  states 0 and 1, one `dividerline` attachment, and one highlight run.
 - `readRichNote` style runs carry the decoded paragraph style, block-quote flag
   and highlight flag alongside the existing comparison signature.
 

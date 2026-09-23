@@ -27,11 +27,9 @@ export const VERIFIED_BACKGROUND = new Set<string>([
   "remove-native-tags",
   "replace-native-tag",
   "create-note-markdown",
+  "create-note-markdown-blocks",
 ]);
-const LIVE_VALIDATION_BLOCKERS: Record<string, string> = {
-  "create-note-markdown-blocks":
-    "Markdown block quotes, fenced code, checklist items, dividers and inline code in create-note await a live readback of the Create Markdown Note Shortcut on this build",
-};
+const LIVE_VALIDATION_BLOCKERS: Record<string, string> = {};
 const signingRefusal =
   "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";
 export const UNAVAILABLE = {
