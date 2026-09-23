@@ -56,6 +56,7 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
+import { createShutdown } from "@/utils/shutdown.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import {
   enrichNoteRead,
@@ -67,6 +68,8 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import { MAX_LINK_LABEL_LENGTH, MAX_LINK_URL_LENGTH } from "@/utils/linkInsert.js";
+import { insertLink } from "@/services/linkInsert.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -1330,6 +1333,169 @@ registerTool(
   )
 );
 
+/** Arguments for the guarded append shared by append-to-note and insert-link. */
+interface GuardedAppendArgs {
+  id: string;
+  expectedContentHash: string;
+  content: string;
+  position?: "after" | "before";
+  separator?: string;
+  format?: "plaintext" | "html";
+  scopeText?: string;
+  /**
+   * HTML placed between the body and the new block on the AppleScript route,
+   * overriding the separator conversion. The native route ignores it and
+   * still requires the default separator.
+   */
+  htmlSeparator?: string;
+}
+
+/**
+ * Revision-checked append to one exact note. Ordinary notes are rewritten
+ * through AppleScript with visible-text and link readback; notes holding
+ * native objects go through the native end-append bridge. Returns the tool
+ * response; `onRoute` learns which route ran before the write starts.
+ */
+function guardedAppend(
+  {
+    id,
+    expectedContentHash,
+    content,
+    position = "after",
+    separator = "\n\n",
+    format = "plaintext",
+    scopeText,
+    htmlSeparator,
+  }: GuardedAppendArgs,
+  onRoute?: (route: "applescript" | "native") => void
+): ToolResponse {
+  // Helper: convert new content to HTML block(s) and separator to HTML.
+  // Notes stores its body as HTML; reading plaintext and writing back as
+  // plaintext would destroy <b>/<i>/etc. formatting and duplicate the
+  // title (plaintext includes the title as the first line, and the
+  // plaintext write path prepends it again).  We always read as HTML,
+  // split off the title <div>, convert the new content to HTML if needed,
+  // and write back as HTML.
+  const contentToHtml = (text: string): string => {
+    if (format === "html") return text;
+    // Plaintext: each line becomes a <div> (empty lines become <div><br></div>)
+    return text
+      .split("\n")
+      .map((line) => {
+        const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div>${escaped || "<br>"}</div>`;
+      })
+      .join("");
+  };
+  const separatorToHtml = (sep: string): string => {
+    if (format === "html") return sep;
+    if (sep === "\n\n") return "<div><br></div>";
+    // Arbitrary plaintext separator: escape and wrap
+    const escaped = sep.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<div>${escaped}</div>`;
+  };
+
+  const snapshot = readExactNoteSnapshot(id);
+  if ("error" in snapshot) return errorResponse(snapshot.error);
+  if (snapshot.contentHash !== expectedContentHash) {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (!snapshot.rich.writable) {
+    if (separator !== "\n\n")
+      return errorResponse("Native append supports the default blank-line separator only");
+    if (position !== "after") return errorResponse("Native append supports the end of a note only");
+    if (!scopeText)
+      return errorResponse("Provide scopeText: a unique existing phrase for native append");
+    if (!VERIFIED_BACKGROUND.has("append-native"))
+      return errorResponse("Native append has not passed live validation; see get-capabilities");
+    onRoute?.("native");
+    const result = appendNative(notesManager, {
+      id,
+      expectedContentHash,
+      scopeText,
+      content,
+      format,
+    });
+    return successResponse("Native append verified without replacing existing objects", result);
+  }
+  onRoute?.("applescript");
+  const attachments = notesManager.listAttachmentsById(id);
+  if (attachments.length > 0) {
+    return errorResponse(
+      `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
+    );
+  }
+
+  assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
+
+  // Separate the title <div> from the body
+  const firstDivEnd = snapshot.rich.content.indexOf("</div>");
+  const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
+  const bodyHtml =
+    firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
+  const newBlock = contentToHtml(content);
+  const sepHtml = htmlSeparator ?? separatorToHtml(separator);
+  const combinedBody =
+    position === "before"
+      ? titleDiv + newBlock + sepHtml + bodyHtml
+      : titleDiv + bodyHtml + sepHtml + newBlock;
+
+  const result = notesManager.updateNoteByIdIfUnchanged(
+    id,
+    snapshot.note.title,
+    snapshot.body,
+    undefined,
+    combinedBody,
+    "html",
+    snapshot.rich.revision
+  );
+  if (result.status === "conflict") {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (result.status === "attachments") {
+    return errorResponse(
+      `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
+    );
+  }
+  if (result.status !== "updated") {
+    return errorResponse(
+      `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
+    );
+  }
+
+  const readback = notesManager.getNoteContentById(id);
+  const richReadback = enrichNoteRead(id, readback || "");
+  const contentHash = readback ? richContentHash(readback, richReadback) : "";
+  if (
+    !richReadback.complete ||
+    linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))
+  ) {
+    return errorResponse(
+      "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
+    );
+  }
+  if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
+    return errorResponse(
+      `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
+    );
+  }
+  const sharedWarning = snapshot.note.shared
+    ? "\n\n⚠️ This note is shared with collaborators. Your changes are visible to them."
+    : "";
+  return successResponse(
+    `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
+    {
+      ok: true,
+      id,
+      title: snapshot.note.title,
+      shared: snapshot.note.shared ?? false,
+      previousContentHash: expectedContentHash,
+      contentHash,
+      verifiedVisibleText: true,
+    }
+  );
+}
+
 // --- append-to-note ---
 
 registerTool(
@@ -1382,148 +1548,110 @@ registerTool(
       verifiedVisibleText: z.boolean().optional(),
     },
   },
-  withErrorHandling(
-    ({
-      id,
-      expectedContentHash,
-      content,
-      position = "after",
-      separator = "\n\n",
-      format = "plaintext",
-      scopeText,
-    }) => {
-      // Helper: convert new content to HTML block(s) and separator to HTML.
-      // Notes stores its body as HTML; reading plaintext and writing back as
-      // plaintext would destroy <b>/<i>/etc. formatting and duplicate the
-      // title (plaintext includes the title as the first line, and the
-      // plaintext write path prepends it again).  We always read as HTML,
-      // split off the title <div>, convert the new content to HTML if needed,
-      // and write back as HTML.
-      const contentToHtml = (text: string): string => {
-        if (format === "html") return text;
-        // Plaintext: each line becomes a <div> (empty lines become <div><br></div>)
-        return text
-          .split("\n")
-          .map((line) => {
-            const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            return `<div>${escaped || "<br>"}</div>`;
-          })
-          .join("");
-      };
-      const separatorToHtml = (sep: string): string => {
-        if (format === "html") return sep;
-        if (sep === "\n\n") return "<div><br></div>";
-        // Arbitrary plaintext separator: escape and wrap
-        const escaped = sep.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<div>${escaped}</div>`;
-      };
+  withErrorHandling((args) => guardedAppend(args), "Error appending to note")
+);
 
-      const snapshot = readExactNoteSnapshot(id);
-      if ("error" in snapshot) return errorResponse(snapshot.error);
-      if (snapshot.contentHash !== expectedContentHash) {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (!snapshot.rich.writable) {
-        if (separator !== "\n\n")
-          return errorResponse("Native append supports the default blank-line separator only");
-        if (position !== "after")
-          return errorResponse("Native append supports the end of a note only");
-        if (!scopeText)
-          return errorResponse("Provide scopeText: a unique existing phrase for native append");
-        if (!VERIFIED_BACKGROUND.has("append-native"))
-          return errorResponse(
-            "Native append has not passed live validation; see get-capabilities"
-          );
-        const result = appendNative(notesManager, {
-          id,
-          expectedContentHash,
-          scopeText,
-          content,
-          format,
-        });
-        return successResponse("Native append verified without replacing existing objects", result);
-      }
-      const attachments = notesManager.listAttachmentsById(id);
-      if (attachments.length > 0) {
-        return errorResponse(
-          `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
-        );
-      }
+// --- insert-link ---
 
-      assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
-
-      // Separate the title <div> from the body
-      const firstDivEnd = snapshot.rich.content.indexOf("</div>");
-      const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
-      const bodyHtml =
-        firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
-      const newBlock = contentToHtml(content);
-      const sepHtml = separatorToHtml(separator);
-      const combinedBody =
-        position === "before"
-          ? titleDiv + newBlock + sepHtml + bodyHtml
-          : titleDiv + bodyHtml + sepHtml + newBlock;
-
-      const result = notesManager.updateNoteByIdIfUnchanged(
-        id,
-        snapshot.note.title,
-        snapshot.body,
-        undefined,
-        combinedBody,
-        "html",
-        snapshot.rich.revision
-      );
-      if (result.status === "conflict") {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (result.status === "attachments") {
-        return errorResponse(
-          `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
-        );
-      }
-      if (result.status !== "updated") {
-        return errorResponse(
-          `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
-        );
-      }
-
-      const readback = notesManager.getNoteContentById(id);
-      const richReadback = enrichNoteRead(id, readback || "");
-      const contentHash = readback ? richContentHash(readback, richReadback) : "";
-      if (
-        !richReadback.complete ||
-        linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))
-      ) {
-        return errorResponse(
-          "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
-        );
-      }
-      if (
-        !readback ||
-        comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)
-      ) {
-        return errorResponse(
-          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id} in Notes.app.`
-        );
-      }
-      const sharedWarning = snapshot.note.shared
-        ? "\n\n⚠️ This note is shared with collaborators. Your changes are visible to them."
-        : "";
-      return successResponse(
-        `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
-        {
-          ok: true,
-          id,
-          title: snapshot.note.title,
-          shared: snapshot.note.shared ?? false,
-          previousContentHash: expectedContentHash,
-          contentHash,
-          verifiedVisibleText: true,
-        }
-      );
+registerTool(
+  "insert-link",
+  {
+    description:
+      "Use when: adding one web, mail or Notes link to an exact note, either as the raw URL (mode 'raw') or as label text that links to the URL (mode 'hyperlink').\nReturns: exact id, the route used, whether Notes stored a link on the inserted text, the stored destination read back from the note, and the new content hash.\nDo not use when: linking to another note by id (insert-note-link fetches its real deep link), or you want a rich URL preview card (not available: no public automation route creates one).\nSafety: same guards as append-to-note (fresh expectedContentHash, attachment block, existing links must survive). Notes with native objects use native end-append and need scopeText; there only position 'end' with a blank line is supported. The link is placed in its own paragraph at the end or directly after the title; placing it inside an existing paragraph is not supported.",
+    inputSchema: {
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
+      url: z
+        .string()
+        .min(1, "url is required")
+        .max(MAX_LINK_URL_LENGTH)
+        .describe(
+          "Link destination: absolute http(s) URL with a host, or a mailto:, notes:// or applenotes: link. No spaces."
+        ),
+      mode: z
+        .enum(["raw", "hyperlink"])
+        .optional()
+        .default("raw")
+        .describe(
+          "'raw' (default) shows the URL itself; 'hyperlink' shows `label` linking to the URL"
+        ),
+      label: z
+        .string()
+        .max(MAX_LINK_LABEL_LENGTH)
+        .optional()
+        .describe("Visible text for mode 'hyperlink' (required there, refused in raw mode)"),
+      linked: z
+        .boolean()
+        .optional()
+        .describe(
+          "Raw mode only. true (default) stores a real link on the URL text. false writes plain text with no stored link; Notes may still detect it when displaying, and the result reports linkStored."
+        ),
+      position: z
+        .enum(["end", "after-title"])
+        .optional()
+        .default("end")
+        .describe("'end' (default) or 'after-title' (first paragraph below the title)"),
+      blankLine: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Leave a blank line between existing text and the link paragraph (default true; native-object notes require true)"
+        ),
+      scopeText: z
+        .string()
+        .min(12)
+        .max(500)
+        .optional()
+        .describe("Existing unique phrase; required only for notes with native objects"),
     },
-    "Error appending to note"
-  )
+    outputSchema: {
+      ok: z.boolean().optional(),
+      id: z.string().optional(),
+      mode: z.string().optional(),
+      url: z.string().optional(),
+      text: z.string().optional(),
+      position: z.string().optional(),
+      route: z.string().optional(),
+      linkStored: z.boolean().optional(),
+      storedUrl: z.string().optional(),
+      previousContentHash: z.string().optional(),
+      contentHash: z.string().optional(),
+    },
+  },
+  withErrorHandling((args) => {
+    const result = insertLink(
+      {
+        ...args,
+        mode: args.mode ?? "raw",
+        position: args.position ?? "end",
+        blankLine: args.blankLine ?? true,
+      },
+      {
+        readLinks: (noteId) => readRichNote(noteId).links,
+        append: (request) => {
+          let route: "applescript" | "native" = "applescript";
+          const response = guardedAppend(
+            {
+              ...request,
+              format: "html",
+              htmlSeparator: request.separator ? "<div><br></div>" : "",
+            },
+            (r) => (route = r)
+          );
+          if (response.isError) throw new Error(response.content[0].text);
+          return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
+        },
+      }
+    );
+    const stored = result.linkStored
+      ? `stored link to ${result.storedUrl}`
+      : "no stored link (plain text)";
+    return successResponse(
+      `Link inserted (${result.mode}, ${result.position}, ${result.route}); ${stored}`,
+      { ...result }
+    );
+  }, "Error inserting link")
 );
 
 // --- delete-note ---
@@ -2732,17 +2860,14 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // Graceful shutdown. This server holds no persistent resources (AppleScript runs
-// are one-shot via execSync), so there's nothing to drain — but wiring SIGINT/
+// are one-shot via execSync), so the only thing to drain is stdout — and wiring SIGINT/
 // SIGTERM and stdin EOF/close to a clean exit keeps behavior tidy and consistent
 // with the sibling apple-mail server: when the parent kills us (signal) or the
 // MCP client disconnects (stdin 'end'/'close'), exit 0 promptly instead of
 // lingering as an orphan. Idempotent so multiple triggers don't double-exit.
-let _shuttingDown = false;
-const shutdown = (): void => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+// Pending stdout is drained first (bounded), so a response larger than the pipe
+// buffer isn't truncated when the client closes stdin right after a request.
+const shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, shutdown);
 }
