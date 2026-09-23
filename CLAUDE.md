@@ -189,6 +189,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `link` is the stored URL; check `linkSafe` before emitting it into HTML
 - Read-only view: do not build a full-body update from it
 
+### export-notes-markdown
+- Exactly one of `id` (exact note ID) or `folder` (path, optional `account`, `limit` default 100)
+- Renders from the decoded body, so checklist state, tables and attachment positions are exact; `get-note-markdown` is unchanged
+- A folder document joins notes with `---`. It is a presentation format: never split it back into notes or use it as a backup
+- `outputPath` is create-only; `[output_exists]` means choose a new path, never delete the old file on the user's behalf
+- Pass `assetsDir` to copy attachment files; without it attachments are placeholders like `\[Image: name\]`
+- Password-protected notes are listed in `skipped`; Full Disk Access is required
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

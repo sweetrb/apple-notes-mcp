@@ -990,6 +990,55 @@ Gets a note's content as Markdown instead of HTML. If the note contains checklis
 
 ---
 
+#### `export-notes-markdown`
+
+Exports one note, or the notes of one folder, as a single Markdown document
+rendered from the decoded note body (the same block model as
+[`get-note-blocks`](#get-note-blocks)). Titles render as `#`, headings as `##`,
+subheadings as `###`. Bulleted, dashed and numbered lists keep their indent
+(four spaces per level), checklists render as `- [x]`/`- [ ]`, block quotes as
+`>`, and monospaced paragraphs as fenced code. Inline runs keep bold, italic,
+strikethrough, underline (`<u>`), highlight (`==`), superscript and subscript
+(`<sup>`/`<sub>`), and links whose scheme is http(s), `notes:`, `applenotes:`
+or `mailto:`. Tables render as GitHub tables. Attachments stay in body order:
+with `assetsDir` they link to copies of their files (images inline, drawings
+through Notes' fallback image, scans as their PDF), and without it they render
+as labeled placeholders such as `\[Image: name\]`. An attachment whose file
+cannot be found renders as `\[Image unavailable: name\]`. This tool leaves
+`get-note-markdown` unchanged.
+
+A folder export is one presentation document with notes separated by `---`.
+It is not a backup or restore format; use `export-notes-json` for that.
+
+**Requires:** Full Disk Access. Password-protected notes are skipped in a
+folder export (listed in `skipped` with code `encrypted`) and refused for a
+single note.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`/`folder` | Exact note ID |
+| `folder` | string | One of `id`/`folder` | Folder path, as for `list-notes` |
+| `account` | string | No | Account holding `folder` |
+| `limit` | number | No | Maximum notes read from the folder (default 100, max 1000) |
+| `outputPath` | string | No | Absolute file to create. Create-only: an existing file (or symlink) is refused with `[output_exists]` |
+| `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
+| `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
+
+Both paths follow the `save-attachment` rules (absolute, under the home
+directory, a temp directory, or `/Volumes`, no symlink escapes) and may not
+point inside the Notes library container. With `outputPath`, asset links are
+relative to the document's directory; without it they are absolute paths.
+
+**Returns:** without `outputPath`, the Markdown itself (refused with
+`[too-large]` above half of `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, because the
+document travels in both the text and structured result). With `outputPath`, a
+receipt: `format`, `count`, `bytes`, `output`, and `assets` (`dir`, `files`).
+Both carry `stats` (attachments, placed, placeholders, unavailable, tables,
+unreadableTables, unreferenced) and `skipped`. Nothing already written is
+deleted if a later step fails.
+
+---
+
 #### `get-checklist-state`
 
 Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
@@ -1361,7 +1410,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
-| `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
+| `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
 | `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
@@ -1391,7 +1440,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

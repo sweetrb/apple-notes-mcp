@@ -43,6 +43,7 @@ Use this skill when the user:
 | `show-note` | Reveal a note in the Notes.app UI by ID |
 | `get-selected-notes` | Read the notes currently selected in Notes.app |
 | `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
+| `export-notes-markdown` | Export one note or a folder as one Markdown document from the decoded body; optional create-only `outputPath` and `assetsDir` for attachment copies (presentation format, not a backup) |
 
 ### Folder Operations
 

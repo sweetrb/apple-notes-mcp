@@ -48,6 +48,7 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
+import { createShutdown } from "@/utils/shutdown.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import {
   enrichNoteRead,
@@ -60,6 +61,11 @@ import {
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
 import { NoteBlocksError, pageNoteBlocks, readNoteBlocks } from "@/utils/noteBlocks.js";
+import {
+  exportNotesMarkdown,
+  MAX_FOLDER_EXPORT_LIMIT,
+  NotesExportError,
+} from "@/services/notesExport.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -2561,6 +2567,108 @@ registerTool(
   }, "Error getting note as markdown")
 );
 
+// --- export-notes-markdown ---
+
+const exportPathInput = (what: string) =>
+  z
+    .string()
+    .min(1)
+    .max(MAX.SAVE_PATH)
+    .optional()
+    .describe(
+      `${what} (absolute; under home, a temp dir, or /Volumes; never inside the Notes library)`
+    );
+
+const exportStatsSchema = z.object({
+  attachments: z.number(),
+  placed: z.number(),
+  placeholders: z.number(),
+  unavailable: z.number(),
+  tables: z.number(),
+  unreadableTables: z.number(),
+  unreferenced: z.number(),
+});
+
+registerTool(
+  "export-notes-markdown",
+  {
+    description:
+      "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.",
+    inputSchema: {
+      id: noteIdInput.optional(),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe("Folder path to export instead of one note (nested paths use '/')"),
+      account: z
+        .string()
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Account holding the folder (defaults to Notes.app's default account)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_FOLDER_EXPORT_LIMIT)
+        .optional()
+        .describe(
+          `Maximum notes read from the folder (default 100, max ${MAX_FOLDER_EXPORT_LIMIT})`
+        ),
+      outputPath: exportPathInput("File to create for the Markdown"),
+      assetsDir: exportPathInput("Directory that receives copies of attachment files"),
+      wrap: z
+        .number()
+        .int()
+        .min(0)
+        .max(1000)
+        .optional()
+        .describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
+    },
+    outputSchema: {
+      format: z.string().optional(),
+      count: z.number().optional(),
+      bytes: z.number().optional(),
+      markdown: z.string().optional(),
+      output: z.string().optional(),
+      assets: z.object({ dir: z.string(), files: z.number() }).optional(),
+      stats: exportStatsSchema.optional(),
+      skipped: z.array(z.object({ id: z.string(), code: z.string() })).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  },
+  withErrorHandling((request) => {
+    let receipt;
+    try {
+      receipt = exportNotesMarkdown(request, {
+        listNoteRefs: (account, folder, since, limit) =>
+          notesManager.listNoteRefs(account, folder, since, limit),
+        // The document travels twice (text and structuredContent).
+        maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024,
+      });
+    } catch (error) {
+      if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
+      const hint =
+        error.code === "no-full-disk-access"
+          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          : "";
+      return errorResponse(`Error exporting Markdown [${error.code}]: ${error.message}${hint}`);
+    }
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    if (receipt.output)
+      return successResponse(
+        `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` +
+          (receipt.assets
+            ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}`
+            : "") +
+          `${skipped}.`,
+        { ...receipt }
+      );
+    return successResponse(receipt.markdown ?? "", { ...receipt });
+  }, "Error exporting Markdown")
+);
+
 // --- get-checklist-state ---
 
 registerTool(
@@ -2677,17 +2785,14 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // Graceful shutdown. This server holds no persistent resources (AppleScript runs
-// are one-shot via execSync), so there's nothing to drain — but wiring SIGINT/
+// are one-shot via execSync), so the only thing to drain is stdout — and wiring SIGINT/
 // SIGTERM and stdin EOF/close to a clean exit keeps behavior tidy and consistent
 // with the sibling apple-mail server: when the parent kills us (signal) or the
 // MCP client disconnects (stdin 'end'/'close'), exit 0 promptly instead of
 // lingering as an orphan. Idempotent so multiple triggers don't double-exit.
-let _shuttingDown = false;
-const shutdown = (): void => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+// Pending stdout is drained first (bounded), so a response larger than the pipe
+// buffer isn't truncated when the client closes stdin right after a request.
+const shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, shutdown);
 }

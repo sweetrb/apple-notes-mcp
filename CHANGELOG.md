@@ -1,5 +1,41 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `export-notes-markdown` exports one note (by exact id) or a folder's notes
+  as one Markdown document rendered from the decoded note body: headings,
+  bulleted, dashed and numbered lists with indent, checklists with state,
+  block quotes, fenced monospaced blocks, bold, italic, strikethrough,
+  underline, highlight, superscript, subscript and safe links. Tables render
+  as GitHub tables and attachments stay in body order. With `assetsDir`,
+  attachment files are copied (existing files are never replaced; taken names
+  get `-2`, `-3`, ...) and linked; without it they render as labeled
+  placeholders, and a missing file renders a visible "unavailable" marker.
+  `outputPath` is create-only and refuses an existing file with
+  `[output_exists]`; without it the Markdown is returned inline under half of
+  `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`. `wrap` hard-wraps prose. A folder
+  document separates notes with `---` and is a presentation format, not a
+  restore format. Neither path may point inside the Notes library container.
+- `src/utils/noteExportData.ts` loads a note's blocks and attachment rows
+  read-only (column names feature-detected, note key bound as a parameter);
+  `exportAssets.ts` finds attachment files, previews and fallback images
+  confined to their account directory and opens them with `O_NOFOLLOW`;
+  `exportRender.ts` holds the format-neutral attachment plans the HTML export
+  will share.
+
+### Fixed
+
+- The server drains pending stdout, capped at two seconds, before exiting on
+  stdin close or a signal. With the new tool, `tools/list` crosses the 64 KiB
+  pipe buffer, and one-shot clients received it truncated. The helper is the
+  same one proposed separately in `fix/drain-stdout-on-shutdown`.
+
+### Unchanged
+
+- `get-note-markdown` keeps its HTML-conversion contract and output.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added

@@ -788,3 +788,59 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+/**
+ * A request to export one note or one folder as a presentation document
+ * (export-notes-markdown). Exactly one of `id` or `folder` is set.
+ */
+export interface NotesExportRequest {
+  /** Exact CoreData note id. */
+  id?: string;
+  /** Folder path, as accepted by list-notes. */
+  folder?: string;
+  /** Account holding `folder` (defaults to Notes.app's default account). */
+  account?: string;
+  /** Maximum notes read from `folder`. */
+  limit?: number;
+  /** Absolute file to create. Create-only: an existing file is refused. */
+  outputPath?: string;
+  /** Absolute directory that receives copies of attachment files. */
+  assetsDir?: string;
+  /** Hard-wrap prose at this many columns (Markdown only; 0 disables). */
+  wrap?: number;
+}
+
+/** Counts of how attachments were rendered in an export. */
+export interface NotesExportAttachmentStats {
+  attachments: number;
+  placed: number;
+  placeholders: number;
+  unavailable: number;
+  tables: number;
+  unreadableTables: number;
+  unreferenced: number;
+}
+
+/** A note that was selected but could not be exported. */
+export interface NotesExportSkip {
+  id: string;
+  /** Stable reason code, such as `encrypted` or `not-found`. */
+  code: string;
+}
+
+/** The bounded result of an export. */
+export interface NotesExportReceipt {
+  format: "markdown" | "html";
+  /** Notes rendered into the document. */
+  count: number;
+  /** UTF-8 size of the document. */
+  bytes: number;
+  /** The document itself, only when no outputPath was given. */
+  markdown?: string;
+  /** Absolute path of the file written. */
+  output?: string;
+  /** Sidecar directory and the number of files copied into it. */
+  assets?: { dir: string; files: number };
+  stats: NotesExportAttachmentStats;
+  skipped: NotesExportSkip[];
+}
