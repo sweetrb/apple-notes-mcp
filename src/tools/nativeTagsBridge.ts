@@ -1,10 +1,18 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
+import { errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { addNativeTags, nativeTagsStatus, runNativeTagsShortcut } from "../services/nativeTags.js";
 import { enrichNoteRead, readRichNote, richContentHash } from "../utils/noteRichText.js";
 
-const noteId = z.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+// Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
+// Core Data key, resolved to the x-coredata id before the handler runs.
+const noteId = exactIdInput(
+  "ICNote",
+  /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
+  NOTE_ID_MESSAGE
+);
 const revision = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 
 /** Register native tag status and mutation tools on the MCP server. */
@@ -30,15 +38,7 @@ export function registerNativeTagsBridge(server: McpServer, manager: AppleNotesM
             structuredContent: result,
           };
         } catch (error) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: error instanceof Error ? error.message : String(error),
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(error instanceof Error ? error.message : String(error), error);
         }
       }) as unknown as ToolCallback<S>
     );

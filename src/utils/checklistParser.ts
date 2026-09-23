@@ -39,6 +39,7 @@ import {
   embeddedMessage,
 } from "@/utils/protobuf.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { checklistRunLineStart } from "@/utils/checklistRuns.js";
 
 /** Style type value for checklist items in Apple Notes protobuf format. */
 const CHECKLIST_STYLE_TYPE = 103;
@@ -162,7 +163,7 @@ function hexToBytes(hex: string): Uint8Array {
  * @param data - Decompressed protobuf bytes
  * @returns Array of checklist items, or null if parsing fails
  */
-function parseChecklistFromProtobuf(data: Uint8Array): ChecklistItem[] | null {
+export function parseChecklistFromProtobuf(data: Uint8Array): ChecklistItem[] | null {
   try {
     // Document root
     const docFields = decodeMessage(data);
@@ -188,6 +189,9 @@ function parseChecklistFromProtobuf(data: Uint8Array): ChecklistItem[] | null {
 
     // Split text into lines for mapping
     const lines = noteText.split("\n");
+    const lineStarts: number[] = [];
+    for (let i = 0, start = 0; i < lines.length; start += lines[i].length + 1, i++)
+      lineStarts.push(start);
 
     // Walk attribute runs, tracking position in the text
     const items: ChecklistItem[] = [];
@@ -219,19 +223,17 @@ function parseChecklistFromProtobuf(data: Uint8Array): ChecklistItem[] | null {
           // Field 2 = done (0 = unchecked, 1 = checked)
           const done = checklistFields ? (varintValue(getField(checklistFields, 2)) ?? 0) : 0;
 
-          // Find which line this position corresponds to
-          let lineStart = 0;
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const lineEnd = lineStart + lines[lineIdx].length;
-            if (charPos >= lineStart && charPos < lineEnd + 1 && !seenLines.has(lineIdx)) {
-              seenLines.add(lineIdx);
-              items.push({
-                text: lines[lineIdx],
-                done: done === 1,
-              });
-              break;
-            }
-            lineStart = lineEnd + 1; // +1 for the \n
+          // Find which line this run styles (see checklistRunLineStart)
+          const lineIdx =
+            charPos <= noteText.length
+              ? lineStarts.indexOf(checklistRunLineStart(noteText, charPos, runLength))
+              : -1;
+          if (lineIdx !== -1 && !seenLines.has(lineIdx)) {
+            seenLines.add(lineIdx);
+            items.push({
+              text: lines[lineIdx],
+              done: done === 1,
+            });
           }
         }
       }
@@ -276,8 +278,8 @@ export function getChecklistItems(noteId: string): ChecklistResult {
       error: "no_fda",
       message:
         "Full Disk Access is required to read checklist state. " +
-        "In System Settings > Privacy & Security > Full Disk Access, grant access to the app " +
-        "that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and " +
+        "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
+        "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
         `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`,
     };
   }

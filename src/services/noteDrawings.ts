@@ -112,7 +112,7 @@ function decodeRow(
  * fails does not fail the call: it carries status "error" with a code, and the
  * overall status says ok, partial, error, or none.
  *
- * Throws NoteStoreReadError for note-level problems (bad id, not found, locked,
+ * Throws NoteStoreError or a coded error for note-level problems (bad id, not found, locked,
  * no Full Disk Access) and PublicHelperError when drawings exist but the helper
  * is not usable, so the caller gets one actionable message instead of N copies.
  */

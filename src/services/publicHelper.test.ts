@@ -25,6 +25,7 @@ import {
   sourceDigestSwift,
   type PublicHelperBuildDeps,
 } from "./publicHelper.js";
+import { CodedError, errorResult } from "@/utils/errorCodes.js";
 
 type SpawnResult = ReturnType<typeof spawnSync>;
 const result = (over: Partial<SpawnResult>): SpawnResult =>
@@ -348,5 +349,22 @@ describe("callPublicHelper", () => {
         )
       )
     ).toBe("helper_not_installed");
+  });
+});
+
+describe("PublicHelperError envelope", () => {
+  it("reports an unavailable helper as unsupported and other failures as operation_failed", () => {
+    const unavailable = errorResult("Error", new PublicHelperError("helper_stale", "rebuild"));
+    expect(unavailable.structuredContent).toEqual({
+      code: "unsupported",
+      helperCode: "helper_stale",
+    });
+    const failed = new PublicHelperError("decode_failed", "bad bytes");
+    expect(failed).toBeInstanceOf(CodedError);
+    expect(failed.code).toBe("decode_failed");
+    expect(errorResult("Error", failed).structuredContent).toEqual({
+      code: "operation_failed",
+      helperCode: "decode_failed",
+    });
   });
 });

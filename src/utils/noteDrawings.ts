@@ -17,11 +17,10 @@ import type { DrawingBounds, DrawingStroke } from "@/types.js";
 import {
   assertNoteReadable,
   NOTE_STATE_SQL,
-  NOTE_STORE_PATH,
-  NoteStoreReadError,
   parseNoteObjectId,
-  queryNoteStore,
+  queryNoteScoped,
 } from "./noteStoreQuery.js";
+import { NOTES_DB_PATH, NoteStoreError, notTombstonedSql, readColumns } from "./noteStoreSql.js";
 
 export const DRAWING_UTIS = ["com.apple.drawing.2", "com.apple.drawing"] as const;
 
@@ -35,39 +34,40 @@ export interface DrawingRow {
   data: Buffer | null;
 }
 
-/** Column list query; the data column is chosen from what the schema has. */
-export const DRAWING_COLUMNS_SQL = "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');";
-
 /**
  * The drawing query for one data column. The column name comes from a fixed
- * allowlist, never from input; the note key is the bound `:pk` parameter.
+ * allowlist, never from input; the note key is the bound `@pk` parameter.
+ * Attachments marked for deletion are skipped where the schema tracks that.
  */
-export function drawingRowsSql(dataColumn: "ZMERGEABLEDATA1" | "ZMERGEABLEDATA"): string {
+export function drawingRowsSql(
+  columns: ReadonlySet<string>,
+  dataColumn: "ZMERGEABLEDATA1" | "ZMERGEABLEDATA"
+): string {
   return [
     NOTE_STATE_SQL,
     "SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, " +
       `'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM ` +
-      "(SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE = :pk AND " +
-      "ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') " +
-      "AND COALESCE(ZMARKEDFORDELETION, 0) = 0 ORDER BY Z_PK) a;",
+      "(SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND " +
+      "a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') " +
+      `AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`,
   ].join("\n");
 }
 
 /** Reads every classic drawing attachment of one note, in primary-key order. */
-export function readDrawingRows(noteId: string, dbPath: string = NOTE_STORE_PATH): DrawingRow[] {
+export function readDrawingRows(noteId: string, dbPath: string = NOTES_DB_PATH): DrawingRow[] {
   const { store, pk } = parseNoteObjectId(noteId);
-  const columns = new Set(queryNoteStore(DRAWING_COLUMNS_SQL, {}, dbPath).map((l) => l.trim()));
+  const columns = readColumns(dbPath);
   const dataColumn = columns.has("ZMERGEABLEDATA1")
     ? "ZMERGEABLEDATA1"
     : columns.has("ZMERGEABLEDATA")
       ? "ZMERGEABLEDATA"
       : null;
   if (!dataColumn)
-    throw new NoteStoreReadError(
-      "query_error",
-      "This macOS version's Notes database has no drawing data column."
+    throw new NoteStoreError(
+      "This macOS version's Notes database has no drawing data column.",
+      "schema"
     );
-  const [stateLine, rowsLine] = queryNoteStore(drawingRowsSql(dataColumn), { pk }, dbPath);
+  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns, dataColumn), pk, dbPath);
   assertNoteReadable(stateLine, noteId);
   const rows = JSON.parse(rowsLine || "[]") as Array<{
     pk: number;

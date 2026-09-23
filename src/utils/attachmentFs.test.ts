@@ -20,6 +20,7 @@ import {
   cleanupTempDir,
   allowedSaveRoots,
   ensureParentDir,
+  deniedSaveRoots,
 } from "@/utils/attachmentFs.js";
 
 const dirs: string[] = [];
@@ -247,5 +248,91 @@ describe("the boundary compares path segments, not string prefixes", () => {
   it("still accepts ordinary paths inside the real allowed roots", () => {
     expect(() => assertSafeSavePath(join(homedir(), "Downloads", "x.png"))).not.toThrow();
     expect(() => assertSafeSavePath("/private/tmp/x.png")).not.toThrow();
+  });
+});
+
+describe("assertSafeSavePath — Notes library container (#208)", () => {
+  let box: string;
+  let container: string;
+  afterEach(() => {
+    if (box) rmSync(box, { recursive: true, force: true });
+  });
+  function setup() {
+    box = realpathSync(mkdtempSync(join(homedir(), ".anatt-deny-")));
+    container = join(box, "Group Containers", "group.com.apple.notes");
+    mkdirSync(join(container, "Accounts"), { recursive: true });
+  }
+
+  it("denies the real Notes group container by default", () => {
+    expect(deniedSaveRoots()).toEqual([
+      join(homedir(), "Library/Group Containers/group.com.apple.notes"),
+    ]);
+    expect(() =>
+      assertSafeSavePath(
+        join(homedir(), "Library/Group Containers/group.com.apple.notes/Media/x.png")
+      )
+    ).toThrow(/Notes library container/);
+  });
+
+  it("refuses a direct path inside the container, and the container itself", () => {
+    setup();
+    expect(() =>
+      assertSafeSavePath(join(container, "Accounts", "x.png"), undefined, [container])
+    ).toThrow(/Notes library container/);
+    expect(() =>
+      assertSafeSavePath(join(container, "new", "deep", "x.png"), undefined, [container])
+    ).toThrow(/Notes library container/);
+    expect(() => assertSafeSavePath(container, undefined, [container])).toThrow(
+      /Notes library container/
+    );
+  });
+
+  it("refuses a destination reached through a symlink into the container", () => {
+    setup();
+    const link = join(box, "innocent");
+    symlinkSync(join(container, "Accounts"), link);
+    expect(() => assertSafeSavePath(join(link, "x.png"), undefined, [container])).toThrow(
+      /Notes library container/
+    );
+  });
+
+  it("refuses a denied root that is itself reached through a symlink", () => {
+    setup();
+    const alias = join(box, "alias-container");
+    symlinkSync(container, alias);
+    // The deny entry is the symlinked spelling; the write uses the real one.
+    expect(() => assertSafeSavePath(join(container, "x.png"), undefined, [alias])).toThrow(
+      /Notes library container/
+    );
+  });
+
+  it("refuses a case-respelled path", () => {
+    setup();
+    const respelled = join(box, "GROUP CONTAINERS", "Group.Com.Apple.Notes", "x.png");
+    expect(() => assertSafeSavePath(respelled, undefined, [container])).toThrow(
+      /Notes library container|outside allowed/
+    );
+    // Even a not-yet-existing container is matched case-insensitively.
+    const missing = join(box, "Missing", "group.com.apple.notes");
+    expect(() =>
+      assertSafeSavePath(join(box, "missing", "GROUP.COM.APPLE.NOTES", "x.png"), undefined, [
+        missing,
+      ])
+    ).toThrow(/Notes library container/);
+  });
+
+  it("still allows prefix-sharing siblings and ordinary paths", () => {
+    setup();
+    const sibling = join(box, "Group Containers", "group.com.apple.notes-evil", "x.png");
+    expect(assertSafeSavePath(sibling, undefined, [container])).toBe(sibling);
+    const ok = join(box, "Exports", "x.png");
+    expect(assertSafeSavePath(ok, undefined, [container])).toBe(ok);
+  });
+
+  it("ensureParentDir refuses before creating anything inside the container", () => {
+    setup();
+    const dest = join(container, "made-by-export", "x.png");
+    expect(() => ensureParentDir(dest, undefined, [container])).toThrow(/Notes library container/);
+    expect(existsSync(join(container, "made-by-export"))).toBe(false);
   });
 });

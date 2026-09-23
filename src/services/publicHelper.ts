@@ -41,6 +41,7 @@ import { homedir, release } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { CodedError } from "@/utils/errorCodes.js";
 
 /** The only protocol version this client speaks. Bump with the Swift `protocolVersion`. */
 export const PUBLIC_HELPER_PROTOCOL = 1;
@@ -195,13 +196,30 @@ export function inspectPublicHelper(
   return { ...base, manifest, ready: true, reason: null, detail: null };
 }
 
-/** A helper failure with a stable machine code. */
-export class PublicHelperError extends Error {
+/** Helper codes that mean the helper cannot be used here until setup runs. */
+const UNAVAILABLE_CODES: ReadonlySet<string> = new Set<PublicHelperUnavailable>([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid",
+]);
+
+/**
+ * A helper failure with a stable machine code. It carries the coded error
+ * envelope: `unsupported` while the helper is unavailable (not built, stale,
+ * modified, or not macOS), `operation_failed` otherwise, with the helper's
+ * own code as `helperCode`.
+ */
+export class PublicHelperError extends CodedError {
   constructor(
     readonly code: string,
     message: string
   ) {
-    super(message);
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      helperCode: code,
+    });
     this.name = "PublicHelperError";
   }
 }
