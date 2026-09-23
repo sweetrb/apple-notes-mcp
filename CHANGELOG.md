@@ -4,28 +4,34 @@
 
 ### Added
 
-- Opt-in native private helper (#181). A small Objective-C program, shipped as
-  source in `native/private-helper/` and built on the user's Mac with
+- Opt-in, **read-only** native private helper (#181, #204, thanks
+  @oliverames). A small Objective-C program, shipped as source in
+  `native/private-helper/` and built on the user's Mac with
   `apple-notes-mcp setup --native-helper`, opens the Notes store through
   Apple's private NotesShared model and speaks a versioned JSON protocol with
-  a fixed action list. It is off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`,
-  and the server checks the helper's source and binary SHA-256 before every
-  call. Three tools:
+  a fixed action list (`hello`, `probe`, `read_note_state`). It is off unless
+  `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`, and the server checks the helper's
+  source and binary SHA-256 before every call. Two tools:
   - `native-helper-status`: build and opt-in state plus a live probe of the
     framework, required selectors, model properties, and store access, with
-    a reason code per feature.
+    a reason code.
   - `native-note-state`: a note's native title, dates, flags, iCloud version
-    counters, and a revision token (read-only).
-  - `native-append-plain-text`: appends plain paragraphs guarded by
-    `ifRevision`, verified by a fresh read-back. It reports
-    `pushScheduled: false`; on macOS 27.2 the change appeared in the running
-    Notes.app at once but was not uploaded to iCloud in the 13 minutes observed;
-    it uploaded only when Notes.app next saved its own change to that note.
-    Until it passes a live validation that includes sync, it also requires
-    `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`.
-- `privateHelperCapabilities()` for a future capability matrix, and
-  `scripts/test-private-helper-copy-store.sh`, which exercises the write path
-  against a copy of the Notes store. See TECHNICAL_NOTES.md "Private helper".
+    counters, and an opaque change token.
+- The helper is read-only by construction: every store it opens uses
+  `NSReadOnlyPersistentStoreOption` with migration disabled, it refuses to
+  continue if Core Data reports a writable store, no code path saves a
+  context, and setup refuses to install a helper that does not report
+  `readOnly: true` or offers any action outside the read-only whitelist. A
+  source test fails the build if a save or write path reappears. Helper
+  errors use the shared `code`/`committed` error envelope (#185).
+- Write support was deliberately deferred by the maintainer. The proposed
+  `native-append-plain-text` action was removed before merge: a second writer
+  beside a running Notes.app, CRDT replica identity, and the iCloud upload lag
+  (a helper-written change was not uploaded until Notes.app next saved that
+  note) are unresolved. The capability matrix's write-dependent placeholders
+  (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`)
+  stay `not_implemented`; their requirement is now labelled
+  `native_write_helper`.
 
 ## [2.8.49] - 2026-09-23
 

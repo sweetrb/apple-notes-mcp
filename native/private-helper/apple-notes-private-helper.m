@@ -5,6 +5,16 @@
 // Core Data store through NotesShared's own managed object model and store
 // options, and performs only the whitelisted actions in kActions below.
 //
+// READ-ONLY. This helper never writes. Every store it opens is opened with
+// NSReadOnlyPersistentStoreOption and migration disabled,
+// OpenReadOnlyContext() refuses to hand out a context whose store is not
+// read-only, and no code path saves a managed object context. Write support
+// (an earlier plain-text append action) was deliberately deferred by the
+// maintainer until a second writer beside a running Notes.app, CRDT replica
+// identity, and the iCloud upload lag are understood.
+// src/services/privateHelperReadOnly.test.ts fails the build if a save or
+// write path reappears here.
+//
 // This is UNSUPPORTED PRIVATE API. Every class and selector is resolved at
 // runtime and checked before use; a missing one fails closed with
 // `private_api_unavailable` instead of crashing. The helper never issues SQL,
@@ -18,7 +28,8 @@
 // Adding an action: write a `static NSDictionary *HandleX(NSDictionary *)`,
 // list the NotesShared selectors it needs in an APIRequirement table (so
 // `probe` can report it), and add one row to kActions with its name and
-// allowed request keys. The dispatcher rejects any other key.
+// allowed request keys. The dispatcher rejects any other key. Actions must
+// be read-only (see above).
 
 #import <AppKit/AppKit.h>
 #import <CoreData/CoreData.h>
@@ -32,7 +43,6 @@
 
 #define PROTOCOL_VERSION 1
 #define MAX_INPUT_BYTES (1024 * 1024)
-#define MAX_APPEND_UTF16 50000
 
 #ifndef HELPER_SOURCE_SHA256
 #define HELPER_SOURCE_SHA256 "unset"
@@ -40,8 +50,6 @@
 
 static NSString *const kFrameworkPath =
     @"/System/Library/PrivateFrameworks/NotesShared.framework/NotesShared";
-static NSString *const kTransactionAuthor = @"apple-notes-mcp-private-helper";
-static NSString *const kChangeReason = @"apple-notes-mcp append_plain_text";
 static NSString *const kEnableEnv = @"APPLE_NOTES_MCP_ENABLE_PRIVATE";
 static NSString *const kCopyStoreEnv = @"APPLE_NOTES_MCP_PRIVATE_STORE";
 
@@ -143,16 +151,6 @@ static const ModelRequirement kModelProperties[] = {
     {"ICFolder", "identifier"},
 };
 
-static const APIRequirement kAppendAPI[] = {
-    {"ICTTMergeableString", "beginEditing", NO},
-    {"ICTTMergeableString", "endEditing", NO},
-    {"ICTTMergeableString", "insertAttributedString:atIndex:", NO},
-    {"ICNote", "edited:range:changeInLength:", NO},
-    {"ICNote", "saveNoteData", NO},
-    {"ICNote", "updateChangeCountWithReason:", NO},
-    {"ICNote", "regenerateTitle:snippet:", NO},
-};
-
 #define COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
 static BOOL gFrameworkLoaded = NO;
@@ -209,7 +207,7 @@ static NSArray<NSString *> *MissingModelProperties(void) {
   return missing;
 }
 
-typedef NS_ENUM(NSInteger, Feature) { FeatureModel, FeatureRead, FeatureAppend };
+typedef NS_ENUM(NSInteger, Feature) { FeatureModel, FeatureRead };
 
 static NSArray<NSString *> *MissingForFeature(Feature feature) {
   LoadFramework();
@@ -221,8 +219,6 @@ static NSArray<NSString *> *MissingForFeature(Feature feature) {
     [missing addObjectsFromArray:MissingModelProperties()];
     [missing addObjectsFromArray:MissingAPI(kReadAPI, COUNT(kReadAPI))];
   }
-  if (feature >= FeatureAppend)
-    [missing addObjectsFromArray:MissingAPI(kAppendAPI, COUNT(kAppendAPI))];
   return missing;
 }
 
@@ -240,11 +236,6 @@ static id Send(id target, const char *sel) {
 }
 static BOOL SendBool(id target, const char *sel) {
   return ((BOOL(*)(id, SEL))objc_msgSend)(target, sel_registerName(sel));
-}
-// Void methods must not go through Send(): ARC would retain whatever garbage
-// sits in the return register.
-static void SendVoid(id target, const char *sel) {
-  ((void (*)(id, SEL))objc_msgSend)(target, sel_registerName(sel));
 }
 
 #pragma mark - Store
@@ -267,8 +258,8 @@ static BOOL SameFile(NSString *a, NSString *b) {
   return sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
 }
 
-// The copy-store override exists for tests. It must never resolve to the
-// live database, including through a symlink or hard link.
+// The copy-store override exists so tests can read a copy. It must never
+// resolve to the live database, including through a symlink or hard link.
 static StoreLocation ResolveStore(void) {
   NSString *override = NSProcessInfo.processInfo.environment[kCopyStoreEnv];
   NSString *live = LiveStorePath();
@@ -287,11 +278,11 @@ static StoreLocation ResolveStore(void) {
   return (StoreLocation){live, NO};
 }
 
-// Opens NotesShared's model over the store with Notes' own store options
-// (persistent history tracking + remote change notifications), which is what
-// lets a running Notes.app merge the helper's saves. Reads add
-// NSReadOnlyPersistentStoreOption so a read can never write.
-static NSManagedObjectContext *OpenContext(StoreLocation store, BOOL readOnly) {
+// Opens NotesShared's model over the store with Notes' own store options,
+// ALWAYS read-only. There is deliberately no read-write variant: the options
+// force NSReadOnlyPersistentStoreOption and disable migration, and the store
+// Core Data hands back is checked again before any context is returned.
+static NSManagedObjectContext *OpenReadOnlyContext(StoreLocation store) {
   RequireFeature(FeatureModel);
   if (!store.isCopy && ![NSProcessInfo.processInfo.environment[kEnableEnv] isEqualToString:@"1"])
     Fail(@"disabled", @"The private helper is disabled; set APPLE_NOTES_MCP_ENABLE_PRIVATE=1 to opt in",
@@ -311,7 +302,11 @@ static NSManagedObjectContext *OpenContext(StoreLocation store, BOOL readOnly) {
   // Never migrate: a model/store mismatch means this helper is out of date.
   options[NSMigratePersistentStoresAutomaticallyOption] = @NO;
   options[NSInferMappingModelAutomaticallyOption] = @NO;
-  if (readOnly) options[NSReadOnlyPersistentStoreOption] = @YES;
+  options[NSReadOnlyPersistentStoreOption] = @YES;
+  if (![options[NSReadOnlyPersistentStoreOption] boolValue] ||
+      [options[NSMigratePersistentStoresAutomaticallyOption] boolValue] ||
+      [options[NSInferMappingModelAutomaticallyOption] boolValue])
+    Fail(@"read_only_violation", @"Refusing to open the Notes store without read-only options", nil);
   NSPersistentStoreCoordinator *coordinator =
       [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:model];
   NSError *error = nil;
@@ -324,13 +319,17 @@ static NSManagedObjectContext *OpenContext(StoreLocation store, BOOL readOnly) {
   if (!persistent)
     Fail(@"store_unavailable", @"Could not open the Notes store with the NotesShared model",
          @{@"detail" : error.localizedDescription ?: @"unknown"});
+  // Belt and braces: refuse to continue if Core Data opened any store
+  // read-write, whatever the options said.
+  for (NSPersistentStore *opened in coordinator.persistentStores) {
+    if (!opened.isReadOnly || ![opened.options[NSReadOnlyPersistentStoreOption] boolValue]) {
+      [coordinator removePersistentStore:opened error:nil];
+      Fail(@"read_only_violation", @"The Notes store was opened read-write; refusing to continue", nil);
+    }
+  }
   NSManagedObjectContext *context =
       [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
   context.persistentStoreCoordinator = coordinator;
-  context.transactionAuthor = kTransactionAuthor;
-  // Optimistic locking: if Notes.app saves the same row between our fetch and
-  // our save, the save fails instead of silently overwriting.
-  context.mergePolicy = NSErrorMergePolicy;
   context.undoManager = nil;
   return context;
 }
@@ -374,10 +373,10 @@ static NSData *NoteBodyData(NSManagedObject *note) {
   return [data isKindOfClass:[NSData class]] ? data : nil;
 }
 
-// Opaque compare-and-swap token over the persisted native state an append
-// depends on: identity, folder, deletion/lock flags, modification date, and
-// a digest of the serialized CRDT body. Any persisted edit (text, style,
-// attachment glyph) changes the body digest.
+// Opaque change-detection token over the persisted native state: identity,
+// folder, deletion/lock flags, modification date, and a digest of the
+// serialized CRDT body. Any persisted edit (text, style, attachment glyph)
+// changes it. It is informational only; no action accepts it back.
 static NSString *RevisionToken(NSManagedObject *note) {
   id folder = [note valueForKey:@"folder"];
   NSData *body = NoteBodyData(note);
@@ -473,7 +472,6 @@ static NSString *RequireIdentifier(NSDictionary *request) {
 static NSDictionary *HandleHello(NSDictionary *request);
 static NSDictionary *HandleProbe(NSDictionary *request);
 static NSDictionary *HandleReadNoteState(NSDictionary *request);
-static NSDictionary *HandleAppendPlainText(NSDictionary *request);
 
 typedef struct {
   const char *name;
@@ -481,12 +479,12 @@ typedef struct {
   NSDictionary *(*handler)(NSDictionary *);
 } ActionSpec;
 
-// The whitelist. Order is the order `hello` reports.
+// The whitelist. Order is the order `hello` reports. Every action is
+// read-only; there is no write action in this protocol version.
 static const ActionSpec kActions[] = {
     {"hello", "", HandleHello},
     {"probe", "", HandleProbe},
     {"read_note_state", "identifier", HandleReadNoteState},
-    {"append_plain_text", "identifier,text,ifRevision", HandleAppendPlainText},
 };
 
 static NSArray<NSString *> *ActionNames(void) {
@@ -501,6 +499,7 @@ static NSDictionary *HandleHello(NSDictionary *request) {
     @"status" : @"ok",
     @"protocolVersion" : @(PROTOCOL_VERSION),
     @"sourceSha256" : @HELPER_SOURCE_SHA256,
+    @"readOnly" : @YES,
     @"actions" : ActionNames(),
   };
 }
@@ -530,7 +529,7 @@ static NSDictionary *HandleProbe(NSDictionary *request) {
   StoreLocation store = {nil, NO};
   @try {
     store = ResolveStore();
-    NSManagedObjectContext *context = OpenContext(store, YES);
+    NSManagedObjectContext *context = OpenReadOnlyContext(store);
     NSFetchRequest *count = [NSFetchRequest fetchRequestWithEntityName:@"ICNote"];
     NSError *error = nil;
     NSUInteger n = [context countForFetchRequest:count error:&error];
@@ -550,6 +549,7 @@ static NSDictionary *HandleProbe(NSDictionary *request) {
     @"status" : @"ok",
     @"protocolVersion" : @(PROTOCOL_VERSION),
     @"sourceSha256" : @HELPER_SOURCE_SHA256,
+    @"readOnly" : @YES,
     @"os" : @{@"version" : osVersion, @"notesAppVersion" : OrNull(notesVersion)},
     @"framework" : @{@"loaded" : @(gFrameworkLoaded), @"error" : OrNull(gFrameworkError)},
     @"store" : @{
@@ -562,7 +562,6 @@ static NSDictionary *HandleProbe(NSDictionary *request) {
     @"syncHostRunning" : @(NotesAppRunning()),
     @"features" : @{
       @"readNoteState" : FeatureReport(FeatureRead, contextOK, contextReason),
-      @"appendPlainText" : FeatureReport(FeatureAppend, contextOK, contextReason),
     },
   };
 }
@@ -570,156 +569,12 @@ static NSDictionary *HandleProbe(NSDictionary *request) {
 static NSDictionary *HandleReadNoteState(NSDictionary *request) {
   NSString *identifier = RequireIdentifier(request);
   RequireFeature(FeatureRead);
-  NSManagedObjectContext *context = OpenContext(ResolveStore(), YES);
+  NSManagedObjectContext *context = OpenReadOnlyContext(ResolveStore());
   NSManagedObject *note = FetchNote(context, identifier);
   NSMutableDictionary *result = [NoteState(note) mutableCopy];
   result[@"status"] = @"ok";
   result[@"syncHostRunning"] = @(NotesAppRunning());
   return result;
-}
-
-// Refuses every note shape this first write path does not model.
-static void RequireAppendableNote(NSManagedObject *note) {
-  if (SendBool(note, "isPasswordProtected"))
-    Fail(@"unsupported_note", @"Locked notes are not supported", nil);
-  if (SendBool(note, "isDeletedOrInTrash") || [[note valueForKey:@"markedForDeletion"] boolValue])
-    Fail(@"unsupported_note", @"Deleted or trashed notes are not supported", nil);
-  if (![note valueForKey:@"folder"]) Fail(@"unsupported_note", @"Folderless notes are not supported", nil);
-  if (SendBool(note, "isSharedViaICloud"))
-    Fail(@"unsupported_note", @"Collaborative (shared) notes are not supported", nil);
-  if (!SendBool(note, "isEditable")) Fail(@"unsupported_note", @"Notes reports this note as not editable", nil);
-  if ([[note valueForKey:@"needsInitialFetchFromCloud"] boolValue] || !NoteBodyData(note))
-    Fail(@"unsupported_note", @"The note body has not finished downloading from iCloud", nil);
-}
-
-static void ValidateAppendText(NSString *text) {
-  if (text.length > MAX_APPEND_UTF16)
-    Fail(@"invalid_request", @"`text` exceeds 50000 UTF-16 code units", nil);
-  NSMutableCharacterSet *forbidden = [NSMutableCharacterSet controlCharacterSet];
-  [forbidden removeCharactersInString:@"\n\t"];
-  [forbidden addCharactersInString:@"\uFFFC\u2028\u2029"];
-  if ([text rangeOfCharacterFromSet:forbidden].location != NSNotFound)
-    Fail(@"invalid_request",
-         @"`text` may contain only printable characters, tabs and \\n newlines (no \\r, "
-         @"attachment glyphs, or other control characters)",
-         nil);
-}
-
-// The paragraph style of a Notes paragraph rides on its terminating newline.
-// When the body does not already end in a newline, the separator we insert
-// becomes the terminator of the old last paragraph, so it carries that
-// paragraph's style value (found by class, not by key name). The appended
-// text itself carries no attributes and becomes plain body paragraphs.
-static NSAttributedString *SeparatorFor(NSAttributedString *existing) {
-  if (existing.length == 0) return nil;
-  if ([existing.string hasSuffix:@"\n"]) return nil;
-  NSDictionary *attrs = [existing attributesAtIndex:existing.length - 1 effectiveRange:NULL];
-  NSMutableDictionary *kept = [NSMutableDictionary dictionary];
-  for (NSString *key in attrs) {
-    NSString *className = NSStringFromClass([attrs[key] class]);
-    if ([className containsString:@"ParagraphStyle"]) kept[key] = attrs[key];
-  }
-  return [[NSAttributedString alloc] initWithString:@"\n" attributes:kept];
-}
-
-static NSDictionary *HandleAppendPlainText(NSDictionary *request) {
-  NSString *identifier = RequireIdentifier(request);
-  NSString *text = RequireString(request, @"text");
-  NSString *ifRevision = RequireString(request, @"ifRevision");
-  ValidateAppendText(text);
-  RequireFeature(FeatureAppend);
-
-  StoreLocation store = ResolveStore();
-  NSManagedObjectContext *context = OpenContext(store, NO);
-  NSManagedObject *note = FetchNote(context, identifier);
-  RequireAppendableNote(note);
-
-  NSString *revisionBefore = RevisionToken(note);
-  if (![revisionBefore isEqualToString:ifRevision])
-    Fail(@"revision_conflict", @"The note changed since ifRevision was read",
-         @{@"committed" : @NO, @"currentRevision" : revisionBefore});
-
-  id ms = Send(note, "mergeableString");
-  NSAttributedString *existing = ms ? Send(ms, "attributedString") : nil;
-  if (![existing isKindOfClass:[NSAttributedString class]])
-    Fail(@"unsupported_note", @"The note body could not be loaded as a mergeable string", nil);
-  NSString *before = [existing.string copy];
-  NSAttributedString *separator = SeparatorFor(existing);
-  NSMutableAttributedString *insertion = [NSMutableAttributedString new];
-  if (separator) [insertion appendAttributedString:separator];
-  [insertion appendAttributedString:[[NSAttributedString alloc] initWithString:text]];
-  NSUInteger at = existing.length;
-
-  // Edit through the CRDT so the change merges with other devices' edits.
-  SendVoid(ms, "beginEditing");
-  ((void (*)(id, SEL, id, NSUInteger))objc_msgSend)(
-      ms, sel_registerName("insertAttributedString:atIndex:"), insertion, at);
-  SendVoid(ms, "endEditing");
-  ((void (*)(id, SEL, NSUInteger, NSRange, NSInteger))objc_msgSend)(
-      note, sel_registerName("edited:range:changeInLength:"), NSTextStorageEditedCharacters,
-      NSMakeRange(at, insertion.length), (NSInteger)insertion.length);
-  ((void (*)(id, SEL, BOOL, BOOL))objc_msgSend)(note, sel_registerName("regenerateTitle:snippet:"), YES,
-                                                YES);
-  if (!SendBool(note, "saveNoteData"))
-    Fail(@"save_failed", @"NotesShared did not serialize the edited body", @{@"committed" : @NO});
-  [note setValue:[NSDate date] forKey:@"modificationDate"];
-  // Bumps the cloud state's local version so Notes treats the note as
-  // needing upload.
-  ((void (*)(id, SEL, id))objc_msgSend)(note, sel_registerName("updateChangeCountWithReason:"),
-                                        kChangeReason);
-
-  NSError *saveError = nil;
-  if (![context save:&saveError]) {
-    [context rollback];
-    BOOL conflict = saveError.code == NSManagedObjectMergeError ||
-                    saveError.code == NSPersistentStoreSaveConflictsError;
-    Fail(conflict ? @"revision_conflict" : @"save_failed",
-         conflict ? @"Notes changed the note during the write; nothing was saved"
-                  : @"The Core Data save failed; nothing was saved",
-         @{@"committed" : @NO, @"detail" : OrNull(saveError.localizedDescription)});
-  }
-
-  // Fresh read-back through a brand-new coordinator so no in-memory state
-  // from the write can satisfy the check.
-  NSString *expected = [before stringByAppendingString:[insertion string]];
-  NSDictionary *after = nil;
-  BOOL verified = NO;
-  NSString *verifyDetail = nil;
-  @try {
-    NSManagedObjectContext *fresh = OpenContext(store, YES);
-    NSManagedObject *reread = FetchNote(fresh, identifier);
-    id freshString = Send(reread, "mergeableString");
-    NSString *persisted = BodyText(freshString);
-    verified = [persisted isEqualToString:expected];
-    if (!verified) verifyDetail = @"The persisted body does not equal the previous body plus the appended text";
-    after = NoteState(reread);
-  } @catch (HelperError *e) {
-    verifyDetail = e.reason;
-  }
-  if (!verified)
-    Fail(@"verification_failed", verifyDetail ?: @"Read-back failed",
-         @{@"committed" : @YES, @"revisionBefore" : revisionBefore});
-
-  BOOL hostRunning = NotesAppRunning();
-  return @{
-    @"status" : @"updated",
-    @"committed" : @YES,
-    @"verified" : @YES,
-    @"identifier" : identifier,
-    @"appendedUTF16" : @(insertion.length),
-    @"separatorInserted" : @((BOOL)(separator != nil)),
-    @"revisionBefore" : revisionBefore,
-    @"revisionAfter" : after[@"revision"],
-    @"modificationDate" : after[@"modificationDate"],
-    @"title" : after[@"title"],
-    @"cloudSync" : after[@"cloudSync"],
-    // The helper never uploads: CloudKit access needs Notes.app's private
-    // entitlements. It only records upload eligibility. See TECHNICAL_NOTES.
-    @"pushScheduled" : @NO,
-    @"syncHostRunning" : @(hostRunning),
-    @"pushState" : hostRunning ? @"awaiting_notes_app" : @"queued_for_next_launch",
-    @"storeKind" : store.isCopy ? @"copy" : @"live",
-  };
 }
 
 #pragma mark - Main

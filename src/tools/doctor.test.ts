@@ -39,8 +39,8 @@ const { matrix } = vi.hoisted(() => ({
         available: false,
         osSupported: true,
         minimumMacOSVersion: null,
-        requirements: ["native_helper"],
-        missing: ["native_helper"],
+        requirements: ["native_write_helper"],
+        missing: ["native_write_helper"],
         unverified: [],
         reason: "not_implemented",
       },
@@ -234,7 +234,7 @@ describe("runDoctor feature matrix", () => {
     const text = formatDoctorReport(r);
     expect(text).toMatch(/Feature matrix \(macOS 26\.1, Darwin 25\.1\.0\)/);
     expect(text).toMatch(/✓ applescriptCore: available \(unverified: notes_automation\)/);
-    expect(text).toMatch(/✗ smartFolders: not_implemented \(missing: native_helper\)/);
+    expect(text).toMatch(/✗ smartFolders: not_implemented \(missing: native_write_helper\)/);
   });
 
   it("keeps the original report when the matrix probe throws", () => {

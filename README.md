@@ -1849,7 +1849,9 @@ It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
 `applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
 `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
 placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
-`audioTranscription`, which need a native helper this server does not ship.
+`audioTranscription`, which need a native *write* helper this server does not
+ship (requirement `native_write_helper`). The opt-in private helper below is
+read-only, so enabling it does not change them: they stay `not_implemented`.
 Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
 `requirements`, `missing`, `unverified`, `tools`, and a machine-readable
 `reason` that is `null` when available and otherwise the first that applies:
@@ -1957,9 +1959,13 @@ preserving the target note's native objects.
 
 ### Private helper (opt-in, unsupported Apple API)
 
-An optional native helper edits notes through Notes' own data model
-(Apple's private NotesShared framework) instead of AppleScript or Shortcuts.
-It is **off by default** and nothing in the rest of the server depends on it.
+An optional, **read-only** native helper reads note state through Notes' own
+data model (Apple's private NotesShared framework) instead of AppleScript or
+Shortcuts. It is **off by default** and nothing in the rest of the server
+depends on it. It cannot write: every store it opens is opened read-only, and
+write support was deliberately deferred by the maintainer until a second
+writer beside a running Notes.app, CRDT replica identity, and the iCloud
+upload lag are understood.
 Private API can break on any macOS update; see
 [TECHNICAL_NOTES.md](TECHNICAL_NOTES.md#private-helper-notesshared) for the
 API surface, risks, and safety contract.
@@ -1990,27 +1996,15 @@ probe: macOS and Notes versions, whether NotesShared loads, whether every
 required class, selector, and model property exists, and whether the Notes
 store opens. Each feature reports `available` plus a `reason` code
 (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`,
-`private_api_unavailable`, `store_unavailable`, `not_live_validated`, …).
-Read-only.
+`private_api_unavailable`, `store_unavailable`, …). Read-only; the response
+carries `readOnly: true`.
 
 #### `native-note-state`
 
 Reads one note's native state by Notes UUID (`identifier`) or x-coredata `id`:
 title, modification date, folder identifier, lock/trash/shared/editable
-flags, iCloud version counters, and a `revision` token. Opens the store with
-Core Data's read-only option.
-
-#### `native-append-plain-text`
-
-Appends plain-text paragraphs to one note, guarded by `ifRevision` (the
-`revision` from `native-note-state`). The helper refuses if anything persisted
-changed since, saves once with optimistic locking, and re-reads through a new
-Core Data stack before reporting `verified: true`. It refuses locked, shared,
-trashed, folderless, and still-downloading notes. The response reports
-`pushScheduled: false` and a `pushState`: the helper cannot upload to iCloud
-itself. A timeout returns `committed: "unknown"`; read the note state before
-retrying. Until this path passes live validation in a release it also requires
-`APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`.
+flags, iCloud version counters, and a `revision` change token (compare two
+reads to detect a change). Opens the store with Core Data's read-only option.
 
 ## Usage Patterns
 

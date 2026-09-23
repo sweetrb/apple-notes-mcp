@@ -9,9 +9,13 @@
  * - the opt-in switch (`APPLE_NOTES_MCP_ENABLE_PRIVATE=1`),
  * - locating the installed binary and refusing a missing, stale, or modified
  *   one before EVERY dispatch (fail closed),
- * - spawning it with a timeout (a timed-out write is indeterminate, never a
- *   failure that is safe to retry), and
+ * - spawning it with a timeout, and
  * - validating every response against a schema before it reaches a tool.
+ *
+ * The helper is READ-ONLY. Its protocol has no write action, it opens every
+ * store with Core Data's read-only option, and this client refuses to send
+ * anything outside {@link READ_ONLY_ACTIONS}. Write support was deliberately
+ * deferred by the maintainer (#181, #204).
  *
  * The protocol is one JSON object on stdin and one on stdout. See
  * TECHNICAL_NOTES.md "Private helper" for the contract.
@@ -36,13 +40,12 @@ export const HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
 export const COPY_STORE_ENV = "APPLE_NOTES_MCP_PRIVATE_STORE";
 /** Per-call timeout override in milliseconds. */
 export const TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
-/**
- * The append path has not yet passed a live end-to-end validation on a
- * released macOS. Until it has, the write tool also requires
- * `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`, the repo's existing gate for
- * unvalidated native writes.
- */
-export const APPEND_LIVE_VALIDATED = false;
+/** The only actions this client will send. All are read-only. */
+export const READ_ONLY_ACTIONS: ReadonlySet<string> = new Set([
+  "hello",
+  "probe",
+  "read_note_state",
+]);
 
 export const HELPER_BINARY_NAME = "apple-notes-private-helper";
 export const HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
@@ -60,8 +63,7 @@ export type PrivateUnavailableReason =
   | "helper_manifest_invalid"
   | "helper_unreachable"
   | "private_api_unavailable"
-  | "store_unavailable"
-  | "not_live_validated";
+  | "store_unavailable";
 
 export const manifestSchema = z.object({
   schemaVersion: z.literal(1),
@@ -201,13 +203,11 @@ export function inspectInstallation(deps: PrivateHelperDeps = defaultDeps()): In
   return { ...base, ready: true, reason: null, detail: null };
 }
 
-/** A helper failure with a stable code. `committed` is set for write actions. */
+/** A helper failure with a stable helper code. */
 export class PrivateHelperError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    /** true = the write was saved, false = nothing was saved, "unknown" = indeterminate. */
-    readonly committed?: boolean | "unknown",
     readonly details: Record<string, unknown> = {}
   ) {
     super(message);
@@ -220,7 +220,6 @@ const errorSchema = z
     status: z.literal("error"),
     code: z.string(),
     message: z.string(),
-    committed: z.boolean().optional(),
   })
   .passthrough();
 
@@ -235,6 +234,7 @@ export const helloSchema = z
     status: z.literal("ok"),
     protocolVersion: z.number().int(),
     sourceSha256: z.string(),
+    readOnly: z.literal(true),
     actions: z.array(z.string()),
   })
   .passthrough();
@@ -243,6 +243,7 @@ export const probeSchema = z
   .object({
     status: z.literal("ok"),
     protocolVersion: z.number().int(),
+    readOnly: z.literal(true),
     os: z.object({ version: z.string(), notesAppVersion: z.string().nullable() }).passthrough(),
     framework: z.object({ loaded: z.boolean(), error: z.string().nullable() }).passthrough(),
     store: z
@@ -254,9 +255,7 @@ export const probeSchema = z
       })
       .passthrough(),
     syncHostRunning: z.boolean(),
-    features: z
-      .object({ readNoteState: featureSchema, appendPlainText: featureSchema })
-      .passthrough(),
+    features: z.object({ readNoteState: featureSchema }).passthrough(),
   })
   .passthrough();
 export type PrivateProbe = z.infer<typeof probeSchema>;
@@ -290,27 +289,6 @@ export const noteStateSchema = z
   .passthrough();
 export type PrivateNoteState = z.infer<typeof noteStateSchema>;
 
-export const appendResultSchema = z
-  .object({
-    status: z.literal("updated"),
-    committed: z.literal(true),
-    verified: z.literal(true),
-    identifier: z.string(),
-    appendedUTF16: z.number().int(),
-    revisionBefore: z.string(),
-    revisionAfter: z.string(),
-    modificationDate: z.string().nullable(),
-    cloudSync: cloudSyncSchema,
-    pushScheduled: z.boolean(),
-    pushState: z.enum(["awaiting_notes_app", "queued_for_next_launch"]),
-    syncHostRunning: z.boolean(),
-    storeKind: z.enum(["live", "copy"]),
-  })
-  .passthrough();
-export type PrivateAppendResult = z.infer<typeof appendResultSchema>;
-
-const WRITE_ACTIONS = new Set(["append_plain_text"]);
-
 export interface CallOptions {
   /** Skip the opt-in check. Only `hello` during setup uses this. */
   allowDisabled?: boolean;
@@ -319,8 +297,9 @@ export interface CallOptions {
 }
 
 /**
- * Send one request to the helper and return its parsed JSON object.
- * Throws PrivateHelperError for every failure, with `committed` set for writes.
+ * Send one read-only request to the helper and return its parsed JSON object.
+ * Throws PrivateHelperError for every failure, including any action outside
+ * {@link READ_ONLY_ACTIONS}, which is refused before anything is spawned.
  */
 export function callPrivateHelper(
   action: string,
@@ -328,23 +307,21 @@ export function callPrivateHelper(
   deps: PrivateHelperDeps = defaultDeps(),
   options: CallOptions = {}
 ): Record<string, unknown> {
-  const isWrite = WRITE_ACTIONS.has(action);
-  const notCommitted = isWrite ? false : undefined;
+  if (!READ_ONLY_ACTIONS.has(action))
+    throw new PrivateHelperError(
+      "unknown_action",
+      `The private helper is read-only; "${action}" is not a supported action.`
+    );
   if (!options.allowDisabled && !privateHelperEnabled(deps.env))
     throw new PrivateHelperError(
       "disabled",
-      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`,
-      notCommitted
+      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`
     );
   let binaryPath = options.binaryPath;
   if (!binaryPath) {
     const install = inspectInstallation(deps);
     if (!install.ready)
-      throw new PrivateHelperError(
-        install.reason || "helper_not_installed",
-        install.detail || "",
-        notCommitted
-      );
+      throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
   const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS;
@@ -358,19 +335,11 @@ export function callPrivateHelper(
   });
   const errno = (result.error as NodeJS.ErrnoException | undefined)?.code;
   if (errno === "ETIMEDOUT" || (result.signal && result.status === null))
-    throw new PrivateHelperError(
-      "timeout",
-      isWrite
-        ? `The helper did not answer within ${timeout} ms. The write is INDETERMINATE: it may ` +
-            "have been saved. Read the note state again before retrying."
-        : `The helper did not answer within ${timeout} ms.`,
-      isWrite ? "unknown" : undefined
-    );
+    throw new PrivateHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
   if (result.error)
     throw new PrivateHelperError(
       "helper_unreachable",
-      `Could not run the helper: ${result.error.message}`,
-      notCommitted
+      `Could not run the helper: ${result.error.message}`
     );
   const stdout = String(result.stdout ?? "").trim();
   let parsed: unknown;
@@ -379,47 +348,32 @@ export function callPrivateHelper(
   } catch {
     throw new PrivateHelperError(
       "invalid_response",
-      `The helper exited with status ${result.status} and no JSON response` +
-        (isWrite ? ". The write is INDETERMINATE; read the note state before retrying." : "."),
-      isWrite ? "unknown" : undefined
+      `The helper exited with status ${result.status} and no JSON response.`
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new PrivateHelperError(
-      "invalid_response",
-      "The helper response is not a JSON object",
-      isWrite ? "unknown" : undefined
-    );
+    throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
   const object = parsed as Record<string, unknown>;
   if (result.status !== 0 || object.status === "error") {
     const error = errorSchema.safeParse(object);
     if (!error.success)
       throw new PrivateHelperError(
         "invalid_response",
-        `The helper failed with an unrecognized error shape (exit ${result.status})`,
-        isWrite ? "unknown" : undefined
+        `The helper failed with an unrecognized error shape (exit ${result.status})`
       );
-    const { status: _status, code, message, committed, ...details } = error.data;
+    const { status: _status, code, message, ...details } = error.data;
     void _status;
-    throw new PrivateHelperError(
-      code,
-      message,
-      isWrite ? (committed ?? "unknown") : undefined,
-      details
-    );
+    throw new PrivateHelperError(code, message, details);
   }
   return object;
 }
 
-function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, isWrite: boolean): T {
+function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success)
     throw new PrivateHelperError(
       "invalid_response",
-      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`,
-      // A malformed success response after a write still means the helper
-      // reported success; treat it as indeterminate rather than failed.
-      isWrite ? "unknown" : undefined
+      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
     );
   return parsed.data;
 }
@@ -428,36 +382,11 @@ const UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 
 export function assertNoteIdentifier(identifier: string): void {
   if (!UUID.test(identifier))
-    throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID", undefined);
-}
-
-/**
- * Control characters other than tab and newline, the object replacement
- * character Notes uses as an attachment glyph (U+FFFC), and the Unicode line
- * and paragraph separators (U+2028, U+2029). Written as escapes so no
- * invisible character lives in the source.
- */
-// eslint-disable-next-line no-control-regex
-const FORBIDDEN_TEXT = /[\x00-\x08\x0B-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
-
-/**
- * Mirror of the helper's text rules, checked before spawning so a bad request
- * never reaches the native side.
- */
-export function assertAppendText(text: string): void {
-  if (!text.length) throw new PrivateHelperError("invalid_request", "text is required", false);
-  if (text.length > 50_000)
-    throw new PrivateHelperError("invalid_request", "text exceeds 50000 UTF-16 code units", false);
-  if (FORBIDDEN_TEXT.test(text))
-    throw new PrivateHelperError(
-      "invalid_request",
-      "text may contain only printable characters, tabs and \\n newlines",
-      false
-    );
+    throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID");
 }
 
 export function probePrivateHelper(deps: PrivateHelperDeps = defaultDeps()): PrivateProbe {
-  return parseOrThrow(probeSchema, callPrivateHelper("probe", {}, deps), false);
+  return parseOrThrow(probeSchema, callPrivateHelper("probe", {}, deps));
 }
 
 export function readNoteState(
@@ -465,37 +394,7 @@ export function readNoteState(
   deps: PrivateHelperDeps = defaultDeps()
 ): PrivateNoteState {
   assertNoteIdentifier(identifier);
-  return parseOrThrow(
-    noteStateSchema,
-    callPrivateHelper("read_note_state", { identifier }, deps),
-    false
-  );
-}
-
-export function appendPlainText(
-  request: { identifier: string; text: string; ifRevision: string },
-  deps: PrivateHelperDeps = defaultDeps()
-): PrivateAppendResult {
-  assertNoteIdentifier(request.identifier);
-  assertAppendText(request.text);
-  if (!/^r1:[a-f0-9]{64}$/.test(request.ifRevision))
-    throw new PrivateHelperError(
-      "invalid_request",
-      "ifRevision must be a revision token from native-note-state",
-      false
-    );
-  if (!APPEND_LIVE_VALIDATED && deps.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
-    throw new PrivateHelperError(
-      "not_live_validated",
-      "native-append-plain-text has not passed live validation in this build. " +
-        "Set APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 to run it on a disposable note.",
-      false
-    );
-  return parseOrThrow(
-    appendResultSchema,
-    callPrivateHelper("append_plain_text", request, deps),
-    true
-  );
+  return parseOrThrow(noteStateSchema, callPrivateHelper("read_note_state", { identifier }, deps));
 }
 
 export interface PrivateFeatureStatus {
@@ -508,9 +407,10 @@ export interface PrivateCapabilities {
   enabled: boolean;
   installation: InstallationReport;
   probe: PrivateProbe | null;
+  /** Always true: the helper has no write action (deferred by the maintainer). */
+  readOnly: true;
   features: {
     readNoteState: PrivateFeatureStatus;
-    appendPlainText: PrivateFeatureStatus;
   };
 }
 
@@ -545,13 +445,11 @@ export function privateHelperCapabilities(
     reason,
     detail,
   });
-  const both = (status: PrivateFeatureStatus) => ({
-    readNoteState: status,
-    appendPlainText: status,
-  });
+  const both = (status: PrivateFeatureStatus) => ({ readNoteState: status });
   if (installation.reason === "unsupported_platform")
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("unsupported_platform", null)),
@@ -559,6 +457,7 @@ export function privateHelperCapabilities(
   if (!enabled)
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("disabled", `Set ${ENABLE_ENV}=1 to opt in to the private helper.`)),
@@ -566,6 +465,7 @@ export function privateHelperCapabilities(
   if (!installation.ready)
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off(installation.reason || "helper_not_installed", installation.detail)),
@@ -577,27 +477,17 @@ export function privateHelperCapabilities(
     const detail = error instanceof Error ? error.message : String(error);
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("helper_unreachable", detail)),
     };
   }
-  const read = featureFromProbe(probe.features.readNoteState);
-  let append = featureFromProbe(probe.features.appendPlainText);
-  if (
-    append.available &&
-    !APPEND_LIVE_VALIDATED &&
-    deps.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1"
-  )
-    append = off(
-      "not_live_validated",
-      "The private append path has not passed live validation in this build; " +
-        "APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 enables it for testing."
-    );
   return {
     enabled,
+    readOnly: true,
     installation,
     probe,
-    features: { readNoteState: read, appendPlainText: append },
+    features: { readNoteState: featureFromProbe(probe.features.readNoteState) },
   };
 }

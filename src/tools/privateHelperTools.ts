@@ -2,13 +2,13 @@
  * MCP tools for the opt-in native private helper (#181).
  *
  * - `native-helper-status`: install state, opt-in state, and the live probe.
- * - `native-note-state`: read one note's native state and revision token.
- * - `native-append-plain-text`: the one demonstration write, guarded by that
- *   revision token (compare-and-swap) and verified by a fresh read-back.
+ * - `native-note-state`: read one note's native state and change token.
  *
- * All three are always registered so the tool list does not change with the
- * environment. Each refuses with a machine-readable `code` when the helper is
- * off, missing, stale, or unsupported on this macOS.
+ * Both are READ-ONLY. The helper has no write action: write support was
+ * deliberately deferred by the maintainer (#181, #204). Both tools are always
+ * registered so the tool list does not change with the environment, and each
+ * refuses with a machine-readable `code` when the helper is off, missing,
+ * stale, or unsupported on this macOS.
  *
  * @module tools/privateHelperTools
  */
@@ -16,9 +16,9 @@ import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/m
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
+import { CodedError, errorResult, type ErrorCode } from "../utils/errorCodes.js";
 import {
   PrivateHelperError,
-  appendPlainText,
   defaultDeps,
   privateHelperCapabilities,
   readNoteState,
@@ -48,21 +48,54 @@ function resolveIdentifier(
   return match[1];
 }
 
-function errorResult(error: unknown) {
-  const payload =
-    error instanceof PrivateHelperError
-      ? {
-          ok: false,
-          code: error.code,
-          message: error.message,
-          ...(error.committed !== undefined ? { committed: error.committed } : {}),
-          ...error.details,
-        }
-      : { ok: false, code: "internal_error", message: String(error) };
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload) }],
-    isError: true,
-  };
+/** Map a helper code onto the server-wide error vocabulary (#185). */
+export function envelopeCode(helperCode: string, message: string): ErrorCode {
+  switch (helperCode) {
+    case "not_found":
+      return "not_found";
+    case "timeout":
+      return "timeout_indeterminate";
+    case "invalid_request":
+    case "invalid_json":
+    case "input_too_large":
+    case "unknown_action":
+      return "validation_error";
+    case "store_unavailable":
+      return /Full Disk Access/i.test(message) ? "full_disk_access_missing" : "operation_failed";
+    case "disabled":
+    case "unsupported_platform":
+    case "unsupported_note":
+    case "private_api_unavailable":
+    case "protocol_mismatch":
+    case "helper_not_installed":
+    case "helper_stale":
+    case "helper_modified":
+    case "helper_manifest_invalid":
+      return "unsupported";
+    default:
+      return "operation_failed";
+  }
+}
+
+/**
+ * Route a helper failure through the shared CodedError/errorResult envelope.
+ * Every action is a read, so nothing is ever committed.
+ */
+function helperErrorResult(error: unknown) {
+  if (!(error instanceof PrivateHelperError)) {
+    const message = error instanceof Error ? error.message : String(error);
+    return errorResult(`native helper: ${message}`, error);
+  }
+  const message = `native helper (${error.code}): ${error.message}`;
+  return errorResult(
+    message,
+    new CodedError(message, {
+      ...error.details,
+      code: envelopeCode(error.code, error.message),
+      helperCode: error.code,
+      committed: false,
+    })
+  );
 }
 
 export function registerPrivateHelperTools(
@@ -93,7 +126,7 @@ export function registerPrivateHelperTools(
             structuredContent: result,
           };
         } catch (error) {
-          return errorResult(error);
+          return helperErrorResult(error);
         }
       }) as unknown as ToolCallback<S>
     );
@@ -101,10 +134,10 @@ export function registerPrivateHelperTools(
 
   tool(
     "native-helper-status",
-    "Use when: checking whether the opt-in native private helper is enabled, built, current, and working on this macOS before calling native-note-state or native-append-plain-text.\n" +
+    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state.\n" +
       "Returns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\n" +
       "Do not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\n" +
-      "Safety: read-only. The probe opens the Notes store read-only and only when the helper is enabled and installed.",
+      "Safety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
     {},
     { readOnlyHint: true, openWorldHint: false },
     (_args, deps) => {
@@ -120,49 +153,15 @@ export function registerPrivateHelperTools(
 
   tool(
     "native-note-state",
-    "Use when: you need a note's native revision token before native-append-plain-text, or its native title, modification date, folder identifier, and iCloud upload state.\n" +
-      "Returns: identifier, title, modificationDate, folderIdentifier, lock/trash/shared/editable flags, `revision` (pass it as ifRevision), and cloudSync versions.\n" +
+    "Use when: you need a note's native title, modification date, folder identifier, lock/trash/shared/editable flags, or iCloud upload state as Notes' own data model reports them.\n" +
+      "Returns: identifier, title, modificationDate, folderIdentifier, lock/trash/shared/editable flags, `revision` (an opaque change token; compare two reads to detect a change), and cloudSync versions.\n" +
       "Do not use when: reading note content (get-note-content, get-note-markdown).\n" +
-      "Safety: read-only; the helper opens the store with Core Data's read-only option. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and a built helper.",
+      "Safety: read-only; the helper opens the store with Core Data's read-only option and has no write action. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and a built helper.",
     {
       identifier: notesUuid.optional().describe("Notes UUID (the notes://showNote identifier)"),
       id: coreDataId.optional().describe("x-coredata note id; resolved to a UUID via the database"),
     },
     { readOnlyHint: true, openWorldHint: false },
     (args, deps) => ({ ...readNoteState(resolveIdentifier(manager, args), deps) })
-  );
-
-  tool(
-    "native-append-plain-text",
-    "Use when: appending plain text paragraphs to one exact note through Notes' own data model, with a compare-and-swap guard. This is the private-helper path, distinct from append-native (Shortcuts) and append-to-note (AppleScript HTML rewrite).\n" +
-      "Returns: committed/verified flags, revisionBefore/revisionAfter, the new modification date, and sync state: pushScheduled (always false; the helper cannot upload), pushState, and cloudSync versions.\n" +
-      "Do not use when: the note is locked, shared, trashed, or still downloading, or you need formatting (text is appended as plain body paragraphs).\n" +
-      'Safety: writes to the Notes database through unsupported private API. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, a built helper, and a fresh `revision` from native-note-state as ifRevision; refuses on any change since. Verifies by re-reading in a new Core Data stack. A timeout is indeterminate (committed: "unknown"): read native-note-state before any retry. Not yet live-validated, so it also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1.',
-    {
-      identifier: notesUuid.optional().describe("Notes UUID"),
-      id: coreDataId.optional().describe("x-coredata note id; resolved to a UUID via the database"),
-      text: z
-        .string()
-        .min(1)
-        .max(50_000)
-        .describe(
-          "Plain text to append. \\n starts a new paragraph; no \\r or control characters."
-        ),
-      ifRevision: z
-        .string()
-        .regex(/^r1:[a-f0-9]{64}$/)
-        .describe("The `revision` returned by native-note-state for this note"),
-    },
-    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    (args, deps) => ({
-      ...appendPlainText(
-        {
-          identifier: resolveIdentifier(manager, args),
-          text: args.text,
-          ifRevision: args.ifRevision,
-        },
-        deps
-      ),
-    })
   );
 }

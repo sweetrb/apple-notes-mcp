@@ -8,13 +8,11 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  APPEND_LIVE_VALIDATED,
   HELPER_BINARY_NAME,
   MANIFEST_NAME,
   PRIVATE_HELPER_PROTOCOL,
   PrivateHelperError,
-  appendPlainText,
-  assertAppendText,
+  READ_ONLY_ACTIONS,
   assertNoteIdentifier,
   callPrivateHelper,
   defaultDeps,
@@ -30,7 +28,6 @@ import {
 } from "./privateHelper.js";
 
 const NOTE = "D629A948-0C61-43BA-8FDE-04CD6DED38C7";
-const REV = `r1:${"a".repeat(64)}`;
 
 /**
  * Fake helper. Reads one JSON request and answers per FAKE_MODE, echoing the
@@ -47,12 +44,10 @@ process.stdin.on("end", () => {
   if (mode === "garbage") { process.stdout.write("not json"); process.exit(0); }
   if (mode === "array") out([1, 2]);
   if (mode === "bad-error") out({ status: "error" }, 1);
-  if (mode === "conflict") out({ status: "error", code: "revision_conflict", message: "changed", committed: false, currentRevision: "r1:x" }, 1);
-  if (mode === "verify-failed") out({ status: "error", code: "verification_failed", message: "mismatch", committed: true }, 1);
-  if (mode === "no-committed") out({ status: "error", code: "internal_error", message: "boom" }, 1);
+  if (mode === "not-found") out({ status: "error", code: "not_found", message: "No note has that identifier", hint: "x" }, 1);
   if (mode === "malformed") out({ status: "ok" });
   const feature = (name) => {
-    if (mode === "missing-api") return { available: false, reason: "private_api_unavailable", missing: ["-[ICNote saveNoteData]"] };
+    if (mode === "missing-api") return { available: false, reason: "private_api_unavailable", missing: ["-[ICNote mergeableString]"] };
     if (mode === "missing-api-empty") return { available: false, reason: "private_api_unavailable", missing: [] };
     if (mode === "no-store") return { available: false, reason: "store_unavailable", missing: [] };
     return { available: true, reason: null, missing: [] };
@@ -60,13 +55,13 @@ process.stdin.on("end", () => {
   const cloudSync = { available: true, inICloudAccount: true, currentLocalVersion: 4, latestVersionSyncedToCloud: 1, uploadPending: true };
   switch (req.action) {
     case "hello":
-      out({ status: "ok", protocolVersion: Number(process.env.FAKE_PROTOCOL || 1), sourceSha256: process.env.FAKE_SOURCE_SHA || "dev", actions: ["hello", "probe", "read_note_state", "append_plain_text"] });
+      out({ status: "ok", protocolVersion: Number(process.env.FAKE_PROTOCOL || 1), sourceSha256: process.env.FAKE_SOURCE_SHA || "dev", readOnly: true, actions: ["hello", "probe", "read_note_state"] });
     case "probe":
-      out({ status: "ok", protocolVersion: 1, os: { version: "27.2.0", notesAppVersion: "4.13" }, framework: { loaded: true, error: null }, store: { kind: "live", opened: mode === "ok", reason: null, noteRows: 3 }, syncHostRunning: true, features: { readNoteState: feature("read"), appendPlainText: feature("append") } });
+      out({ status: "ok", protocolVersion: 1, readOnly: true, os: { version: "27.2.0", notesAppVersion: "4.13" }, framework: { loaded: true, error: null }, store: { kind: "live", opened: mode === "ok", reason: null, noteRows: 3 }, syncHostRunning: true, features: { readNoteState: feature("read") } });
     case "read_note_state":
       out({ status: "ok", identifier: req.identifier, objectURI: "x-coredata://S/ICNote/p1", title: "t", modificationDate: "2026-09-23T00:00:00.000Z", folderIdentifier: "F", passwordProtected: false, deletedOrInTrash: false, sharedViaICloud: false, editable: true, revision: "r1:" + "b".repeat(64), cloudSync, syncHostRunning: true, echo: req });
-    case "append_plain_text":
-      out({ status: "updated", committed: true, verified: true, identifier: req.identifier, appendedUTF16: req.text.length + 1, revisionBefore: req.ifRevision, revisionAfter: "r1:" + "c".repeat(64), modificationDate: null, cloudSync, pushScheduled: false, pushState: "awaiting_notes_app", syncHostRunning: true, storeKind: "live", echo: req });
+    case "spawned-marker":
+      out({ status: "ok", spawned: true });
     default:
       out({ status: "error", code: "unknown_action", message: "no" }, 1);
   }
@@ -235,10 +230,16 @@ describe("callPrivateHelper", SPAWN_TIMEOUT, () => {
     fx.install();
     const e = caught(() => callPrivateHelper("probe", {}, fx.deps()));
     expect(e.code).toBe("disabled");
-    expect(e.committed).toBeUndefined();
-    expect(caught(() => callPrivateHelper("append_plain_text", {}, fx.deps())).committed).toBe(
-      false
-    );
+  });
+
+  it("is read-only: refuses any action outside the whitelist before spawning", () => {
+    fx.install();
+    expect([...READ_ONLY_ACTIONS].sort()).toEqual(["hello", "probe", "read_note_state"]);
+    for (const action of ["append_plain_text", "spawned-marker", "save", "write"]) {
+      const e = caught(() => callPrivateHelper(action, { identifier: NOTE }, fx.deps(ON)));
+      expect(e.code).toBe("unknown_action");
+      expect(e.message).toMatch(/read-only/);
+    }
   });
 
   it("refuses a missing or stale helper even when enabled", () => {
@@ -264,80 +265,50 @@ describe("callPrivateHelper", SPAWN_TIMEOUT, () => {
     expect(r).toMatchObject({ status: "ok", protocolVersion: 1 });
   });
 
-  it("treats a timed-out write as indeterminate", () => {
+  it("reports a timeout", () => {
     fx.install();
     const deps = fx.deps({
       ...ON,
       FAKE_MODE: "hang",
       APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS: "300",
     });
-    const write = caught(() => callPrivateHelper("append_plain_text", {}, deps));
-    expect(write.code).toBe("timeout");
-    expect(write.committed).toBe("unknown");
-    expect(write.message).toMatch(/INDETERMINATE/);
     const read = caught(() => callPrivateHelper("probe", {}, deps));
     expect(read.code).toBe("timeout");
-    expect(read.committed).toBeUndefined();
+    expect(read.message).toMatch(/300 ms/);
   });
 
   it("rejects output that is not a JSON object", () => {
     fx.install();
     const garbage = fx.deps({ ...ON, FAKE_MODE: "garbage" });
     expect(caught(() => callPrivateHelper("probe", {}, garbage)).code).toBe("invalid_response");
-    expect(caught(() => callPrivateHelper("append_plain_text", {}, garbage)).committed).toBe(
-      "unknown"
-    );
     const array = fx.deps({ ...ON, FAKE_MODE: "array" });
     expect(caught(() => callPrivateHelper("probe", {}, array)).code).toBe("invalid_response");
-    expect(caught(() => callPrivateHelper("append_plain_text", {}, array)).committed).toBe(
-      "unknown"
-    );
   });
 
-  it("passes the helper's error code, committed flag and details through", () => {
+  it("passes the helper's error code and details through", () => {
     fx.install();
-    const conflict = caught(() =>
-      callPrivateHelper("append_plain_text", {}, fx.deps({ ...ON, FAKE_MODE: "conflict" }))
+    const missing = caught(() =>
+      callPrivateHelper(
+        "read_note_state",
+        { identifier: NOTE },
+        fx.deps({ ...ON, FAKE_MODE: "not-found" })
+      )
     );
-    expect(conflict).toMatchObject({
-      code: "revision_conflict",
-      committed: false,
-      details: { currentRevision: "r1:x" },
-    });
-    const verify = caught(() =>
-      callPrivateHelper("append_plain_text", {}, fx.deps({ ...ON, FAKE_MODE: "verify-failed" }))
-    );
-    expect(verify).toMatchObject({ code: "verification_failed", committed: true });
-  });
-
-  it("marks a write error without a committed flag as indeterminate", () => {
-    fx.install();
-    const deps = fx.deps({ ...ON, FAKE_MODE: "no-committed" });
-    expect(caught(() => callPrivateHelper("append_plain_text", {}, deps)).committed).toBe(
-      "unknown"
-    );
-    expect(caught(() => callPrivateHelper("probe", {}, deps)).committed).toBeUndefined();
+    expect(missing).toMatchObject({ code: "not_found", details: { hint: "x" } });
   });
 
   it("rejects an error response of unknown shape", () => {
     fx.install();
     const deps = fx.deps({ ...ON, FAKE_MODE: "bad-error" });
     expect(caught(() => callPrivateHelper("probe", {}, deps)).code).toBe("invalid_response");
-    expect(caught(() => callPrivateHelper("append_plain_text", {}, deps)).committed).toBe(
-      "unknown"
-    );
   });
 
   it("reports a helper that cannot be started", () => {
     const deps = fx.deps(ON);
     const e = caught(() =>
-      callPrivateHelper("append_plain_text", {}, deps, { binaryPath: join(fx.root, "absent") })
+      callPrivateHelper("probe", {}, deps, { binaryPath: join(fx.root, "absent") })
     );
-    expect(e).toMatchObject({ code: "helper_unreachable", committed: false });
-    expect(
-      caught(() => callPrivateHelper("probe", {}, deps, { binaryPath: join(fx.root, "absent") }))
-        .committed
-    ).toBeUndefined();
+    expect(e.code).toBe("helper_unreachable");
   });
 
   it("falls back to the default timeout for a non-numeric override", () => {
@@ -355,7 +326,9 @@ describe("typed actions", SPAWN_TIMEOUT, () => {
   it("parses the probe", () => {
     fx.install();
     const probe = probePrivateHelper(fx.deps(ON));
-    expect(probe.features.appendPlainText.available).toBe(true);
+    expect(probe.readOnly).toBe(true);
+    expect(probe.features.readNoteState.available).toBe(true);
+    expect(Object.keys(probe.features)).toEqual(["readNoteState"]);
     expect(probe.os.version).toBe("27.2.0");
   });
 
@@ -371,74 +344,10 @@ describe("typed actions", SPAWN_TIMEOUT, () => {
     fx.install();
     const e = caught(() => readNoteState(NOTE, fx.deps({ ...ON, FAKE_MODE: "malformed" })));
     expect(e.code).toBe("invalid_response");
-    expect(e.committed).toBeUndefined();
-  });
-
-  it("gates the unvalidated append behind APPLE_NOTES_MCP_ALLOW_UNVERIFIED", () => {
-    expect(APPEND_LIVE_VALIDATED).toBe(false);
-    fx.install();
-    const e = caught(() =>
-      appendPlainText({ identifier: NOTE, text: "hi", ifRevision: REV }, fx.deps(ON))
-    );
-    expect(e).toMatchObject({ code: "not_live_validated", committed: false });
-  });
-
-  it("validates append input before spawning", () => {
-    const deps = fx.deps({ ...ON, APPLE_NOTES_MCP_ALLOW_UNVERIFIED: "1" });
-    expect(
-      caught(() => appendPlainText({ identifier: NOTE, text: "x", ifRevision: "sha256:x" }, deps))
-        .code
-    ).toBe("invalid_request");
-    expect(
-      caught(() => appendPlainText({ identifier: "x", text: "x", ifRevision: REV }, deps)).code
-    ).toBe("invalid_request");
-  });
-
-  it("appends and returns the verified result", () => {
-    fx.install();
-    const r = appendPlainText(
-      { identifier: NOTE, text: "hello\nworld", ifRevision: REV },
-      fx.deps({ ...ON, APPLE_NOTES_MCP_ALLOW_UNVERIFIED: "1" })
-    );
-    expect(r).toMatchObject({ committed: true, verified: true, pushScheduled: false });
-    expect(r.echo).toEqual({
-      protocol: 1,
-      action: "append_plain_text",
-      identifier: NOTE,
-      text: "hello\nworld",
-      ifRevision: REV,
-    });
-  });
-
-  it("treats a malformed append success as indeterminate", () => {
-    fx.install();
-    const e = caught(() =>
-      appendPlainText(
-        { identifier: NOTE, text: "x", ifRevision: REV },
-        fx.deps({ ...ON, APPLE_NOTES_MCP_ALLOW_UNVERIFIED: "1", FAKE_MODE: "malformed" })
-      )
-    );
-    expect(e).toMatchObject({ code: "invalid_response", committed: "unknown" });
   });
 });
 
-describe("text and identifier rules", () => {
-  it("accepts printable text, tabs and newlines", () => {
-    expect(() => assertAppendText("a\tb\nc é 漢字 🙂")).not.toThrow();
-  });
-
-  it.each([
-    ["empty", ""],
-    ["carriage return", "a\rb"],
-    ["NUL", "a\u0000b"],
-    ["attachment glyph", "a￼b"],
-    ["line separator", "a b"],
-    ["C1 control", "a\u0085b"],
-    ["too long", "x".repeat(50_001)],
-  ])("rejects %s", (_label, text) => {
-    expect(() => assertAppendText(text)).toThrow(PrivateHelperError);
-  });
-
+describe("identifier rules", () => {
   it("requires a UUID-shaped identifier", () => {
     expect(() => assertNoteIdentifier(NOTE.toLowerCase())).not.toThrow();
     expect(() => assertNoteIdentifier("x-coredata://A/ICNote/p1")).toThrow(/UUID/);
@@ -459,7 +368,8 @@ describe("privateHelperCapabilities never throws", SPAWN_TIMEOUT, () => {
     const c = privateHelperCapabilities(fx.deps());
     expect(c.enabled).toBe(false);
     expect(c.probe).toBeNull();
-    expect(c.features.appendPlainText).toMatchObject({ available: false, reason: "disabled" });
+    expect(c.readOnly).toBe(true);
+    expect(c.features.readNoteState).toMatchObject({ available: false, reason: "disabled" });
   });
 
   it("explains a missing helper", () => {
@@ -479,10 +389,10 @@ describe("privateHelperCapabilities never throws", SPAWN_TIMEOUT, () => {
   it("names missing private API from the live probe", () => {
     fx.install();
     const c = privateHelperCapabilities(fx.deps({ ...ON, FAKE_MODE: "missing-api" }));
-    expect(c.features.appendPlainText).toMatchObject({
+    expect(c.features.readNoteState).toMatchObject({
       available: false,
       reason: "private_api_unavailable",
-      detail: "missing: -[ICNote saveNoteData]",
+      detail: "missing: -[ICNote mergeableString]",
     });
     const empty = privateHelperCapabilities(fx.deps({ ...ON, FAKE_MODE: "missing-api-empty" }));
     expect(empty.features.readNoteState.detail).toBe("private_api_unavailable");
@@ -494,17 +404,11 @@ describe("privateHelperCapabilities never throws", SPAWN_TIMEOUT, () => {
     expect(c.features.readNoteState.reason).toBe("store_unavailable");
   });
 
-  it("keeps the append off until live validation unless explicitly allowed", () => {
+  it("reports only the read feature, and is available when the probe says so", () => {
     fx.install();
-    const gated = privateHelperCapabilities(fx.deps(ON));
-    expect(gated.features.readNoteState.available).toBe(true);
-    expect(gated.features.appendPlainText).toMatchObject({
-      available: false,
-      reason: "not_live_validated",
-    });
-    const allowed = privateHelperCapabilities(
-      fx.deps({ ...ON, APPLE_NOTES_MCP_ALLOW_UNVERIFIED: "1" })
-    );
-    expect(allowed.features.appendPlainText.available).toBe(true);
+    const c = privateHelperCapabilities(fx.deps(ON));
+    expect(c.readOnly).toBe(true);
+    expect(Object.keys(c.features)).toEqual(["readNoteState"]);
+    expect(c.features.readNoteState.available).toBe(true);
   });
 });

@@ -47742,35 +47742,37 @@ var FEATURES = [
       { kind: "shortcut", name: markdownShortcutName }
     ]
   },
-  // Placeholders for features that need a native helper this server does not
-  // ship. They always report `not_implemented` so clients can detect them.
+  // Placeholders for features that need a native WRITE helper, which this
+  // server does not ship. The opt-in private helper is read-only (write
+  // support was deliberately deferred), so enabling or installing it changes
+  // nothing here: these always report `not_implemented`.
   {
     name: "checklistToggle",
     description: "Check or uncheck an existing checklist item in place",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "smartFolders",
     description: "Create or edit Smart Folders and their tag rules",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "paragraphLinks",
     description: "Link to a specific paragraph or heading inside a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   },
   {
     name: "audioTranscription",
     description: "Transcribe audio recordings attached to a note",
     tools: [],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_helper" }]
+    requirements: [{ kind: "native_write_helper" }]
   }
 ];
 function requirementLabel(requirement) {
@@ -47818,7 +47820,7 @@ function evaluateFeature(feature, env) {
           failures.add("shortcut_not_installed");
         }
         break;
-      case "native_helper":
+      case "native_write_helper":
         missing.push(label);
         failures.add("not_implemented");
         break;
@@ -51450,7 +51452,11 @@ var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
 var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
 var TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
-var APPEND_LIVE_VALIDATED = false;
+var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "probe",
+  "read_note_state"
+]);
 var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
@@ -51552,22 +51558,19 @@ function inspectInstallation(deps = defaultDeps2()) {
   return { ...base, ready: true, reason: null, detail: null };
 }
 var PrivateHelperError = class extends Error {
-  constructor(code, message, committed, details = {}) {
+  constructor(code, message, details = {}) {
     super(message);
     this.code = code;
-    this.committed = committed;
     this.details = details;
     this.name = "PrivateHelperError";
   }
   code;
-  committed;
   details;
 };
 var errorSchema = external_exports.object({
   status: external_exports.literal("error"),
   code: external_exports.string(),
-  message: external_exports.string(),
-  committed: external_exports.boolean().optional()
+  message: external_exports.string()
 }).passthrough();
 var featureSchema = external_exports.object({
   available: external_exports.boolean(),
@@ -51578,11 +51581,13 @@ var helloSchema = external_exports.object({
   status: external_exports.literal("ok"),
   protocolVersion: external_exports.number().int(),
   sourceSha256: external_exports.string(),
+  readOnly: external_exports.literal(true),
   actions: external_exports.array(external_exports.string())
 }).passthrough();
 var probeSchema = external_exports.object({
   status: external_exports.literal("ok"),
   protocolVersion: external_exports.number().int(),
+  readOnly: external_exports.literal(true),
   os: external_exports.object({ version: external_exports.string(), notesAppVersion: external_exports.string().nullable() }).passthrough(),
   framework: external_exports.object({ loaded: external_exports.boolean(), error: external_exports.string().nullable() }).passthrough(),
   store: external_exports.object({
@@ -51592,7 +51597,7 @@ var probeSchema = external_exports.object({
     noteRows: external_exports.number().int().nullable()
   }).passthrough(),
   syncHostRunning: external_exports.boolean(),
-  features: external_exports.object({ readNoteState: featureSchema, appendPlainText: featureSchema }).passthrough()
+  features: external_exports.object({ readNoteState: featureSchema }).passthrough()
 }).passthrough();
 var cloudSyncSchema = external_exports.object({
   available: external_exports.boolean(),
@@ -51616,40 +51621,22 @@ var noteStateSchema = external_exports.object({
   cloudSync: cloudSyncSchema,
   syncHostRunning: external_exports.boolean()
 }).passthrough();
-var appendResultSchema = external_exports.object({
-  status: external_exports.literal("updated"),
-  committed: external_exports.literal(true),
-  verified: external_exports.literal(true),
-  identifier: external_exports.string(),
-  appendedUTF16: external_exports.number().int(),
-  revisionBefore: external_exports.string(),
-  revisionAfter: external_exports.string(),
-  modificationDate: external_exports.string().nullable(),
-  cloudSync: cloudSyncSchema,
-  pushScheduled: external_exports.boolean(),
-  pushState: external_exports.enum(["awaiting_notes_app", "queued_for_next_launch"]),
-  syncHostRunning: external_exports.boolean(),
-  storeKind: external_exports.enum(["live", "copy"])
-}).passthrough();
-var WRITE_ACTIONS = /* @__PURE__ */ new Set(["append_plain_text"]);
 function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options = {}) {
-  const isWrite = WRITE_ACTIONS.has(action);
-  const notCommitted = isWrite ? false : void 0;
+  if (!READ_ONLY_ACTIONS.has(action))
+    throw new PrivateHelperError(
+      "unknown_action",
+      `The private helper is read-only; "${action}" is not a supported action.`
+    );
   if (!options.allowDisabled && !privateHelperEnabled(deps.env))
     throw new PrivateHelperError(
       "disabled",
-      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`,
-      notCommitted
+      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`
     );
   let binaryPath = options.binaryPath;
   if (!binaryPath) {
     const install = inspectInstallation(deps);
     if (!install.ready)
-      throw new PrivateHelperError(
-        install.reason || "helper_not_installed",
-        install.detail || "",
-        notCommitted
-      );
+      throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
   const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
@@ -51663,16 +51650,11 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
   });
   const errno = result.error?.code;
   if (errno === "ETIMEDOUT" || result.signal && result.status === null)
-    throw new PrivateHelperError(
-      "timeout",
-      isWrite ? `The helper did not answer within ${timeout} ms. The write is INDETERMINATE: it may have been saved. Read the note state again before retrying.` : `The helper did not answer within ${timeout} ms.`,
-      isWrite ? "unknown" : void 0
-    );
+    throw new PrivateHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
   if (result.error)
     throw new PrivateHelperError(
       "helper_unreachable",
-      `Could not run the helper: ${result.error.message}`,
-      notCommitted
+      `Could not run the helper: ${result.error.message}`
     );
   const stdout = String(result.stdout ?? "").trim();
   let parsed;
@@ -51681,96 +51663,45 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
   } catch {
     throw new PrivateHelperError(
       "invalid_response",
-      `The helper exited with status ${result.status} and no JSON response` + (isWrite ? ". The write is INDETERMINATE; read the note state before retrying." : "."),
-      isWrite ? "unknown" : void 0
+      `The helper exited with status ${result.status} and no JSON response.`
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new PrivateHelperError(
-      "invalid_response",
-      "The helper response is not a JSON object",
-      isWrite ? "unknown" : void 0
-    );
+    throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
   const object3 = parsed;
   if (result.status !== 0 || object3.status === "error") {
     const error2 = errorSchema.safeParse(object3);
     if (!error2.success)
       throw new PrivateHelperError(
         "invalid_response",
-        `The helper failed with an unrecognized error shape (exit ${result.status})`,
-        isWrite ? "unknown" : void 0
+        `The helper failed with an unrecognized error shape (exit ${result.status})`
       );
-    const { status: _status, code, message, committed, ...details } = error2.data;
+    const { status: _status, code, message, ...details } = error2.data;
     void _status;
-    throw new PrivateHelperError(
-      code,
-      message,
-      isWrite ? committed ?? "unknown" : void 0,
-      details
-    );
+    throw new PrivateHelperError(code, message, details);
   }
   return object3;
 }
-function parseOrThrow(schema, value, isWrite) {
+function parseOrThrow(schema, value) {
   const parsed = schema.safeParse(value);
   if (!parsed.success)
     throw new PrivateHelperError(
       "invalid_response",
-      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`,
-      // A malformed success response after a write still means the helper
-      // reported success; treat it as indeterminate rather than failed.
-      isWrite ? "unknown" : void 0
+      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
     );
   return parsed.data;
 }
 var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 function assertNoteIdentifier(identifier) {
   if (!UUID.test(identifier))
-    throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID", void 0);
-}
-var FORBIDDEN_TEXT = /[\x00-\x08\x0B-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
-function assertAppendText(text2) {
-  if (!text2.length) throw new PrivateHelperError("invalid_request", "text is required", false);
-  if (text2.length > 5e4)
-    throw new PrivateHelperError("invalid_request", "text exceeds 50000 UTF-16 code units", false);
-  if (FORBIDDEN_TEXT.test(text2))
-    throw new PrivateHelperError(
-      "invalid_request",
-      "text may contain only printable characters, tabs and \\n newlines",
-      false
-    );
+    throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID");
 }
 function probePrivateHelper(deps = defaultDeps2()) {
-  return parseOrThrow(probeSchema, callPrivateHelper("probe", {}, deps), false);
+  return parseOrThrow(probeSchema, callPrivateHelper("probe", {}, deps));
 }
 function readNoteState(identifier, deps = defaultDeps2()) {
   assertNoteIdentifier(identifier);
-  return parseOrThrow(
-    noteStateSchema,
-    callPrivateHelper("read_note_state", { identifier }, deps),
-    false
-  );
-}
-function appendPlainText(request, deps = defaultDeps2()) {
-  assertNoteIdentifier(request.identifier);
-  assertAppendText(request.text);
-  if (!/^r1:[a-f0-9]{64}$/.test(request.ifRevision))
-    throw new PrivateHelperError(
-      "invalid_request",
-      "ifRevision must be a revision token from native-note-state",
-      false
-    );
-  if (!APPEND_LIVE_VALIDATED && deps.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
-    throw new PrivateHelperError(
-      "not_live_validated",
-      "native-append-plain-text has not passed live validation in this build. Set APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 to run it on a disposable note.",
-      false
-    );
-  return parseOrThrow(
-    appendResultSchema,
-    callPrivateHelper("append_plain_text", request, deps),
-    true
-  );
+  return parseOrThrow(noteStateSchema, callPrivateHelper("read_note_state", { identifier }, deps));
 }
 function featureFromProbe(feature) {
   if (!feature) return { available: false, reason: "private_api_unavailable", detail: null };
@@ -51790,13 +51721,11 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
     reason,
     detail
   });
-  const both = (status) => ({
-    readNoteState: status,
-    appendPlainText: status
-  });
+  const both = (status) => ({ readNoteState: status });
   if (installation.reason === "unsupported_platform")
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("unsupported_platform", null))
@@ -51804,6 +51733,7 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
   if (!enabled)
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("disabled", `Set ${ENABLE_ENV}=1 to opt in to the private helper.`))
@@ -51811,6 +51741,7 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
   if (!installation.ready)
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off(installation.reason || "helper_not_installed", installation.detail))
@@ -51822,23 +51753,18 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
     const detail = error2 instanceof Error ? error2.message : String(error2);
     return {
       enabled,
+      readOnly: true,
       installation,
       probe: null,
       features: both(off("helper_unreachable", detail))
     };
   }
-  const read = featureFromProbe(probe.features.readNoteState);
-  let append = featureFromProbe(probe.features.appendPlainText);
-  if (append.available && !APPEND_LIVE_VALIDATED && deps.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
-    append = off(
-      "not_live_validated",
-      "The private append path has not passed live validation in this build; APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 enables it for testing."
-    );
   return {
     enabled,
+    readOnly: true,
     installation,
     probe,
-    features: { readNoteState: read, appendPlainText: append }
+    features: { readNoteState: featureFromProbe(probe.features.readNoteState) }
   };
 }
 
@@ -51973,7 +51899,20 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       });
       return done(false);
     }
-    steps.push({ step: "handshake", ok: true, detail: `protocol ${hello.protocolVersion}` });
+    const writeActions = hello.actions.filter((action) => !READ_ONLY_ACTIONS.has(action));
+    if (writeActions.length) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper offers non-read-only actions (${writeActions.join(", ")}); refusing to install`
+      });
+      return done(false);
+    }
+    steps.push({
+      step: "handshake",
+      ok: true,
+      detail: `protocol ${hello.protocolVersion}, read-only`
+    });
     const manifest = {
       schemaVersion: 1,
       protocolVersion: hello.protocolVersion,
@@ -52035,18 +51974,48 @@ function resolveIdentifier(manager, args) {
     );
   return match[1];
 }
-function errorResult2(error2) {
-  const payload = error2 instanceof PrivateHelperError ? {
-    ok: false,
-    code: error2.code,
-    message: error2.message,
-    ...error2.committed !== void 0 ? { committed: error2.committed } : {},
-    ...error2.details
-  } : { ok: false, code: "internal_error", message: String(error2) };
-  return {
-    content: [{ type: "text", text: JSON.stringify(payload) }],
-    isError: true
-  };
+function envelopeCode(helperCode, message) {
+  switch (helperCode) {
+    case "not_found":
+      return "not_found";
+    case "timeout":
+      return "timeout_indeterminate";
+    case "invalid_request":
+    case "invalid_json":
+    case "input_too_large":
+    case "unknown_action":
+      return "validation_error";
+    case "store_unavailable":
+      return /Full Disk Access/i.test(message) ? "full_disk_access_missing" : "operation_failed";
+    case "disabled":
+    case "unsupported_platform":
+    case "unsupported_note":
+    case "private_api_unavailable":
+    case "protocol_mismatch":
+    case "helper_not_installed":
+    case "helper_stale":
+    case "helper_modified":
+    case "helper_manifest_invalid":
+      return "unsupported";
+    default:
+      return "operation_failed";
+  }
+}
+function helperErrorResult(error2) {
+  if (!(error2 instanceof PrivateHelperError)) {
+    const message2 = error2 instanceof Error ? error2.message : String(error2);
+    return errorResult(`native helper: ${message2}`, error2);
+  }
+  const message = `native helper (${error2.code}): ${error2.message}`;
+  return errorResult(
+    message,
+    new CodedError(message, {
+      ...error2.details,
+      code: envelopeCode(error2.code, error2.message),
+      helperCode: error2.code,
+      committed: false
+    })
+  );
 }
 function registerPrivateHelperTools(server2, manager, depsFactory = () => defaultDeps2()) {
   function tool(name, description, inputSchema, annotations, handler) {
@@ -52066,14 +52035,14 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
             structuredContent: result
           };
         } catch (error2) {
-          return errorResult2(error2);
+          return helperErrorResult(error2);
         }
       })
     );
   }
   tool(
     "native-helper-status",
-    "Use when: checking whether the opt-in native private helper is enabled, built, current, and working on this macOS before calling native-note-state or native-append-plain-text.\nReturns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\nDo not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\nSafety: read-only. The probe opens the Notes store read-only and only when the helper is enabled and installed.",
+    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state.\nReturns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\nDo not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\nSafety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
     {},
     { readOnlyHint: true, openWorldHint: false },
     (_args, deps) => {
@@ -52086,36 +52055,13 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
   );
   tool(
     "native-note-state",
-    "Use when: you need a note's native revision token before native-append-plain-text, or its native title, modification date, folder identifier, and iCloud upload state.\nReturns: identifier, title, modificationDate, folderIdentifier, lock/trash/shared/editable flags, `revision` (pass it as ifRevision), and cloudSync versions.\nDo not use when: reading note content (get-note-content, get-note-markdown).\nSafety: read-only; the helper opens the store with Core Data's read-only option. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and a built helper.",
+    "Use when: you need a note's native title, modification date, folder identifier, lock/trash/shared/editable flags, or iCloud upload state as Notes' own data model reports them.\nReturns: identifier, title, modificationDate, folderIdentifier, lock/trash/shared/editable flags, `revision` (an opaque change token; compare two reads to detect a change), and cloudSync versions.\nDo not use when: reading note content (get-note-content, get-note-markdown).\nSafety: read-only; the helper opens the store with Core Data's read-only option and has no write action. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and a built helper.",
     {
       identifier: notesUuid.optional().describe("Notes UUID (the notes://showNote identifier)"),
       id: coreDataId2.optional().describe("x-coredata note id; resolved to a UUID via the database")
     },
     { readOnlyHint: true, openWorldHint: false },
     (args, deps) => ({ ...readNoteState(resolveIdentifier(manager, args), deps) })
-  );
-  tool(
-    "native-append-plain-text",
-    'Use when: appending plain text paragraphs to one exact note through Notes\' own data model, with a compare-and-swap guard. This is the private-helper path, distinct from append-native (Shortcuts) and append-to-note (AppleScript HTML rewrite).\nReturns: committed/verified flags, revisionBefore/revisionAfter, the new modification date, and sync state: pushScheduled (always false; the helper cannot upload), pushState, and cloudSync versions.\nDo not use when: the note is locked, shared, trashed, or still downloading, or you need formatting (text is appended as plain body paragraphs).\nSafety: writes to the Notes database through unsupported private API. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, a built helper, and a fresh `revision` from native-note-state as ifRevision; refuses on any change since. Verifies by re-reading in a new Core Data stack. A timeout is indeterminate (committed: "unknown"): read native-note-state before any retry. Not yet live-validated, so it also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1.',
-    {
-      identifier: notesUuid.optional().describe("Notes UUID"),
-      id: coreDataId2.optional().describe("x-coredata note id; resolved to a UUID via the database"),
-      text: external_exports.string().min(1).max(5e4).describe(
-        "Plain text to append. \\n starts a new paragraph; no \\r or control characters."
-      ),
-      ifRevision: external_exports.string().regex(/^r1:[a-f0-9]{64}$/).describe("The `revision` returned by native-note-state for this note")
-    },
-    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    (args, deps) => ({
-      ...appendPlainText(
-        {
-          identifier: resolveIdentifier(manager, args),
-          text: args.text,
-          ifRevision: args.ifRevision
-        },
-        deps
-      )
-    })
   );
 }
 

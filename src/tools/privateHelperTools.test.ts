@@ -6,15 +6,14 @@ vi.mock(import("../services/privateHelper.js"), async (importOriginal) => ({
   ...(await importOriginal()),
   privateHelperCapabilities: vi.fn(),
   readNoteState: vi.fn(),
-  appendPlainText: vi.fn(),
 }));
 import {
   PrivateHelperError,
-  appendPlainText,
   privateHelperCapabilities,
   readNoteState,
 } from "../services/privateHelper.js";
-import { registerPrivateHelperTools } from "./privateHelperTools.js";
+import { ERROR_CODES } from "../utils/errorCodes.js";
+import { envelopeCode, registerPrivateHelperTools } from "./privateHelperTools.js";
 
 const NOTE = "D629A948-0C61-43BA-8FDE-04CD6DED38C7";
 const REV = `r1:${"a".repeat(64)}`;
@@ -34,26 +33,28 @@ function fixture(link: string | null = `notes://showNote?identifier=${NOTE}`) {
     return item[2](args);
   };
   const config = (name: string) => registerTool.mock.calls.find((c) => c[0] === name)?.[1];
-  return { call, config, manager };
+  const names = () => registerTool.mock.calls.map((c) => c[0]);
+  return { call, config, manager, names };
 }
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("private helper tools", () => {
-  it("registers three tools with honest annotations", () => {
-    const { config } = fixture();
-    expect(config("native-helper-status").annotations.readOnlyHint).toBe(true);
-    expect(config("native-note-state").annotations.readOnlyHint).toBe(true);
-    expect(config("native-append-plain-text").annotations).toMatchObject({
-      readOnlyHint: false,
-      destructiveHint: false,
-    });
-    expect(config("native-append-plain-text").description).toMatch(/Safety:.*ifRevision/s);
+  it("registers only the two read-only tools, and says so", () => {
+    const { config, names } = fixture();
+    expect(names()).toEqual(["native-helper-status", "native-note-state"]);
+    for (const name of names()) {
+      expect(config(name).annotations.readOnlyHint).toBe(true);
+      expect(config(name).description).toMatch(/Safety: read-only/);
+    }
+    expect(config("native-helper-status").description).toMatch(/deliberately deferred/);
+    expect(names()).not.toContain("native-append-plain-text");
   });
 
   it("status adds the setup command while the helper is not installed", async () => {
     vi.mocked(privateHelperCapabilities).mockReturnValueOnce({
       enabled: true,
+      readOnly: true,
       installation: { ready: false } as never,
       probe: null,
       features: {} as never,
@@ -61,10 +62,12 @@ describe("private helper tools", () => {
     const r = await fixture().call("native-helper-status", {});
     expect(r.structuredContent).toMatchObject({
       ok: true,
+      readOnly: true,
       setupCommand: "apple-notes-mcp setup --native-helper",
     });
     vi.mocked(privateHelperCapabilities).mockReturnValueOnce({
       enabled: true,
+      readOnly: true,
       installation: { ready: true } as never,
       probe: null,
       features: {} as never,
@@ -85,63 +88,81 @@ describe("private helper tools", () => {
 
   it("refuses ambiguous, missing, or unresolvable note references", async () => {
     const both = await fixture().call("native-note-state", { identifier: NOTE, id: CD });
-    expect(JSON.parse(both.content[0].text)).toMatchObject({ code: "invalid_request" });
+    expect(both.structuredContent).toMatchObject({
+      code: "validation_error",
+      helperCode: "invalid_request",
+    });
     const none = await fixture().call("native-note-state", {});
-    expect(JSON.parse(none.content[0].text)).toMatchObject({ code: "invalid_request" });
+    expect(none.structuredContent).toMatchObject({ code: "validation_error" });
     const unresolved = await fixture(null).call("native-note-state", { id: CD });
     expect(unresolved.isError).toBe(true);
-    expect(JSON.parse(unresolved.content[0].text)).toMatchObject({ code: "not_found" });
+    expect(unresolved.structuredContent).toMatchObject({
+      code: "not_found",
+      helperCode: "not_found",
+    });
     expect(readNoteState).not.toHaveBeenCalled();
   });
 
-  it("appends with the resolved identifier and returns the helper result", async () => {
-    vi.mocked(appendPlainText).mockReturnValue({ committed: true, verified: true } as never);
-    const r = await fixture().call("native-append-plain-text", {
-      id: CD,
-      text: "hello",
-      ifRevision: REV,
+  it("reports helper errors through the shared CodedError envelope", async () => {
+    vi.mocked(readNoteState).mockImplementation(() => {
+      throw new PrivateHelperError("helper_stale", "rebuild it", { hint: "x" });
     });
-    expect(appendPlainText).toHaveBeenCalledWith(
-      { identifier: NOTE, text: "hello", ifRevision: REV },
-      {}
-    );
-    expect(r.structuredContent).toEqual({ ok: true, committed: true, verified: true });
-  });
-
-  it("reports write errors with their code, committed state, and details", async () => {
-    vi.mocked(appendPlainText).mockImplementation(() => {
-      throw new PrivateHelperError("revision_conflict", "changed", false, { currentRevision: REV });
-    });
-    const r = await fixture().call("native-append-plain-text", {
-      identifier: NOTE,
-      text: "x",
-      ifRevision: REV,
-    });
+    const r = await fixture().call("native-note-state", { identifier: NOTE });
     expect(r.isError).toBe(true);
-    expect(JSON.parse(r.content[0].text)).toEqual({
-      ok: false,
-      code: "revision_conflict",
-      message: "changed",
+    expect(r.content[0].text).toBe("native helper (helper_stale): rebuild it");
+    expect(r.structuredContent).toEqual({
+      code: "unsupported",
+      helperCode: "helper_stale",
       committed: false,
-      currentRevision: REV,
+      hint: "x",
     });
   });
 
-  it("wraps unexpected failures as internal errors", async () => {
+  it("wraps unexpected failures through the classifier", async () => {
     vi.mocked(privateHelperCapabilities).mockImplementationOnce(() => {
       throw new Error("kaboom");
     });
     const r = await fixture().call("native-helper-status", {});
-    expect(JSON.parse(r.content[0].text)).toEqual({
-      ok: false,
-      code: "internal_error",
-      message: "Error: kaboom",
-    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toBe("native helper: kaboom");
+    expect(r.structuredContent).toEqual({ code: "operation_failed" });
+  });
+
+  it("maps every helper code into the documented vocabulary", () => {
+    const codes = [
+      "not_found",
+      "timeout",
+      "invalid_request",
+      "invalid_json",
+      "input_too_large",
+      "unknown_action",
+      "store_unavailable",
+      "disabled",
+      "unsupported_platform",
+      "unsupported_note",
+      "private_api_unavailable",
+      "protocol_mismatch",
+      "helper_not_installed",
+      "helper_stale",
+      "helper_modified",
+      "helper_manifest_invalid",
+      "helper_unreachable",
+      "invalid_response",
+      "read_only_violation",
+      "internal_error",
+    ];
+    for (const code of codes) expect(Object.keys(ERROR_CODES)).toContain(envelopeCode(code, ""));
+    expect(envelopeCode("store_unavailable", "Grant Full Disk Access")).toBe(
+      "full_disk_access_missing"
+    );
+    expect(envelopeCode("store_unavailable", "open failed")).toBe("operation_failed");
+    expect(envelopeCode("timeout", "")).toBe("timeout_indeterminate");
   });
 
   it("uses the real dependencies when none are injected", async () => {
     vi.mocked(privateHelperCapabilities).mockReturnValueOnce({
       enabled: false,
+      readOnly: true,
       installation: { ready: true } as never,
       probe: null,
       features: {} as never,
@@ -155,9 +176,9 @@ describe("private helper tools", () => {
   });
 
   it("validates tool input with the declared schemas", () => {
-    const schema = fixture().config("native-append-plain-text").inputSchema;
-    expect(schema.ifRevision.safeParse("sha256:abc").success).toBe(false);
+    const schema = fixture().config("native-note-state").inputSchema;
     expect(schema.identifier.safeParse("nope").success).toBe(false);
+    expect(schema.identifier.safeParse(NOTE).success).toBe(true);
     expect(schema.id.safeParse(CD).success).toBe(true);
   });
 });

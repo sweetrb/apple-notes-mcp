@@ -29,6 +29,7 @@ import {
   callPrivateHelper,
   defaultDeps,
   helloSchema,
+  READ_ONLY_ACTIONS,
   helperInstallDir,
   inspectInstallation,
   sha256Hex,
@@ -201,7 +202,20 @@ export function buildPrivateHelper(
       });
       return done(false);
     }
-    steps.push({ step: "handshake", ok: true, detail: `protocol ${hello.protocolVersion}` });
+    const writeActions = hello.actions.filter((action) => !READ_ONLY_ACTIONS.has(action));
+    if (writeActions.length) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper offers non-read-only actions (${writeActions.join(", ")}); refusing to install`,
+      });
+      return done(false);
+    }
+    steps.push({
+      step: "handshake",
+      ok: true,
+      detail: `protocol ${hello.protocolVersion}, read-only`,
+    });
 
     const manifest: PrivateHelperManifest = {
       schemaVersion: 1,

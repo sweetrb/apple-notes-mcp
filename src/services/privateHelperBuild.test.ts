@@ -72,6 +72,7 @@ function deps(overrides: Record<string, Outcome | undefined> = {}, env = {}): He
           status: "ok",
           protocolVersion: 1,
           sourceSha256: SOURCE_SHA,
+          readOnly: true,
           actions: ["hello"],
         }),
         stderr: "",
@@ -210,11 +211,38 @@ describe("buildPrivateHelper", () => {
     expect(report.steps.at(-1)).toMatchObject({ step: "handshake", ok: false });
   });
 
+  it("refuses a helper that does not report read-only or offers a write action", () => {
+    const notReadOnly = JSON.stringify({
+      status: "ok",
+      protocolVersion: 1,
+      sourceSha256: SOURCE_SHA,
+      actions: ["hello"],
+    });
+    const a = buildPrivateHelper(false, deps({ helper: { status: 0, stdout: notReadOnly } }));
+    expect(a.ok).toBe(false);
+    expect(a.steps.at(-1)).toMatchObject({ step: "handshake", ok: false });
+    const writer = JSON.stringify({
+      status: "ok",
+      protocolVersion: 1,
+      sourceSha256: SOURCE_SHA,
+      readOnly: true,
+      actions: ["hello", "append_plain_text"],
+    });
+    const b = buildPrivateHelper(false, deps({ helper: { status: 0, stdout: writer } }));
+    expect(b.ok).toBe(false);
+    expect(b.steps.at(-1)).toMatchObject({
+      step: "handshake",
+      ok: false,
+      detail: expect.stringMatching(/append_plain_text/),
+    });
+  });
+
   it("refuses a helper reporting another source or protocol", () => {
     const wrong = JSON.stringify({
       status: "ok",
       protocolVersion: 1,
       sourceSha256: "x",
+      readOnly: true,
       actions: [],
     });
     const report = buildPrivateHelper(false, deps({ helper: { status: 0, stdout: wrong } }));
