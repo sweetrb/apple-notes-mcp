@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24777,8 +24777,8 @@ var ZodError = class _ZodError extends Error {
   constructor(issues) {
     super();
     this.issues = [];
-    this.addIssue = (sub2) => {
-      this.issues = [...this.issues, sub2];
+    this.addIssue = (sub3) => {
+      this.issues = [...this.issues, sub3];
     };
     this.addIssues = (subs = []) => {
       this.issues = [...this.issues, ...subs];
@@ -24845,13 +24845,13 @@ var ZodError = class _ZodError extends Error {
   flatten(mapper = (issue2) => issue2.message) {
     const fieldErrors = {};
     const formErrors = [];
-    for (const sub2 of this.issues) {
-      if (sub2.path.length > 0) {
-        const firstEl = sub2.path[0];
+    for (const sub3 of this.issues) {
+      if (sub3.path.length > 0) {
+        const firstEl = sub3.path[0];
         fieldErrors[firstEl] = fieldErrors[firstEl] || [];
-        fieldErrors[firstEl].push(mapper(sub2));
+        fieldErrors[firstEl].push(mapper(sub3));
       } else {
-        formErrors.push(mapper(sub2));
+        formErrors.push(mapper(sub3));
       }
     }
     return { formErrors, fieldErrors };
@@ -29150,12 +29150,12 @@ var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
-  for (const sub2 of error2.issues) {
-    if (sub2.path.length > 0) {
-      fieldErrors[sub2.path[0]] = fieldErrors[sub2.path[0]] || [];
-      fieldErrors[sub2.path[0]].push(mapper(sub2));
+  for (const sub3 of error2.issues) {
+    if (sub3.path.length > 0) {
+      fieldErrors[sub3.path[0]] = fieldErrors[sub3.path[0]] || [];
+      fieldErrors[sub3.path[0]].push(mapper(sub3));
     } else {
-      formErrors.push(mapper(sub2));
+      formErrors.push(mapper(sub3));
     }
   }
   return { formErrors, fieldErrors };
@@ -39275,7 +39275,7 @@ function decodeVarint(buf, offset) {
   }
   throw new Error(`Unexpected end of buffer reading varint at offset ${offset}`);
 }
-function decodeMessage(buf) {
+function decodeMessage(buf, options = {}) {
   const fields = [];
   let offset = 0;
   while (offset < buf.length) {
@@ -39296,10 +39296,13 @@ function decodeMessage(buf) {
       const value = buf.slice(offset, offset + length);
       fields.push({ fieldNumber, wireType, value });
       offset += length;
-    } else if (wireType === 5) {
-      offset += 4;
-    } else if (wireType === 1) {
-      offset += 8;
+    } else if (wireType === 5 || wireType === 1) {
+      const width = wireType === 5 ? 4 : 8;
+      if (offset + width > buf.length) break;
+      if (options.keepFixed) {
+        fields.push({ fieldNumber, wireType, value: buf.slice(offset, offset + width) });
+      }
+      offset += width;
     } else {
       break;
     }
@@ -39329,6 +39332,11 @@ function embeddedMessage(field) {
   const bytes = bytesValue(field);
   if (!bytes) return void 0;
   return decodeMessage(bytes);
+}
+function fixed64Double(field) {
+  if (!field || field.wireType !== 1 || !(field.value instanceof Uint8Array)) return void 0;
+  if (field.value.length !== 8) return void 0;
+  return new DataView(field.value.buffer, field.value.byteOffset, 8).getFloat64(0, true);
 }
 
 // src/utils/checklistParser.ts
@@ -39832,6 +39840,370 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
   }
 }
 
+// src/utils/audioTranscripts.ts
+import { execFileSync as execFileSync4 } from "node:child_process";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+import { gunzipSync as gunzipSync3 } from "node:zlib";
+var NOTES_DB_PATH2 = join3(
+  homedir3(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var DEFAULT_MAX_SEGMENTS = 2e3;
+var MAX_SEGMENTS_LIMIT = 2e4;
+var AudioTranscriptError = class extends Error {
+  constructor(kind, message) {
+    super(message);
+    this.kind = kind;
+    this.name = "AudioTranscriptError";
+  }
+  kind;
+};
+var decode = (bytes) => decodeMessage(bytes, { keepFixed: true });
+var sub = (f, n) => {
+  const bytes = getField(f, n)?.value;
+  return bytes instanceof Uint8Array ? decode(bytes) : void 0;
+};
+var need = (value, what) => {
+  if (value === void 0) throw new Error(`Missing ${what}`);
+  return value;
+};
+var many = (f, n) => getFields(f, n).map((field) => {
+  if (!(field.value instanceof Uint8Array)) throw new Error("Invalid nested entry");
+  return decode(field.value);
+});
+function parseAudioRecording(data) {
+  const root = decode(data);
+  const entries = many(root, 3);
+  if (entries.length === 0) throw new Error("No mergeable objects");
+  if (entries.length > 2e6) throw new Error("Recording too large");
+  const keys = getFields(root, 4).map((f) => stringValue(f) ?? "");
+  const types = getFields(root, 5).map((f) => stringValue(f) ?? "");
+  const uuids = getFields(root, 6).map(
+    (f) => f.value instanceof Uint8Array ? Buffer.from(f.value).toString("hex") : ""
+  );
+  const uuidSlot = /* @__PURE__ */ new Map();
+  uuids.forEach((uuid2, i) => {
+    if (uuid2 && !uuidSlot.has(uuid2)) uuidSlot.set(uuid2, i);
+  });
+  const entry = (index) => {
+    const value = entries[index];
+    if (!value) throw new Error("Invalid object reference");
+    return value;
+  };
+  const customMap = (e) => {
+    const map = sub(e, 13);
+    if (!map) return void 0;
+    const values = /* @__PURE__ */ new Map();
+    for (const item of many(map, 3)) {
+      const key = keys[need(varintValue(getField(item, 1)), "map key")];
+      const value = sub(item, 2);
+      if (key !== void 0 && value) values.set(key, value);
+    }
+    return { type: types[need(varintValue(getField(map, 1)), "map type")] ?? "", values };
+  };
+  const objectIndex = (id2) => id2 ? varintValue(getField(id2, 6)) : void 0;
+  const registerTarget = (id2) => {
+    const index = objectIndex(id2);
+    if (index === void 0) return void 0;
+    const register = sub(entry(index), 1);
+    if (!register) return void 0;
+    const target = objectIndex(sub(register, 2));
+    return target === void 0 ? void 0 : entry(target);
+  };
+  const registerPrimitive = (id2) => {
+    const target = registerTarget(id2);
+    const map = target && customMap(target);
+    if (!map) return void 0;
+    const self = map.values.get("self");
+    if (self) return stringValue(getField(self, 4));
+    const double = map.values.get("doubleValue");
+    if (double) return fixed64Double(getField(double, 3));
+    const integer2 = map.values.get("integerValue");
+    if (integer2) return varintValue(getField(integer2, 2));
+    return void 0;
+  };
+  const registerNoteText = (id2) => {
+    const target = registerTarget(id2);
+    const note = target && sub(target, 10);
+    const text = note && stringValue(getField(note, 2));
+    return text?.replace(/\n+$/u, "") || void 0;
+  };
+  const recordings = entries.map((e) => customMap(e)).filter((m) => m?.type === "com.apple.notes.ICTTAudioRecording");
+  if (recordings.length !== 1) throw new Error("Expected exactly one audio recording object");
+  const recording = recordings[0];
+  const fragments = [];
+  const fragmentList = objectIndex(recording.values.get("fragments"));
+  if (fragmentList !== void 0) {
+    const list = need(sub(entry(fragmentList), 5), "fragment list");
+    for (const item of many(list, 1)) {
+      const fragment = customMap(entry(need(objectIndex(sub(item, 2)), "fragment reference")));
+      if (fragment?.type !== "com.apple.notes.ICTTAudioRecording.Fragment")
+        throw new Error("Unexpected fragment type");
+      const identity = stringValue(getField(fragment.values.get("identity") ?? [], 4));
+      const segments = [];
+      const transcriptRef = objectIndex(fragment.values.get("transcript"));
+      if (transcriptRef !== void 0) {
+        const set = sub(entry(transcriptRef), 15);
+        if (!set) throw new Error("Unsupported transcript container");
+        const bySlot = /* @__PURE__ */ new Map();
+        for (const element of many(sub(set, 2) ?? [], 1)) {
+          const keyMap = customMap(entry(need(objectIndex(sub(element, 1)), "segment key")));
+          const slot = varintValue(getField(keyMap?.values.get("UUIDIndex") ?? [], 2));
+          const value = objectIndex(sub(element, 2));
+          if (slot === void 0 || value === void 0) throw new Error("Invalid segment key");
+          bySlot.set(slot, value);
+        }
+        const ordering = many(need(sub(set, 1), "transcript ordering"), 2).map((pair) => ({
+          index: need(varintValue(getField(pair, 1)), "segment index"),
+          uuid: getField(pair, 2)?.value
+        })).sort((a, b) => a.index - b.index);
+        for (const { uuid: uuid2 } of ordering) {
+          if (!(uuid2 instanceof Uint8Array)) throw new Error("Invalid segment UUID");
+          const slot = uuidSlot.get(Buffer.from(uuid2).toString("hex"));
+          const segmentIndex = slot === void 0 ? void 0 : bySlot.get(slot);
+          if (segmentIndex === void 0) throw new Error("Unresolved transcript segment");
+          const segment = customMap(entry(segmentIndex));
+          if (segment?.type !== "com.apple.notes.ICTTTranscriptSegment")
+            throw new Error("Unexpected segment type");
+          const text = registerPrimitive(segment.values.get("text"));
+          if (typeof text !== "string") throw new Error("Segment without text");
+          const start = registerPrimitive(segment.values.get("timestamp"));
+          const duration3 = registerPrimitive(segment.values.get("duration"));
+          const speaker = registerPrimitive(segment.values.get("speaker"));
+          segments.push({
+            text,
+            ...typeof start === "number" ? { start } : {},
+            ...typeof duration3 === "number" ? { duration: duration3 } : {},
+            ...typeof speaker === "string" && speaker ? { speaker } : {}
+          });
+        }
+      }
+      fragments.push({ ...identity ? { identity } : {}, segments });
+    }
+  }
+  const summary = registerNoteText(recording.values.get("summary"));
+  const topLineSummary = registerNoteText(recording.values.get("topLineSummary"));
+  return {
+    fragments,
+    ...summary ? { summary } : {},
+    ...topLineSummary ? { topLineSummary } : {}
+  };
+}
+function joinSegments(segments) {
+  let out = "";
+  for (const { text } of segments) {
+    if (!text) continue;
+    const glue = !out || /\s$/u.test(out) || /^\s/u.test(text) || /^[.,!?;:%)\]}…'’]/u.test(text) ? "" : " ";
+    out += glue + text;
+  }
+  return out.trim();
+}
+function parseNoteId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d+)$/.exec(noteId3);
+  if (!match) {
+    throw new AudioTranscriptError(
+      "invalid_id",
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`
+    );
+  }
+  return { store: match[1], pk: match[2] };
+}
+var AUDIO_UTI_SQL = "(a.ZTYPEUTI LIKE '%audio%' OR a.ZTYPEUTI IN ('public.mp3'))";
+function buildTranscriptSql(pk, available) {
+  if (!/^\d+$/.test(pk)) throw new Error("Invalid primary key");
+  const optional2 = (column, key, alias = "a") => available.has(column) ? `, '${key}', ${alias}.${column}` : "";
+  const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  return [
+    "BEGIN;",
+    // Every statement yields exactly one row, so output lines stay positional.
+    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}), 'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}));`,
+    `SELECT COALESCE((SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = ${pk} LIMIT 1), '');`,
+    "SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.ZMERGEABLEDATA1)" + optional2("ZDURATION", "duration") + optional2("ZNEEDSTRANSCRIPTION", "needsTranscription") + ", 'fragments', json((SELECT json_group_array(json_object('identifier', c.ZIDENTIFIER" + optional2("ZDURATION", "duration", "c") + `)) FROM ZICCLOUDSYNCINGOBJECT c WHERE c.ZPARENTATTACHMENT = a.Z_PK)))) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = ${pk} AND a.ZPARENTATTACHMENT IS NULL AND ${AUDIO_UTI_SQL};`,
+    "COMMIT;"
+  ].join("\n");
+}
+var REQUIRED_COLUMNS = [
+  "ZMERGEABLEDATA1",
+  "ZPARENTATTACHMENT",
+  "ZTYPEUTI",
+  "ZNOTE",
+  "ZIDENTIFIER"
+];
+function runSqlite(dbPath2, sql) {
+  return execFileSync4("sqlite3", ["-readonly", dbPath2, sql], {
+    encoding: "utf8",
+    timeout: 1e4,
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function bodyAttachmentOrder(gzipped) {
+  const doc = decodeMessage(gunzipSync3(gzipped, { maxOutputLength: 64 * 1024 * 1024 }));
+  const body = embeddedMessage(getField(embeddedMessage(getField(doc, 2)) ?? [], 3));
+  if (!body) throw new Error("Unsupported Notes document structure");
+  const ids = [];
+  for (const run of getFields(body, 5)) {
+    const attachment = embeddedMessage(getField(embeddedMessage(run) ?? [], 12));
+    const id2 = attachment && stringValue(getField(attachment, 1));
+    if (id2 && !ids.includes(id2)) ids.push(id2);
+  }
+  return ids;
+}
+function readAudioTranscripts(noteId3, options = {}) {
+  const { store, pk } = parseNoteId(noteId3);
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH2;
+  const maxSegments = Math.min(
+    Math.max(1, Math.floor(options.maxSegments ?? DEFAULT_MAX_SEGMENTS)),
+    MAX_SEGMENTS_LIMIT
+  );
+  let lines;
+  try {
+    const available = new Set(
+      runSqlite(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
+    );
+    const missing = REQUIRED_COLUMNS.filter((c) => !available.has(c));
+    if (missing.length)
+      throw new AudioTranscriptError(
+        "query_error",
+        `This macOS version's Notes database lacks ${missing.join(", ")}; stored transcripts cannot be read.`
+      );
+    lines = runSqlite(dbPath2, buildTranscriptSql(pk, available)).split("\n");
+  } catch (error2) {
+    if (error2 instanceof AudioTranscriptError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new AudioTranscriptError(
+        "no_fda",
+        `Full Disk Access is required to read stored transcripts. Grant it to the app that launches this server, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+      );
+    throw new AudioTranscriptError("query_error", "Failed to read the Notes database.");
+  }
+  const [noteLine = "{}", bodyLine = "", rowsLine = "[]"] = lines;
+  const note = JSON.parse(noteLine || "{}");
+  if (!note.found)
+    throw new AudioTranscriptError(
+      "not_found",
+      `No note found in the database for ID "${noteId3}".`
+    );
+  if (note.locked)
+    throw new AudioTranscriptError(
+      "locked",
+      "This note is password-protected; its transcripts are encrypted and cannot be read."
+    );
+  const rows = JSON.parse(rowsLine || "[]");
+  let order;
+  try {
+    if (/^[0-9A-F]+$/i.test(bodyLine.trim()))
+      order = bodyAttachmentOrder(Buffer.from(bodyLine.trim(), "hex"));
+  } catch {
+    order = void 0;
+  }
+  const ordered = order ? order.flatMap((id2) => rows.filter((row) => row.identifier === id2)) : [...rows].sort((a, b) => a.pk - b.pk);
+  const attachments = ordered.map((row) => describeRow(row, store, options, maxSegments));
+  return { id: noteId3, attachments, bodyOrder: Boolean(order), truncated: false };
+}
+function describeRow(row, store, options, maxSegments) {
+  const childDurations = (row.fragments ?? []).map((f) => f.duration).filter((d) => typeof d === "number" && d > 0);
+  const durationSeconds = typeof row.duration === "number" && row.duration > 0 ? row.duration : childDurations.length ? childDurations.reduce((a, b) => a + b, 0) : void 0;
+  const base = {
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier,
+    typeUti: row.uti,
+    status: "none",
+    ...durationSeconds !== void 0 ? { durationSeconds } : {},
+    ...typeof row.needsTranscription === "number" ? { needsTranscription: row.needsTranscription === 1 } : {}
+  };
+  if (!row.data) return base;
+  let recording;
+  try {
+    recording = parseAudioRecording(Buffer.from(row.data, "hex"));
+  } catch (error2) {
+    return {
+      ...base,
+      status: "undecodable",
+      reason: error2 instanceof Error ? error2.message : String(error2)
+    };
+  }
+  const multi = recording.fragments.length > 1;
+  const all = recording.fragments.flatMap(
+    (fragment, i) => fragment.segments.map((s) => multi ? { ...s, fragment: i } : s)
+  );
+  const text = recording.fragments.map((f) => joinSegments(f.segments)).filter(Boolean).join("\n\n");
+  const speakers = [...new Set(all.flatMap((s) => s.speaker ? [s.speaker] : []))];
+  return {
+    ...base,
+    status: all.length ? "ok" : "none",
+    fragmentCount: recording.fragments.length,
+    wordCount: all.length,
+    ...text ? { text } : {},
+    ...speakers.length ? { speakers } : {},
+    ...recording.summary ? { summary: recording.summary } : {},
+    ...recording.topLineSummary ? { topLineSummary: recording.topLineSummary } : {},
+    ...options.includeSegments && all.length ? {
+      segments: all.slice(0, maxSegments),
+      ...all.length > maxSegments ? { segmentsTruncated: true } : {}
+    } : {}
+  };
+}
+function fitTranscriptsToBudget(result, maxBytes, measure) {
+  if (measure(result) <= maxBytes) return result;
+  let next = {
+    ...result,
+    truncated: true,
+    attachments: result.attachments.map((a) => {
+      if (!a.segments) return a;
+      const rest = { ...a, segmentsTruncated: true };
+      delete rest.segments;
+      return rest;
+    })
+  };
+  for (let share = 0.5; measure(next) > maxBytes && share > 1e-4; share /= 2) {
+    next = {
+      ...next,
+      attachments: next.attachments.map((a) => {
+        const original = result.attachments.find((o) => o.attachmentId === a.attachmentId);
+        if (!original?.text) return a;
+        const keep = Math.floor(original.text.length * share);
+        return { ...a, text: original.text.slice(0, keep), textTruncated: true };
+      })
+    };
+  }
+  return next;
+}
+var clock = (seconds) => {
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor(total % 3600 / 60);
+  const s = total % 60;
+  const mm = h ? String(m).padStart(2, "0") : String(m);
+  return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
+};
+function formatTranscriptsText(result) {
+  const count = result.attachments.length;
+  if (count === 0) return `No audio attachments found in note ${result.id}.`;
+  const lines = [`${count} audio attachment${count === 1 ? "" : "s"} in note ${result.id}:`];
+  result.attachments.forEach((a, i) => {
+    const facts = [
+      `status ${a.status}`,
+      ...a.durationSeconds !== void 0 ? [clock(a.durationSeconds)] : [],
+      ...a.wordCount !== void 0 ? [`${a.wordCount} words`] : [],
+      ...a.fragmentCount && a.fragmentCount > 1 ? [`${a.fragmentCount} fragments`] : [],
+      ...a.speakers?.length ? [`${a.speakers.length} speakers`] : [],
+      ...a.reason ? [`reason: ${a.reason}`] : []
+    ];
+    lines.push("", `[${i + 1}] ${a.attachmentId} (${facts.join(", ")})`);
+    if (a.summary) lines.push(`Summary: ${a.summary}`);
+    if (a.text) lines.push(a.textTruncated ? `${a.text} [truncated]` : a.text);
+  });
+  if (result.truncated)
+    lines.push(
+      "",
+      "Some segments or text were left out to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
+    );
+  return lines.join("\n");
+}
+
 // src/utils/attachmentFs.ts
 import {
   existsSync as existsSync2,
@@ -39843,11 +40215,11 @@ import {
   rmSync,
   statSync
 } from "fs";
-import { dirname, isAbsolute, join as join3, relative, resolve, sep } from "path";
-import { homedir as homedir3, tmpdir } from "os";
+import { dirname, isAbsolute, join as join4, relative, resolve, sep } from "path";
+import { homedir as homedir4, tmpdir } from "os";
 function allowedSaveRoots() {
   return [
-    resolve(homedir3()),
+    resolve(homedir4()),
     resolve(tmpdir()),
     "/Volumes",
     "/private/var/folders",
@@ -39921,7 +40293,7 @@ function assertSafeSavePath(p, roots = allowedSaveRoots()) {
   if (suffix.split(sep).includes("..")) {
     throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
   }
-  const canonicalDest = suffix ? join3(canonicalAncestor, suffix) : canonicalAncestor;
+  const canonicalDest = suffix ? join4(canonicalAncestor, suffix) : canonicalAncestor;
   const allowed = canonicalRoots(roots);
   if (!isWithinRoots(canonicalAncestor, allowed) || !isWithinRoots(canonicalDest, allowed)) {
     throw new Error(
@@ -39971,8 +40343,8 @@ function cleanupTempDir(dir) {
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
 import { existsSync as existsSync3 } from "fs";
-import { homedir as homedir4 } from "os";
-import { join as join4 } from "path";
+import { homedir as homedir5 } from "os";
+import { join as join5 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(character id 31)";
@@ -40200,7 +40572,7 @@ function getNoteLinkFromDB(coreDataId) {
   const match = coreDataId.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath2 = join4(homedir4(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  const dbPath2 = join5(homedir5(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
   if (!existsSync3(dbPath2)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
@@ -42442,18 +42814,31 @@ var AppleNotesManager = class {
     }
     return markdown;
   }
+  /**
+   * Reads the transcripts Notes has stored for a note's top-level audio
+   * recordings, one entry per attachment in body order. Read-only: queries the
+   * NoteStore database with `sqlite3 -readonly` and needs Full Disk Access.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param options - word-level segment inclusion and cap
+   * @throws AudioTranscriptError for an invalid id, a missing or locked note,
+   *   missing Full Disk Access, or a database read failure
+   */
+  getAudioTranscripts(id2, options = {}) {
+    return readAudioTranscripts(id2, options);
+  }
 };
 
 // src/utils/syncDetection.ts
-import { execFileSync as execFileSync4 } from "child_process";
+import { execFileSync as execFileSync5 } from "child_process";
 import * as fs2 from "fs";
 import * as path2 from "path";
 import * as os2 from "os";
-var NOTES_DB_PATH2 = path2.join(
+var NOTES_DB_PATH3 = path2.join(
   os2.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var WAL_PATH = `${NOTES_DB_PATH2}-wal`;
+var WAL_PATH = `${NOTES_DB_PATH3}-wal`;
 var RECENT_ACTIVITY_THRESHOLD_SECONDS = 5;
 var SYNC_STATUS_CACHE_TTL_MS = 2e3;
 var cachedSyncStatus = null;
@@ -42469,7 +42854,7 @@ function getSyncStatus(useCache = true) {
     recentActivity: false
   };
   try {
-    if (!fs2.existsSync(NOTES_DB_PATH2)) {
+    if (!fs2.existsSync(NOTES_DB_PATH3)) {
       status.error = "Notes database not found";
       cachedSyncStatus = status;
       cacheTimestamp = Date.now();
@@ -42490,9 +42875,9 @@ function getSyncStatus(useCache = true) {
         WHERE object.ZCLOUDSTATE = state.Z_PK
       );
     `;
-    const result = execFileSync4(
+    const result = execFileSync5(
       "sqlite3",
-      ["-readonly", NOTES_DB_PATH2, query.replace(/\n/g, " ")],
+      ["-readonly", NOTES_DB_PATH3, query.replace(/\n/g, " ")],
       {
         encoding: "utf8",
         timeout: 5e3,
@@ -42549,11 +42934,11 @@ function withSyncAwarenessSync(operation, fn) {
 }
 
 // src/utils/noteMetadata.ts
-import { execFileSync as execFileSync5 } from "child_process";
+import { execFileSync as execFileSync6 } from "child_process";
 import * as fs3 from "fs";
 import * as path3 from "path";
 import * as os3 from "os";
-var NOTES_DB_PATH3 = path3.join(
+var NOTES_DB_PATH4 = path3.join(
   os3.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
@@ -42569,15 +42954,15 @@ var COLUMN_MAP = [
   { key: "widgetSnippet", column: "ZWIDGETSNIPPET", type: "text" },
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
-function runSqlite(query) {
-  return execFileSync5("sqlite3", ["-readonly", NOTES_DB_PATH3, query], {
+function runSqlite2(query) {
+  return execFileSync6("sqlite3", ["-readonly", NOTES_DB_PATH4, query], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
   }).trim();
 }
 function presentColumns() {
-  const out = runSqlite("PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);");
+  const out = runSqlite2("PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);");
   const cols = /* @__PURE__ */ new Set();
   for (const line of out.split("\n")) {
     const name = line.split("|")[1];
@@ -42595,7 +42980,7 @@ function getNoteMetadata(noteId3) {
     };
   }
   const pk = pkMatch[1];
-  if (!fs3.existsSync(NOTES_DB_PATH3)) {
+  if (!fs3.existsSync(NOTES_DB_PATH4)) {
     return { metadata: null, error: "no_fda", message: FDA_MESSAGE };
   }
   try {
@@ -42605,7 +42990,7 @@ function getNoteMetadata(noteId3) {
       return { metadata: {} };
     }
     const pairs = selected.map((c) => `'${c.key}', ${c.column}`).join(", ");
-    const row = runSqlite(
+    const row = runSqlite2(
       `SELECT json_object(${pairs}) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ${pk};`
     );
     if (!row) {
@@ -42730,10 +43115,10 @@ function describeSearchScope(searchContent, resultCount) {
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
+import { execFileSync as execFileSync7 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join7 } from "node:path";
+import { join as join8 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -42809,7 +43194,7 @@ function addNativeTags(request, deps) {
   };
 }
 function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  const lines = execFileSync7("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
@@ -42829,11 +43214,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join8(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
+    const path4 = join8(directory, "request.json");
     writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -42852,10 +43237,10 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync8 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -43030,9 +43415,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join9(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join8(directory, "request.json");
+    const file = join9(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -43052,7 +43437,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync8("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
         timeout: 6e4,
         maxBuffer: 1024 * 1024,
@@ -43444,12 +43829,12 @@ function formatDoctorReport(r) {
 
 // src/services/fileConfig.ts
 import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join9 } from "path";
-import { homedir as homedir7 } from "os";
+import { join as join10 } from "path";
+import { homedir as homedir8 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join10(homedir8(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   const applied = [];
@@ -43657,8 +44042,8 @@ function withJsonSchema2020_12(transport2) {
 }
 
 // src/utils/noteTables.ts
-import { gunzipSync as gunzipSync3 } from "node:zlib";
-var sub = (f, n) => {
+import { gunzipSync as gunzipSync4 } from "node:zlib";
+var sub2 = (f, n) => {
   const value = embeddedMessage(getField(f, n));
   if (!value) throw new Error(`Missing table field ${n}`);
   return value;
@@ -43668,7 +44053,7 @@ var num = (f, n) => {
   if (v === void 0) throw new Error(`Missing table index ${n}`);
   return v;
 };
-var many = (f, n) => getFields(f, n).map((v) => {
+var many2 = (f, n) => getFields(f, n).map((v) => {
   const m = embeddedMessage(v);
   if (!m) throw new Error("Invalid table entry");
   return m;
@@ -43678,37 +44063,37 @@ var hex = (f) => {
   return Buffer.from(f.value).toString("hex");
 };
 function parseNoteTable(compressed) {
-  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
-  const data = sub(sub(root, 2), 3), entries = many(data, 3);
+  const root = decodeMessage(gunzipSync4(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const data = sub2(sub2(root, 2), 3), entries = many2(data, 3);
   if (entries.length > 1e5) throw new Error("Table too large");
   const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
   const entry = (index) => {
     if (!entries[index]) throw new Error("Invalid table reference");
     return entries[index];
   };
-  const uuidIndex = (index) => num(sub(many(sub(entry(index), 13), 3)[0], 2), 2);
+  const uuidIndex = (index) => num(sub2(many2(sub2(entry(index), 13), 3)[0], 2), 2);
   const roots = entries.filter((e) => {
     const map = embeddedMessage(getField(e, 13));
     return map && types[num(map, 1)] === "com.apple.notes.ICTable";
   });
   if (roots.length !== 1) throw new Error("Ambiguous native table root");
   const refs = new Map(
-    many(sub(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub(m, 2), 6)])
+    many2(sub2(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub2(m, 2), 6)])
   );
   const ordered = (key) => {
     const ref = refs.get(key);
     if (ref === void 0) throw new Error("Missing table dimension");
-    const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
-    const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
+    const ordering = sub2(sub2(entry(ref), 16), 1), array2 = sub2(ordering, 1);
+    const ids = many2(array2, 2).map((a) => hex(getField(a, 2)));
     const map = /* @__PURE__ */ new Map();
     ids.forEach((id2, i) => {
       const index = uuids.indexOf(id2);
       if (index < 0) throw new Error("Missing dimension UUID");
       map.set(index, i);
     });
-    const aliases = many(sub(ordering, 2), 1).map((pair) => [
-      uuidIndex(num(sub(pair, 1), 6)),
-      uuidIndex(num(sub(pair, 2), 6))
+    const aliases = many2(sub2(ordering, 2), 1).map((pair) => [
+      uuidIndex(num(sub2(pair, 1), 6)),
+      uuidIndex(num(sub2(pair, 2), 6))
     ]);
     for (let pass = 0; pass < aliases.length + 1; pass++) {
       let changed = false;
@@ -43727,13 +44112,13 @@ function parseNoteTable(compressed) {
   const values = rows.ids.map(() => columns.ids.map(() => ""));
   const cellRef = refs.get("cellColumns");
   if (cellRef === void 0) throw new Error("Missing table cells");
-  for (const column of many(sub(entry(cellRef), 6), 1)) {
-    const ci = columns.map.get(uuidIndex(num(sub(column, 1), 6)));
-    const cells = entry(num(sub(column, 2), 6));
-    for (const row of many(sub(cells, 6), 1)) {
-      const ri = rows.map.get(uuidIndex(num(sub(row, 1), 6)));
+  for (const column of many2(sub2(entry(cellRef), 6), 1)) {
+    const ci = columns.map.get(uuidIndex(num(sub2(column, 1), 6)));
+    const cells = entry(num(sub2(column, 2), 6));
+    for (const row of many2(sub2(cells, 6), 1)) {
+      const ri = rows.map.get(uuidIndex(num(sub2(row, 1), 6)));
       if (ri === void 0 || ci === void 0) continue;
-      const note = sub(entry(num(sub(row, 2), 6)), 10);
+      const note = sub2(entry(num(sub2(row, 2), 6)), 10);
       const text = stringValue(getField(note, 2));
       if (text === void 0 || text.includes("\uFFFC"))
         throw new Error("Embedded or unsupported table cell");
@@ -43742,8 +44127,8 @@ function parseNoteTable(compressed) {
   }
   const rtl = entries.some((e) => {
     const map = embeddedMessage(getField(e, 13));
-    return map && many(map, 3).some(
-      (m) => stringValue(getField(sub(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
+    return map && many2(map, 3).some(
+      (m) => stringValue(getField(sub2(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
     );
   });
   if (rtl) {
@@ -43766,7 +44151,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43880,8 +44265,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join11(directory, basename(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -46206,6 +46591,44 @@ ${summary}`,
       { items: result.items, checked, total: result.items.length }
     );
   }, "Error reading checklist state")
+);
+registerTool(
+  "get-audio-transcripts",
+  {
+    description: "Use when: reading the transcript (and summary, if any) that Notes already computed for the audio recordings in one note, by id.\nReturns: one entry per top-level audio attachment in body order, with attachmentId, durationSeconds, status (ok, none when no transcript is stored, or undecodable with a reason), joined transcript text, wordCount, speakers and summary when stored, and optional word-level segments.\nDo not use when: you need the audio file itself (save-attachment) or the note body (get-note-content). This tool does not transcribe; it only reads what Notes stored.\nNote: read-only; requires Full Disk Access and reads the NoteStore database. Password-protected notes are refused. Large responses drop segments first, then shorten text, to stay under APPLE_NOTES_MCP_EXPORT_MAX_BYTES.",
+    inputSchema: {
+      id: noteIdInput,
+      includeSegments: external_exports.boolean().optional().describe(
+        "Also return word-level segments (text, start and duration in seconds, speaker). Default false."
+      ),
+      maxSegments: external_exports.number().int().min(1).max(MAX_SEGMENTS_LIMIT).optional().describe(
+        `Cap on segments returned per attachment when includeSegments is true (default ${DEFAULT_MAX_SEGMENTS}).`
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      attachments: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      bodyOrder: external_exports.boolean().optional(),
+      truncated: external_exports.boolean().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, includeSegments, maxSegments }) => {
+    let result;
+    try {
+      result = notesManager.getAudioTranscripts(id2, { includeSegments, maxSegments });
+    } catch (error2) {
+      if (error2 instanceof AudioTranscriptError) return errorResponse(error2.message);
+      throw error2;
+    }
+    const toResponse = (r) => successResponse(formatTranscriptsText(r), { ...r });
+    const fitted = fitTranscriptsToBudget(
+      result,
+      exportMaxResponseBytes(),
+      (r) => Buffer.byteLength(JSON.stringify(toResponse(r)))
+    );
+    return toResponse(fitted);
+  }, "Error reading audio transcripts")
 );
 registerTool(
   "get-note-metadata",

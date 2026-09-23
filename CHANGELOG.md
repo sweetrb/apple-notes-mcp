@@ -1,5 +1,26 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `get-audio-transcripts` reads the transcripts Notes already computed for the
+  audio recordings in a note, plus the summary when Notes generated one. It
+  returns one entry per top-level audio attachment in body order, with its
+  attachment id, duration, joined transcript text, word count, speakers and a
+  per-attachment `status`: `ok`, `none` (no transcript stored) or
+  `undecodable` with a reason. `includeSegments` adds word-level segments
+  (text, start, duration, speaker), capped per attachment by `maxSegments`
+  (default 2000). The transcript is decoded read-only from the recording's
+  mergeable data in the NoteStore database, so the tool needs Full Disk Access
+  and refuses password-protected notes. Recordings extended with more takes
+  are joined fragment by fragment in stored order; that path is verified with
+  synthetic fixtures only. Responses over `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`
+  drop segments first, then shorten text, and say so.
+- The internal protobuf decoder can keep fixed-width fields
+  (`decodeMessage(buf, { keepFixed: true })`) and read 64-bit doubles. Existing
+  callers are unchanged.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

@@ -32,6 +32,8 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  AudioTranscriptOptions,
+  AudioTranscriptsResult,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -41,6 +43,7 @@ import {
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -3577,5 +3580,19 @@ export class AppleNotesManager {
     }
 
     return markdown;
+  }
+
+  /**
+   * Reads the transcripts Notes has stored for a note's top-level audio
+   * recordings, one entry per attachment in body order. Read-only: queries the
+   * NoteStore database with `sqlite3 -readonly` and needs Full Disk Access.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param options - word-level segment inclusion and cap
+   * @throws AudioTranscriptError for an invalid id, a missing or locked note,
+   *   missing Full Disk Access, or a database read failure
+   */
+  getAudioTranscripts(id: string, options: AudioTranscriptOptions = {}): AudioTranscriptsResult {
+    return readAudioTranscripts(id, options);
   }
 }

@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -168,6 +168,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account, including account IDs and default folders |
 | **Batch Operations** | Delete or move multiple notes at once |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
+| **Audio Transcripts** | Read the transcripts and summaries Notes stored for audio recordings (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
 | **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
 | **Notes.app UI State** | Reveal a note in Notes.app or read the current Notes.app selection |
@@ -1004,6 +1005,38 @@ Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQ
 
 ---
 
+#### `get-audio-transcripts`
+
+Reads the transcript, and the summary when one exists, that Notes already computed for the audio recordings in a note. It does not transcribe anything itself. Notes keeps each recording's transcript as word-level mergeable data on the audio attachment's database row, and this tool decodes it read-only.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)). Password-protected notes are refused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `includeSegments` | boolean | No | Also return word-level segments: `text`, `start` and `duration` in seconds, and `speaker`. Default `false` |
+| `maxSegments` | number | No | Cap on segments per attachment when `includeSegments` is set (default 2000, at most 20000) |
+
+**Example:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "includeSegments": true,
+  "maxSegments": 500
+}
+```
+
+**Returns:** `structuredContent.attachments` holds one entry per top-level audio attachment, in the order the recordings appear in the note. Each entry has:
+
+- `attachmentId` (usable with `save-attachment`), `identifier`, `typeUti`, and `durationSeconds` when known
+- `status`: `ok` (a transcript is stored), `none` (no transcript is stored, for example a recording Notes has not transcribed, or an audio file attached from elsewhere), or `undecodable` with a `reason`
+- `text` (the words joined into readable text), `wordCount`, `fragmentCount`, `speakers`, `summary` and `topLineSummary` when stored, and `needsTranscription` when the database records it
+- `segments`, only when `includeSegments` is set, with `segmentsTruncated` when the cap cut them short
+
+A recording extended with more takes has several fragments. Their transcripts are joined in stored order, separated by a blank line, and each segment carries a `fragment` index. Recordings with more than one fragment have been verified against synthetic fixtures only. A response that would exceed `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` (default 8 MB) drops segments first and then shortens `text`, marking `truncated`, `segmentsTruncated` and `textTruncated`. When the note body cannot be parsed, attachments come back in database order with `bodyOrder: false`.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -1360,7 +1393,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

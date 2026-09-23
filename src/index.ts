@@ -59,6 +59,14 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import {
+  AudioTranscriptError,
+  DEFAULT_MAX_SEGMENTS,
+  MAX_SEGMENTS_LIMIT,
+  fitTranscriptsToBudget,
+  formatTranscriptsText,
+} from "@/utils/audioTranscripts.js";
+import type { AudioTranscriptsResult } from "@/types.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -2548,6 +2556,56 @@ registerTool(
       { items: result.items, checked, total: result.items.length }
     );
   }, "Error reading checklist state")
+);
+
+// --- get-audio-transcripts ---
+
+registerTool(
+  "get-audio-transcripts",
+  {
+    description:
+      "Use when: reading the transcript (and summary, if any) that Notes already computed for the audio recordings in one note, by id.\nReturns: one entry per top-level audio attachment in body order, with attachmentId, durationSeconds, status (ok, none when no transcript is stored, or undecodable with a reason), joined transcript text, wordCount, speakers and summary when stored, and optional word-level segments.\nDo not use when: you need the audio file itself (save-attachment) or the note body (get-note-content). This tool does not transcribe; it only reads what Notes stored.\nNote: read-only; requires Full Disk Access and reads the NoteStore database. Password-protected notes are refused. Large responses drop segments first, then shorten text, to stay under APPLE_NOTES_MCP_EXPORT_MAX_BYTES.",
+    inputSchema: {
+      id: noteIdInput,
+      includeSegments: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also return word-level segments (text, start and duration in seconds, speaker). Default false."
+        ),
+      maxSegments: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_SEGMENTS_LIMIT)
+        .optional()
+        .describe(
+          `Cap on segments returned per attachment when includeSegments is true (default ${DEFAULT_MAX_SEGMENTS}).`
+        ),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      attachments: z.array(z.object({}).passthrough()).optional(),
+      bodyOrder: z.boolean().optional(),
+      truncated: z.boolean().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, includeSegments, maxSegments }) => {
+    let result: AudioTranscriptsResult;
+    try {
+      result = notesManager.getAudioTranscripts(id, { includeSegments, maxSegments });
+    } catch (error) {
+      if (error instanceof AudioTranscriptError) return errorResponse(error.message);
+      throw error;
+    }
+    const toResponse = (r: AudioTranscriptsResult): ToolResponse =>
+      successResponse(formatTranscriptsText(r), { ...r });
+    const fitted = fitTranscriptsToBudget(result, exportMaxResponseBytes(), (r) =>
+      Buffer.byteLength(JSON.stringify(toResponse(r)))
+    );
+    return toResponse(fitted);
+  }, "Error reading audio transcripts")
 );
 
 // --- get-note-metadata (BETA) ---

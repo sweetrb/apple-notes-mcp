@@ -71,6 +71,7 @@ Use this skill when the user:
 | `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
 | `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
+| `get-audio-transcripts` | Read the transcripts and summaries Notes stored for a note's audio recordings |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
 | `health-check` | Quickly verify Notes.app access |
@@ -121,6 +122,12 @@ Action: Search by title if needed, then use get-note-content with the exact ID
 Use titles for discovery only. Mutations require the exact note ID; update,
 append, and delete also require the `contentHash` returned by
 `get-note-content`. This prevents duplicate-title mistakes and stale saves.
+
+For a note with audio recordings, `get-audio-transcripts` returns the
+transcript Notes already computed for each recording (it never transcribes).
+Check each attachment's `status`: `none` means Notes stored no transcript, not
+that the read failed. Ask for `includeSegments` only when word timings or
+speakers per word matter, because segments make the response much larger.
 
 ### Updating Notes
 

@@ -57,6 +57,13 @@ const NO_RETRY_OPTIONS = { maxRetries: 1 };
 import { getChecklistItems } from "@/utils/checklistParser.js";
 const mockGetChecklistItems = vi.mocked(getChecklistItems);
 
+// Mock the transcript reader so the delegation test never touches SQLite.
+vi.mock("@/utils/audioTranscripts.js", () => ({
+  readAudioTranscripts: vi.fn(),
+}));
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+const mockReadAudioTranscripts = vi.mocked(readAudioTranscripts);
+
 // Result delimiters (#18) — must match appleNotesManager.ts.
 // FIELD_SEP (US, \x1f) separates fields within a record;
 // RECORD_SEP (RS, \x1e) separates records within a list.
@@ -4116,5 +4123,28 @@ describe("htmlToPlaintext (export helper)", () => {
     expect(toPlaintext("a<<i>>b")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("<x<y>z>")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("plain <b>text</b> here")).toBe("plain text here");
+  });
+});
+
+describe("getAudioTranscripts", () => {
+  it("delegates to the read-only transcript reader with the caller's options", () => {
+    const result = {
+      id: "x-coredata://S/ICNote/p1",
+      attachments: [],
+      bodyOrder: true,
+      truncated: false,
+    };
+    mockReadAudioTranscripts.mockReturnValueOnce(result);
+    const manager = new AppleNotesManager();
+    expect(
+      manager.getAudioTranscripts("x-coredata://S/ICNote/p1", {
+        includeSegments: true,
+        maxSegments: 5,
+      })
+    ).toBe(result);
+    expect(mockReadAudioTranscripts).toHaveBeenCalledWith("x-coredata://S/ICNote/p1", {
+      includeSegments: true,
+      maxSegments: 5,
+    });
   });
 });
