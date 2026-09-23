@@ -339,6 +339,24 @@ describe("callPublicHelper", () => {
     ).toBe("undecodable");
   });
 
+  it("refuses actions outside the allowlist before spawning", () => {
+    let spawned = false;
+    expect(
+      code(() =>
+        callPublicHelper(
+          "encode_drawing",
+          { strokes: [] },
+          deps(() => {
+            spawned = true;
+            return result({ stdout: '{"status":"ok"}' });
+          }),
+          direct
+        )
+      )
+    ).toBe("unknown_action");
+    expect(spawned).toBe(false);
+  });
+
   it("refuses to run an uninstalled helper", () => {
     expect(
       code(() =>
