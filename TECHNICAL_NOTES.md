@@ -266,6 +266,38 @@ not interpret are counted in `undecodedFields` rather than guessed.
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.
 
+### Paragraph Links (verified 2026-09-23, macOS 27.2)
+
+`src/utils/noteParagraphs.ts` (the `list-note-paragraphs` and
+`get-paragraph-link` tools) builds and guards these links.
+
+**Format.** Notes opens a paragraph from
+`applenotes://showNote?identifier=<NOTE-UUID>&paragraphID=<PARAGRAPH-UUID>`.
+No note in the surveyed library held a Notes-generated section link to copy
+the format from, so it was confirmed from Notes itself without opening a
+link: Notes.app registers the `notes` and `applenotes` URL schemes
+(`CFBundleURLTypes`), its binary holds the literal
+`applenotes://showNote?identifier=`, and the URL handler's query-key string
+table in the system's shared library cache lists `paragraphID` (with
+`identifier`, `attachmentID` and `contentOffsetY`) beside the selectors
+`appURLForNote:paragraphID:` and `paragraphIDForURL`. The key is spelled
+exactly `paragraphID`. UUIDs are written uppercase, as `NSUUID` prints them.
+
+**Where the paragraph UUID lives.** ParagraphStyle field 9 (16 bytes) on each
+attribute run, as in the block model above. A run that crosses a paragraph
+break carries one UUID for both paragraphs, which is how Notes ends up with
+repeated IDs after a split.
+
+**When a link is safe.** The reader takes the UUID on the paragraph's first
+run and returns a link only if no run outside that paragraph (from its first
+character through its newline) carries the same UUID. Otherwise the link
+could open another paragraph, so the tools refuse. A survey of 738 decodable
+note bodies in one live library (counts only) found 30,362 non-empty
+paragraphs: 17,553 with a unique ID, 12,807 sharing one, and 2 with none.
+Every title (78), heading (18) and subheading (7) was unique; body text was
+roughly half and half. A paragraph whose runs carry more than one UUID is
+common and reported as `mixedParagraphIds`; its first-run UUID is still used.
+
 ### CRDT Implementation
 
 Tables and collaborative editing use Conflict-Free Replicated Data Types (CRDTs). Apple uses "topotext" for synchronization with first-write-wins conflict resolution via iCloud.

@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join12(output, replacement);
+        return join13(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join12(output, rule.append(self.options));
+          output = join13(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join12(output, replacement) {
+    function join13(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -40185,16 +40185,16 @@ function parseNotePropertiesOutput(output) {
     passwordProtected: ppStr?.trim() === "true"
   };
 }
-function splitFolderPath(folderPath) {
-  const parts = folderPath.split(/(?<!\\)\//);
+function splitFolderPath(folderPath2) {
+  const parts = folderPath2.split(/(?<!\\)\//);
   return parts.map((p) => p.replace(/\\\//g, "/")).filter((p) => p.length > 0);
 }
 function escapeFolderName(name) {
   return name.replace(/\//g, "\\/");
 }
-function buildFolderReference(folderPath) {
-  validateLength(folderPath, MAX_FOLDER_PATH_LENGTH, "Folder path");
-  const parts = splitFolderPath(folderPath);
+function buildFolderReference(folderPath2) {
+  validateLength(folderPath2, MAX_FOLDER_PATH_LENGTH, "Folder path");
+  const parts = splitFolderPath(folderPath2);
   if (parts.length > MAX_FOLDER_DEPTH) {
     throw new Error(
       `Folder path exceeds maximum nesting depth of ${MAX_FOLDER_DEPTH} (got ${parts.length})`
@@ -44211,6 +44211,338 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH4 } = {}) {
   return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
 }
 
+// src/utils/noteParagraphs.ts
+import { existsSync as existsSync8 } from "node:fs";
+import { gunzipSync as gunzipSync5 } from "node:zlib";
+
+// src/utils/noteStoreSql.ts
+import { execFileSync as execFileSync9 } from "node:child_process";
+import { homedir as homedir9 } from "node:os";
+import { join as join11 } from "node:path";
+var NOTES_DB_PATH5 = join11(
+  homedir9(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var NoteStoreError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteStoreError";
+    this.code = code;
+  }
+};
+function notePrimaryKey(id2) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteStoreError(
+      "invalid-id",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number>"
+    );
+  return Number(pk);
+}
+function runStoreSql(dbPath2, sql, params = {}) {
+  const args = ["-readonly", "-cmd", ".parameter init"];
+  for (const [name, value] of Object.entries(params)) {
+    if (!/^[a-z]\w*$/i.test(name) || !Number.isSafeInteger(value))
+      throw new NoteStoreError("invalid-argument", "Invalid query parameter");
+    args.push("-cmd", `.parameter set @${name} ${value}`);
+  }
+  let output;
+  try {
+    output = execFileSync9("/usr/bin/sqlite3", [...args, dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 15e3,
+      maxBuffer: 128 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteStoreError("query-failed", "Failed to query the Notes database");
+  }
+  return output.split("\n").filter((line) => line !== "");
+}
+function parseJsonLine(line, fallback) {
+  if (line === void 0 || line === "") return fallback;
+  try {
+    return JSON.parse(line);
+  } catch {
+    throw new NoteStoreError("query-failed", "Unexpected Notes database response");
+  }
+}
+function objectColumns(dbPath2) {
+  const [line] = runStoreSql(
+    dbPath2,
+    "SELECT json_group_array(name) FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  );
+  const names = parseJsonLine(line, []);
+  if (!names.length)
+    throw new NoteStoreError("unsupported-schema", "The Notes database has no object table");
+  return new Set(names);
+}
+function schemaHelpers(columns) {
+  const col = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort();
+  const accountOf = (alias) => accountColumns.length ? `COALESCE(${accountColumns.map((name) => `${alias}.${name}`).join(", ")})` : "NULL";
+  const notDeleted = (alias) => `COALESCE(${col(alias, "ZMARKEDFORDELETION")}, 0) = 0`;
+  return { col, accountOf, notDeleted, has: (name) => columns.has(name) };
+}
+var entity = (name) => {
+  if (!/^IC[A-Za-z]+$/.test(name)) throw new NoteStoreError("invalid-argument", "Invalid entity");
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${name}')`;
+};
+
+// src/utils/noteParagraphs.ts
+var ParagraphLinkError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "ParagraphLinkError";
+    this.code = code;
+  }
+};
+var paragraphUrl = (noteIdentifier, paragraphId) => `applenotes://showNote?identifier=${noteIdentifier.toUpperCase()}&paragraphID=${paragraphId.toUpperCase()}`;
+var normalizeParagraphText = (text) => text.normalize("NFKC").replace(/\ufffc/g, "").split(/\s+/u).filter(Boolean).join(" ").toLowerCase();
+var bytesField = (fields, n) => fields.find((f) => f.fieldNumber === n && f.wireType === 2)?.bytes;
+var uuidOf = (bytes) => {
+  if (bytes?.length !== 16) return void 0;
+  const h = Buffer.from(bytes).toString("hex").toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+function runParagraphIds(data) {
+  const document = decodeWireFields(bytesField(decodeWireFields(data), 2));
+  const note = decodeWireFields(bytesField(document, 3));
+  const runs = [];
+  let start = 0;
+  for (const field of note.filter((f) => f.fieldNumber === 5)) {
+    const run = decodeWireFields(field.bytes);
+    const length = Number(run.find((f) => f.fieldNumber === 1).varint);
+    const style = bytesField(run, 2);
+    const paragraphId = style ? uuidOf(bytesField(decodeWireFields(style), 9)) : void 0;
+    runs.push({ start, length, ...paragraphId ? { paragraphId } : {} });
+    start += length;
+  }
+  return runs;
+}
+function classifyParagraphIds(doc, runs) {
+  const ranges = doc.blocks.map((block) => [block.start, block.start + block.length + 1]);
+  const blocksOfId = /* @__PURE__ */ new Map();
+  const idsOfBlock = doc.blocks.map(() => /* @__PURE__ */ new Set());
+  let b = 0;
+  for (const run of runs) {
+    const end = run.start + run.length;
+    while (b < ranges.length && ranges[b][1] <= run.start) b++;
+    for (let i = b; i < ranges.length && ranges[i][0] < end; i++) {
+      idsOfBlock[i].add(run.paragraphId);
+      if (run.paragraphId) {
+        const owners = blocksOfId.get(run.paragraphId) ?? /* @__PURE__ */ new Set();
+        owners.add(i);
+        blocksOfId.set(run.paragraphId, owners);
+      }
+    }
+  }
+  return doc.blocks.map((block, i) => {
+    const paragraphId = block.paragraphUuid ?? null;
+    const mixed = idsOfBlock[i].size > 1;
+    if (!paragraphId) return { status: "missing", paragraphId, mixed };
+    const owners = blocksOfId.get(paragraphId).size;
+    return owners === 1 ? { status: "unique", paragraphId, mixed } : { status: "shared", paragraphId, sharedWith: owners - 1, mixed };
+  });
+}
+function paragraphsOf(doc, runs, noteIdentifier) {
+  const ids = classifyParagraphIds(doc, runs);
+  const out = [];
+  doc.blocks.forEach((block, i) => {
+    if (!normalizeParagraphText(block.text)) return;
+    const { status, paragraphId, sharedWith, mixed } = ids[i];
+    out.push({
+      blockIndex: block.index,
+      text: block.text,
+      style: block.style,
+      styleType: block.styleType,
+      paragraphId,
+      paragraphIdStatus: status,
+      ...sharedWith !== void 0 ? { sharedWith } : {},
+      ...mixed ? { mixedParagraphIds: true } : {},
+      ...status === "unique" && noteIdentifier ? { url: paragraphUrl(noteIdentifier, paragraphId) } : {}
+    });
+  });
+  return out;
+}
+function selectParagraph(paragraphs, selector) {
+  const given = [selector.contains, selector.match, selector.blockIndex].filter(
+    (value) => value !== void 0
+  ).length;
+  if (given !== 1)
+    throw new NoteStoreError(
+      "invalid-argument",
+      "Choose exactly one paragraph selector: contains, match, or blockIndex"
+    );
+  if (selector.blockIndex !== void 0) {
+    const hit = paragraphs.find((p) => p.blockIndex === selector.blockIndex);
+    if (!hit)
+      throw new ParagraphLinkError(
+        "no-match",
+        `Block ${selector.blockIndex} is not a non-empty paragraph of this note`
+      );
+    return hit;
+  }
+  const wanted = normalizeParagraphText(selector.contains ?? selector.match);
+  if (!wanted)
+    throw new NoteStoreError("invalid-argument", "The paragraph selector has no visible text");
+  const matches = paragraphs.filter(
+    (p) => selector.match !== void 0 ? normalizeParagraphText(p.text) === wanted : normalizeParagraphText(p.text).includes(wanted)
+  );
+  if (!matches.length)
+    throw new ParagraphLinkError("no-match", "No paragraph matches the selector");
+  if (selector.occurrence === void 0 && matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-paragraph",
+      `The selector matches ${matches.length} paragraphs; use a longer snippet or pass occurrence (1-${matches.length})`
+    );
+  const occurrence = selector.occurrence ?? 1;
+  if (occurrence > matches.length)
+    throw new ParagraphLinkError(
+      "occurrence-out-of-range",
+      `Occurrence ${occurrence} requested but only ${matches.length} paragraphs match`
+    );
+  return matches[occurrence - 1];
+}
+function folderPath(folders, pk) {
+  const parts = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (let f = folders.get(pk ?? -1); f && !seen.has(f.pk); f = folders.get(f.parent ?? -1)) {
+    seen.add(f.pk);
+    parts.unshift((f.title ?? "").replace(/\//g, "\\/"));
+  }
+  return parts.length ? parts.join("/") : null;
+}
+function noteListSql(columns) {
+  const { col, notDeleted } = schemaHelpers(columns);
+  return `SELECT json_group_array(json_object('pk', n.Z_PK, 'identifier', ${col("n", "ZIDENTIFIER")},
+      'title', ${col("n", "ZTITLE1")}, 'folder', ${col("n", "ZFOLDER")},
+      'active', ${notDeleted("n")} AND ${col("n", "ZFOLDER")} IS NOT NULL
+        AND COALESCE(${col("f", "ZFOLDERTYPE")}, 0) <> 1))
+    FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${col("n", "ZFOLDER")}
+    WHERE n.Z_ENT = ${entity("ICNote")};
+    SELECT json_group_array(json_object('pk', x.Z_PK, 'title', ${col("x", "ZTITLE2")}, 'parent', ${col("x", "ZPARENT")}))
+    FROM ZICCLOUDSYNCINGOBJECT x WHERE x.Z_ENT = ${entity("ICFolder")};
+    SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));`;
+}
+function resolveNote(dbPath2, columns, selector) {
+  const given = [selector.id, selector.identifier, selector.title].filter(
+    (value) => value !== void 0
+  ).length;
+  if (given !== 1)
+    throw new NoteStoreError("invalid-argument", "Choose exactly one of id, identifier, or title");
+  if (selector.folder !== void 0 && selector.title === void 0)
+    throw new NoteStoreError("invalid-argument", "folder only narrows a title lookup");
+  if (selector.id) return { pk: notePrimaryKey(selector.id), id: selector.id };
+  const [noteLine, folderLine, storeLine] = runStoreSql(dbPath2, noteListSql(columns));
+  const notes = parseJsonLine(noteLine, []);
+  const folders = new Map(parseJsonLine(folderLine, []).map((f) => [f.pk, f]));
+  const store = parseJsonLine(storeLine, { uuid: null }).uuid;
+  let matches;
+  if (selector.identifier !== void 0) {
+    const wanted = selector.identifier.toUpperCase();
+    matches = notes.filter((n) => (n.identifier ?? "").toUpperCase() === wanted);
+  } else {
+    matches = notes.filter((n) => n.active && n.title === selector.title);
+    if (selector.folder !== void 0) {
+      const wanted = selector.folder;
+      matches = matches.filter((n) => {
+        const path4 = folderPath(folders, n.folder);
+        return path4 === wanted || folders.get(n.folder ?? -1)?.title === wanted;
+      });
+    }
+  }
+  if (!matches.length) throw new NoteStoreError("not-found", "No note matches the selector");
+  if (matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-note",
+      `${matches.length} notes match; pass folder (name or path) or use the note id. Folders: ${matches.map((n) => folderPath(folders, n.folder) ?? "(none)").join(", ")}`
+    );
+  const pk = matches[0].pk;
+  return { pk, id: store ? `x-coredata://${store}/ICNote/p${pk}` : null };
+}
+function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH5 } = {}) {
+  if (!existsSync8(dbPath2))
+    throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+  const columns = objectColumns(dbPath2);
+  const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
+  const { col } = schemaHelpers(columns);
+  const [line] = runStoreSql(
+    dbPath2,
+    `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")},
+        'identifier', ${col("n", "ZIDENTIFIER")},
+        'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+        'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+        'locked', ${col("n", "ZISPASSWORDPROTECTED")})
+      FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`,
+    { pk }
+  );
+  const row = parseJsonLine(line, null);
+  if (!row || !row.isNote) throw new NoteStoreError("not-found", "No note found for the selector");
+  if (row.encrypted || row.locked)
+    throw new ParagraphLinkError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new ParagraphLinkError("no-body", "No body data is stored for this note");
+  const compressed = Buffer.from(row.data, "hex");
+  let doc;
+  try {
+    doc = decodeCompressedNoteBlocks(compressed);
+  } catch (error2) {
+    const message = error2 instanceof NoteBlocksError ? error2.message : String(error2);
+    throw new ParagraphLinkError("no-body", `The note body could not be decoded: ${message}`);
+  }
+  const runs = runParagraphIds(gunzipSync5(compressed, { maxOutputLength: 32 * 1024 * 1024 }));
+  const paragraphs = paragraphsOf(doc, runs, row.identifier);
+  const counts = { unique: 0, shared: 0, missing: 0 };
+  for (const p of paragraphs) counts[p.paragraphIdStatus]++;
+  return { id: id2, identifier: row.identifier, paragraphs, counts };
+}
+function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 1024 * 1024, linkableOnly = false } = {}) {
+  const list = linkableOnly ? paragraphs.filter((p) => p.url) : paragraphs;
+  const start = Math.min(Math.max(0, offset), list.length);
+  const out = [];
+  let bytes = 0;
+  for (let i = start; i < list.length && out.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(list[i]));
+    if (out.length && bytes + size > maxBytes) break;
+    out.push(list[i]);
+    bytes += size;
+  }
+  const next = start + out.length;
+  return {
+    paragraphs: out,
+    page: {
+      offset: start,
+      returned: out.length,
+      total: list.length,
+      hasMore: next < list.length,
+      ...next < list.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function paragraphLink(note, selector) {
+  const paragraph = selectParagraph(note.paragraphs, selector);
+  if (paragraph.paragraphIdStatus === "shared")
+    throw new ParagraphLinkError(
+      "paragraph-id-shared",
+      `This paragraph's ID is shared with ${paragraph.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
+    );
+  if (!paragraph.url)
+    throw new ParagraphLinkError(
+      "paragraph-id-missing",
+      paragraph.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
+    );
+  return { url: paragraph.url, paragraph };
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -44224,7 +44556,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join12 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -44338,8 +44670,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join11(directory, basename(path4));
+      const directory = mkdtempSync4(join12(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join12(directory, basename(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44816,7 +45148,7 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync8 } from "node:fs";
+import { existsSync as existsSync9 } from "node:fs";
 import { release } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44836,7 +45168,7 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync8;
+  const exists = dependencies.exists || existsSync9;
   const open = dependencies.open || ((path4) => {
     const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
@@ -45587,6 +45919,99 @@ registerTool(
       { id: id2, ...page }
     );
   }, "Error reading note blocks")
+);
+var paragraphNoteSelector = {
+  id: noteIdInput.optional().describe("Exact note ID (give one of id, identifier, title)"),
+  identifier: external_exports.string().regex(/^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/).optional().describe("The note's UUID, as in its notes:// or applenotes:// link"),
+  title: external_exports.string().min(1).max(MAX.TITLE).optional().describe("Exact note title; must be unique unless folder narrows it"),
+  folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("With title only: the note's folder name or full path (Work/Clients)")
+};
+function paragraphErrorResponse(prefix, error2) {
+  if (error2 instanceof NoteStoreError || error2 instanceof ParagraphLinkError) {
+    const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+    return errorResponse(`${prefix} [${error2.code}]: ${error2.message}${hint}`);
+  }
+  throw error2;
+}
+registerTool(
+  "list-note-paragraphs",
+  {
+    description: "Use when: you need a note's paragraphs with their style and stored paragraph ID, for example to choose one to link to.\nReturns: one page of non-empty paragraphs in body order, each with blockIndex (as in get-note-blocks), text, style, paragraphId, paragraphIdStatus (unique, shared, missing) and, only when unique, a direct applenotes:// url that opens that paragraph; plus counts per status and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you need inline formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Paragraph IDs repeat often (Notes copies them when a paragraph is split), so shared IDs get no url. Password-protected notes are refused.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      linkableOnly: external_exports.boolean().optional().describe("Return only paragraphs that have a direct url (default false)"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().nullable().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      paragraphs: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, identifier, title, folder, linkableOnly, offset, limit }) => {
+    let note;
+    try {
+      note = readNoteParagraphs({ id: id2, identifier, title, folder });
+    } catch (error2) {
+      return paragraphErrorResponse("Error listing paragraphs", error2);
+    }
+    const page = pageParagraphs(note.paragraphs, {
+      offset,
+      limit,
+      linkableOnly,
+      maxBytes: blocksMaxResponseBytes()
+    });
+    const { unique, shared, missing } = note.counts;
+    return successResponse(
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + ".",
+      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+    );
+  }, "Error listing paragraphs")
+);
+registerTool(
+  "get-paragraph-link",
+  {
+    description: "Use when: you need a link that opens Notes at one paragraph (for example a heading) of a note.\nReturns: a direct applenotes://showNote?identifier=<note>&paragraphID=<paragraph> url and the selected paragraph, only when that paragraph's stored ID is present and appears in no other paragraph of the note. Otherwise an error with a code: [paragraph-id-shared], [paragraph-id-missing], [no-match], [ambiguous-paragraph] (pass occurrence or a longer snippet), [occurrence-out-of-range], [ambiguous-note], [encrypted].\nDo not use when: you want a link to the whole note (get-note-link).\nSafety: read-only; never creates or changes a paragraph ID, so a paragraph without a unique ID cannot be linked. Requires Full Disk Access. A later edit in Notes can replace the ID and break the link.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: external_exports.string().min(1).max(MAX.CONTENT).optional().describe(
+        "Snippet of the paragraph (case, spacing and Unicode width are ignored); give one of contains, match, blockIndex"
+      ),
+      match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text, compared the same way"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+    },
+    outputSchema: {
+      url: external_exports.string().optional(),
+      id: external_exports.string().nullable().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      paragraph: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(
+    ({ id: id2, identifier, title, folder, contains, match, blockIndex, occurrence }) => {
+      let result;
+      let note;
+      try {
+        note = readNoteParagraphs({ id: id2, identifier, title, folder });
+        result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+      } catch (error2) {
+        return paragraphErrorResponse("No paragraph link", error2);
+      }
+      return successResponse(`Paragraph link: ${result.url}`, {
+        url: result.url,
+        id: note.id,
+        identifier: note.identifier,
+        paragraph: { ...result.paragraph }
+      });
+    },
+    "Error getting paragraph link"
+  )
 );
 registerTool(
   "list-native-tags",

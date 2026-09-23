@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `list-note-paragraphs` lists a note's non-empty paragraphs, read-only from
+  the NoteStore database, with `blockIndex`, text, style, the stored
+  `paragraphId`, and `paragraphIdStatus` (`unique`, `shared`, `missing`).
+  A `unique` paragraph also gets a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link. The
+  note can be chosen by `id`, by `identifier` (UUID), or by exact `title`
+  narrowed with `folder`.
+- `get-paragraph-link` selects one paragraph by snippet (`contains`), whole
+  text (`match`) or `blockIndex`, with `occurrence` for repeated text, and
+  returns its direct link only when the paragraph's ID appears in no other
+  paragraph of the note. Notes copies paragraph IDs when a paragraph is split,
+  so a shared ID is refused with `[paragraph-id-shared]` rather than risk
+  opening the wrong paragraph. The tool never creates or repairs an ID.
+- `src/utils/noteStoreSql.ts` (read-only, integer-bound, schema-tolerant
+  sqlite3 access).
+- TECHNICAL_NOTES.md documents the paragraph link format, how it was
+  confirmed, and how often paragraph IDs are unique in a real library.
+
 ### Fixed
 
 - The server no longer cuts off a large response when the client closes

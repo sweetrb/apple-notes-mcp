@@ -432,6 +432,75 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `list-note-paragraphs`
+
+Lists one note's non-empty paragraphs in body order, read-only from the
+NoteStore database. Each paragraph has `blockIndex` (its index in
+`get-note-blocks`, where empty paragraphs also count), `text`, `style`,
+`styleType`, `paragraphId` (the UUID Notes stores on the paragraph's first
+text run), and `paragraphIdStatus`:
+
+- `unique`: no other paragraph in the note carries this ID. The paragraph also
+  gets `url`, a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link that
+  opens Notes at that paragraph.
+- `shared`: other paragraphs carry the same ID (`sharedWith` counts them).
+  Notes copies the ID when a paragraph is split, so this is common for body
+  text. No `url` is given, because it could open the wrong paragraph.
+- `missing`: no ID is stored.
+
+`mixedParagraphIds: true` marks a paragraph whose text runs carry more than
+one ID; only the first-run ID is used. Titles and headings usually have unique
+IDs.
+
+**Requires:** Full Disk Access. Password-protected notes are refused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`, `identifier`, `title` | Exact note ID |
+| `identifier` | string | One of `id`, `identifier`, `title` | The note's UUID, as in its `notes://` link |
+| `title` | string | One of `id`, `identifier`, `title` | Exact note title (Recently Deleted is ignored); must match one note |
+| `folder` | string | No | With `title`: the note's folder name or full path, such as `Work/Clients` |
+| `linkableOnly` | boolean | No | Return only paragraphs with a `url` |
+| `offset` | number | No | First paragraph to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum paragraphs per page (default 500, max 5000) |
+
+---
+
+#### `get-paragraph-link`
+
+Returns a direct link to one paragraph of a note:
+`applenotes://showNote?identifier=<note>&paragraphID=<paragraph>`. It selects
+the note like `list-note-paragraphs` and the paragraph by exactly one of:
+
+- `contains`: a snippet of the paragraph. Case, runs of spaces, and Unicode
+  width are ignored.
+- `match`: the whole paragraph, compared the same way.
+- `blockIndex`: from `list-note-paragraphs`.
+
+When `contains` or `match` hits several paragraphs, pass `occurrence` (1-based)
+or a longer snippet.
+
+The link is returned only when the paragraph's ID is `unique` in the note.
+Otherwise the tool refuses with a code: `[paragraph-id-shared]`,
+`[paragraph-id-missing]`, `[no-match]`, `[ambiguous-paragraph]`,
+`[occurrence-out-of-range]`, `[ambiguous-note]` (several notes have that title;
+the message lists their folders), or `[encrypted]`. The tool never creates or
+changes a paragraph ID, and an edit in Notes can later replace the ID and break
+the link.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id`, `identifier`, `title`, `folder` | string | One of `id`, `identifier`, `title` | Note selector, as in `list-note-paragraphs` |
+| `contains` | string | One of `contains`, `match`, `blockIndex` | Snippet of the paragraph |
+| `match` | string | One of `contains`, `match`, `blockIndex` | The whole paragraph |
+| `blockIndex` | number | One of `contains`, `match`, `blockIndex` | The paragraph's `blockIndex` |
+| `occurrence` | number | No | Which match to use when several paragraphs match |
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags used within one explicit `account` and `folder`,
@@ -1362,7 +1431,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. A [`list-note-paragraphs`](#list-note-paragraphs) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
@@ -1391,7 +1460,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-paragraphs`, `get-paragraph-link`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
