@@ -143,7 +143,7 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPINNED` | Pinned state (boolean) | AppleScript has no `pinned` property, so this is the only read path for pin state |
 | `ZHASCHECKLIST`, `ZHASCHECKLISTINPROGRESS` | Whether a note has a checklist, and whether any item is still unchecked | Cheap flags without decoding the body |
 | `ZISRECOVERINGFROMTRASH` | Trash / recovery state | Distinguishes a recently deleted note |
-| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | Smart Folders are otherwise not scriptable |
+| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | The rules are not scriptable. AppleScript can still list a smart folder's current notes by folder id (`notes of folder id "…/ICFolder/pN"`, verified macOS 27.2, Notes 4.13); `list-smart-folders` uses both |
 | `ZSNIPPET`, `ZWIDGETSNIPPET` | Preview snippet text | Fast preview without reading the full body |
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
@@ -152,6 +152,44 @@ Reading these is safe under the existing rules: copy the three database files fi
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
 To *change* pin state or tags, use the Shortcuts bridge (below), not a SQL `UPDATE`.
+
+### query-notes Data Sources
+
+`query-notes` (`src/utils/noteQuery.ts` for the grammar, `src/utils/noteQueryStore.ts`
+for the reader) evaluates every predicate from the database, read-only, in two
+`sqlite3 -readonly` calls: `PRAGMA table_info` for feature detection, then one
+`BEGIN … COMMIT` read transaction. Entity numbers are looked up by name in
+`Z_PRIMARYKEY` (`ICNote`, `ICFolder`, `ICAccount`) because they differ between
+stores. The sources below were checked against a live store on macOS 27.2 on
+2026-09-23:
+
+| Predicate | Source |
+|-----------|--------|
+| Note id | `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`; the UUID matched AppleScript's `id of note` |
+| Title, dates | `ZTITLE1`; `ZMODIFICATIONDATE1`; `COALESCE(ZCREATIONDATE3, ZCREATIONDATE1)` (Core Data seconds since 2001-01-01 UTC) |
+| Folder, path | note `ZFOLDER` → folder `ZTITLE2`, walked up `ZPARENT` |
+| Account | folder `ZOWNER` (inherited from the parent) → account `ZNAME` |
+| Recently Deleted | folder `ZFOLDERTYPE = 1` (identifier `TrashFolder-…`); also `ZMARKEDFORDELETION` and `ZFOLDER IS NULL` |
+| `pinned`, `locked` | `ZISPINNED`, `ZISPASSWORDPROTECTED` |
+| `shared` | `ZSERVERSHAREDATA IS NOT NULL` on the note or any ancestor folder. On the live store this set equalled AppleScript's `shared` set exactly |
+| Text, words, links, checklists, attachments | The gzipped `ZICNOTEDATA.ZDATA` document, decoded per note: text (field 2), attribute-run links (field 9), `AttachmentInfo` type UTIs (field 12.2), checklist style 103 with done state (field 2.5.2) |
+| `tag:` | `ICInlineAttachment` rows with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag'`, `ZNOTE1` = note, `ZALTTEXT` = `#tag`, counted only when their `ZIDENTIFIER` is still an object in the body |
+
+Facets come from the body's `AttachmentInfo` types rather than from `ICAttachment`
+rows, because rows outlive their objects: on the live store, some top-level
+attachment rows (tables and URL previews) were no longer referenced by any note
+body, while every referenced row's UTI equalled the body's UTI. The UTI mapping is
+`public.url` and inline note links → `has:link` (as are attribute-run links);
+`com.apple.notes.table` → `has:table`; `com.apple.paper.doc.scan` and the legacy
+`com.apple.notes.gallery` → `has:scan`; `com.adobe.pdf` and `com.apple.paper.doc.pdf`
+→ `has:pdf`; `com.apple.paper` and the legacy `com.apple.drawing*` /
+`com.apple.notes.sketch` → `has:drawing`; image, video, and audio UTIs → their
+facet. Every non-inline object except a table also counts as `has:attachment`.
+`has:video` and `tag:` are verified against fixtures only; the store used for
+live verification had no video attachments or native tags.
+
+Password-protected notes store an encrypted `ZDATA`, so only title and metadata
+predicates can match them.
 
 ---
 
@@ -200,6 +238,68 @@ message ParagraphStyle {
 }
 ```
 
+### Note Body Block Model: Verified Field Map (2026-09-23, macOS 27.2)
+
+`src/utils/noteBlocks.ts` (the `get-note-blocks` tool) decodes these fields.
+Evidence came from three places:
+
+- **Proto:** the public [apple_cloud_notes_parser](https://github.com/threeplanetssoftware/apple_cloud_notes_parser)
+  `proto/notestore.proto` and its `lib/ProtoPatches.rb` renderer.
+- **Survey:** a read-only scan of every `ZICNOTEDATA.ZDATA` blob in one live
+  library: 713 rows, 710 decoded, and 3 password-protected rows with encrypted
+  bodies. Only field numbers, wire types, and value counts were recorded.
+- **Probe:** synthetic notes created with AppleScript HTML in a scratch
+  folder, then read back from the database.
+
+Run lengths count UTF-16 code units. Varints are 64-bit, so a negative value
+is a 10-byte varint.
+
+**AttributeRun (`Note.5`)**
+
+| Field | Meaning | Evidence | Status |
+|---|---|---|---|
+| 1 | length (UTF-16 units) | proto; survey 63,400 runs | confirmed |
+| 2 | ParagraphStyle | proto; survey 63,393 runs | confirmed |
+| 3 | Font {1 name, 2 size (fixed32 float), 3 hints} | proto; probe (`Courier`, 24.0 for `<h1>`); survey hints 1 ×6,162 and 2 ×3 | confirmed. Hints bit 1 = bold, bit 2 = italic |
+| 5 | font weight: 1 bold, 2 italic, 3 bold+italic | proto; probe `<b>`=1, `<i>`=2; survey 1/2/3 | confirmed |
+| 6 | underline (1) | proto; probe `<u>`; survey 402 | confirmed |
+| 7 | strikethrough (1) | proto; probe `<s>`, `<strike>`; survey 8 | confirmed |
+| 8 | baseline: 1 superscript, -1 subscript | proto (`superscript`, "sign indicates super/sub"); probe `<sup>`=1, `<sub>`=-1 as a 10-byte varint | confirmed. None in the surveyed library |
+| 9 | link URL (string) | proto; probe `https:` and `tel:`; survey 401 | confirmed |
+| 10 | Color {1 red, 2 green, 3 blue, 4 alpha}, each a fixed32 float 0–1 | proto; probe `#ff0000` → (1,0,0,1); survey 29 | confirmed |
+| 12 | AttachmentInfo {1 identifier, 2 type UTI} | proto; survey 456 | confirmed |
+| 13 | varint whose values fall in the Unix-epoch-seconds range (2023–2026) | survey 3,324 runs in 138 notes. The proto names it `unknown_identifier` | **unconfirmed; not decoded** |
+| 14 | emphasis (highlight) style: 1 purple, 2 pink, 3 orange, 4 mint, 5 blue | proto (`emphasis_style`) and its renderer's color table | documented, **not observed**: 0 runs in the survey, and AppleScript HTML cannot set it. Decoded; any other value is reported as `unknown` with the raw number |
+| 15 | message with four length-delimited subfields | survey: 1 run | **unconfirmed; not decoded** |
+
+**ParagraphStyle (`AttributeRun.2`)**
+
+| Field | Meaning | Evidence | Status |
+|---|---|---|---|
+| 1 | style type: 0 title, 1 heading, 2 subheading, 4 monospaced, 100 bulleted, 101 dashed, 102 numbered, 103 checklist. Absent or -1 = body | proto; survey saw exactly these values; probe `<ul>`=100, `<ol>`=102, `<tt>`/`<pre>`=4 | confirmed. Other values decode as `unknown` with `styleType` kept |
+| 2 | alignment: 0 left, 1 center, 2 right, 3 justify | proto; probe `text-align` center=1, right=2, justify=3; survey 0 ×22,364 | confirmed |
+| 3 | varint, 1 on 60,663 of 63,393 styles | survey | **unconfirmed; not decoded** |
+| 4 | indent level | proto; probe nested `<ul>`=1; survey 38 | confirmed |
+| 5 | Checklist {1 UUID (16 bytes), 2 done 0/1} | proto; survey 301 (25 done) | confirmed |
+| 7 | varint 1–8 on list paragraphs (1 on the first numbered item) | survey 1,892; probe first `<ol>` item = 1 | **unconfirmed; not decoded** |
+| 8 | block quote (1) | proto (`block_quote`); survey 18 runs in 2 notes, all on body-style paragraphs | confirmed present. AppleScript `<blockquote>` does not set it |
+| 9 | paragraph UUID (16 bytes) | survey: all 63,393 styles carry exactly 16 bytes | confirmed as a UUID. **Not unique per paragraph**: 14,939 of 40,985 paragraph-ending runs repeat an earlier paragraph's UUID in the same note, 14,808 of them the adjacent paragraph's |
+
+Behavior the probe also showed:
+
+- AppleScript HTML `<h1>`, `<h2>` and `<h3>` import as bold body text with a
+  larger font. They do not set the Title, Heading or Subheading style.
+- AppleScript's HTML export drops superscript, subscript, alignment and
+  highlight. A full-body rewrite through AppleScript loses them.
+- The legacy `decodeVarint` in `protobuf.ts` rejects varints longer than 35
+  bits, so `parseRichNote` throws on a subscript run and such notes read as
+  non-writable. The block model uses the lossless `decodeWireFields` instead.
+
+The decoder takes paragraph attributes from the run that covers a
+paragraph's first character. In the survey every run of a paragraph carried
+the same visual style (40,989 of 40,989 paragraphs). Field numbers it does
+not interpret are counted in `undecodedFields` rather than guessed.
+
 ### Embedded Objects
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.
@@ -207,6 +307,18 @@ The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Eac
 ### CRDT Implementation
 
 Tables and collaborative editing use Conflict-Free Replicated Data Types (CRDTs). Apple uses "topotext" for synchronization with first-write-wins conflict resolution via iCloud.
+
+### Stored Audio Transcripts (verified macOS 27)
+
+Notes stores the transcript it computes for an audio recording on the recording's attachment row (`ZTYPEUTI = 'com.apple.m4a-audio'`, `ZPARENTATTACHMENT IS NULL`) in `ZICCLOUDSYNCINGOBJECT.ZMERGEABLEDATA1`. Unlike table data, the blob is plain protobuf, not gzipped. Its root holds the object entries (field 3), the key names (4), the type names (5) and the UUIDs (6). The dedicated columns `ZTEMPORARYTRANSCRIPTDATA` and `ZSUMMARY` were empty on every audio row checked. `get-audio-transcripts` decodes the blob as follows:
+
+- One `com.apple.notes.ICTTAudioRecording` custom map (entry field 13). Its `fragments` key points to a list (entry field 5) of `ICTTAudioRecording.Fragment` maps.
+- Each fragment's `identity` is the `ZIDENTIFIER` of a child attachment (`public.mpeg-4-audio`, `ZPARENTATTACHMENT` = the recording). The child row carries that take's `ZDURATION`. The parent's `ZDURATION` was 0 on some recordings, so the tool falls back to the sum of the child durations.
+- A fragment's `transcript` points to an ordered set in entry field 15. Field 15.1 holds a topotext note plus `{1: index, 2: 16-byte UUID}` pairs that give the order. Field 15.2 is a dictionary from an `NSUUID` map (whose `UUIDIndex` points into root field 6) to a segment object.
+- Each `ICTTTranscriptSegment` is one recognized word. `text` and `speaker` are registers (entry field 1) that point to an `NSString` map (`self`, field 4). `timestamp` and `duration` point to an `NSNumber` map (`doubleValue`, a little-endian fixed64 double in field 3, in seconds). Words usually carry their own leading space.
+- `summary` and `topLineSummary` are registers that point to a topotext note (entry field 10). They are empty unless Notes generated a summary.
+
+On the test library, 6 of 6 recordings decoded, each with one fragment. Timestamps in ordering-index order are mostly monotonic, with small backward steps where speakers overlap. Recordings with several fragments were not available, so fragment concatenation in list order is covered by synthetic fixtures only.
 
 ---
 

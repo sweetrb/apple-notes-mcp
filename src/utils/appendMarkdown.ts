@@ -2,6 +2,48 @@
 const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Visible characters that stand in for Markdown task items on the HTML route. */
+export const TASK_GLYPHS = { open: "☐", done: "☑" } as const;
+
+/** A `- [ ] text` / `- [x] text` task item, as matched after the list marker. */
+const TASK_ITEM = /^\[([ xX])\][ \t]+(\S.*)$/;
+
+export interface MarkdownHtmlOptions {
+  /**
+   * Render bullet task items (`- [ ]`, `- [x]`) as ordinary list rows that
+   * start with a visible ☐ / ☑ character. HTML cannot create native checklist
+   * paragraphs, so without this the brackets are refused as unsupported syntax.
+   */
+  taskGlyphs?: boolean;
+}
+
+/**
+ * Remove a leading `# <title>` line that duplicates a separately supplied note
+ * title, plus one blank line after it. The match is exact (case and
+ * whitespace) so a different first heading stays in the body.
+ */
+export function stripDuplicateTitleHeading(
+  markdown: string,
+  title: string
+): { content: string; stripped: boolean } {
+  const normalized = markdown.replace(/^\uFEFF/, "");
+  const lines = normalized.split(/\r?\n/);
+  if (lines[0] !== `# ${title}`) return { content: markdown, stripped: false };
+  const rest = lines.slice(lines.length > 1 && lines[1] === "" ? 2 : 1);
+  return { content: rest.join("\n"), stripped: true };
+}
+
+/** Count bullet task items the HTML route would render as glyph rows. */
+export function countTaskItems(markdown: string): number {
+  return markdown
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => {
+      const item = /^[-+*]\s+(.+)$/.exec(line);
+      return item !== null && TASK_ITEM.test(item[1]);
+    }).length;
+}
+
 /**
  * What Notes' own Markdown importer (the Create Note action with "Interpret as
  * Markdown") must produce for the block constructs it maps to native styles, so
@@ -69,7 +111,7 @@ export function usesMarkdownBlocks(markdown: string): boolean {
  */
 export function renderMarkdown(
   markdown: string,
-  options: { blocks?: boolean } = {}
+  options: MarkdownHtmlOptions & { blocks?: boolean } = {}
 ): RenderedMarkdown {
   const blocks = options.blocks === true;
   if (blocks ? /[-]/u.test(markdown) : /[]/u.test(markdown))
@@ -233,7 +275,10 @@ export function renderMarkdown(
         list = kind;
         html += `<${kind}>`;
       }
-      html += `<li>${inline(item[2])}</li>`;
+      const task = options.taskGlyphs && item[1] ? TASK_ITEM.exec(item[2]) : null;
+      html += task
+        ? `<li>${task[1] === " " ? TASK_GLYPHS.open : TASK_GLYPHS.done} ${inline(task[2])}</li>`
+        : `<li>${inline(item[2])}</li>`;
       previousBlank = false;
       continue;
     }
@@ -251,7 +296,11 @@ export function renderMarkdown(
   return { html, expect };
 }
 
-/** Convert the bounded append subset of Markdown to semantic Apple Notes HTML. */
-export function appendMarkdownHtml(markdown: string): string {
-  return renderMarkdown(markdown).html;
+/**
+ * Convert the bounded append subset of Markdown to semantic Apple Notes HTML.
+ * Block quotes, fenced code, dividers and inline code are refused here; with
+ * `taskGlyphs`, bullet task items become ☐ / ☑ glyph rows (the HTML route).
+ */
+export function appendMarkdownHtml(markdown: string, options: MarkdownHtmlOptions = {}): string {
+  return renderMarkdown(markdown, { taskGlyphs: options.taskGlyphs }).html;
 }
