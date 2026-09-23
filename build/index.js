@@ -50782,11 +50782,13 @@ function escapeMarkdown(text2) {
   return text2.replace(/[\\`*_[\]<>~|]/g, (char) => `\\${char}`).replace(/&(?=#?[A-Za-z0-9]+;)/g, "&amp;").replace(/==/g, "\\=\\=");
 }
 function escapeLineStart(line) {
+  if (/^\s*(?:-[ \t]*){3,}$/.test(line)) return line.replace("-", "\\-");
   return line.replace(
-    /^(\s*)([#>+-]|\d+[.)])(?=\s|$)/,
+    /^(\s*)(#{1,6}|[>+-]|\d{1,9}[.)])(?=\s|$)/,
     (_, space, marker) => /^\d/.test(marker) ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}` : `${space}\\${marker}`
   );
 }
+var BLOCK_START_WORD = /^(?:#{1,6}|[-+*]|-+|=+|\d{1,9}[.)])$/;
 function linkDestination(url) {
   return url.replace(
     /[\s()<>]/g,
@@ -50958,7 +50960,7 @@ function renderLine(block, body, first2, isTitle, counters) {
     counters[level] = 0;
     if (block.style === "checklist") marker = block.checklist?.done ? "- [x]" : "- [ ]";
   }
-  return { text: `${indent}${marker} ${body}`, group: "list", quote };
+  return { text: `${indent}${marker} ${escapeLineStart(body)}`, group: "list", quote };
 }
 function joinLines(lines) {
   let out = "";
@@ -50991,7 +50993,7 @@ function wrapMarkdown(markdown, width) {
     let current = prefix;
     let empty = true;
     for (const word of words) {
-      if (!empty && current.length + 1 + word.length > width) {
+      if (!empty && current.length + 1 + word.length > width && !BLOCK_START_WORD.test(word)) {
         out.push(current);
         current = hang + word;
       } else current += (empty ? "" : " ") + word;
@@ -52111,24 +52113,25 @@ var TemplateRenderer = class {
     if (block.style === "heading") return rule("block.heading", body);
     if (block.style === "subheading") return rule("block.subheading", body);
     if (!LIST_STYLES2.has(block.style) || !first2) return rule("block.body", escapeLineStart(body));
+    const item = escapeLineStart(body);
     const level = Math.min(block.indent, 20);
     counters.length = Math.min(counters.length, level + 1);
     while (counters.length <= level) counters.push(0);
     let result;
     if (block.style === "numbered")
-      result = rule("block.numbered", body, { index: String(++counters[level]) }, true);
+      result = rule("block.numbered", item, { index: String(++counters[level]) }, true);
     else {
       counters[level] = 0;
       if (block.style === "checklist") {
         const done = !!block.checklist?.done;
         result = rule(
           done ? "block.checklist.checked" : "block.checklist.unchecked",
-          body,
+          item,
           { checked: String(done) },
           true
         );
       } else
-        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", body, {}, true);
+        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", item, {}, true);
     }
     const indent = this.template.options.listIndent.repeat(level);
     if (result[0] && indent)

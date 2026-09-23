@@ -143,6 +143,21 @@ describe("standard-markdown parity with the fixed renderer", () => {
     ["several notes", () => [exportNote([block("A", "title")]), exportNote([block("B")], [], "B")]],
     ["no notes", () => []],
     [
+      "body and list text that looks like block syntax",
+      () => [
+        exportNote([
+          block("T", "title"),
+          block("## not a heading"),
+          block("---"),
+          block("## q", "body", { blockQuote: true }),
+          block("## item text", "dashed"),
+          block("1. item text", "numbered"),
+          block("- item text", "checklist", { checklist: { id: "a", done: false } }),
+          block("alpha beta ## gamma delta"),
+        ]),
+      ],
+    ],
+    [
       "adjacent emphasis",
       () => [
         exportNote([

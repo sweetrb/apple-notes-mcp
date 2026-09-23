@@ -1658,8 +1658,12 @@ or `mailto:`. Tables render as GitHub tables. Attachments stay in body order:
 with `assetsDir` they link to copies of their files (images inline, drawings
 through Notes' fallback image, scans as their PDF), and without it they render
 as labeled placeholders such as `\[Image: name\]`. An attachment whose file
-cannot be found renders as `\[Image unavailable: name\]`. This tool leaves
-`get-note-markdown` unchanged.
+cannot be found renders as `\[Image unavailable: name\]`. Body text that
+Markdown would read as block syntax (a leading `#` to `######`, `>`, `-`, `+`,
+`*`, `1.` or `1)`, a `---` line, a code fence or a table row) is
+backslash-escaped, so a plain paragraph such as `## Notes` stays a paragraph,
+and `wrap` never starts a continuation line with such a marker. This tool
+leaves `get-note-markdown` unchanged.
 
 A folder export is one presentation document with notes separated by `---`.
 It is not a backup or restore format; use `export-notes-json` for that.
