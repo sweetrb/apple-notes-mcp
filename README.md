@@ -1658,8 +1658,12 @@ or `mailto:`. Tables render as GitHub tables. Attachments stay in body order:
 with `assetsDir` they link to copies of their files (images inline, drawings
 through Notes' fallback image, scans as their PDF), and without it they render
 as labeled placeholders such as `\[Image: name\]`. An attachment whose file
-cannot be found renders as `\[Image unavailable: name\]`. This tool leaves
-`get-note-markdown` unchanged.
+cannot be found renders as `\[Image unavailable: name\]`. Body text that
+Markdown would read as block syntax (a leading `#` to `######`, `>`, `-`, `+`,
+`*`, `1.` or `1)`, a `---` line, a code fence or a table row) is
+backslash-escaped, so a plain paragraph such as `## Notes` stays a paragraph,
+and `wrap` never starts a continuation line with such a marker. This tool
+leaves `get-note-markdown` unchanged.
 
 A folder export is one presentation document with notes separated by `---`.
 It is not a backup or restore format; use `export-notes-json` for that.
@@ -2069,6 +2073,35 @@ Saves Notes' rendered image of one Paper drawing or classic drawing to a new fil
 **Returns:** `savedPath`, `format`, `width`, `height`, `bytes`, `source` (`fallback` for Notes' full rendering, `preview` for its largest thumbnail when no full rendering exists), and the drawing's `attachmentId`, `identifier`, `kind`, and `handwritingSummary`.
 
 **⚠️ Safety:** Writes one new file, readable only by you (mode 0600). `savePath` follows the `save-attachment` allowlist (home, temp, or `/Volumes`), may not be inside the Notes data folder, and must not exist yet. The image header (PNG signature and IHDR, or JPEG frame) is checked before copying and the written file is checked again; a file that fails is removed.
+
+---
+
+#### `analyze-svg`
+
+Analyzes one local SVG file and reports whether it can be represented as editable monoline strokes (a list of strokes, each a solid color, a width, and a polyline) and what that conversion would approximate or drop. It is a standalone preflight: it reads only the file, opens no Notes data, and makes no network request.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | Yes | Absolute path of one `.svg` file: a regular file, not a symbolic link, at most 1 MiB of UTF-8, in home, temp, or `/Volumes` |
+| `includeDrawing` | boolean | No | Also return the normalized drawing. Off by default because it can be large |
+
+**Returns:** `classification`, `importable`, `defaultWriteAllowed`, `requiredLosses`, `issues` (each with a `code`, the `loss` it causes or `null`, an element `location` such as `svg/g[2]/path[1]#id`, and a message), `viewport`, `counts` (elements, references, path segments, output strokes and points, and the `geometryWork`, `dashWork`, and `scanWork` budgets as `{used, max}`), `source` (`sha256`, `bytes`), `drawingBytes`, and `analysisDigest`.
+
+| Classification | Meaning |
+|---|---|
+| `safe` | The output needs no reported approximation or omission. `defaultWriteAllowed` is true |
+| `lossy` | The output needs `geometry-approximation` or `paint-approximation` |
+| `unsupported` | Visible content would be dropped (`drop-content`), or nothing drawable remains (`importable: false`) |
+
+The loss modes:
+
+- `geometry-approximation`: non-round caps or joins are drawn round, a non-uniformly scaled stroke gets one width, or centerlines are clipped at a viewport. Curves are flattened to within 0.25 px, which is not reported as a loss.
+- `paint-approximation`: solid fills become overlapping strokes, group opacity is applied to each stroke, and blend modes or a non-default paint order are ignored.
+- `drop-content`: text, images, gradient and pattern paint, filters, masks, clip paths, markers, `<switch>`, and unknown elements are omitted.
+
+Supported input: `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`; `g`, `a`, nested `svg`; local `defs`, `symbol`, and `use`; transforms; `viewBox` and `preserveAspectRatio`; solid named, hex, `rgb()`/`rgba()`, and `hsl()` colors, `currentColor`, opacity, fill rules, and dashes, from attributes or the `style` attribute. `analysisDigest` is a SHA-256 over the canonical analysis and normalized drawing, so equal digests mean the same result.
+
+**⚠️ Safety:** Read-only. Active or unsafe input is refused as an error with `code: "validation_error"` and an `svgCode`: `svg_unsafe` for scripts, event-handler attributes, `<style>` elements, animation, embedded objects, DOCTYPE or entity declarations, processing instructions, and any external reference (only local `#id` references and embedded raster images are allowed); `svg_invalid` for malformed XML; `svg_reference_invalid` for cyclic or duplicate-id references; `svg_complexity_limit` or `svg_geometry_invalid` when a limit is exceeded (16,384 elements, 100,000 path segments, 4,096 output strokes, 100,000 points, 5,000,000 fill scan checks); `svg_file_invalid` for a path or file that cannot be read.
 
 ---
 

@@ -135,6 +135,7 @@ import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
 import { registerMarkdownTemplates } from "@/tools/markdownTemplates.js";
 import { TEMPLATE_SLUG, TemplateStore } from "@/services/templateStore.js";
+import { registerSvgAnalysis } from "@/tools/svgAnalysis.js";
 import {
   hasScopeGuard,
   MAX_FORBIDDEN_FOLDERS,
@@ -205,6 +206,7 @@ const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
 registerMarkdownTemplates(server);
+registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 registerPrivateHelperTools(server, notesManager);

@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.8] - 2026-09-23
+## [2.9.10] - 2026-09-23
 
 ### Added
 
@@ -17,7 +17,7 @@
   `~/Library/Application Support/apple-notes-mcp/templates`).
 - The capability matrix lists the library as `markdownTemplateLibrary`.
 
-## [2.9.7] - 2026-09-23
+## [2.9.9] - 2026-09-23
 
 ### Added
 
@@ -48,6 +48,39 @@
 
 - `export-notes-markdown` without a template produces the same output as
   2.8.49.
+
+## [2.9.8] - 2026-09-23
+
+### Added
+
+- `analyze-svg`, a standalone, read-only SVG preflight. It reads one local
+  SVG file (a regular file of at most 1 MiB of UTF-8 in home, temp, or
+  `/Volumes`) and reports whether it can be represented as editable monoline
+  strokes: a `classification` (`safe`, `lossy`, `unsupported`), the
+  `requiredLosses` (`geometry-approximation`, `paint-approximation`,
+  `drop-content`), located `issues`, work-budget counts, the source SHA-256,
+  and an `analysisDigest` over the canonical analysis and normalized drawing;
+  `includeDrawing` adds the drawing. It supports the basic shapes and paths,
+  groups, nested `svg`, local `defs`/`symbol`/`use`, transforms, `viewBox` and
+  `preserveAspectRatio`, solid colors, `currentColor`, opacity, fill rules,
+  and dashes. Scripts, event handlers, `<style>` elements, animation, DOCTYPE
+  and entities, and external references are refused. The XML reader is
+  written for this purpose and adds no dependency. Registered as the
+  `svgAnalysis` feature in `get-capabilities`.
+
+## [2.9.7] - 2026-09-23
+
+### Fixed
+
+- `export-notes-markdown` escapes a body paragraph that starts with `##` to
+  `######` (previously only a single `#` was escaped), so a plain paragraph
+  such as `## Notes` no longer renders as a heading. A body line of `---` (or
+  `-----`) is escaped instead of rendering as a thematic break, and the text
+  after a list item's own marker gets the same treatment, so a bullet whose text
+  starts with `## ` or `1. ` no longer nests a heading or list. `wrap` no longer
+  breaks a line just before a word that would open a block at the start of the
+  next line (`#`, `-`, `+`, `*`, `1.`, `===`). Notes' own headings and lists
+  are unchanged. Reported by @oliverames (#232).
 
 ## [2.9.6] - 2026-09-23
 

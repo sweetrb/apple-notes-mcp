@@ -640,24 +640,26 @@ class TemplateRenderer {
     if (block.style === "heading") return rule("block.heading", body);
     if (block.style === "subheading") return rule("block.subheading", body);
     if (!LIST_STYLES.has(block.style) || !first) return rule("block.body", escapeLineStart(body));
+    // A list item's own text is escaped after its marker, as the fixed renderer does.
+    const item = escapeLineStart(body);
     const level = Math.min(block.indent, 20);
     counters.length = Math.min(counters.length, level + 1);
     while (counters.length <= level) counters.push(0);
     let result: [string | undefined, string | undefined];
     if (block.style === "numbered")
-      result = rule("block.numbered", body, { index: String(++counters[level]) }, true);
+      result = rule("block.numbered", item, { index: String(++counters[level]) }, true);
     else {
       counters[level] = 0;
       if (block.style === "checklist") {
         const done = !!block.checklist?.done;
         result = rule(
           done ? "block.checklist.checked" : "block.checklist.unchecked",
-          body,
+          item,
           { checked: String(done) },
           true
         );
       } else
-        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", body, {}, true);
+        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", item, {}, true);
     }
     const indent = this.template.options.listIndent.repeat(level);
     if (result[0] && indent)

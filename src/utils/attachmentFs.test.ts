@@ -21,6 +21,7 @@ import {
   allowedSaveRoots,
   ensureParentDir,
   deniedSaveRoots,
+  assertReadableInRoots,
 } from "@/utils/attachmentFs.js";
 
 const dirs: string[] = [];
@@ -334,5 +335,30 @@ describe("assertSafeSavePath — Notes library container (#208)", () => {
     const dest = join(container, "made-by-export", "x.png");
     expect(() => ensureParentDir(dest, undefined, [container])).toThrow(/Notes library container/);
     expect(existsSync(join(container, "made-by-export"))).toBe(false);
+  });
+});
+
+describe("assertReadableInRoots", () => {
+  it("returns the absolute path inside the roots and names the file kind in errors", () => {
+    const root = mkdtempSync(join(tmpdir(), "readable-roots-"));
+    try {
+      const file = join(root, "a.svg");
+      writeFileSync(file, "x");
+      expect(assertReadableInRoots(file, [root], "SVG file")).toBe(file);
+      expect(() => assertReadableInRoots("", [root], "SVG file")).toThrow(
+        "A svg file path is required."
+      );
+      expect(() => assertReadableInRoots("a.svg", [root], "SVG file")).toThrow(
+        /SVG file path must be absolute/
+      );
+      expect(() => assertReadableInRoots(join(root, "missing.svg"), [root], "SVG file")).toThrow(
+        /SVG file does not exist/
+      );
+      expect(() => assertReadableInRoots("/etc/hosts", [root])).toThrow(
+        /outside allowed locations/
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
