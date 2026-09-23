@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.1] - 2026-09-23
+## [2.9.2] - 2026-09-23
 
 ### Added
 
@@ -36,6 +36,21 @@
 
 - `list-notes`' description now points to `list-recent-notes` for date
   order, sync cursors, or word counts. Its behavior is unchanged.
+
+## [2.9.1] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). The guard's revision is re-read just before the delete, and
+  its body, lock state, and folder are checked again inside the delete
+  AppleScript, with the same fail-closed Recently Deleted test as the note
+  being deleted. `requireActiveNoteId` requires a second note to stay active
+  without fingerprinting its content. The Quick Note check reads the database,
+  so the guard needs Full Disk Access; a guard note the database has not saved
+  yet passes on the live checks. The pair is not one transaction.
 
 ## [2.9.0] - 2026-09-23
 
