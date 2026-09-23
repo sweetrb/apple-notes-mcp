@@ -32,6 +32,10 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  AudioTranscriptOptions,
+  AudioTranscriptsResult,
+  NoteTablesResult,
+  SmartFolder,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -41,6 +45,11 @@ import {
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+import { collectNoteTables } from "@/utils/tableMarkdown.js";
+import { readSmartFolders } from "@/utils/smartFolders.js";
+import { uniqueById } from "@/utils/uniqueById.js";
+import { readTrashFolderIds, RECENTLY_DELETED_FOLDER_NAME } from "@/utils/trashFolders.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -49,6 +58,20 @@ import {
   cleanupTempDir,
   ensureParentDir,
 } from "@/utils/attachmentFs.js";
+import {
+  describeDrawings,
+  exportDrawingRaster,
+  readDrawingRows,
+  selectDrawing,
+} from "@/utils/paperAttachments.js";
+import type { DrawingAttachment, DrawingRasterExport } from "@/types.js";
+import {
+  assembleAttachmentAssets,
+  exportAttachmentAssets,
+  readNoteAttachmentRows,
+  selectFirstImage,
+} from "@/utils/attachmentAssets.js";
+import type { AttachmentExportResult, FirstImage, NoteAttachmentAssets } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import {
   buildScopeGuardScript,
@@ -84,6 +107,58 @@ const FIELD_SEP = "\x1f";
 const RECORD_SEP = "\x1e";
 const AS_FIELD_SEP = "(character id 31)";
 const AS_RECORD_SEP = "(character id 30)";
+// Group separator: splits a bulk listing from the trailing list of note ids
+// found in Recently Deleted (#207).
+const GROUP_SEP = "\x1d";
+const AS_GROUP_SEP = "(character id 29)";
+
+/** One note from a bulk listing. */
+export interface NoteListRef {
+  title: string;
+  id: string;
+  /** Present (true) only for a note in Recently Deleted, when those are included. */
+  inRecentlyDeleted?: boolean;
+}
+
+/** A bulk listing plus how many Recently Deleted notes it skipped. */
+export interface NoteListResult {
+  refs: NoteListRef[];
+  excludedRecentlyDeleted: number;
+}
+
+/** Folder ids from the database are interpolated, so only exact Core Data ids pass. */
+const FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+
+/**
+ * AppleScript list literal of the Recently Deleted folder ids known to the
+ * database; `{}` when none are known (no Full Disk Access).
+ */
+function trashFolderIdList(): string {
+  const ids = readTrashFolderIds().filter((id) => FOLDER_ID_PATTERN.test(id));
+  return `{${ids.map((id) => `"${id}"`).join(", ")}}`;
+}
+
+/**
+ * AppleScript that sets `__trashNoteIds` to the ids of every note Notes.app
+ * currently shows in Recently Deleted, within the enclosing tell target (an
+ * account). The folder is found by its database id and, as a fallback that
+ * needs no Full Disk Access, by its English name. Each lookup is guarded, so
+ * an account without a trash folder contributes nothing. (#207)
+ */
+function buildTrashNoteIdsCollector(): string {
+  return `
+        set __trashNoteIds to {}
+        repeat with __trashFolderId in ${trashFolderIdList()}
+          try
+            set __trashNoteIds to __trashNoteIds & (id of notes of folder id (contents of __trashFolderId))
+          end try
+        end repeat
+        try
+          repeat with __trashFolder in (every folder whose name is "${RECENTLY_DELETED_FOLDER_NAME}")
+            set __trashNoteIds to __trashNoteIds & (id of notes of __trashFolder)
+          end repeat
+        end try`;
+}
 
 // =============================================================================
 // Export paging (#162)
@@ -567,7 +642,7 @@ export function splitFolderPath(folderPath: string): string[] {
  * @param name - Raw folder name (may contain `/`)
  * @returns Folder name with `/` escaped as `\/`
  */
-function escapeFolderName(name: string): string {
+export function escapeFolderName(name: string): string {
   return name.replace(/\//g, "\\/");
 }
 
@@ -892,6 +967,17 @@ export class AppleNotesManager {
     }
 
     return this.defaultAccountName || undefined;
+  }
+
+  /**
+   * The account a search with this `account` argument is scoped to: the
+   * caller's account when named, else Notes.app's default account (cached).
+   * Returns `undefined` when no account was named and the default cannot be
+   * determined. Used by search-notes' database path so it searches the same
+   * account the AppleScript path would.
+   */
+  searchAccountScope(account?: string): string | undefined {
+    return this.reportedAccount(this.resolveAccount(account));
   }
 
   /**
@@ -1376,6 +1462,22 @@ export class AppleNotesManager {
   }
 
   /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id: string): NoteTablesResult {
+    return collectNoteTables(readRichNote(id), id);
+  }
+
+  /**
    * Retrieves detailed metadata for a note by title.
    *
    * Similar to getNoteContent but returns structured metadata
@@ -1505,17 +1607,47 @@ export class AppleNotesManager {
     id: string,
     expectedBody: string,
     scope?: ScopeGuard
-  ): { status: "deleted" | "conflict" | "failed" } | { status: "scope_conflict"; reason: string } {
+  ):
+    | { status: "deleted" | "conflict" | "not-deleted" | "in-recently-deleted" | "failed" }
+    | { status: "scope_conflict"; reason: string } {
     const safeId = sanitizeNoteId(id);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    // Deleting a note that is already in Recently Deleted removes it for good,
+    // so the script refuses one whose folder is Recently Deleted (#198). The
+    // folder is read from Notes.app in the same script, not from the database,
+    // which can still show a just-deleted note in its old folder; the database
+    // only supplies which folder ids are Recently Deleted.
+    //
+    // Notes can accept a scripting `delete` without acting on it, so the script
+    // re-reads the note's original folder afterwards: a note still listed there
+    // was not moved to Recently Deleted and must not be reported as deleted.
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
+      set originalFolder to missing value
+      try
+        set originalFolder to container of noteRef
+      end try
+      if originalFolder is not missing value then
+        set __inTrash to false
+        try
+          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+        end try
+        try
+          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+        end try
+        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      end if
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      if originalFolder is not missing value then
+        try
+          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        end try
+      end if
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -1528,6 +1660,8 @@ export class AppleNotesManager {
     if (deleteScopeFailure) return { status: "scope_conflict", reason: deleteScopeFailure };
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
+    if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
 
@@ -1571,14 +1705,20 @@ export class AppleNotesManager {
    *   dateSetup: a date filter must scan every note's date). The script then
    *   returns the total note count as a leading record so the caller can
    *   detect a dedup shortfall and fall back to a full fetch.
+   * @param trashCheck - Also return the ids of notes in Recently Deleted,
+   *   after a group separator, so the caller can exclude or flag them (#207).
+   *   Only valid inside an account-scoped script.
    */
   private buildBulkListCommand(opts: {
     folderRef?: string;
     dateSetup?: string;
     sliceLimit?: number;
+    trashCheck?: boolean;
   }): string {
-    const { folderRef, dateSetup, sliceLimit } = opts;
+    const { folderRef, dateSetup, sliceLimit, trashCheck } = opts;
     const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const trashSetup = trashCheck ? `${buildTrashNoteIdsCollector()}\n` : "";
+    const trashSuffix = trashCheck ? ` & ${AS_GROUP_SEP} & (__trashNoteIds as text)` : "";
     const countGuard = (listVar: string) =>
       `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
 
@@ -1599,7 +1739,7 @@ export class AppleNotesManager {
       const slicedSource = folderRef
         ? `(notes 1 thru fetchCount of ${folderRef})`
         : `(notes 1 thru fetchCount)`;
-      return `
+      return `${trashSetup}
         set totalCount to count of ${fullSource}
         set fetchCount to ${sliceLimit}
         if fetchCount > totalCount then set fetchCount to totalCount
@@ -1626,7 +1766,7 @@ export class AppleNotesManager {
           end repeat
         end if
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)${trashSuffix}
       `;
     }
 
@@ -1643,7 +1783,7 @@ export class AppleNotesManager {
       ? `if (item i of noteDates) >= thresholdDate then\n            `
       : "";
     const dateGuardClose = dateSetup ? `\n          end if` : "";
-    return `
+    return `${trashSetup}
         ${dateSetup ?? ""}set noteNames to name of ${fullSource}
         set noteIds to id of ${fullSource}
         ${dateFetch}${countGuard("noteIds")}
@@ -1652,8 +1792,67 @@ export class AppleNotesManager {
           ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
+        return (resultList as text)${trashSuffix}
       `;
+  }
+
+  /**
+   * Lists every smart folder with its decoded query, read-only.
+   *
+   * Folder metadata and queries come from the NoteStore database (Full Disk
+   * Access). With `includeMatchingNotes`, Notes.app itself is asked which notes
+   * each smart folder currently shows, so membership reflects Notes' own
+   * evaluation of the query rather than a reimplementation of it.
+   *
+   * @param options.includeMatchingNotes - Also list the notes each folder shows
+   * @param options.limit - Maximum matching notes per folder (default 50)
+   * @throws Error when the database cannot be read (message says why)
+   */
+  listSmartFolders(
+    options: { includeMatchingNotes?: boolean; limit?: number } = {}
+  ): SmartFolder[] {
+    const result = readSmartFolders();
+    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!options.includeMatchingNotes) return result.folders;
+    const limit = options.limit ?? 50;
+    return result.folders.map((folder) => {
+      try {
+        const { total, notes } = this.listSmartFolderNoteRefs(folder.id, limit);
+        return { ...folder, matchingNoteCount: total, matchingNotes: notes };
+      } catch (error) {
+        return {
+          ...folder,
+          matchingNotesError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+  }
+
+  /**
+   * Asks Notes.app for the notes one smart folder currently shows.
+   *
+   * @returns The folder's total note count and up to `limit` (title, id) pairs
+   */
+  listSmartFolderNoteRefs(
+    folderId: string,
+    limit: number
+  ): { total: number; notes: { title: string; id: string }[] } {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId))
+      throw new Error("An exact folder ID is required");
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const script = buildAppLevelScript(
+      this.buildBulkListCommand({ folderRef: `folder id "${folderId}"`, sliceLimit: safeLimit })
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list smart folder notes: ${result.error ?? "unknown error"}`);
+    }
+    const sepIdx = result.output.indexOf(RECORD_SEP);
+    const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+    const total = Number.parseInt(header.trim(), 10);
+    if (Number.isNaN(total)) throw new Error("Unexpected smart folder listing output");
+    const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
+    return { total, notes: this.parseBulkListOutput(records, safeLimit) };
   }
 
   /**
@@ -1663,19 +1862,61 @@ export class AppleNotesManager {
    * after dedup so duplicates never count against it.
    */
   private parseBulkListOutput(output: string, safeLimit?: number): { title: string; id: string }[] {
-    if (!output.trim()) return [];
+    return this.parseBulkListRecords(output, safeLimit).refs;
+  }
+
+  /**
+   * Splits a trash-checked listing (see buildBulkListCommand's trashCheck)
+   * into the listing records and the set of note ids in Recently Deleted.
+   * Output without the group separator carries no trash information (null).
+   */
+  private splitTrashIds(output: string): { records: string; trashIds: Set<string> | null } {
+    const idx = output.lastIndexOf(GROUP_SEP);
+    if (idx === -1) return { records: output, trashIds: null };
+    const trashIds = new Set(
+      output
+        .slice(idx + 1)
+        .split(RECORD_SEP)
+        .map((id) => id.trim())
+        .filter(Boolean)
+    );
+    return { records: output.slice(0, idx), trashIds };
+  }
+
+  /**
+   * Parses bulk listing records, deduplicated by id. Notes whose id is in
+   * `trash.ids` are dropped (and counted) unless `trash.include`, in which
+   * case they are kept and flagged `inRecentlyDeleted`. The limit applies
+   * after both dedup and trash filtering.
+   */
+  private parseBulkListRecords(
+    output: string,
+    safeLimit?: number,
+    trash?: { ids: Set<string> | null; include: boolean }
+  ): { refs: NoteListRef[]; excludedRecentlyDeleted: number } {
+    const refs: NoteListRef[] = [];
+    let excludedRecentlyDeleted = 0;
+    if (!output.trim()) return { refs, excludedRecentlyDeleted };
     const seenIds = new Set<string>();
-    const refs: { title: string; id: string }[] = [];
     for (const item of output.split(RECORD_SEP)) {
       const [title, id] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId = id?.trim() || generateFallbackId();
       if (seenIds.has(noteId)) continue;
       seenIds.add(noteId);
-      refs.push({ title: title.trim(), id: noteId });
+      const trashed = trash?.ids?.has(noteId) ?? false;
+      if (trashed && !trash?.include) {
+        excludedRecentlyDeleted++;
+        continue;
+      }
+      refs.push(
+        trashed
+          ? { title: title.trim(), id: noteId, inRecentlyDeleted: true }
+          : { title: title.trim(), id: noteId }
+      );
       if (safeLimit !== undefined && refs.length >= safeLimit) break;
     }
-    return refs;
+    return { refs, excludedRecentlyDeleted };
   }
 
   /**
@@ -1688,8 +1929,9 @@ export class AppleNotesManager {
     account?: string,
     folder?: string,
     modifiedSince?: string,
-    limit?: number
-  ): { title: string; id: string }[] {
+    limit?: number,
+    includeRecentlyDeleted = false
+  ): NoteListResult {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== undefined && limit > 0 ? Math.floor(limit) : undefined;
     const folderRef = folder ? buildFolderReference(folder) : undefined;
@@ -1709,32 +1951,44 @@ export class AppleNotesManager {
     if (safeLimit !== undefined && !dateSetup) {
       const script = buildAccountScopedScript(
         { account: targetAccount },
-        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit, trashCheck: true })
       );
       const result = executeAppleScript(script);
       if (!result.success) {
         throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
       }
-      const sepIdx = result.output.indexOf(RECORD_SEP);
-      const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+      const { records: body, trashIds } = this.splitTrashIds(result.output);
+      const sepIdx = body.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? body : body.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
-      const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
-      const refs = this.parseBulkListOutput(records, safeLimit);
-      // A malformed header (NaN) also falls through to the full fetch.
-      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs;
+      const records = sepIdx === -1 ? "" : body.slice(sepIdx + 1);
+      const parsed = this.parseBulkListRecords(records, safeLimit, {
+        ids: trashIds,
+        include: includeRecentlyDeleted,
+      });
+      // A malformed header (NaN) also falls through to the full fetch, as
+      // does a slice thinned by dedup or by Recently Deleted exclusion.
+      if (
+        !Number.isNaN(totalCount) &&
+        (parsed.refs.length >= safeLimit || totalCount <= safeLimit)
+      ) {
+        return parsed;
       }
     }
 
     const script = buildAccountScopedScript(
       { account: targetAccount },
-      this.buildBulkListCommand({ folderRef, dateSetup })
+      this.buildBulkListCommand({ folderRef, dateSetup, trashCheck: true })
     );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    const { records, trashIds } = this.splitTrashIds(result.output);
+    return this.parseBulkListRecords(records, safeLimit, {
+      ids: trashIds,
+      include: includeRecentlyDeleted,
+    });
   }
 
   /**
@@ -1747,7 +2001,7 @@ export class AppleNotesManager {
    * @returns Array of note titles
    */
   listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
-    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs.map((ref) => ref.title);
   }
 
   /**
@@ -1759,6 +2013,9 @@ export class AppleNotesManager {
    * specifier resolves ambiguously to the same one note every time — see
    * the fix in exportNotesAsJson for the failure mode this avoids).
    *
+   * Notes in Recently Deleted are excluded (#207); use
+   * `listNoteRefsDetailed()` to include and flag them.
+   *
    * @returns Array of { title, id } pairs, deduplicated by id
    */
   listNoteRefs(
@@ -1767,7 +2024,24 @@ export class AppleNotesManager {
     modifiedSince?: string,
     limit?: number
   ): { title: string; id: string }[] {
-    return this.listNotesCore(account, folder, modifiedSince, limit);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs;
+  }
+
+  /**
+   * Same as `listNoteRefs()`, plus control over notes in Recently Deleted and
+   * a count of how many were skipped. Notes.app's account-wide `notes`
+   * includes Recently Deleted, so they are excluded unless
+   * `includeRecentlyDeleted`, in which case each is flagged
+   * `inRecentlyDeleted: true`. (#207)
+   */
+  listNoteRefsDetailed(
+    account?: string,
+    folder?: string,
+    modifiedSince?: string,
+    limit?: number,
+    includeRecentlyDeleted = false
+  ): NoteListResult {
+    return this.listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted);
   }
 
   /**
@@ -1866,7 +2140,8 @@ export class AppleNotesManager {
       }
     }
 
-    return sharedNotes;
+    // Notes.app can enumerate one note twice under `notes of account` (#183).
+    return uniqueById(sharedNotes);
   }
 
   // ===========================================================================
@@ -2882,7 +3157,8 @@ export class AppleNotesManager {
       }
     }
 
-    return attachments;
+    // A freshly added attachment can be enumerated twice (#197).
+    return uniqueById(attachments);
   }
 
   /**
@@ -2977,7 +3253,8 @@ export class AppleNotesManager {
       }
     }
 
-    return attachments;
+    // A freshly added attachment can be enumerated twice (#197).
+    return uniqueById(attachments);
   }
 
   /**
@@ -3109,6 +3386,72 @@ export class AppleNotesManager {
     } finally {
       cleanupTempDir(dir);
     }
+  }
+
+  /**
+   * Lists a note's Paper (`com.apple.paper`) and classic drawing attachments
+   * with Notes' rendered raster, read-only from NoteStore and the Notes group
+   * container. Requires Full Disk Access.
+   *
+   * @throws PaperStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  listPaperAttachmentsById(noteId: string): DrawingAttachment[] {
+    return describeDrawings(readDrawingRows(noteId));
+  }
+
+  /**
+   * Copies Notes' rendered raster of one drawing to a new file. `attachmentId`
+   * (identifier or AppleScript id) is required when the note has more than one.
+   */
+  exportPaperImageById(
+    noteId: string,
+    savePath: string,
+    attachmentId?: string
+  ): DrawingRasterExport {
+    const drawing = selectDrawing(this.listPaperAttachmentsById(noteId), noteId, attachmentId);
+    return { drawing, ...exportDrawingRaster(drawing, savePath) };
+  }
+
+  /**
+   * Reads one note's attachments with their on-disk asset and preview paths,
+   * in body order, from the NoteStore database and the Notes group container
+   * (both read-only). Requires Full Disk Access.
+   *
+   * @param noteId - canonical CoreData note id
+   * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  getAttachmentAssetsById(noteId: string): NoteAttachmentAssets {
+    const { rows, bodyOrder } = readNoteAttachmentRows(noteId);
+    return assembleAttachmentAssets(rows, bodyOrder);
+  }
+
+  /**
+   * The note's lead visual: the first image in body order (even when its asset
+   * has not downloaded), else the first scan or drawing, else null.
+   */
+  getFirstImageById(noteId: string): FirstImage | null {
+    return selectFirstImage(this.getAttachmentAssetsById(noteId));
+  }
+
+  /**
+   * Copies a note's attachment files into a directory. Each attachment exports
+   * its real asset; its rendered preview only when no asset exists. Existing
+   * files are never replaced: name collisions get `-2`, `-3`, ... suffixes.
+   * The directory must satisfy the same allowlist as save-attachment and may
+   * not be inside the Notes group container.
+   */
+  exportAttachmentsById(
+    noteId: string,
+    exportDir: string,
+    firstImageOnly = false
+  ): {
+    exportDir: string;
+    results: AttachmentExportResult[];
+    firstImage?: FirstImage | null;
+  } {
+    return exportAttachmentAssets(this.getAttachmentAssetsById(noteId), exportDir, {
+      firstImageOnly,
+    });
   }
 
   // ===========================================================================
@@ -3618,5 +3961,19 @@ export class AppleNotesManager {
     }
 
     return markdown;
+  }
+
+  /**
+   * Reads the transcripts Notes has stored for a note's top-level audio
+   * recordings, one entry per attachment in body order. Read-only: queries the
+   * NoteStore database with `sqlite3 -readonly` and needs Full Disk Access.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param options - word-level segment inclusion and cap
+   * @throws AudioTranscriptError for an invalid id, a missing or locked note,
+   *   missing Full Disk Access, or a database read failure
+   */
+  getAudioTranscripts(id: string, options: AudioTranscriptOptions = {}): AudioTranscriptsResult {
+    return readAudioTranscripts(id, options);
   }
 }

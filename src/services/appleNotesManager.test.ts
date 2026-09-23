@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -56,6 +57,35 @@ const NO_RETRY_OPTIONS = { maxRetries: 1 };
 
 import { getChecklistItems } from "@/utils/checklistParser.js";
 const mockGetChecklistItems = vi.mocked(getChecklistItems);
+
+// Mock the transcript reader so the delegation test never touches SQLite.
+vi.mock("@/utils/audioTranscripts.js", () => ({
+  readAudioTranscripts: vi.fn(),
+}));
+import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+const mockReadAudioTranscripts = vi.mocked(readAudioTranscripts);
+
+// Recently Deleted folder ids come from the database; keep tests off it.
+vi.mock("@/utils/trashFolders.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/trashFolders.js")>()),
+  readTrashFolderIds: vi.fn(() => []),
+}));
+import { readTrashFolderIds } from "@/utils/trashFolders.js";
+const mockReadTrashFolderIds = vi.mocked(readTrashFolderIds);
+const G = "\x1d";
+const TRASH_FOLDER = "x-coredata://ABC-123/ICFolder/p9";
+
+function compilesAsAppleScript(script: string): void {
+  const dir = mkdtempSync(join(tmpdir(), "trash-script-"));
+  try {
+    writeFileSync(join(dir, "s.applescript"), script);
+    execFileSync("/usr/bin/osacompile", ["-o", join(dir, "s.scpt"), join(dir, "s.applescript")], {
+      stdio: "pipe",
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 // Result delimiters (#18) — must match appleNotesManager.ts.
 // FIELD_SEP (US, \x1f) separates fields within a record;
@@ -1552,6 +1582,38 @@ describe("AppleNotesManager", () => {
         status: "conflict",
       });
     });
+
+    it("reports a delete that left the note in its original folder", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_NOT_DELETED" });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Reviewed body</div>")).toEqual({
+        status: "not-deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      // The folder is captured before the delete and re-read after it.
+      expect(script.indexOf("container of noteRef")).toBeLessThan(script.indexOf("delete noteRef"));
+      expect(script.indexOf("delete noteRef")).toBeLessThan(
+        script.indexOf("id of notes of originalFolder")
+      );
+    });
+
+    it("generates a delete script that AppleScript compiles", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      manager.deleteNoteByIdIfUnchanged(id, '<div>Body with "quotes" and \\ slash</div>');
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
+      try {
+        writeFileSync(join(dir, "delete.applescript"), script);
+        expect(() =>
+          execFileSync(
+            "/usr/bin/osacompile",
+            ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
+            { stdio: "pipe" }
+          )
+        ).not.toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1970,6 +2032,166 @@ describe("AppleNotesManager", () => {
       expect(script).toContain(
         'if (count of noteIds) is not (count of noteShared) then error "Notes changed during listing"'
       );
+    });
+
+    it("reports a note Notes enumerates twice only once, in first-seen order (#183)", () => {
+      const row = (title: string, id: string) =>
+        [title, id, "2025-1-2-3-4-5", "2025-6-7-8-9-10", "true", "false"].join(F);
+      mockExecuteAppleScript
+        .mockReturnValueOnce({ success: true, output: "iCloud" })
+        .mockReturnValueOnce({
+          success: true,
+          output: [
+            row("Team plan", "x-coredata://ABC/ICNote/p7"),
+            row("Budget", "x-coredata://ABC/ICNote/p8"),
+            row("Team plan", "x-coredata://ABC/ICNote/p7"),
+          ].join(R),
+        });
+
+      expect(manager.listSharedNotes().map((note) => note.id)).toEqual([
+        "x-coredata://ABC/ICNote/p7",
+        "x-coredata://ABC/ICNote/p8",
+      ]);
+    });
+  });
+
+  describe("Recently Deleted (#198, #207)", () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+
+    it("delete refuses a note whose folder is Recently Deleted, before deleting", () => {
+      mockReadTrashFolderIds.mockReturnValue([TRASH_FOLDER, "not-a-folder-id"]);
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: "SAFETY_IN_RECENTLY_DELETED",
+      });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>")).toEqual({
+        status: "in-recently-deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      // Checked live against Notes.app's container, by database id and by name.
+      expect(script).toContain(`{"${TRASH_FOLDER}"} contains (id of originalFolder)`);
+      expect(script).not.toContain("not-a-folder-id");
+      expect(script).toContain('(name of originalFolder) is "Recently Deleted"');
+      expect(script.indexOf("SAFETY_IN_RECENTLY_DELETED")).toBeLessThan(
+        script.indexOf("delete noteRef")
+      );
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
+    it("delete still checks the folder name without database access", () => {
+      mockReadTrashFolderIds.mockReturnValue([]);
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>").status).toBe("deleted");
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      expect(script).toContain("{} contains (id of originalFolder)");
+      expect(script).toContain('(name of originalFolder) is "Recently Deleted"');
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
+    it("list excludes notes Notes.app reports in Recently Deleted", () => {
+      mockReadTrashFolderIds.mockReturnValue([TRASH_FOLDER]);
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output:
+          [["Live", id].join(F), ["Gone", "x-coredata://ABC/ICNote/p2"].join(F)].join(R) +
+          G +
+          ["x-coredata://ABC/ICNote/p2", "x-coredata://ABC/ICNote/p3"].join(R),
+      });
+      expect(manager.listNoteRefsDetailed()).toEqual({
+        refs: [{ title: "Live", id }],
+        excludedRecentlyDeleted: 1,
+      });
+      expect(manager.listNoteRefs()).toEqual([{ title: "Live", id }]);
+      expect(manager.listNotes()).toEqual(["Live"]);
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      expect(script).toContain(`repeat with __trashFolderId in {"${TRASH_FOLDER}"}`);
+      expect(script).toContain('every folder whose name is "Recently Deleted"');
+      expect(script).toContain("(character id 29) & (__trashNoteIds as text)");
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
+    it("list includes and flags Recently Deleted notes on request", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output:
+          [["Live", id].join(F), ["Gone", "x-coredata://ABC/ICNote/p2"].join(F)].join(R) +
+          G +
+          "x-coredata://ABC/ICNote/p2",
+      });
+      expect(
+        manager.listNoteRefsDetailed(undefined, undefined, undefined, undefined, true)
+      ).toEqual({
+        refs: [
+          { title: "Live", id },
+          { title: "Gone", id: "x-coredata://ABC/ICNote/p2", inRecentlyDeleted: true },
+        ],
+        excludedRecentlyDeleted: 0,
+      });
+    });
+
+    it("an empty trash list excludes nothing", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: ["Live", id].join(F) + G,
+      });
+      expect(manager.listNoteRefsDetailed()).toEqual({
+        refs: [{ title: "Live", id }],
+        excludedRecentlyDeleted: 0,
+      });
+    });
+
+    it("a bounded slice thinned by exclusion falls back to the full listing", () => {
+      mockExecuteAppleScript
+        .mockReturnValueOnce({
+          success: true,
+          output:
+            "3" +
+            R +
+            [["Gone", "x-coredata://ABC/ICNote/p2"].join(F), ["Live", id].join(F)].join(R) +
+            G +
+            "x-coredata://ABC/ICNote/p2",
+        })
+        .mockReturnValueOnce({
+          success: true,
+          output:
+            [
+              ["Gone", "x-coredata://ABC/ICNote/p2"].join(F),
+              ["Live", id].join(F),
+              ["Also", "x-coredata://ABC/ICNote/p3"].join(F),
+            ].join(R) +
+            G +
+            "x-coredata://ABC/ICNote/p2",
+        });
+      expect(manager.listNoteRefsDetailed(undefined, undefined, undefined, 2)).toEqual({
+        refs: [
+          { title: "Live", id },
+          { title: "Also", id: "x-coredata://ABC/ICNote/p3" },
+        ],
+        excludedRecentlyDeleted: 1,
+      });
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(2);
+      const sliceScript = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      expect(sliceScript).toContain("(character id 29) & (__trashNoteIds as text)");
+      expect(() => compilesAsAppleScript(sliceScript)).not.toThrow();
+    });
+
+    it("a bounded slice that stays full after exclusion is returned as is", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "5" + R + ["Live", id].join(F) + G,
+      });
+      expect(manager.listNoteRefsDetailed(undefined, undefined, undefined, 1)).toEqual({
+        refs: [{ title: "Live", id }],
+        excludedRecentlyDeleted: 0,
+      });
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+    });
+
+    it("smart folder listings carry no trash check", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "0" + R });
+      manager.listSmartFolderNoteRefs("x-coredata://ABC/ICFolder/p4", 5);
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      expect(script).not.toContain("__trashNoteIds");
     });
   });
 
@@ -2977,6 +3199,21 @@ describe("AppleNotesManager", () => {
       });
       expect(attachments[0].created?.getFullYear()).toBe(2026);
       expect(attachments[0].modified?.getHours()).toBe(11);
+    });
+
+    it("reports an attachment enumerated twice only once, in first-seen order (#197)", () => {
+      const output = [
+        ["x-coredata://ABC/ICAttachment/p2", "new.png", "public.png"].join(F),
+        ["x-coredata://ABC/ICAttachment/p1", "photo.jpg", "public.jpeg"].join(F),
+        ["x-coredata://ABC/ICAttachment/p2", "new.png", "public.png"].join(F),
+      ].join(R);
+      mockExecuteAppleScript.mockReturnValue({ success: true, output });
+      const expected = ["x-coredata://ABC/ICAttachment/p2", "x-coredata://ABC/ICAttachment/p1"];
+
+      expect(manager.listAttachmentsById("x-coredata://ABC/ICNote/p123").map((a) => a.id)).toEqual(
+        expected
+      );
+      expect(manager.listAttachments("My Note", "iCloud").map((a) => a.id)).toEqual(expected);
     });
 
     it("returns empty array when note has no attachments", () => {
@@ -4116,5 +4353,28 @@ describe("htmlToPlaintext (export helper)", () => {
     expect(toPlaintext("a<<i>>b")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("<x<y>z>")).not.toMatch(/<[^>]*>/);
     expect(toPlaintext("plain <b>text</b> here")).toBe("plain text here");
+  });
+});
+
+describe("getAudioTranscripts", () => {
+  it("delegates to the read-only transcript reader with the caller's options", () => {
+    const result = {
+      id: "x-coredata://S/ICNote/p1",
+      attachments: [],
+      bodyOrder: true,
+      truncated: false,
+    };
+    mockReadAudioTranscripts.mockReturnValueOnce(result);
+    const manager = new AppleNotesManager();
+    expect(
+      manager.getAudioTranscripts("x-coredata://S/ICNote/p1", {
+        includeSegments: true,
+        maxSegments: 5,
+      })
+    ).toBe(result);
+    expect(mockReadAudioTranscripts).toHaveBeenCalledWith("x-coredata://S/ICNote/p1", {
+      includeSegments: true,
+      maxSegments: 5,
+    });
   });
 });

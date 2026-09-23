@@ -33,12 +33,42 @@ const hex = (f: ProtoField | undefined) => {
   if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
   return Buffer.from(f.value).toString("hex");
 };
+/** A table cell whose text could not be decoded without guessing. */
+export interface IncompleteTableCell {
+  /** Zero-based row index in display order. */
+  row: number;
+  /** Zero-based column index in display order. */
+  column: number;
+  reason: string;
+}
+/** Result of {@link parseNoteTableCells}: undecodable cells are null, never guessed. */
+export interface DetailedNoteTable {
+  rows: Array<Array<string | null>>;
+  rowIds: string[];
+  columnIds: string[];
+  incompleteCells: IncompleteTableCell[];
+}
+
 /** Decode a complete native Notes table, including stable row and column IDs. */
 export function parseNoteTable(compressed: Uint8Array): {
   rows: string[][];
   rowIds: string[];
   columnIds: string[];
 } {
+  const table = decodeTable(compressed, true);
+  return { rows: table.rows as string[][], rowIds: table.rowIds, columnIds: table.columnIds };
+}
+
+/**
+ * Decode a native Notes table, keeping readable cells when some cannot be decoded.
+ * A cell holding an embedded object, or with no stored text, becomes `null` and is
+ * listed in `incompleteCells`. Structural damage still throws, as in parseNoteTable.
+ */
+export function parseNoteTableCells(compressed: Uint8Array): DetailedNoteTable {
+  return decodeTable(compressed, false);
+}
+
+function decodeTable(compressed: Uint8Array, strict: boolean): DetailedNoteTable {
   const root = decodeMessage(gunzipSync(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
   const data = sub(sub(root, 2), 3),
     entries = many(data, 3);
@@ -92,7 +122,8 @@ export function parseNoteTable(compressed: Uint8Array): {
     columns = ordered("crColumns");
   if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 100000)
     throw new Error("Unsupported table size");
-  const values = rows.ids.map(() => columns.ids.map(() => ""));
+  const values: Array<Array<string | null>> = rows.ids.map(() => columns.ids.map(() => ""));
+  const incomplete: Array<{ ri: number; ci: number; reason: string }> = [];
   const cellRef = refs.get("cellColumns");
   if (cellRef === undefined) throw new Error("Missing table cells");
   for (const column of many(sub(entry(cellRef), 6), 1)) {
@@ -103,8 +134,16 @@ export function parseNoteTable(compressed: Uint8Array): {
       if (ri === undefined || ci === undefined) continue; // deleted CRDT row/column
       const note = sub(entry(num(sub(row, 2), 6)), 10);
       const text = stringValue(getField(note, 2));
-      if (text === undefined || text.includes("\ufffc"))
-        throw new Error("Embedded or unsupported table cell");
+      if (text === undefined || text.includes("\ufffc")) {
+        if (strict) throw new Error("Embedded or unsupported table cell");
+        values[ri][ci] = null;
+        incomplete.push({
+          ri,
+          ci,
+          reason: text === undefined ? "Cell text is missing" : "Cell contains an embedded object",
+        });
+        continue;
+      }
       values[ri][ci] = text.replace(/\n$/u, "");
     }
   }
@@ -117,9 +156,13 @@ export function parseNoteTable(compressed: Uint8Array): {
       )
     );
   });
+  const width = columns.ids.length;
   if (rtl) {
     for (const row of values) row.reverse();
     columns.ids.reverse();
   }
-  return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
+  const incompleteCells = incomplete
+    .map(({ ri, ci, reason }) => ({ row: ri, column: rtl ? width - 1 - ci : ci, reason }))
+    .sort((a, b) => a.row - b.row || a.column - b.column);
+  return { rows: values, rowIds: rows.ids, columnIds: columns.ids, incompleteCells };
 }

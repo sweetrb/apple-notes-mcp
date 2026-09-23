@@ -14,6 +14,11 @@ import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { FULL_DISK_ACCESS_GUIDE_URL, NODE_RUNTIME_TCC_GUIDE_URL } from "@/utils/docsUrls.js";
 import { NATIVE_TAGS_SHORTCUT, nativeTagsStatus } from "@/services/nativeTags.js";
 import { BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT } from "@/services/backgroundNotes.js";
+import {
+  formatCapabilityMatrix,
+  getCapabilityMatrix,
+  type CapabilityMatrix,
+} from "@/services/capabilityMatrix.js";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 export interface DoctorCheck {
@@ -24,9 +29,15 @@ export interface DoctorCheck {
 export interface DoctorReport {
   healthy: boolean;
   checks: DoctorCheck[];
+  /** OS-version-aware feature matrix; absent only if probing it threw. */
+  runtimeOS?: CapabilityMatrix["runtimeOS"];
+  features?: CapabilityMatrix["features"];
 }
 
-export function runDoctor(manager: AppleNotesManager): DoctorReport {
+export function runDoctor(
+  manager: AppleNotesManager,
+  capabilityMatrix: () => CapabilityMatrix = getCapabilityMatrix
+): DoctorReport {
   const checks: DoctorCheck[] = [];
 
   // 1. Notes.app reachability + Automation permission (existing health checks).
@@ -115,7 +126,17 @@ export function runDoctor(manager: AppleNotesManager): DoctorReport {
   checks.push(checkNodeRuntimeSignature());
 
   const healthy = !checks.some((c) => c.status === "fail");
-  return { healthy, checks };
+  // 6. Feature matrix. Informational: an unavailable optional feature is not a
+  // setup failure, so it never changes `healthy` or adds a check.
+  let matrix: CapabilityMatrix | undefined;
+  try {
+    matrix = capabilityMatrix();
+  } catch {
+    matrix = undefined;
+  }
+  return matrix
+    ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features }
+    : { healthy, checks };
 }
 
 /**
@@ -181,5 +202,7 @@ export function formatDoctorReport(r: DoctorReport): string {
   const icon = (s: CheckStatus): string => (s === "ok" ? "✅" : s === "warn" ? "⚠️ " : "❌");
   const lines = [`🩺 apple-notes-mcp doctor — ${r.healthy ? "healthy" : "ISSUES FOUND"}`, ""];
   for (const c of r.checks) lines.push(`${icon(c.status)} ${c.name}: ${c.detail}`);
+  if (r.runtimeOS && r.features)
+    lines.push("", formatCapabilityMatrix({ runtimeOS: r.runtimeOS, features: r.features }));
   return lines.join("\n");
 }

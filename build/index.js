@@ -108,7 +108,7 @@ var require_code = __commonJS({
     }
     exports._ = _;
     var plus = new _Code("+");
-    function str(strs, ...args) {
+    function str2(strs, ...args) {
       const expr = [safeStringify(strs[0])];
       let i = 0;
       while (i < args.length) {
@@ -119,7 +119,7 @@ var require_code = __commonJS({
       optimize(expr);
       return new _Code(expr);
     }
-    exports.str = str;
+    exports.str = str2;
     function addCodeArg(code, arg) {
       if (arg instanceof _Code)
         code.push(...arg._items);
@@ -162,7 +162,7 @@ var require_code = __commonJS({
       return;
     }
     function strConcat(c1, c2) {
-      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str`${c1}${c2}`;
+      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str2`${c1}${c2}`;
     }
     exports.strConcat = strConcat;
     function interpolate(x) {
@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants6) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants2);
+          this.rhs = optimizeExpr(this.rhs, names, constants6);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants6) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants2);
+        this.rhs = optimizeExpr(this.rhs, names, constants6);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants2) {
-        this.code = optimizeExpr(this.code, names, constants2);
+      optimizeNames(names, constants6) {
+        this.code = optimizeExpr(this.code, names, constants6);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants6) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants2))
+          if (n.optimizeNames(names, constants6))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants6) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
-        if (!(super.optimizeNames(names, constants2) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants6);
+        if (!(super.optimizeNames(names, constants6) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants2);
+        this.condition = optimizeExpr(this.condition, names, constants6);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants6) {
+        if (!super.optimizeNames(names, constants6))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants2);
+        this.iteration = optimizeExpr(this.iteration, names, constants6);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants6) {
+        if (!super.optimizeNames(names, constants6))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants2);
+        this.iterable = optimizeExpr(this.iterable, names, constants6);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants6) {
         var _a, _b;
-        super.optimizeNames(names, constants2);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants2);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants2);
+        super.optimizeNames(names, constants6);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants6);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants6);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants2) {
+    function optimizeExpr(expr, names, constants6) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants2[n.str];
+        const c = constants6[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants2[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants6[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -1105,11 +1105,11 @@ var require_util = __commonJS({
       return false;
     }
     exports.schemaHasRules = schemaHasRules;
-    function schemaHasRulesButRef(schema, RULES) {
+    function schemaHasRulesButRef(schema, RULES2) {
       if (typeof schema == "boolean")
         return !schema;
       for (const key in schema)
-        if (key !== "$ref" && RULES.all[key])
+        if (key !== "$ref" && RULES2.all[key])
           return true;
       return false;
     }
@@ -1124,22 +1124,22 @@ var require_util = __commonJS({
       return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
     }
     exports.schemaRefOrVal = schemaRefOrVal;
-    function unescapeFragment(str) {
-      return unescapeJsonPointer(decodeURIComponent(str));
+    function unescapeFragment(str2) {
+      return unescapeJsonPointer(decodeURIComponent(str2));
     }
     exports.unescapeFragment = unescapeFragment;
-    function escapeFragment(str) {
-      return encodeURIComponent(escapeJsonPointer(str));
+    function escapeFragment(str2) {
+      return encodeURIComponent(escapeJsonPointer(str2));
     }
     exports.escapeFragment = escapeFragment;
-    function escapeJsonPointer(str) {
-      if (typeof str == "number")
-        return `${str}`;
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPointer(str2) {
+      if (typeof str2 == "number")
+        return `${str2}`;
+      return str2.replace(/~/g, "~0").replace(/\//g, "~1");
     }
     exports.escapeJsonPointer = escapeJsonPointer;
-    function unescapeJsonPointer(str) {
-      return str.replace(/~1/g, "/").replace(/~0/g, "~");
+    function unescapeJsonPointer(str2) {
+      return str2.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports.unescapeJsonPointer = unescapeJsonPointer;
     function eachItem(xs, f) {
@@ -2164,8 +2164,8 @@ var require_json_schema_traverse = __commonJS({
         post(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
       }
     }
-    function escapeJsonPtr(str) {
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPtr(str2) {
+      return str2.replace(/~/g, "~0").replace(/\//g, "~1");
     }
   }
 });
@@ -2503,17 +2503,17 @@ var require_validate = __commonJS({
     }
     function schemaKeywords(it, types, typeErrors, errsCount) {
       const { gen, schema, data, allErrors, opts, self } = it;
-      const { RULES } = self;
-      if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES))) {
-        gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition));
+      const { RULES: RULES2 } = self;
+      if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES2))) {
+        gen.block(() => keywordCode(it, "$ref", RULES2.all.$ref.definition));
         return;
       }
       if (!opts.jtd)
         checkStrictTypes(it, types);
       gen.block(() => {
-        for (const group of RULES.rules)
+        for (const group of RULES2.rules)
           groupKeywords(group);
-        groupKeywords(RULES.post);
+        groupKeywords(RULES2.post);
       });
       function groupKeywords(group) {
         if (!(0, applicability_1.shouldUseGroup)(schema, group))
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve3.call(this, root, ref);
+      let _sch = resolve5.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve3(root, ref) {
+    function resolve5(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3261,15 +3261,15 @@ var require_utils = __commonJS({
         isIPV6: true
       };
     }
-    function findToken(str, token) {
+    function findToken(str2, token) {
       let ind = 0;
-      for (let i = 0; i < str.length; i++) {
-        if (str[i] === token) ind++;
+      for (let i = 0; i < str2.length; i++) {
+        if (str2[i] === token) ind++;
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path9) {
+      let input = path9;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3358,9 +3358,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decodeUnreserved && isUnreserved(decoded)) {
               output += decoded;
@@ -3380,9 +3380,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decoded !== "." && isUnreserved(decoded)) {
               output += decoded;
@@ -3422,9 +3422,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -3460,9 +3460,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -3507,9 +3507,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (isUnreserved(decoded)) {
               output += decoded;
@@ -3547,9 +3547,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -3674,8 +3674,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path9 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path9 && path9 !== "/" ? path9 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve3(baseURI, relativeURI, options) {
+    function resolve5(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -3876,49 +3876,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative2, options, skipNormalization) {
+    function resolveComponent(base, relative4, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse3(serialize(base, options), options);
-        relative2 = parse3(serialize(relative2, options), options);
+        relative4 = parse3(serialize(relative4, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative2.scheme) {
-        target.scheme = relative2.scheme;
-        target.userinfo = relative2.userinfo;
-        target.host = relative2.host;
-        target.port = relative2.port;
-        target.path = removeDotSegments(relative2.path || "");
-        target.query = relative2.query;
+      if (!options.tolerant && relative4.scheme) {
+        target.scheme = relative4.scheme;
+        target.userinfo = relative4.userinfo;
+        target.host = relative4.host;
+        target.port = relative4.port;
+        target.path = removeDotSegments(relative4.path || "");
+        target.query = relative4.query;
       } else {
-        if (relative2.userinfo !== void 0 || relative2.host !== void 0 || relative2.port !== void 0) {
-          target.userinfo = relative2.userinfo;
-          target.host = relative2.host;
-          target.port = relative2.port;
-          target.path = removeDotSegments(relative2.path || "");
-          target.query = relative2.query;
+        if (relative4.userinfo !== void 0 || relative4.host !== void 0 || relative4.port !== void 0) {
+          target.userinfo = relative4.userinfo;
+          target.host = relative4.host;
+          target.port = relative4.port;
+          target.path = removeDotSegments(relative4.path || "");
+          target.query = relative4.query;
         } else {
-          if (!relative2.path) {
+          if (!relative4.path) {
             target.path = base.path;
-            if (relative2.query !== void 0) {
-              target.query = relative2.query;
+            if (relative4.query !== void 0) {
+              target.query = relative4.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative2.path[0] === "/") {
-              target.path = removeDotSegments(relative2.path);
+            if (relative4.path[0] === "/") {
+              target.path = removeDotSegments(relative4.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative2.path;
+                target.path = "/" + relative4.path;
               } else if (!base.path) {
-                target.path = relative2.path;
+                target.path = relative4.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative2.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative4.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative2.query;
+            target.query = relative4.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -3926,7 +3926,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative2.fragment;
+      target.fragment = relative4.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve3,
+      resolve: resolve5,
       resolveComponent,
       equal,
       serialize,
@@ -4267,7 +4267,7 @@ var require_core = __commonJS({
     var util_1 = require_util();
     var $dataRefSchema = require_data();
     var uri_1 = require_uri();
-    var defaultRegExp = (str, flags) => new RegExp(str, flags);
+    var defaultRegExp = (str2, flags) => new RegExp(str2, flags);
     defaultRegExp.code = "new RegExp";
     var META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
     var EXT_SCOPE_NAMES = /* @__PURE__ */ new Set([
@@ -4600,10 +4600,10 @@ var require_core = __commonJS({
       }
       // Remove keyword
       removeKeyword(keyword) {
-        const { RULES } = this;
-        delete RULES.keywords[keyword];
-        delete RULES.all[keyword];
-        for (const group of RULES.rules) {
+        const { RULES: RULES2 } = this;
+        delete RULES2.keywords[keyword];
+        delete RULES2.all[keyword];
+        for (const group of RULES2.rules) {
           const i = group.rules.findIndex((rule) => rule.keyword === keyword);
           if (i >= 0)
             group.rules.splice(i, 1);
@@ -4620,7 +4620,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -4771,9 +4771,9 @@ var require_core = __commonJS({
     }
     var KEYWORD_NAME = /^[a-z_$][a-z0-9_$:-]*$/i;
     function checkKeyword(keyword, def) {
-      const { RULES } = this;
+      const { RULES: RULES2 } = this;
       (0, util_1.eachItem)(keyword, (kwd) => {
-        if (RULES.keywords[kwd])
+        if (RULES2.keywords[kwd])
           throw new Error(`Keyword ${kwd} is already defined`);
         if (!KEYWORD_NAME.test(kwd))
           throw new Error(`Keyword ${kwd} has invalid name`);
@@ -4789,13 +4789,13 @@ var require_core = __commonJS({
       const post = definition === null || definition === void 0 ? void 0 : definition.post;
       if (dataType && post)
         throw new Error('keyword with "post" flag cannot have "type"');
-      const { RULES } = this;
-      let ruleGroup = post ? RULES.post : RULES.rules.find(({ type: t }) => t === dataType);
+      const { RULES: RULES2 } = this;
+      let ruleGroup = post ? RULES2.post : RULES2.rules.find(({ type: t }) => t === dataType);
       if (!ruleGroup) {
         ruleGroup = { type: dataType, rules: [] };
-        RULES.rules.push(ruleGroup);
+        RULES2.rules.push(ruleGroup);
       }
-      RULES.keywords[keyword] = true;
+      RULES2.keywords[keyword] = true;
       if (!definition)
         return;
       const rule = {
@@ -4810,7 +4810,7 @@ var require_core = __commonJS({
         addBeforeRule.call(this, ruleGroup, rule, definition.before);
       else
         ruleGroup.rules.push(rule);
-      RULES.all[keyword] = rule;
+      RULES2.all[keyword] = rule;
       (_a = definition.implements) === null || _a === void 0 ? void 0 : _a.forEach((kwd) => this.addKeyword(kwd));
     }
     function addBeforeRule(ruleGroup, rule, before) {
@@ -5062,16 +5062,16 @@ var require_ucs2length = __commonJS({
   "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    function ucs2length(str) {
-      const len = str.length;
+    function ucs2length(str2) {
+      const len = str2.length;
       let length = 0;
       let pos = 0;
       let value;
       while (pos < len) {
         length++;
-        value = str.charCodeAt(pos++);
+        value = str2.charCodeAt(pos++);
         if (value >= 55296 && value <= 56319 && pos < len) {
-          value = str.charCodeAt(pos);
+          value = str2.charCodeAt(pos);
           if ((value & 64512) === 56320)
             pos++;
         }
@@ -6883,12 +6883,12 @@ var require_formats = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
-    function fmtDef(validate, compare) {
-      return { validate, compare };
+    function fmtDef(validate, compare2) {
+      return { validate, compare: compare2 };
     }
     exports.fullFormats = {
       // date: http://tools.ietf.org/html/rfc3339#section-5.6
-      date: fmtDef(date3, compareDate),
+      date: fmtDef(date3, compareDate2),
       // date-time: http://tools.ietf.org/html/rfc3339#section-5.6
       time: fmtDef(getTime(true), compareTime),
       "date-time": fmtDef(getDateTime(true), compareDateTime),
@@ -6935,7 +6935,7 @@ var require_formats = __commonJS({
     };
     exports.fastFormats = {
       ...exports.fullFormats,
-      date: fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d$/, compareDate),
+      date: fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d$/, compareDate2),
       time: fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareTime),
       "date-time": fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\dt(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareDateTime),
       "iso-time": fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)?$/i, compareIsoTime),
@@ -6954,8 +6954,8 @@ var require_formats = __commonJS({
     }
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
     var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    function date3(str) {
-      const matches = DATE.exec(str);
+    function date3(str2) {
+      const matches = DATE.exec(str2);
       if (!matches)
         return false;
       const year = +matches[1];
@@ -6963,7 +6963,7 @@ var require_formats = __commonJS({
       const day = +matches[3];
       return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
     }
-    function compareDate(d1, d2) {
+    function compareDate2(d1, d2) {
       if (!(d1 && d2))
         return void 0;
       if (d1 > d2)
@@ -6974,8 +6974,8 @@ var require_formats = __commonJS({
     }
     var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
     function getTime(strictTimeZone) {
-      return function time3(str) {
-        const matches = TIME.exec(str);
+      return function time3(str2) {
+        const matches = TIME.exec(str2);
         if (!matches)
           return false;
         const hr = +matches[1];
@@ -7021,8 +7021,8 @@ var require_formats = __commonJS({
     var DATE_TIME_SEPARATOR = /t|\s/i;
     function getDateTime(strictTimeZone) {
       const time3 = getTime(strictTimeZone);
-      return function date_time(str) {
-        const dateTime = str.split(DATE_TIME_SEPARATOR);
+      return function date_time(str2) {
+        const dateTime = str2.split(DATE_TIME_SEPARATOR);
         return dateTime.length === 2 && date3(dateTime[0]) && time3(dateTime[1]);
       };
     }
@@ -7040,20 +7040,20 @@ var require_formats = __commonJS({
         return void 0;
       const [d1, t1] = dt1.split(DATE_TIME_SEPARATOR);
       const [d2, t2] = dt2.split(DATE_TIME_SEPARATOR);
-      const res = compareDate(d1, d2);
+      const res = compareDate2(d1, d2);
       if (res === void 0)
         return void 0;
       return res || compareTime(t1, t2);
     }
     var NOT_URI_FRAGMENT = /\/|:/;
     var URI = /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)(?:\?(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
-    function uri(str) {
-      return NOT_URI_FRAGMENT.test(str) && URI.test(str);
+    function uri(str2) {
+      return NOT_URI_FRAGMENT.test(str2) && URI.test(str2);
     }
     var BYTE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/gm;
-    function byte(str) {
+    function byte(str2) {
       BYTE.lastIndex = 0;
-      return BYTE.test(str);
+      return BYTE.test(str2);
     }
     var MIN_INT32 = -(2 ** 31);
     var MAX_INT32 = 2 ** 31 - 1;
@@ -7067,11 +7067,11 @@ var require_formats = __commonJS({
       return true;
     }
     var Z_ANCHOR = /[^\\]\\Z/;
-    function regex(str) {
-      if (Z_ANCHOR.test(str))
+    function regex(str2) {
+      if (Z_ANCHOR.test(str2))
         return false;
       try {
-        new RegExp(str);
+        new RegExp(str2);
         return true;
       } catch (e) {
         return false;
@@ -7181,12 +7181,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs4, exportName) {
+    function addFormats(ajv, list, fs9, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs4[f]);
+        ajv.addFormat(f, fs9[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants2 = {
+    var constants6 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants2) {
-      v = { value: constants2[c] };
+    for (c in constants6) {
+      v = { value: constants6[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -8768,25 +8768,25 @@ var require_ContainerNode = __commonJS({
         return this._firstChild;
       } },
       lastChild: { get: function() {
-        var kids = this._childNodes, first;
+        var kids = this._childNodes, first2;
         if (kids) {
           return kids.length === 0 ? null : kids[kids.length - 1];
         }
-        first = this._firstChild;
-        if (first === null) {
+        first2 = this._firstChild;
+        if (first2 === null) {
           return null;
         }
-        return first._previousSibling;
+        return first2._previousSibling;
       } },
       _ensureChildNodes: { value: function() {
         if (this._childNodes) {
           return;
         }
-        var first = this._firstChild, kid = first, childNodes = this._childNodes = new NodeList();
-        if (first) do {
+        var first2 = this._firstChild, kid = first2, childNodes = this._childNodes = new NodeList();
+        if (first2) do {
           childNodes.push(kid);
           kid = kid._nextSibling;
-        } while (kid !== first);
+        } while (kid !== first2);
         this._firstChild = null;
       } },
       // Remove all of this node's children.  This is a minor
@@ -9206,12 +9206,12 @@ var require_DOMTokenList = __commonJS({
       if (strProp === clist._lastStringValue) {
         return toArray(clist);
       }
-      var str = strProp.replace(/(^[ \t\r\n\f]+)|([ \t\r\n\f]+$)/g, "");
-      if (str === "") {
+      var str2 = strProp.replace(/(^[ \t\r\n\f]+)|([ \t\r\n\f]+$)/g, "");
+      if (str2 === "") {
         return [];
       } else {
         var seen = /* @__PURE__ */ Object.create(null);
-        return str.split(/[ \t\r\n\f]+/g).filter(function(n) {
+        return str2.split(/[ \t\r\n\f]+/g).filter(function(n) {
           var key = "$" + n;
           if (seen[key]) {
             return false;
@@ -9266,16 +9266,16 @@ var require_select = __commonJS({
       var nodeType = n.parentNode.nodeType;
       return nodeType === 1 || nodeType === 9;
     };
-    var unquote = function(str) {
-      if (!str) return str;
-      var ch = str[0];
+    var unquote = function(str2) {
+      if (!str2) return str2;
+      var ch = str2[0];
       if (ch === '"' || ch === "'") {
-        if (str[str.length - 1] === ch) {
-          str = str.slice(1, -1);
+        if (str2[str2.length - 1] === ch) {
+          str2 = str2.slice(1, -1);
         } else {
-          str = str.slice(1);
+          str2 = str2.slice(1);
         }
-        return str.replace(rules.str_escape, function(s) {
+        return str2.replace(rules.str_escape, function(s) {
           var m = /^\\(?:([0-9A-Fa-f]+)|([\r\n\f]+))/.exec(s);
           if (!m) {
             return s.slice(1);
@@ -9289,14 +9289,14 @@ var require_select = __commonJS({
             String.fromCharCode(cp)
           );
         });
-      } else if (rules.ident.test(str)) {
-        return decodeid(str);
+      } else if (rules.ident.test(str2)) {
+        return decodeid(str2);
       } else {
-        return str;
+        return str2;
       }
     };
-    var decodeid = function(str) {
-      return str.replace(rules.escape, function(s) {
+    var decodeid = function(str2) {
+      return str2.replace(rules.escape, function(s) {
         var m = /^\\([0-9A-Fa-f]+)/.exec(s);
         if (!m) {
           return s[1];
@@ -9621,8 +9621,8 @@ var require_select = __commonJS({
       // Non-standard, for compatibility purposes.
       ":contains": function(param) {
         return function(el) {
-          var text = el.innerText || el.textContent || el.value || "";
-          return text.indexOf(param) !== -1;
+          var text2 = el.innerText || el.textContent || el.value || "";
+          return text2.indexOf(param) !== -1;
         };
       },
       ":has": function(param) {
@@ -9872,9 +9872,9 @@ var require_select = __commonJS({
     var makeSubject = function() {
       var target;
       function subject(el) {
-        var node = el.ownerDocument, scope = node.getElementsByTagName(subject.lname), i = scope.length;
+        var node = el.ownerDocument, scope2 = node.getElementsByTagName(subject.lname), i = scope2.length;
         while (i--) {
-          if (subject.test(scope[i]) && target === el) {
+          if (subject.test(scope2[i]) && target === el) {
             target = null;
             return true;
           }
@@ -9902,16 +9902,16 @@ var require_select = __commonJS({
       };
     };
     var find = function(sel, node) {
-      var results = [], test = compile(sel), scope = node.getElementsByTagName(test.qname), i = 0, el;
-      while (el = scope[i++]) {
+      var results = [], test = compile(sel), scope2 = node.getElementsByTagName(test.qname), i = 0, el;
+      while (el = scope2[i++]) {
         if (test(el)) results.push(el);
       }
       if (test.sel) {
         while (test.sel) {
           test = compile(test.sel);
-          scope = node.getElementsByTagName(test.qname);
+          scope2 = node.getElementsByTagName(test.qname);
           i = 0;
-          while (el = scope[i++]) {
+          while (el = scope2[i++]) {
             if (test(el) && indexOf.call(results, el) === -1) {
               results.push(el);
             }
@@ -10257,22 +10257,22 @@ var require_Element = __commonJS({
         }
       },
       _insertAdjacent: { value: function _insertAdjacent(position, node) {
-        var first = false;
+        var first2 = false;
         switch (position) {
           case "beforebegin":
-            first = true;
+            first2 = true;
           /* falls through */
           case "afterend":
             var parent = this.parentNode;
             if (parent === null) {
               return null;
             }
-            return parent.insertBefore(node, first ? this : this.nextSibling);
+            return parent.insertBefore(node, first2 ? this : this.nextSibling);
           case "afterbegin":
-            first = true;
+            first2 = true;
           /* falls through */
           case "beforeend":
-            return this.insertBefore(node, first ? this.firstChild : null);
+            return this.insertBefore(node, first2 ? this.firstChild : null);
           default:
             return utils.SyntaxError();
         }
@@ -10289,9 +10289,9 @@ var require_Element = __commonJS({
         position = utils.toASCIILowerCase(String(position));
         this._insertAdjacent(position, textNode);
       } },
-      insertAdjacentHTML: { value: function insertAdjacentHTML(position, text) {
+      insertAdjacentHTML: { value: function insertAdjacentHTML(position, text2) {
         position = utils.toASCIILowerCase(String(position));
-        text = String(text);
+        text2 = String(text2);
         var context;
         switch (position) {
           case "beforebegin":
@@ -10315,7 +10315,7 @@ var require_Element = __commonJS({
           this.ownerDocument._address,
           context
         );
-        parser.parse(text, true);
+        parser.parse(text2, true);
         this._insertAdjacent(position, parser._asDocumentFragment());
       } },
       children: { get: function() {
@@ -12184,9 +12184,9 @@ var require_URL = __commonJS({
       },
       // See: http://tools.ietf.org/html/rfc3986#section-5.2
       // and https://url.spec.whatwg.org/#constructors
-      resolve: function(relative2) {
+      resolve: function(relative4) {
         var base = this;
-        var r = new URL2(relative2);
+        var r = new URL2(relative4);
         var t = new URL2();
         if (r.scheme !== void 0) {
           t.scheme = r.scheme;
@@ -12238,32 +12238,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path9) {
+          if (!path9) return path9;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path9.length > 0) {
+            if (path9 === "." || path9 === "..") {
+              path9 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path9.substring(0, 2);
+            var threechars = path9.substring(0, 3);
+            var fourchars = path9.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path9 = path9.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path9 = path9.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path9 = "/" + path9.substring(3);
+            } else if (twochars === "/." && path9.length === 2) {
+              path9 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path9.length === 3) {
+              path9 = "/" + path9.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path9.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path9 = path9.substring(segment.length);
             }
           }
           return output;
@@ -12434,9 +12434,9 @@ var require_CSSStyleDeclaration = __commonJS({
       // Note that the styles don't get parsed until they're actually needed
       _parsed: { get: function() {
         if (!this._parsedStyles || this.cssText !== this._lastParsedText) {
-          var text = this.cssText;
-          this._parsedStyles = parseStyles(text);
-          this._lastParsedText = text;
+          var text2 = this.cssText;
+          this._parsedStyles = parseStyles(text2);
+          this._lastParsedText = text2;
           delete this._names;
         }
         return this._parsedStyles;
@@ -23907,7 +23907,7 @@ var require_turndown_cjs = __commonJS({
       });
     }
     var markdownEscapes = [[/\\/g, "\\\\"], [/\*/g, "\\*"], [/^-/g, "\\-"], [/^\+ /g, "\\+ "], [/^(=+)/g, "\\$1"], [/^(#{1,6}) /g, "\\$1 "], [/`/g, "\\`"], [/^~~~/g, "\\~~~"], [/\[/g, "\\["], [/\]/g, "\\]"], [/^>/g, "\\>"], [/_/g, "\\_"], [/^(\d+)\. /g, "$1\\. "]];
-    function escapeMarkdown(string3) {
+    function escapeMarkdown2(string3) {
       return markdownEscapes.reduce(function(accumulator, escape3) {
         return accumulator.replace(escape3[0], escape3[1]);
       }, string3);
@@ -24087,7 +24087,7 @@ var require_turndown_cjs = __commonJS({
     rules.image = {
       filter: "img",
       replacement: function(content, node) {
-        var alt = escapeMarkdown(cleanAttribute(node.getAttribute("alt")));
+        var alt = escapeMarkdown2(cleanAttribute(node.getAttribute("alt")));
         var src = escapeLinkDestination(node.getAttribute("src") || "");
         var title = cleanAttribute(node.getAttribute("title"));
         var titlePart = title ? ' "' + escapeLinkTitle(title) + '"' : "";
@@ -24181,15 +24181,15 @@ var require_turndown_cjs = __commonJS({
       var node = next(prev, element, isPre);
       while (node !== element) {
         if (node.nodeType === 3 || node.nodeType === 4) {
-          var text = node.data.replace(/[ \r\n\t]+/g, " ");
-          if ((!prevText || / $/.test(prevText.data)) && !keepLeadingWs && text[0] === " ") {
-            text = text.substr(1);
+          var text2 = node.data.replace(/[ \r\n\t]+/g, " ");
+          if ((!prevText || / $/.test(prevText.data)) && !keepLeadingWs && text2[0] === " ") {
+            text2 = text2.substr(1);
           }
-          if (!text) {
+          if (!text2) {
             node = remove(node);
             continue;
           }
-          node.data = text;
+          node.data = text2;
           prevText = node;
         } else if (node.nodeType === 1) {
           if (isBlock2(node) || node.nodeName === "BR") {
@@ -24232,10 +24232,10 @@ var require_turndown_cjs = __commonJS({
     }
     var root = typeof window !== "undefined" ? window : {};
     function canParseHTMLNatively() {
-      var Parser = root.DOMParser;
+      var Parser2 = root.DOMParser;
       var canParse = false;
       try {
-        if (new Parser().parseFromString("", "text/html")) {
+        if (new Parser2().parseFromString("", "text/html")) {
           canParse = true;
         }
       } catch (e) {
@@ -24243,15 +24243,15 @@ var require_turndown_cjs = __commonJS({
       return canParse;
     }
     function createHTMLParser() {
-      var Parser = function() {
+      var Parser2 = function() {
       };
       {
         var domino = require_lib();
-        Parser.prototype.parseFromString = function(string3) {
+        Parser2.prototype.parseFromString = function(string3) {
           return domino.createDocument(string3);
         };
       }
-      return Parser;
+      return Parser2;
     }
     var HTMLParser = canParseHTMLNatively() ? root.DOMParser : createHTMLParser();
     function RootNode(input, options) {
@@ -24452,7 +24452,7 @@ var require_turndown_cjs = __commonJS({
        * @type String
        */
       escape: function(string3) {
-        return escapeMarkdown(string3);
+        return escapeMarkdown2(string3);
       }
     };
     function process3(parentNode) {
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join23(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join23(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join23(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24675,9 +24675,9 @@ var util;
 })(util || (util = {}));
 var objectUtil;
 (function(objectUtil2) {
-  objectUtil2.mergeShapes = (first, second) => {
+  objectUtil2.mergeShapes = (first2, second) => {
     return {
-      ...first,
+      ...first2,
       ...second
       // second overwrites first
     };
@@ -24777,8 +24777,8 @@ var ZodError = class _ZodError extends Error {
   constructor(issues) {
     super();
     this.issues = [];
-    this.addIssue = (sub2) => {
-      this.issues = [...this.issues, sub2];
+    this.addIssue = (sub4) => {
+      this.issues = [...this.issues, sub4];
     };
     this.addIssues = (subs = []) => {
       this.issues = [...this.issues, ...subs];
@@ -24845,13 +24845,13 @@ var ZodError = class _ZodError extends Error {
   flatten(mapper = (issue2) => issue2.message) {
     const fieldErrors = {};
     const formErrors = [];
-    for (const sub2 of this.issues) {
-      if (sub2.path.length > 0) {
-        const firstEl = sub2.path[0];
+    for (const sub4 of this.issues) {
+      if (sub4.path.length > 0) {
+        const firstEl = sub4.path[0];
         fieldErrors[firstEl] = fieldErrors[firstEl] || [];
-        fieldErrors[firstEl].push(mapper(sub2));
+        fieldErrors[firstEl].push(mapper(sub4));
       } else {
-        formErrors.push(mapper(sub2));
+        formErrors.push(mapper(sub4));
       }
     }
     return { formErrors, fieldErrors };
@@ -24979,8 +24979,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path9, errorMaps, issueData } = params;
+  const fullPath = [...path9, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -25096,11 +25096,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path9, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path9;
     this._key = key;
   }
   get path() {
@@ -27599,10 +27599,10 @@ var ZodRecord = class _ZodRecord extends ZodType {
   get element() {
     return this._def.valueType;
   }
-  static create(first, second, third) {
+  static create(first2, second, third) {
     if (second instanceof ZodType) {
       return new _ZodRecord({
-        keyType: first,
+        keyType: first2,
         valueType: second,
         typeName: ZodFirstPartyTypeKind.ZodRecord,
         ...processCreateParams(third)
@@ -27610,7 +27610,7 @@ var ZodRecord = class _ZodRecord extends ZodType {
     }
     return new _ZodRecord({
       keyType: ZodString.create(),
-      valueType: first,
+      valueType: first2,
       typeName: ZodFirstPartyTypeKind.ZodRecord,
       ...processCreateParams(second)
     });
@@ -28667,9 +28667,9 @@ function assertNever(_x) {
 }
 function assert(_) {
 }
-function getEnumValues(entries) {
-  const numericValues = Object.values(entries).filter((v) => typeof v === "number");
-  const values = Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
+function getEnumValues(entries2) {
+  const numericValues = Object.values(entries2).filter((v) => typeof v === "number");
+  const values = Object.entries(entries2).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
   return values;
 }
 function joinValues(array2, separator = "|") {
@@ -28737,10 +28737,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path9) {
+  if (!path9)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path9.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -28755,14 +28755,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str = "";
+  let str2 = "";
   for (let i = 0; i < length; i++) {
-    str += chars[Math.floor(Math.random() * chars.length)];
+    str2 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str;
+  return str2;
 }
-function esc(str) {
-  return JSON.stringify(str);
+function esc(str2) {
+  return JSON.stringify(str2);
 }
 var captureStackTrace = Error.captureStackTrace ? Error.captureStackTrace : (..._args) => {
 };
@@ -28850,8 +28850,8 @@ var getParsedType2 = (data) => {
 };
 var propertyKeyTypes = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
 var primitiveTypes = /* @__PURE__ */ new Set(["string", "number", "bigint", "boolean", "symbol", "undefined"]);
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str2) {
+  return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -29060,11 +29060,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path9, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path9);
     return iss;
   });
 }
@@ -29150,12 +29150,12 @@ var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
-  for (const sub2 of error2.issues) {
-    if (sub2.path.length > 0) {
-      fieldErrors[sub2.path[0]] = fieldErrors[sub2.path[0]] || [];
-      fieldErrors[sub2.path[0]].push(mapper(sub2));
+  for (const sub4 of error2.issues) {
+    if (sub4.path.length > 0) {
+      fieldErrors[sub4.path[0]] = fieldErrors[sub4.path[0]] || [];
+      fieldErrors[sub4.path[0]].push(mapper(sub4));
     } else {
-      formErrors.push(mapper(sub2));
+      formErrors.push(mapper(sub4));
     }
   }
   return { formErrors, fieldErrors };
@@ -32475,11 +32475,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path9) {
+  if (path9.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path9.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -33039,10 +33039,10 @@ var ZodEnum2 = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
   };
 });
 function _enum(values, params) {
-  const entries = Array.isArray(values) ? Object.fromEntries(values.map((v) => [v, v])) : values;
+  const entries2 = Array.isArray(values) ? Object.fromEntries(values.map((v) => [v, v])) : values;
   return new ZodEnum2({
     type: "enum",
-    entries,
+    entries: entries2,
     ...util_exports.normalizeParams(params)
   });
 }
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+        await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve5, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve3(parseResult.data);
+            resolve5(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve5, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve3, interval);
+      const timeoutId = setTimeout(resolve5, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -37774,12 +37774,12 @@ var UriTemplate = class _UriTemplate {
    * A template expression is a sequence of characters enclosed in curly braces,
    * like {foo} or {?bar}.
    */
-  static isTemplate(str) {
-    return /\{[^}\s]+\}/.test(str);
+  static isTemplate(str2) {
+    return /\{[^}\s]+\}/.test(str2);
   }
-  static validateLength(str, max, context) {
-    if (str.length > max) {
-      throw new Error(`${context} exceeds maximum length of ${max} characters (got ${str.length})`);
+  static validateLength(str2, max, context) {
+    if (str2.length > max) {
+      throw new Error(`${context} exceeds maximum length of ${max} characters (got ${str2.length})`);
     }
   }
   get variableNames() {
@@ -37908,8 +37908,8 @@ var UriTemplate = class _UriTemplate {
     }
     return result;
   }
-  escapeRegExp(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  escapeRegExp(str2) {
+    return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   partToRegExp(part) {
     const patterns = [];
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+      await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve3) => {
+    return new Promise((resolve5) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve3();
+        resolve5();
       } else {
-        this._stdout.once("drain", resolve3);
+        this._stdout.once("drain", resolve5);
       }
     });
   }
@@ -38989,6 +38989,22 @@ var FULL_DISK_ACCESS_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blo
 var NODE_RUNTIME_TCC_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md";
 var AUTOMATION_PERMISSION_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp#permission-denied";
 var AUTOMATION_REMEDIATION = `Grant automation access in System Settings > Privacy & Security > Automation to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it \u2014 run the doctor tool to verify. See: ${AUTOMATION_PERMISSION_GUIDE_URL}`;
+
+// src/utils/callTimeout.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+var CALL_TIMEOUT_SECONDS = { min: 1, max: 120 };
+var scope = new AsyncLocalStorage();
+function runWithCallTimeout(seconds, fn) {
+  if (seconds === void 0) return fn();
+  if (!Number.isInteger(seconds) || seconds < CALL_TIMEOUT_SECONDS.min || seconds > CALL_TIMEOUT_SECONDS.max)
+    throw new Error(
+      `timeoutSeconds must be a whole number from ${CALL_TIMEOUT_SECONDS.min} to ${CALL_TIMEOUT_SECONDS.max}`
+    );
+  return scope.run(seconds * 1e3, fn);
+}
+function callTimeoutMs() {
+  return scope.getStore();
+}
 
 // src/utils/applescript.ts
 var DEFAULT_TIMEOUT_MS = 3e4;
@@ -39146,7 +39162,7 @@ function parseErrorMessage(errorOutput) {
   return coreError.trim() || "Unknown AppleScript error";
 }
 function executeAppleScript(script, options = {}) {
-  const timeoutMs = options.timeoutMs ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
   if (!script || !script.trim()) {
@@ -39259,23 +39275,15 @@ var WIRE_TYPE = {
 };
 function decodeVarint(buf, offset) {
   let result = 0;
-  let shift = 0;
-  let pos = offset;
-  while (pos < buf.length) {
-    const byte = buf[pos];
+  for (let pos = offset, shift = 0; pos < buf.length && shift < 28; shift += 7) {
+    const byte = buf[pos++];
     result |= (byte & 127) << shift;
-    pos++;
-    if ((byte & 128) === 0) {
-      return [result, pos];
-    }
-    shift += 7;
-    if (shift > 35) {
-      throw new Error(`Varint too long at offset ${offset}`);
-    }
+    if ((byte & 128) === 0) return [result, pos];
   }
-  throw new Error(`Unexpected end of buffer reading varint at offset ${offset}`);
+  const [value, next] = decodeVarint64(buf, offset);
+  return [Number(BigInt.asIntN(64, value)), next];
 }
-function decodeMessage(buf) {
+function decodeMessage(buf, options = {}) {
   const fields = [];
   let offset = 0;
   while (offset < buf.length) {
@@ -39290,16 +39298,19 @@ function decodeMessage(buf) {
     } else if (wireType === WIRE_TYPE.LENGTH_DELIMITED) {
       let length;
       [length, offset] = decodeVarint(buf, offset);
-      if (offset + length > buf.length) {
+      if (length < 0 || offset + length > buf.length) {
         break;
       }
       const value = buf.slice(offset, offset + length);
       fields.push({ fieldNumber, wireType, value });
       offset += length;
-    } else if (wireType === 5) {
-      offset += 4;
-    } else if (wireType === 1) {
-      offset += 8;
+    } else if (wireType === 5 || wireType === 1) {
+      const width = wireType === 5 ? 4 : 8;
+      if (offset + width > buf.length) break;
+      if (options.keepFixed) {
+        fields.push({ fieldNumber, wireType, value: buf.slice(offset, offset + width) });
+      }
+      offset += width;
     } else {
       break;
     }
@@ -39330,6 +39341,82 @@ function embeddedMessage(field) {
   if (!bytes) return void 0;
   return decodeMessage(bytes);
 }
+function fixed64Double(field) {
+  if (!field || field.wireType !== 1 || !(field.value instanceof Uint8Array)) return void 0;
+  if (field.value.length !== 8) return void 0;
+  return new DataView(field.value.buffer, field.value.byteOffset, 8).getFloat64(0, true);
+}
+var ProtobufDecodeError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ProtobufDecodeError";
+  }
+};
+function decodeVarint64(buf, offset) {
+  let result = 0n;
+  let shift = 0n;
+  let pos = offset;
+  while (pos < buf.length) {
+    const byte = buf[pos++];
+    result |= BigInt(byte & 127) << shift;
+    if ((byte & 128) === 0) return [BigInt.asUintN(64, result), pos];
+    shift += 7n;
+    if (shift >= 70n) throw new ProtobufDecodeError(`Varint too long at offset ${offset}`);
+  }
+  throw new ProtobufDecodeError(`Unexpected end of buffer reading varint at offset ${offset}`);
+}
+function decodeWireFields(buf) {
+  const fields = [];
+  let offset = 0;
+  while (offset < buf.length) {
+    const [tag, afterTag] = decodeVarint64(buf, offset);
+    offset = afterTag;
+    const fieldNumber = Number(tag >> 3n);
+    const wireType = Number(tag & 7n);
+    if (fieldNumber === 0 || fieldNumber > 536870911)
+      throw new ProtobufDecodeError("Invalid field number");
+    if (wireType === 0) {
+      const [value, next] = decodeVarint64(buf, offset);
+      offset = next;
+      fields.push({ fieldNumber, wireType, varint: value });
+      continue;
+    }
+    let length;
+    if (wireType === 1) length = 8;
+    else if (wireType === 5) length = 4;
+    else if (wireType === 2) {
+      const [value, next] = decodeVarint64(buf, offset);
+      if (value > BigInt(buf.length)) throw new ProtobufDecodeError("Truncated field");
+      length = Number(value);
+      offset = next;
+    } else throw new ProtobufDecodeError(`Unsupported wire type ${wireType}`);
+    if (offset + length > buf.length) throw new ProtobufDecodeError("Truncated field");
+    fields.push({
+      fieldNumber,
+      wireType,
+      bytes: buf.subarray(offset, offset + length)
+    });
+    offset += length;
+  }
+  return fields;
+}
+function signedVarint(value) {
+  return Number(BigInt.asIntN(64, value));
+}
+function fixed32Float(field) {
+  if (!field || field.wireType !== 5 || !field.bytes || field.bytes.length !== 4) return void 0;
+  const bytes = field.bytes;
+  return new DataView(bytes.buffer, bytes.byteOffset, 4).getFloat32(0, true);
+}
+
+// src/utils/checklistRuns.ts
+function checklistRunLineStart(text2, position, length) {
+  const end = position + length;
+  let anchor = position;
+  while (anchor < end && text2[anchor] === "\n") anchor++;
+  if (anchor === end) anchor = position;
+  return anchor === 0 ? 0 : text2.lastIndexOf("\n", anchor - 1) + 1;
+}
 
 // src/utils/checklistParser.ts
 var CHECKLIST_STYLE_TYPE = 103;
@@ -39357,16 +39444,16 @@ function queryNoteData(noteId3) {
     return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
-  const query = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
+  const query2 = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
   try {
-    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
+    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query2], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
     });
-    const hex2 = result.trim();
-    if (!hex2) return { hex: null };
-    return { hex: hex2 };
+    const hex3 = result.trim();
+    if (!hex3) return { hex: null };
+    return { hex: hex3 };
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     console.error(`Failed to query NoteStore database: ${message}`);
@@ -39376,10 +39463,10 @@ function queryNoteData(noteId3) {
     return { hex: null };
   }
 }
-function hexToBytes(hex2) {
-  const bytes = new Uint8Array(hex2.length / 2);
-  for (let i = 0; i < hex2.length; i += 2) {
-    bytes[i / 2] = parseInt(hex2.substring(i, i + 2), 16);
+function hexToBytes(hex3) {
+  const bytes = new Uint8Array(hex3.length / 2);
+  for (let i = 0; i < hex3.length; i += 2) {
+    bytes[i / 2] = parseInt(hex3.substring(i, i + 2), 16);
   }
   return bytes;
 }
@@ -39398,6 +39485,9 @@ function parseChecklistFromProtobuf(data) {
     const attributeRuns = getFields(noteBodyFields, 5);
     if (attributeRuns.length === 0) return null;
     const lines = noteText.split("\n");
+    const lineStarts = [];
+    for (let i = 0, start = 0; i < lines.length; start += lines[i].length + 1, i++)
+      lineStarts.push(start);
     const items = [];
     let charPos = 0;
     const seenLines = /* @__PURE__ */ new Set();
@@ -39414,18 +39504,13 @@ function parseChecklistFromProtobuf(data) {
           const checklistField = getField(styleFields, 5);
           const checklistFields = embeddedMessage(checklistField);
           const done = checklistFields ? varintValue(getField(checklistFields, 2)) ?? 0 : 0;
-          let lineStart = 0;
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const lineEnd = lineStart + lines[lineIdx].length;
-            if (charPos >= lineStart && charPos < lineEnd + 1 && !seenLines.has(lineIdx)) {
-              seenLines.add(lineIdx);
-              items.push({
-                text: lines[lineIdx],
-                done: done === 1
-              });
-              break;
-            }
-            lineStart = lineEnd + 1;
+          const lineIdx = charPos <= noteText.length ? lineStarts.indexOf(checklistRunLineStart(noteText, charPos, runLength)) : -1;
+          if (lineIdx !== -1 && !seenLines.has(lineIdx)) {
+            seenLines.add(lineIdx);
+            items.push({
+              text: lines[lineIdx],
+              done: done === 1
+            });
           }
         }
       }
@@ -39530,10 +39615,32 @@ import { createHash } from "node:crypto";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 import { gunzipSync as gunzipSync2 } from "node:zlib";
+
+// src/utils/uniqueById.ts
+function uniqueById(items) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const item of items) {
+    if (item.id) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+// src/utils/noteRichText.ts
+var HTML_LOSSY_ORDER = [
+  "superscript",
+  "subscript",
+  "alignment",
+  "highlight"
+];
 var dbPath = join2(homedir2(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
 var safeUrl = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
-var escapeAttribute = (text) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-var normalized = (text) => text.replace(/[\s\ufffc]/gu, "");
+var escapeAttribute = (text2) => text2.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+var normalized = (text2) => text2.replace(/[\s\ufffc]/gu, "");
 function styleValue(field) {
   if (!(field.value instanceof Uint8Array)) return field.value;
   if (field.fieldNumber === 2) {
@@ -39550,6 +39657,7 @@ function styleValue(field) {
         else if (wire === 5) offset += 4;
         else if (wire === 2) {
           [length, offset] = decodeVarint(data, offset);
+          if (length < 0) return Buffer.from(data).toString("hex");
           offset += length;
         } else return Buffer.from(data).toString("hex");
         if (offset > data.length) return Buffer.from(data).toString("hex");
@@ -39566,8 +39674,8 @@ function parseRichNote(data, nativeTags = []) {
   const doc = decodeMessage(data);
   const wrapper = embeddedMessage(getField(doc, 2));
   const body = wrapper && embeddedMessage(getField(wrapper, 3));
-  const text = body && stringValue(getField(body, 2));
-  if (!body || text === void 0) throw new Error("Unsupported Notes document structure");
+  const text2 = body && stringValue(getField(body, 2));
+  if (!body || text2 === void 0) throw new Error("Unsupported Notes document structure");
   const links = [];
   const nativeObjectIds = [];
   const objects = [];
@@ -39576,63 +39684,75 @@ function parseRichNote(data, nativeTags = []) {
   let position = 0;
   let hasNativeObjects = false;
   let hasChecklist = false;
+  const lossy = /* @__PURE__ */ new Set();
   for (const run of getFields(body, 5)) {
     const fields = embeddedMessage(run);
     if (!fields) throw new Error("Invalid Notes attribute run");
     const length = varintValue(getField(fields, 1));
-    if (length === void 0 || length < 0 || position + length > text.length)
+    if (length === void 0 || length < 0 || position + length > text2.length)
       throw new Error("Invalid Notes run length");
+    const paragraph = embeddedMessage(getField(fields, 2));
     styleRuns.push({
+      paragraphStyle: paragraph ? varintValue(getField(paragraph, 1)) ?? 3 : 3,
+      blockQuote: Boolean(paragraph && varintValue(getField(paragraph, 8))),
+      highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
       signature: JSON.stringify(
         fields.filter((f) => f.fieldNumber >= 2 && f.fieldNumber <= 12 || f.fieldNumber === 14).map((f) => [f.fieldNumber, styleValue(f)])
       )
     });
+    if (/[^\s\ufffc]/u.test(text2.slice(position, position + length))) {
+      const baseline = varintValue(getField(fields, 8)) ?? 0;
+      if (baseline > 0) lossy.add("superscript");
+      if (baseline < 0) lossy.add("subscript");
+      if (paragraph && (varintValue(getField(paragraph, 2)) ?? 0) !== 0) lossy.add("alignment");
+      if (varintValue(getField(fields, 14))) lossy.add("highlight");
+    }
     const url = stringValue(getField(fields, 9));
     if (url) {
       if (!safeUrl(url)) throw new Error("Unsupported link scheme in note");
       const previous = links.at(-1);
       if (previous?.url === url && previous.start + previous.length === position) {
         previous.length += length;
-        previous.text += text.slice(position, position + length);
+        previous.text += text2.slice(position, position + length);
       } else
-        links.push({ start: position, length, text: text.slice(position, position + length), url });
+        links.push({ start: position, length, text: text2.slice(position, position + length), url });
     }
     hasNativeObjects ||= Boolean(getField(fields, 12));
     const attachment = embeddedMessage(getField(fields, 12));
     const attachmentId = attachment && stringValue(getField(attachment, 1));
-    if (attachmentId) nativeObjectIds.push(attachmentId);
-    if (attachmentId)
+    if (attachment && attachmentId && !nativeObjectIds.includes(attachmentId)) {
+      nativeObjectIds.push(attachmentId);
       objects.push({
         id: attachmentId,
         type: stringValue(getField(attachment, 2)) || "unknown",
         start: position,
         length
       });
-    const paragraph = embeddedMessage(getField(fields, 2));
+    }
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
-      const start = text.lastIndexOf("\n", position - 1) + 1;
+      const start = checklistRunLineStart(text2, position, length);
       if (itemId && !checklistItems.some((item) => item.id === itemId))
         checklistItems.push({
           id: itemId,
           start,
-          text: text.slice(
+          text: text2.slice(
             start,
-            text.indexOf("\n", start) === -1 ? text.length : text.indexOf("\n", start)
+            text2.indexOf("\n", start) === -1 ? text2.length : text2.indexOf("\n", start)
           ),
           done: checklist ? varintValue(getField(checklist, 2)) === 1 : false
         });
     }
     position += length;
   }
-  if (position !== text.length) throw new Error("Incomplete Notes attribute runs");
+  if (position !== text2.length) throw new Error("Incomplete Notes attribute runs");
   return {
-    text,
+    text: text2,
     links,
     nativeTags: hasNativeObjects ? nativeTags : [],
     nativeObjectIds,
@@ -39641,7 +39761,8 @@ function parseRichNote(data, nativeTags = []) {
     revision: createHash("sha256").update(data).digest("hex"),
     objects,
     checklistItems,
-    styleRuns
+    styleRuns,
+    ...lossy.size ? { htmlLossyFormatting: HTML_LOSSY_ORDER.filter((f) => lossy.has(f)) } : {}
   };
 }
 function readRichNote(id2) {
@@ -39667,7 +39788,9 @@ function readRichNote(id2) {
     (row) => !row || typeof row.id !== "string" || !Number.isInteger(row.pk) || typeof row.mergeable !== "string" || !/^[0-9a-f]*$/i.test(row.mergeable)
   ))
     throw new Error("Invalid native object metadata");
-  rich.objectData = objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id));
+  rich.objectData = uniqueById(
+    objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id))
+  );
   rich.revision = createHash("sha256").update(rich.revision).update(JSON.stringify(rich.objectData)).digest("hex");
   rich.nativeTagObjectIds = {};
   for (const id3 of rich.nativeObjectIds)
@@ -39758,17 +39881,26 @@ function enrichNoteRead(id2, rawBody) {
     const rich = readRichNote(id2);
     metadata = rich;
     const content = restoreNoteLinks(rawBody, rich);
-    const writable = !rich.hasNativeObjects && !rich.hasChecklist;
+    const complete = !rich.hasNativeObjects && !rich.hasChecklist;
+    const lossy = rich.htmlLossyFormatting ?? [];
+    const writable = complete && lossy.length === 0;
+    const warnings = [];
+    if (!complete)
+      warnings.push(
+        "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
+      );
+    if (lossy.length)
+      warnings.push(
+        `This note uses formatting that Notes' AppleScript HTML does not carry (${lossy.join(", ")}); a full-body edit would silently drop it, so full-body edits are blocked. Edit it in Notes.app, or use append-to-note with scopeText, which appends natively and verifies existing formatting.`
+      );
     return {
       content,
       links: rich.links,
       nativeTags: rich.nativeTags,
-      complete: writable,
+      complete,
       writable,
       revision: rich.revision,
-      ...!writable ? {
-        warning: "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
-      } : {}
+      ...warnings.length ? { warning: warnings.join(" ") } : {}
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -39832,22 +39964,996 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
   }
 }
 
+// src/utils/audioTranscripts.ts
+import { execFileSync as execFileSync4 } from "node:child_process";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+import { gunzipSync as gunzipSync3 } from "node:zlib";
+var NOTES_DB_PATH2 = join3(
+  homedir3(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var DEFAULT_MAX_SEGMENTS = 2e3;
+var MAX_SEGMENTS_LIMIT = 2e4;
+var AudioTranscriptError = class extends Error {
+  constructor(kind, message) {
+    super(message);
+    this.kind = kind;
+    this.name = "AudioTranscriptError";
+  }
+  kind;
+};
+var decode = (bytes) => decodeMessage(bytes, { keepFixed: true });
+var sub = (f, n) => {
+  const bytes = getField(f, n)?.value;
+  return bytes instanceof Uint8Array ? decode(bytes) : void 0;
+};
+var need = (value, what) => {
+  if (value === void 0) throw new Error(`Missing ${what}`);
+  return value;
+};
+var many = (f, n) => getFields(f, n).map((field) => {
+  if (!(field.value instanceof Uint8Array)) throw new Error("Invalid nested entry");
+  return decode(field.value);
+});
+function parseAudioRecording(data) {
+  const root = decode(data);
+  const entries2 = many(root, 3);
+  if (entries2.length === 0) throw new Error("No mergeable objects");
+  if (entries2.length > 2e6) throw new Error("Recording too large");
+  const keys = getFields(root, 4).map((f) => stringValue(f) ?? "");
+  const types = getFields(root, 5).map((f) => stringValue(f) ?? "");
+  const uuids = getFields(root, 6).map(
+    (f) => f.value instanceof Uint8Array ? Buffer.from(f.value).toString("hex") : ""
+  );
+  const uuidSlot = /* @__PURE__ */ new Map();
+  uuids.forEach((uuid2, i) => {
+    if (uuid2 && !uuidSlot.has(uuid2)) uuidSlot.set(uuid2, i);
+  });
+  const entry = (index) => {
+    const value = entries2[index];
+    if (!value) throw new Error("Invalid object reference");
+    return value;
+  };
+  const customMap = (e) => {
+    const map = sub(e, 13);
+    if (!map) return void 0;
+    const values = /* @__PURE__ */ new Map();
+    for (const item of many(map, 3)) {
+      const key = keys[need(varintValue(getField(item, 1)), "map key")];
+      const value = sub(item, 2);
+      if (key !== void 0 && value) values.set(key, value);
+    }
+    return { type: types[need(varintValue(getField(map, 1)), "map type")] ?? "", values };
+  };
+  const objectIndex = (id2) => id2 ? varintValue(getField(id2, 6)) : void 0;
+  const registerTarget = (id2) => {
+    const index = objectIndex(id2);
+    if (index === void 0) return void 0;
+    const register = sub(entry(index), 1);
+    if (!register) return void 0;
+    const target = objectIndex(sub(register, 2));
+    return target === void 0 ? void 0 : entry(target);
+  };
+  const registerPrimitive = (id2) => {
+    const target = registerTarget(id2);
+    const map = target && customMap(target);
+    if (!map) return void 0;
+    const self = map.values.get("self");
+    if (self) return stringValue(getField(self, 4));
+    const double = map.values.get("doubleValue");
+    if (double) return fixed64Double(getField(double, 3));
+    const integer2 = map.values.get("integerValue");
+    if (integer2) return varintValue(getField(integer2, 2));
+    return void 0;
+  };
+  const registerNoteText = (id2) => {
+    const target = registerTarget(id2);
+    const note = target && sub(target, 10);
+    const text2 = note && stringValue(getField(note, 2));
+    return text2?.replace(/\n+$/u, "") || void 0;
+  };
+  const recordings = entries2.map((e) => customMap(e)).filter((m) => m?.type === "com.apple.notes.ICTTAudioRecording");
+  if (recordings.length !== 1) throw new Error("Expected exactly one audio recording object");
+  const recording = recordings[0];
+  const fragments = [];
+  const fragmentList = objectIndex(recording.values.get("fragments"));
+  if (fragmentList !== void 0) {
+    const list = need(sub(entry(fragmentList), 5), "fragment list");
+    for (const item of many(list, 1)) {
+      const fragment = customMap(entry(need(objectIndex(sub(item, 2)), "fragment reference")));
+      if (fragment?.type !== "com.apple.notes.ICTTAudioRecording.Fragment")
+        throw new Error("Unexpected fragment type");
+      const identity = stringValue(getField(fragment.values.get("identity") ?? [], 4));
+      const segments = [];
+      const transcriptRef = objectIndex(fragment.values.get("transcript"));
+      if (transcriptRef !== void 0) {
+        const set = sub(entry(transcriptRef), 15);
+        if (!set) throw new Error("Unsupported transcript container");
+        const bySlot = /* @__PURE__ */ new Map();
+        for (const element of many(sub(set, 2) ?? [], 1)) {
+          const keyMap = customMap(entry(need(objectIndex(sub(element, 1)), "segment key")));
+          const slot = varintValue(getField(keyMap?.values.get("UUIDIndex") ?? [], 2));
+          const value = objectIndex(sub(element, 2));
+          if (slot === void 0 || value === void 0) throw new Error("Invalid segment key");
+          bySlot.set(slot, value);
+        }
+        const ordering = many(need(sub(set, 1), "transcript ordering"), 2).map((pair) => ({
+          index: need(varintValue(getField(pair, 1)), "segment index"),
+          uuid: getField(pair, 2)?.value
+        })).sort((a, b) => a.index - b.index);
+        for (const { uuid: uuid2 } of ordering) {
+          if (!(uuid2 instanceof Uint8Array)) throw new Error("Invalid segment UUID");
+          const slot = uuidSlot.get(Buffer.from(uuid2).toString("hex"));
+          const segmentIndex = slot === void 0 ? void 0 : bySlot.get(slot);
+          if (segmentIndex === void 0) throw new Error("Unresolved transcript segment");
+          const segment = customMap(entry(segmentIndex));
+          if (segment?.type !== "com.apple.notes.ICTTTranscriptSegment")
+            throw new Error("Unexpected segment type");
+          const text2 = registerPrimitive(segment.values.get("text"));
+          if (typeof text2 !== "string") throw new Error("Segment without text");
+          const start = registerPrimitive(segment.values.get("timestamp"));
+          const duration3 = registerPrimitive(segment.values.get("duration"));
+          const speaker = registerPrimitive(segment.values.get("speaker"));
+          segments.push({
+            text: text2,
+            ...typeof start === "number" ? { start } : {},
+            ...typeof duration3 === "number" ? { duration: duration3 } : {},
+            ...typeof speaker === "string" && speaker ? { speaker } : {}
+          });
+        }
+      }
+      fragments.push({ ...identity ? { identity } : {}, segments });
+    }
+  }
+  const summary = registerNoteText(recording.values.get("summary"));
+  const topLineSummary = registerNoteText(recording.values.get("topLineSummary"));
+  return {
+    fragments,
+    ...summary ? { summary } : {},
+    ...topLineSummary ? { topLineSummary } : {}
+  };
+}
+function joinSegments(segments) {
+  let out = "";
+  for (const { text: text2 } of segments) {
+    if (!text2) continue;
+    const glue = !out || /\s$/u.test(out) || /^\s/u.test(text2) || /^[.,!?;:%)\]}…'’]/u.test(text2) ? "" : " ";
+    out += glue + text2;
+  }
+  return out.trim();
+}
+function parseNoteId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d+)$/.exec(noteId3);
+  if (!match) {
+    throw new AudioTranscriptError(
+      "invalid_id",
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`
+    );
+  }
+  return { store: match[1], pk: match[2] };
+}
+var AUDIO_UTI_SQL = "(a.ZTYPEUTI LIKE '%audio%' OR a.ZTYPEUTI IN ('public.mp3'))";
+function buildTranscriptSql(pk, available) {
+  if (!/^\d+$/.test(pk)) throw new Error("Invalid primary key");
+  const optional2 = (column, key, alias = "a") => available.has(column) ? `, '${key}', ${alias}.${column}` : "";
+  const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  return [
+    "BEGIN;",
+    // Every statement yields exactly one row, so output lines stay positional.
+    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}), 'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}));`,
+    `SELECT COALESCE((SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = ${pk} LIMIT 1), '');`,
+    "SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.ZMERGEABLEDATA1)" + optional2("ZDURATION", "duration") + optional2("ZNEEDSTRANSCRIPTION", "needsTranscription") + ", 'fragments', json((SELECT json_group_array(json_object('identifier', c.ZIDENTIFIER" + optional2("ZDURATION", "duration", "c") + `)) FROM ZICCLOUDSYNCINGOBJECT c WHERE c.ZPARENTATTACHMENT = a.Z_PK)))) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = ${pk} AND a.ZPARENTATTACHMENT IS NULL AND ${AUDIO_UTI_SQL};`,
+    "COMMIT;"
+  ].join("\n");
+}
+var REQUIRED_COLUMNS = [
+  "ZMERGEABLEDATA1",
+  "ZPARENTATTACHMENT",
+  "ZTYPEUTI",
+  "ZNOTE",
+  "ZIDENTIFIER"
+];
+function runSqlite(dbPath2, sql) {
+  return execFileSync4("sqlite3", ["-readonly", dbPath2, sql], {
+    encoding: "utf8",
+    timeout: 1e4,
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function bodyAttachmentOrder(gzipped) {
+  const doc = decodeMessage(gunzipSync3(gzipped, { maxOutputLength: 64 * 1024 * 1024 }));
+  const body = embeddedMessage(getField(embeddedMessage(getField(doc, 2)) ?? [], 3));
+  if (!body) throw new Error("Unsupported Notes document structure");
+  const ids = [];
+  for (const run of getFields(body, 5)) {
+    const attachment = embeddedMessage(getField(embeddedMessage(run) ?? [], 12));
+    const id2 = attachment && stringValue(getField(attachment, 1));
+    if (id2 && !ids.includes(id2)) ids.push(id2);
+  }
+  return ids;
+}
+function readAudioTranscripts(noteId3, options = {}) {
+  const { store, pk } = parseNoteId(noteId3);
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH2;
+  const maxSegments = Math.min(
+    Math.max(1, Math.floor(options.maxSegments ?? DEFAULT_MAX_SEGMENTS)),
+    MAX_SEGMENTS_LIMIT
+  );
+  let lines;
+  try {
+    const available = new Set(
+      runSqlite(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
+    );
+    const missing = REQUIRED_COLUMNS.filter((c) => !available.has(c));
+    if (missing.length)
+      throw new AudioTranscriptError(
+        "query_error",
+        `This macOS version's Notes database lacks ${missing.join(", ")}; stored transcripts cannot be read.`
+      );
+    lines = runSqlite(dbPath2, buildTranscriptSql(pk, available)).split("\n");
+  } catch (error2) {
+    if (error2 instanceof AudioTranscriptError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new AudioTranscriptError(
+        "no_fda",
+        `Full Disk Access is required to read stored transcripts. Grant it to the app that launches this server, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+      );
+    throw new AudioTranscriptError("query_error", "Failed to read the Notes database.");
+  }
+  const [noteLine = "{}", bodyLine = "", rowsLine = "[]"] = lines;
+  const note = JSON.parse(noteLine || "{}");
+  if (!note.found)
+    throw new AudioTranscriptError(
+      "not_found",
+      `No note found in the database for ID "${noteId3}".`
+    );
+  if (note.locked)
+    throw new AudioTranscriptError(
+      "locked",
+      "This note is password-protected; its transcripts are encrypted and cannot be read."
+    );
+  const rows = JSON.parse(rowsLine || "[]");
+  let order;
+  try {
+    if (/^[0-9A-F]+$/i.test(bodyLine.trim()))
+      order = bodyAttachmentOrder(Buffer.from(bodyLine.trim(), "hex"));
+  } catch {
+    order = void 0;
+  }
+  const ordered = order ? order.flatMap((id2) => rows.filter((row) => row.identifier === id2)) : [...rows].sort((a, b) => a.pk - b.pk);
+  const attachments = ordered.map((row) => describeRow(row, store, options, maxSegments));
+  return { id: noteId3, attachments, bodyOrder: Boolean(order), truncated: false };
+}
+function describeRow(row, store, options, maxSegments) {
+  const childDurations = (row.fragments ?? []).map((f) => f.duration).filter((d) => typeof d === "number" && d > 0);
+  const durationSeconds = typeof row.duration === "number" && row.duration > 0 ? row.duration : childDurations.length ? childDurations.reduce((a, b) => a + b, 0) : void 0;
+  const base = {
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier,
+    typeUti: row.uti,
+    status: "none",
+    ...durationSeconds !== void 0 ? { durationSeconds } : {},
+    ...typeof row.needsTranscription === "number" ? { needsTranscription: row.needsTranscription === 1 } : {}
+  };
+  if (!row.data) return base;
+  let recording;
+  try {
+    recording = parseAudioRecording(Buffer.from(row.data, "hex"));
+  } catch (error2) {
+    return {
+      ...base,
+      status: "undecodable",
+      reason: error2 instanceof Error ? error2.message : String(error2)
+    };
+  }
+  const multi = recording.fragments.length > 1;
+  const all = recording.fragments.flatMap(
+    (fragment, i) => fragment.segments.map((s) => multi ? { ...s, fragment: i } : s)
+  );
+  const text2 = recording.fragments.map((f) => joinSegments(f.segments)).filter(Boolean).join("\n\n");
+  const speakers = [...new Set(all.flatMap((s) => s.speaker ? [s.speaker] : []))];
+  return {
+    ...base,
+    status: all.length ? "ok" : "none",
+    fragmentCount: recording.fragments.length,
+    wordCount: all.length,
+    ...text2 ? { text: text2 } : {},
+    ...speakers.length ? { speakers } : {},
+    ...recording.summary ? { summary: recording.summary } : {},
+    ...recording.topLineSummary ? { topLineSummary: recording.topLineSummary } : {},
+    ...options.includeSegments && all.length ? {
+      segments: all.slice(0, maxSegments),
+      ...all.length > maxSegments ? { segmentsTruncated: true } : {}
+    } : {}
+  };
+}
+function fitTranscriptsToBudget(result, maxBytes, measure) {
+  if (measure(result) <= maxBytes) return result;
+  let next = {
+    ...result,
+    truncated: true,
+    attachments: result.attachments.map((a) => {
+      if (!a.segments) return a;
+      const rest = { ...a, segmentsTruncated: true };
+      delete rest.segments;
+      return rest;
+    })
+  };
+  for (let share = 0.5; measure(next) > maxBytes && share > 1e-4; share /= 2) {
+    next = {
+      ...next,
+      attachments: next.attachments.map((a) => {
+        const original = result.attachments.find((o) => o.attachmentId === a.attachmentId);
+        if (!original?.text) return a;
+        const keep = Math.floor(original.text.length * share);
+        return { ...a, text: original.text.slice(0, keep), textTruncated: true };
+      })
+    };
+  }
+  return next;
+}
+var clock = (seconds) => {
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor(total % 3600 / 60);
+  const s = total % 60;
+  const mm = h ? String(m).padStart(2, "0") : String(m);
+  return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
+};
+function formatTranscriptsText(result) {
+  const count = result.attachments.length;
+  if (count === 0) return `No audio attachments found in note ${result.id}.`;
+  const lines = [`${count} audio attachment${count === 1 ? "" : "s"} in note ${result.id}:`];
+  result.attachments.forEach((a, i) => {
+    const facts = [
+      `status ${a.status}`,
+      ...a.durationSeconds !== void 0 ? [clock(a.durationSeconds)] : [],
+      ...a.wordCount !== void 0 ? [`${a.wordCount} words`] : [],
+      ...a.fragmentCount && a.fragmentCount > 1 ? [`${a.fragmentCount} fragments`] : [],
+      ...a.speakers?.length ? [`${a.speakers.length} speakers`] : [],
+      ...a.reason ? [`reason: ${a.reason}`] : []
+    ];
+    lines.push("", `[${i + 1}] ${a.attachmentId} (${facts.join(", ")})`);
+    if (a.summary) lines.push(`Summary: ${a.summary}`);
+    if (a.text) lines.push(a.textTruncated ? `${a.text} [truncated]` : a.text);
+  });
+  if (result.truncated)
+    lines.push(
+      "",
+      "Some segments or text were left out to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
+    );
+  return lines.join("\n");
+}
+
+// src/utils/noteTables.ts
+import { gunzipSync as gunzipSync4 } from "node:zlib";
+var sub2 = (f, n) => {
+  const value = embeddedMessage(getField(f, n));
+  if (!value) throw new Error(`Missing table field ${n}`);
+  return value;
+};
+var num = (f, n) => {
+  const v = varintValue(getField(f, n));
+  if (v === void 0) throw new Error(`Missing table index ${n}`);
+  return v;
+};
+var many2 = (f, n) => getFields(f, n).map((v) => {
+  const m = embeddedMessage(v);
+  if (!m) throw new Error("Invalid table entry");
+  return m;
+});
+var hex = (f) => {
+  if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
+  return Buffer.from(f.value).toString("hex");
+};
+function parseNoteTable(compressed) {
+  const table = decodeTable(compressed, true);
+  return { rows: table.rows, rowIds: table.rowIds, columnIds: table.columnIds };
+}
+function parseNoteTableCells(compressed) {
+  return decodeTable(compressed, false);
+}
+function decodeTable(compressed, strict) {
+  const root = decodeMessage(gunzipSync4(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const data = sub2(sub2(root, 2), 3), entries2 = many2(data, 3);
+  if (entries2.length > 1e5) throw new Error("Table too large");
+  const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
+  const entry = (index) => {
+    if (!entries2[index]) throw new Error("Invalid table reference");
+    return entries2[index];
+  };
+  const uuidIndex = (index) => num(sub2(many2(sub2(entry(index), 13), 3)[0], 2), 2);
+  const roots = entries2.filter((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && types[num(map, 1)] === "com.apple.notes.ICTable";
+  });
+  if (roots.length !== 1) throw new Error("Ambiguous native table root");
+  const refs = new Map(
+    many2(sub2(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub2(m, 2), 6)])
+  );
+  const ordered = (key) => {
+    const ref = refs.get(key);
+    if (ref === void 0) throw new Error("Missing table dimension");
+    const ordering = sub2(sub2(entry(ref), 16), 1), array2 = sub2(ordering, 1);
+    const ids = many2(array2, 2).map((a) => hex(getField(a, 2)));
+    const map = /* @__PURE__ */ new Map();
+    ids.forEach((id2, i) => {
+      const index = uuids.indexOf(id2);
+      if (index < 0) throw new Error("Missing dimension UUID");
+      map.set(index, i);
+    });
+    const aliases = many2(sub2(ordering, 2), 1).map((pair) => [
+      uuidIndex(num(sub2(pair, 1), 6)),
+      uuidIndex(num(sub2(pair, 2), 6))
+    ]);
+    for (let pass = 0; pass < aliases.length + 1; pass++) {
+      let changed = false;
+      for (const [key2, value] of aliases)
+        if (map.has(key2) && !map.has(value)) {
+          map.set(value, map.get(key2));
+          changed = true;
+        }
+      if (!changed) break;
+    }
+    return { ids, map };
+  };
+  const rows = ordered("crRows"), columns = ordered("crColumns");
+  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
+    throw new Error("Unsupported table size");
+  const values = rows.ids.map(() => columns.ids.map(() => ""));
+  const incomplete = [];
+  const cellRef = refs.get("cellColumns");
+  if (cellRef === void 0) throw new Error("Missing table cells");
+  for (const column of many2(sub2(entry(cellRef), 6), 1)) {
+    const ci = columns.map.get(uuidIndex(num(sub2(column, 1), 6)));
+    const cells = entry(num(sub2(column, 2), 6));
+    for (const row of many2(sub2(cells, 6), 1)) {
+      const ri = rows.map.get(uuidIndex(num(sub2(row, 1), 6)));
+      if (ri === void 0 || ci === void 0) continue;
+      const note = sub2(entry(num(sub2(row, 2), 6)), 10);
+      const text2 = stringValue(getField(note, 2));
+      if (text2 === void 0 || text2.includes("\uFFFC")) {
+        if (strict) throw new Error("Embedded or unsupported table cell");
+        values[ri][ci] = null;
+        incomplete.push({
+          ri,
+          ci,
+          reason: text2 === void 0 ? "Cell text is missing" : "Cell contains an embedded object"
+        });
+        continue;
+      }
+      values[ri][ci] = text2.replace(/\n$/u, "");
+    }
+  }
+  const rtl = entries2.some((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && many2(map, 3).some(
+      (m) => stringValue(getField(sub2(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
+    );
+  });
+  const width = columns.ids.length;
+  if (rtl) {
+    for (const row of values) row.reverse();
+    columns.ids.reverse();
+  }
+  const incompleteCells = incomplete.map(({ ri, ci, reason }) => ({ row: ri, column: rtl ? width - 1 - ci : ci, reason })).sort((a, b) => a.row - b.row || a.column - b.column);
+  return { rows: values, rowIds: rows.ids, columnIds: columns.ids, incompleteCells };
+}
+
+// src/utils/tableMarkdown.ts
+var UNDECODED_CELL_MARKER = "[undecoded cell]";
+function escapeMarkdownTableCell(text2) {
+  return text2.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r\n|[\r\n\u2028\u2029]/g, "<br>");
+}
+function renderMarkdownTable(rows) {
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (rows.length === 0 || width === 0) return "";
+  const line = (row) => "| " + Array.from({ length: width }, (_, i) => {
+    const cell = row[i];
+    return cell === null ? UNDECODED_CELL_MARKER : escapeMarkdownTableCell(cell ?? "");
+  }).join(" | ") + " |";
+  const [header, ...body] = rows;
+  return [line(header), "| " + Array(width).fill("---").join(" | ") + " |", ...body.map(line)].join(
+    "\n"
+  );
+}
+function collectNoteTables(rich, noteId3) {
+  const seen = /* @__PURE__ */ new Set();
+  const ordered = (rich.objects || []).filter((object3) => object3.type.includes("table")).sort((a, b) => a.start - b.start).filter((object3) => {
+    if (seen.has(object3.id)) return false;
+    seen.add(object3.id);
+    return true;
+  });
+  const tables = ordered.map((object3, i) => {
+    const index = i + 1;
+    const data = (rich.objectData || []).find((row) => row.id === object3.id);
+    if (!data || !data.mergeable) {
+      return { index, id: object3.id, complete: false, reason: "Native table data is unavailable" };
+    }
+    const attachmentId = noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${data.pk}`);
+    try {
+      const table = parseNoteTableCells(Buffer.from(data.mergeable, "hex"));
+      const complete = table.incompleteCells.length === 0;
+      return {
+        index,
+        id: object3.id,
+        attachmentId,
+        complete,
+        ...complete ? {} : { reason: `${table.incompleteCells.length} cell(s) could not be decoded` },
+        rows: table.rows,
+        rowIds: table.rowIds,
+        columnIds: table.columnIds,
+        rowCount: table.rowIds.length,
+        columnCount: table.columnIds.length,
+        incompleteCells: table.incompleteCells,
+        markdown: renderMarkdownTable(table.rows)
+      };
+    } catch (error2) {
+      return {
+        index,
+        id: object3.id,
+        attachmentId,
+        complete: false,
+        reason: error2 instanceof Error ? error2.message : String(error2)
+      };
+    }
+  });
+  const markdown = tables.map(
+    (table) => table.markdown !== void 0 ? table.markdown : `[table ${table.index} could not be decoded: ${table.reason}]`
+  ).join("\n\n");
+  return { tables, tableCellsComplete: tables.every((table) => table.complete), markdown };
+}
+
+// src/utils/smartFolders.ts
+import { execFileSync as execFileSync5 } from "child_process";
+import * as fs2 from "fs";
+import * as os2 from "os";
+import * as path2 from "path";
+var NOTES_DB_PATH3 = path2.join(
+  os2.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var FDA_MESSAGE = `Full Disk Access is required to read smart folders. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var COCOA_EPOCH_OFFSET = 978307200;
+var MAX_DEPTH = 32;
+var RELATIVE_RANGES = {
+  0: "today",
+  1: "yesterday",
+  2: "in the last 7 days",
+  3: "in the last 30 days",
+  4: "in the last 3 months",
+  5: "in the last 12 months"
+};
+var CUSTOM_UNITS = {
+  0: "hours",
+  1: "days",
+  2: "weeks",
+  3: "months",
+  4: "years"
+};
+var ATTACHMENT_SECTIONS = {
+  1: "Photos & Videos",
+  2: "Drawings",
+  3: "Maps",
+  4: "Websites",
+  5: "Audio",
+  6: "Documents",
+  7: "Scans"
+};
+var isClause = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isDeletedWrapper = (value) => isClause(value) && Object.keys(value).length === 1 && typeof value.deleted === "boolean";
+function cocoaDate(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const date3 = new Date((value + COCOA_EPOCH_OFFSET) * 1e3);
+  return Number.isNaN(date3.getTime()) ? null : date3.toISOString();
+}
+var Decoder = class {
+  constructor(context) {
+    this.context = context;
+  }
+  context;
+  fullyDecoded = true;
+  unknown(key, value, excluded) {
+    this.fullyDecoded = false;
+    return {
+      type: "unknown",
+      ...key === null ? {} : { key },
+      value,
+      ...excluded ? { excluded: true } : {},
+      description: "Unrecognized clause (see value)"
+    };
+  }
+  /** Decode a list of sibling clauses, dropping inner `deleted` wrappers. */
+  list(clauses, excluded, depth) {
+    if (!Array.isArray(clauses)) return [this.clause(clauses, excluded, depth)];
+    return clauses.filter((clause) => !isDeletedWrapper(clause)).map((clause) => this.clause(clause, excluded, depth));
+  }
+  group(match, clauses, excluded, depth) {
+    const items = Array.isArray(clauses) ? clauses.filter((clause) => !isDeletedWrapper(clause)) : [clauses];
+    if (items.length === 1) return this.clause(items[0], excluded, depth + 1);
+    const filters = this.list(items, false, depth + 1);
+    const joiner = match === "all" ? "all of" : "any of";
+    return {
+      type: "group",
+      match,
+      ...excluded ? { excluded: true } : {},
+      filters,
+      description: `${excluded ? "not " : ""}${joiner}: ${filters.map((f) => f.description).join("; ")}`
+    };
+  }
+  /** Mark a positively described leaf as an Exclude rule. */
+  negate(filter) {
+    const text2 = filter.description;
+    const negated = text2.startsWith("has ") ? text2.replace(/^has /, "does not have ") : text2.startsWith("is ") ? text2.replace(/^is /, "is not ") : text2.startsWith("mentions ") ? text2.replace(/^mentions /, "does not mention ") : `not ${text2}`;
+    return { ...filter, excluded: true, description: negated };
+  }
+  clause(clause, excluded, depth) {
+    if (depth > MAX_DEPTH || !isClause(clause)) return this.unknown(null, clause, excluded);
+    const keys = Object.keys(clause);
+    if (keys.length !== 1) {
+      return this.group(
+        "all",
+        keys.map((key2) => ({ [key2]: clause[key2] })),
+        excluded,
+        depth
+      );
+    }
+    const [key] = keys;
+    const value = clause[key];
+    if (key === "and" || key === "or") {
+      if (!Array.isArray(value)) return this.unknown(key, value, excluded);
+      return this.group(key === "and" ? "all" : "any", value, excluded, depth);
+    }
+    if (key === "not") return this.clause(value, !excluded, depth + 1);
+    const leaf = this.leaf(key, value, excluded);
+    if (!leaf) return this.unknown(key, value, excluded);
+    return excluded && !leaf.excluded ? this.negate(leaf) : leaf;
+  }
+  /**
+   * Decode one leaf clause. Boolean flags describe their own negation (an
+   * excluded `pinned: true` reads "is not pinned"); other leaves are described
+   * positively and negated by the caller.
+   */
+  leaf(key, value, excluded) {
+    const flag2 = (description, negative) => typeof value === "boolean" ? {
+      type: key,
+      value,
+      ...excluded ? { excluded: true } : {},
+      description: value !== excluded ? description : negative
+    } : null;
+    switch (key) {
+      case "checklist":
+        return flag2("has a checklist", "has no checklist");
+      case "checklistInProgress":
+        return flag2("has an unfinished checklist", "has no unfinished checklist");
+      case "checklistCompleted":
+        return flag2("has a completed checklist", "has no completed checklist");
+      case "attachment":
+        return flag2("has attachments", "has no attachments");
+      case "pinned":
+        return flag2("is pinned", "is not pinned");
+      case "systemPaper":
+        return flag2("is a Quick Note", "is not a Quick Note");
+      case "passwordProtected":
+        return flag2("is locked", "is not locked");
+      case "shared":
+        return flag2("is shared", "is not shared");
+      case "mention":
+        return flag2("mentions anyone", "mentions no one");
+      case "tagged":
+        return flag2("has any tag", "has no tags");
+      case "attachmentSection": {
+        if (typeof value !== "number" || !ATTACHMENT_SECTIONS[value]) return null;
+        return {
+          type: key,
+          value,
+          name: ATTACHMENT_SECTIONS[value],
+          description: `has ${ATTACHMENT_SECTIONS[value]} attachments`
+        };
+      }
+      case "tag": {
+        if (typeof value !== "string") return null;
+        const names = this.context.tags?.[value] ?? [];
+        const name = names.length === 1 ? names[0] : void 0;
+        return {
+          type: key,
+          value,
+          ...name ? { name } : {},
+          description: `has tag #${name ?? value}`
+        };
+      }
+      case "folder": {
+        if (typeof value !== "string") return null;
+        const folder = this.context.folders?.[value];
+        return {
+          type: key,
+          value,
+          ...folder ? { folderId: folder.id } : {},
+          ...folder?.title ? { name: folder.title } : {},
+          description: folder?.title ? `is in folder "${folder.title}"` : `is in folder ${value}${folder ? "" : " (not found)"}`
+        };
+      }
+      case "sharedParticipant":
+      case "mentionParticipant":
+        return typeof value === "string" ? {
+          type: key,
+          value,
+          description: key === "sharedParticipant" ? `is shared with participant ${value}` : `mentions participant ${value}`
+        } : null;
+      case "creationDateRelativeRange":
+      case "modificationDateRelativeRange": {
+        if (!isClause(value) || typeof value.type !== "number") return null;
+        const verb = key.startsWith("creation") ? "created" : "edited";
+        if (value.type === 6) {
+          const amount = value.customAmount;
+          const unit = typeof value.customUnit === "number" ? CUSTOM_UNITS[value.customUnit] : null;
+          if (typeof amount !== "number" || !unit) return null;
+          return {
+            type: key,
+            value,
+            description: `${verb} in the last ${amount} ${unit}`
+          };
+        }
+        const range = RELATIVE_RANGES[value.type];
+        return range ? { type: key, value, description: `${verb} ${range}` } : null;
+      }
+      case "creationDateRange":
+      case "modificationDateRange": {
+        if (!isClause(value)) return null;
+        const from = cocoaDate(value.fromDate);
+        const to = cocoaDate(value.toDate);
+        if (!from || !to) return null;
+        const verb = key.startsWith("creation") ? "created" : "edited";
+        return {
+          type: key,
+          value,
+          from,
+          to,
+          description: `${verb} between ${from} and ${to}`
+        };
+      }
+      default:
+        return null;
+    }
+  }
+};
+function decodeSmartFolderQuery(raw, context = {}) {
+  if (raw === null || raw.trim() === "") {
+    return { match: null, filters: [], query: null, fullyDecoded: false };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { match: null, filters: [], query: raw, fullyDecoded: false };
+  }
+  const decoder = new Decoder(context);
+  const type = isClause(parsed) ? parsed.type : void 0;
+  if (!isClause(type)) {
+    return {
+      match: null,
+      filters: [decoder.unknown(null, parsed, false)],
+      query: parsed,
+      fullyDecoded: false
+    };
+  }
+  let includesRecentlyDeleted;
+  let inner = [type];
+  if (Object.keys(type).length === 1 && Array.isArray(type.and)) {
+    const wrapper = type.and.find(isDeletedWrapper);
+    if (wrapper) {
+      includesRecentlyDeleted = wrapper.deleted;
+      inner = type.and.filter((clause) => !isDeletedWrapper(clause));
+    }
+  }
+  const query2 = inner.length === 1 ? inner[0] : { and: inner };
+  let match = "all";
+  let filters;
+  const only = inner.length === 1 && isClause(inner[0]) ? inner[0] : void 0;
+  const onlyKey = only && Object.keys(only).length === 1 ? Object.keys(only)[0] : void 0;
+  if (only && onlyKey === "and" && Array.isArray(only.and)) {
+    filters = decoder.list(only.and, false, 1);
+  } else if (only && onlyKey === "or" && Array.isArray(only.or)) {
+    match = "any";
+    filters = decoder.list(only.or, false, 1);
+  } else if (only && onlyKey === "not" && isClause(only.not) && Object.keys(only.not).length === 1 && Array.isArray(only.not.or)) {
+    match = "none";
+    filters = decoder.list(only.not.or, false, 1);
+  } else {
+    filters = decoder.list(inner, false, 1);
+  }
+  return {
+    match,
+    filters,
+    query: query2,
+    ...includesRecentlyDeleted === void 0 ? {} : { includesRecentlyDeleted },
+    fullyDecoded: decoder.fullyDecoded
+  };
+}
+var SMART_FOLDERS_SQL = `BEGIN;
+SELECT Z_UUID FROM Z_METADATA;
+SELECT json_group_array(json_object(
+  'pk', f.Z_PK,
+  'identifier', f.ZIDENTIFIER,
+  'title', f.ZTITLE2,
+  'folderType', f.ZFOLDERTYPE,
+  'query', f.ZSMARTFOLDERQUERYJSON,
+  'parentPk', p.Z_PK,
+  'parentIdentifier', p.ZIDENTIFIER,
+  'parentTitle', p.ZTITLE2,
+  'accountPk', a.Z_PK,
+  'accountIdentifier', a.ZIDENTIFIER,
+  'accountName', a.ZNAME))
+FROM ZICCLOUDSYNCINGOBJECT f
+LEFT JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = f.ZPARENT
+LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = f.ZOWNER
+WHERE f.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder')
+  AND (f.ZFOLDERTYPE = 2 OR f.ZSMARTFOLDERQUERYJSON IS NOT NULL)
+  AND COALESCE(f.ZMARKEDFORDELETION, 0) = 0;
+SELECT json_group_object(ZIDENTIFIER, json_object('pk', Z_PK, 'title', ZTITLE2))
+FROM ZICCLOUDSYNCINGOBJECT
+WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder')
+  AND ZIDENTIFIER IS NOT NULL;
+SELECT json_group_array(json_object('standardized', ZSTANDARDIZEDCONTENT, 'display', ZDISPLAYTEXT))
+FROM ZICCLOUDSYNCINGOBJECT
+WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICHashtag')
+  AND ZSTANDARDIZEDCONTENT IS NOT NULL
+  AND COALESCE(ZMARKEDFORDELETION, 0) = 0;
+COMMIT;`;
+var REQUIRED_COLUMNS2 = [
+  "ZIDENTIFIER",
+  "ZTITLE2",
+  "ZFOLDERTYPE",
+  "ZSMARTFOLDERQUERYJSON",
+  "ZPARENT",
+  "ZOWNER",
+  "ZNAME",
+  "ZMARKEDFORDELETION",
+  "ZSTANDARDIZEDCONTENT",
+  "ZDISPLAYTEXT"
+];
+function buildSmartFolders(output) {
+  const lines = output.trim().split("\n");
+  if (lines.length < 4) throw new Error("Unexpected smart folder query output");
+  const [storeUuid, rowsJson, foldersJson, tagsJson] = lines;
+  if (!/^[0-9A-F-]+$/i.test(storeUuid)) throw new Error("Unexpected Notes store identifier");
+  const coreDataId2 = (entity3, pk) => `x-coredata://${storeUuid}/${entity3}/p${pk}`;
+  const rows = JSON.parse(rowsJson);
+  const folderRows = JSON.parse(foldersJson || "{}");
+  const tagRows = JSON.parse(tagsJson || "[]");
+  const folders = {};
+  for (const [identifier, row] of Object.entries(folderRows)) {
+    folders[identifier] = { id: coreDataId2("ICFolder", row.pk), title: row.title };
+  }
+  const tags = {};
+  for (const tag of tagRows) {
+    if (!tag.display) continue;
+    const names = tags[tag.standardized] ||= [];
+    if (!names.includes(tag.display)) names.push(tag.display);
+  }
+  return rows.map((row) => {
+    const decoded = decodeSmartFolderQuery(row.query, { folders, tags });
+    return {
+      id: coreDataId2("ICFolder", row.pk),
+      identifier: row.identifier,
+      name: row.title,
+      account: row.accountName,
+      accountId: row.accountPk === null ? null : coreDataId2("ICAccount", row.accountPk),
+      accountIdentifier: row.accountIdentifier,
+      parent: row.parentTitle,
+      parentId: row.parentPk === null ? null : coreDataId2("ICFolder", row.parentPk),
+      parentIdentifier: row.parentIdentifier,
+      match: decoded.match,
+      filters: decoded.filters,
+      ...decoded.includesRecentlyDeleted === void 0 ? {} : { includesRecentlyDeleted: decoded.includesRecentlyDeleted },
+      fullyDecoded: decoded.fullyDecoded,
+      query: decoded.query,
+      rawQuery: row.query
+    };
+  }).sort(
+    (a, b) => (a.account ?? "").localeCompare(b.account ?? "") || (a.name ?? "").localeCompare(b.name ?? "") || a.id.localeCompare(b.id)
+  );
+}
+function runSqlite2(dbPath2, sql) {
+  return execFileSync5("sqlite3", ["-readonly", dbPath2, sql], {
+    encoding: "utf8",
+    timeout: 5e3,
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function readSmartFolders(dbPath2 = NOTES_DB_PATH3) {
+  if (!fs2.existsSync(dbPath2)) return { folders: null, error: "no_fda", message: FDA_MESSAGE };
+  try {
+    const columns = new Set(
+      runSqlite2(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").trim().split("\n")
+    );
+    const missing = REQUIRED_COLUMNS2.filter((column) => !columns.has(column));
+    if (missing.length) {
+      return {
+        folders: null,
+        error: "unsupported_schema",
+        message: `This Notes database does not have the columns smart folders need (${missing.join(", ")}).`
+      };
+    }
+    return { folders: buildSmartFolders(runSqlite2(dbPath2, SMART_FOLDERS_SQL)) };
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      return { folders: null, error: "no_fda", message: FDA_MESSAGE };
+    }
+    console.error(`Failed to read smart folders: ${message}`);
+    return { folders: null, error: "query_error", message: "Failed to read smart folders." };
+  }
+}
+
+// src/utils/trashFolders.ts
+import { execFileSync as execFileSync6 } from "child_process";
+import * as fs3 from "fs";
+import * as os3 from "os";
+import * as path3 from "path";
+var NOTES_DB_PATH4 = path3.join(
+  os3.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var RECENTLY_DELETED_FOLDER_NAME = "Recently Deleted";
+var CACHE_TTL_MS = 5 * 60 * 1e3;
+var cache = null;
+function query(dbPath2, sql) {
+  return execFileSync6("sqlite3", ["-readonly", dbPath2, sql], {
+    encoding: "utf8",
+    timeout: 5e3,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function readTrashFolderIds(dbPath2 = NOTES_DB_PATH4) {
+  if (cache && cache.dbPath === dbPath2 && Date.now() - cache.at < CACHE_TTL_MS) {
+    return cache.ids;
+  }
+  try {
+    if (!fs3.existsSync(dbPath2)) return [];
+    const columns = new Set(
+      query(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
+    );
+    const predicates = [];
+    if (columns.has("ZFOLDERTYPE")) predicates.push("COALESCE(ZFOLDERTYPE, 0) = 1");
+    if (columns.has("ZIDENTIFIER"))
+      predicates.push("COALESCE(ZIDENTIFIER, '') LIKE 'TrashFolder%'");
+    if (!predicates.length) return [];
+    const sql = `SELECT (SELECT Z_UUID FROM Z_METADATA LIMIT 1); SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder') AND (${predicates.join(" OR ")}) ORDER BY Z_PK;`;
+    const [uuid2, ...pks] = query(dbPath2, sql).split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!uuid2 || !/^[0-9A-F-]+$/i.test(uuid2)) return [];
+    const ids = pks.filter((pk) => /^\d+$/.test(pk)).map((pk) => `x-coredata://${uuid2}/ICFolder/p${pk}`);
+    cache = { dbPath: dbPath2, at: Date.now(), ids };
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
 // src/utils/attachmentFs.ts
 import {
-  existsSync as existsSync2,
+  closeSync,
+  constants,
+  existsSync as existsSync4,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
   statSync
 } from "fs";
-import { dirname, isAbsolute, join as join3, relative, resolve, sep } from "path";
-import { homedir as homedir3, tmpdir } from "os";
+import { dirname, isAbsolute, join as join6, relative, resolve, sep } from "path";
+import { homedir as homedir6, tmpdir } from "os";
 function allowedSaveRoots() {
   return [
-    resolve(homedir3()),
+    resolve(homedir6()),
     resolve(tmpdir()),
     "/Volumes",
     "/private/var/folders",
@@ -39855,8 +40961,11 @@ function allowedSaveRoots() {
     "/private/tmp"
   ];
 }
-function canonicalize(path4) {
-  return realpathSync.native(path4);
+function deniedSaveRoots() {
+  return [join6(homedir6(), "Library/Group Containers/group.com.apple.notes")];
+}
+function canonicalize(path9) {
+  return realpathSync.native(path9);
 }
 function isWithinRoots(candidate, roots) {
   return roots.some((root) => {
@@ -39878,9 +40987,9 @@ function canonicalRoots(roots) {
   }
   return canonical;
 }
-function entryExists(path4) {
+function entryExists(path9) {
   try {
-    lstatSync(path4);
+    lstatSync(path9);
     return true;
   } catch (e) {
     const code = e.code;
@@ -39896,11 +41005,11 @@ function deepestExistingAncestor(abs) {
     current = parent;
   }
 }
-function ensureParentDir(abs, roots = allowedSaveRoots()) {
-  assertSafeSavePath(abs, roots);
+function ensureParentDir(abs, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
+  assertSafeSavePath(abs, roots, denied);
   mkdirSync(dirname(abs), { recursive: true });
 }
-function assertSafeSavePath(p, roots = allowedSaveRoots()) {
+function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
@@ -39921,12 +41030,18 @@ function assertSafeSavePath(p, roots = allowedSaveRoots()) {
   if (suffix.split(sep).includes("..")) {
     throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
   }
-  const canonicalDest = suffix ? join3(canonicalAncestor, suffix) : canonicalAncestor;
+  const canonicalDest = suffix ? join6(canonicalAncestor, suffix) : canonicalAncestor;
   const allowed = canonicalRoots(roots);
   if (!isWithinRoots(canonicalAncestor, allowed) || !isWithinRoots(canonicalDest, allowed)) {
     throw new Error(
       `Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonicalDest}" through a symbolic link.`
     );
+  }
+  const deniedForms = [
+    .../* @__PURE__ */ new Set([...denied.map((d) => resolve(d)), ...canonicalRoots(denied)])
+  ].map((d) => d.toLowerCase());
+  if ([abs, canonicalDest].some((form) => isWithinRoots(form.toLowerCase(), deniedForms))) {
+    throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
   return abs;
 }
@@ -39961,10 +41076,980 @@ function fileSize(p) {
 function makeTempDir() {
   return mkdtempSync(resolve(tmpdir(), "apple-notes-att-"));
 }
+function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
+  if (!p || !p.trim()) throw new Error("A content file path is required.");
+  if (!isAbsolute(p)) throw new Error(`Content file path must be absolute: "${p}"`);
+  const abs = resolve(p);
+  if (!isWithinRoots(abs, roots))
+    throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
+  let canonical;
+  try {
+    canonical = canonicalize(abs);
+  } catch {
+    throw new Error(`Content file does not exist or cannot be resolved: "${abs}"`);
+  }
+  if (!isWithinRoots(canonical, canonicalRoots(roots)))
+    throw new Error(
+      `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
+    );
+  let descriptor;
+  try {
+    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error2) {
+    if (error2.code === "ELOOP")
+      throw new Error(`Refusing to read the symbolic link "${abs}".`);
+    throw error2;
+  }
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
+    if (stat.size === 0) throw new Error(`Content file is empty: "${abs}"`);
+    if (stat.size > maxBytes)
+      throw new Error(`Content file is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
+    const bytes = readFileSync(descriptor);
+    if (bytes.length !== stat.size)
+      throw new Error("Content file changed while it was being read; try again");
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+    } catch {
+      throw new Error(`Content file is not valid UTF-8 text: "${abs}"`);
+    }
+  } finally {
+    closeSync(descriptor);
+  }
+}
 function cleanupTempDir(dir) {
   try {
-    if (existsSync2(dir)) rmSync(dir, { recursive: true, force: true });
+    if (existsSync4(dir)) rmSync(dir, { recursive: true, force: true });
   } catch {
+  }
+}
+
+// src/utils/paperAttachments.ts
+import { execFileSync as execFileSync8 } from "node:child_process";
+import {
+  closeSync as closeSync3,
+  constants as constants3,
+  fstatSync as fstatSync3,
+  lstatSync as lstatSync3,
+  mkdirSync as mkdirSync3,
+  openSync as openSync3,
+  readdirSync as readdirSync2,
+  readSync as readSync2,
+  unlinkSync as unlinkSync2,
+  writeSync as writeSync2
+} from "node:fs";
+import { basename as basename2, dirname as dirname3, extname as extname2, join as join8 } from "node:path";
+
+// src/utils/attachmentAssets.ts
+import { execFileSync as execFileSync7 } from "node:child_process";
+import {
+  closeSync as closeSync2,
+  constants as constants2,
+  fstatSync as fstatSync2,
+  lstatSync as lstatSync2,
+  mkdirSync as mkdirSync2,
+  openSync as openSync2,
+  readdirSync,
+  readSync,
+  realpathSync as realpathSync2,
+  unlinkSync,
+  writeSync
+} from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { basename, dirname as dirname2, extname, isAbsolute as isAbsolute2, join as join7, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
+import { gunzipSync as gunzipSync5 } from "node:zlib";
+var NOTES_CONTAINER_DIR = join7(
+  homedir7(),
+  "Library/Group Containers/group.com.apple.notes"
+);
+var AttachmentStoreError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+    this.name = "AttachmentStoreError";
+  }
+  code;
+};
+var MAX_PREVIEW_DIR_ENTRIES = 1e5;
+var MAX_BUNDLE_ENTRIES = 64;
+var MAX_GENERATION_DIRS = 64;
+var MAX_COLLISION_SUFFIX = 1e4;
+var MAX_BODY_BYTES = 32 * 1024 * 1024;
+var PREVIEW_IMAGE_SUFFIXES = /* @__PURE__ */ new Set([".png", ".jpg", ".jpeg", ".heic", ".tiff", ".gif"]);
+var GENERIC_FILE_NAMES = /* @__PURE__ */ new Set([
+  "fallbackimage.png",
+  "fallbackimage.jpg",
+  "fallbackpdf.pdf",
+  "preview.png",
+  "orientedpreview.png"
+]);
+var IMAGE_UTIS = /* @__PURE__ */ new Set([
+  "public.jpeg",
+  "public.png",
+  "public.heic",
+  "public.heif",
+  "public.tiff",
+  "public.image",
+  "com.compuserve.gif",
+  "org.webmproject.webp",
+  "com.microsoft.bmp",
+  "com.adobe.raw-image"
+]);
+function classifyAttachmentKind(uti) {
+  if (!uti) return "other";
+  const u = uti.toLowerCase();
+  if (u === "com.apple.notes.table") return "table";
+  if (u === "public.url" || u.startsWith("public.url")) return "url";
+  if (u === "com.apple.paper.doc.scan" || u === "com.apple.notes.gallery" || u.includes("scan"))
+    return "scan";
+  if (u === "com.apple.paper" || u.startsWith("com.apple.drawing")) return "drawing";
+  if (u === "com.adobe.pdf" || u.includes("pdf")) return "pdf";
+  if (u.includes("audio")) return "audio";
+  if (u === "public.mpeg-4" || u.includes("movie") || u.includes("video")) return "video";
+  if (IMAGE_UTIS.has(u) || u.includes("image")) return "image";
+  return "other";
+}
+function parseNoteId2(noteId3) {
+  const m = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d+)$/.exec(noteId3);
+  if (!m) {
+    throw new AttachmentStoreError(
+      `Invalid note ID format: "${noteId3}". Expected x-coredata://UUID/ICNote/pNNN`,
+      "invalid_id"
+    );
+  }
+  return { store: m[1], pk: Number(m[2]) };
+}
+function attachmentCoreDataId(noteId3, pk) {
+  return noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
+}
+function buildAttachmentRowsSql(notePk, columns) {
+  if (!Number.isSafeInteger(notePk) || notePk < 0) throw new Error("Invalid note primary key");
+  const col3 = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const firstOf = (alias, names) => {
+    const present = names.filter((n) => columns.has(n)).map((n) => `${alias}.${n}`);
+    if (present.length === 0) return "NULL";
+    return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
+  };
+  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const accountRefs = [
+    ...accountCols.map((c) => `a.${c}`),
+    ...accountCols.map((c) => `n.${c}`)
+  ].join(", ");
+  const account = accountCols.length ? `(SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAccount') AND acc.Z_PK IN (${accountRefs}) LIMIT 1)` : "NULL";
+  const noteLink = columns.has("ZNOTE") ? "a.ZNOTE" : "NULL";
+  const parent = col3("a", "ZPARENTATTACHMENT");
+  const deleted = columns.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  const fields = [
+    `'pk', a.Z_PK`,
+    `'identifier', a.ZIDENTIFIER`,
+    `'uti', ${col3("a", "ZTYPEUTI")}`,
+    `'parentPk', ${parent}`,
+    `'filename', ${col3("a", "ZFILENAME")}`,
+    `'mediaIdentifier', m.ZIDENTIFIER`,
+    `'mediaFilename', ${col3("m", "ZFILENAME")}`,
+    `'mediaGeneration', ${firstOf("m", ["ZGENERATION1", "ZGENERATION"])}`,
+    `'fallbackImageGeneration', ${col3("a", "ZFALLBACKIMAGEGENERATION")}`,
+    `'fallbackPdfGeneration', ${col3("a", "ZFALLBACKPDFGENERATION")}`,
+    `'accountIdentifier', ${account}`
+  ].join(", ");
+  const mediaJoin = columns.has("ZMEDIA") ? "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON m.Z_PK = a.ZMEDIA" : "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON 0";
+  const childClause = parent === "NULL" ? "" : ` OR a.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE p.ZNOTE = ${notePk})`;
+  return [
+    "BEGIN;",
+    `SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ${notePk} AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote');`,
+    `SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT a ${mediaJoin} LEFT JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = ${noteLink} WHERE a.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAttachment') AND (${noteLink} = ${notePk}${childClause})${deleted};`,
+    `SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = ${notePk};`,
+    "COMMIT;"
+  ].join(" ");
+}
+function runSqlite3(dbPath2, sql) {
+  try {
+    return execFileSync7("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 1e4,
+      maxBuffer: 128 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message)) {
+      throw new AttachmentStoreError(
+        "Full Disk Access is required to read attachment paths. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
+        "no_fda"
+      );
+    }
+    throw new AttachmentStoreError(`Failed to read attachment rows: ${message}`, "query_error");
+  }
+}
+function toStringOrNull(value) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+function toIntOrNull(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+}
+function parseAttachmentRows(json2) {
+  const raw = JSON.parse(json2 || "[]");
+  if (!Array.isArray(raw)) throw new Error("Invalid attachment rows");
+  const rows = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item;
+    const pk = toIntOrNull(r.pk);
+    const identifier = toStringOrNull(r.identifier);
+    if (pk === null || identifier === null) continue;
+    rows.push({
+      pk,
+      identifier,
+      uti: toStringOrNull(r.uti),
+      parentPk: toIntOrNull(r.parentPk),
+      filename: toStringOrNull(r.filename),
+      mediaIdentifier: toStringOrNull(r.mediaIdentifier),
+      mediaFilename: toStringOrNull(r.mediaFilename),
+      mediaGeneration: toStringOrNull(r.mediaGeneration),
+      fallbackImageGeneration: toStringOrNull(r.fallbackImageGeneration),
+      fallbackPdfGeneration: toStringOrNull(r.fallbackPdfGeneration),
+      accountIdentifier: toStringOrNull(r.accountIdentifier)
+    });
+  }
+  return rows.sort((a, b) => a.pk - b.pk);
+}
+function attachmentOrderFromNoteData(hex3) {
+  if (!hex3 || !/^[0-9a-f]+$/i.test(hex3)) return null;
+  try {
+    const data = gunzipSync5(Buffer.from(hex3, "hex"), { maxOutputLength: MAX_BODY_BYTES });
+    const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
+    const body = wrapper && embeddedMessage(getField(wrapper, 3));
+    if (!body) return null;
+    const ids = [];
+    for (const run of getFields(body, 5)) {
+      const fields = embeddedMessage(run);
+      const info = fields && embeddedMessage(getField(fields, 12));
+      const id2 = info && stringValue(getField(info, 1));
+      if (id2 && !ids.some((seen) => seen.toLowerCase() === id2.toLowerCase())) ids.push(id2);
+    }
+    return ids;
+  } catch {
+    return null;
+  }
+}
+function readNoteAttachmentRows(noteId3, dbPath2 = join7(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+  const { pk } = parseNoteId2(noteId3);
+  const columnList = runSqlite3(
+    dbPath2,
+    "SELECT group_concat(name, ',') FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  ).trim();
+  const columns = new Set(columnList.split(",").filter(Boolean));
+  if (!columns.has("ZIDENTIFIER")) {
+    throw new AttachmentStoreError("Unsupported Notes database schema", "query_error");
+  }
+  const lines = runSqlite3(dbPath2, buildAttachmentRowsSql(pk, columns)).split("\n");
+  if (lines[0]?.trim() !== "1") {
+    throw new AttachmentStoreError(
+      `No note found in the database for ID "${noteId3}".`,
+      "not_found"
+    );
+  }
+  let rows;
+  try {
+    rows = parseAttachmentRows(lines[1] ?? "[]");
+  } catch {
+    throw new AttachmentStoreError("Attachment rows could not be parsed", "query_error");
+  }
+  return { rows, bodyOrder: attachmentOrderFromNoteData(lines[2]?.trim()) };
+}
+function safeComponent(value) {
+  if (typeof value !== "string" || !value || value.length > 255) return null;
+  if (value === "." || value === ".." || value.includes("/") || value.includes("\0")) return null;
+  return value;
+}
+function realInside(path9, rootReal) {
+  try {
+    const real = realpathSync2.native(path9);
+    return real === rootReal || real.startsWith(rootReal + sep2) ? real : null;
+  } catch {
+    return null;
+  }
+}
+function isRegularFile(path9) {
+  try {
+    return lstatSync2(path9).isFile();
+  } catch {
+    return false;
+  }
+}
+function isDirectory(path9) {
+  try {
+    return lstatSync2(path9).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function boundedEntries(dir, limit) {
+  try {
+    const entries2 = readdirSync(dir);
+    return entries2.length > limit ? null : entries2.sort();
+  } catch {
+    return null;
+  }
+}
+function resolveAccountDir(containerDir, accountIdentifier) {
+  const accountsDir = join7(containerDir, "Accounts");
+  let accountsReal;
+  try {
+    accountsReal = realpathSync2.native(accountsDir);
+  } catch {
+    return null;
+  }
+  const account = safeComponent(accountIdentifier);
+  if (account) {
+    const dir = realInside(join7(accountsReal, account), accountsReal);
+    if (dir && isDirectory(dir)) return dir;
+  }
+  const entries2 = (boundedEntries(accountsReal, 64) ?? []).filter(
+    (e) => isDirectory(join7(accountsReal, e))
+  );
+  if (entries2.length !== 1) return null;
+  return realInside(join7(accountsReal, entries2[0]), accountsReal);
+}
+function generationRank(name) {
+  const m = /^(\d+)_/.exec(name);
+  return m ? Number(m[1]) : 0;
+}
+function generationDirs(base, accountDir) {
+  const entries2 = boundedEntries(base, MAX_GENERATION_DIRS) ?? [];
+  return entries2.map((e) => realInside(join7(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
+}
+function fallbackFiles(accountDir, rootName, identifier, generation, names) {
+  const base = join7(accountDir, rootName, identifier);
+  const found = [];
+  const add = (candidate) => {
+    const real = realInside(candidate, accountDir);
+    if (real && isRegularFile(real) && !found.includes(real)) found.push(real);
+  };
+  const gen = safeComponent(generation);
+  if (gen) for (const name of names) add(join7(base, gen, name));
+  if (isDirectory(base)) {
+    for (const dir of generationDirs(base, accountDir))
+      for (const name of names) add(join7(dir, name));
+    for (const name of names) add(join7(base, name));
+  }
+  for (const name of names) add(join7(accountDir, rootName, `${identifier}${extname(name)}`));
+  return found;
+}
+function previewPixelArea(name) {
+  const matches = [...name.matchAll(/-(\d{1,6})x(\d{1,6})(?=-|\.|$)/g)];
+  const last = matches.at(-1);
+  return last ? Number(last[1]) * Number(last[2]) : 0;
+}
+function previewFileInBundle(bundle, accountDir) {
+  const direct = [];
+  const nested = [];
+  for (const entry of boundedEntries(bundle, MAX_BUNDLE_ENTRIES) ?? []) {
+    const child = realInside(join7(bundle, entry), accountDir);
+    if (!child) continue;
+    if (isRegularFile(child)) direct.push(child);
+    else if (isDirectory(child)) nested.push(child);
+  }
+  nested.sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
+  const pick2 = (files) => files.find((f) => basename(f) === "Preview.png") ?? files.find((f) => PREVIEW_IMAGE_SUFFIXES.has(extname(f).toLowerCase())) ?? null;
+  for (const dir of nested) {
+    const files = (boundedEntries(dir, MAX_BUNDLE_ENTRIES) ?? []).map((e) => realInside(join7(dir, e), accountDir)).filter((p) => p !== null && isRegularFile(p));
+    const chosen = pick2(files);
+    if (chosen) return chosen;
+  }
+  return pick2(direct);
+}
+function listPreviewEntries(accountDir) {
+  return boundedEntries(join7(accountDir, "Previews"), MAX_PREVIEW_DIR_ENTRIES) ?? [];
+}
+function previewPaths(accountDir, identifier, entries2) {
+  const id2 = safeComponent(identifier);
+  if (!id2) return [];
+  const prefix = `${id2}-`.toLowerCase();
+  const candidates = entries2.filter((name) => name.toLowerCase().startsWith(prefix)).filter((name) => {
+    const ext = extname(name).toLowerCase();
+    return !ext || PREVIEW_IMAGE_SUFFIXES.has(ext) || /^\.\d+$/.test(ext);
+  }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
+  const files = [];
+  for (const name of candidates) {
+    const real = realInside(join7(accountDir, "Previews", name), accountDir);
+    if (!real) continue;
+    const file = isRegularFile(real) ? real : isDirectory(real) ? previewFileInBundle(real, accountDir) : null;
+    if (file && !files.includes(file)) files.push(file);
+  }
+  return files;
+}
+function assetPathsFor(accountDir, row) {
+  const found = [];
+  const add = (candidate) => {
+    const real = realInside(candidate, accountDir);
+    if (real && isRegularFile(real) && !found.includes(real)) found.push(real);
+  };
+  const mediaId = safeComponent(row.mediaIdentifier);
+  const mediaName = safeComponent(row.mediaFilename);
+  const mediaGen = safeComponent(row.mediaGeneration);
+  if (mediaId && mediaName) {
+    if (mediaGen) add(join7(accountDir, "Media", mediaId, mediaGen, mediaName));
+    add(join7(accountDir, "Media", mediaId, mediaName));
+  }
+  const id2 = safeComponent(row.identifier);
+  if (!id2) return found;
+  const ownName = safeComponent(row.filename);
+  if (ownName) add(join7(accountDir, "Media", id2, ownName));
+  for (const file of fallbackFiles(accountDir, "FallbackImages", id2, row.fallbackImageGeneration, [
+    "FallbackImage.png",
+    "FallbackImage.jpg"
+  ]))
+    add(file);
+  for (const file of fallbackFiles(accountDir, "FallbackPDFs", id2, row.fallbackPdfGeneration, [
+    "FallbackPDF.pdf"
+  ]))
+    add(file);
+  return found;
+}
+function assembleAttachmentAssets(rows, bodyOrder, containerDir = NOTES_CONTAINER_DIR) {
+  const byPk = new Map(rows.map((r) => [r.pk, r]));
+  const roots = rows.filter((r) => r.parentPk === null || !byPk.has(r.parentPk));
+  const bodyIndex = /* @__PURE__ */ new Map();
+  (bodyOrder ?? []).forEach((id2, index) => bodyIndex.set(id2.toLowerCase(), index));
+  const indexOf = (r) => bodyIndex.get(r.identifier.toLowerCase()) ?? null;
+  const inBody = roots.filter((r) => indexOf(r) !== null);
+  const orderSource = inBody.length > 0 ? "body" : "creation";
+  const orderedRoots = [
+    ...inBody.sort((a, b) => indexOf(a) - indexOf(b)),
+    ...roots.filter((r) => indexOf(r) === null)
+  ];
+  const accountDirs = /* @__PURE__ */ new Map();
+  const previewEntries = /* @__PURE__ */ new Map();
+  const accountDirFor = (account) => {
+    if (!accountDirs.has(account))
+      accountDirs.set(account, resolveAccountDir(containerDir, account));
+    return accountDirs.get(account) ?? null;
+  };
+  const record2 = (row, parent) => {
+    const accountDir = accountDirFor(row.accountIdentifier ?? parent?.accountIdentifier ?? null);
+    let assetPaths = [];
+    let previews = [];
+    if (accountDir) {
+      if (!previewEntries.has(accountDir))
+        previewEntries.set(accountDir, listPreviewEntries(accountDir));
+      assetPaths = assetPathsFor(accountDir, row);
+      previews = previewPaths(accountDir, row.identifier, previewEntries.get(accountDir));
+    }
+    const previewPath = previews[0] ?? null;
+    return {
+      pk: row.pk,
+      identifier: row.identifier,
+      uti: row.uti,
+      kind: classifyAttachmentKind(row.uti),
+      parentIdentifier: parent?.identifier ?? null,
+      filename: row.filename ?? row.mediaFilename,
+      bodyIndex: parent ? null : indexOf(row),
+      assetPaths,
+      previewPath,
+      paths: previewPath ? [...assetPaths, previewPath] : [...assetPaths]
+    };
+  };
+  const attachments = [];
+  for (const root of orderedRoots) {
+    attachments.push(record2(root, null));
+    for (const child of rows.filter((r) => r.parentPk === root.pk && r !== root)) {
+      attachments.push(record2(child, root));
+    }
+  }
+  return { orderSource, attachments };
+}
+function selectFirstImage(assets) {
+  const candidates = assets.attachments.filter((a) => {
+    if (a.parentIdentifier !== null) return true;
+    return assets.orderSource === "creation" || a.bodyIndex !== null;
+  });
+  const eligibleChild = (a) => a.parentIdentifier === null || candidates.some((p) => p.parentIdentifier === null && p.identifier === a.parentIdentifier);
+  const ordered = candidates.filter(eligibleChild);
+  const chosen = ordered.find((a) => a.kind === "image") ?? ordered.find((a) => a.kind === "scan" || a.kind === "drawing");
+  if (!chosen) return null;
+  const siblings = chosen.parentIdentifier ? ordered.filter((a) => a.parentIdentifier === chosen.parentIdentifier) : [];
+  return {
+    pk: chosen.pk,
+    identifier: chosen.identifier,
+    uti: chosen.uti,
+    kind: chosen.kind,
+    path: chosen.assetPaths[0] ?? null,
+    previewPath: chosen.previewPath,
+    parentIdentifier: chosen.parentIdentifier,
+    galleryIndex: chosen.parentIdentifier ? siblings.indexOf(chosen) : null,
+    orderSource: assets.orderSource
+  };
+}
+function canonicalTail(p) {
+  let current = resolve2(p);
+  const tail = [];
+  for (; ; ) {
+    try {
+      return join7(realpathSync2.native(current), ...tail);
+    } catch {
+      const parent = dirname2(current);
+      if (parent === current) return join7(current, ...tail);
+      tail.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+function isInsideNotesContainer(p, containerDir = NOTES_CONTAINER_DIR) {
+  const target = canonicalTail(p).toLowerCase();
+  const container = canonicalTail(containerDir).toLowerCase();
+  const rel = relative2(container, target);
+  return !(rel === ".." || rel.startsWith(`..${sep2}`) || isAbsolute2(rel));
+}
+function copyFileExclusive(src, dest) {
+  const input = openSync2(src, constants2.O_RDONLY | constants2.O_NOFOLLOW);
+  try {
+    if (!fstatSync2(input).isFile()) throw new Error("Source is not a regular file");
+    const output = openSync2(
+      dest,
+      constants2.O_WRONLY | constants2.O_CREAT | constants2.O_EXCL | constants2.O_NOFOLLOW,
+      384
+    );
+    try {
+      const buffer = Buffer.allocUnsafe(1024 * 1024);
+      for (; ; ) {
+        const read = readSync(input, buffer, 0, buffer.length, null);
+        if (read === 0) break;
+        let written = 0;
+        while (written < read) written += writeSync(output, buffer, written, read - written);
+      }
+    } catch (error2) {
+      closeSync2(output);
+      unlinkSync(dest);
+      throw error2;
+    }
+    closeSync2(output);
+  } finally {
+    closeSync2(input);
+  }
+}
+function exportFileName(record2, source, kind) {
+  const ext = extname(source);
+  if (kind === "preview") {
+    const stored2 = safeComponent(record2.filename ? basename(record2.filename) : null);
+    const stem = stored2 ? basename(stored2, extname(stored2)) : record2.identifier;
+    return `${safeComponent(stem) ?? record2.identifier}-preview${ext}`;
+  }
+  const stored = safeComponent(record2.filename ? basename(record2.filename) : null);
+  if (stored && !GENERIC_FILE_NAMES.has(stored.toLowerCase())) return stored;
+  const own = basename(source);
+  if (!GENERIC_FILE_NAMES.has(own.toLowerCase())) return own;
+  return `${record2.identifier}${ext}`;
+}
+function collisionName(name, attempt) {
+  if (attempt <= 1) return name;
+  const ext = extname(name);
+  const stem = ext && ext !== name ? name.slice(0, -ext.length) : name;
+  return `${stem}-${attempt}${ext}`;
+}
+function prepareExportDir(exportDir, containerDir = NOTES_CONTAINER_DIR) {
+  const abs = assertSafeSavePath(exportDir);
+  if (isInsideNotesContainer(abs, containerDir)) {
+    throw new Error(`Refusing to write inside the Notes data container: "${abs}"`);
+  }
+  mkdirSync2(abs, { recursive: true });
+  if (isInsideNotesContainer(abs, containerDir)) {
+    throw new Error(`Refusing to write inside the Notes data container: "${abs}"`);
+  }
+  return abs;
+}
+function exportOneAttachment(record2, dir, source) {
+  const base = {
+    pk: record2.pk,
+    identifier: record2.identifier,
+    uti: record2.uti,
+    kind: record2.kind,
+    parentIdentifier: record2.parentIdentifier,
+    exportedTo: null,
+    exportedKind: null
+  };
+  if (!source) return base;
+  const name = exportFileName(record2, source.path, source.kind);
+  for (let attempt = 1; attempt <= MAX_COLLISION_SUFFIX; attempt++) {
+    const dest = join7(dir, collisionName(name, attempt));
+    try {
+      assertSafeSavePath(dest);
+      copyFileExclusive(source.path, dest);
+      return { ...base, exportedTo: dest, exportedKind: source.kind };
+    } catch (error2) {
+      if (error2.code === "EEXIST") continue;
+      return { ...base, error: error2 instanceof Error ? error2.message : String(error2) };
+    }
+  }
+  return { ...base, error: "Too many name collisions in the export directory" };
+}
+function exportSource(record2) {
+  if (record2.assetPaths[0]) return { path: record2.assetPaths[0], kind: "asset" };
+  if (record2.previewPath) return { path: record2.previewPath, kind: "preview" };
+  return null;
+}
+function exportAttachmentAssets(assets, exportDir, options = {}) {
+  const dir = prepareExportDir(exportDir, options.containerDir);
+  if (options.firstImageOnly) {
+    const first2 = selectFirstImage(assets);
+    if (!first2) return { exportDir: dir, results: [], firstImage: null };
+    const record2 = assets.attachments.find((a) => a.pk === first2.pk);
+    return {
+      exportDir: dir,
+      results: [exportOneAttachment(record2, dir, exportSource(record2))],
+      firstImage: first2
+    };
+  }
+  const results = [];
+  for (const record2 of assets.attachments) {
+    if (record2.parentIdentifier !== null) {
+      const parent = assets.attachments.find(
+        (a) => a.parentIdentifier === null && a.identifier === record2.parentIdentifier
+      );
+      if (parent && exportSource(parent)) continue;
+    } else if (!exportSource(record2) && assets.attachments.some((c) => c.parentIdentifier === record2.identifier)) {
+      continue;
+    }
+    results.push(exportOneAttachment(record2, dir, exportSource(record2)));
+  }
+  return { exportDir: dir, results };
+}
+
+// src/utils/paperAttachments.ts
+var MAX_AXIS = 32768;
+var MAX_PREVIEW_DIR_ENTRIES2 = 1e5;
+var MAX_DIR_ENTRIES = 64;
+var HEADER_BYTES = 64 * 1024;
+var PNG_MAGIC = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+var IMAGE_SUFFIXES = /* @__PURE__ */ new Set([".png", ".jpg", ".jpeg"]);
+var axisOk = (n) => Number.isInteger(n) && n > 0 && n <= MAX_AXIS;
+function parseImageHeader(buf) {
+  if (buf.length >= 24 && buf.subarray(0, 8).equals(PNG_MAGIC)) {
+    if (buf.readUInt32BE(8) !== 13 || buf.toString("latin1", 12, 16) !== "IHDR") return null;
+    const width = buf.readUInt32BE(16);
+    const height = buf.readUInt32BE(20);
+    return axisOk(width) && axisOk(height) ? { format: "png", width, height } : null;
+  }
+  if (buf.length >= 4 && buf[0] === 255 && buf[1] === 216 && buf[2] === 255) {
+    let offset = 2;
+    while (offset + 4 <= buf.length) {
+      if (buf[offset] !== 255) return null;
+      const marker = buf[offset + 1];
+      if (marker === 255) {
+        offset++;
+        continue;
+      }
+      const length = buf.readUInt16BE(offset + 2);
+      if (length < 2) return null;
+      const isFrame = marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204;
+      if (isFrame) {
+        if (offset + 9 > buf.length) return null;
+        const height = buf.readUInt16BE(offset + 5);
+        const width = buf.readUInt16BE(offset + 7);
+        return axisOk(width) && axisOk(height) ? { format: "jpeg", width, height } : null;
+      }
+      offset += 2 + length;
+    }
+  }
+  return null;
+}
+function readImageInfoFd(fd) {
+  if (!fstatSync3(fd).isFile()) return null;
+  const buf = Buffer.alloc(HEADER_BYTES);
+  const read = readSync2(fd, buf, 0, buf.length, 0);
+  return parseImageHeader(buf.subarray(0, read));
+}
+function readImageInfo(path9) {
+  let fd;
+  try {
+    fd = openSync3(path9, constants3.O_RDONLY | constants3.O_NOFOLLOW);
+  } catch {
+    return null;
+  }
+  try {
+    return readImageInfoFd(fd);
+  } finally {
+    closeSync3(fd);
+  }
+}
+function buildDrawingRowsSql(notePk, columns) {
+  if (!Number.isSafeInteger(notePk) || notePk < 0) throw new Error("Invalid note primary key");
+  const col3 = (name) => columns.has(name) ? `a.${name}` : "NULL";
+  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const account = accountCols.length ? `(SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAccount') AND acc.Z_PK IN (${[
+    ...accountCols.map((c) => `a.${c}`),
+    ...accountCols.map((c) => `n.${c}`)
+  ].join(", ")}) LIMIT 1)` : "NULL";
+  const deleted = columns.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  const fields = [
+    `'pk', a.Z_PK`,
+    `'identifier', a.ZIDENTIFIER`,
+    `'uti', a.ZTYPEUTI`,
+    `'handwritingSummary', ${col3("ZHANDWRITINGSUMMARY")}`,
+    `'fallbackImageGeneration', ${col3("ZFALLBACKIMAGEGENERATION")}`,
+    `'accountIdentifier', ${account}`
+  ].join(", ");
+  return [
+    "BEGIN;",
+    `SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ${notePk} AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote');`,
+    `SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT a LEFT JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = a.ZNOTE WHERE a.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAttachment') AND a.ZNOTE = ${notePk} AND (a.ZTYPEUTI = 'com.apple.paper' OR a.ZTYPEUTI = 'com.apple.drawing' OR a.ZTYPEUTI LIKE 'com.apple.drawing.%')${deleted};`,
+    "COMMIT;"
+  ].join(" ");
+}
+function runSqlite4(dbPath2, sql) {
+  try {
+    return execFileSync8("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 1e4,
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message)) {
+      throw new AttachmentStoreError(
+        "Full Disk Access is required to read drawing attachments. Grant it to the app that launches this server, then relaunch it (run the doctor tool to verify).",
+        "no_fda"
+      );
+    }
+    throw new AttachmentStoreError(`Failed to read drawing attachments: ${message}`, "query_error");
+  }
+}
+var str = (v) => typeof v === "string" && v.length > 0 ? v : null;
+function parseDrawingRows(json2) {
+  const raw = JSON.parse(json2 || "[]");
+  if (!Array.isArray(raw)) throw new Error("Invalid drawing rows");
+  const rows = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item;
+    const identifier = str(r.identifier);
+    const uti = str(r.uti);
+    if (!Number.isSafeInteger(r.pk) || !identifier || !uti) continue;
+    const summary = str(r.handwritingSummary);
+    rows.push({
+      pk: r.pk,
+      identifier,
+      uti,
+      handwritingSummary: summary && summary.trim() ? summary : null,
+      fallbackImageGeneration: str(r.fallbackImageGeneration),
+      accountIdentifier: str(r.accountIdentifier)
+    });
+  }
+  return rows.sort((a, b) => a.pk - b.pk);
+}
+function readDrawingRows(noteId3, dbPath2 = join8(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+  const { pk } = parseNoteId2(noteId3);
+  const columns = new Set(
+    runSqlite4(
+      dbPath2,
+      "SELECT group_concat(name, ',') FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+    ).trim().split(",").filter(Boolean)
+  );
+  if (!columns.has("ZIDENTIFIER") || !columns.has("ZTYPEUTI") || !columns.has("ZNOTE")) {
+    throw new AttachmentStoreError("Unsupported Notes database schema", "query_error");
+  }
+  const lines = runSqlite4(dbPath2, buildDrawingRowsSql(pk, columns)).split("\n");
+  if (lines[0]?.trim() !== "1") {
+    throw new AttachmentStoreError(
+      `No note found in the database for ID "${noteId3}".`,
+      "not_found"
+    );
+  }
+  try {
+    return parseDrawingRows(lines[1] ?? "[]");
+  } catch {
+    throw new AttachmentStoreError("Drawing rows could not be parsed", "query_error");
+  }
+}
+function kindOf(path9) {
+  try {
+    const st = lstatSync3(path9);
+    return st.isFile() ? "file" : st.isDirectory() ? "dir" : null;
+  } catch {
+    return null;
+  }
+}
+function entries(dir, limit) {
+  try {
+    const list = readdirSync2(dir);
+    return list.length > limit ? [] : list.sort();
+  } catch {
+    return [];
+  }
+}
+var byGenerationDesc = (a, b) => generationRank(basename2(b)) - generationRank(basename2(a));
+function findFallbackImage(accountDir, identifier, generation) {
+  const id2 = safeComponent(identifier);
+  if (!id2) return null;
+  const base = join8(accountDir, "FallbackImages", id2);
+  const names = ["FallbackImage.png", "FallbackImage.jpg"];
+  const candidates = [];
+  const gen = safeComponent(generation);
+  if (gen) for (const n of names) candidates.push(join8(base, gen, n));
+  const gens = entries(base, MAX_DIR_ENTRIES).map((e) => join8(base, e)).sort(byGenerationDesc);
+  for (const g of gens) for (const n of names) candidates.push(join8(g, n));
+  for (const n of names) candidates.push(join8(base, n));
+  candidates.push(join8(accountDir, "FallbackImages", `${id2}.png`));
+  candidates.push(join8(accountDir, "FallbackImages", `${id2}.jpg`));
+  for (const c of candidates) {
+    const real = realInside(c, accountDir);
+    if (real && kindOf(real) === "file") return real;
+  }
+  return null;
+}
+function findLargestPreview(accountDir, identifier) {
+  const id2 = safeComponent(identifier);
+  if (!id2) return null;
+  const dir = join8(accountDir, "Previews");
+  const prefix = `${id2}-`.toLowerCase();
+  const names = entries(dir, MAX_PREVIEW_DIR_ENTRIES2).filter((n) => n.toLowerCase().startsWith(prefix)).filter((n) => {
+    const ext = extname2(n).toLowerCase();
+    return !ext || IMAGE_SUFFIXES.has(ext) || /^\.\d+$/.test(ext);
+  }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
+  for (const name of names) {
+    const real = realInside(join8(dir, name), accountDir);
+    if (!real) continue;
+    const kind = kindOf(real);
+    if (kind === "file") return real;
+    if (kind !== "dir") continue;
+    const gens = entries(real, MAX_DIR_ENTRIES).map((e) => realInside(join8(real, e), accountDir)).filter((p) => p !== null && kindOf(p) === "dir").sort(byGenerationDesc);
+    for (const g of [...gens, real]) {
+      const file = realInside(join8(g, "Preview.png"), accountDir);
+      if (file && kindOf(file) === "file") return file;
+    }
+  }
+  return null;
+}
+function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
+  return rows.map((row) => {
+    const accountDir = resolveAccountDir(containerDir, row.accountIdentifier);
+    const kind = row.uti === "com.apple.paper" ? "paper" : "drawing";
+    const id2 = safeComponent(row.identifier);
+    const fallbackImagePath = accountDir ? findFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration) : null;
+    const previewPath = accountDir ? findLargestPreview(accountDir, row.identifier) : null;
+    const bundle = accountDir && id2 && kind === "paper" ? realInside(join8(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
+    let raster = null;
+    for (const [path9, source] of [
+      [fallbackImagePath, "fallback"],
+      [previewPath, "preview"]
+    ]) {
+      const info = path9 ? readImageInfo(path9) : null;
+      if (path9 && info) {
+        raster = { path: path9, source, ...info };
+        break;
+      }
+    }
+    return {
+      pk: row.pk,
+      identifier: row.identifier,
+      uti: row.uti,
+      kind,
+      handwritingSummary: row.handwritingSummary,
+      bundlePresent: bundle !== null && kindOf(bundle) === "dir",
+      fallbackImagePath,
+      previewPath,
+      raster
+    };
+  });
+}
+function verifyWrittenImage(fd, path9, expected) {
+  const check2 = readImageInfoFd(fd);
+  if (!check2 || check2.format !== expected.format || check2.width !== expected.width || check2.height !== expected.height) {
+    unlinkSync2(path9);
+    throw new Error("The exported image failed validation and was removed.");
+  }
+  return check2;
+}
+function selectDrawing(drawings, noteId3, attachmentId) {
+  if (attachmentId) {
+    const wanted = attachmentId.toLowerCase();
+    const found = drawings.find(
+      (d) => d.identifier.toLowerCase() === wanted || attachmentCoreDataId(noteId3, d.pk).toLowerCase() === wanted
+    );
+    if (!found) throw new Error(`No Paper or drawing attachment "${attachmentId}" in this note.`);
+    return found;
+  }
+  if (drawings.length === 0) throw new Error("This note has no Paper or drawing attachment.");
+  if (drawings.length > 1) {
+    throw new Error(
+      `This note has ${drawings.length} Paper or drawing attachments; pass attachmentId (from list-paper-attachments) to choose one.`
+    );
+  }
+  return drawings[0];
+}
+function exportDrawingRaster(drawing, savePath, containerDir = NOTES_CONTAINER_DIR) {
+  if (!drawing.raster) {
+    throw new Error(
+      "Notes has no rendered image for this drawing on disk yet (open the note in Notes.app to let it render, then retry)."
+    );
+  }
+  const abs = assertSafeSavePath(savePath);
+  if (isInsideNotesContainer(abs, containerDir)) {
+    throw new Error(`Refusing to write inside the Notes data container: "${abs}"`);
+  }
+  const ext = extname2(abs).toLowerCase();
+  const expected = drawing.raster.format === "png" ? [".png"] : [".jpg", ".jpeg"];
+  if (!expected.includes(ext)) {
+    throw new Error(
+      `The rendered image is ${drawing.raster.format.toUpperCase()}; savePath must end in ${expected.join(" or ")}.`
+    );
+  }
+  mkdirSync3(dirname3(abs), { recursive: true });
+  assertSafeSavePath(abs);
+  if (isInsideNotesContainer(abs, containerDir)) {
+    throw new Error(`Refusing to write inside the Notes data container: "${abs}"`);
+  }
+  const input = openSync3(drawing.raster.path, constants3.O_RDONLY | constants3.O_NOFOLLOW);
+  let bytes = 0;
+  try {
+    if (!fstatSync3(input).isFile()) throw new Error("The rendered image is not a regular file");
+    const header = Buffer.alloc(HEADER_BYTES);
+    const headerLength = readSync2(input, header, 0, header.length, 0);
+    const info = parseImageHeader(header.subarray(0, headerLength));
+    if (!info || info.format !== drawing.raster.format) {
+      throw new Error(
+        "The rendered image changed or is not a valid PNG/JPEG; nothing was written."
+      );
+    }
+    let output;
+    try {
+      output = openSync3(
+        abs,
+        constants3.O_RDWR | constants3.O_CREAT | constants3.O_EXCL | constants3.O_NOFOLLOW,
+        384
+      );
+    } catch (error2) {
+      if (error2.code === "EEXIST") {
+        throw new Error(`"${abs}" already exists; choose a new savePath.`);
+      }
+      throw error2;
+    }
+    try {
+      const buffer = Buffer.allocUnsafe(1024 * 1024);
+      let position = 0;
+      for (; ; ) {
+        const read = readSync2(input, buffer, 0, buffer.length, position);
+        if (read === 0) break;
+        position += read;
+        let written = 0;
+        while (written < read) written += writeSync2(output, buffer, written, read - written);
+      }
+      bytes = position;
+      const check2 = verifyWrittenImage(output, abs, info);
+      return { savedPath: abs, bytes, source: drawing.raster.source, ...check2 };
+    } catch (error2) {
+      try {
+        unlinkSync2(abs);
+      } catch {
+      }
+      throw error2;
+    } finally {
+      closeSync3(output);
+    }
+  } finally {
+    closeSync3(input);
   }
 }
 
@@ -40041,13 +42126,34 @@ function scopeConflictMessage(reason) {
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync3 } from "fs";
-import { homedir as homedir4 } from "os";
-import { join as join4 } from "path";
+import { existsSync as existsSync5 } from "fs";
+import { homedir as homedir8 } from "os";
+import { join as join9 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(character id 31)";
 var AS_RECORD_SEP = "(character id 30)";
+var GROUP_SEP = "";
+var AS_GROUP_SEP = "(character id 29)";
+var FOLDER_ID_PATTERN = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+function trashFolderIdList() {
+  const ids = readTrashFolderIds().filter((id2) => FOLDER_ID_PATTERN.test(id2));
+  return `{${ids.map((id2) => `"${id2}"`).join(", ")}}`;
+}
+function buildTrashNoteIdsCollector() {
+  return `
+        set __trashNoteIds to {}
+        repeat with __trashFolderId in ${trashFolderIdList()}
+          try
+            set __trashNoteIds to __trashNoteIds & (id of notes of folder id (contents of __trashFolderId))
+          end try
+        end repeat
+        try
+          repeat with __trashFolder in (every folder whose name is "${RECENTLY_DELETED_FOLDER_NAME}")
+            set __trashNoteIds to __trashNoteIds & (id of notes of __trashFolder)
+          end repeat
+        end try`;
+}
 var DEFAULT_EXPORT_PAGE_SIZE = 50;
 var DEFAULT_EXPORT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 function exportMaxResponseBytes(env = process.env) {
@@ -40078,11 +42184,11 @@ function fitExportNoteToBudget(note, maxBytes) {
 function executeMutationAppleScript(script) {
   return executeAppleScript(script, { maxRetries: 1 });
 }
-function escapeForAppleScript(text) {
-  if (!text) {
+function escapeForAppleScript(text2) {
+  if (!text2) {
     return "";
   }
-  let escaped = text.replace(/&/g, "&amp;");
+  let escaped = text2.replace(/&/g, "&amp;");
   escaped = escaped.replace(/\\/g, "&#92;");
   escaped = escaped.replace(/"/g, '\\"');
   escaped = escaped.replace(/\n/g, "<br>");
@@ -40095,9 +42201,9 @@ function escapeHtmlForAppleScript(htmlContent) {
   }
   return htmlContent.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
-function escapePlainStringForAppleScript(text) {
-  if (!text) return "";
-  return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+function escapePlainStringForAppleScript(text2) {
+  if (!text2) return "";
+  return text2.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 var MAX_TITLE_LENGTH = 2e3;
 var MAX_CONTENT_LENGTH = 5 * 1024 * 1024;
@@ -40250,10 +42356,10 @@ function buildAccountResolution(account) {
     if ${AS_ACCOUNT_REF} is missing value then error "${ACCOUNT_RESOLUTION_ERROR} Account \\"${safeAccount}\\" not found"
   `;
 }
-function buildAccountScopedScript(scope, command) {
+function buildAccountScopedScript(scope2, command) {
   return `
     tell application "Notes"
-      ${buildAccountResolution(scope.account)}
+      ${buildAccountResolution(scope2.account)}
       tell ${AS_ACCOUNT_REF}
         ${command}
       end tell
@@ -40267,12 +42373,12 @@ function buildAppLevelScript(command) {
     end tell
   `;
 }
-function getNoteLinkFromDB(coreDataId) {
-  const match = coreDataId.match(/\/p(\d+)$/);
+function getNoteLinkFromDB(coreDataId2) {
+  const match = coreDataId2.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath2 = join4(homedir4(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
-  if (!existsSync3(dbPath2)) return null;
+  const dbPath2 = join9(homedir8(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  if (!existsSync5(dbPath2)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
     const db = new DatabaseSync(dbPath2, { readOnly: true });
@@ -40337,6 +42443,16 @@ var AppleNotesManager = class {
       this.defaultAccountName = result.success ? result.output.trim() : "";
     }
     return this.defaultAccountName || void 0;
+  }
+  /**
+   * The account a search with this `account` argument is scoped to: the
+   * caller's account when named, else Notes.app's default account (cached).
+   * Returns `undefined` when no account was named and the default cannot be
+   * determined. Used by search-notes' database path so it searches the same
+   * account the AppleScript path would.
+   */
+  searchAccountScope(account) {
+    return this.reportedAccount(this.resolveAccount(account));
   }
   /**
    * Checks if a note is password-protected by its ID.
@@ -40477,9 +42593,9 @@ var AppleNotesManager = class {
    * const topResults = manager.searchNotes("project", false, undefined, undefined, undefined, 10);
    * ```
    */
-  searchNotes(query, searchContent = false, account, folder, modifiedSince, limit) {
+  searchNotes(query2, searchContent = false, account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
-    const safeQuery = escapePlainStringForAppleScript(query);
+    const safeQuery = escapePlainStringForAppleScript(query2);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const whereParts = [];
     if (searchContent) {
@@ -40537,7 +42653,7 @@ var AppleNotesManager = class {
     const script = buildAccountScopedScript({ account: targetAccount }, searchCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      throw new Error(`Failed to search notes for "${query}": ${result.error ?? "unknown error"}`);
+      throw new Error(`Failed to search notes for "${query2}": ${result.error ?? "unknown error"}`);
     }
     if (!result.output.trim()) {
       return [];
@@ -40714,6 +42830,21 @@ var AppleNotesManager = class {
     };
   }
   /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id2) {
+    return collectNoteTables(readRichNote(id2), id2);
+  }
+  /**
    * Retrieves detailed metadata for a note by title.
    *
    * Similar to getNoteContent but returns structured metadata
@@ -40766,7 +42897,7 @@ var AppleNotesManager = class {
    * race that would exist if JavaScript checked the note and then issued a
    * separate unconditional `set body` command.
    */
-  updateNoteByIdIfUnchanged(id2, currentTitle, expectedBody, newTitle, newContent, format = "plaintext", expectedRichRevision, scope) {
+  updateNoteByIdIfUnchanged(id2, currentTitle, expectedBody, newTitle, newContent, format = "plaintext", expectedRichRevision, scope2) {
     const safeId = sanitizeNoteId(id2);
     if (expectedRichRevision) {
       const rich = readRichNote(id2);
@@ -40787,7 +42918,7 @@ var AppleNotesManager = class {
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const safeWrittenBody = escapeHtmlForAppleScript(writtenBody);
     const script = buildAppLevelScript(`
-      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
+      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       if (count of attachments of noteRef) is greater than 0 then return "SAFETY_ATTACHMENTS"
       set currentBody to body of noteRef
       considering case
@@ -40814,17 +42945,36 @@ var AppleNotesManager = class {
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
    */
-  deleteNoteByIdIfUnchanged(id2, expectedBody, scope) {
+  deleteNoteByIdIfUnchanged(id2, expectedBody, scope2) {
     const safeId = sanitizeNoteId(id2);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const script = buildAppLevelScript(`
-      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
+      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
+      set originalFolder to missing value
+      try
+        set originalFolder to container of noteRef
+      end try
+      if originalFolder is not missing value then
+        set __inTrash to false
+        try
+          if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
+        end try
+        try
+          if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
+        end try
+        if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      end if
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      if originalFolder is not missing value then
+        try
+          if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        end try
+      end if
       return "SAFETY_DELETED"
     `);
     const result = executeMutationAppleScript(script);
@@ -40836,6 +42986,8 @@ var AppleNotesManager = class {
     if (deleteScopeFailure) return { status: "scope_conflict", reason: deleteScopeFailure };
     const status = result.output.trim();
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
+    if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
+    if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
   /**
@@ -40845,11 +42997,11 @@ var AppleNotesManager = class {
    *
    * @returns null when every precondition holds, otherwise the failure reason
    */
-  checkNoteScope(id2, scope) {
+  checkNoteScope(id2, scope2) {
     const safeId = sanitizeNoteId(id2);
     const result = executeAppleScript(
       buildAppLevelScript(`
-      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
+      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       return "SCOPE_OK"`)
     );
     if (!result.success) return result.error || "the note's folder could not be read";
@@ -40877,14 +43029,20 @@ var AppleNotesManager = class {
    *   dateSetup: a date filter must scan every note's date). The script then
    *   returns the total note count as a leading record so the caller can
    *   detect a dedup shortfall and fall back to a full fetch.
+   * @param trashCheck - Also return the ids of notes in Recently Deleted,
+   *   after a group separator, so the caller can exclude or flag them (#207).
+   *   Only valid inside an account-scoped script.
    */
   buildBulkListCommand(opts) {
-    const { folderRef, dateSetup, sliceLimit } = opts;
+    const { folderRef, dateSetup, sliceLimit, trashCheck } = opts;
     const fullSource = folderRef ? `notes of ${folderRef}` : "notes";
+    const trashSetup = trashCheck ? `${buildTrashNoteIdsCollector()}
+` : "";
+    const trashSuffix = trashCheck ? ` & ${AS_GROUP_SEP} & (__trashNoteIds as text)` : "";
     const countGuard = (listVar) => `if (count of ${listVar}) is not (count of noteNames) then error "${BULK_LIST_MUTATION_ERROR}"`;
     if (sliceLimit !== void 0) {
       const slicedSource = folderRef ? `(notes 1 thru fetchCount of ${folderRef})` : `(notes 1 thru fetchCount)`;
-      return `
+      return `${trashSetup}
         set totalCount to count of ${fullSource}
         set fetchCount to ${sliceLimit}
         if fetchCount > totalCount then set fetchCount to totalCount
@@ -40911,7 +43069,7 @@ var AppleNotesManager = class {
           end repeat
         end if
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)
+        return (totalCount as text) & ${AS_RECORD_SEP} & (resultList as text)${trashSuffix}
       `;
     }
     const dateFetch = dateSetup ? `set noteDates to modification date of ${fullSource}
@@ -40922,7 +43080,7 @@ var AppleNotesManager = class {
             ` : "";
     const dateGuardClose = dateSetup ? `
           end if` : "";
-    return `
+    return `${trashSetup}
         ${dateSetup ?? ""}set noteNames to name of ${fullSource}
         set noteIds to id of ${fullSource}
         ${dateFetch}${countGuard("noteIds")}
@@ -40931,8 +43089,60 @@ var AppleNotesManager = class {
           ${dateGuardOpen}set end of resultList to (item i of noteNames) & ${AS_FIELD_SEP} & (item i of noteIds)${dateGuardClose}
         end repeat
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
-        return resultList as text
+        return (resultList as text)${trashSuffix}
       `;
+  }
+  /**
+   * Lists every smart folder with its decoded query, read-only.
+   *
+   * Folder metadata and queries come from the NoteStore database (Full Disk
+   * Access). With `includeMatchingNotes`, Notes.app itself is asked which notes
+   * each smart folder currently shows, so membership reflects Notes' own
+   * evaluation of the query rather than a reimplementation of it.
+   *
+   * @param options.includeMatchingNotes - Also list the notes each folder shows
+   * @param options.limit - Maximum matching notes per folder (default 50)
+   * @throws Error when the database cannot be read (message says why)
+   */
+  listSmartFolders(options = {}) {
+    const result = readSmartFolders();
+    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!options.includeMatchingNotes) return result.folders;
+    const limit = options.limit ?? 50;
+    return result.folders.map((folder) => {
+      try {
+        const { total, notes } = this.listSmartFolderNoteRefs(folder.id, limit);
+        return { ...folder, matchingNoteCount: total, matchingNotes: notes };
+      } catch (error2) {
+        return {
+          ...folder,
+          matchingNotesError: error2 instanceof Error ? error2.message : String(error2)
+        };
+      }
+    });
+  }
+  /**
+   * Asks Notes.app for the notes one smart folder currently shows.
+   *
+   * @returns The folder's total note count and up to `limit` (title, id) pairs
+   */
+  listSmartFolderNoteRefs(folderId2, limit) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId2))
+      throw new Error("An exact folder ID is required");
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const script = buildAppLevelScript(
+      this.buildBulkListCommand({ folderRef: `folder id "${folderId2}"`, sliceLimit: safeLimit })
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list smart folder notes: ${result.error ?? "unknown error"}`);
+    }
+    const sepIdx = result.output.indexOf(RECORD_SEP);
+    const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+    const total = Number.parseInt(header.trim(), 10);
+    if (Number.isNaN(total)) throw new Error("Unexpected smart folder listing output");
+    const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
+    return { total, notes: this.parseBulkListOutput(records, safeLimit) };
   }
   /**
    * Parses bulk listing output into deduplicated (title, id) pairs.
@@ -40941,19 +43151,49 @@ var AppleNotesManager = class {
    * after dedup so duplicates never count against it.
    */
   parseBulkListOutput(output, safeLimit) {
-    if (!output.trim()) return [];
-    const seenIds = /* @__PURE__ */ new Set();
+    return this.parseBulkListRecords(output, safeLimit).refs;
+  }
+  /**
+   * Splits a trash-checked listing (see buildBulkListCommand's trashCheck)
+   * into the listing records and the set of note ids in Recently Deleted.
+   * Output without the group separator carries no trash information (null).
+   */
+  splitTrashIds(output) {
+    const idx = output.lastIndexOf(GROUP_SEP);
+    if (idx === -1) return { records: output, trashIds: null };
+    const trashIds = new Set(
+      output.slice(idx + 1).split(RECORD_SEP).map((id2) => id2.trim()).filter(Boolean)
+    );
+    return { records: output.slice(0, idx), trashIds };
+  }
+  /**
+   * Parses bulk listing records, deduplicated by id. Notes whose id is in
+   * `trash.ids` are dropped (and counted) unless `trash.include`, in which
+   * case they are kept and flagged `inRecentlyDeleted`. The limit applies
+   * after both dedup and trash filtering.
+   */
+  parseBulkListRecords(output, safeLimit, trash) {
     const refs = [];
+    let excludedRecentlyDeleted = 0;
+    if (!output.trim()) return { refs, excludedRecentlyDeleted };
+    const seenIds = /* @__PURE__ */ new Set();
     for (const item of output.split(RECORD_SEP)) {
       const [title, id2] = item.split(FIELD_SEP);
       if (!title?.trim()) continue;
       const noteId3 = id2?.trim() || generateFallbackId();
       if (seenIds.has(noteId3)) continue;
       seenIds.add(noteId3);
-      refs.push({ title: title.trim(), id: noteId3 });
+      const trashed = trash?.ids?.has(noteId3) ?? false;
+      if (trashed && !trash?.include) {
+        excludedRecentlyDeleted++;
+        continue;
+      }
+      refs.push(
+        trashed ? { title: title.trim(), id: noteId3, inRecentlyDeleted: true } : { title: title.trim(), id: noteId3 }
+      );
       if (safeLimit !== void 0 && refs.length >= safeLimit) break;
     }
-    return refs;
+    return { refs, excludedRecentlyDeleted };
   }
   /**
    * Core listing path shared by `listNotes()` and `listNoteRefs()`: lists
@@ -40961,7 +43201,7 @@ var AppleNotesManager = class {
    * returning (title, id) pairs. Kept private because both public callers
    * need to apply their own return shape.
    */
-  listNotesCore(account, folder, modifiedSince, limit) {
+  listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted = false) {
     const targetAccount = this.resolveAccount(account);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const folderRef = folder ? buildFolderReference(folder) : void 0;
@@ -40975,30 +43215,38 @@ var AppleNotesManager = class {
     if (safeLimit !== void 0 && !dateSetup) {
       const script2 = buildAccountScopedScript(
         { account: targetAccount },
-        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit })
+        this.buildBulkListCommand({ folderRef, sliceLimit: safeLimit, trashCheck: true })
       );
       const result2 = executeAppleScript(script2);
       if (!result2.success) {
         throw new Error(`Failed to list notes: ${result2.error ?? "unknown error"}`);
       }
-      const sepIdx = result2.output.indexOf(RECORD_SEP);
-      const header = sepIdx === -1 ? result2.output : result2.output.slice(0, sepIdx);
+      const { records: body, trashIds: trashIds2 } = this.splitTrashIds(result2.output);
+      const sepIdx = body.indexOf(RECORD_SEP);
+      const header = sepIdx === -1 ? body : body.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
-      const records = sepIdx === -1 ? "" : result2.output.slice(sepIdx + 1);
-      const refs = this.parseBulkListOutput(records, safeLimit);
-      if (!Number.isNaN(totalCount) && (refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return refs;
+      const records2 = sepIdx === -1 ? "" : body.slice(sepIdx + 1);
+      const parsed = this.parseBulkListRecords(records2, safeLimit, {
+        ids: trashIds2,
+        include: includeRecentlyDeleted
+      });
+      if (!Number.isNaN(totalCount) && (parsed.refs.length >= safeLimit || totalCount <= safeLimit)) {
+        return parsed;
       }
     }
     const script = buildAccountScopedScript(
       { account: targetAccount },
-      this.buildBulkListCommand({ folderRef, dateSetup })
+      this.buildBulkListCommand({ folderRef, dateSetup, trashCheck: true })
     );
     const result = executeAppleScript(script);
     if (!result.success) {
       throw new Error(`Failed to list notes: ${result.error ?? "unknown error"}`);
     }
-    return this.parseBulkListOutput(result.output, safeLimit);
+    const { records, trashIds } = this.splitTrashIds(result.output);
+    return this.parseBulkListRecords(records, safeLimit, {
+      ids: trashIds,
+      include: includeRecentlyDeleted
+    });
   }
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and limit.
@@ -41010,7 +43258,7 @@ var AppleNotesManager = class {
    * @returns Array of note titles
    */
   listNotes(account, folder, modifiedSince, limit) {
-    return this.listNotesCore(account, folder, modifiedSince, limit).map((ref) => ref.title);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs.map((ref) => ref.title);
   }
   /**
    * Lists all notes in an account, optionally filtered by folder, date, and
@@ -41021,10 +43269,23 @@ var AppleNotesManager = class {
    * specifier resolves ambiguously to the same one note every time — see
    * the fix in exportNotesAsJson for the failure mode this avoids).
    *
+   * Notes in Recently Deleted are excluded (#207); use
+   * `listNoteRefsDetailed()` to include and flag them.
+   *
    * @returns Array of { title, id } pairs, deduplicated by id
    */
   listNoteRefs(account, folder, modifiedSince, limit) {
-    return this.listNotesCore(account, folder, modifiedSince, limit);
+    return this.listNotesCore(account, folder, modifiedSince, limit).refs;
+  }
+  /**
+   * Same as `listNoteRefs()`, plus control over notes in Recently Deleted and
+   * a count of how many were skipped. Notes.app's account-wide `notes`
+   * includes Recently Deleted, so they are excluded unless
+   * `includeRecentlyDeleted`, in which case each is flagged
+   * `inRecentlyDeleted: true`. (#207)
+   */
+  listNoteRefsDetailed(account, folder, modifiedSince, limit, includeRecentlyDeleted = false) {
+    return this.listNotesCore(account, folder, modifiedSince, limit, includeRecentlyDeleted);
   }
   /**
    * Lists all shared (collaborative) notes across all accounts.
@@ -41106,7 +43367,7 @@ var AppleNotesManager = class {
         }
       }
     }
-    return sharedNotes;
+    return uniqueById(sharedNotes);
   }
   // ===========================================================================
   // Folder Operations
@@ -41212,7 +43473,7 @@ var AppleNotesManager = class {
       return [];
     }
     const recordSeparator = result.output.includes(RECORD_SEP) ? RECORD_SEP : "\n";
-    const entries = result.output.split(recordSeparator).map((line) => {
+    const entries2 = result.output.split(recordSeparator).map((line) => {
       const parts = line.includes(FIELD_SEP) ? line.split(FIELD_SEP) : line.split("	");
       return {
         id: (parts[0] || "").trim(),
@@ -41225,7 +43486,7 @@ var AppleNotesManager = class {
         account: (parts[4] || "").trim()
       };
     });
-    const byId = new Map(entries.map((e) => [e.id, e]));
+    const byId = new Map(entries2.map((e) => [e.id, e]));
     const buildPath = (entry) => {
       const safeName = escapeFolderName(entry.name);
       if (!entry.parentId) return safeName;
@@ -41235,7 +43496,7 @@ var AppleNotesManager = class {
       }
       return safeName;
     };
-    return entries.map((entry) => ({
+    return entries2.map((entry) => ({
       id: entry.id,
       name: buildPath(entry),
       account: entry.account || targetAccount || "",
@@ -41291,9 +43552,9 @@ var AppleNotesManager = class {
     );
     const idResult = executeAppleScript(idScript);
     const [rawId = "", rawAccount = ""] = idResult.success ? idResult.output.split(FIELD_SEP) : [];
-    const folderId = idResult.success ? extractCoreDataId(rawId, "folder") : "";
+    const folderId2 = idResult.success ? extractCoreDataId(rawId, "folder") : "";
     return {
-      id: folderId,
+      id: folderId2,
       name,
       account: rawAccount.trim() || targetAccount || ""
     };
@@ -41332,14 +43593,14 @@ var AppleNotesManager = class {
    * @param account - Account containing the destination folder (defaults to Notes.app's default account)
    * @returns true if the move succeeded, false otherwise
    */
-  moveNoteById(id2, destinationFolder, account, scope) {
+  moveNoteById(id2, destinationFolder, account, scope2) {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeNoteId(id2);
     const destFolderRef = `${buildFolderReference(destinationFolder)} of ${AS_ACCOUNT_REF}`;
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
       set destFolder to ${destFolderRef}
-      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope, "destFolder")}
+      set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2, "destFolder")}
       move noteRef to destFolder
       set movedNoteRef to note id "${safeId}"
       set actualFolder to container of movedNoteRef
@@ -41947,7 +44208,7 @@ var AppleNotesManager = class {
         });
       }
     }
-    return attachments;
+    return uniqueById(attachments);
   }
   /**
    * Lists attachments for a note by its title.
@@ -42034,7 +44295,7 @@ var AppleNotesManager = class {
         });
       }
     }
-    return attachments;
+    return uniqueById(attachments);
   }
   /**
    * Saves a single attachment of a note (identified by attachment id) to a file
@@ -42096,7 +44357,7 @@ var AppleNotesManager = class {
     if (parts[0] !== "OK") {
       return { success: false, error: parts[1]?.trim() || "attachment not found" };
     }
-    if (!existsSync3(abs) || fileSize(abs) === 0) {
+    if (!existsSync5(abs) || fileSize(abs) === 0) {
       return { success: false, error: `Notes reported success but no file was written to ${abs}` };
     }
     return {
@@ -42138,6 +44399,55 @@ var AppleNotesManager = class {
     } finally {
       cleanupTempDir(dir);
     }
+  }
+  /**
+   * Lists a note's Paper (`com.apple.paper`) and classic drawing attachments
+   * with Notes' rendered raster, read-only from NoteStore and the Notes group
+   * container. Requires Full Disk Access.
+   *
+   * @throws PaperStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  listPaperAttachmentsById(noteId3) {
+    return describeDrawings(readDrawingRows(noteId3));
+  }
+  /**
+   * Copies Notes' rendered raster of one drawing to a new file. `attachmentId`
+   * (identifier or AppleScript id) is required when the note has more than one.
+   */
+  exportPaperImageById(noteId3, savePath, attachmentId) {
+    const drawing = selectDrawing(this.listPaperAttachmentsById(noteId3), noteId3, attachmentId);
+    return { drawing, ...exportDrawingRaster(drawing, savePath) };
+  }
+  /**
+   * Reads one note's attachments with their on-disk asset and preview paths,
+   * in body order, from the NoteStore database and the Notes group container
+   * (both read-only). Requires Full Disk Access.
+   *
+   * @param noteId - canonical CoreData note id
+   * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
+   */
+  getAttachmentAssetsById(noteId3) {
+    const { rows, bodyOrder } = readNoteAttachmentRows(noteId3);
+    return assembleAttachmentAssets(rows, bodyOrder);
+  }
+  /**
+   * The note's lead visual: the first image in body order (even when its asset
+   * has not downloaded), else the first scan or drawing, else null.
+   */
+  getFirstImageById(noteId3) {
+    return selectFirstImage(this.getAttachmentAssetsById(noteId3));
+  }
+  /**
+   * Copies a note's attachment files into a directory. Each attachment exports
+   * its real asset; its rendered preview only when no asset exists. Existing
+   * files are never replaced: name collisions get `-2`, `-3`, ... suffixes.
+   * The directory must satisfy the same allowlist as save-attachment and may
+   * not be inside the Notes group container.
+   */
+  exportAttachmentsById(noteId3, exportDir, firstImageOnly = false) {
+    return exportAttachmentAssets(this.getAttachmentAssetsById(noteId3), exportDir, {
+      firstImageOnly
+    });
   }
   // ===========================================================================
   // Batch Operations
@@ -42291,13 +44601,13 @@ var AppleNotesManager = class {
    * Simple HTML to plaintext conversion for export.
    */
   htmlToPlaintext(html) {
-    let text = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<\/p>/gi, "\n");
+    let text2 = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<\/p>/gi, "\n");
     let prev;
     do {
-      prev = text;
-      text = text.replace(/<[^>]*>/g, "");
-    } while (text !== prev);
-    return text.replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#92;/g, "\\").replace(/&amp;/g, "&").replace(/\n{3,}/g, "\n\n").trim();
+      prev = text2;
+      text2 = text2.replace(/<[^>]*>/g, "");
+    } while (text2 !== prev);
+    return text2.replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#92;/g, "\\").replace(/&amp;/g, "&").replace(/\n{3,}/g, "\n\n").trim();
   }
   /**
    * Exports notes as a JSON structure for backup/migration, one page at a time.
@@ -42473,11 +44783,11 @@ var AppleNotesManager = class {
     const enriched = lines.map((line) => {
       const listMatch = line.match(/^(\s*[-*])\s+(.+)$/);
       if (!listMatch) return line;
-      const [, prefix, text] = listMatch;
-      const done = checklistMap.get(text.trim());
+      const [, prefix, text2] = listMatch;
+      const done = checklistMap.get(text2.trim());
       if (done === void 0) return line;
-      checklistMap.delete(text.trim());
-      return `${prefix} ${done ? "[x]" : "[ ]"} ${text}`;
+      checklistMap.delete(text2.trim());
+      return `${prefix} ${done ? "[x]" : "[ ]"} ${text2}`;
     });
     return enriched.join("\n");
   }
@@ -42536,18 +44846,31 @@ var AppleNotesManager = class {
     }
     return markdown;
   }
+  /**
+   * Reads the transcripts Notes has stored for a note's top-level audio
+   * recordings, one entry per attachment in body order. Read-only: queries the
+   * NoteStore database with `sqlite3 -readonly` and needs Full Disk Access.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @param options - word-level segment inclusion and cap
+   * @throws AudioTranscriptError for an invalid id, a missing or locked note,
+   *   missing Full Disk Access, or a database read failure
+   */
+  getAudioTranscripts(id2, options = {}) {
+    return readAudioTranscripts(id2, options);
+  }
 };
 
 // src/utils/syncDetection.ts
-import { execFileSync as execFileSync4 } from "child_process";
-import * as fs2 from "fs";
-import * as path2 from "path";
-import * as os2 from "os";
-var NOTES_DB_PATH2 = path2.join(
-  os2.homedir(),
+import { execFileSync as execFileSync9 } from "child_process";
+import * as fs4 from "fs";
+import * as path4 from "path";
+import * as os4 from "os";
+var NOTES_DB_PATH5 = path4.join(
+  os4.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var WAL_PATH = `${NOTES_DB_PATH2}-wal`;
+var WAL_PATH = `${NOTES_DB_PATH5}-wal`;
 var RECENT_ACTIVITY_THRESHOLD_SECONDS = 5;
 var SYNC_STATUS_CACHE_TTL_MS = 2e3;
 var cachedSyncStatus = null;
@@ -42563,19 +44886,19 @@ function getSyncStatus(useCache = true) {
     recentActivity: false
   };
   try {
-    if (!fs2.existsSync(NOTES_DB_PATH2)) {
+    if (!fs4.existsSync(NOTES_DB_PATH5)) {
       status.error = "Notes database not found";
       cachedSyncStatus = status;
       cacheTimestamp = Date.now();
       return status;
     }
-    if (fs2.existsSync(WAL_PATH)) {
-      const walStats = fs2.statSync(WAL_PATH);
+    if (fs4.existsSync(WAL_PATH)) {
+      const walStats = fs4.statSync(WAL_PATH);
       const secondsAgo = (Date.now() - walStats.mtimeMs) / 1e3;
       status.secondsSinceLastChange = Math.round(secondsAgo);
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
     }
-    const query = `
+    const query2 = `
       SELECT COUNT(*) FROM ZICCLOUDSTATE state
       WHERE state.ZCURRENTLOCALVERSION > state.ZLATESTVERSIONSYNCEDTOCLOUD
       AND state.ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL
@@ -42584,9 +44907,9 @@ function getSyncStatus(useCache = true) {
         WHERE object.ZCLOUDSTATE = state.Z_PK
       );
     `;
-    const result = execFileSync4(
+    const result = execFileSync9(
       "sqlite3",
-      ["-readonly", NOTES_DB_PATH2, query.replace(/\n/g, " ")],
+      ["-readonly", NOTES_DB_PATH5, query2.replace(/\n/g, " ")],
       {
         encoding: "utf8",
         timeout: 5e3,
@@ -42643,15 +44966,15 @@ function withSyncAwarenessSync(operation, fn) {
 }
 
 // src/utils/noteMetadata.ts
-import { execFileSync as execFileSync5 } from "child_process";
-import * as fs3 from "fs";
-import * as path3 from "path";
-import * as os3 from "os";
-var NOTES_DB_PATH3 = path3.join(
-  os3.homedir(),
+import { execFileSync as execFileSync10 } from "child_process";
+import * as fs5 from "fs";
+import * as path5 from "path";
+import * as os5 from "os";
+var NOTES_DB_PATH6 = path5.join(
+  os5.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var FDA_MESSAGE = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var FDA_MESSAGE2 = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
 var COLUMN_MAP = [
   { key: "pinned", column: "ZISPINNED", type: "bool" },
   { key: "hasChecklist", column: "ZHASCHECKLIST", type: "bool" },
@@ -42663,15 +44986,15 @@ var COLUMN_MAP = [
   { key: "widgetSnippet", column: "ZWIDGETSNIPPET", type: "text" },
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
-function runSqlite(query) {
-  return execFileSync5("sqlite3", ["-readonly", NOTES_DB_PATH3, query], {
+function runSqlite5(query2) {
+  return execFileSync10("sqlite3", ["-readonly", NOTES_DB_PATH6, query2], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
   }).trim();
 }
 function presentColumns() {
-  const out = runSqlite("PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);");
+  const out = runSqlite5("PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);");
   const cols = /* @__PURE__ */ new Set();
   for (const line of out.split("\n")) {
     const name = line.split("|")[1];
@@ -42689,8 +45012,8 @@ function getNoteMetadata(noteId3) {
     };
   }
   const pk = pkMatch[1];
-  if (!fs3.existsSync(NOTES_DB_PATH3)) {
-    return { metadata: null, error: "no_fda", message: FDA_MESSAGE };
+  if (!fs5.existsSync(NOTES_DB_PATH6)) {
+    return { metadata: null, error: "no_fda", message: FDA_MESSAGE2 };
   }
   try {
     const available = presentColumns();
@@ -42699,7 +45022,7 @@ function getNoteMetadata(noteId3) {
       return { metadata: {} };
     }
     const pairs = selected.map((c) => `'${c.key}', ${c.column}`).join(", ");
-    const row = runSqlite(
+    const row = runSqlite5(
       `SELECT json_object(${pairs}) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = ${pk};`
     );
     if (!row) {
@@ -42724,11 +45047,653 @@ function getNoteMetadata(noteId3) {
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      return { metadata: null, error: "no_fda", message: FDA_MESSAGE };
+      return { metadata: null, error: "no_fda", message: FDA_MESSAGE2 };
     }
     console.error(`Failed to read note metadata: ${message}`);
     return { metadata: null, error: "query_error", message: "Failed to read note metadata." };
   }
+}
+
+// src/utils/noteListings.ts
+import { gunzipSync as gunzipSync6 } from "zlib";
+
+// src/utils/noteStoreSql.ts
+import { execFileSync as execFileSync11 } from "child_process";
+import * as fs6 from "fs";
+import * as os6 from "os";
+import * as path6 from "path";
+var NOTES_DB_PATH7 = path6.join(
+  os6.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
+var STORE_FDA_MESSAGE = `Full Disk Access is required to read the Notes database. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var NoteStoreError = class extends Error {
+  constructor(message, kind) {
+    super(message);
+    this.kind = kind;
+    this.name = "NoteStoreError";
+  }
+  kind;
+};
+function doubleToHex(value) {
+  if (!Number.isFinite(value)) throw new NoteStoreError("Not a finite number", "invalid_input");
+  const buffer = Buffer.alloc(8);
+  buffer.writeDoubleBE(value);
+  return buffer.toString("hex");
+}
+function hexToDouble(hex3) {
+  if (!/^[0-9a-f]{16}$/i.test(hex3))
+    throw new NoteStoreError("Invalid double bits", "invalid_input");
+  const value = Buffer.from(hex3, "hex").readDoubleBE();
+  if (!Number.isFinite(value)) throw new NoteStoreError("Invalid double bits", "invalid_input");
+  return value;
+}
+function renderValue(value) {
+  if ("int" in value) {
+    if (!Number.isSafeInteger(value.int)) {
+      throw new NoteStoreError("Bound integer out of range", "invalid_input");
+    }
+    return String(value.int);
+  }
+  if ("blob" in value) return `x'${Buffer.from(value.blob).toString("hex")}'`;
+  const double = "double" in value ? value.double : hexToDouble(value.doubleBits);
+  return `ieee754_from_blob(x'${doubleToHex(double)}')`;
+}
+function runReadOnlySql(dbPath2, sql, params = {}) {
+  if (!fs6.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+  const args = ["-readonly"];
+  const names = Object.keys(params);
+  if (names.length) args.push("-cmd", ".parameter init");
+  for (const name of names) {
+    if (!/^[a-z][a-z0-9_]*$/i.test(name)) {
+      throw new NoteStoreError(`Invalid parameter name ${name}`, "invalid_input");
+    }
+    args.push("-cmd", `.parameter set @${name} ${renderValue(params[name])}`);
+  }
+  args.push(dbPath2, sql);
+  try {
+    return execFileSync11("sqlite3", args, {
+      encoding: "utf8",
+      timeout: 3e4,
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message)) {
+      throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`Notes database query failed: ${message}`);
+    throw new NoteStoreError("Failed to query the Notes database.", "query_error");
+  }
+}
+function parseJsonLines(output) {
+  const rows = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      throw new NoteStoreError("Unexpected Notes database response.", "query_error");
+    }
+  }
+  return rows;
+}
+function readColumns(dbPath2) {
+  const out = runReadOnlySql(
+    dbPath2,
+    "SELECT json_object('name', name) FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  );
+  return new Set(parseJsonLines(out).map((row) => row.name));
+}
+function requireColumns(columns, required2, tool) {
+  const missing = required2.filter((column) => !columns.has(column));
+  if (missing.length) {
+    throw new NoteStoreError(
+      `This macOS version's Notes database lacks columns ${tool} needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+}
+function col(columns, alias, name, fallback = "NULL") {
+  return columns.has(name) ? `${alias}.${name}` : fallback;
+}
+function entity(name) {
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
+}
+function accountRef(columns, alias) {
+  const refs = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort().map((name) => `${alias}.${name}`);
+  if (!refs.length) return "NULL";
+  return refs.length === 1 ? refs[0] : `COALESCE(${refs.join(", ")})`;
+}
+function trashFolderSql(columns, f) {
+  const parts = [];
+  if (columns.has("ZFOLDERTYPE")) parts.push(`COALESCE(${f}.ZFOLDERTYPE, 0) = 1`);
+  if (columns.has("ZIDENTIFIER")) parts.push(`COALESCE(${f}.ZIDENTIFIER, '') LIKE 'TrashFolder%'`);
+  return parts.length ? `(${parts.join(" OR ")})` : "0";
+}
+function notTombstonedSql(columns, alias) {
+  return columns.has("ZMARKEDFORDELETION") ? `COALESCE(${alias}.ZMARKEDFORDELETION, 0) = 0` : "1";
+}
+function activeNoteSql(columns, n, f) {
+  return [
+    `${n}.ZFOLDER IS NOT NULL`,
+    `${f}.Z_PK IS NOT NULL`,
+    notTombstonedSql(columns, n),
+    notTombstonedSql(columns, f),
+    `NOT ${trashFolderSql(columns, f)}`
+  ].join(" AND ");
+}
+function coreDataToIso(seconds) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) return null;
+  const date3 = new Date(CORE_DATA_EPOCH_MS + seconds * 1e3);
+  return Number.isNaN(date3.getTime()) ? null : date3.toISOString();
+}
+function noteIdFor(storeUuid, pk) {
+  return `x-coredata://${storeUuid}/ICNote/p${pk}`;
+}
+function readStoreContext(dbPath2, columns) {
+  const sql = [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col(columns, "a", "ZNAME")}, 'identifier', ${col(columns, "a", "ZIDENTIFIER")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity("ICAccount")} AND ${notTombstonedSql(columns, "a")};`,
+    `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col(columns, "f", "ZTITLE2")}, 'identifier', ${col(columns, "f", "ZIDENTIFIER")}, 'parent', ${col(columns, "f", "ZPARENT")}, 'account', ${col(columns, "f", "ZOWNER", accountRef(columns, "f"))}, 'folderType', ${col(columns, "f", "ZFOLDERTYPE")}, 'trash', ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "f")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity("ICFolder")};`,
+    "COMMIT;"
+  ].join(" ");
+  const rows = parseJsonLines(runReadOnlySql(dbPath2, sql));
+  const meta = rows.find((row) => row.k === "meta");
+  if (typeof meta?.uuid !== "string" || !meta.uuid) {
+    throw new NoteStoreError("The Notes database has no store identifier.", "schema");
+  }
+  return {
+    uuid: meta.uuid,
+    accounts: rows.filter((row) => row.k === "account").map((row) => ({
+      pk: row.pk,
+      name: typeof row.name === "string" ? row.name : "",
+      identifier: row.identifier ?? null
+    })),
+    folders: rows.filter((row) => row.k === "folder").map((row) => ({
+      pk: row.pk,
+      name: row.name ?? null,
+      identifier: row.identifier ?? null,
+      parent: row.parent ?? null,
+      account: row.account ?? null,
+      folderType: row.folderType ?? null,
+      trash: row.trash ? 1 : 0,
+      tombstoned: row.tombstoned ? 1 : 0
+    }))
+  };
+}
+function folderPaths(folders) {
+  const byPk = new Map(folders.map((folder) => [folder.pk, folder]));
+  const paths = /* @__PURE__ */ new Map();
+  for (const folder of folders) {
+    const segments = [];
+    const seen = /* @__PURE__ */ new Set();
+    let current = folder;
+    while (current && !seen.has(current.pk)) {
+      seen.add(current.pk);
+      segments.unshift(escapeFolderName(current.name ?? ""));
+      current = current.parent !== null ? byPk.get(current.parent) : void 0;
+    }
+    paths.set(folder.pk, segments.join("/"));
+  }
+  return paths;
+}
+function resolveAccountName(accounts, name) {
+  const wanted = name.trim().toLocaleLowerCase();
+  const exact = accounts.filter((account) => account.name.toLocaleLowerCase() === wanted);
+  if (exact.length === 1) return exact[0];
+  const prefix = accounts.filter((account) => account.name.toLocaleLowerCase().startsWith(wanted));
+  if (exact.length === 0 && prefix.length === 1) return prefix[0];
+  const names = accounts.map((account) => account.name).join(", ");
+  throw new NoteStoreError(
+    exact.length > 1 || prefix.length > 1 ? `Account "${name}" is ambiguous. Accounts: ${names}.` : `No account named "${name}". Accounts: ${names}.`,
+    "invalid_input"
+  );
+}
+
+// src/utils/noteListings.ts
+var SPECIAL_LIMIT = { DEFAULT: 100, MAX: 1e3 };
+var HASHTAG_UTI = "com.apple.notes.inlinetextattachment.hashtag";
+var KIND_COLUMN = {
+  pinned: ["ZISPINNED"],
+  "quick-notes": ["ZISSYSTEMPAPER"],
+  "recently-deleted": ["ZFOLDERTYPE", "ZIDENTIFIER"],
+  locked: ["ZISPASSWORDPROTECTED"]
+};
+function kindSupported(columns, kind) {
+  return KIND_COLUMN[kind].some((name) => columns.has(name));
+}
+var flag = (columns, alias, name) => columns.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
+function kindPredicate(columns, kind) {
+  switch (kind) {
+    case "pinned":
+      return `${flag(columns, "n", "ZISPINNED")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+    case "quick-notes":
+      return `${flag(columns, "n", "ZISSYSTEMPAPER")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+    case "recently-deleted":
+      return `f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")} AND ${notTombstonedSql(columns, "n")}`;
+    case "locked":
+      return `${flag(columns, "n", "ZISPASSWORDPROTECTED")} = 1`;
+  }
+}
+function folderAccountJoins(columns) {
+  const owner = col(columns, "f", "ZOWNER");
+  const account = owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;
+  return `LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")}`;
+}
+function noteFrom(columns) {
+  return `FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)}`;
+}
+var REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZTITLE1"];
+function buildSpecialNotesSql(columns, kind, scoped) {
+  requireColumns(columns, REQUIRED, "list-special-notes");
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
+  const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
+  const modified = col(columns, "n", "ZMODIFICATIONDATE1");
+  const locked = flag(columns, "n", "ZISPASSWORDPROTECTED");
+  const where = `WHERE n.Z_ENT = ${entity("ICNote")} AND ${kindPredicate(columns, kind)}` + (scoped ? " AND a.Z_PK = @account" : "");
+  const snippet = `CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns, "n", "ZSNIPPET")} END`;
+  const hint = kind === "locked" ? col(columns, "n", "ZPASSWORDHINT") : "NULL";
+  const row = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', ${modified}, 'pinned', ${flag(columns, "n", "ZISPINNED")}, 'locked', ${locked}, 'quick', ${flag(columns, "n", "ZISSYSTEMPAPER")}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "n")}, 'snippet', ${snippet}, 'hint', ${hint}) ${noteFrom(columns)} ${where} ORDER BY ${modified} DESC, n.Z_PK DESC LIMIT @limit;`;
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'total', 'n', COUNT(*)) ${noteFrom(columns)} ${where};`,
+    row,
+    "COMMIT;"
+  ].join(" ");
+}
+function listSpecialNotes(options) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const limit = Math.min(
+    Math.max(1, Math.trunc(options.limit ?? SPECIAL_LIMIT.DEFAULT)),
+    SPECIAL_LIMIT.MAX
+  );
+  const columns = readColumns(dbPath2);
+  const empty = {
+    kind: options.kind,
+    notes: [],
+    count: 0,
+    total: 0,
+    limit,
+    supported: false
+  };
+  if (!kindSupported(columns, options.kind)) return empty;
+  const context = readStoreContext(dbPath2, columns);
+  const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const params = { limit: { int: limit } };
+  if (scope2) params.account = { int: scope2.pk };
+  const rows = parseJsonLines(
+    runReadOnlySql(dbPath2, buildSpecialNotesSql(columns, options.kind, Boolean(scope2)), params)
+  );
+  const paths = folderPaths(context.folders);
+  const accountNames = new Map(context.accounts.map((account) => [account.pk, account.name]));
+  const notes = rows.filter((row) => row.k === "note").map((row) => toSpecialRow(row, context.uuid, paths, accountNames, options.kind));
+  return {
+    kind: options.kind,
+    notes,
+    count: notes.length,
+    total: rows.find((row) => row.k === "total")?.n ?? notes.length,
+    limit,
+    supported: true,
+    ...scope2 ? { account: scope2.name } : {}
+  };
+}
+function toSpecialRow(row, uuid2, paths, accountNames, kind) {
+  const locked = Boolean(row.locked);
+  const note = {
+    id: noteIdFor(uuid2, row.pk),
+    identifier: row.identifier ?? null,
+    title: row.title ?? null,
+    folder: row.folder !== null ? paths.get(row.folder) ?? null : null,
+    account: row.account !== null ? accountNames.get(row.account) ?? null : null,
+    created: coreDataToIso(row.created),
+    modified: coreDataToIso(row.modified),
+    pinned: Boolean(row.pinned),
+    locked,
+    quickNote: Boolean(row.quick),
+    inRecentlyDeleted: Boolean(row.trash),
+    markedForDeletion: Boolean(row.tombstoned)
+  };
+  if (!locked) note.snippet = row.snippet ?? null;
+  if (kind === "locked" && row.hint) note.passwordHint = row.hint;
+  return note;
+}
+var TAG_REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"];
+function buildTagInventorySql(columns, scoped) {
+  requireColumns(columns, TAG_REQUIRED, "list-native-tags");
+  const accountFilter = scoped ? " AND a.Z_PK = @account" : "";
+  const uses = `FROM ZICCLOUDSYNCINGOBJECT i JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = i.ZNOTE1 AND n.Z_ENT = ${entity("ICNote")} ${folderAccountJoins(columns)} WHERE i.ZTYPEUTI1 = '${HASHTAG_UTI}' AND ${notTombstonedSql(columns, "i")} AND ${activeNoteSql(columns, "n", "f")}${accountFilter}`;
+  const tagAccount = accountRef(columns, "t");
+  const display = ["ZDISPLAYTEXT", "ZSTANDARDIZEDCONTENT", "ZNAME"].filter((name) => columns.has(name)).map((name) => `t.${name}`);
+  const displayExpr = display.length > 1 ? `COALESCE(${display.join(", ")})` : display[0] || "NULL";
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'tag', 'text', ${displayExpr}, 'account', ta.Z_PK) FROM ZICCLOUDSYNCINGOBJECT t LEFT JOIN ZICCLOUDSYNCINGOBJECT ta ON ta.Z_PK = ${tagAccount} AND ta.Z_ENT = ${entity("ICAccount")} WHERE t.Z_ENT = ${entity("ICHashtag")} AND ${notTombstonedSql(columns, "t")}${scoped ? " AND ta.Z_PK = @account" : ""};`,
+    `SELECT json_object('k', 'use', 'note', n.Z_PK, 'object', i.ZIDENTIFIER, 'text', i.ZALTTEXT, 'account', a.Z_PK, 'locked', ${flag(columns, "n", "ZISPASSWORDPROTECTED")}) ${uses};`,
+    `SELECT json_object('k', 'body', 'note', b.Z_PK, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = b.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT b WHERE b.Z_PK IN (SELECT n.Z_PK ${uses}) AND ${flag(columns, "b", "ZISPASSWORDPROTECTED")} = 0;`,
+    "COMMIT;"
+  ].join(" ");
+}
+var bareTag = (text2) => text2.replace(/^#/, "").trim();
+function referencedObjects(hex3) {
+  if (!hex3 || !/^[0-9a-f]+$/i.test(hex3)) return null;
+  try {
+    const data = gunzipSync6(Buffer.from(hex3, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
+    const body = wrapper && embeddedMessage(getField(wrapper, 3));
+    if (!body) return null;
+    const ids = /* @__PURE__ */ new Set();
+    for (const run of getFields(body, 5)) {
+      const attachment = embeddedMessage(getField(embeddedMessage(run) ?? [], 12));
+      const id2 = attachment && stringValue(getField(attachment, 1));
+      if (id2) ids.add(id2);
+    }
+    return ids;
+  } catch {
+    return null;
+  }
+}
+function nativeTagInventory(options = {}) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const columns = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns);
+  const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const rows = parseJsonLines(
+    runReadOnlySql(
+      dbPath2,
+      buildTagInventorySql(columns, Boolean(scope2)),
+      scope2 ? { account: { int: scope2.pk } } : {}
+    )
+  );
+  return assembleInventory(rows, context.accounts, scope2);
+}
+function assembleInventory(rows, accounts, scope2) {
+  const accountNames = new Map(accounts.map((account) => [account.pk, account.name]));
+  const bodies = /* @__PURE__ */ new Map();
+  for (const row of rows) if (row.k === "body") bodies.set(row.note, referencedObjects(row.data));
+  const groups = /* @__PURE__ */ new Map();
+  const group = (text2, weight) => {
+    const key = text2.toLocaleLowerCase();
+    let found = groups.get(key);
+    if (!found) groups.set(key, found = { spellings: /* @__PURE__ */ new Map(), notes: /* @__PURE__ */ new Map() });
+    found.spellings.set(text2, (found.spellings.get(text2) ?? 0) + weight);
+    return found;
+  };
+  const unverified = /* @__PURE__ */ new Set();
+  for (const row of rows) {
+    if (row.k === "tag" && row.text && bareTag(row.text)) group(bareTag(row.text), 0);
+    if (row.k !== "use" || !row.text || !bareTag(row.text)) continue;
+    const referenced = row.locked ? null : bodies.get(row.note) ?? null;
+    if (referenced && !(row.object && referenced.has(row.object))) continue;
+    if (!referenced) unverified.add(row.note);
+    group(bareTag(row.text), 1).notes.set(row.note, row.account);
+  }
+  const inventory = [...groups.values()].map((entry) => {
+    const spellings = [...entry.spellings.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+    );
+    const perAccount = {};
+    for (const accountPk of entry.notes.values()) {
+      const name = accountPk !== null && accountNames.get(accountPk) || "unknown";
+      perAccount[name] = (perAccount[name] ?? 0) + 1;
+    }
+    const result = {
+      tag: spellings[0][0],
+      noteCount: entry.notes.size,
+      accounts: perAccount
+    };
+    if (spellings.length > 1) result.spellings = spellings.slice(1).map(([text2]) => text2);
+    return result;
+  });
+  inventory.sort((a, b) => b.noteCount - a.noteCount || a.tag.localeCompare(b.tag));
+  return {
+    inventory,
+    tagCount: inventory.length,
+    complete: unverified.size === 0,
+    unverifiedNotes: unverified.size,
+    ...scope2 ? { account: scope2.name } : {}
+  };
+}
+
+// src/utils/noteIdentifiers.ts
+import { execFileSync as execFileSync12 } from "child_process";
+import * as fs7 from "fs";
+import * as os7 from "os";
+import * as path7 from "path";
+var NOTES_DB_PATH8 = path7.join(
+  os7.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var UUID_PATTERN = /^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/;
+var NUMERIC_KEY_PATTERN = /^\d{1,18}$/;
+var NOTE_ID_MESSAGE = "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...), or the note's Notes UUID or numeric key";
+function identifierForm(value) {
+  if (UUID_PATTERN.test(value)) return "uuid";
+  if (NUMERIC_KEY_PATTERN.test(value)) return "key";
+  return "other";
+}
+function isAlternateIdentifier(value) {
+  return identifierForm(value) !== "other";
+}
+var IdentifierResolutionError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "IdentifierResolutionError";
+  }
+  code;
+};
+var ENTITY_LABEL = {
+  ICNote: "note",
+  ICFolder: "folder",
+  ICAccount: "account"
+};
+var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access for the app that launches this server (System Settings > Privacy & Security > Full Disk Access, then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
+function canonicalKey(value) {
+  return BigInt(value).toString();
+}
+function assertAll(values, pattern, label) {
+  for (const value of values) {
+    if (!pattern.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
+  }
+}
+function entityClause(entity3) {
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${entity3}')`;
+}
+function buildResolveSql(entity3, keys, uuids) {
+  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
+  assertAll(uuids, UUID_PATTERN, "UUID");
+  const matches = [];
+  if (keys.length > 0) {
+    matches.push(`o.Z_PK IN (${[...new Set(keys.map(canonicalKey))].join(", ")})`);
+  }
+  if (uuids.length > 0) {
+    const variants = /* @__PURE__ */ new Set();
+    for (const uuid2 of uuids) {
+      variants.add(uuid2);
+      variants.add(uuid2.toUpperCase());
+      variants.add(uuid2.toLowerCase());
+    }
+    matches.push(`o.ZIDENTIFIER IN (${[...variants].map((v) => `'${v}'`).join(", ")})`);
+  }
+  const where = matches.length > 0 ? matches.join(" OR ") : "0";
+  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object('pk', o.Z_PK, 'identifier', o.ZIDENTIFIER)) FROM ZICCLOUDSYNCINGOBJECT o WHERE o.Z_ENT = ${entityClause(entity3)} AND (${where})));`;
+}
+function buildLookupSql(entity3, keys) {
+  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
+  const pks = [...new Set(keys.map(canonicalKey))];
+  const inList = pks.length > 0 ? pks.join(", ") : "NULL";
+  let fields = "'pk', o.Z_PK, 'identifier', o.ZIDENTIFIER";
+  let joins = "";
+  if (entity3 === "ICNote") {
+    fields += ", 'folderIdentifier', f.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
+    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = o.ZFOLDER LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = f.ZOWNER ";
+  } else if (entity3 === "ICFolder") {
+    fields += ", 'parentIdentifier', p.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
+    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = o.ZPARENT LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = o.ZOWNER ";
+  }
+  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT o ${joins}WHERE o.Z_ENT = ${entityClause(entity3)} AND o.Z_PK IN (${inList})));`;
+}
+function runJsonQuery(sql, dbPath2) {
+  if (!fs7.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+  let out;
+  try {
+    out = execFileSync12("sqlite3", ["-readonly", dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 5e3,
+      stdio: ["pipe", "pipe", "pipe"]
+    }).trim();
+  } catch (error2) {
+    const detail = error2 instanceof Error ? `${error2.message} ${String(error2.stderr ?? "")}` : String(error2);
+    if (detail.includes("authorization denied") || detail.includes("unable to open database")) {
+      throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+    }
+    console.error(`Identifier query failed: ${detail}`);
+    throw new IdentifierResolutionError("query_error", "Failed to read the Notes database.");
+  }
+  const parsed = JSON.parse(out || "{}");
+  const rows = typeof parsed.rows === "string" ? JSON.parse(parsed.rows) : parsed.rows;
+  return { store: parsed.store ?? null, rows: rows ?? [] };
+}
+function coreDataId(store, entity3, pk) {
+  return `x-coredata://${store}/${entity3}/p${pk}`;
+}
+function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH8) {
+  const resolved = /* @__PURE__ */ new Map();
+  const keys = [];
+  const uuids = [];
+  for (const value of values) {
+    const form = identifierForm(value);
+    if (form === "key") keys.push(value);
+    else if (form === "uuid") uuids.push(value);
+    else resolved.set(value, value);
+  }
+  if (keys.length === 0 && uuids.length === 0) return resolved;
+  const { store, rows } = runJsonQuery(
+    buildResolveSql(entity3, keys, uuids),
+    dbPath2
+  );
+  if (!store) {
+    throw new IdentifierResolutionError(
+      "query_error",
+      "The Notes database has no store UUID, so an x-coredata id cannot be built."
+    );
+  }
+  const byKey = new Map(rows.map((row) => [String(row.pk), row]));
+  const byUuid = new Map(
+    rows.filter((row) => row.identifier).map((row) => [String(row.identifier).toUpperCase(), row])
+  );
+  const label = ENTITY_LABEL[entity3];
+  const missing = [];
+  for (const key of keys) {
+    const row = byKey.get(canonicalKey(key));
+    if (row) resolved.set(key, coreDataId(store, entity3, row.pk));
+    else missing.push(`numeric key ${key}`);
+  }
+  for (const uuid2 of uuids) {
+    const row = byUuid.get(uuid2.toUpperCase());
+    if (row) resolved.set(uuid2, coreDataId(store, entity3, row.pk));
+    else missing.push(`identifier ${uuid2}`);
+  }
+  if (missing.length > 0) {
+    throw new IdentifierResolutionError(
+      "not_found",
+      `No ${label} found for ${missing.join(", ")}. A numeric key must belong to a ${label}, not another object type.`
+    );
+  }
+  return resolved;
+}
+var COREDATA_PARTS = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(ICNote|ICFolder|ICAccount)\/p(\d{1,18})$/;
+function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH8) {
+  const result = /* @__PURE__ */ new Map();
+  const wanted = /* @__PURE__ */ new Map();
+  for (const id2 of ids) {
+    const match = COREDATA_PARTS.exec(id2);
+    if (!match || match[2] !== entity3) continue;
+    const pk = canonicalKey(match[3]);
+    const list = wanted.get(pk) ?? [];
+    list.push({ id: id2, store: match[1] });
+    wanted.set(pk, list);
+  }
+  if (wanted.size === 0) return result;
+  let query2;
+  try {
+    query2 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
+  } catch {
+    return result;
+  }
+  const store = query2.store?.toUpperCase();
+  for (const row of query2.rows) {
+    const fields = {};
+    for (const key of [
+      "identifier",
+      "folderIdentifier",
+      "parentIdentifier",
+      "accountIdentifier"
+    ]) {
+      const value = row[key];
+      if (typeof value === "string" && value) fields[key] = value;
+    }
+    for (const target of wanted.get(String(row.pk)) ?? []) {
+      if (target.store.toUpperCase() === store) result.set(target.id, fields);
+    }
+  }
+  return result;
+}
+function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH8) {
+  const ids = items.map((item) => item.id).filter((id2) => typeof id2 === "string");
+  if (ids.length === 0) return items;
+  const found = lookupStableIdentifiers(ids, entity3, dbPath2);
+  if (found.size === 0) return items;
+  return items.map(
+    (item) => item.id && found.has(item.id) ? { ...item, ...found.get(item.id) } : item
+  );
+}
+var defaultResolver = (values, entity3) => resolveIdentifiers(values, entity3);
+var DEFAULT_MAX_ID_LENGTH = 2e3;
+function acceptAlternateForms(pattern) {
+  return new RegExp(
+    `${pattern.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
+    pattern.flags
+  );
+}
+function resolveInSchema(values, entity3, ctx, resolver) {
+  if (!values.some(isAlternateIdentifier)) return new Map(values.map((v) => [v, v]));
+  try {
+    return resolver(values, entity3);
+  } catch (error2) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: error2 instanceof Error ? error2.message : String(error2)
+    });
+    return null;
+  }
+}
+function exactIdInput(entity3, pattern, message, options = {}) {
+  const resolver = options.resolver ?? defaultResolver;
+  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message).transform((value, ctx) => {
+    const map = resolveInSchema([value], entity3, ctx, resolver);
+    return map ? map.get(value) ?? value : external_exports.NEVER;
+  });
+}
+function exactIdArrayInput(entity3, pattern, message, options = {}) {
+  const resolver = options.resolver ?? defaultResolver;
+  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message);
+  const array2 = options.maxItems === void 0 ? external_exports.array(item) : external_exports.array(item).max(options.maxItems);
+  return array2.transform((values, ctx) => {
+    const map = resolveInSchema(values, entity3, ctx, resolver);
+    return map ? values.map((value) => map.get(value) ?? value) : external_exports.NEVER;
+  });
+}
+function looseIdTransform(entity3, resolver = defaultResolver) {
+  return (value, ctx) => {
+    if (!isAlternateIdentifier(value)) return value;
+    const map = resolveInSchema([value], entity3, ctx, resolver);
+    return map ? map.get(value) ?? value : external_exports.NEVER;
+  };
 }
 
 // src/utils/contentWarnings.ts
@@ -42748,10 +45713,10 @@ function htmlToText(html) {
 var HASHTAG_RE = new RegExp("(?<![\\p{L}\\p{N}_])#([\\p{L}\\p{N}_]*\\p{L}[\\p{L}\\p{N}_]*)", "gu");
 function parseHashtags(body) {
   if (!body) return [];
-  const text = htmlToText(body);
+  const text2 = htmlToText(body);
   const seen = /* @__PURE__ */ new Set();
   const result = [];
-  for (const match of text.matchAll(HASHTAG_RE)) {
+  for (const match of text2.matchAll(HASHTAG_RE)) {
     const tag = match[1];
     const key = tag.toLowerCase();
     if (!seen.has(key)) {
@@ -42767,7 +45732,7 @@ var BLOCK_END_RE = /<\/(?:div|h[1-6]|p|li)>/gi;
 var BREAK_RE = /<br\s*\/?\s*>/gi;
 var TAG_RE = /<[^>]*>/g;
 var NON_RENDERED_BLOCK_RE = /<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
-function decodeHtmlEntities(text) {
+function decodeHtmlEntities(text2) {
   const decodeCodePoint = (match, value, radix) => {
     const codePoint = Number.parseInt(value, radix);
     if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 1114111 || codePoint >= 55296 && codePoint <= 57343) {
@@ -42775,21 +45740,21 @@ function decodeHtmlEntities(text) {
     }
     return String.fromCodePoint(codePoint);
   };
-  return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex2) => decodeCodePoint(match, hex2, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
+  return text2.replace(/&#x([0-9a-f]+);?/gi, (match, hex3) => decodeCodePoint(match, hex3, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
 }
 function firstVisibleHtmlLine(html) {
-  let text = html;
+  let text2 = html;
   let previous;
   do {
-    previous = text;
-    text = text.replace(NON_RENDERED_BLOCK_RE, "");
-  } while (text !== previous);
-  text = text.replace(BREAK_RE, "\n").replace(BLOCK_END_RE, "\n");
+    previous = text2;
+    text2 = text2.replace(NON_RENDERED_BLOCK_RE, "");
+  } while (text2 !== previous);
+  text2 = text2.replace(BREAK_RE, "\n").replace(BLOCK_END_RE, "\n");
   do {
-    previous = text;
-    text = text.replace(TAG_RE, "");
-  } while (text !== previous);
-  return decodeHtmlEntities(text).split(/[\r\n\u2028\u2029]+/).map((line) => line.replace(/\s+/g, " ").trim()).find(Boolean);
+    previous = text2;
+    text2 = text2.replace(TAG_RE, "");
+  } while (text2 !== previous);
+  return decodeHtmlEntities(text2).split(/[\r\n\u2028\u2029]+/).map((line) => line.replace(/\s+/g, " ").trim()).find(Boolean);
 }
 function resolveUpdateResponseTitle(currentTitle, newTitle, format, newContent) {
   if (format === "html") return firstVisibleHtmlLine(newContent) ?? currentTitle;
@@ -42820,14 +45785,865 @@ function describeSearchScope(searchContent, resultCount) {
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
 
+// src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync13 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
+import { gunzipSync as gunzipSync7 } from "zlib";
+
+// src/utils/noteQuery.ts
+var QUERY_LIMITS = {
+  /** Maximum number of tokens (terms, operators, parentheses). */
+  MAX_TOKENS: 256,
+  /** Maximum nesting depth of parentheses and NOT operators combined. */
+  MAX_DEPTH: 64
+};
+var FACETS = [
+  "link",
+  "attachment",
+  "checklist",
+  "drawing",
+  "image",
+  "video",
+  "audio",
+  "pdf",
+  "table",
+  "scan",
+  "tag"
+];
+var FLAGS = ["pinned", "locked", "shared"];
+var NoteQueryError = class extends Error {
+  constructor(message, position) {
+    super(position === void 0 ? message : `${message} (at position ${position + 1})`);
+    this.position = position;
+    this.name = "NoteQueryError";
+  }
+  position;
+};
+var FIELDS = /* @__PURE__ */ new Set([
+  "title",
+  "body",
+  "text",
+  "folder",
+  "account",
+  "tag",
+  "has",
+  "is",
+  "checklist",
+  "words",
+  "created",
+  "modified"
+]);
+function readQuoted(input, start) {
+  let value = "";
+  let i = start + 1;
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === "\\" && (input[i + 1] === '"' || input[i + 1] === "\\")) {
+      value += input[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === '"') return [value, i + 1];
+    value += ch;
+    i++;
+  }
+  throw new NoteQueryError("Unterminated quoted phrase", start);
+}
+var isSpace = (ch) => /\s/u.test(ch);
+function tokenize(input) {
+  const tokens = [];
+  const push = (token) => {
+    if (tokens.length >= QUERY_LIMITS.MAX_TOKENS) {
+      throw new NoteQueryError(
+        `Query has more than ${QUERY_LIMITS.MAX_TOKENS} tokens; simplify it`,
+        token.pos
+      );
+    }
+    tokens.push(token);
+  };
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (isSpace(ch)) {
+      i++;
+      continue;
+    }
+    if (ch === "(" || ch === ")") {
+      push({ kind: ch === "(" ? "lparen" : "rparen", pos: i });
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      const [value, next] = readQuoted(input, i);
+      push({ kind: "term", pos: i, value, quoted: true });
+      i = next;
+      continue;
+    }
+    if (ch === "-" && i + 1 < input.length && !isSpace(input[i + 1]) && input[i + 1] !== ")") {
+      push({ kind: "not", pos: i });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < input.length && !isSpace(input[j]) && !'()"'.includes(input[j])) j++;
+    const word = input.slice(i, j);
+    const colon = word.indexOf(":");
+    if (colon > 0) {
+      const prefix = word.slice(0, colon);
+      const field = prefix.toLowerCase();
+      let value = word.slice(colon + 1);
+      if (FIELDS.has(field)) {
+        let quoted = false;
+        if (value === "" && input[j] === '"') {
+          [value, j] = readQuoted(input, j);
+          quoted = true;
+        }
+        push({ kind: "term", pos: i, field, value, quoted });
+        i = j;
+        continue;
+      }
+      if (/^[a-z]+$/i.test(prefix) && !value.startsWith("//")) {
+        throw new NoteQueryError(
+          `Unknown field "${prefix}:". Known fields: ${[...FIELDS].join(", ")}. Quote the term to search it literally`,
+          i
+        );
+      }
+    }
+    const upper = word.toUpperCase();
+    if (upper === "AND" || upper === "OR" || upper === "NOT") {
+      push({ kind: upper.toLowerCase(), pos: i });
+    } else {
+      push({ kind: "term", pos: i, value: word, quoted: false });
+    }
+    i = j;
+  }
+  return tokens;
+}
+var COMPARE_RE = /^(>=|<=|>|<|=)?(.*)$/s;
+function splitComparison(value) {
+  const match = COMPARE_RE.exec(value);
+  return [match[1] ?? "=", match[2]];
+}
+function parseLocalDate(text2, pos) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text2);
+  if (!match) {
+    throw new NoteQueryError(`Expected a date as YYYY-MM-DD, got "${text2}"`, pos);
+  }
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const start = new Date(year, month - 1, day);
+  if (start.getFullYear() !== year || start.getMonth() !== month - 1 || start.getDate() !== day) {
+    throw new NoteQueryError(`"${text2}" is not a valid calendar date`, pos);
+  }
+  return { start: start.getTime(), end: new Date(year, month - 1, day + 1).getTime() };
+}
+function termNode(token) {
+  const { field, value, quoted, pos } = token;
+  if (field === void 0) {
+    if (value === "") throw new NoteQueryError("Empty quoted phrase", pos);
+    const lower2 = value.toLowerCase();
+    if (!quoted && FLAGS.includes(lower2)) {
+      return { type: "flag", flag: lower2 };
+    }
+    return { type: "text", field: "any", value };
+  }
+  if (value === "") throw new NoteQueryError(`"${field}:" needs a value`, pos);
+  const lower = value.toLowerCase();
+  switch (field) {
+    case "title":
+    case "body":
+      return { type: "text", field, value };
+    case "text":
+      return { type: "text", field: "any", value };
+    case "folder":
+    case "account":
+      return { type: field, value };
+    case "tag": {
+      const tag = value.replace(/^#/, "");
+      if (!tag) throw new NoteQueryError(`"tag:" needs a tag name`, pos);
+      return { type: "tag", value: tag };
+    }
+    case "has":
+      if (!FACETS.includes(lower)) {
+        throw new NoteQueryError(
+          `Unknown facet "has:${value}". Supported: ${FACETS.map((f) => `has:${f}`).join(", ")}`,
+          pos
+        );
+      }
+      return { type: "has", facet: lower };
+    case "is":
+      if (!FLAGS.includes(lower)) {
+        throw new NoteQueryError(`Unknown flag "is:${value}". Supported: ${FLAGS.join(", ")}`, pos);
+      }
+      return { type: "flag", flag: lower };
+    case "checklist":
+      if (lower !== "open" && lower !== "done") {
+        throw new NoteQueryError(`"checklist:" accepts open or done, got "${value}"`, pos);
+      }
+      return { type: "checklist", state: lower };
+    case "words": {
+      const [op, number3] = splitComparison(value);
+      if (!/^\d{1,9}$/.test(number3)) {
+        throw new NoteQueryError(`"words:" needs a whole number, e.g. words:>250`, pos);
+      }
+      return { type: "words", op, value: Number(number3) };
+    }
+    case "created":
+    case "modified": {
+      const [op, date3] = splitComparison(value);
+      return { type: "date", field, op, date: date3, ...parseLocalDate(date3, pos) };
+    }
+  }
+  throw new NoteQueryError(`Unknown field "${field}:"`, pos);
+}
+var Parser = class {
+  constructor(tokens, length) {
+    this.tokens = tokens;
+    this.length = length;
+  }
+  tokens;
+  length;
+  index = 0;
+  depth = 0;
+  parse() {
+    if (this.tokens.length === 0) throw new NoteQueryError("Query is empty");
+    const node = this.parseOr();
+    const extra = this.peek();
+    if (extra) {
+      throw new NoteQueryError(
+        extra.kind === "rparen" ? "Unmatched closing parenthesis" : "Unexpected token",
+        extra.pos
+      );
+    }
+    return node;
+  }
+  peek() {
+    return this.tokens[this.index];
+  }
+  enter(pos) {
+    this.depth++;
+    if (this.depth > QUERY_LIMITS.MAX_DEPTH) {
+      throw new NoteQueryError(
+        `Query nests deeper than ${QUERY_LIMITS.MAX_DEPTH} levels; simplify it`,
+        pos
+      );
+    }
+  }
+  missingOperand(after) {
+    const next = this.peek();
+    throw new NoteQueryError(`${after} needs a search term after it`, next?.pos ?? this.length);
+  }
+  parseOr() {
+    const children = [this.parseAnd()];
+    while (this.peek()?.kind === "or") {
+      this.index++;
+      children.push(this.parseAnd());
+    }
+    return children.length === 1 ? children[0] : { type: "or", children };
+  }
+  parseAnd() {
+    const children = [this.parseUnary()];
+    for (; ; ) {
+      const next = this.peek();
+      if (next?.kind === "and") {
+        this.index++;
+        children.push(this.parseUnary());
+      } else if (next && (next.kind === "term" || next.kind === "not" || next.kind === "lparen")) {
+        children.push(this.parseUnary());
+      } else {
+        break;
+      }
+    }
+    return children.length === 1 ? children[0] : { type: "and", children };
+  }
+  parseUnary() {
+    const token = this.peek();
+    if (token?.kind === "not") {
+      this.index++;
+      this.enter(token.pos);
+      const child = this.parseUnary();
+      this.depth--;
+      return { type: "not", child };
+    }
+    return this.parsePrimary();
+  }
+  parsePrimary() {
+    const token = this.peek();
+    if (!token) {
+      const previous2 = this.tokens[this.index - 1];
+      this.missingOperand(previous2 ? previous2.kind.toUpperCase().replace("LPAREN", "(") : "Query");
+    }
+    if (token.kind === "lparen") {
+      this.index++;
+      this.enter(token.pos);
+      if (this.peek()?.kind === "rparen") {
+        throw new NoteQueryError("Empty parentheses", token.pos);
+      }
+      const node = this.parseOr();
+      if (this.peek()?.kind !== "rparen") {
+        throw new NoteQueryError("Missing closing parenthesis", token.pos);
+      }
+      this.index++;
+      this.depth--;
+      return node;
+    }
+    if (token.kind === "term") {
+      this.index++;
+      return termNode(token);
+    }
+    if (token.kind === "rparen") {
+      throw new NoteQueryError("Unexpected closing parenthesis", token.pos);
+    }
+    const previous = this.tokens[this.index - 1];
+    if (!previous || previous.kind === "lparen") {
+      throw new NoteQueryError(
+        `${token.kind.toUpperCase()} needs a search term before it`,
+        token.pos
+      );
+    }
+    this.missingOperand(previous.kind === "term" ? "Operator" : previous.kind.toUpperCase());
+  }
+};
+function parseNoteQuery(input) {
+  return new Parser(tokenize(input), input.length).parse();
+}
+function normalizeForMatch(text2) {
+  return text2.normalize("NFC").replace(/[\ufffc\u00a0]/gu, " ").toLowerCase();
+}
+function needsContent(node) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.some(needsContent);
+    case "not":
+      return needsContent(node.child);
+    case "text":
+      return node.field !== "title";
+    case "tag":
+    case "has":
+    case "checklist":
+    case "words":
+      return true;
+    default:
+      return false;
+  }
+}
+function needsTags(node) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.some(needsTags);
+    case "not":
+      return needsTags(node.child);
+    case "tag":
+      return true;
+    case "has":
+      return node.facet === "tag";
+    default:
+      return false;
+  }
+}
+function compare(actual, op, expected) {
+  switch (op) {
+    case "=":
+      return actual === expected;
+    case ">":
+      return actual > expected;
+    case ">=":
+      return actual >= expected;
+    case "<":
+      return actual < expected;
+    case "<=":
+      return actual <= expected;
+  }
+}
+function compareDate(actual, node) {
+  if (actual === void 0) return false;
+  switch (node.op) {
+    case "=":
+      return actual >= node.start && actual < node.end;
+    case ">":
+      return actual >= node.end;
+    case ">=":
+      return actual >= node.start;
+    case "<":
+      return actual < node.start;
+    case "<=":
+      return actual < node.end;
+  }
+}
+var orderCache = /* @__PURE__ */ new WeakMap();
+function cheapFirst(children) {
+  let ordered = orderCache.get(children);
+  if (!ordered) {
+    ordered = [...children].sort((a, b) => Number(needsContent(a)) - Number(needsContent(b)));
+    orderCache.set(children, ordered);
+  }
+  return ordered;
+}
+function evaluateNoteQuery(node, note) {
+  switch (node.type) {
+    case "and":
+      return cheapFirst(node.children).every((child) => evaluateNoteQuery(child, note));
+    case "or":
+      return cheapFirst(node.children).some((child) => evaluateNoteQuery(child, note));
+    case "not":
+      return !evaluateNoteQuery(node.child, note);
+    case "text": {
+      const needle = normalizeForMatch(node.value);
+      if (node.field === "title") return note.titleLower.includes(needle);
+      if (node.field === "any" && note.titleLower.includes(needle)) return true;
+      const content = note.content();
+      if (!content) return false;
+      return (node.field === "body" ? content.bodyLower : content.textLower).includes(needle);
+    }
+    case "folder":
+      return note.folderKeys.includes(normalizeForMatch(node.value));
+    case "account":
+      return note.accountLower === normalizeForMatch(node.value);
+    case "flag":
+      return note[node.flag];
+    case "date":
+      return compareDate(node.field === "created" ? note.created : note.modified, node);
+    case "tag": {
+      const content = note.content();
+      return Boolean(content?.tags.includes(normalizeForMatch(node.value)));
+    }
+    case "has":
+      return Boolean(note.content()?.facets.has(node.facet));
+    case "checklist": {
+      const content = note.content();
+      if (!content || content.checklist.total === 0) return false;
+      return node.state === "open" ? content.checklist.open > 0 : content.checklist.open === 0;
+    }
+    case "words": {
+      const content = note.content();
+      return content ? compare(content.words, node.op, node.value) : false;
+    }
+  }
+}
+function positiveTextTerms(node, negated = false) {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.flatMap((child) => positiveTextTerms(child, negated));
+    case "not":
+      return positiveTextTerms(node.child, !negated);
+    case "text":
+      return negated ? [] : [node.value];
+    default:
+      return [];
+  }
+}
+
+// src/utils/noteQueryStore.ts
+var NOTES_DB_PATH9 = path8.join(
+  os8.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var QUERY_SCAN = { DEFAULT: 500, MAX: 5e3 };
+var QUERY_RESULTS = { DEFAULT: 50, MAX: 500 };
+var CORE_DATA_EPOCH_MS2 = Date.UTC(2001, 0, 1);
+var SNIPPET_BEFORE = 60;
+var SNIPPET_LENGTH = 180;
+var QUERY_FDA_MESSAGE = `Full Disk Access is required to query notes. In System Settings > Privacy & Security > Full Disk Access, grant access to the app that launches this server (Claude Desktop / Terminal / iTerm2), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
+var NoteQueryStoreError = class extends Error {
+  constructor(message, kind) {
+    super(message);
+    this.kind = kind;
+    this.name = "NoteQueryStoreError";
+  }
+  kind;
+};
+function facetsForAttachmentType(uti) {
+  const type = uti.toLowerCase();
+  if (type === "com.apple.notes.inlinetextattachment.hashtag") return [];
+  if (type === "com.apple.notes.inlinetextattachment.link") return ["link"];
+  if (type.startsWith("com.apple.notes.inlinetextattachment.")) return [];
+  if (type === "com.apple.notes.table") return ["table"];
+  const facets = ["attachment"];
+  if (type === "public.url") facets.push("link");
+  else if (type === "com.apple.paper.doc.scan" || type === "com.apple.notes.gallery")
+    facets.push("scan");
+  else if (type === "com.adobe.pdf" || type === "com.apple.paper.doc.pdf") facets.push("pdf");
+  else if (type === "com.apple.paper" || type === "com.apple.drawing" || type === "com.apple.drawing.2" || type === "com.apple.notes.sketch")
+    facets.push("drawing");
+  else if (/^public\.(jpeg|png|heic|heif|tiff|gif|image|camera-raw-image|webp|bmp|svg-image)$/.test(
+    type
+  ) || type === "com.adobe.raw-image" || type === "com.compuserve.gif" || type === "org.webmproject.webp" || type === "com.microsoft.bmp")
+    facets.push("image");
+  else if (/^public\.(movie|video|mpeg-4|mpeg|avi|3gpp|3gpp2)$/.test(type) || type === "com.apple.quicktime-movie" || type === "com.apple.m4v-video")
+    facets.push("video");
+  else if (/^public\.(audio|mp3|mpeg-4-audio|aiff-audio|aifc-audio)$/.test(type) || type === "com.apple.m4a-audio" || type === "com.apple.coreaudio-format" || type === "com.microsoft.waveform-audio")
+    facets.push("audio");
+  return facets;
+}
+var CHECKLIST_STYLE = 103;
+function decodeNoteBody(data) {
+  const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
+  const body = wrapper && embeddedMessage(getField(wrapper, 3));
+  const text2 = body && stringValue(getField(body, 2));
+  if (!body || text2 === void 0) return null;
+  const facets = /* @__PURE__ */ new Set();
+  const objectIds = /* @__PURE__ */ new Set();
+  const checklist = /* @__PURE__ */ new Map();
+  let position = 0;
+  for (const run of getFields(body, 5)) {
+    const fields = embeddedMessage(run);
+    if (!fields) continue;
+    const length = varintValue(getField(fields, 1)) ?? 0;
+    if (stringValue(getField(fields, 9))) facets.add("link");
+    const attachment = embeddedMessage(getField(fields, 12));
+    if (attachment) {
+      const id2 = stringValue(getField(attachment, 1));
+      if (id2) objectIds.add(id2);
+      for (const facet of facetsForAttachmentType(stringValue(getField(attachment, 2)) ?? ""))
+        facets.add(facet);
+    }
+    const paragraph = embeddedMessage(getField(fields, 2));
+    if (paragraph && varintValue(getField(paragraph, 1)) === CHECKLIST_STYLE) {
+      const item = embeddedMessage(getField(paragraph, 5));
+      const rawId = item && getField(item, 1)?.value;
+      const key = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : `line:${text2.lastIndexOf("\n", position - 1) + 1}`;
+      checklist.set(key, (item && varintValue(getField(item, 2))) === 1);
+    }
+    position += length;
+  }
+  if (checklist.size > 0) facets.add("checklist");
+  const done = [...checklist.values()].filter(Boolean).length;
+  return {
+    text: text2,
+    facets,
+    checklist: { total: checklist.size, open: checklist.size - done },
+    objectIds
+  };
+}
+function countWords(text2) {
+  let count = 0;
+  for (const word of text2.replace(/\ufffc/gu, " ").split(/\s+/u)) {
+    if (/[\p{L}\p{N}]/u.test(word)) count++;
+  }
+  return count;
+}
+var REQUIRED_COLUMNS3 = ["Z_PK", "Z_ENT", "ZTITLE1", "ZFOLDER", "ZMODIFICATIONDATE1"];
+function col2(available, alias, name) {
+  return available.has(name) ? `${alias}.${name}` : "NULL";
+}
+var entity2 = (name) => `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
+function buildScanSql(available, options) {
+  const missing = REQUIRED_COLUMNS3.filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns query-notes needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const scan = Math.trunc(options.scanLimit);
+  if (!Number.isInteger(scan) || scan < 1 || scan > QUERY_SCAN.MAX) {
+    throw new NoteQueryStoreError(`scanLimit must be 1\u2013${QUERY_SCAN.MAX}`, "query_error");
+  }
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((c) => available.has(c)).map((c) => `n.${c}`).join(", ") || "NULL";
+  const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
+  const bool = (name) => available.has(name) ? `COALESCE(n.${name}, 0)` : "0";
+  const notNull = (alias, name) => available.has(name) ? `${alias}.${name} IS NOT NULL` : "0";
+  const tagsExpr = options.withTags && ["ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"].every((c) => available.has(c)) ? `(SELECT json_group_array(json_array(t.ZIDENTIFIER, t.ZALTTEXT)) FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE1 = n.Z_PK AND t.ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag')` : "NULL";
+  const where = [`n.Z_ENT = ${entity2("ICNote")}`];
+  if (!options.includeDeleted) {
+    where.push("n.ZFOLDER IS NOT NULL");
+    if (available.has("ZMARKEDFORDELETION")) where.push("COALESCE(n.ZMARKEDFORDELETION, 0) = 0");
+    if (available.has("ZFOLDERTYPE")) {
+      where.push(
+        `n.ZFOLDER NOT IN (SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT WHERE Z_ENT = ${entity2("ICFolder")} AND ZFOLDERTYPE = 1)`
+      );
+    }
+  }
+  const whereSql = where.join(" AND ");
+  const folderRow = `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col2(available, "f", "ZTITLE2")}, 'parent', ${col2(available, "f", "ZPARENT")}, 'type', ${col2(available, "f", "ZFOLDERTYPE")}, 'owner', ${col2(available, "f", "ZOWNER")}, 'shared', ${notNull("f", "ZSERVERSHAREDATA")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity2("ICFolder")};`;
+  const accountRow = `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col2(available, "a", "ZNAME")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity2("ICAccount")};`;
+  const dataExpr = options.withBodies ? "(SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)" : "NULL";
+  const noteRow = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'title', n.ZTITLE1, 'folder', n.ZFOLDER, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'pinned', ${bool("ZISPINNED")}, 'locked', ${bool("ZISPASSWORDPROTECTED")}, 'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'snippet', ${col2(available, "n", "ZSNIPPET")}, 'data', ${dataExpr}, 'tags', ${tagsExpr}) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql} ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT ${scan};`;
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'total', 'n', COUNT(*)) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql};`,
+    folderRow,
+    accountRow,
+    noteRow,
+    "COMMIT;"
+  ].join(" ");
+}
+function runSqlite6(dbPath2, query2) {
+  return execFileSync13("sqlite3", ["-readonly", dbPath2, query2], {
+    encoding: "utf8",
+    timeout: 3e4,
+    maxBuffer: 512 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function presentColumns2(dbPath2) {
+  const cols = /* @__PURE__ */ new Set();
+  for (const line of runSqlite6(dbPath2, "PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);").split("\n")) {
+    const name = line.split("|")[1];
+    if (name) cols.add(name);
+  }
+  return cols;
+}
+var escapeSegment = escapeFolderName;
+function resolveFolders(rows) {
+  const byPk = new Map(rows.map((row) => [row.pk, row]));
+  const resolved = /* @__PURE__ */ new Map();
+  const resolve5 = (pk, seen) => {
+    const cached2 = resolved.get(pk);
+    if (cached2) return cached2;
+    const row = byPk.get(pk);
+    if (!row || seen.has(pk)) return void 0;
+    seen.add(pk);
+    const parent = row.parent !== null ? resolve5(row.parent, seen) : void 0;
+    const name = row.name ?? "";
+    const path9 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
+    const plainPath = parent ? `${parent.plainPath}/${name}` : name;
+    const info = {
+      path: path9,
+      plainPath,
+      keys: [...new Set([name, plainPath, path9].map(normalizeForMatch))],
+      accountPk: row.owner ?? parent?.accountPk ?? null,
+      shared: Boolean(row.shared) || Boolean(parent?.shared)
+    };
+    resolved.set(pk, info);
+    return info;
+  };
+  for (const row of rows) resolve5(row.pk, /* @__PURE__ */ new Set());
+  return resolved;
+}
+var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
+function buildSnippet(text2, terms) {
+  const clean = text2.replace(/\ufffc/gu, " ");
+  const firstBreak = clean.indexOf("\n");
+  const body = firstBreak === -1 ? clean : clean.slice(firstBreak + 1);
+  const lower = normalizeForMatch(body);
+  let start = 0;
+  if (lower.length === body.length) {
+    const hits = terms.map((term) => lower.indexOf(normalizeForMatch(term))).filter((index) => index >= 0);
+    if (hits.length) start = Math.max(0, Math.min(...hits) - SNIPPET_BEFORE);
+  }
+  const slice = body.slice(start, start + SNIPPET_LENGTH).replace(/\s+/gu, " ").trim();
+  if (!slice) return "";
+  return `${start > 0 ? "\u2026" : ""}${slice}${start + SNIPPET_LENGTH < body.length ? "\u2026" : ""}`;
+}
+function queryNotes(expression, options = {}) {
+  const ast = parseNoteQuery(expression);
+  return runNoteQuery(ast, {
+    ...options,
+    limit: Math.min(options.limit ?? QUERY_RESULTS.DEFAULT, QUERY_RESULTS.MAX)
+  });
+}
+function runNoteQuery(ast, options = {}) {
+  const limit = options.limit ?? QUERY_RESULTS.DEFAULT;
+  const scanLimit = Math.min(options.scanLimit ?? QUERY_SCAN.DEFAULT, QUERY_SCAN.MAX);
+  const includeDeleted = options.includeDeleted ?? false;
+  const withBodies = needsContent(ast);
+  const withTags = needsTags(ast);
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH9;
+  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  let output;
+  try {
+    const available = presentColumns2(dbPath2);
+    output = runSqlite6(
+      dbPath2,
+      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+    );
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+  let uuid2;
+  let eligible = 0;
+  const folderRows = [];
+  const accounts = /* @__PURE__ */ new Map();
+  const notes = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line);
+    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    else if (row.k === "total") eligible = Number(row.n) || 0;
+    else if (row.k === "folder") folderRows.push(row);
+    else if (row.k === "account" && typeof row.name === "string")
+      accounts.set(Number(row.pk), row.name);
+    else if (row.k === "note") notes.push(row);
+  }
+  if (!uuid2 || !/^[0-9A-Fa-f-]+$/.test(uuid2)) {
+    throw new NoteQueryStoreError(
+      "The Notes database has no store identifier, so note IDs cannot be formed.",
+      "schema"
+    );
+  }
+  const folders = resolveFolders(folderRows);
+  const textTerms = positiveTextTerms(ast);
+  const hits = [];
+  let matched = 0;
+  let unreadable = 0;
+  for (const row of notes) {
+    const folder = row.folder !== null ? folders.get(row.folder) : void 0;
+    const account = folder?.accountPk !== null && folder?.accountPk !== void 0 ? accounts.get(folder.accountPk) : void 0;
+    const locked = Boolean(row.locked);
+    let decoded;
+    let content;
+    const decode2 = () => {
+      if (decoded !== void 0) return decoded;
+      decoded = null;
+      if (locked) return decoded;
+      if (!row.data) {
+        if (withBodies) unreadable++;
+        return decoded;
+      }
+      try {
+        decoded = decodeNoteBody(
+          new Uint8Array(
+            gunzipSync7(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
+          )
+        );
+      } catch {
+        decoded = null;
+      }
+      if (!decoded) unreadable++;
+      return decoded;
+    };
+    const note = {
+      titleLower: normalizeForMatch(row.title ?? ""),
+      folderKeys: folder?.keys ?? [],
+      accountLower: account !== void 0 ? normalizeForMatch(account) : void 0,
+      pinned: Boolean(row.pinned),
+      locked,
+      shared: Boolean(row.shared) || Boolean(folder?.shared),
+      created: coreDataMs(row.created),
+      modified: coreDataMs(row.modified),
+      content: () => {
+        if (content !== void 0) return content;
+        const body2 = decode2();
+        if (!body2) return content = null;
+        const text2 = body2.text;
+        const firstBreak = text2.indexOf("\n");
+        const tags = /* @__PURE__ */ new Set();
+        for (const [id2, alt] of row.tags ?? []) {
+          if (id2 && alt && body2.objectIds.has(id2))
+            tags.add(normalizeForMatch(alt.replace(/^#/, "")));
+        }
+        const facets = new Set(body2.facets);
+        if (tags.size) facets.add("tag");
+        content = {
+          textLower: normalizeForMatch(text2),
+          bodyLower: normalizeForMatch(firstBreak === -1 ? "" : text2.slice(firstBreak + 1)),
+          words: countWords(text2),
+          facets,
+          checklist: body2.checklist,
+          tags: [...tags]
+        };
+        return content;
+      }
+    };
+    if (!evaluateNoteQuery(ast, note)) continue;
+    matched++;
+    if (hits.length >= limit) continue;
+    const body = locked ? null : decode2();
+    hits.push({
+      id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
+      title: row.title ?? "",
+      ...folder ? { folder: folder.path } : {},
+      ...account !== void 0 ? { account } : {},
+      ...note.modified !== void 0 ? { modified: new Date(note.modified).toISOString() } : {},
+      ...note.created !== void 0 ? { created: new Date(note.created).toISOString() } : {},
+      snippet: locked ? "" : body ? buildSnippet(body.text, textTerms) : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
+      ...locked ? { locked: true } : {}
+    });
+  }
+  return {
+    notes: hits,
+    count: hits.length,
+    matched,
+    scanned: notes.length,
+    eligible,
+    scanLimit,
+    scanTruncated: eligible > notes.length,
+    limit,
+    truncated: matched > hits.length,
+    unreadable
+  };
+}
+
+// src/utils/searchContentDb.ts
+function buildSearchContentQuery(options) {
+  const children = [{ type: "text", field: "any", value: options.query }];
+  const folder = options.folder?.trim();
+  if (folder) children.push({ type: "folder", value: folder });
+  const account = options.account?.trim();
+  if (account) children.push({ type: "account", value: account });
+  if (options.modifiedSince) {
+    const start = new Date(options.modifiedSince).getTime();
+    if (Number.isFinite(start)) {
+      children.push({
+        type: "date",
+        field: "modified",
+        op: ">=",
+        date: options.modifiedSince,
+        start,
+        end: start + 24 * 60 * 60 * 1e3
+      });
+    }
+  }
+  return children.length === 1 ? children[0] : { type: "and", children };
+}
+function searchContentViaDatabase(options) {
+  const result = runNoteQuery(buildSearchContentQuery(options), {
+    limit: options.limit,
+    scanLimit: QUERY_SCAN.MAX,
+    dbPath: options.dbPath
+  });
+  const notes = result.notes.map((hit) => ({
+    id: hit.id,
+    title: hit.title,
+    content: "",
+    tags: [],
+    created: hit.created ? new Date(hit.created) : /* @__PURE__ */ new Date(0),
+    modified: hit.modified ? new Date(hit.modified) : /* @__PURE__ */ new Date(0),
+    ...hit.folder !== void 0 ? { folder: hit.folder } : {},
+    ...hit.account !== void 0 ? { account: hit.account } : {}
+  }));
+  return {
+    notes,
+    scan: {
+      scanned: result.scanned,
+      eligible: result.eligible,
+      scanTruncated: result.scanTruncated,
+      matched: result.matched
+    }
+  };
+}
+function describeContentScan(scan) {
+  if (!scan?.scanTruncated) return "";
+  return `
+
+\u2139\uFE0F Searched the ${scan.scanned} most recently modified of ${scan.eligible} notes; older notes were not searched. A title search (\`searchContent: false\`) covers every note.`;
+}
+function contentSearchFailureHint(message, dbUnavailable) {
+  if (!/timed out/i.test(message)) return message;
+  const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the app that launches this server (run the doctor tool) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
+  return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
+}
+
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync6 } from "node:child_process";
+import { execFileSync as execFileSync14 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join7 } from "node:path";
+import { join as join15 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -42881,12 +46697,12 @@ function addNativeTags(request, deps) {
   }
   const after = deps.read(request.id);
   const allTags = [.../* @__PURE__ */ new Set([...before.rich.nativeTags, ...tags])];
-  const textWithoutTags = (text) => {
+  const textWithoutTags = (text2) => {
     for (const tag of [...allTags].sort((a, b) => b.length - a.length)) {
       const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      text = text.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
+      text2 = text2.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
     }
-    return text.replace(/[\s\ufffc]/gu, "");
+    return text2.replace(/[\s\ufffc]/gu, "");
   };
   if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
     throw new Error(
@@ -42902,13 +46718,19 @@ function addNativeTags(request, deps) {
     } : {}
   };
 }
-function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+function listInstalledShortcuts() {
+  return execFileSync14("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"]
   }).split(/\r?\n/u);
+}
+var nativeTagsShortcutName = () => process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
+function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
+  return resolveShortcut(listInstalledShortcuts(), shortcut);
+}
+function resolveShortcut(lines, shortcut) {
   const matches = lines.flatMap((line) => {
     const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
     return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
@@ -42923,11 +46745,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join7(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join15(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path4 = join7(directory, "request.json");
-    writeFileSync(path4, JSON.stringify(input), { mode: 384 });
-    execFileSync6("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path4], {
+    const path9 = join15(directory, "request.json");
+    writeFileSync(path9, JSON.stringify(input), { mode: 384 });
+    execFileSync14("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path9], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -42946,77 +46768,226 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync15 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join16 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function appendMarkdownHtml(markdown) {
-  if (markdown.includes("\uE000") || markdown.includes("\uE001"))
+var TASK_GLYPHS = { open: "\u2610", done: "\u2611" };
+var TASK_ITEM = /^\[([ xX])\][ \t]+(\S.*)$/;
+function stripDuplicateTitleHeading(markdown, title) {
+  const normalized2 = markdown.replace(/^\uFEFF/, "");
+  const lines = normalized2.split(/\r?\n/);
+  if (lines[0] !== `# ${title}`) return { content: markdown, stripped: false };
+  const rest = lines.slice(lines.length > 1 && lines[1] === "" ? 2 : 1);
+  return { content: rest.join("\n"), stripped: true };
+}
+function countTaskItems(markdown) {
+  return markdown.replace(/\r\n/g, "\n").split("\n").filter((line) => {
+    const item = /^[-+*]\s+(.+)$/.exec(line);
+    return item !== null && TASK_ITEM.test(item[1]);
+  }).length;
+}
+var FENCE = "```";
+var CHECKLIST_ITEM = /^- \[( |x)\] (.+)$/;
+function withoutMarkdownCode(markdown) {
+  let inCode = false;
+  return markdown.replace(/\r\n/g, "\n").split("\n").map((line) => {
+    if (line === FENCE) {
+      inCode = !inCode;
+      return "";
+    }
+    return inCode ? "" : line.replace(/`[^`\n]+`/g, "x");
+  }).join("\n");
+}
+function usesMarkdownBlocks(markdown) {
+  return /`/.test(markdown) || /^>/m.test(markdown) || /^---[ \t]*$/m.test(markdown) || /^- \[[ x]\] /m.test(markdown);
+}
+function renderMarkdown(markdown, options = {}) {
+  const blocks = options.blocks === true;
+  if (blocks ? /[-]/u.test(markdown) : /[]/u.test(markdown))
     throw new Error("Unsupported reserved characters");
   if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
     throw new Error("Unsupported control characters");
-  if (/[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(markdown))
+  const checked = blocks ? withoutMarkdownCode(markdown) : markdown;
+  if (blocks ? /[`~|]|^#{4,}\s|^[ \t]+>|^>[ \t]*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(checked) : /[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(checked))
     throw new Error(
-      "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
+      blocks ? "Markdown import supports paragraphs, headings, flat lists, checklist items, block quotes, fenced code, dividers, emphasis, inline code and inline links; use semantic HTML for other formatting" : "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
     );
-  const inline = (text) => {
+  const expect = {
+    quotes: [],
+    code: [],
+    checklist: [],
+    dividers: 0,
+    highlights: []
+  };
+  const inline = (text2) => {
+    const spans = [];
+    let value = text2;
+    if (blocks)
+      value = value.replace(/`([^`\n]+)`/g, (_s, code2) => {
+        if (/^\s|\s$/.test(code2)) throw new Error("Inline code cannot start or end with a space");
+        expect.highlights.push(code2);
+        spans.push(`<code>${escape2(code2)}</code>`);
+        return `\uE002${spans.length - 1}\uE003`;
+      });
     const links = [];
-    let value = text.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
+    value = value.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
       if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url))
         throw new Error("Unsupported Markdown link URL");
+      if (/[]/u.test(label)) throw new Error("Inline code inside a link is unsupported");
       links.push(`<a href="${escape2(url)}">${escape2(label)}</a>`);
       return `\uE000${links.length - 1}\uE001`;
     });
     value = escape2(value).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
     if (value.includes("[") || value.includes("]") || value.includes("*"))
       throw new Error("Unsupported or unbalanced Markdown inline syntax");
-    return value.replace(/\uE000(\d+)\uE001/g, (_s, i) => links[Number(i)]);
+    return value.replace(/(\d+)/g, (_s, i) => links[Number(i)]).replace(/(\d+)/g, (_s, i) => spans[Number(i)]);
   };
-  let html = "", list;
+  const withoutTags = (html2) => {
+    let text2 = "", inTag = false;
+    for (const ch of html2) {
+      if (ch === "<") inTag = true;
+      else if (ch === ">" && inTag) inTag = false;
+      else if (!inTag) text2 += ch;
+    }
+    return text2;
+  };
+  const visible = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  let html = "", list, quote = false, code, previousBlank = true;
   const close = () => {
     if (list) {
-      html += `</${list}>`;
+      html += list === "checklist" ? "</ul>" : `</${list}>`;
       list = void 0;
+    }
+    if (quote) {
+      html += "</blockquote>";
+      quote = false;
     }
   };
   for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
+    if (code) {
+      if (line === FENCE) {
+        if (!code.length) throw new Error("Empty fenced code blocks are unsupported");
+        html += `<pre>${escape2(code.join("\n"))}</pre>`;
+        expect.code.push(code.join("\n"));
+        code = void 0;
+        previousBlank = false;
+      } else code.push(line);
+      continue;
+    }
+    const blank = !line.trim();
+    if (blocks) {
+      if (quote && !blank && !line.startsWith(">"))
+        throw new Error("End a block quote with a blank line before other text");
+      if (line.startsWith(FENCE)) {
+        if (line !== FENCE)
+          throw new Error("Fenced code must open and close with a bare ``` line (no language)");
+        close();
+        code = [];
+        continue;
+      }
+      if (line.startsWith(">")) {
+        const text2 = line.replace(/^> ?/, "");
+        if (!text2.trim()) throw new Error("Empty block quote lines are unsupported");
+        if (/^(?:#|[-+*][ \t]|\d+[.)][ \t]|>|```)/.test(text2))
+          throw new Error("Block quotes support text and inline formatting only");
+        if (!quote) {
+          close();
+          html += "<blockquote>";
+          quote = true;
+          expect.quotes.push("");
+        }
+        const rendered = inline(text2);
+        html += `<div>${rendered}</div>`;
+        expect.quotes[expect.quotes.length - 1] += ` ${visible(rendered)}`;
+        previousBlank = false;
+        continue;
+      }
+      if (/^---[ \t]*$/.test(line)) {
+        if (!previousBlank) throw new Error("Put a blank line before a --- divider");
+        close();
+        html += "<hr>";
+        expect.dividers++;
+        previousBlank = false;
+        continue;
+      }
+      const task = CHECKLIST_ITEM.exec(line);
+      if (task) {
+        if (list && list !== "checklist")
+          throw new Error("Separate checklist items from other list items with a blank line");
+        if (list !== "checklist") {
+          close();
+          list = "checklist";
+          html += '<ul class="checklist">';
+        }
+        const rendered = inline(task[2]);
+        html += `<li>${rendered}</li>`;
+        expect.checklist.push({ text: visible(rendered).trim(), done: task[1] === "x" });
+        previousBlank = false;
+        continue;
+      }
+    }
     if (/^\s{2,}\S/.test(line)) throw new Error("Nested lists and indented code are unsupported");
     const heading = /^(#{1,3})\s+(.+)$/.exec(line), item = /^(?:([-+*])|\d+\.)\s+(.+)$/.exec(line);
     if (item) {
       const kind = item[1] ? "ul" : "ol";
+      if (list === "checklist")
+        throw new Error("Separate checklist items from other list items with a blank line");
       if (list !== kind) {
         close();
         list = kind;
         html += `<${kind}>`;
       }
-      html += `<li>${inline(item[2])}</li>`;
+      const task = options.taskGlyphs && item[1] ? TASK_ITEM.exec(item[2]) : null;
+      html += task ? `<li>${task[1] === " " ? TASK_GLYPHS.open : TASK_GLYPHS.done} ${inline(task[2])}</li>` : `<li>${inline(item[2])}</li>`;
+      previousBlank = false;
       continue;
     }
     close();
-    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : line.trim() ? `<div>${inline(line)}</div>` : "<div><br></div>";
+    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : !blank ? `<div>${inline(line)}</div>` : "<div><br></div>";
+    previousBlank = blank;
   }
+  if (code) throw new Error("Unclosed fenced code block");
   close();
-  return html;
+  expect.quotes = expect.quotes.map((q) => q.trim());
+  return { html, expect };
+}
+function appendMarkdownHtml(markdown, options = {}) {
+  return renderMarkdown(markdown, { taskGlyphs: options.taskGlyphs }).html;
 }
 
 // src/utils/noteRevision.ts
 var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+var LEGACY_ENTITIES = {
+  nbsp: " ",
+  quot: '"',
+  lt: "<",
+  gt: ">",
+  amp: "&"
+};
 function comparableVisibleText(html) {
-  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(/&nbsp;|&#160;/gi, " ").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_match, codePoint) => String.fromCodePoint(Number(codePoint))).replace(
-    /&#x([0-9a-f]+);/gi,
-    (_match, codePoint) => String.fromCodePoint(Number.parseInt(codePoint, 16))
+  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(
+    /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
+    (_match, legacy, dec, hex3) => {
+      if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
+      if (dec) return String.fromCodePoint(Number(dec));
+      if (hex3) return String.fromCodePoint(Number.parseInt(hex3, 16));
+      return "'";
+    }
   ).replace(/\s+/g, " ").trim();
 }
 
 // src/services/backgroundNotes.ts
 var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
-var backgroundStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+var backgroundShortcutName = () => process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
+var backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 var nativeTagBridgeStatus = () => nativeTagsStatus();
 var MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
-var markdownNoteStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT);
+var markdownShortcutName = () => process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;
+var markdownNoteStatus = () => nativeTagsStatus(markdownShortcutName());
 function readBackgroundSnapshot(manager, id2) {
   if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
     throw new Error("Exact note ID required");
@@ -43079,7 +47050,7 @@ var UNMODELED_MARKDOWN = [
   [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
   [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"]
 ];
-function validateAppendContent(content, format) {
+function validateAppendContent(content, format, options = {}) {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
   if (format === "html") {
@@ -43109,11 +47080,12 @@ function validateAppendContent(content, format) {
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
   if (format === "markdown") {
-    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+    const checked = options.blocks ? withoutMarkdownCode(content).replace(/^---[ \t]*$/gm, "") : content;
+    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(checked))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
-    const withoutLinkDestinations = content.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
+    const withoutLinkDestinations = checked.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
     for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : content))
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
@@ -43124,9 +47096,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join8(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join8(directory, "request.json");
+    const file = join16(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -43146,9 +47118,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync7("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
-        timeout: 6e4,
+        timeout: callTimeoutMs() ?? 6e4,
         maxBuffer: 1024 * 1024,
         stdio: ["ignore", "pipe", "pipe"]
       });
@@ -43163,9 +47135,9 @@ function backgroundDependencies(manager) {
   return {
     read: (id2) => readBackgroundSnapshot(manager, id2),
     run: runBackgroundShortcut,
-    candidates: (title, scope) => manager.listAccounts().flatMap(
+    candidates: (title, scope2) => manager.listAccounts().flatMap(
       (account) => manager.searchNotes(title, false, account.name).filter(
-        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope)
+        (note) => note.title === title && !note.passwordProtected && manager.getNotePlaintextById(note.id).includes(scope2)
       ).map((note) => note.id)
     )
   };
@@ -43289,11 +47261,11 @@ function appendNative(manager, request) {
     throw new Error("Use create-table for verified native table insertion");
   const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
   const op = request.format === "plaintext" ? "append-text" : request.format === "markdown" ? "append-markdown" : "append-html";
-  const text = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
+  const text2 = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
   return mutateBackground(
     request,
     op,
-    { text },
+    { text: text2 },
     (before, after) => {
       assertPreserved(before, after, { append: true });
       const verifyHtml = markdownHtml ?? request.content;
@@ -43333,14 +47305,46 @@ function setNativeTag(manager, request) {
     deps
   );
 }
-var literalMarkdown = (text) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
+var literalMarkdown = (text2) => text2.replace(/[!-/:-@[-`{-~]/g, "\\$&");
 function headingLevels(html) {
   return [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].filter((match) => comparableVisibleText(match[2])).map((match) => Number(match[1]));
 }
+var DIVIDER_UTI = "com.apple.notes.inlinetextattachment.dividerline";
+function assertMarkdownBlocks(rich, expected) {
+  const tidy = (s) => s.replace(/[\s￼]+/gu, " ").trim();
+  const runs = rich.styleRuns || [];
+  const styledText = (matches) => {
+    let out = "", previous = false;
+    for (const run of runs) {
+      const hit = matches(run);
+      if (hit) out += (previous ? "" : " ") + rich.text.slice(run.start, run.start + run.length);
+      previous = hit;
+    }
+    return tidy(out);
+  };
+  if (styledText((run) => run.blockQuote === true) !== tidy(expected.quotes.join(" ")))
+    throw new Error("Block quotes not verified");
+  if (styledText((run) => run.paragraphStyle === 4) !== tidy(expected.code.join(" ")))
+    throw new Error("Monospaced code blocks not verified");
+  if (styledText((run) => run.highlight === true) !== tidy(expected.highlights.join(" ")))
+    throw new Error("Inline code highlights not verified");
+  const items = (rich.checklistItems || []).map((item) => ({
+    text: tidy(item.text),
+    done: item.done
+  }));
+  const wanted = expected.checklist.map((item) => ({ text: tidy(item.text), done: item.done }));
+  if (JSON.stringify(items) !== JSON.stringify(wanted))
+    throw new Error("Checklist items or their done state not verified");
+  if ((rich.objects || []).filter((o) => o.type === DIVIDER_UTI).length !== expected.dividers)
+    throw new Error("Dividers not verified");
+}
 function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
-  validateAppendContent(request.content, "markdown");
-  const bodyHtml = appendMarkdownHtml(request.content);
+  validateAppendContent(request.content, "markdown", { blocks: true });
+  const { html: bodyHtml, expect: blockExpectations } = renderMarkdown(request.content, {
+    blocks: true
+  });
+  const checkBlocks = usesMarkdownBlocks(request.content);
   if (request.folder) buildFolderReference(request.folder);
   const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`.replace(/\s+/gu, " ").trim();
   const expectedLevels = [1, ...headingLevels(bodyHtml)].join();
@@ -43349,7 +47353,7 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const segments = (path4) => JSON.stringify(splitFolderPath(path4).map((part) => part.toLocaleLowerCase()));
+  const segments = (path9) => JSON.stringify(splitFolderPath(path9).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
     if (!manager.listAccounts().some(
@@ -43393,6 +47397,7 @@ ${request.content}`
         if (headingLevels(note2.html).join() !== expectedLevels)
           throw new Error("Heading styles not verified");
         assertAppendedHtmlLinks(0, note2.rich.links, bodyHtml);
+        if (checkBlocks) assertMarkdownBlocks(note2.rich, blockExpectations);
         return [{ id: noteId3, account: account2, note: note2 }];
       } catch (error2) {
         failures.push(`${noteId3}: ${reason(error2)}`);
@@ -43437,8 +47442,261 @@ ${request.content}`
   }
 }
 
+// src/services/capabilityMatrix.ts
+import { execFileSync as execFileSync16 } from "node:child_process";
+import { release } from "node:os";
+var MACOS_SHORTCUTS_CLI = "12.0";
+var MACOS_MARKDOWN_IMPORT = "26.0";
+var FEATURES = [
+  {
+    name: "applescriptCore",
+    description: "Create, read, search, update, move, and delete notes and folders through Notes.app's AppleScript interface",
+    tools: [
+      "create-note",
+      "search-notes",
+      "get-note-content",
+      "update-note",
+      "append-to-note",
+      "insert-link",
+      "delete-note",
+      "move-note",
+      "list-notes",
+      "list-folders",
+      "create-folder",
+      "list-accounts"
+    ],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "notes_automation" }]
+  },
+  {
+    name: "fullDiskAccessReads",
+    description: "Read-only reads of the Notes database: query-notes, checklist state, note metadata, note links, native objects, native tags, and sync detail",
+    tools: [
+      "query-notes",
+      "get-checklist-state",
+      "get-note-metadata",
+      "get-note-link",
+      "get-native-objects",
+      "list-native-tags",
+      "get-note-markdown (checklist annotations)",
+      "get-sync-status (pending uploads)"
+    ],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "full_disk_access" }]
+  },
+  {
+    name: "shortcutsBridges",
+    description: "Run the optional native-write Shortcut bridges in the background",
+    tools: [],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [{ kind: "shortcuts_cli" }]
+  },
+  {
+    name: "backgroundOperationsBridge",
+    description: "Native background edits through the Background Operations bridge, verified by exact-ID database readback",
+    tools: [
+      "append-native",
+      "create-checklist-item",
+      "create-checklist-items",
+      "create-table",
+      "insert-note-link",
+      "set-note-pinned",
+      "remove-native-tags"
+    ],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: backgroundShortcutName }
+    ]
+  },
+  {
+    name: "nativeTagsBridge",
+    description: "Add real Notes tags through the Native Tags bridge",
+    tools: ["add-native-tags", "replace-native-tag"],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: nativeTagsShortcutName }
+    ]
+  },
+  {
+    name: "markdownNoteBridge",
+    description: "Create a note from Markdown with real Title, Heading, and Subheading styles through the Create Markdown Note bridge",
+    tools: ['create-note (format: "markdown")'],
+    minimumMacOSVersion: MACOS_MARKDOWN_IMPORT,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: markdownShortcutName }
+    ]
+  },
+  // Placeholders for features that need a native helper this server does not
+  // ship. They always report `not_implemented` so clients can detect them.
+  {
+    name: "checklistToggle",
+    description: "Check or uncheck an existing checklist item in place",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "smartFolders",
+    description: "Create or edit Smart Folders and their tag rules",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "paragraphLinks",
+    description: "Link to a specific paragraph or heading inside a note",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "audioTranscription",
+    description: "Transcribe audio recordings attached to a note",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  }
+];
+function requirementLabel(requirement) {
+  return requirement.kind === "shortcut" ? `shortcut:${requirement.name()}` : requirement.kind;
+}
+function compareVersions(a, b) {
+  const pa = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const pb = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+function evaluateFeature(feature, env) {
+  const isMac = env.platform === "darwin";
+  const floor = feature.minimumMacOSVersion;
+  const versionKnown = env.macOSVersion !== null;
+  const osSupported = isMac && (floor === null || versionKnown && compareVersions(env.macOSVersion, floor) >= 0);
+  const missing = [];
+  const unverified = [];
+  const failures = /* @__PURE__ */ new Set();
+  for (const requirement of feature.requirements) {
+    const label = requirementLabel(requirement);
+    switch (requirement.kind) {
+      case "notes_automation":
+        unverified.push(label);
+        break;
+      case "full_disk_access":
+        if (!env.fullDiskAccess) {
+          missing.push(label);
+          failures.add("full_disk_access_missing");
+        }
+        break;
+      case "shortcuts_cli":
+        if (env.shortcutLines === null) {
+          missing.push(label);
+          failures.add("shortcuts_unavailable");
+        }
+        break;
+      case "shortcut":
+        if (env.shortcutLines === null) unverified.push(label);
+        else if (!resolveShortcut(env.shortcutLines, requirement.name()).installed) {
+          missing.push(label);
+          failures.add("shortcut_not_installed");
+        }
+        break;
+      case "native_helper":
+        missing.push(label);
+        failures.add("not_implemented");
+        break;
+    }
+  }
+  let reason = null;
+  if (!isMac) reason = "unsupported_platform";
+  else if (failures.has("not_implemented")) reason = "not_implemented";
+  else if (floor !== null && !versionKnown) reason = "unknown_os_version";
+  else if (!osSupported) reason = `requires_macos_${Number.parseInt(floor, 10)}`;
+  else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
+  else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
+  else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  return {
+    description: feature.description,
+    tools: feature.tools,
+    available: reason === null,
+    osSupported,
+    minimumMacOSVersion: floor,
+    requirements: feature.requirements.map(requirementLabel),
+    missing,
+    unverified,
+    reason
+  };
+}
+function evaluateFeatures(env, features = FEATURES) {
+  return {
+    runtimeOS: {
+      platform: env.platform,
+      macOSVersion: env.macOSVersion,
+      darwinRelease: env.darwinRelease
+    },
+    features: Object.fromEntries(features.map((f) => [f.name, evaluateFeature(f, env)]))
+  };
+}
+function readMacOSVersion() {
+  if (process.platform !== "darwin") return null;
+  try {
+    const out = execFileSync16("/usr/bin/sw_vers", ["-productVersion"], {
+      encoding: "utf8",
+      timeout: 3e3,
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return /^\d+(\.\d+)*$/.test(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+function probeCapabilityEnvironment() {
+  const platform = process.platform;
+  const isMac = platform === "darwin";
+  let shortcutLines = null;
+  if (isMac) {
+    try {
+      shortcutLines = listInstalledShortcuts();
+    } catch {
+      shortcutLines = null;
+    }
+  }
+  return {
+    platform,
+    macOSVersion: readMacOSVersion(),
+    darwinRelease: release(),
+    fullDiskAccess: isMac && hasFullDiskAccess(),
+    shortcutLines
+  };
+}
+function getCapabilityMatrix(probe = probeCapabilityEnvironment) {
+  return evaluateFeatures(probe());
+}
+function formatCapabilityMatrix(matrix) {
+  const os9 = matrix.runtimeOS;
+  const lines = [
+    `Feature matrix (macOS ${os9.macOSVersion ?? "unknown"}, Darwin ${os9.darwinRelease}):`
+  ];
+  for (const [name, status] of Object.entries(matrix.features)) {
+    lines.push(
+      status.available ? `  \u2713 ${name}: available${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}` : `  \u2717 ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}`
+    );
+  }
+  return lines.join("\n");
+}
+
 // src/tools/doctor.ts
-function runDoctor(manager) {
+function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
   const checks = [];
   const hc = manager.healthCheck();
   for (const c of hc.checks) {
@@ -43489,7 +47747,13 @@ function runDoctor(manager) {
   }
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
-  return { healthy, checks };
+  let matrix;
+  try {
+    matrix = capabilityMatrix();
+  } catch {
+    matrix = void 0;
+  }
+  return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features } : { healthy, checks };
 }
 function markdownBridgeDetail() {
   const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
@@ -43533,23 +47797,25 @@ function formatDoctorReport(r) {
   const icon = (s) => s === "ok" ? "\u2705" : s === "warn" ? "\u26A0\uFE0F " : "\u274C";
   const lines = [`\u{1FA7A} apple-notes-mcp doctor \u2014 ${r.healthy ? "healthy" : "ISSUES FOUND"}`, ""];
   for (const c of r.checks) lines.push(`${icon(c.status)} ${c.name}: ${c.detail}`);
+  if (r.runtimeOS && r.features)
+    lines.push("", formatCapabilityMatrix({ runtimeOS: r.runtimeOS, features: r.features }));
   return lines.join("\n");
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync6, readFileSync as readFileSync2 } from "fs";
-import { join as join9 } from "path";
-import { homedir as homedir7 } from "os";
+import { existsSync as existsSync11, readFileSync as readFileSync2 } from "fs";
+import { join as join17 } from "path";
+import { homedir as homedir14 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join9(homedir7(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join17(homedir14(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
-function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
+function loadFileConfig(env = process.env, path9 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync6(path4)) return applied;
-    const parsed = JSON.parse(readFileSync2(path4, "utf8"));
+    if (!existsSync11(path9)) return applied;
+    const parsed = JSON.parse(readFileSync2(path9, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v !== "string") continue;
@@ -43559,7 +47825,7 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
       }
     }
   } catch (e) {
-    console.error(`Failed to load apple-notes-mcp config file ${path4}: ${String(e)}`);
+    console.error(`Failed to load apple-notes-mcp config file ${path9}: ${String(e)}`);
   }
   return applied;
 }
@@ -43750,119 +48016,2054 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
-// src/utils/noteTables.ts
-import { gunzipSync as gunzipSync3 } from "node:zlib";
-var sub = (f, n) => {
-  const value = embeddedMessage(getField(f, n));
-  if (!value) throw new Error(`Missing table field ${n}`);
-  return value;
+// src/utils/errorCodes.ts
+var CodedError = class extends Error {
+  envelope;
+  constructor(message, envelope) {
+    super(message);
+    this.name = "CodedError";
+    this.envelope = envelope;
+  }
 };
-var num = (f, n) => {
-  const v = varintValue(getField(f, n));
-  if (v === void 0) throw new Error(`Missing table index ${n}`);
-  return v;
-};
-var many = (f, n) => getFields(f, n).map((v) => {
-  const m = embeddedMessage(v);
-  if (!m) throw new Error("Invalid table entry");
-  return m;
-});
-var hex = (f) => {
-  if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
-  return Buffer.from(f.value).toString("hex");
-};
-function parseNoteTable(compressed) {
-  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
-  const data = sub(sub(root, 2), 3), entries = many(data, 3);
-  if (entries.length > 1e5) throw new Error("Table too large");
-  const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
-  const entry = (index) => {
-    if (!entries[index]) throw new Error("Invalid table reference");
-    return entries[index];
+var RULES = [
+  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  {
+    code: "verification_failed",
+    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
+  },
+  {
+    code: "revision_conflict",
+    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
+  },
+  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
+  {
+    code: "shortcut_not_installed",
+    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
+  },
+  {
+    code: "not_found",
+    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
+  },
+  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
+  {
+    code: "notes_unavailable",
+    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
+  },
+  {
+    code: "unsupported",
+    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
+  },
+  {
+    code: "validation_error",
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+  }
+];
+var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
+var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
+function classifyError(message, cause) {
+  if (cause instanceof CodedError) return { ...cause.envelope };
+  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message;
+  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
+  let code = "operation_failed";
+  if (timeoutCause) code = "timeout_indeterminate";
+  else if (isPermissionDenied(text2)) code = "permission_denied";
+  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
+  const envelope = { code };
+  if (code === "timeout_indeterminate" || code === "verification_failed") {
+    envelope.indeterminate = true;
+    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
+  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
+    envelope.committed = false;
+    envelope.indeterminate = false;
+  }
+  return envelope;
+}
+function errorResult(message, cause) {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: classifyError(message, cause),
+    isError: true
   };
-  const uuidIndex = (index) => num(sub(many(sub(entry(index), 13), 3)[0], 2), 2);
-  const roots = entries.filter((e) => {
-    const map = embeddedMessage(getField(e, 13));
-    return map && types[num(map, 1)] === "com.apple.notes.ICTable";
-  });
-  if (roots.length !== 1) throw new Error("Ambiguous native table root");
-  const refs = new Map(
-    many(sub(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub(m, 2), 6)])
-  );
-  const ordered = (key) => {
-    const ref = refs.get(key);
-    if (ref === void 0) throw new Error("Missing table dimension");
-    const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
-    const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
-    const map = /* @__PURE__ */ new Map();
-    ids.forEach((id2, i) => {
-      const index = uuids.indexOf(id2);
-      if (index < 0) throw new Error("Missing dimension UUID");
-      map.set(index, i);
-    });
-    const aliases = many(sub(ordering, 2), 1).map((pair) => [
-      uuidIndex(num(sub(pair, 1), 6)),
-      uuidIndex(num(sub(pair, 2), 6))
-    ]);
-    for (let pass = 0; pass < aliases.length + 1; pass++) {
-      let changed = false;
-      for (const [key2, value] of aliases)
-        if (map.has(key2) && !map.has(value)) {
-          map.set(value, map.get(key2));
-          changed = true;
+}
+
+// src/utils/shutdown.ts
+var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
+function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
+  let shuttingDown = false;
+  let exited = false;
+  const exitOnce = () => {
+    if (exited) return;
+    exited = true;
+    clearTimeout(timer);
+    exit();
+  };
+  let timer;
+  const exitWhenDrained = () => {
+    if (stream.writableLength === 0) exitOnce();
+    else stream.once("drain", exitWhenDrained);
+  };
+  return () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    timer = setTimeout(exitOnce, timeoutMs);
+    setImmediate(exitWhenDrained);
+  };
+}
+
+// src/utils/noteBlocks.ts
+import { execFileSync as execFileSync17 } from "node:child_process";
+import { existsSync as existsSync12 } from "node:fs";
+import { homedir as homedir15 } from "node:os";
+import { join as join18 } from "node:path";
+import { gunzipSync as gunzipSync8 } from "node:zlib";
+var NoteBlocksError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteBlocksError";
+    this.code = code;
+  }
+};
+var STYLE_NAMES = {
+  0: "title",
+  1: "heading",
+  2: "subheading",
+  4: "monospaced",
+  100: "bulleted",
+  101: "dashed",
+  102: "numbered",
+  103: "checklist"
+};
+var ALIGNMENTS = {
+  0: "left",
+  1: "center",
+  2: "right",
+  3: "justify"
+};
+var HIGHLIGHTS = {
+  1: "purple",
+  2: "pink",
+  3: "orange",
+  4: "mint",
+  5: "blue"
+};
+var KNOWN_RUN_FIELDS = /* @__PURE__ */ new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
+var KNOWN_PARAGRAPH_FIELDS = /* @__PURE__ */ new Set([1, 2, 4, 5, 8, 9]);
+var isSafeLink = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var utf8 = new TextDecoder();
+var first = (fields, n) => fields.find((f) => f.fieldNumber === n);
+var varintOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 0 && f.varint !== void 0 ? signedVarint(f.varint) : void 0;
+};
+var bytesOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 2 ? f.bytes : void 0;
+};
+var stringOf = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? utf8.decode(b) : void 0;
+};
+var sub3 = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? decodeWireFields(b) : void 0;
+};
+var hex2 = (bytes) => Buffer.from(bytes).toString("hex");
+var uuidString = (bytes) => {
+  const h = hex2(bytes).toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+var channel = (value) => Math.max(0, Math.min(255, Math.round((Number.isFinite(value) ? value : 0) * 255))).toString(16).toUpperCase().padStart(2, "0");
+function colorOf(fields) {
+  const [r, g, b, a] = [1, 2, 3, 4].map((n) => fixed32Float(first(fields, n)));
+  if (r === void 0 && g === void 0 && b === void 0) return void 0;
+  const rgb = `#${channel(r)}${channel(g)}${channel(b)}`;
+  return a === void 0 || a >= 0.999 ? rgb : `${rgb}${channel(a)}`;
+}
+var DEFAULT_PARAGRAPH = {
+  styleType: null,
+  alignmentValue: 0,
+  indent: 0,
+  blockQuote: false
+};
+function decodeParagraph(fields, tally) {
+  if (!fields) return DEFAULT_PARAGRAPH;
+  for (const n of new Set(fields.map((f) => f.fieldNumber)))
+    if (!KNOWN_PARAGRAPH_FIELDS.has(n)) tally.set(n, (tally.get(n) || 0) + 1);
+  const attrs = {
+    styleType: varintOf(fields, 1) ?? null,
+    alignmentValue: varintOf(fields, 2) ?? 0,
+    indent: Math.max(0, varintOf(fields, 4) ?? 0),
+    blockQuote: (varintOf(fields, 8) ?? 0) !== 0
+  };
+  if (attrs.styleType === -1) attrs.styleType = null;
+  const checklist = sub3(fields, 5);
+  const checklistId = checklist && bytesOf(checklist, 1);
+  if (attrs.styleType === 103 && checklistId)
+    attrs.checklist = { id: hex2(checklistId), done: varintOf(checklist, 2) === 1 };
+  const uuid2 = bytesOf(fields, 9);
+  if (uuid2?.length === 16) attrs.paragraphUuid = uuidString(uuid2);
+  return attrs;
+}
+function decodeInline(fields) {
+  const inline = {};
+  const font = sub3(fields, 3);
+  const hints = font ? varintOf(font, 3) ?? 0 : 0;
+  const weight = varintOf(fields, 5) ?? 0;
+  if (weight === 1 || weight === 3 || hints & 1) inline.bold = true;
+  if (weight === 2 || weight === 3 || hints & 2) inline.italic = true;
+  if (varintOf(fields, 6)) inline.underline = true;
+  if (varintOf(fields, 7)) inline.strikethrough = true;
+  const baseline = varintOf(fields, 8) ?? 0;
+  if (baseline > 0) inline.superscript = true;
+  if (baseline < 0) inline.subscript = true;
+  const color = sub3(fields, 10);
+  const colorValue = color && colorOf(color);
+  if (colorValue) inline.color = colorValue;
+  const emphasis = varintOf(fields, 14);
+  if (emphasis !== void 0 && emphasis !== 0) {
+    inline.highlight = HIGHLIGHTS[emphasis] ?? "unknown";
+    if (inline.highlight === "unknown") inline.highlightValue = emphasis;
+  }
+  const link = stringOf(fields, 9);
+  if (link) {
+    inline.link = link;
+    inline.linkSafe = isSafeLink(link);
+  }
+  if (font) {
+    const name = stringOf(font, 1);
+    const size = fixed32Float(first(font, 2));
+    if (name || size !== void 0)
+      inline.font = {
+        ...name ? { name } : {},
+        ...size !== void 0 && Number.isFinite(size) ? { size } : {}
+      };
+  }
+  const attachment = sub3(fields, 12);
+  const attachmentId = attachment && stringOf(attachment, 1);
+  if (attachmentId)
+    inline.attachment = { id: attachmentId, uti: stringOf(attachment, 2) || "unknown" };
+  return inline;
+}
+function wrap(error2) {
+  if (error2 instanceof NoteBlocksError) throw error2;
+  if (error2 instanceof ProtobufDecodeError)
+    throw new NoteBlocksError("malformed-protobuf", error2.message);
+  throw error2;
+}
+function decodeNoteBlocks(data) {
+  let note;
+  try {
+    const document = sub3(decodeWireFields(data), 2);
+    note = document && sub3(document, 3);
+  } catch (error2) {
+    wrap(error2);
+  }
+  const textBytes = note && bytesOf(note, 2);
+  if (!note || !textBytes)
+    throw new NoteBlocksError("unsupported-structure", "Unsupported Notes document structure");
+  const text2 = utf8.decode(textBytes);
+  const runTally = /* @__PURE__ */ new Map();
+  const paragraphTally = /* @__PURE__ */ new Map();
+  const runs = [];
+  let position = 0;
+  try {
+    for (const field of note.filter((f) => f.fieldNumber === 5)) {
+      if (field.wireType !== 2 || !field.bytes)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes attribute run");
+      const fields = decodeWireFields(field.bytes);
+      const length = varintOf(fields, 1);
+      if (length === void 0 || length < 0 || position + length > text2.length)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes run length");
+      for (const n of new Set(fields.map((f) => f.fieldNumber)))
+        if (!KNOWN_RUN_FIELDS.has(n)) runTally.set(n, (runTally.get(n) || 0) + 1);
+      runs.push({
+        start: position,
+        length,
+        paragraph: decodeParagraph(sub3(fields, 2), paragraphTally),
+        inline: decodeInline(fields)
+      });
+      position += length;
+    }
+  } catch (error2) {
+    wrap(error2);
+  }
+  if (position !== text2.length)
+    throw new NoteBlocksError("invalid-runs", "Incomplete Notes attribute runs");
+  const blocks = [];
+  const attachments = [];
+  let runIndex = 0;
+  let paragraphStart = 0;
+  while (paragraphStart < text2.length) {
+    const newline = text2.indexOf("\n", paragraphStart);
+    const end = newline === -1 ? text2.length : newline;
+    while (runIndex < runs.length - 1 && runs[runIndex].start + runs[runIndex].length <= paragraphStart)
+      runIndex++;
+    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
+    const style = attrs.styleType === null ? "body" : STYLE_NAMES[attrs.styleType] ?? "unknown";
+    const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";
+    const block = {
+      index: blocks.length,
+      start: paragraphStart,
+      length: end - paragraphStart,
+      text: text2.slice(paragraphStart, end),
+      style,
+      styleType: attrs.styleType,
+      indent: attrs.indent,
+      alignment,
+      ...alignment === "unknown" ? { alignmentValue: attrs.alignmentValue } : {},
+      blockQuote: attrs.blockQuote,
+      ...attrs.checklist ? { checklist: attrs.checklist } : {},
+      ...attrs.paragraphUuid ? { paragraphUuid: attrs.paragraphUuid } : {},
+      runs: [],
+      attachments: []
+    };
+    for (let i = runIndex; i < runs.length && runs[i].start < end; i++) {
+      const run = runs[i];
+      const start = Math.max(run.start, paragraphStart);
+      const stop = Math.min(run.start + run.length, end);
+      if (stop <= start) continue;
+      block.runs.push({
+        start,
+        length: stop - start,
+        text: text2.slice(start, stop),
+        ...run.inline
+      });
+      if (run.inline.attachment)
+        for (let at = text2.indexOf("\uFFFC", start); at !== -1 && at < stop; at = text2.indexOf("\uFFFC", at + 1)) {
+          const marker = { ...run.inline.attachment, start: at, blockIndex: block.index };
+          block.attachments.push(marker);
+          attachments.push(marker);
         }
-      if (!changed) break;
     }
-    return { ids, map };
+    blocks.push(block);
+    paragraphStart = end + 1;
+  }
+  return {
+    text: text2,
+    textLength: text2.length,
+    blocks,
+    attachments,
+    undecodedFields: {
+      attributeRun: Object.fromEntries([...runTally].sort((a, b) => a[0] - b[0])),
+      paragraphStyle: Object.fromEntries([...paragraphTally].sort((a, b) => a[0] - b[0]))
+    },
+    summary: summarize(blocks, attachments)
   };
-  const rows = ordered("crRows"), columns = ordered("crColumns");
-  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
-    throw new Error("Unsupported table size");
-  const values = rows.ids.map(() => columns.ids.map(() => ""));
-  const cellRef = refs.get("cellColumns");
-  if (cellRef === void 0) throw new Error("Missing table cells");
-  for (const column of many(sub(entry(cellRef), 6), 1)) {
-    const ci = columns.map.get(uuidIndex(num(sub(column, 1), 6)));
-    const cells = entry(num(sub(column, 2), 6));
-    for (const row of many(sub(cells, 6), 1)) {
-      const ri = rows.map.get(uuidIndex(num(sub(row, 1), 6)));
-      if (ri === void 0 || ci === void 0) continue;
-      const note = sub(entry(num(sub(row, 2), 6)), 10);
-      const text = stringValue(getField(note, 2));
-      if (text === void 0 || text.includes("\uFFFC"))
-        throw new Error("Embedded or unsupported table cell");
-      values[ri][ci] = text.replace(/\n$/u, "");
+}
+function summarize(blocks, attachments) {
+  const summary = {
+    blocks: blocks.length,
+    styles: {},
+    alignments: {},
+    blockQuotes: 0,
+    indented: 0,
+    checklist: { total: 0, done: 0 },
+    inline: {
+      bold: 0,
+      italic: 0,
+      underline: 0,
+      strikethrough: 0,
+      superscript: 0,
+      subscript: 0,
+      color: 0,
+      highlight: 0,
+      link: 0,
+      unsafeLink: 0
+    },
+    attachments: attachments.length
+  };
+  for (const block of blocks) {
+    summary.styles[block.style] = (summary.styles[block.style] || 0) + 1;
+    summary.alignments[block.alignment] = (summary.alignments[block.alignment] || 0) + 1;
+    if (block.blockQuote) summary.blockQuotes++;
+    if (block.indent > 0) summary.indented++;
+    if (block.checklist) {
+      summary.checklist.total++;
+      if (block.checklist.done) summary.checklist.done++;
+    }
+    for (const run of block.runs) {
+      for (const key of [
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "superscript",
+        "subscript",
+        "color",
+        "highlight",
+        "link"
+      ])
+        if (run[key]) summary.inline[key]++;
+      if (run.link && !run.linkSafe) summary.inline.unsafeLink++;
     }
   }
-  const rtl = entries.some((e) => {
-    const map = embeddedMessage(getField(e, 13));
-    return map && many(map, 3).some(
-      (m) => stringValue(getField(sub(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
+  return summary;
+}
+function decodeCompressedNoteBlocks(compressed) {
+  let data;
+  try {
+    data = gunzipSync8(compressed, { maxOutputLength: 32 * 1024 * 1024 });
+  } catch (error2) {
+    throw new NoteBlocksError(
+      "decompress-failed",
+      `Failed to decompress note data: ${error2 instanceof Error ? error2.message : String(error2)}`
     );
-  });
-  if (rtl) {
-    for (const row of values) row.reverse();
-    columns.ids.reverse();
   }
-  return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
+  return decodeNoteBlocks(data);
+}
+var DEFAULT_BLOCKS_MAX_BYTES = 4 * 1024 * 1024;
+function blocksMaxResponseBytes(env = process.env) {
+  const raw = env.APPLE_NOTES_MCP_BLOCKS_MAX_BYTES;
+  if (raw !== void 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return DEFAULT_BLOCKS_MAX_BYTES;
+}
+function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResponseBytes() } = {}) {
+  const total = doc.blocks.length;
+  const start = Math.min(Math.max(0, offset), total);
+  const blocks = [];
+  let bytes = 0;
+  for (let i = start; i < total && blocks.length < limit; i++) {
+    let block = doc.blocks[i];
+    let size = Buffer.byteLength(JSON.stringify(block));
+    if (bytes + size > maxBytes) {
+      if (blocks.length) break;
+      block = {
+        ...block,
+        text: "",
+        textOmitted: true,
+        runs: block.runs.map((run) => ({ ...run, text: "" }))
+      };
+      size = Buffer.byteLength(JSON.stringify(block));
+    }
+    blocks.push(block);
+    bytes += size;
+  }
+  const next = start + blocks.length;
+  return {
+    textLength: doc.textLength,
+    blocks,
+    page: {
+      offset: start,
+      returned: blocks.length,
+      total,
+      hasMore: next < total,
+      ...next < total ? { nextOffset: next } : {}
+    },
+    summary: doc.summary,
+    undecodedFields: doc.undecodedFields
+  };
+}
+var NOTES_DB_PATH10 = join18(
+  homedir15(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH10 } = {}) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteBlocksError(
+      "invalid-id",
+      `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
+    );
+  if (!existsSync12(dbPath2))
+    throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+  const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
+  let output;
+  try {
+    output = execFileSync17(
+      "/usr/bin/sqlite3",
+      ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
+      {
+        encoding: "utf8",
+        timeout: 5e3,
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    ).trim();
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
+  }
+  let row;
+  try {
+    row = JSON.parse(output);
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  if (!row.exists) throw new NoteBlocksError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted)
+    throw new NoteBlocksError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted and cannot be decoded"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new NoteBlocksError("no-body", "No body data is stored for this note");
+  return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
+}
+
+// src/utils/linkInsert.ts
+var MAX_LINK_URL_LENGTH = 4096;
+var MAX_LINK_LABEL_LENGTH = 2e3;
+var LINK_SCHEMES = /^(?:https?:\/\/[^/?#\s]+|mailto:[^\s]|notes:\/\/[^\s]|applenotes:[^\s])/i;
+function validateLinkUrl(url) {
+  if (!url) throw new Error("Link URL is required");
+  if (url.length > MAX_LINK_URL_LENGTH)
+    throw new Error(`Link URL is longer than ${MAX_LINK_URL_LENGTH} characters`);
+  if (Array.from(url).some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127))
+    throw new Error("Link URL cannot contain spaces, line breaks or control characters");
+  if (/[<>"]/u.test(url)) throw new Error('Link URL cannot contain <, > or "');
+  if (!LINK_SCHEMES.test(url))
+    throw new Error(
+      "Link URL must be an absolute http(s) URL with a host, or a mailto:, notes:// or applenotes: link"
+    );
+  return url;
+}
+function validateLinkLabel(label) {
+  if (!label.trim()) throw new Error("Hyperlink label must contain visible text");
+  if (label.length > MAX_LINK_LABEL_LENGTH)
+    throw new Error(`Hyperlink label is longer than ${MAX_LINK_LABEL_LENGTH} characters`);
+  if (Array.from(label).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
+    throw new Error("Hyperlink label must be one line without control characters");
+  return label;
+}
+var escapeText = (text2) => text2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escapeHref = (url) => escapeText(url).replace(/"/g, "&quot;");
+function buildLinkInsertion(request) {
+  const url = validateLinkUrl(request.url);
+  if (request.mode === "hyperlink") {
+    if (request.label === void 0) throw new Error("Hyperlink mode requires a label");
+    if (request.linked === false)
+      throw new Error("linked=false applies to raw mode only; a hyperlink is always linked");
+    const label = validateLinkLabel(request.label);
+    return {
+      html: `<div><a href="${escapeHref(url)}">${escapeText(label)}</a></div>`,
+      text: label,
+      link: { text: label, url }
+    };
+  }
+  if (request.label !== void 0)
+    throw new Error("A label applies to hyperlink mode only; raw mode shows the URL itself");
+  if (request.linked === false)
+    return { html: `<div>${escapeText(url)}</div>`, text: url, link: null };
+  return {
+    html: `<div><a href="${escapeHref(url)}">${escapeText(url)}</a></div>`,
+    text: url,
+    link: { text: url, url }
+  };
+}
+function countMatchingLinks(links, expected) {
+  const wanted = linkSignature([expected]);
+  return links.filter((link) => linkSignature([link]) === wanted).length;
+}
+function countLinksTo(links, url) {
+  const wanted = linkSignature([{ text: "x", url }]);
+  return links.filter((link) => linkSignature([{ text: "x", url: link.url }]) === wanted).length;
+}
+function verifyLinkReadback(before, after, insertion, url) {
+  for (const link of before) {
+    if (countMatchingLinks(after, link) < countMatchingLinks(before, link))
+      throw new Error("An existing link changed during the insert; read the note before retrying");
+  }
+  if (insertion.link) {
+    const added = countMatchingLinks(after, insertion.link) - countMatchingLinks(before, insertion.link);
+    if (added !== 1)
+      throw new Error(
+        "The inserted link was not found in the note's stored links; read the note before retrying"
+      );
+    const stored = after.filter(
+      (link) => linkSignature([link]) === linkSignature([insertion.link])
+    );
+    return { linkStored: true, storedUrl: stored[stored.length - 1].url };
+  }
+  const gained = countLinksTo(after, url) - countLinksTo(before, url);
+  return gained > 0 ? {
+    linkStored: true,
+    storedUrl: after.filter((link) => countLinksTo([link], url) === 1).pop().url
+  } : { linkStored: false };
+}
+
+// src/services/linkInsert.ts
+function insertLink(request, deps) {
+  const insertion = buildLinkInsertion(request);
+  const before = deps.readLinks(request.id);
+  const outcome = deps.append({
+    id: request.id,
+    expectedContentHash: request.expectedContentHash,
+    content: insertion.html,
+    position: request.position === "after-title" ? "before" : "after",
+    separator: request.blankLine ? "\n\n" : "",
+    scopeText: request.scopeText
+  });
+  let readback;
+  try {
+    readback = verifyLinkReadback(before, deps.readLinks(request.id), insertion, request.url);
+  } catch (error2) {
+    throw new Error(
+      `The text was written, but link verification failed: ${error2 instanceof Error ? error2.message : String(error2)}. Do not retry automatically.`
+    );
+  }
+  return {
+    ok: true,
+    id: request.id,
+    mode: request.mode,
+    url: request.url,
+    text: insertion.text,
+    position: request.position,
+    route: outcome.route,
+    ...readback,
+    previousContentHash: request.expectedContentHash,
+    contentHash: outcome.contentHash
+  };
+}
+
+// src/services/notesExport.ts
+import { mkdirSync as mkdirSync5 } from "node:fs";
+import { basename as basename4, dirname as dirname4, extname as extname4, join as join21 } from "node:path";
+
+// src/utils/exportAssets.ts
+import {
+  closeSync as closeSync4,
+  constants as constants4,
+  fstatSync as fstatSync4,
+  mkdirSync as mkdirSync4,
+  openSync as openSync4,
+  readdirSync as readdirSync3,
+  readSync as readSync3,
+  realpathSync as realpathSync3,
+  statSync as statSync3,
+  writeSync as writeSync3
+} from "node:fs";
+import { homedir as homedir16 } from "node:os";
+import { basename as basename3, extname as extname3, join as join19, relative as relative3, resolve as resolve3, sep as sep3 } from "node:path";
+var NOTES_CONTAINER = join19(homedir16(), "Library/Group Containers/group.com.apple.notes");
+var MAX_EMBED_BYTES = 10 * 1024 * 1024;
+var MAX_EMBED_TOTAL_BYTES = 256 * 1024 * 1024;
+var MAX_DIRECTORY_ENTRIES = 2e4;
+var MAX_BUNDLE_ENTRIES2 = 64;
+var IMAGE_EXTENSIONS = /* @__PURE__ */ new Set([".png", ".jpg", ".jpeg", ".heic", ".gif", ".tiff", ".webp"]);
+function safeComponent2(value) {
+  if (!value || value.length > 255) return void 0;
+  if (value === "." || value === ".." || /[/\\\0]/.test(value)) return void 0;
+  return value;
+}
+function confine(candidate, root) {
+  try {
+    const real = realpathSync3.native(candidate);
+    return real.startsWith(root + sep3) ? real : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function listDirectory(dir, limit) {
+  try {
+    const names = readdirSync3(dir);
+    return names.length > limit ? [] : names.sort();
+  } catch {
+    return [];
+  }
+}
+function isFile(path9) {
+  let fd;
+  try {
+    fd = openSync4(path9, constants4.O_RDONLY | constants4.O_NOFOLLOW);
+    return fstatSync4(fd).isFile();
+  } catch {
+    return false;
+  } finally {
+    if (fd !== void 0) closeSync4(fd);
+  }
+}
+function isDirectory2(path9) {
+  try {
+    return statSync3(path9).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function previewArea(name) {
+  const sizes = [...name.matchAll(/-(\d{1,5})x(\d{1,5})(?=-|\.|$)/g)];
+  const last = sizes[sizes.length - 1];
+  return last ? Number(last[1]) * Number(last[2]) : 0;
+}
+var AssetLocator = class {
+  accounts;
+  previewIndex = /* @__PURE__ */ new Map();
+  constructor(container = NOTES_CONTAINER) {
+    let accountsRoot = "";
+    try {
+      accountsRoot = realpathSync3.native(join19(container, "Accounts"));
+    } catch {
+    }
+    this.accounts = accountsRoot ? listDirectory(accountsRoot, 1e3).flatMap((name) => {
+      const dir = safeComponent2(name) && confine(join19(accountsRoot, name), accountsRoot);
+      return dir && isDirectory2(dir) ? [dir] : [];
+    }) : [];
+  }
+  /** Canonical account directories found in the container. */
+  get accountDirs() {
+    return [...this.accounts];
+  }
+  /** The attachment's own file and its best preview, when present. */
+  locate(source) {
+    const id2 = safeComponent2(source.id);
+    if (!id2) return {};
+    for (const account of this.accounts) {
+      const files = this.locateIn(account, id2, source);
+      if (files.primary || files.preview) return files;
+    }
+    return {};
+  }
+  locateIn(account, id2, source) {
+    const preview = this.preview(account, id2);
+    const media = this.media(account, source);
+    switch (source.kind) {
+      case "drawing":
+      case "paper": {
+        const fallback = this.fallback(
+          account,
+          "FallbackImages",
+          id2,
+          source.fallbackImageGeneration,
+          ["FallbackImage.png", "FallbackImage.jpg"]
+        );
+        if (fallback)
+          return { primary: { path: fallback, name: `${source.kind}.png`, role: "fallback" } };
+        return preview ? { primary: preview } : {};
+      }
+      case "scan": {
+        const pdf = this.fallback(account, "FallbackPDFs", id2, source.fallbackPdfGeneration, [
+          "FallbackPDF.pdf"
+        ]);
+        return {
+          ...pdf ? { primary: { path: pdf, name: "scan.pdf", role: "fallback" } } : {},
+          ...preview ? { preview } : {}
+        };
+      }
+      case "link":
+        return preview ? { preview } : {};
+      default:
+        return {
+          ...media ? { primary: media } : {},
+          ...preview ? { preview } : {}
+        };
+    }
+  }
+  /** Media/<media-id>/<generation>/<filename>, then without the generation. */
+  media(account, source) {
+    const mediaId = safeComponent2(source.mediaId);
+    const filename = safeComponent2(source.mediaFilename);
+    if (!mediaId || !filename) return void 0;
+    const generation = safeComponent2(source.mediaGeneration);
+    const candidates = [
+      ...generation ? [join19(account, "Media", mediaId, generation, filename)] : [],
+      join19(account, "Media", mediaId, filename)
+    ];
+    for (const candidate of candidates) {
+      const path9 = confine(candidate, account);
+      if (path9 && isFile(path9)) return { path: path9, name: filename, role: "original" };
+    }
+    return void 0;
+  }
+  /** <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation. */
+  fallback(account, dir, id2, generation, names) {
+    const base = join19(account, dir, id2);
+    const gen = safeComponent2(generation);
+    const generations = [
+      ...gen ? [gen] : [],
+      "",
+      ...listDirectory(base, MAX_BUNDLE_ENTRIES2).filter((name) => name !== gen && safeComponent2(name)).reverse()
+    ];
+    for (const g of generations)
+      for (const name of names) {
+        const path9 = confine(g ? join19(base, g, name) : join19(base, name), account);
+        if (path9 && isFile(path9)) return path9;
+      }
+    return void 0;
+  }
+  /** The largest rendered preview image for an attachment. */
+  preview(account, id2) {
+    let index = this.previewIndex.get(account);
+    if (!index) {
+      index = /* @__PURE__ */ new Map();
+      for (const name of listDirectory(join19(account, "Previews"), MAX_DIRECTORY_ENTRIES)) {
+        const key = name.slice(0, 36).toUpperCase();
+        const entries3 = index.get(key) ?? [];
+        entries3.push(name);
+        index.set(key, entries3);
+      }
+      this.previewIndex.set(account, index);
+    }
+    const entries2 = (index.get(id2.toUpperCase()) ?? []).filter((name) => name.slice(36, 37) === "-" || name.length === 36).filter((name) => {
+      const ext = extname3(name).toLowerCase();
+      return !ext || IMAGE_EXTENSIONS.has(ext) || /^\.\d+$/.test(ext);
+    }).sort((a, b) => previewArea(b) - previewArea(a) || a.localeCompare(b));
+    for (const name of entries2) {
+      const entry = confine(join19(account, "Previews", name), account);
+      if (!entry) continue;
+      const file = isFile(entry) ? entry : this.bundleImage(entry, account);
+      if (file) return { path: file, name: "preview", role: "preview" };
+    }
+    return void 0;
+  }
+  /** Preview.png (or another image) at most two levels inside a bundle. */
+  bundleImage(bundle, account) {
+    const found = [];
+    for (const child of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
+      const path9 = confine(join19(bundle, child), account);
+      if (!path9) continue;
+      if (isFile(path9)) found.push(path9);
+      else
+        for (const grandchild of listDirectory(path9, MAX_BUNDLE_ENTRIES2)) {
+          const inner = confine(join19(path9, grandchild), account);
+          if (inner && isFile(inner)) found.push(inner);
+        }
+    }
+    return found.find((path9) => basename3(path9) === "Preview.png") ?? found.find((path9) => IMAGE_EXTENSIONS.has(extname3(path9).toLowerCase()));
+  }
+};
+function sniffMime(head, name) {
+  const ascii = Buffer.from(head).toString("latin1");
+  if (ascii.startsWith("\x89PNG")) return "image/png";
+  if (head[0] === 255 && head[1] === 216) return "image/jpeg";
+  if (ascii.startsWith("GIF8")) return "image/gif";
+  if (ascii.startsWith("%PDF")) return "application/pdf";
+  if (ascii.slice(4, 12) === "ftypheic" || ascii.slice(4, 12) === "ftypmif1") return "image/heic";
+  if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "image/webp";
+  const byExtension = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".heic": "image/heic",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".mov": "video/quicktime",
+    ".mp4": "video/mp4",
+    ".txt": "text/plain"
+  };
+  return byExtension[extname3(name).toLowerCase()] ?? "application/octet-stream";
+}
+function extensionFor(mime) {
+  const map = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/heic": ".heic",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf"
+  };
+  return map[mime] ?? "";
+}
+function safeAssetName(name, mime) {
+  let clean = basename3(name).normalize("NFC").replace(/[^\p{L}\p{N}._ -]+/gu, "_").replace(/^[.\s]+/, "").trim();
+  if (!clean) clean = "attachment";
+  if (!extname3(clean)) clean += extensionFor(mime);
+  const ext = extname3(clean);
+  if (clean.length > 120) clean = clean.slice(0, 120 - ext.length) + ext;
+  return clean;
+}
+function encodePathUrl(path9) {
+  return path9.split("/").map(encodeURIComponent).join("/");
+}
+function canonicalForm(abs) {
+  let current = abs;
+  let rest = "";
+  for (; ; ) {
+    try {
+      const real = realpathSync3.native(current);
+      return rest ? join19(real, rest) : real;
+    } catch {
+      const parent = resolve3(current, "..");
+      if (parent === current) return abs;
+      rest = rest ? join19(basename3(current), rest) : basename3(current);
+      current = parent;
+    }
+  }
+}
+function assertExportPath(p, container = NOTES_CONTAINER) {
+  const abs = assertSafeSavePath(p);
+  const within = (path9, root) => path9 === root || path9.startsWith(root + sep3);
+  const roots = [resolve3(container), canonicalForm(resolve3(container))];
+  const forms = [abs, canonicalForm(abs)];
+  if (forms.some((form) => roots.some((root) => within(form, root))))
+    throw new Error("Refusing to write inside the Notes library container.");
+  return abs;
+}
+var CREATE_FLAGS = constants4.O_WRONLY | constants4.O_CREAT | constants4.O_EXCL | constants4.O_NOFOLLOW;
+var OutputExistsError = class extends Error {
+  code = "output_exists";
+  constructor(path9) {
+    super(`Output file already exists: ${path9}. Choose a new path or remove the old file first.`);
+    this.name = "OutputExistsError";
+  }
+};
+function openCreateOnly(path9) {
+  try {
+    return openSync4(path9, CREATE_FLAGS, 420);
+  } catch (error2) {
+    if (error2.code === "EEXIST") throw new OutputExistsError(path9);
+    throw error2;
+  }
+}
+function writeAllAndClose(fd, content) {
+  try {
+    const data = Buffer.from(content, "utf8");
+    let written = 0;
+    while (written < data.length) written += writeSync3(fd, data, written);
+    return data.length;
+  } finally {
+    closeSync4(fd);
+  }
+}
+function openSource(path9) {
+  const fd = openSync4(path9, constants4.O_RDONLY | constants4.O_NOFOLLOW);
+  const stat = fstatSync4(fd);
+  if (!stat.isFile()) {
+    closeSync4(fd);
+    throw new Error("Asset is not a regular file");
+  }
+  return { fd, size: stat.size };
+}
+function readHead(fd) {
+  const head = Buffer.alloc(16);
+  const n = readSync3(fd, head, 0, 16, 0);
+  return head.subarray(0, n);
+}
+var SidecarWriter = class {
+  constructor(dir, linkBase) {
+    this.dir = dir;
+    this.linkBase = linkBase;
+  }
+  dir;
+  linkBase;
+  placed = /* @__PURE__ */ new Map();
+  created = false;
+  count = 0;
+  place(asset) {
+    const done = this.placed.get(asset.path);
+    if (done) return done;
+    let source;
+    try {
+      source = openSource(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      const mime = sniffMime(readHead(source.fd), asset.name);
+      if (!this.created) {
+        assertExportPath(this.dir);
+        mkdirSync4(this.dir, { recursive: true });
+        this.created = true;
+      }
+      const name = safeAssetName(asset.name, mime);
+      const ext = extname3(name);
+      const stem = name.slice(0, name.length - ext.length);
+      let target;
+      let out;
+      for (let n = 1; n <= 1e3 && out === void 0; n++) {
+        target = join19(this.dir, n === 1 ? name : `${stem}-${n}${ext}`);
+        try {
+          out = openSync4(target, CREATE_FLAGS, 420);
+        } catch (error2) {
+          if (error2.code !== "EEXIST") throw error2;
+        }
+      }
+      if (out === void 0 || !target) return { error: "no-free-name" };
+      try {
+        const chunk = Buffer.alloc(1024 * 1024);
+        for (let position = 0; ; ) {
+          const n = readSync3(source.fd, chunk, 0, chunk.length, position);
+          if (n <= 0) break;
+          let written = 0;
+          while (written < n) written += writeSync3(out, chunk, written, n - written);
+          position += n;
+        }
+      } finally {
+        closeSync4(out);
+      }
+      this.count++;
+      const url = this.linkBase ? encodePathUrl(relative3(this.linkBase, target).split(sep3).join("/")) : target;
+      const result = { url, mime };
+      this.placed.set(asset.path, result);
+      return result;
+    } catch (error2) {
+      return { error: error2 instanceof Error ? error2.message : String(error2) };
+    } finally {
+      closeSync4(source.fd);
+    }
+  }
+};
+var DataUrlWriter = class {
+  constructor(maxBytes = MAX_EMBED_BYTES, totalBytes = MAX_EMBED_TOTAL_BYTES) {
+    this.maxBytes = maxBytes;
+    this.totalBytes = totalBytes;
+  }
+  maxBytes;
+  totalBytes;
+  placed = /* @__PURE__ */ new Map();
+  embeddedBytes = 0;
+  count = 0;
+  place(asset) {
+    const done = this.placed.get(asset.path);
+    if (done) return done;
+    let source;
+    try {
+      source = openSource(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      if (source.size > this.maxBytes || this.embeddedBytes + source.size > this.totalBytes)
+        return { error: "too-large" };
+      const data = Buffer.alloc(source.size);
+      let read = 0;
+      while (read < source.size) {
+        const n = readSync3(source.fd, data, read, source.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      const mime = sniffMime(data.subarray(0, 16), asset.name);
+      const result = {
+        url: `data:${mime};base64,${data.subarray(0, read).toString("base64")}`,
+        mime
+      };
+      this.count++;
+      this.embeddedBytes += read;
+      this.placed.set(asset.path, result);
+      return result;
+    } finally {
+      closeSync4(source.fd);
+    }
+  }
+};
+
+// src/utils/exportRender.ts
+var emptyStats = () => ({
+  attachments: 0,
+  placed: 0,
+  placeholders: 0,
+  unavailable: 0,
+  tables: 0,
+  unreadableTables: 0,
+  unreferenced: 0
+});
+var isSafeHref = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var LABELS = {
+  table: "Table",
+  image: "Image",
+  drawing: "Drawing",
+  paper: "Drawing",
+  scan: "Scanned document",
+  pdf: "PDF",
+  audio: "Audio",
+  video: "Video",
+  link: "Link",
+  gallery: "Gallery",
+  divider: "Divider",
+  inline: "Inline attachment",
+  file: "File"
+};
+var attachmentLabel = (kind) => LABELS[kind];
+function fmtOf(run) {
+  const fmt = {};
+  if (run.bold) fmt.bold = true;
+  if (run.italic) fmt.italic = true;
+  if (run.underline) fmt.underline = true;
+  if (run.strikethrough) fmt.strikethrough = true;
+  if (run.superscript) fmt.superscript = true;
+  if (run.subscript) fmt.subscript = true;
+  if (run.highlight) fmt.highlight = run.highlight;
+  if (run.color) fmt.color = run.color;
+  if (run.link && run.linkSafe) fmt.link = run.link;
+  return fmt;
+}
+var sameFmt = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function blockPieces(block, plan) {
+  const pieces = [];
+  const pushText = (text2, fmt) => {
+    if (!text2) return;
+    const last = pieces[pieces.length - 1];
+    if (last?.type === "text" && sameFmt(last.fmt, fmt)) last.text += text2;
+    else pieces.push({ type: "text", text: text2, fmt });
+  };
+  for (const run of block.runs) {
+    const fmt = fmtOf(run);
+    const parts = run.text.split("\uFFFC");
+    parts.forEach((part, i) => {
+      if (i > 0 && run.attachment)
+        pieces.push({ type: "attachment", id: run.attachment.id, plan: plan(run.attachment.id) });
+      pushText(part, fmt);
+    });
+  }
+  return pieces;
+}
+var isBlockPlan = (plan) => plan.type === "table" || plan.type === "divider" || plan.type === "gallery";
+function titleBlockIndex(note) {
+  const first2 = note.doc.blocks.find((block) => block.text.trim());
+  if (!first2) return -1;
+  if (first2.style === "title") return first2.index;
+  return first2.text.trim() === note.title.trim() && first2.style !== "monospaced" ? first2.index : -1;
+}
+function place(ctx, asset) {
+  return asset && ctx.writer ? ctx.writer.place(asset) : void 0;
+}
+function planAttachment(attachment, ctx) {
+  ctx.stats.attachments++;
+  const unavailable = (label2, reason, name2) => {
+    ctx.stats.unavailable++;
+    return { type: "unavailable", label: label2, reason, ...name2 ? { name: name2 } : {} };
+  };
+  if (!attachment) return unavailable("Attachment", "missing");
+  const label = attachmentLabel(attachment.kind);
+  const name = attachment.title;
+  switch (attachment.kind) {
+    case "inline": {
+      const link = attachment.uti.endsWith(".link") && attachment.tokenId && isSafeHref(attachment.tokenId) ? attachment.tokenId : void 0;
+      return { type: "inline", text: attachment.altText ?? "", ...link ? { link } : {} };
+    }
+    case "divider":
+      return { type: "divider" };
+    case "table": {
+      ctx.stats.tables++;
+      try {
+        if (!attachment.tableData) throw new Error("no table data");
+        return {
+          type: "table",
+          rows: parseNoteTable(Buffer.from(attachment.tableData, "hex")).rows
+        };
+      } catch {
+        ctx.stats.unreadableTables++;
+        return unavailable(label, "undecodable");
+      }
+    }
+    case "gallery": {
+      ctx.stats.attachments--;
+      return {
+        type: "gallery",
+        items: attachment.children.map((child) => planAttachment(child, ctx))
+      };
+    }
+    case "link": {
+      const url = attachment.url ?? "";
+      const preview = ctx.locator ? place(ctx, ctx.locator.locate(attachment).preview) : void 0;
+      if (preview && "url" in preview) ctx.stats.placed++;
+      return {
+        type: "card",
+        title: name ?? url,
+        displayUrl: url,
+        ...isSafeHref(url) ? { url } : {},
+        ...preview && "url" in preview ? { previewUrl: preview.url } : {}
+      };
+    }
+    default: {
+      if (!ctx.writer) {
+        ctx.stats.placeholders++;
+        return { type: "placeholder", label, ...name ? { name } : {} };
+      }
+      const files = ctx.locator?.locate(attachment) ?? {};
+      const primary = place(ctx, files.primary);
+      const visual = ["image", "drawing", "paper"].includes(attachment.kind);
+      const wantsPreview = attachment.kind === "scan" || attachment.kind === "pdf";
+      const preview = files.preview && (wantsPreview || visual && !(primary && "url" in primary)) ? place(ctx, files.preview) : void 0;
+      const previewUrl = preview && "url" in preview ? preview.url : void 0;
+      if (primary && "url" in primary) {
+        ctx.stats.placed++;
+        const display = visual ? "image" : attachment.kind === "audio" ? "audio" : attachment.kind === "video" ? "video" : "link";
+        return {
+          type: "asset",
+          label,
+          ...name ? { name } : {},
+          display,
+          url: primary.url,
+          mime: primary.mime,
+          ...previewUrl ? { previewUrl } : {}
+        };
+      }
+      if (visual && previewUrl) {
+        ctx.stats.placed++;
+        return {
+          type: "asset",
+          label,
+          ...name ? { name } : {},
+          display: "image",
+          url: previewUrl,
+          mime: preview.mime
+        };
+      }
+      const reason = primary && "error" in primary ? primary.error : "missing";
+      return unavailable(label, reason, name);
+    }
+  }
+}
+function unreferencedAttachments(note) {
+  const referenced = new Set(note.doc.attachments.map((marker) => marker.id));
+  return note.ordered.filter(
+    (attachment) => !referenced.has(attachment.id) && attachment.kind !== "table" && attachment.kind !== "inline" && attachment.kind !== "divider"
+  );
+}
+
+// src/utils/htmlExport.ts
+function escapeHtml(text2) {
+  return text2.replace(
+    /[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+  );
+}
+var HIGHLIGHT_CLASSES = /* @__PURE__ */ new Set(["purple", "pink", "orange", "mint", "blue"]);
+var ALIGN = /* @__PURE__ */ new Set(["center", "right", "justify"]);
+var REASONS = {
+  "too-large": " (too large to embed; export with embedAssets false)",
+  unreadable: " (unreadable)",
+  undecodable: " (could not be decoded)"
+};
+function wrapText(text2, fmt) {
+  let out = escapeHtml(text2).replace(/\n/g, "<br>");
+  if (fmt.subscript) out = `<sub>${out}</sub>`;
+  if (fmt.superscript) out = `<sup>${out}</sup>`;
+  if (fmt.highlight)
+    out = `<mark class="hl-${HIGHLIGHT_CLASSES.has(fmt.highlight) ? fmt.highlight : "other"}">${out}</mark>`;
+  if (fmt.strikethrough) out = `<s>${out}</s>`;
+  if (fmt.underline) out = `<u>${out}</u>`;
+  if (fmt.italic) out = `<em>${out}</em>`;
+  if (fmt.bold) out = `<strong>${out}</strong>`;
+  if (fmt.color && /^#[0-9A-F]{6}(?:[0-9A-F]{2})?$/i.test(fmt.color))
+    out = `<span style="color:${fmt.color}">${out}</span>`;
+  return out;
+}
+var bracket = (label, name) => escapeHtml(`[${name ? `${label}: ${name}` : label}]`);
+function domainOf(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+function isHtmlBlockPlan(plan) {
+  switch (plan.type) {
+    case "table":
+    case "divider":
+    case "gallery":
+    case "card":
+      return true;
+    case "asset":
+      return plan.display !== "link" || !!plan.previewUrl;
+    default:
+      return false;
+  }
+}
+function inlinePlanHtml(plan) {
+  switch (plan.type) {
+    case "inline":
+      return plan.link ? `<a href="${escapeHtml(plan.link)}">${escapeHtml(plan.text)}</a>` : escapeHtml(plan.text);
+    case "placeholder":
+      return `<span class="attachment-placeholder">${bracket(plan.label, plan.name)}</span>`;
+    case "unavailable":
+      return `<span class="attachment-unavailable" role="note">${bracket(
+        `${plan.label} unavailable${REASONS[plan.reason] ?? ""}`,
+        plan.name
+      )}</span>`;
+    case "asset":
+      return `<a class="attachment attachment-file" href="${escapeHtml(plan.url)}">${escapeHtml(
+        plan.name ?? plan.label
+      )}</a>`;
+    default:
+      return blockPlanHtml(plan);
+  }
+}
+function blockPlanHtml(plan) {
+  switch (plan.type) {
+    case "table":
+      return tableHtml(plan.rows);
+    case "divider":
+      return "<hr>";
+    case "gallery":
+      return `<div class="attachment-gallery">${plan.items.map((item) => isHtmlBlockPlan(item) ? blockPlanHtml(item) : inlinePlanHtml(item)).join("")}</div>`;
+    case "card": {
+      const image = plan.previewUrl ? `<img src="${escapeHtml(plan.previewUrl)}" alt="" loading="lazy">` : "";
+      const text2 = `<span class="link-card-text"><span class="link-card-title">${escapeHtml(plan.title)}</span><span class="link-card-domain">${escapeHtml(domainOf(plan.displayUrl))}</span></span>`;
+      return plan.url ? `<a class="link-card" href="${escapeHtml(plan.url)}">${image}${text2}</a>` : `<div class="link-card">${image}${text2}</div>`;
+    }
+    case "asset": {
+      const name = escapeHtml(plan.name ?? plan.label);
+      const src = escapeHtml(plan.url);
+      const caption = plan.name ? `<figcaption>${name}</figcaption>` : "";
+      if (plan.display === "image")
+        return `<figure class="attachment attachment-image"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      if (plan.display === "audio" || plan.display === "video")
+        return `<figure class="attachment attachment-${plan.display}"><${plan.display} controls preload="metadata" src="${src}"></${plan.display}>${caption}</figure>`;
+      return `<figure class="attachment attachment-document"><a href="${src}"><img src="${escapeHtml(plan.previewUrl)}" alt="${name}" loading="lazy"></a><figcaption><a href="${src}">${name}</a></figcaption></figure>`;
+    }
+    default:
+      return `<p>${inlinePlanHtml(plan)}</p>`;
+  }
+}
+function tableHtml(rows) {
+  const width = Math.max(1, ...rows.map((row) => row.length));
+  const cells = (row, tag) => Array.from(
+    { length: width },
+    (_, i) => `<${tag}>${escapeHtml(row[i] ?? "").replace(/\r?\n/g, "<br>")}</${tag}>`
+  ).join("");
+  const [head = [], ...body] = rows;
+  return `<table><thead><tr>${cells(head, "th")}</tr></thead><tbody>${body.map((row) => `<tr>${cells(row, "td")}</tr>`).join("")}</tbody></table>`;
+}
+function inlineHtml(pieces) {
+  let out = "";
+  for (let i = 0; i < pieces.length; ) {
+    const piece = pieces[i];
+    if (piece.type === "attachment") {
+      out += inlinePlanHtml(piece.plan);
+      i++;
+      continue;
+    }
+    const link = piece.fmt.link;
+    let inner = "";
+    let j = i;
+    for (; j < pieces.length; j++) {
+      const next = pieces[j];
+      if (next.type !== "text" || next.fmt.link !== link) break;
+      inner += wrapText(next.text, next.fmt);
+    }
+    out += link ? `<a href="${escapeHtml(link)}">${inner}</a>` : inner;
+    i = j;
+  }
+  return out;
+}
+function blockParts(pieces) {
+  const parts = [];
+  let segment = [];
+  const flush = () => {
+    const html = inlineHtml(segment).trim();
+    if (html) parts.push({ inline: html });
+    segment = [];
+  };
+  for (const piece of pieces) {
+    if (piece.type === "attachment" && isHtmlBlockPlan(piece.plan)) {
+      flush();
+      parts.push({ block: blockPlanHtml(piece.plan) });
+    } else segment.push(piece);
+  }
+  flush();
+  return parts;
+}
+var LIST_TAGS = {
+  bulleted: "ul",
+  dashed: "ul",
+  checklist: "ul",
+  numbered: "ol"
+};
+var alignAttr = (block) => ALIGN.has(block.alignment) ? ` style="text-align:${block.alignment}"` : "";
+function renderNoteHtml(note, ctx) {
+  const plan = (id2) => planAttachment(note.attachments.get(id2), ctx);
+  const titleIndex = titleBlockIndex(note);
+  const out = [];
+  const lists = [];
+  let quote = false;
+  let code;
+  const closeLists = (depth = 0) => {
+    while (lists.length > depth) {
+      const list = lists.pop();
+      out.push(`${list.open ? "</li>" : ""}</${list.tag}>`);
+    }
+  };
+  const flushCode = () => {
+    if (code) out.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+    code = void 0;
+  };
+  const setQuote = (on) => {
+    if (on === quote) return;
+    flushCode();
+    closeLists();
+    out.push(on ? "<blockquote>" : "</blockquote>");
+    quote = on;
+  };
+  if (titleIndex === -1 && note.title.trim()) out.push(`<h1>${escapeHtml(note.title.trim())}</h1>`);
+  for (const block of note.doc.blocks) {
+    setQuote(block.blockQuote);
+    if (block.style === "monospaced") {
+      closeLists();
+      (code ??= []).push(block.text.replace(/￼/g, ""));
+      continue;
+    }
+    flushCode();
+    const listTag = LIST_TAGS[block.style];
+    if (!listTag) closeLists();
+    if (!block.text.trim()) continue;
+    const parts = blockParts(blockPieces(block, plan));
+    if (!parts.length) continue;
+    if (listTag) {
+      const level = Math.min(block.indent, 20);
+      const cls = block.style === "checklist" || block.style === "dashed" ? block.style : "";
+      closeLists(level + 1);
+      const top = lists[level];
+      if (top && (top.tag !== listTag || top.cls !== cls)) closeLists(level);
+      if (lists[level]?.open) out.push("</li>");
+      while (lists.length < level) {
+        out.push(`<${listTag}><li class="nest">`);
+        lists.push({ tag: listTag, cls: "", open: true });
+      }
+      if (lists.length === level) {
+        out.push(`<${listTag}${cls ? ` class="${cls}"` : ""}>`);
+        lists.push({ tag: listTag, cls, open: false });
+      }
+      lists[level].open = true;
+      const box = block.style === "checklist" ? `<input type="checkbox" disabled${block.checklist?.done ? " checked" : ""}> ` : "";
+      const done = block.style === "checklist" && block.checklist?.done ? ` class="done"` : "";
+      const body = parts.map((part) => "inline" in part ? part.inline : part.block).join("");
+      out.push(`<li${done}${alignAttr(block)}>${box}${body}`);
+      continue;
+    }
+    const tag = block.index === titleIndex || block.style === "title" ? "h1" : block.style === "heading" ? "h2" : block.style === "subheading" ? "h3" : "p";
+    for (const part of parts)
+      out.push(
+        "inline" in part ? `<${tag}${alignAttr(block)}>${part.inline}</${tag}>` : part.block
+      );
+  }
+  flushCode();
+  closeLists();
+  setQuote(false);
+  for (const attachment of unreferencedAttachments(note)) {
+    ctx.stats.unreferenced++;
+    out.push(blockPlanHtml(planAttachment(attachment, ctx)));
+  }
+  return `<article class="note">
+${out.filter(Boolean).join("\n")}
+</article>`;
+}
+var CSS = `
+:root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fff; --muted: #6e6e73; --line: #d2d2d7; --card: #f5f5f7; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --bg: #1d1d1f; --muted: #a1a1a6; --line: #424245; --card: #2c2c2e; } }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem; }
+h1, h2, h3 { line-height: 1.25; }
+blockquote { margin: 1rem 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--muted); }
+pre { background: var(--card); padding: .75rem 1rem; overflow-x: auto; border-radius: 6px; }
+code { font: 14px/1.4 ui-monospace, Menlo, monospace; }
+ul.dashed { list-style-type: "\u2013 "; }
+ul.checklist { list-style: none; padding-left: 1.25rem; }
+ul.checklist li.done { color: var(--muted); text-decoration: line-through; }
+li.nest { list-style: none; }
+table { border-collapse: collapse; margin: 1rem 0; }
+th, td { border: 1px solid var(--line); padding: .35rem .6rem; text-align: left; vertical-align: top; }
+th { background: var(--card); }
+figure { margin: 1rem 0; }
+figure img, figure video { max-width: 100%; height: auto; border-radius: 6px; }
+figcaption { color: var(--muted); font-size: .875rem; }
+.attachment-gallery { display: flex; flex-wrap: wrap; gap: .5rem; }
+.attachment-gallery figure { margin: 0; flex: 1 1 12rem; }
+.link-card { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; padding: .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
+.link-card img { width: 4rem; height: 4rem; object-fit: cover; border-radius: 4px; }
+.link-card-text { display: flex; flex-direction: column; min-width: 0; }
+.link-card-title { font-weight: 600; }
+.link-card-domain { color: var(--muted); font-size: .875rem; }
+.attachment-unavailable, .attachment-placeholder { display: inline-block; padding: 0 .35rem; border: 1px dashed var(--muted); border-radius: 4px; color: var(--muted); font-size: .875rem; }
+mark { border-radius: 2px; padding: 0 .1em; }
+mark.hl-purple { background: #e5d4ff; } mark.hl-pink { background: #ffd1e3; } mark.hl-orange { background: #ffe0b8; }
+mark.hl-mint { background: #c8f2de; } mark.hl-blue { background: #cfe3ff; } mark.hl-other { background: #fff3a8; }
+hr.note-separator { margin: 3rem 0; border: 0; border-top: 2px solid var(--line); }
+`.trim();
+function renderNotesHtml(notes, ctx, { title }) {
+  const body = notes.map((note) => renderNoteHtml(note, ctx)).join('\n<hr class="note-separator">\n');
+  return [
+    "<!DOCTYPE html>",
+    "<html>",
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<meta name="generator" content="apple-notes-mcp">',
+    `<title>${escapeHtml(title)}</title>`,
+    `<style>
+${CSS}
+</style>`,
+    "</head>",
+    "<body>",
+    "<main>",
+    body,
+    "</main>",
+    "</body>",
+    "</html>",
+    ""
+  ].join("\n");
+}
+
+// src/utils/markdownExport.ts
+var NOTE_SEPARATOR = "\n\n---\n\n";
+function escapeMarkdown(text2) {
+  return text2.replace(/[\\`*_[\]<>~|]/g, (char) => `\\${char}`).replace(/&(?=#?[A-Za-z0-9]+;)/g, "&amp;").replace(/==/g, "\\=\\=");
+}
+function escapeLineStart(line) {
+  return line.replace(
+    /^(\s*)([#>+-]|\d+[.)])(?=\s|$)/,
+    (_, space, marker) => /^\d/.test(marker) ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}` : `${space}\\${marker}`
+  );
+}
+function linkDestination(url) {
+  return url.replace(
+    /[\s()<>]/g,
+    (char) => char === " " ? "%20" : `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`
+  );
+}
+function delimit(text2, open, close = open) {
+  const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(text2);
+  return match[2] ? `${match[1]}${open}${match[2]}${close}${match[3]}` : text2;
+}
+var LAYERS = [
+  ["italic", "*", "*"],
+  ["bold", "**", "**"],
+  ["strikethrough", "~~", "~~"],
+  ["underline", "<u>", "</u>"],
+  ["highlight", "==", "=="],
+  ["superscript", "<sup>", "</sup>"],
+  ["subscript", "<sub>", "</sub>"]
+];
+function joinSafe(left, right) {
+  return left && right && /[*~=]$/.test(left) && left.at(-1) === right[0] ? `${left}<!-- -->${right}` : left + right;
+}
+function layered(pieces, depth = 0) {
+  if (depth === LAYERS.length)
+    return pieces.map((piece) => escapeMarkdown(piece.text.replace(/\n/g, " "))).join("");
+  const [key, open, close] = LAYERS[depth];
+  let out = "";
+  for (let i = 0; i < pieces.length; ) {
+    const on = !!pieces[i].fmt[key];
+    let j = i;
+    while (j < pieces.length && !!pieces[j].fmt[key] === on) j++;
+    const inner = layered(pieces.slice(i, j), depth + 1);
+    out = joinSafe(out, on ? delimit(inner, open, close) : inner);
+    i = j;
+  }
+  return out;
+}
+var bracket2 = (label, name) => `\\[${escapeMarkdown(name ? `${label}: ${name}` : label)}\\]`;
+function planMarkdown(plan) {
+  switch (plan.type) {
+    case "inline":
+      return plan.link ? `[${escapeMarkdown(plan.text)}](${linkDestination(plan.link)})` : escapeMarkdown(plan.text);
+    case "divider":
+      return "---";
+    case "table":
+      return tableMarkdown(plan.rows);
+    case "placeholder":
+      return bracket2(plan.label, plan.name);
+    case "unavailable":
+      return bracket2(`${plan.label} unavailable`, plan.name);
+    case "asset": {
+      const text2 = escapeMarkdown(plan.name ?? plan.label);
+      if (plan.display === "image") return `![${text2}](${linkDestination(plan.url)})`;
+      const inner = plan.previewUrl ? `![${text2}](${linkDestination(plan.previewUrl)})` : text2;
+      return `[${inner}](${linkDestination(plan.url)})`;
+    }
+    case "card":
+      return plan.url ? `[${escapeMarkdown(plan.title)}](${linkDestination(plan.url)})` : `${escapeMarkdown(plan.title)} (${escapeMarkdown(plan.displayUrl)})`;
+    case "gallery":
+      return plan.items.map(planMarkdown).join("\n\n");
+  }
+}
+function tableMarkdown(rows) {
+  const width = Math.max(1, ...rows.map((row) => row.length));
+  const cell = (value) => escapeMarkdown(value ?? "").replace(/\r?\n/g, "<br>").trim() || " ";
+  const line = (row) => `| ${Array.from({ length: width }, (_, i) => cell(row[i])).join(" | ")} |`;
+  const [head = [], ...body] = rows;
+  return [line(head), `| ${Array(width).fill("---").join(" | ")} |`, ...body.map(line)].join("\n");
+}
+function inlineMarkdown(pieces) {
+  let out = "";
+  for (let i = 0; i < pieces.length; ) {
+    const piece = pieces[i];
+    if (piece.type === "attachment") {
+      out = joinSafe(out, planMarkdown(piece.plan));
+      i++;
+      continue;
+    }
+    const link = piece.fmt.link;
+    let j = i;
+    while (j < pieces.length && pieces[j].type === "text" && pieces[j].fmt.link === link)
+      j++;
+    const inner = layered(pieces.slice(i, j));
+    out = joinSafe(out, link ? delimit(inner, "[", `](${linkDestination(link)})`) : inner);
+    i = j;
+  }
+  return out;
+}
+var LIST_STYLES = /* @__PURE__ */ new Set(["bulleted", "dashed", "numbered", "checklist"]);
+function renderNoteMarkdown(note, ctx) {
+  const plan = (id2) => planAttachment(note.attachments.get(id2), ctx);
+  const titleIndex = titleBlockIndex(note);
+  const lines = [];
+  const counters = [];
+  let code;
+  const flushCode = () => {
+    if (!code) return;
+    const longest = Math.max(
+      2,
+      ...code.lines.map((l) => Math.max(0, ...(l.match(/`+/g) ?? []).map((m) => m.length)))
+    );
+    const fence = "`".repeat(longest + 1);
+    lines.push({
+      text: [fence, ...code.lines, fence].join("\n"),
+      group: "code",
+      quote: code.quote
+    });
+    code = void 0;
+  };
+  if (titleIndex === -1 && note.title.trim())
+    lines.push({ text: `# ${escapeMarkdown(note.title.trim())}`, group: "para", quote: false });
+  for (const block of note.doc.blocks) {
+    if (block.style === "monospaced") {
+      if (code && code.quote !== block.blockQuote) flushCode();
+      code ??= { lines: [], quote: block.blockQuote };
+      code.lines.push(block.text.replace(/\ufffc/g, ""));
+      continue;
+    }
+    flushCode();
+    if (!LIST_STYLES.has(block.style)) counters.length = 0;
+    if (!block.text.trim()) continue;
+    const pieces = blockPieces(block, plan);
+    let segment = [];
+    const segments = [];
+    for (const piece of pieces) {
+      if (piece.type === "attachment" && isBlockPlan(piece.plan)) {
+        segments.push(segment, piece.plan);
+        segment = [];
+      } else segment.push(piece);
+    }
+    segments.push(segment);
+    let first2 = true;
+    for (const segment2 of segments) {
+      if (!Array.isArray(segment2)) {
+        lines.push({ text: planMarkdown(segment2), group: "block", quote: block.blockQuote });
+        continue;
+      }
+      const body = inlineMarkdown(segment2).trim();
+      if (!body) continue;
+      lines.push(renderLine(block, body, first2, block.index === titleIndex, counters));
+      first2 = false;
+    }
+  }
+  flushCode();
+  for (const attachment of unreferencedAttachments(note)) {
+    ctx.stats.unreferenced++;
+    lines.push({
+      text: planMarkdown(planAttachment(attachment, ctx)),
+      group: "block",
+      quote: false
+    });
+  }
+  return joinLines(lines);
+}
+function renderLine(block, body, first2, isTitle, counters) {
+  const quote = block.blockQuote;
+  if (isTitle || block.style === "title") return { text: `# ${body}`, group: "para", quote };
+  if (block.style === "heading") return { text: `## ${body}`, group: "para", quote };
+  if (block.style === "subheading") return { text: `### ${body}`, group: "para", quote };
+  if (!LIST_STYLES.has(block.style) || !first2)
+    return { text: escapeLineStart(body), group: "para", quote };
+  const level = Math.min(block.indent, 20);
+  counters.length = Math.min(counters.length, level + 1);
+  while (counters.length <= level) counters.push(0);
+  const indent = "    ".repeat(level);
+  let marker = "-";
+  if (block.style === "numbered") marker = `${++counters[level]}.`;
+  else {
+    counters[level] = 0;
+    if (block.style === "checklist") marker = block.checklist?.done ? "- [x]" : "- [ ]";
+  }
+  return { text: `${indent}${marker} ${body}`, group: "list", quote };
+}
+function joinLines(lines) {
+  let out = "";
+  let previous;
+  for (const line of lines) {
+    const text2 = line.quote ? line.text.split("\n").map((l) => l ? `> ${l}` : ">").join("\n") : line.text;
+    if (previous) {
+      const tight = previous.group === "list" && line.group === "list" && previous.quote === line.quote;
+      out += tight ? "\n" : previous.quote && line.quote ? "\n>\n" : "\n\n";
+    }
+    out += text2;
+    previous = line;
+  }
+  return out;
+}
+function wrapMarkdown(markdown, width) {
+  if (!width) return markdown;
+  let fenced = false;
+  const out = [];
+  for (const line of markdown.split("\n")) {
+    const bare = line.replace(/^(?:> ?)+/, "");
+    if (/^\s*```/.test(bare)) fenced = !fenced;
+    if (fenced || /^\s*```/.test(bare) || line.length <= width || /^\s*(#|\||!\[)/.test(bare)) {
+      out.push(line);
+      continue;
+    }
+    const prefix = /^((?:> ?)*\s*(?:(?:[-*+]|\d+\.)(?: \[[ x]\])? )?)/.exec(line)[1];
+    const hang = prefix.replace(/[^>\s]/g, " ").replace(/>(?! )/g, "> ");
+    const words = line.slice(prefix.length).split(" ");
+    let current = prefix;
+    let empty = true;
+    for (const word of words) {
+      if (!empty && current.length + 1 + word.length > width) {
+        out.push(current);
+        current = hang + word;
+      } else current += (empty ? "" : " ") + word;
+      empty = false;
+    }
+    out.push(current);
+  }
+  return out.join("\n");
+}
+function renderNotesMarkdown(notes, ctx, { wrap: wrap2 = 0 } = {}) {
+  const body = notes.map((note) => renderNoteMarkdown(note, ctx)).join(NOTE_SEPARATOR);
+  return (wrap2 ? wrapMarkdown(body, wrap2) : body) + (notes.length ? "\n" : "");
+}
+
+// src/utils/noteExportData.ts
+import { execFileSync as execFileSync18 } from "node:child_process";
+import { homedir as homedir17 } from "node:os";
+import { join as join20 } from "node:path";
+var NOTES_DB_PATH11 = join20(
+  homedir17(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var IMAGE_UTIS2 = /* @__PURE__ */ new Set([
+  "public.jpeg",
+  "public.png",
+  "public.heic",
+  "public.heif",
+  "public.image",
+  "public.tiff",
+  "public.webp",
+  "org.webmproject.webp",
+  "com.compuserve.gif",
+  "com.microsoft.bmp",
+  "com.adobe.raw-image",
+  "public.camera-raw-image"
+]);
+var AUDIO_UTIS = /* @__PURE__ */ new Set([
+  "com.apple.m4a-audio",
+  "public.mpeg-4-audio",
+  "public.mp3",
+  "public.audio",
+  "public.aiff-audio",
+  "com.microsoft.waveform-audio"
+]);
+var VIDEO_UTIS = /* @__PURE__ */ new Set([
+  "public.movie",
+  "public.video",
+  "public.mpeg-4",
+  "com.apple.quicktime-movie"
+]);
+function classifyUti(uti) {
+  if (uti === "com.apple.notes.table") return "table";
+  if (uti === "com.apple.notes.inlinetextattachment.dividerline") return "divider";
+  if (uti.startsWith("com.apple.notes.inlinetextattachment.")) return "inline";
+  if (uti === "com.apple.notes.gallery") return "gallery";
+  if (uti === "com.apple.drawing" || uti === "com.apple.drawing.2") return "drawing";
+  if (uti === "com.apple.paper.doc.scan") return "scan";
+  if (uti === "com.apple.paper") return "paper";
+  if (uti === "public.url") return "link";
+  if (uti === "com.adobe.pdf") return "pdf";
+  if (IMAGE_UTIS2.has(uti)) return "image";
+  if (AUDIO_UTIS.has(uti)) return "audio";
+  if (VIDEO_UTIS.has(uti)) return "video";
+  return "file";
+}
+var ATTACHMENT_COLUMNS = [
+  ["uti0", "a", "ZTYPEUTI"],
+  ["uti1", "a", "ZTYPEUTI1"],
+  ["parent", "a", "ZPARENTATTACHMENT"],
+  ["title", "a", "ZTITLE"],
+  ["userTitle", "a", "ZUSERTITLE"],
+  ["url", "a", "ZURLSTRING"],
+  ["alt", "a", "ZALTTEXT"],
+  ["token", "a", "ZTOKENCONTENTIDENTIFIER"],
+  ["fbImageGen", "a", "ZFALLBACKIMAGEGENERATION"],
+  ["fbPdfGen", "a", "ZFALLBACKPDFGENERATION"],
+  ["mediaId", "m", "ZIDENTIFIER"],
+  ["mediaFilename", "m", "ZFILENAME"],
+  ["mediaGen", "m", "ZGENERATION1"]
+];
+var columnCache = /* @__PURE__ */ new Map();
+function sqlite(dbPath2, args) {
+  try {
+    return execFileSync18(
+      "/usr/bin/sqlite3",
+      ["-readonly", ...args.slice(0, -1), dbPath2, args.at(-1)],
+      {
+        encoding: "utf8",
+        timeout: 1e4,
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    ).trim();
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
+  }
+}
+function objectColumns(dbPath2 = NOTES_DB_PATH11) {
+  let columns = columnCache.get(dbPath2);
+  if (!columns) {
+    columns = new Set(
+      sqlite(dbPath2, ["SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"]).split("\n").filter(Boolean)
+    );
+    columnCache.set(dbPath2, columns);
+  }
+  return columns;
+}
+function attachmentQuery(columns) {
+  const col3 = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const fields = ATTACHMENT_COLUMNS.map(([key, alias, name]) => `'${key}', ${col3(alias, name)}`);
+  const uti = `COALESCE(${col3("a", "ZTYPEUTI")}, ${col3("a", "ZTYPEUTI1")})`;
+  const mergeable = columns.has("ZMERGEABLEDATA1") ? columns.has("ZMERGEABLEDATA") ? "COALESCE(a.ZMERGEABLEDATA1, a.ZMERGEABLEDATA)" : "a.ZMERGEABLEDATA1" : col3("a", "ZMERGEABLEDATA");
+  const noteLinks = ["ZNOTE", "ZNOTE1"].filter((c) => columns.has(c)).map((c) => `a.${c} = @pk`);
+  const owner = noteLinks.length ? `(${noteLinks.join(" OR ")})` : "0";
+  const media = columns.has("ZMEDIA") ? "m.Z_PK = a.ZMEDIA" : "0";
+  const live = columns.has("ZMARKEDFORDELETION") ? "AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  return `SELECT json_object('title', (SELECT ${col3("n", "ZTITLE1")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk), 'attachments', (SELECT json_group_array(json_object('pk', a.Z_PK, 'id', a.ZIDENTIFIER, ${fields.join(", ")}, 'table', CASE WHEN ${uti} = 'com.apple.notes.table' THEN hex(${mergeable}) END)) FROM ZICCLOUDSYNCINGOBJECT a LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON ${media} WHERE ${owner} AND a.ZIDENTIFIER IS NOT NULL ${live}));`;
+}
+var text = (value) => typeof value === "string" && value.length ? value : typeof value === "number" ? String(value) : void 0;
+function buildAttachments(rows) {
+  const all = rows.filter((row) => typeof row.id === "string" && Number.isInteger(row.pk)).map((row) => {
+    const uti = text(row.uti0) ?? text(row.uti1) ?? "unknown";
+    const attachment = {
+      id: row.id,
+      pk: row.pk,
+      uti,
+      kind: classifyUti(uti),
+      children: []
+    };
+    const set = (key, value) => {
+      if (value !== void 0) attachment[key] = value;
+    };
+    set("parentPk", Number.isInteger(row.parent) ? row.parent : void 0);
+    set("title", text(row.title) ?? text(row.userTitle) ?? text(row.mediaFilename));
+    set("url", text(row.url));
+    set("altText", text(row.alt));
+    set("tokenId", text(row.token));
+    set("mediaId", text(row.mediaId));
+    set("mediaFilename", text(row.mediaFilename));
+    set("mediaGeneration", text(row.mediaGen));
+    set("fallbackImageGeneration", text(row.fbImageGen));
+    set("fallbackPdfGeneration", text(row.fbPdfGen));
+    const table = text(row.table);
+    set("tableData", table && /^[0-9a-f]+$/i.test(table) ? table : void 0);
+    return attachment;
+  }).sort((a, b) => a.pk - b.pk);
+  const byPk = new Map(all.map((a) => [a.pk, a]));
+  const ordered = [];
+  for (const attachment of all) {
+    const parent = attachment.parentPk !== void 0 ? byPk.get(attachment.parentPk) : void 0;
+    if (parent) parent.children.push(attachment);
+    else ordered.push(attachment);
+  }
+  return { byId: new Map(all.map((a) => [a.id, a])), ordered };
+}
+function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
+  const doc = readNoteBlocks(id2, { dbPath: dbPath2 });
+  const pk = /\/ICNote\/p([0-9]{1,18})$/.exec(id2)[1];
+  const output = sqlite(dbPath2, [
+    "-cmd",
+    ".parameter init",
+    "-cmd",
+    `.parameter set @pk ${pk}`,
+    attachmentQuery(objectColumns(dbPath2))
+  ]);
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  const rows = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  const { byId, ordered } = buildAttachments(rows);
+  const firstLine = doc.blocks.find((block) => block.text.trim())?.text.trim() ?? "";
+  return {
+    id: id2,
+    title: text(parsed.title) ?? firstLine,
+    doc,
+    attachments: byId,
+    ordered
+  };
+}
+
+// src/services/notesExport.ts
+var DEFAULT_FOLDER_EXPORT_LIMIT = 100;
+var MAX_FOLDER_EXPORT_LIMIT = 1e3;
+var NotesExportError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "NotesExportError";
+  }
+  code;
+};
+function validPath(path9, what) {
+  try {
+    return assertExportPath(path9);
+  } catch (error2) {
+    throw new NotesExportError(
+      "invalid-path",
+      `${what}: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+}
+function selectNotes(request, deps) {
+  if (!!request.id === !!request.folder)
+    throw new NotesExportError("invalid-request", "Provide exactly one of 'id' or 'folder'.");
+  if (request.id) return [request.id];
+  const limit = Math.min(request.limit ?? DEFAULT_FOLDER_EXPORT_LIMIT, MAX_FOLDER_EXPORT_LIMIT);
+  try {
+    return deps.listNoteRefs(request.account, request.folder, void 0, limit).map((ref) => ref.id);
+  } catch (error2) {
+    throw new NotesExportError(
+      "folder-unavailable",
+      `Could not list folder "${request.folder}": ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+}
+function loadNotes(ids, single, read) {
+  const notes = [];
+  const skipped = [];
+  for (const id2 of ids) {
+    try {
+      notes.push(read ? read(id2) : readExportNote(id2));
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      if (single) throw new NotesExportError(error2.code, error2.message);
+      skipped.push({ id: id2, code: error2.code });
+    }
+  }
+  return { notes, skipped };
+}
+function openOutput(output) {
+  mkdirSync5(dirname4(output), { recursive: true });
+  try {
+    return openCreateOnly(output);
+  } catch (error2) {
+    if (error2 instanceof OutputExistsError)
+      throw new NotesExportError("output_exists", error2.message);
+    throw error2;
+  }
+}
+function renderInto(fd, render) {
+  try {
+    return render();
+  } catch (error2) {
+    if (fd !== void 0) writeAllAndClose(fd, "");
+    throw error2;
+  }
+}
+function exportNotesMarkdown(request, deps) {
+  const output = request.outputPath ? validPath(request.outputPath, "outputPath") : void 0;
+  const assetsDir = request.assetsDir ? validPath(request.assetsDir, "assetsDir") : void 0;
+  if (output && assetsDir && output === assetsDir)
+    throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
+  const ids = selectNotes(request, deps);
+  const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  const fd = output ? openOutput(output) : void 0;
+  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname4(output) : void 0) : void 0;
+  const ctx = {
+    stats: emptyStats(),
+    ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
+  };
+  const markdown = renderInto(
+    fd,
+    () => renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 })
+  );
+  const bytes = Buffer.byteLength(markdown);
+  const receipt = {
+    format: "markdown",
+    count: notes.length,
+    bytes,
+    stats: ctx.stats,
+    skipped,
+    ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : {}
+  };
+  if (fd !== void 0) {
+    writeAllAndClose(fd, markdown);
+    return { ...receipt, output };
+  }
+  if (bytes > deps.maxInlineBytes)
+    throw new NotesExportError(
+      "too-large",
+      `The Markdown is ${bytes} bytes, over the ${deps.maxInlineBytes}-byte inline limit. Pass outputPath to write it to a file, or export fewer notes.`
+    );
+  return { ...receipt, markdown };
+}
+function defaultSidecarDir(output) {
+  return join21(dirname4(output), `${basename4(output, extname4(output))}.assets`);
+}
+function exportNotesHtml(request, deps) {
+  if (!request.outputPath)
+    throw new NotesExportError(
+      "invalid-request",
+      "outputPath is required for HTML export; the document is written to a file."
+    );
+  const embed = request.embedAssets ?? !request.assetsDir;
+  if (embed && request.assetsDir)
+    throw new NotesExportError(
+      "invalid-request",
+      "assetsDir applies only with embedAssets false (sidecar assets)."
+    );
+  const output = validPath(request.outputPath, "outputPath");
+  const assetsDir = embed ? void 0 : validPath(request.assetsDir ?? defaultSidecarDir(output), "assetsDir");
+  if (assetsDir === output)
+    throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
+  const ids = selectNotes(request, deps);
+  const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  const fd = openOutput(output);
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname4(output)) : new DataUrlWriter();
+  const ctx = {
+    stats: emptyStats(),
+    writer,
+    locator: deps.locator ?? new AssetLocator()
+  };
+  const title = request.id ? notes[0]?.title || "Note" : request.folder;
+  const html = renderInto(fd, () => renderNotesHtml(notes, ctx, { title }));
+  const bytes = writeAllAndClose(fd, html);
+  return {
+    format: "html",
+    count: notes.length,
+    bytes,
+    output,
+    stats: ctx.stats,
+    skipped,
+    ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count }
+  };
 }
 
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
-  closeSync,
-  constants,
-  fstatSync,
+  closeSync as closeSync5,
+  constants as constants5,
+  fstatSync as fstatSync5,
   mkdtempSync as mkdtempSync4,
-  openSync,
+  openSync as openSync5,
   readFileSync as readFileSync3,
   rmSync as rmSync4,
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
-var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join22 } from "node:path";
+var noteId = exactIdInput(
+  "ICNote",
+  /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
+  NOTE_ID_MESSAGE
+);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
+var folderId = external_exports.string().max(2e3).transform(looseIdTransform("ICFolder"));
 function readSnapshot(manager, id2) {
   const note = manager.getNoteById(id2);
   if (!note) throw new Error("Note not found");
@@ -43871,14 +50072,14 @@ function readSnapshot(manager, id2) {
   if (!body) throw new Error("Note content is unavailable");
   const enriched = enrichNoteRead(id2, body);
   const rich = readRichNote(id2);
-  if (!enriched.complete || enriched.revision !== rich.revision)
+  if (enriched.revision !== rich.revision)
     throw new Error("Native metadata changed during read; read the note again");
   return { id: id2, title: note.title, body, rich, hash: richContentHash(body, enriched) };
 }
 function assertExistingContentPreserved(before, after) {
   if (before.id !== after.id || before.title !== after.title)
     throw new Error("Note identity changed");
-  const tidy = (text) => text.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
+  const tidy = (text2) => text2.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
   if (!tidy(after.rich.text).startsWith(tidy(before.rich.text)))
     throw new Error("Existing note text was not preserved");
   if (linkSignature(before.rich.links) !== linkSignature(after.rich.links.slice(0, before.rich.links.length)))
@@ -43898,11 +50099,11 @@ function assertExistingContentPreserved(before, after) {
       throw new Error("Existing native object content or presentation changed");
   }
 }
-function localAttachment(path4) {
-  if (!isAbsolute2(path4)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path4, constants.O_RDONLY | constants.O_NOFOLLOW);
+function localAttachment(path9) {
+  if (!isAbsolute3(path9)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync5(path9, constants5.O_RDONLY | constants5.O_NOFOLLOW);
   try {
-    const stat = fstatSync(descriptor);
+    const stat = fstatSync5(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync3(descriptor);
@@ -43910,7 +50111,7 @@ function localAttachment(path4) {
       throw new Error("Attachment changed while it was being read; try again");
     return bytes;
   } finally {
-    closeSync(descriptor);
+    closeSync5(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -43931,15 +50132,7 @@ function registerDirectOperations(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : String(error2)
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : String(error2), error2);
         }
       })
     );
@@ -43947,15 +50140,18 @@ function registerDirectOperations(server2, manager) {
   tool(
     "get-folder-by-id",
     "Use when: reading the exact folder name and parent before a guarded rename.\nReturns: folder id, current name, and parent id.\nDo not use when: listing folders by path (list-folders).\nSafety: read-only.",
-    { id: external_exports.string().max(2e3) },
-    ({ id: id2 }) => manager.getFolderById(id2),
+    { id: folderId },
+    ({ id: id2 }) => {
+      const folder = manager.getFolderById(id2);
+      return { ...folder, ...lookupStableIdentifiers([folder.id], "ICFolder").get(folder.id) };
+    },
     true
   );
   tool(
     "rename-folder",
     "Use when: renaming one previously read folder in place.\nReturns: the unchanged folder id, new name, and parent id after readback.\nDo not use when: creating, moving, or deleting a folder.\nSafety: requires the expected current name and parent; refuses stale metadata and sibling conflicts.",
     {
-      id: external_exports.string().max(2e3),
+      id: folderId,
       expectedName: external_exports.string().max(1e3),
       expectedParentId: external_exports.string().max(2e3),
       newName: external_exports.string().min(1).max(1e3)
@@ -43965,69 +50161,151 @@ function registerDirectOperations(server2, manager) {
       ...manager.renameFolderById(args.id, args.expectedName, args.expectedParentId, args.newName)
     })
   );
+  const attachmentInput = {
+    path: external_exports.string().min(1).max(4096).describe("Absolute path of the local file to attach"),
+    filename: external_exports.string().min(1).max(255).optional().describe(
+      "Name the attachment gets in Notes instead of the source file's name. One path component with the source file's extension; no slash, colon, or control characters, and no leading dot."
+    )
+  };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
-    { id: noteId, expectedContentHash: revision, path: external_exports.string().min(1).max(4096) },
-    ({ id: id2, expectedContentHash, path: path4 }) => {
-      const before = readSnapshot(manager, id2);
-      if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
-      const bytes = localAttachment(path4);
-      const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    { id: noteId, expectedContentHash: revision, ...attachmentInput },
+    (args) => attachFile(manager, args)
+  );
+  tool(
+    "create-note-with-attachment",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails after the note exists, the error names the new note's id; attach to it with add-attachment instead of creating another note.",
+    {
+      title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
+      content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
+      folder: external_exports.string().max(1e3).optional().describe("Existing folder or nested path; create it first with create-folder"),
+      account: external_exports.string().max(200).optional().describe("Account name; defaults to Notes' default"),
+      ...attachmentInput
+    },
+    (args) => {
+      const name = attachmentName(args.path, args.filename);
+      localAttachment(args.path);
+      const note = manager.createNote(
+        args.title,
+        args.content ?? "",
+        [],
+        args.folder,
+        args.account,
+        "plaintext"
+      );
+      if (!note)
+        throw new Error(
+          `Failed to create note "${args.title}". Check that the folder and account exist (list-folders, list-accounts); nothing was attached`
+        );
+      const handOff = `Note ${note.id} was created; attach to it with add-attachment instead of creating another note`;
+      let snapshot;
       try {
-        writeFileSync3(temporaryFile, bytes, { mode: 384 });
-        if (readSnapshot(manager, id2).hash !== before.hash)
-          throw new Error("Note revision changed");
-        let returnedId;
-        let transportUncertain = false;
-        try {
-          returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
-        } catch {
-          transportUncertain = true;
-        }
-        const after = readSnapshot(manager, id2);
-        assertExistingContentPreserved(before, after);
-        const readInserted = () => [
-          ...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()
-        ].filter((item) => !beforeAttachments.some((existing) => existing.id === item.id));
-        let inserted = readInserted();
-        for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
-          inserted = readInserted();
-        }
-        const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
-        if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
-          throw new Error(
-            "Attachment insertion outcome uncertain; read the exact note before retrying"
-          );
-        const attachmentId = inserted[0].id;
-        const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
-        const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-        if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
-          throw new Error(
-            "Attachment bytes were not verified; read the exact note before retrying"
-          );
+        snapshot = readSnapshot(manager, note.id);
+      } catch (error2) {
+        throw new Error(`${handOff}. The new note could not be read back: ${String(error2)}`);
+      }
+      try {
         return {
-          ok: true,
-          id: id2,
-          attachmentId,
-          contentHash: after.hash,
-          bytes: bytes.length,
-          ...transportUncertain ? {
-            transportWarning: "Transport was uncertain; exact bytes and prior content were verified"
-          } : {}
+          ...attachFile(manager, {
+            id: note.id,
+            expectedContentHash: snapshot.hash,
+            path: args.path,
+            filename: name
+          }),
+          title: args.title,
+          folder: args.folder,
+          noteCreated: true
         };
-      } finally {
-        rmSync4(directory, { recursive: true, force: true });
+      } catch (error2) {
+        throw new Error(`${handOff}. ${error2 instanceof Error ? error2.message : String(error2)}`);
       }
     }
   );
 }
+function attachmentName(path9, filename) {
+  const source = basename5(path9);
+  if (filename === void 0) return source;
+  if (Buffer.byteLength(filename, "utf8") > 255)
+    throw new Error("filename must be at most 255 bytes");
+  if (filename !== filename.trim() || filename === "" || filename.startsWith(".") || /[/:\\\p{Cc}]/u.test(filename))
+    throw new Error(
+      "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
+    );
+  if (extname5(filename).toLowerCase() !== extname5(source).toLowerCase())
+    throw new Error(
+      `filename must keep the source file's extension (${extname5(source) || "none"})`
+    );
+  return filename;
+}
+function attachFile(manager, args) {
+  const { id: id2, expectedContentHash, path: path9 } = args;
+  const name = attachmentName(path9, args.filename);
+  const before = readSnapshot(manager, id2);
+  if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
+  const bytes = localAttachment(path9);
+  const beforeAttachments = manager.listAttachmentsById(id2);
+  const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
+  const temporaryFile = join22(directory, name);
+  try {
+    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
+    let returnedId;
+    let transportUncertain = false;
+    try {
+      returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
+    } catch {
+      transportUncertain = true;
+    }
+    const after = readSnapshot(manager, id2);
+    assertExistingContentPreserved(before, after);
+    const readInserted = () => [...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()].filter(
+      (item) => !beforeAttachments.some((existing) => existing.id === item.id)
+    );
+    let inserted = readInserted();
+    for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      inserted = readInserted();
+    }
+    const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
+    if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
+      throw new Error(
+        "Attachment insertion outcome uncertain; read the exact note before retrying"
+      );
+    const attachmentId = inserted[0].id;
+    const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
+    const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+    if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
+      throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+    const nameVerified = inserted[0].name === name;
+    return {
+      ok: true,
+      id: id2,
+      attachmentId,
+      contentHash: after.hash,
+      bytes: bytes.length,
+      name: inserted[0].name,
+      ...args.filename === void 0 ? {} : {
+        filenameVerified: nameVerified,
+        ...nameVerified ? {} : {
+          filenameWarning: "The attachment and its bytes were verified, but Notes reports a different name"
+        }
+      },
+      ...transportUncertain ? {
+        transportWarning: "Transport was uncertain; exact bytes and prior content were verified"
+      } : {}
+    };
+  } finally {
+    rmSync4(directory, { recursive: true, force: true });
+  }
+}
 
 // src/tools/nativeTagsBridge.ts
-var noteId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+var noteId2 = exactIdInput(
+  "ICNote",
+  /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
+  NOTE_ID_MESSAGE
+);
 var revision2 = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function registerNativeTagsBridge(server2, manager) {
   function tool(name, description, inputSchema, handler) {
@@ -44046,15 +50324,7 @@ function registerNativeTagsBridge(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : String(error2)
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : String(error2), error2);
         }
       })
     );
@@ -44100,9 +50370,9 @@ function registerNativeTagsBridge(server2, manager) {
         { id: id2, expectedContentHash, scopeText, tags, title: initial.title },
         {
           read,
-          candidates: (title, scope) => manager.listAccounts().flatMap(
+          candidates: (title, scope2) => manager.listAccounts().flatMap(
             (account) => manager.searchNotes(title, false, account.name).filter(
-              (note) => !note.passwordProtected && manager.getNotePlaintextById(note.id).toLocaleLowerCase().includes(scope.toLocaleLowerCase())
+              (note) => !note.passwordProtected && manager.getNotePlaintextById(note.id).toLocaleLowerCase().includes(scope2.toLocaleLowerCase())
             ).map((note) => note.id)
           ),
           run: runNativeTagsShortcut
@@ -44122,7 +50392,8 @@ var VERIFIED_BACKGROUND = /* @__PURE__ */ new Set([
   "set-note-pinned",
   "remove-native-tags",
   "replace-native-tag",
-  "create-note-markdown"
+  "create-note-markdown",
+  "create-note-markdown-blocks"
 ]);
 var LIVE_VALIDATION_BLOCKERS = {};
 var signingRefusal = "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";
@@ -44147,7 +50418,7 @@ function requireValidated(name) {
       UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || `${name} has not passed live background validation in this build; see get-capabilities`
     );
 }
-var id = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
+var id = exactIdInput("ICNote", /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i, NOTE_ID_MESSAGE);
 var revision3 = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 var common = {
   id,
@@ -44156,7 +50427,77 @@ var common = {
     "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
   )
 };
+var EMPTY_TABLE_ROWS = [
+  ["", ""],
+  ["", ""]
+];
 var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var MAX_CHECKLIST_BATCH = 20;
+var byPosition = (items = []) => [...items].sort((a, b) => a.start - b.start);
+function appendChecklistItems(args, deps, readRich) {
+  const existing = new Set(byPosition(readRich(args.id).checklistItems).map((item) => item.id));
+  const landed = [];
+  let contentHash = args.expectedContentHash;
+  for (const [index, text2] of args.items.entries()) {
+    let wrote = false;
+    try {
+      const result = mutateBackground(
+        { ...args, expectedContentHash: contentHash },
+        "create-checklist-item",
+        { text: text2 },
+        (before, after) => {
+          wrote = true;
+          assertPreserved(before, after, { append: true });
+          const added = after.checklist.slice(before.checklist.length);
+          if (added.length !== 1 || added[0].text !== text2 || added[0].done)
+            throw new Error("Native checklist item not verified");
+        },
+        deps
+      );
+      const items = byPosition(readRich(args.id).checklistItems);
+      const fresh = items.filter(
+        (item) => !existing.has(item.id) && !landed.some((done) => done.id === item.id)
+      );
+      if (fresh.length !== 1 || fresh[0].text !== text2 || fresh[0].done)
+        throw new Error("Native checklist identity not verified");
+      for (const done of landed) {
+        const current = items.find((item) => item.id === done.id);
+        if (!current || current.text !== done.text || current.done)
+          throw new Error("An earlier appended item changed identity or text");
+      }
+      landed.push({ index, id: fresh[0].id, text: text2 });
+      contentHash = result.contentHash;
+    } catch (error2) {
+      return {
+        ok: false,
+        id: args.id,
+        landed,
+        stoppedAt: {
+          index,
+          text: text2,
+          outcome: wrote ? "uncertain" : "not-written",
+          error: error2 instanceof Error ? error2.message : String(error2)
+        },
+        notAttempted: args.items.slice(index + 1),
+        contentHash,
+        message: `Stopped at item ${index + 1} of ${args.items.length}; ${landed.length} item(s) landed and were verified. Read the exact note before retrying, and retry only items that are not present.`
+      };
+    }
+  }
+  const finalItems = byPosition(readRich(args.id).checklistItems);
+  const tail = finalItems.slice(finalItems.length - landed.length);
+  const orderVerified = tail.length === landed.length && tail.every((item, i) => item.id === landed[i].id && item.text === landed[i].text);
+  return {
+    ok: orderVerified,
+    id: args.id,
+    contentHash,
+    items: landed,
+    orderVerified,
+    ...orderVerified ? {} : {
+      message: "Every item landed and was verified, but they are not the note's last checklist items in the requested order. Read the note before editing it further."
+    }
+  };
+}
 function registerNativeOperations(server2, manager) {
   function tool(name, description, input, handler, readOnly = false) {
     server2.registerTool(
@@ -44175,22 +50516,14 @@ function registerNativeOperations(server2, manager) {
             structuredContent: result
           };
         } catch (error2) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: error2 instanceof Error ? error2.message : "Operation failed"
-              }
-            ],
-            isError: true
-          };
+          return errorResult(error2 instanceof Error ? error2.message : "Operation failed", error2);
         }
       })
     );
   }
   tool(
     "get-capabilities",
-    "Use when: checking native background-edit support before calling a write tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
+    "Use when: checking native background-edit support or which feature groups this Mac supports before calling a tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation; plus runtimeOS and an OS-version-aware features matrix (available, osSupported, minimumMacOSVersion, requirements, missing, unverified, machine reason code) per feature group.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
     {},
     () => {
       let bridge;
@@ -44211,7 +50544,8 @@ function registerNativeOperations(server2, manager) {
         "remove-native-tags",
         "replace-native-tag",
         "insert-note-link",
-        "create-note-markdown"
+        "create-note-markdown",
+        "create-note-markdown-blocks"
       ];
       let tagBridgeInstalled = false;
       try {
@@ -44223,7 +50557,7 @@ function registerNativeOperations(server2, manager) {
         markdownBridgeInstalled = markdownNoteStatus().installed;
       } catch {
       }
-      const installed = (name) => name === "create-note-markdown" ? markdownBridgeInstalled : bridge.installed;
+      const installed = (name) => name.startsWith("create-note-markdown") ? markdownBridgeInstalled : bridge.installed;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
@@ -44240,7 +50574,8 @@ function registerNativeOperations(server2, manager) {
             }
           ])
         ),
-        unavailable: UNAVAILABLE
+        unavailable: UNAVAILABLE,
+        ...getCapabilityMatrix()
       };
     },
     true
@@ -44283,14 +50618,31 @@ function registerNativeOperations(server2, manager) {
     }
   );
   tool(
-    "create-table",
-    "Use when: appending one native Notes table from a rectangular array of strings.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    "create-checklist-items",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
     {
       ...common,
-      rows: external_exports.array(external_exports.array(external_exports.string().max(1e4)).min(1).max(100)).min(1).max(1e3)
+      items: external_exports.array(
+        external_exports.string().min(1).max(1e4).refine((s) => !/[\r\n\0]/u.test(s), "One line per checklist item")
+      ).min(1).max(MAX_CHECKLIST_BATCH).describe(`Item texts in the order they should appear (1-${MAX_CHECKLIST_BATCH})`)
     },
     (args) => {
+      requireValidated("create-checklist-item");
+      return appendChecklistItems(args, backgroundDependencies(manager), readRichNote);
+    }
+  );
+  tool(
+    "create-table",
+    "Use when: appending one native Notes table from a rectangular array of strings, or an empty table when rows is omitted.\nReturns: the native table identity and decoded cells after readback.\nDo not use when: a text table is acceptable or the rows are not rectangular.\nSafety: never substitutes text; preserves existing rich content and reports failure unless the native table is verified.",
+    {
+      ...common,
+      rows: external_exports.array(external_exports.array(external_exports.string().max(1e4)).min(1).max(100)).min(1).max(1e3).optional().describe(
+        "Cell text, row by row. Omit for an empty 2 x 2 table, the size Notes itself inserts."
+      )
+    },
+    (input) => {
       requireValidated("create-table");
+      const args = { ...input, rows: input.rows ?? EMPTY_TABLE_ROWS };
       if (args.rows.some((row) => row.length !== args.rows[0].length))
         throw new Error("Table rows must have equal cell counts");
       const before = readRichNote(args.id);
@@ -44452,9 +50804,9 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync7 } from "node:fs";
-import { release } from "node:os";
-import { dirname as dirname2, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync13 } from "node:fs";
+import { release as release2 } from "node:os";
+import { dirname as dirname5, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -44472,16 +50824,16 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync7;
-  const open = dependencies.open || ((path4) => {
-    const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
+  const exists = dependencies.exists || existsSync13;
+  const open = dependencies.open || ((path9) => {
+    const result = spawnSync2("/usr/bin/open", [path9], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
-  const osRelease = (dependencies.osRelease || release)();
+  const baseDirectory = dependencies.baseDirectory || resolve4(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
+  const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path4 = resolve2(baseDirectory, file);
+    const path9 = resolve4(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -44497,9 +50849,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
-      else if (!exists(path4)) error2 = `Packaged Shortcut is missing: ${path4}`;
+      else if (!exists(path9)) error2 = `Packaged Shortcut is missing: ${path9}`;
       else {
-        const result = open(path4);
+        const result = open(path9);
         opened = result.ok;
         if (!result.ok) error2 = result.error || `Could not open ${file}`;
       }
@@ -44508,7 +50860,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       name,
       installed,
       identifier,
-      file: path4,
+      file: path9,
       opened,
       ...optional2 ? { optional: optional2 } : {},
       ...skipped ? { skipped } : {},
@@ -44562,19 +50914,20 @@ function successResponse(message, structured) {
   if (structured) res.structuredContent = structured;
   return res;
 }
-function errorResponse(message) {
-  return {
-    content: [{ type: "text", text: message }],
-    isError: true
-  };
+function errorResponse(message, cause) {
+  return errorResult(message, cause);
 }
 function withErrorHandling(handler, errorPrefix) {
   return async (params) => {
     try {
-      return handler(params);
+      const seconds = params.timeoutSeconds;
+      return runWithCallTimeout(
+        typeof seconds === "number" ? seconds : void 0,
+        () => handler(params)
+      );
     } catch (error2) {
       const message = error2 instanceof Error ? error2.message : "Unknown error";
-      return errorResponse(`${errorPrefix}: ${message}`);
+      return errorResponse(`${errorPrefix}: ${message}`, error2);
     }
   };
 }
@@ -44591,20 +50944,39 @@ var MAX = {
   TAGS: 100,
   BATCH_IDS: 500
 };
+var MAX_CONTENT_FILE_BYTES = 1024 * 1024;
 var noteTitleSchema = {
   title: external_exports.string().min(1, "Note title is required").max(MAX.TITLE),
   account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
     "Account name (defaults to Notes.app's default account; exact or unique-prefix match)"
   )
 };
-var noteIdInput = external_exports.string().min(1, "Note ID is required").max(MAX.ID).regex(
-  /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/,
-  "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...)"
-).describe("Exact CoreData note ID returned by search-notes, list-notes, or create-note");
+var NOTE_COREDATA_ID = /^x-coredata:\/\/[0-9A-Fa-f-]+\/ICNote\/p\d+$/;
+var NOTE_ID_FORMS = "x-coredata id, Notes UUID, or numeric key";
+var noteIdInput = exactIdInput("ICNote", NOTE_COREDATA_ID, NOTE_ID_MESSAGE, {
+  maxLength: MAX.ID
+}).describe(`Exact note ID returned by search-notes, list-notes, or create-note: ${NOTE_ID_FORMS}`);
+var noteIdArrayInput = exactIdArrayInput("ICNote", NOTE_COREDATA_ID, NOTE_ID_MESSAGE, {
+  maxLength: MAX.ID,
+  maxItems: MAX.BATCH_IDS
+});
+var looseNoteId = (base) => base.max(MAX.ID).transform(looseIdTransform("ICNote"));
+var looseFolderId = (base) => base.max(MAX.ID).transform(looseIdTransform("ICFolder"));
+var noteIdentifierOutput = {
+  identifier: external_exports.string().optional(),
+  folderIdentifier: external_exports.string().optional(),
+  accountIdentifier: external_exports.string().optional()
+};
+function noteIdentifiers(id2) {
+  return lookupStableIdentifiers([id2], "ICNote").get(id2) ?? {};
+}
 var expectedContentHashInput = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/, "expectedContentHash must come from get-note-content").describe(
   "Revision token returned by get-note-content for this exact ID. The mutation stops if the note changed since that read."
 );
-var scopeFolderIdInput = external_exports.string().max(MAX.ID).regex(SCOPE_FOLDER_ID, "An exact folder id is required (x-coredata://.../ICFolder/p...)");
+var SCOPE_FOLDER_ID_MESSAGE = "An exact folder id is required: x-coredata://.../ICFolder/p..., Notes UUID, or numeric key (from list-folders)";
+var scopeFolderIdInput = exactIdInput("ICFolder", SCOPE_FOLDER_ID, SCOPE_FOLDER_ID_MESSAGE, {
+  maxLength: MAX.ID
+});
 var scopeGuardInputs = {
   ifFolderId: scopeFolderIdInput.optional().describe(
     "Precondition: the note must currently be in exactly this folder (id from list-folders). Re-checked immediately before the write."
@@ -44612,7 +50984,15 @@ var scopeGuardInputs = {
   ifAncestorFolderId: scopeFolderIdInput.optional().describe(
     "Precondition: the note must be inside this folder or any of its subfolders. Re-checked immediately before the write."
   ),
-  forbiddenAncestorFolderIds: external_exports.array(scopeFolderIdInput).max(MAX_FORBIDDEN_FOLDERS).optional().describe(
+  forbiddenAncestorFolderIds: exactIdArrayInput(
+    "ICFolder",
+    SCOPE_FOLDER_ID,
+    SCOPE_FOLDER_ID_MESSAGE,
+    {
+      maxLength: MAX.ID,
+      maxItems: MAX_FORBIDDEN_FOLDERS
+    }
+  ).optional().describe(
     "Precondition: the note must not be inside any of these folders or their subfolders (for move-note, neither may the destination). Re-checked immediately before the write."
   )
 };
@@ -44623,6 +51003,9 @@ function scopeFrom(args) {
     forbiddenAncestorFolderIds: args.forbiddenAncestorFolderIds
   };
 }
+var timeoutSecondsInput = external_exports.number().int().min(CALL_TIMEOUT_SECONDS.min).max(CALL_TIMEOUT_SECONDS.max).optional().describe(
+  `Per-call timeout in seconds (${CALL_TIMEOUT_SECONDS.min}-${CALL_TIMEOUT_SECONDS.max}) for each Notes.app automation step this call runs, overriding APPLE_NOTES_MCP_TIMEOUT_MS. A timed-out write is uncertain, not failed: read the note by id before any retry.`
+);
 function readExactNoteSnapshot(id2) {
   const note = notesManager.getNoteById(id2);
   if (!note) return { error: `Note with ID "${id2}" not found` };
@@ -44635,6 +51018,10 @@ function readExactNoteSnapshot(id2) {
   if (!body) return { error: `Failed to read content of note "${note.title}"` };
   const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
+}
+var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
+function inRecentlyDeletedMessage(title) {
+  return `Note "${title}" is already in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Remove it from Recently Deleted in Notes.app if that is intended.`;
 }
 function revisionConflictMessage(title) {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
@@ -44659,11 +51046,17 @@ registerTool(
     description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it.",
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
-      content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).describe(
-        'Note body. AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L.'
+      content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).optional().describe(
+        'Note body; required unless contentPath is given (pass exactly one). In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown" (markdownRoute "shortcut"), `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles (see create-note-markdown-blocks in get-capabilities).'
+      ),
+      contentPath: external_exports.string().min(1).max(MAX.SAVE_PATH).optional().describe(
+        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
-        "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
+        "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."
+      ),
+      markdownRoute: external_exports.enum(["shortcut", "html"]).optional().default("shortcut").describe(
+        "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible \u2610 / \u2611 character \u2014 not native, checkable checklist items \u2014 refusing block quotes, fenced code and inline code, and keeping a `---` line as literal text."
       ),
       tags: external_exports.array(external_exports.string().max(MAX.TAG)).max(MAX.TAGS).optional().describe(
         "Returned-only metadata \u2014 NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action. Refused with format 'markdown': add tags afterwards with add-native-tags."
@@ -44673,7 +51066,8 @@ registerTool(
       ),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to the account Notes.app itself reports as default). Matched exactly, or by a unique prefix; an ambiguous prefix is refused. Must be an account Notes.app already has configured \u2014 see list-accounts."
-      )
+      ),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       ok: external_exports.boolean().optional(),
@@ -44682,10 +51076,66 @@ registerTool(
       folder: external_exports.string().optional(),
       account: external_exports.string().optional(),
       contentHash: external_exports.string().optional(),
-      verified: external_exports.boolean().optional()
+      verified: external_exports.boolean().optional(),
+      strippedDuplicateTitle: external_exports.boolean().optional(),
+      taskItemsRendered: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ title, content, format = "plaintext", tags = [], folder, account }) => {
+  withErrorHandling((params) => {
+    const {
+      title,
+      contentPath,
+      format = "plaintext",
+      markdownRoute = "shortcut",
+      tags = [],
+      folder,
+      account
+    } = params;
+    if (params.content === void 0 === (contentPath === void 0))
+      return errorResponse("Provide exactly one of content or contentPath");
+    let content = params.content ?? readAllowedTextFile(contentPath, MAX_CONTENT_FILE_BYTES);
+    if (format !== "markdown" && markdownRoute !== "shortcut")
+      return errorResponse('markdownRoute applies to format "markdown" only');
+    let strippedDuplicateTitle = false;
+    if (format === "markdown") {
+      const stripped = stripDuplicateTitleHeading(content, title);
+      strippedDuplicateTitle = stripped.stripped;
+      content = stripped.content;
+      if (!content.trim())
+        return errorResponse(
+          "The Markdown holds only the title heading; add body content, or use format 'plaintext' for a title-only note"
+        );
+    }
+    const titleNote = strippedDuplicateTitle ? { strippedDuplicateTitle: true } : {};
+    if (format === "markdown" && markdownRoute === "html") {
+      const taskItemsRendered = countTaskItems(content);
+      const html = appendMarkdownHtml(content, { taskGlyphs: true });
+      const note2 = notesManager.createNote(title, html, tags, folder, account, "html");
+      if (!note2)
+        return errorResponse(
+          `Failed to create note "${title}". Check that the folder and account exist (list-folders, list-accounts) and that this server has Automation access (run the doctor tool).`
+        );
+      const createdBody2 = notesManager.getNoteContentById(note2.id);
+      if (!notesManager.getNoteById(note2.id) || !createdBody2)
+        return errorResponse(
+          `A note may have been created, but its exact ID could not be verified. Do not retry automatically. Returned ID: ${note2.id}`
+        );
+      const glyphNote = taskItemsRendered ? ` ${taskItemsRendered} task item(s) were rendered as visible \u2610 / \u2611 text, not native checklist items.` : "";
+      return successResponse(
+        `Note created from Markdown: "${note2.title}" [id: ${note2.id}]${glyphNote}`,
+        {
+          ok: true,
+          id: note2.id,
+          title: note2.title,
+          folder,
+          account,
+          contentHash: richContentHash(createdBody2, enrichNoteRead(note2.id, createdBody2)),
+          verified: true,
+          taskItemsRendered,
+          ...titleNote
+        }
+      );
+    }
     if (format === "markdown") {
       if (account)
         return errorResponse(
@@ -44696,8 +51146,12 @@ registerTool(
           'tags are not supported with format "markdown"; create the note without tags, then add them with add-native-tags using the returned id'
         );
       requireValidated("create-note-markdown");
+      if (usesMarkdownBlocks(content)) requireValidated("create-note-markdown-blocks");
       const result = createMarkdownNote(notesManager, { title, content, folder });
-      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
+      return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, {
+        ...result,
+        ...titleNote
+      });
     }
     const note = notesManager.createNote(title, content, tags, folder, account, format);
     if (!note) {
@@ -44729,10 +51183,12 @@ registerTool(
 registerTool(
   "search-notes",
   {
-    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id.\nDo not use when: you already have a note id (use get-note-content) or want every note (use list-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.",
+    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: external_exports.string().min(1, "Search query is required").max(MAX.QUERY),
-      searchContent: external_exports.boolean().optional().describe("Search note content instead of titles"),
+      searchContent: external_exports.boolean().optional().describe(
+        "Search note content (title line included) instead of titles. Uses the Notes database when Full Disk Access is available, else AppleScript"
+      ),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to search in"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Limit search to a specific folder"),
       modifiedSince: external_exports.string().max(64).optional().describe(
@@ -44744,21 +51200,59 @@ registerTool(
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      count: external_exports.number().optional()
+      count: external_exports.number().optional(),
+      source: external_exports.enum(["database", "applescript"]).optional(),
+      scanTruncated: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
+  withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
     const effectiveLimit = resolveSearchLimit(limit);
     const limitWasDefault = limit === void 0;
+    let source;
+    let dbScan;
+    let dbUnavailable;
+    const runSearch = () => {
+      if (searchContent) {
+        try {
+          const db = searchContentViaDatabase({
+            query: query2,
+            account: notesManager.searchAccountScope(account),
+            folder,
+            modifiedSince,
+            limit: effectiveLimit
+          });
+          source = "database";
+          dbScan = db.scan;
+          return db.notes;
+        } catch (error2) {
+          if (!(error2 instanceof NoteQueryStoreError)) throw error2;
+          dbUnavailable = error2.kind;
+        }
+        source = "applescript";
+      }
+      try {
+        return notesManager.searchNotes(
+          query2,
+          searchContent,
+          account,
+          folder,
+          modifiedSince,
+          effectiveLimit
+        );
+      } catch (error2) {
+        if (!searchContent || !(error2 instanceof Error)) throw error2;
+        throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
+      }
+    };
     const {
       result: notes,
       syncBefore,
       syncInterference
-    } = withSyncAwarenessSync(
-      "search-notes",
-      () => notesManager.searchNotes(query, searchContent, account, folder, modifiedSince, effectiveLimit)
-    );
-    const searchType = searchContent ? "content" : "titles";
+    } = withSyncAwarenessSync("search-notes", runSearch);
+    const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
+    const sourceFields = source ? { source } : {};
+    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+    const scanNote = describeContentScan(dbScan);
     const folderInfo = folder ? ` in folder "${folder}"` : "";
     const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
     const { info: limitInfo, truncationNote } = describeSearchLimit(
@@ -44779,8 +51273,8 @@ ${syncWarnings.join(" ")}` : "";
     if (notes.length === 0) {
       const scopeHint = describeSearchScope(searchContent, notes.length);
       return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${syncNote}`,
-        { notes: [], count: 0 }
+        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+        { notes: [], count: 0, ...sourceFields, ...scanFields }
       );
     }
     const noteList = notes.map((n) => {
@@ -44794,17 +51288,97 @@ ${syncWarnings.join(" ")}` : "";
     }).join("\n");
     return successResponse(
       `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${truncationNote}${syncNote}`,
-      { notes, count: notes.length }
+${noteList}${truncationNote}${scanNote}${syncNote}`,
+      {
+        notes: withStableIdentifiers(notes, "ICNote"),
+        count: notes.length,
+        ...sourceFields,
+        ...scanFields
+      }
     );
   }, "Error searching notes")
+);
+registerTool(
+  "query-notes",
+  {
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    inputSchema: {
+      query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
+        'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
+      ),
+      limit: external_exports.number().int().positive().max(QUERY_RESULTS.MAX).optional().describe(
+        `Maximum notes to return (default ${QUERY_RESULTS.DEFAULT}, max ${QUERY_RESULTS.MAX}). The response reports how many matched in total.`
+      ),
+      scanLimit: external_exports.number().int().positive().max(QUERY_SCAN.MAX).optional().describe(
+        `How many of the most recently modified notes to examine (default ${QUERY_SCAN.DEFAULT}, max ${QUERY_SCAN.MAX}). The response says when older notes were left unscanned.`
+      ),
+      includeDeleted: external_exports.boolean().optional().describe(
+        "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+      )
+    },
+    outputSchema: {
+      notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      matched: external_exports.number().optional(),
+      scanned: external_exports.number().optional(),
+      eligible: external_exports.number().optional(),
+      scanLimit: external_exports.number().optional(),
+      scanTruncated: external_exports.boolean().optional(),
+      limit: external_exports.number().optional(),
+      truncated: external_exports.boolean().optional(),
+      unreadable: external_exports.number().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted }) => {
+    let result;
+    try {
+      result = queryNotes(query2, { limit, scanLimit, includeDeleted });
+    } catch (error2) {
+      if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
+        return errorResponse(
+          error2 instanceof NoteQueryError ? `Invalid query: ${error2.message}` : error2.message
+        );
+      }
+      throw error2;
+    }
+    const scope2 = `scanned ${result.scanned} of ${result.eligible} notes` + (result.scanTruncated ? `, the most recent ${result.scanLimit}; pass a higher scanLimit to include older notes` : "");
+    const notes = [];
+    if (result.truncated) {
+      notes.push(
+        `\u2139\uFE0F ${result.matched} notes matched; showing the first ${result.count}. Pass a higher limit or narrow the query.`
+      );
+    }
+    if (result.unreadable > 0) {
+      notes.push(
+        `\u26A0\uFE0F ${result.unreadable} note bodies could not be decoded, so body predicates did not match them.`
+      );
+    }
+    const footer = notes.length ? `
+
+${notes.join("\n")}` : "";
+    if (result.count === 0) {
+      return successResponse(`No notes matched (${scope2}).${footer}`, { ...result });
+    }
+    const lines = result.notes.map((n) => {
+      const where = [n.account, n.folder].filter(Boolean).join(" / ");
+      const snippet = n.snippet ? `
+      ${n.snippet}` : "";
+      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+    }).join("\n");
+    return successResponse(
+      `Found ${result.matched} matching notes (${scope2}):
+${lines}${footer}`,
+      { ...result }
+    );
+  }, "Error querying notes")
 );
 registerTool(
   "get-note-content",
   {
     description: "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
     inputSchema: {
-      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
@@ -44812,6 +51386,7 @@ registerTool(
     },
     outputSchema: {
       id: external_exports.string().optional(),
+      ...noteIdentifierOutput,
       title: external_exports.string().optional(),
       content: external_exports.string().optional(),
       contentHash: external_exports.string().optional(),
@@ -44851,6 +51426,7 @@ registerTool(
       const warning2 = [strippedImagesWarning(stripped2), rich2.warning].filter(Boolean).join("\n\n");
       return successResponse(warning2 ? content2 + warning2 : content2, {
         id: id2,
+        ...noteIdentifiers(id2),
         title: note2.title,
         content: content2,
         contentHash: richContentHash(rawContent2, rich2),
@@ -44892,6 +51468,7 @@ registerTool(
     const warning = [strippedImagesWarning(stripped), rich.warning].filter(Boolean).join("\n\n");
     return successResponse(warning ? content + warning : content, {
       id: note.id,
+      ...noteIdentifiers(note.id),
       title,
       content,
       contentHash: richContentHash(rawContent, rich),
@@ -44916,7 +51493,7 @@ registerTool(
   {
     description: "Use when: reading one note's body as plain text with no HTML, by id (preferred) or title.\nReturns: the note's plaintext exactly as Notes exposes it.\nDo not use when: you need the HTML body (get-note-content) or Markdown with checklist state (get-note-markdown).\nNote: this reads the note's native plaintext property, so it skips the HTML-to-text conversion; password-protected notes must be unlocked in Notes.app first.",
     inputSchema: {
-      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
@@ -44968,7 +51545,9 @@ registerTool(
   {
     description: "Use when: you have a note id and need its metadata only.\nReturns: id, title, created, modified, shared, passwordProtected.\nDo not use when: you need the body text (get-note-content) or only have a title (get-note-details).",
     inputSchema: {
-      id: external_exports.string().min(1, "Note ID is required").max(MAX.ID)
+      id: looseNoteId(external_exports.string().min(1, "Note ID is required")).describe(
+        `Note ID: ${NOTE_ID_FORMS}`
+      )
     },
     outputSchema: {
       id: external_exports.string().optional(),
@@ -44976,7 +51555,8 @@ registerTool(
       created: external_exports.string().optional(),
       modified: external_exports.string().optional(),
       shared: external_exports.boolean().optional(),
-      passwordProtected: external_exports.boolean().optional()
+      passwordProtected: external_exports.boolean().optional(),
+      ...noteIdentifierOutput
     }
   },
   withErrorHandling(({ id: id2 }) => {
@@ -44990,7 +51570,8 @@ registerTool(
       created: note.created.toISOString(),
       modified: note.modified.toISOString(),
       shared: note.shared,
-      passwordProtected: note.passwordProtected
+      passwordProtected: note.passwordProtected,
+      ...noteIdentifiers(note.id)
     };
     return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note")
@@ -45007,7 +51588,8 @@ registerTool(
       modified: external_exports.string().optional(),
       shared: external_exports.boolean().optional(),
       passwordProtected: external_exports.boolean().optional(),
-      account: external_exports.string().optional()
+      account: external_exports.string().optional(),
+      ...noteIdentifierOutput
     }
   },
   withErrorHandling(({ title, account }) => {
@@ -45022,7 +51604,8 @@ registerTool(
       modified: note.modified.toISOString(),
       shared: note.shared,
       passwordProtected: note.passwordProtected,
-      account: note.account
+      account: note.account,
+      ...noteIdentifiers(note.id)
     };
     return successResponse(JSON.stringify(metadata, null, 2), metadata);
   }, "Error retrieving note details")
@@ -45032,7 +51615,9 @@ registerTool(
   {
     description: "Use when: the user wants to reveal a known note in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need note content (get-note-content) or metadata (get-note-by-id).\nNote: this opens or focuses the Notes UI.",
     inputSchema: {
-      id: external_exports.string().min(1, "Note ID is required").max(MAX.ID),
+      id: looseNoteId(external_exports.string().min(1, "Note ID is required")).describe(
+        `Note ID: ${NOTE_ID_FORMS}`
+      ),
       separately: external_exports.boolean().optional().describe("Open in a separate note window when supported by Notes.app")
     },
     outputSchema: {
@@ -45053,7 +51638,7 @@ registerTool(
   {
     description: "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the app that launches this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
-      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
     },
@@ -45108,7 +51693,9 @@ registerTool(
   {
     description: "Use when: the user wants to reveal a known folder in Notes.app by id.\nReturns: confirmation that Notes.app accepted the show command.\nDo not use when: you only need the folder list (list-folders).\nNote: this opens or focuses the Notes UI. Get the id from list-folders.",
     inputSchema: {
-      id: external_exports.string().min(1, "Folder ID is required").max(MAX.ID),
+      id: looseFolderId(external_exports.string().min(1, "Folder ID is required")).describe(
+        "Folder ID from list-folders: x-coredata id, Notes UUID, or numeric key"
+      ),
       separately: external_exports.boolean().optional().describe("Open in a separate window when supported by Notes.app")
     },
     outputSchema: {
@@ -45208,21 +51795,121 @@ registerTool(
   }, "Error reading native objects")
 );
 registerTool(
+  "get-note-tables",
+  {
+    description: "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: every table in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, and tableCellsComplete.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. Cell text only: links and styling inside cells are not rendered.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      tables: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      tableCount: external_exports.number().optional(),
+      tableCellsComplete: external_exports.boolean().optional(),
+      markdown: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2 }) => {
+    const { metadata, message } = getNoteMetadata(id2);
+    if (!metadata) return errorResponse(message || `Failed to read note "${id2}"`);
+    if (metadata.passwordProtected) {
+      return errorResponse(
+        `Note "${id2}" is password-protected; its tables are encrypted. Unlock it in Notes.app first.`
+      );
+    }
+    const result = notesManager.getNoteTablesById(id2);
+    const count = result.tables.length;
+    const summary = count === 0 ? "This note has no native tables." : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:
+
+${result.markdown}`;
+    return successResponse(summary, {
+      id: id2,
+      tables: result.tables,
+      tableCount: count,
+      tableCellsComplete: result.tableCellsComplete,
+      markdown: result.markdown
+    });
+  }, "Error reading note tables")
+);
+registerTool(
+  "get-note-blocks",
+  {
+    description: "Use when: you need a note's structure, not just its text: paragraph styles (title, heading, subheading, body, monospaced, bulleted/dashed/numbered list, checklist with done state), indent, alignment, block quote, inline formatting (bold, italic, underline, strikethrough, superscript, subscript, color, highlight, links) and attachment positions, by exact id.\nReturns: one page of blocks in body order (default 500, stopped early under APPLE_NOTES_MCP_BLOCKS_MAX_BYTES, default 4 MB), whole-note summary counts, undecodedFields, and page info; while page.hasMore is true, call again with offset set to page.nextOffset. Offsets and lengths count UTF-16 code units.\nDo not use when: you want the editable HTML body (get-note-content) or Markdown (get-note-markdown).\nSafety: read-only; decodes the NoteStore database directly and requires Full Disk Access. Password-protected notes are refused. Link URLs are returned as stored; linkSafe is false for schemes other than http(s), notes, applenotes and mailto.",
+    inputSchema: {
+      id: noteIdInput,
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first block to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum blocks to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      textLength: external_exports.number().optional(),
+      blocks: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional(),
+      summary: external_exports.record(external_exports.unknown()).optional(),
+      undecodedFields: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, offset, limit }) => {
+    let page;
+    try {
+      page = pageNoteBlocks(readNoteBlocks(id2), { offset, limit });
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error reading note blocks [${error2.code}]: ${error2.message}${hint}`);
+    }
+    const { summary } = page;
+    const styles = Object.entries(summary.styles).map(([style, count]) => `${style} ${count}`).join(", ");
+    return successResponse(
+      `Decoded ${summary.blocks} blocks (${styles || "none"}); returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more available at offset ${page.page.nextOffset}` : "") + ".",
+      { id: id2, ...page }
+    );
+  }, "Error reading note blocks")
+);
+registerTool(
   "list-native-tags",
   {
-    description: "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
+    description: "Use when: listing actual native Notes tags, either in one folder (pass folder) or as an account-wide inventory with note counts (omit folder; account then optionally narrows it, else every account is counted).\nReturns: folder mode maps each tag to exact matching note IDs, plus completeness and per-note errors; inventory mode returns each tag with noteCount and per-account counts, sorted by count.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
     inputSchema: {
-      account: external_exports.string().min(1).max(MAX.ACCOUNT),
-      folder: external_exports.string().min(1).max(MAX.FOLDER)
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe(
+        "Account name (exact or unique prefix). Folder mode: defaults to Notes.app's default account. Inventory mode: omit to count every account."
+      ),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder to list tags in. Omit for the account-wide inventory with counts.")
     },
     outputSchema: {
       tags: external_exports.record(external_exports.array(external_exports.string())).optional(),
       complete: external_exports.boolean().optional(),
-      errors: external_exports.record(external_exports.string()).optional()
+      errors: external_exports.record(external_exports.string()).optional(),
+      inventory: external_exports.array(
+        external_exports.object({
+          tag: external_exports.string(),
+          noteCount: external_exports.number(),
+          accounts: external_exports.record(external_exports.number()),
+          spellings: external_exports.array(external_exports.string()).optional()
+        }).passthrough()
+      ).optional(),
+      tagCount: external_exports.number().optional(),
+      unverifiedNotes: external_exports.number().optional(),
+      account: external_exports.string().optional()
     },
     annotations: { readOnlyHint: true }
   },
   withErrorHandling(({ account, folder }) => {
+    if (!folder) {
+      const result = nativeTagInventory({ account });
+      const scope2 = result.account ? ` in ${result.account}` : " across all accounts";
+      const lines = result.inventory.map(
+        (entry) => `  - ${entry.tag}: ${entry.noteCount} note${entry.noteCount === 1 ? "" : "s"}`
+      );
+      const partial2 = result.complete ? "" : `
+
+${result.unverifiedNotes} note(s) could not be checked against their body (locked or unreadable) and were counted from tag objects alone.`;
+      return successResponse(
+        `${result.tagCount} native tag${result.tagCount === 1 ? "" : "s"}${scope2}` + (lines.length ? `:
+${lines.join("\n")}` : ".") + partial2,
+        result
+      );
+    }
     const tags = {};
     const errors = {};
     for (const note of notesManager.listNoteRefs(account, folder)) {
@@ -45256,6 +51943,7 @@ registerTool(
         "New note body. AppleScript cannot produce true Apple Notes checklists; checkbox inputs and `- [ ]` markdown do not render as checkable items. Use a plain list and convert in Notes.app with \u21E7\u2318L."
       ),
       format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Content format: 'plaintext' (default) or 'html' for rich formatting"),
+      timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
     outputSchema: {
@@ -45353,6 +52041,125 @@ registerTool(
     "Error updating note"
   )
 );
+function guardedAppend({
+  id: id2,
+  expectedContentHash,
+  content,
+  position = "after",
+  separator = "\n\n",
+  format = "plaintext",
+  scopeText,
+  htmlSeparator,
+  ...scopeArgs
+}, onRoute) {
+  const contentToHtml = (text2) => {
+    if (format === "html") return text2;
+    return text2.split("\n").map((line) => {
+      const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<div>${escaped || "<br>"}</div>`;
+    }).join("");
+  };
+  const separatorToHtml = (sep4) => {
+    if (format === "html") return sep4;
+    if (sep4 === "\n\n") return "<div><br></div>";
+    const escaped = sep4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<div>${escaped}</div>`;
+  };
+  const snapshot = readExactNoteSnapshot(id2);
+  if ("error" in snapshot) return errorResponse(snapshot.error);
+  if (snapshot.contentHash !== expectedContentHash) {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (!snapshot.rich.writable) {
+    if (separator !== "\n\n")
+      return errorResponse("Native append supports the default blank-line separator only");
+    if (position !== "after") return errorResponse("Native append supports the end of a note only");
+    if (!scopeText)
+      return errorResponse("Provide scopeText: a unique existing phrase for native append");
+    if (!VERIFIED_BACKGROUND.has("append-native"))
+      return errorResponse("Native append has not passed live validation; see get-capabilities");
+    const nativeScope = scopeFrom(scopeArgs);
+    if (hasScopeGuard(nativeScope)) {
+      const reason = notesManager.checkNoteScope(id2, nativeScope);
+      if (reason) return errorResponse(scopeConflictMessage(reason));
+    }
+    onRoute?.("native");
+    const result2 = appendNative(notesManager, {
+      id: id2,
+      expectedContentHash,
+      scopeText,
+      content,
+      format
+    });
+    return successResponse("Native append verified without replacing existing objects", result2);
+  }
+  onRoute?.("applescript");
+  const attachments = notesManager.listAttachmentsById(id2);
+  if (attachments.length > 0) {
+    return errorResponse(
+      `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
+    );
+  }
+  assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
+  const firstDivEnd = snapshot.rich.content.indexOf("</div>");
+  const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
+  const bodyHtml = firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
+  const newBlock = contentToHtml(content);
+  const sepHtml = htmlSeparator ?? separatorToHtml(separator);
+  const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
+  const result = notesManager.updateNoteByIdIfUnchanged(
+    id2,
+    snapshot.note.title,
+    snapshot.body,
+    void 0,
+    combinedBody,
+    "html",
+    snapshot.rich.revision,
+    scopeFrom(scopeArgs)
+  );
+  if (result.status === "conflict") {
+    return errorResponse(revisionConflictMessage(snapshot.note.title));
+  }
+  if (result.status === "scope_conflict") {
+    return errorResponse(scopeConflictMessage(result.reason));
+  }
+  if (result.status === "attachments") {
+    return errorResponse(
+      `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
+    );
+  }
+  if (result.status !== "updated") {
+    return errorResponse(
+      `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
+    );
+  }
+  const readback = notesManager.getNoteContentById(id2);
+  const richReadback = enrichNoteRead(id2, readback || "");
+  const contentHash = readback ? richContentHash(readback, richReadback) : "";
+  if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
+    return errorResponse(
+      "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
+    );
+  }
+  if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
+    return errorResponse(
+      `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
+    );
+  }
+  const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
+  return successResponse(
+    `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
+    {
+      ok: true,
+      id: id2,
+      title: snapshot.note.title,
+      shared: snapshot.note.shared ?? false,
+      previousContentHash: expectedContentHash,
+      contentHash,
+      verifiedVisibleText: true
+    }
+  );
+}
 registerTool(
   "append-to-note",
   {
@@ -45363,10 +52170,11 @@ registerTool(
       content: external_exports.string().min(1, "Content to append is required").max(MAX.CONTENT).describe("Text to append to the note body"),
       scopeText: external_exports.string().min(12).max(500).optional().describe("Existing unique phrase required for native append to protected notes"),
       position: external_exports.enum(["after", "before"]).optional().default("after").describe(
-        "Where to insert: 'after' appends to the end (default), 'before' prepends to the start"
+        "Where to insert: 'after' appends to the end (default); 'before' inserts directly below the note's title line, so the title stays first"
       ),
       separator: external_exports.string().max(20).optional().default("\n\n").describe("String placed between existing content and new content (default: two newlines)"),
       format: external_exports.enum(["plaintext", "html"]).optional().default("plaintext").describe("Format of the content being appended: 'plaintext' (default) or 'html'"),
+      timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
     outputSchema: {
@@ -45379,136 +52187,85 @@ registerTool(
       verifiedVisibleText: external_exports.boolean().optional()
     }
   },
-  withErrorHandling(
-    ({
-      id: id2,
-      expectedContentHash,
-      content,
-      position = "after",
-      separator = "\n\n",
-      format = "plaintext",
-      scopeText,
-      ...scopeArgs
-    }) => {
-      const contentToHtml = (text) => {
-        if (format === "html") return text;
-        return text.split("\n").map((line) => {
-          const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return `<div>${escaped || "<br>"}</div>`;
-        }).join("");
-      };
-      const separatorToHtml = (sep2) => {
-        if (format === "html") return sep2;
-        if (sep2 === "\n\n") return "<div><br></div>";
-        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<div>${escaped}</div>`;
-      };
-      const snapshot = readExactNoteSnapshot(id2);
-      if ("error" in snapshot) return errorResponse(snapshot.error);
-      if (snapshot.contentHash !== expectedContentHash) {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (!snapshot.rich.writable) {
-        if (separator !== "\n\n")
-          return errorResponse("Native append supports the default blank-line separator only");
-        if (position !== "after")
-          return errorResponse("Native append supports the end of a note only");
-        if (!scopeText)
-          return errorResponse("Provide scopeText: a unique existing phrase for native append");
-        if (!VERIFIED_BACKGROUND.has("append-native"))
-          return errorResponse(
-            "Native append has not passed live validation; see get-capabilities"
-          );
-        const nativeScope = scopeFrom(scopeArgs);
-        if (hasScopeGuard(nativeScope)) {
-          const reason = notesManager.checkNoteScope(id2, nativeScope);
-          if (reason) return errorResponse(scopeConflictMessage(reason));
-        }
-        const result2 = appendNative(notesManager, {
-          id: id2,
-          expectedContentHash,
-          scopeText,
-          content,
-          format
-        });
-        return successResponse("Native append verified without replacing existing objects", result2);
-      }
-      const attachments = notesManager.listAttachmentsById(id2);
-      if (attachments.length > 0) {
-        return errorResponse(
-          `Note "${snapshot.note.title}" has ${attachments.length} attachment(s). Append is blocked because it rewrites the full body; edit it in Notes.app.`
-        );
-      }
-      assertLinkedWrite(snapshot.rich, snapshot.rich.content, "html");
-      const firstDivEnd = snapshot.rich.content.indexOf("</div>");
-      const titleDiv = firstDivEnd !== -1 ? snapshot.rich.content.slice(0, firstDivEnd + 6) : "";
-      const bodyHtml = firstDivEnd !== -1 ? snapshot.rich.content.slice(firstDivEnd + 6) : snapshot.rich.content;
-      const newBlock = contentToHtml(content);
-      const sepHtml = separatorToHtml(separator);
-      const combinedBody = position === "before" ? titleDiv + newBlock + sepHtml + bodyHtml : titleDiv + bodyHtml + sepHtml + newBlock;
-      const result = notesManager.updateNoteByIdIfUnchanged(
-        id2,
-        snapshot.note.title,
-        snapshot.body,
-        void 0,
-        combinedBody,
-        "html",
-        snapshot.rich.revision,
-        scopeFrom(scopeArgs)
-      );
-      if (result.status === "conflict") {
-        return errorResponse(revisionConflictMessage(snapshot.note.title));
-      }
-      if (result.status === "scope_conflict") {
-        return errorResponse(scopeConflictMessage(result.reason));
-      }
-      if (result.status === "attachments") {
-        return errorResponse(
-          `Note "${snapshot.note.title}" gained an attachment before saving. No content was appended.`
-        );
-      }
-      if (result.status !== "updated") {
-        return errorResponse(
-          `The append result for note "${snapshot.note.title}" is uncertain. Read the exact ID before retrying.`
-        );
-      }
-      const readback = notesManager.getNoteContentById(id2);
-      const richReadback = enrichNoteRead(id2, readback || "");
-      const contentHash = readback ? richContentHash(readback, richReadback) : "";
-      if (!richReadback.complete || linkSignature(richReadback.links) !== linkSignature(htmlLinks(result.writtenBody))) {
-        return errorResponse(
-          "The note accepted the write, but rich-link readback is not verified. Read the exact ID before retrying; do not repeat the write automatically."
-        );
-      }
-      if (!readback || comparableVisibleText(readback) !== comparableVisibleText(result.writtenBody)) {
-        return errorResponse(
-          `The note accepted an append, but exact-ID readback visible text did not match. Do not retry automatically; inspect note ID ${id2} in Notes.app.`
-        );
-      }
-      const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note is shared with collaborators. Your changes are visible to them." : "";
-      return successResponse(
-        `Note appended; visible text verified: "${snapshot.note.title}"${sharedWarning}`,
-        {
-          ok: true,
-          id: id2,
-          title: snapshot.note.title,
-          shared: snapshot.note.shared ?? false,
-          previousContentHash: expectedContentHash,
-          contentHash,
-          verifiedVisibleText: true
-        }
-      );
+  withErrorHandling((args) => guardedAppend(args), "Error appending to note")
+);
+registerTool(
+  "insert-link",
+  {
+    description: "Use when: adding one web, mail or Notes link to an exact note, either as the raw URL (mode 'raw') or as label text that links to the URL (mode 'hyperlink').\nReturns: exact id, the route used, whether Notes stored a link on the inserted text, the stored destination read back from the note, and the new content hash.\nDo not use when: linking to another note by id (insert-note-link fetches its real deep link), or you want a rich URL preview card (not available: no public automation route creates one).\nSafety: same guards as append-to-note (fresh expectedContentHash, attachment block, existing links must survive). Notes with native objects use native end-append and need scopeText; there only position 'end' with a blank line is supported. The link is placed in its own paragraph at the end or directly after the title; placing it inside an existing paragraph is not supported.",
+    inputSchema: {
+      id: noteIdInput,
+      expectedContentHash: expectedContentHashInput,
+      url: external_exports.string().min(1, "url is required").max(MAX_LINK_URL_LENGTH).describe(
+        "Link destination: absolute http(s) URL with a host, or a mailto:, notes:// or applenotes: link. No spaces."
+      ),
+      mode: external_exports.enum(["raw", "hyperlink"]).optional().default("raw").describe(
+        "'raw' (default) shows the URL itself; 'hyperlink' shows `label` linking to the URL"
+      ),
+      label: external_exports.string().max(MAX_LINK_LABEL_LENGTH).optional().describe("Visible text for mode 'hyperlink' (required there, refused in raw mode)"),
+      linked: external_exports.boolean().optional().describe(
+        "Raw mode only. true (default) stores a real link on the URL text. false writes plain text with no stored link; Notes may still detect it when displaying, and the result reports linkStored."
+      ),
+      position: external_exports.enum(["end", "after-title"]).optional().default("end").describe("'end' (default) or 'after-title' (first paragraph below the title)"),
+      blankLine: external_exports.boolean().optional().default(true).describe(
+        "Leave a blank line between existing text and the link paragraph (default true; native-object notes require true)"
+      ),
+      scopeText: external_exports.string().min(12).max(500).optional().describe("Existing unique phrase; required only for notes with native objects")
     },
-    "Error appending to note"
-  )
+    outputSchema: {
+      ok: external_exports.boolean().optional(),
+      id: external_exports.string().optional(),
+      mode: external_exports.string().optional(),
+      url: external_exports.string().optional(),
+      text: external_exports.string().optional(),
+      position: external_exports.string().optional(),
+      route: external_exports.string().optional(),
+      linkStored: external_exports.boolean().optional(),
+      storedUrl: external_exports.string().optional(),
+      previousContentHash: external_exports.string().optional(),
+      contentHash: external_exports.string().optional()
+    }
+  },
+  withErrorHandling((args) => {
+    const result = insertLink(
+      {
+        ...args,
+        mode: args.mode ?? "raw",
+        position: args.position ?? "end",
+        blankLine: args.blankLine ?? true
+      },
+      {
+        readLinks: (noteId3) => readRichNote(noteId3).links,
+        append: (request) => {
+          let route = "applescript";
+          const response = guardedAppend(
+            {
+              ...request,
+              format: "html",
+              htmlSeparator: request.separator ? "<div><br></div>" : ""
+            },
+            (r) => route = r
+          );
+          if (response.isError) throw new Error(response.content[0].text);
+          return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
+        }
+      }
+    );
+    const stored = result.linkStored ? `stored link to ${result.storedUrl}` : "no stored link (plain text)";
+    return successResponse(
+      `Link inserted (${result.mode}, ${result.position}, ${result.route}); ${stored}`,
+      { ...result }
+    );
+  }, "Error inserting link")
 );
 registerTool(
   "delete-note",
   {
-    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
+    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
     outputSchema: {
@@ -45531,6 +52288,12 @@ registerTool(
     }
     if (result.status === "scope_conflict") {
       return errorResponse(scopeConflictMessage(result.reason));
+    }
+    if (result.status === "in-recently-deleted") {
+      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
+    }
+    if (result.status === "not-deleted") {
+      return errorResponse(NOT_DELETED_MESSAGE);
     }
     if (result.status !== "deleted") {
       return errorResponse(
@@ -45558,6 +52321,7 @@ registerTool(
       id: noteIdInput,
       folder: external_exports.string().min(1, "Destination folder is required").max(MAX.FOLDER),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note/folder"),
+      timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
     outputSchema: {
@@ -45597,28 +52361,47 @@ registerTool(
 registerTool(
   "list-notes",
   {
-    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: warns if iCloud sync is active and results may be partial.",
+    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
       modifiedSince: external_exports.string().max(64).optional().describe(
         "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for listing only recent notes in large collections."
       ),
-      limit: external_exports.number().int().positive().optional().describe("Maximum number of notes to return")
+      limit: external_exports.number().int().positive().optional().describe("Maximum number of notes to return"),
+      includeRecentlyDeleted: external_exports.boolean().optional().describe(
+        "Also list notes in Recently Deleted, each flagged inRecentlyDeleted (default false)"
+      )
     },
     outputSchema: {
-      notes: external_exports.array(external_exports.object({ title: external_exports.string(), id: external_exports.string() })).optional(),
-      count: external_exports.number().optional()
+      notes: external_exports.array(
+        external_exports.object({
+          title: external_exports.string(),
+          id: external_exports.string(),
+          inRecentlyDeleted: external_exports.boolean().optional(),
+          identifier: external_exports.string().optional(),
+          folderIdentifier: external_exports.string().optional(),
+          accountIdentifier: external_exports.string().optional()
+        })
+      ).optional(),
+      count: external_exports.number().optional(),
+      excludedRecentlyDeleted: external_exports.number().optional()
     }
   },
-  withErrorHandling(({ account, folder, modifiedSince, limit }) => {
+  withErrorHandling(({ account, folder, modifiedSince, limit, includeRecentlyDeleted }) => {
     const {
-      result: notes,
+      result: { refs: notes, excludedRecentlyDeleted },
       syncBefore,
       syncInterference
     } = withSyncAwarenessSync(
       "list-notes",
-      () => notesManager.listNoteRefs(account, folder, modifiedSince, limit)
+      () => notesManager.listNoteRefsDetailed(
+        account,
+        folder,
+        modifiedSince,
+        limit,
+        includeRecentlyDeleted ?? false
+      )
     );
     const location = folder ? ` in folder "${folder}"` : "";
     const acct = account ? ` (${account})` : "";
@@ -45634,17 +52417,22 @@ registerTool(
     const syncNote = syncWarnings.length > 0 ? `
 
 ${syncWarnings.join(" ")}` : "";
+    const trashNote = excludedRecentlyDeleted > 0 ? `
+
+Skipped ${excludedRecentlyDeleted} note(s) in Recently Deleted; pass includeRecentlyDeleted: true to list them.` : "";
+    const trashData = excludedRecentlyDeleted > 0 ? { excludedRecentlyDeleted } : {};
     if (notes.length === 0) {
-      return successResponse(`No notes found${location}${acct}${dateInfo}${syncNote}`, {
+      return successResponse(`No notes found${location}${acct}${dateInfo}${trashNote}${syncNote}`, {
         notes: [],
-        count: 0
+        count: 0,
+        ...trashData
       });
     }
-    const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
+    const noteList = notes.map((n) => `  - ${n.title}${n.inRecentlyDeleted ? " [RECENTLY DELETED]" : ""} [id: ${n.id}]`).join("\n");
     return successResponse(
       `Found ${notes.length} notes${location}${acct}${dateInfo}${limitInfo}:
-${noteList}${syncNote}`,
-      { notes, count: notes.length }
+${noteList}${trashNote}${syncNote}`,
+      { notes: withStableIdentifiers(notes, "ICNote"), count: notes.length, ...trashData }
     );
   }, "Error listing notes")
 );
@@ -45668,7 +52456,10 @@ registerTool(
     }
     const noteList = notes.map((n) => `  - ${n.title} [id: ${n.id}]`).join("\n");
     return successResponse(`Selected note(s):
-${noteList}`, { notes, count: notes.length });
+${noteList}`, {
+      notes: withStableIdentifiers(notes, "ICNote"),
+      count: notes.length
+    });
   }, "Error getting selected notes")
 );
 registerTool(
@@ -45709,11 +52500,60 @@ ${syncWarnings.join(" ")}` : "";
       `Found ${folders.length} folders${resolvedAcct}:
 ${folderList}${syncNote}`,
       {
-        folders,
+        folders: withStableIdentifiers(folders, "ICFolder"),
         count: folders.length
       }
     );
   }, "Error listing folders")
+);
+registerTool(
+  "list-smart-folders",
+  {
+    description: `Use when: listing Smart Folders and the rules that define them.
+Returns: each smart folder's name, ids, account, and parent, its rules decoded as match ("all"/"any"/"none") plus filters (each with a readable description), the stored query with the outer deleted wrapper removed, and the raw stored query JSON. With includeMatchingNotes, also the notes Notes.app currently shows in each folder.
+Do not use when: listing ordinary folders (list-folders) or searching notes (search-notes).
+Safety: read-only; reads the NoteStore database and requires Full Disk Access. includeMatchingNotes asks Notes.app (Automation permission) for each folder's current contents rather than re-evaluating the rules. Unrecognized rules are kept as "unknown" filters and set fullyDecoded false.`,
+    inputSchema: {
+      includeMatchingNotes: external_exports.boolean().optional().describe(
+        "Also list the notes Notes.app currently shows in each smart folder (default false)"
+      ),
+      limit: external_exports.number().int().min(1).max(500).optional().describe("Maximum matching notes returned per folder (default 50; count is always total)")
+    },
+    outputSchema: {
+      smartFolders: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      fullyDecoded: external_exports.boolean().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ includeMatchingNotes = false, limit }) => {
+    const folders = notesManager.listSmartFolders({ includeMatchingNotes, limit });
+    const fullyDecoded = folders.every((folder) => folder.fullyDecoded);
+    if (folders.length === 0) {
+      return successResponse("No smart folders found.", {
+        smartFolders: [],
+        count: 0,
+        fullyDecoded
+      });
+    }
+    const lines = folders.map((folder) => {
+      const joiner = folder.match === "any" ? " OR " : " AND ";
+      const rules = folder.filters.map((filter) => filter.description).join(joiner);
+      const prefix = folder.match === "none" ? "none of: " : "";
+      const where = [folder.account, folder.parent].filter(Boolean).join(" / ");
+      const matches = folder.matchingNoteCount !== void 0 ? ` [${folder.matchingNoteCount} note(s)]` : folder.matchingNotesError ? ` [notes unavailable: ${folder.matchingNotesError}]` : "";
+      return `  - ${folder.name ?? "(untitled)"}${where ? ` (${where})` : ""}: ${prefix}${rules || "(no rules)"}${matches}`;
+    });
+    return successResponse(
+      `Found ${folders.length} smart folder(s):
+${lines.join("\n")}${fullyDecoded ? "" : '\n\nSome rules were not recognized; see filters of type "unknown".'}`,
+      {
+        smartFolders: folders,
+        count: folders.length,
+        fullyDecoded
+      }
+    );
+  }, "Error listing smart folders")
 );
 registerTool(
   "create-folder",
@@ -45785,7 +52625,7 @@ registerTool(
     }).join("\n");
     return successResponse(`Found ${accounts.length} accounts:
 ${accountList}`, {
-      accounts,
+      accounts: withStableIdentifiers(accounts, "ICAccount"),
       count: accounts.length
     });
   }, "Error listing accounts")
@@ -45804,7 +52644,9 @@ registerTool(
     const location = notesManager.getDefaultLocation();
     const message = `Default account: ${location.account.name} [id: ${location.account.id}]
 Default folder: ${location.folder.name} [id: ${location.folder.id}]`;
-    return successResponse(message, { ...location });
+    const [account] = withStableIdentifiers([location.account], "ICAccount");
+    const [folder] = withStableIdentifiers([location.folder], "ICFolder");
+    return successResponse(message, { account, folder });
   }, "Error getting default Notes location")
 );
 registerTool(
@@ -45834,7 +52676,7 @@ registerTool(
 ${noteList}
 
 \u26A0\uFE0F Changes to shared notes are visible to all collaborators.`,
-      { notes: sharedNotes, count: sharedNotes.length }
+      { notes: withStableIdentifiers(sharedNotes, "ICNote"), count: sharedNotes.length }
     );
   }, "Error listing shared notes")
 );
@@ -45911,11 +52753,13 @@ ${fdaLine}`, {
 registerTool(
   "doctor",
   {
-    description: "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
+    description: "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields, including runtimeOS and the same OS-version-aware features matrix as get-capabilities.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
     inputSchema: {},
     outputSchema: {
       healthy: external_exports.boolean().optional(),
-      checks: external_exports.array(external_exports.object({}).passthrough()).optional()
+      checks: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      runtimeOS: external_exports.object({}).passthrough().optional(),
+      features: external_exports.record(external_exports.string(), external_exports.object({}).passthrough()).optional()
     }
   },
   withErrorHandling(() => {
@@ -45968,21 +52812,57 @@ registerTool(
     return successResponse(lines.join("\n"), { ...stats });
   }, "Error getting notes statistics")
 );
+function attachmentAssetView(noteId3, record2) {
+  return {
+    attachmentId: attachmentCoreDataId(noteId3, record2.pk),
+    identifier: record2.identifier,
+    uti: record2.uti,
+    kind: record2.kind,
+    parentIdentifier: record2.parentIdentifier,
+    bodyIndex: record2.bodyIndex,
+    assetPaths: record2.assetPaths,
+    previewPath: record2.previewPath,
+    paths: record2.paths
+  };
+}
+function firstImageView(noteId3, first2) {
+  if (!first2) return null;
+  const { pk, ...rest } = first2;
+  return { attachmentId: attachmentCoreDataId(noteId3, pk), ...rest };
+}
 registerTool(
   "list-attachments",
   {
-    description: "Use when: listing the attachments of one note, by id (preferred) or title.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment).\nDo not use when: you want the attachment bytes (fetch-attachment) or a file on disk (save-attachment).",
+    description: "Use when: listing the attachments of one note, by id (preferred) or title. With includePaths, also where each attachment's files are on disk; with firstImage, only the note's lead visual.\nReturns: each attachment's name, content type, and id (use with save-attachment/fetch-attachment). includePaths adds identifier, uti, kind, bodyIndex, assetPaths (the attachment's own files), previewPath (Notes' largest rendered thumbnail, always an image file), and paths. firstImage returns {firstImage, orderSource}: the first image in body order even when its asset has not downloaded (path null), else the first scan or drawing, else null.\nDo not use when: you want the attachment bytes (fetch-attachment) or files on disk (save-attachment, export-attachments).\nNote: includePaths and firstImage need the note id and Full Disk Access; they read NoteStore and the Notes data folder read-only. Treat the returned paths as local data: copy files out with export-attachments rather than handing raw paths on.",
     inputSchema: {
-      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
-      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)"),
+      includePaths: external_exports.boolean().optional().describe(
+        "Add on-disk assetPaths, previewPath, and paths to each attachment (requires id and Full Disk Access)"
+      ),
+      firstImage: external_exports.boolean().optional().describe(
+        "Return only the note's lead visual in body order instead of the list (requires id and Full Disk Access)"
+      )
     },
     outputSchema: {
       attachments: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      count: external_exports.number().optional()
+      count: external_exports.number().optional(),
+      firstImage: external_exports.object({}).passthrough().nullable().optional(),
+      orderSource: external_exports.enum(["body", "creation"]).optional(),
+      pathsError: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id: id2, title, account }) => {
+  withErrorHandling(({ id: id2, title, account, includePaths = false, firstImage = false }) => {
+    if ((includePaths || firstImage) && !id2) {
+      return errorResponse("includePaths and firstImage require the note 'id'");
+    }
+    if (firstImage && id2) {
+      const assets = notesManager.getAttachmentAssetsById(id2);
+      const first2 = firstImageView(id2, selectFirstImage(assets));
+      const text2 = first2 ? `Lead visual: ${first2.kind} attachment ${first2.attachmentId} (${first2.path ? "asset on disk" : first2.previewPath ? "preview only" : "not downloaded"}; order from ${assets.orderSource}).` : "This note has no image, scan, or drawing attachment.";
+      return successResponse(text2, { firstImage: first2, orderSource: assets.orderSource });
+    }
     if (id2) {
       const note2 = notesManager.getNoteById(id2);
       if (!note2) {
@@ -45996,10 +52876,42 @@ registerTool(
         });
       }
       const attachmentList2 = attachments2.map((a) => `  - ${a.name} (${a.contentType})`).join("\n");
-      return successResponse(
-        `Found ${attachments2.length} attachment(s) in "${note2.title}":
+      if (!includePaths) {
+        return successResponse(
+          `Found ${attachments2.length} attachment(s) in "${note2.title}":
 ${attachmentList2}`,
-        { attachments: attachments2, count: attachments2.length }
+          { attachments: attachments2, count: attachments2.length }
+        );
+      }
+      let assets;
+      try {
+        assets = notesManager.getAttachmentAssetsById(id2);
+      } catch (error2) {
+        const pathsError = error2 instanceof Error ? error2.message : String(error2);
+        return successResponse(
+          `Found ${attachments2.length} attachment(s) in "${note2.title}" (paths unavailable: ${pathsError}):
+${attachmentList2}`,
+          { attachments: attachments2, count: attachments2.length, pathsError }
+        );
+      }
+      const byPk = new Map(assets.attachments.map((r) => [r.pk, r]));
+      let onDisk = 0;
+      const enriched = attachments2.map((a) => {
+        const pk = Number(/\/ICAttachment\/p(\d+)$/.exec(a.id)?.[1]);
+        const record2 = byPk.get(pk);
+        if (!record2) return a;
+        if (record2.paths.length > 0) onDisk++;
+        const children = assets.attachments.filter((c) => c.parentIdentifier === record2.identifier).map((c) => attachmentAssetView(id2, c));
+        return {
+          ...a,
+          ...attachmentAssetView(id2, record2),
+          ...children.length ? { children } : {}
+        };
+      });
+      return successResponse(
+        `Found ${attachments2.length} attachment(s) in "${note2.title}" (${onDisk} with files on disk; order from ${assets.orderSource}):
+${attachmentList2}`,
+        { attachments: enriched, count: attachments2.length, orderSource: assets.orderSource }
       );
     }
     if (!title) {
@@ -46026,7 +52938,7 @@ ${attachmentList}`,
 registerTool(
   "batch-delete-notes",
   {
-    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict.",
+    description: "Use when: moving several reviewed notes to Recently Deleted.\nReturns: per-note success or conflict.\nDo not use when: deleting a single note.\nSafety: every entry requires an exact id and the content hash from get-note-content. Any note changed since review is preserved and reported as a conflict. A note already in Recently Deleted is refused, since deleting it there would be permanent.",
     inputSchema: {
       notes: external_exports.array(
         external_exports.object({
@@ -46057,6 +52969,11 @@ registerTool(
       if (result.status === "conflict") {
         return { id: id2, success: false, error: revisionConflictMessage(snapshot.note.title) };
       }
+      if (result.status === "in-recently-deleted") {
+        return { id: id2, success: false, error: inRecentlyDeletedMessage(snapshot.note.title) };
+      }
+      if (result.status === "not-deleted")
+        return { id: id2, success: false, error: NOT_DELETED_MESSAGE };
       return { id: id2, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;
@@ -46081,7 +52998,9 @@ registerTool(
   {
     description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
     inputSchema: {
-      ids: external_exports.array(noteIdInput).max(MAX.BATCH_IDS).describe(`Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`),
+      ids: noteIdArrayInput.describe(
+        `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`
+      ),
       folder: external_exports.string().max(MAX.FOLDER).describe(
         'Destination folder name or nested path (e.g. "Work/Clients"). Must already exist \u2014 create-folder first.'
       ),
@@ -46123,11 +53042,15 @@ registerTool(
 registerTool(
   "save-attachment",
   {
-    description: "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes. Get the ids from list-attachments first.",
+    description: "Use when: writing one note attachment to a file on disk.\nReturns: the saved path.\nDo not use when: you want the bytes in-memory as base64 (fetch-attachment).\nSafety: writes a file; savePath must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Get the ids from list-attachments first.",
     inputSchema: {
-      noteId: external_exports.string().min(1, "noteId is required").max(MAX.ID).describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(external_exports.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: external_exports.string().min(1, "attachmentId is required").max(MAX.ATTACHMENT_ID).describe("Attachment id (from list-attachments)"),
-      savePath: external_exports.string().min(1, "savePath is required").max(MAX.SAVE_PATH).describe("Absolute destination file path (must be under home, temp, or /Volumes)")
+      savePath: external_exports.string().min(1, "savePath is required").max(MAX.SAVE_PATH).describe(
+        "Absolute destination file path (must be under home, temp, or /Volumes; never inside the Notes data folder)"
+      )
     },
     outputSchema: {
       savedPath: external_exports.string().optional(),
@@ -46147,12 +53070,151 @@ registerTool(
     });
   }, "Error saving attachment")
 );
+function drawingView(noteId3, d) {
+  const { pk, raster, ...rest } = d;
+  return {
+    attachmentId: attachmentCoreDataId(noteId3, pk),
+    ...rest,
+    raster: raster ? { source: raster.source, format: raster.format, width: raster.width, height: raster.height } : null
+  };
+}
+registerTool(
+  "list-paper-attachments",
+  {
+    description: "Use when: finding the Paper drawings (com.apple.paper) and classic drawings in one note, and whether Notes has a rendered image of each.\nReturns: per drawing its attachmentId, identifier, uti, kind (paper or drawing), handwritingSummary (Notes' recognized handwriting text, or null), bundlePresent, fallbackImagePath, previewPath, and raster {source, format, width, height} (the validated image export-paper-image would copy, or null).\nDo not use when: you want every attachment (list-attachments) or the image file itself (export-paper-image).\nSafety: read-only; reads NoteStore and the Notes data folder without opening Notes.app and requires Full Disk Access. Strokes are not decoded: Notes' Paper bundle has no public reader, so the raster is Notes' own rendering.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      attachments: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2 }) => {
+    const drawings = notesManager.listPaperAttachmentsById(id2).map((d) => drawingView(id2, d));
+    if (drawings.length === 0) {
+      return successResponse("This note has no Paper or drawing attachments.", {
+        attachments: [],
+        count: 0
+      });
+    }
+    const lines = drawings.map(
+      (d) => `  - ${d.kind} ${d.attachmentId}: ${d.raster ? `${d.raster.format.toUpperCase()} ${d.raster.width}x${d.raster.height} (${d.raster.source})` : "no rendered image on disk"}${d.handwritingSummary ? "; handwriting text stored" : ""}`
+    );
+    return successResponse(
+      `Found ${drawings.length} Paper or drawing attachment(s):
+${lines.join("\n")}`,
+      { attachments: drawings, count: drawings.length }
+    );
+  }, "Error listing Paper attachments")
+);
+registerTool(
+  "export-paper-image",
+  {
+    description: "Use when: saving Notes' rendered image of a Paper drawing or classic drawing to a file.\nReturns: savedPath, format (png or jpeg), width, height, bytes, source (fallback: Notes' full rendering; preview: its largest thumbnail, used only when no full rendering exists), and the drawing's attachmentId and handwritingSummary.\nDo not use when: the attachment is a photo or file (save-attachment or export-attachments).\nSafety: writes one new file; savePath must be absolute, under the home directory, a temp dir, or /Volumes, outside the Notes data folder, must not exist yet, and must end in the image's extension (.png, or .jpg/.jpeg). The image header is validated before and after copying. Pass attachmentId (from list-paper-attachments) when the note has more than one drawing. Requires Full Disk Access; Notes.app is not opened.",
+    inputSchema: {
+      noteId: noteIdInput,
+      savePath: external_exports.string().min(1, "savePath is required").max(MAX.SAVE_PATH).describe(
+        "Absolute path for the new image file (.png, or .jpg/.jpeg for a JPEG rendering)"
+      ),
+      attachmentId: external_exports.string().max(MAX.ATTACHMENT_ID).optional().describe(
+        "Drawing to export (attachmentId or identifier from list-paper-attachments); required when the note has more than one"
+      )
+    },
+    outputSchema: {
+      savedPath: external_exports.string().optional(),
+      format: external_exports.enum(["png", "jpeg"]).optional(),
+      width: external_exports.number().optional(),
+      height: external_exports.number().optional(),
+      bytes: external_exports.number().optional(),
+      source: external_exports.enum(["fallback", "preview"]).optional(),
+      attachmentId: external_exports.string().optional(),
+      identifier: external_exports.string().optional(),
+      kind: external_exports.enum(["paper", "drawing"]).optional(),
+      handwritingSummary: external_exports.string().nullable().optional()
+    }
+  },
+  withErrorHandling(({ noteId: noteId3, savePath, attachmentId }) => {
+    const r = notesManager.exportPaperImageById(noteId3, savePath, attachmentId);
+    return successResponse(
+      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}`,
+      {
+        savedPath: r.savedPath,
+        format: r.format,
+        width: r.width,
+        height: r.height,
+        bytes: r.bytes,
+        source: r.source,
+        attachmentId: attachmentCoreDataId(noteId3, r.drawing.pk),
+        identifier: r.drawing.identifier,
+        kind: r.drawing.kind,
+        handwritingSummary: r.drawing.handwritingSummary
+      }
+    );
+  }, "Error exporting Paper image")
+);
+registerTool(
+  "export-attachments",
+  {
+    description: `Use when: copying every file attachment of one note (or only its lead visual) into a directory on disk.
+Returns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "preview" when the asset never downloaded and only Notes' rendered thumbnail was available, or null when nothing was on disk.
+Do not use when: exporting one attachment to an exact path (save-attachment) or reading bytes inline (fetch-attachment).
+Safety: writes files; exportDir must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Existing files are never replaced: name collisions get -2, -3, ... suffixes. Reads NoteStore and the Notes data folder read-only; requires Full Disk Access. Notes.app is not opened.`,
+    inputSchema: {
+      noteId: noteIdInput,
+      exportDir: external_exports.string().min(1, "exportDir is required").max(MAX.SAVE_PATH).describe("Absolute destination directory (created if missing; home, temp, or /Volumes)"),
+      firstImageOnly: external_exports.boolean().optional().describe("Export only the note's lead visual (see list-attachments firstImage)")
+    },
+    outputSchema: {
+      exportDir: external_exports.string().optional(),
+      exported: external_exports.number().optional(),
+      previews: external_exports.number().optional(),
+      skipped: external_exports.number().optional(),
+      failed: external_exports.number().optional(),
+      results: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      firstImage: external_exports.object({}).passthrough().nullable().optional()
+    }
+  },
+  withErrorHandling(({ noteId: noteId3, exportDir, firstImageOnly = false }) => {
+    const r = notesManager.exportAttachmentsById(noteId3, exportDir, firstImageOnly);
+    const results = r.results.map(({ pk, ...rest }) => ({
+      attachmentId: attachmentCoreDataId(noteId3, pk),
+      ...rest
+    }));
+    const exported = results.filter((x) => x.exportedKind !== null).length;
+    const previews = results.filter((x) => x.exportedKind === "preview").length;
+    const failed = results.filter((x) => x.error).length;
+    const skipped = results.length - exported - failed;
+    const structured = {
+      exportDir: r.exportDir,
+      exported,
+      previews,
+      skipped,
+      failed,
+      results
+    };
+    if (firstImageOnly) {
+      structured.firstImage = firstImageView(noteId3, r.firstImage ?? null);
+      if (!r.firstImage) {
+        return successResponse(
+          "This note has no image, scan, or drawing attachment; nothing was exported.",
+          structured
+        );
+      }
+    }
+    return successResponse(
+      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
+      structured
+    );
+  }, "Error exporting attachments")
+);
 registerTool(
   "fetch-attachment",
   {
     description: "Use when: retrieving one note attachment's bytes inline as base64 (no file written).\nReturns: name, content type, byte count, and base64 data.\nDo not use when: you want it saved to disk (save-attachment).\nNote: get the ids from list-attachments first.",
     inputSchema: {
-      noteId: external_exports.string().min(1, "noteId is required").max(MAX.ID).describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(external_exports.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: external_exports.string().min(1, "attachmentId is required").max(MAX.ATTACHMENT_ID).describe("Attachment id (from list-attachments)")
     },
     outputSchema: {
@@ -46178,7 +53240,9 @@ registerTool(
   {
     description: "Use when: the user wants to reveal one note attachment in Notes.app.\nReturns: confirmation that Notes.app revealed the attachment.\nDo not use when: you want the bytes (fetch-attachment) or a file on disk (save-attachment).\nNote: this opens or focuses the Notes UI. Get the ids from list-attachments first.",
     inputSchema: {
-      noteId: external_exports.string().min(1, "noteId is required").max(MAX.ID).describe("CoreData note id (from search/list)"),
+      noteId: looseNoteId(external_exports.string().min(1, "noteId is required")).describe(
+        `Note id (from search/list): ${NOTE_ID_FORMS}`
+      ),
       attachmentId: external_exports.string().min(1, "attachmentId is required").max(MAX.ATTACHMENT_ID).describe("Attachment id (from list-attachments)"),
       separately: external_exports.boolean().optional().describe("Open in a separate window when supported by Notes.app")
     },
@@ -46278,7 +53342,7 @@ registerTool(
   {
     description: "Use when: reading a note as Markdown, with checklist items annotated [x]/[ ] when Full Disk Access is granted.\nReturns: the note's Markdown.\nDo not use when: you need the raw HTML/plaintext body (get-note-content) or only metadata (get-note-details).\nNote: falls back to plain lists (no checkmarks) without Full Disk Access.",
     inputSchema: {
-      id: external_exports.string().max(MAX.ID).optional().describe("Note ID (preferred - more reliable than title)"),
+      id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account containing the note (ignored if id is provided)")
     },
@@ -46306,12 +53370,126 @@ registerTool(
     return successResponse(markdown, { markdown });
   }, "Error getting note as markdown")
 );
+var exportPathInput = (what) => external_exports.string().min(1).max(MAX.SAVE_PATH).optional().describe(
+  `${what} (absolute; under home, a temp dir, or /Volumes; never inside the Notes library)`
+);
+var exportStatsSchema = external_exports.object({
+  attachments: external_exports.number(),
+  placed: external_exports.number(),
+  placeholders: external_exports.number(),
+  unavailable: external_exports.number(),
+  tables: external_exports.number(),
+  unreadableTables: external_exports.number(),
+  unreferenced: external_exports.number()
+});
+registerTool(
+  "export-notes-markdown",
+  {
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.",
+    inputSchema: {
+      id: noteIdInput.optional(),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account holding the folder (defaults to Notes.app's default account)"),
+      limit: external_exports.number().int().min(1).max(MAX_FOLDER_EXPORT_LIMIT).optional().describe(
+        `Maximum notes read from the folder (default 100, max ${MAX_FOLDER_EXPORT_LIMIT})`
+      ),
+      outputPath: exportPathInput("File to create for the Markdown"),
+      assetsDir: exportPathInput("Directory that receives copies of attachment files"),
+      wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)")
+    },
+    outputSchema: {
+      format: external_exports.string().optional(),
+      count: external_exports.number().optional(),
+      bytes: external_exports.number().optional(),
+      markdown: external_exports.string().optional(),
+      output: external_exports.string().optional(),
+      assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
+      stats: exportStatsSchema.optional(),
+      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+  },
+  withErrorHandling((request) => {
+    let receipt;
+    try {
+      receipt = exportNotesMarkdown(request, {
+        listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        // The document travels twice (text and structuredContent).
+        maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024
+      });
+    } catch (error2) {
+      if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
+    }
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    if (receipt.output)
+      return successResponse(
+        `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` + (receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : "") + `${skipped}.`,
+        { ...receipt }
+      );
+    return successResponse(receipt.markdown ?? "", { ...receipt });
+  }, "Error exporting Markdown")
+);
+registerTool(
+  "export-notes-html",
+  {
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.",
+    inputSchema: {
+      id: noteIdInput.optional(),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
+      account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account holding the folder (defaults to Notes.app's default account)"),
+      limit: external_exports.number().int().min(1).max(MAX_FOLDER_EXPORT_LIMIT).optional().describe(
+        `Maximum notes read from the folder (default 100, max ${MAX_FOLDER_EXPORT_LIMIT})`
+      ),
+      outputPath: external_exports.string().min(1).max(MAX.SAVE_PATH).describe(
+        "HTML file to create (absolute; under home, a temp dir, or /Volumes; never inside the Notes library)"
+      ),
+      embedAssets: external_exports.boolean().optional().describe("Embed assets as data URLs (default true). False writes a sidecar directory"),
+      assetsDir: exportPathInput(
+        "Sidecar directory when embedAssets is false (default <stem>.assets)"
+      )
+    },
+    outputSchema: {
+      format: external_exports.string().optional(),
+      count: external_exports.number().optional(),
+      bytes: external_exports.number().optional(),
+      output: external_exports.string().optional(),
+      assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
+      embedded: external_exports.number().optional(),
+      stats: exportStatsSchema.optional(),
+      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+  },
+  withErrorHandling((request) => {
+    let receipt;
+    try {
+      receipt = exportNotesHtml(request, {
+        listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        maxInlineBytes: 0
+      });
+    } catch (error2) {
+      if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`);
+    }
+    const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    return successResponse(
+      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
+      { ...receipt }
+    );
+  }, "Error exporting HTML")
+);
 registerTool(
   "get-checklist-state",
   {
     description: "Use when: reading the checked/unchecked state of a note's checklist items, by id.\nReturns: each item's text and done state plus checked/total counts.\nDo not use when: you only have a title (get the id via search-notes first) or want the full body text (get-note-content).\nNote: requires Full Disk Access; reads the NoteStore database directly.",
     inputSchema: {
-      id: external_exports.string().min(1, "Note ID is required. Use search-notes to find the note ID first.").max(MAX.ID)
+      id: looseNoteId(
+        external_exports.string().min(1, "Note ID is required. Use search-notes to find the note ID first.")
+      ).describe(`Note ID: ${NOTE_ID_FORMS}`)
     },
     outputSchema: {
       items: external_exports.array(external_exports.object({}).passthrough()).optional(),
@@ -46343,11 +53521,51 @@ ${summary}`,
   }, "Error reading checklist state")
 );
 registerTool(
+  "get-audio-transcripts",
+  {
+    description: "Use when: reading the transcript (and summary, if any) that Notes already computed for the audio recordings in one note, by id.\nReturns: one entry per top-level audio attachment in body order, with attachmentId, durationSeconds, status (ok, none when no transcript is stored, or undecodable with a reason), joined transcript text, wordCount, speakers and summary when stored, and optional word-level segments.\nDo not use when: you need the audio file itself (save-attachment) or the note body (get-note-content). This tool does not transcribe; it only reads what Notes stored.\nSafety: read-only; requires Full Disk Access and reads the NoteStore database. Password-protected notes are refused. Large responses drop segments first, then shorten text, to stay under APPLE_NOTES_MCP_EXPORT_MAX_BYTES.",
+    inputSchema: {
+      id: noteIdInput,
+      includeSegments: external_exports.boolean().optional().describe(
+        "Also return word-level segments (text, start and duration in seconds, speaker). Default false."
+      ),
+      maxSegments: external_exports.number().int().min(1).max(MAX_SEGMENTS_LIMIT).optional().describe(
+        `Cap on segments returned per attachment when includeSegments is true (default ${DEFAULT_MAX_SEGMENTS}).`
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      attachments: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      bodyOrder: external_exports.boolean().optional(),
+      truncated: external_exports.boolean().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, includeSegments, maxSegments }) => {
+    let result;
+    try {
+      result = notesManager.getAudioTranscripts(id2, { includeSegments, maxSegments });
+    } catch (error2) {
+      if (error2 instanceof AudioTranscriptError) return errorResponse(error2.message);
+      throw error2;
+    }
+    const toResponse = (r) => successResponse(formatTranscriptsText(r), { ...r });
+    const fitted = fitTranscriptsToBudget(
+      result,
+      exportMaxResponseBytes(),
+      (r) => Buffer.byteLength(JSON.stringify(toResponse(r)))
+    );
+    return toResponse(fitted);
+  }, "Error reading audio transcripts")
+);
+registerTool(
   "get-note-metadata",
   {
     description: "[BETA] Use when: reading note metadata AppleScript cannot expose \u2014 pinned state, checklist flags, trash/recovery state, preview snippet, password hint \u2014 by id.\nReturns: a metadata object; fields vary by macOS version and are omitted when unavailable.\nDo not use when: you need the body (get-note-content) or per-item checklist state (get-checklist-state).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. BETA \u2014 the database schema changes between macOS releases, so some fields may be absent. Works on trashed notes that AppleScript can no longer resolve.",
     inputSchema: {
-      id: external_exports.string().min(1, "Note ID is required. Use search-notes to find the note ID first.").max(MAX.ID)
+      id: looseNoteId(
+        external_exports.string().min(1, "Note ID is required. Use search-notes to find the note ID first.")
+      ).describe(`Note ID: ${NOTE_ID_FORMS}`)
     },
     outputSchema: {
       pinned: external_exports.boolean().optional(),
@@ -46371,6 +53589,57 @@ registerTool(
     return successResponse(summary, metadata);
   }, "Error reading note metadata")
 );
+var SPECIAL_KIND_LABEL = {
+  pinned: "pinned notes",
+  "quick-notes": "Quick Notes",
+  "recently-deleted": "notes in Recently Deleted",
+  locked: "password-protected notes"
+};
+registerTool(
+  "list-special-notes",
+  {
+    description: "Use when: listing pinned notes, Quick Notes, notes in Recently Deleted, or password-protected (locked) notes \u2014 sets AppleScript cannot enumerate.\nReturns: metadata rows newest first (id, identifier, title, folder path, account, created, modified, and pinned/locked/quickNote/inRecentlyDeleted flags; snippet except for locked notes; passwordHint for kind locked), plus total before limit. supported is false when this macOS version's database cannot answer that kind.\nDo not use when: you need note content (get-note-content) or a folder listing (list-notes).\nNote: reads the NoteStore SQLite database read-only and requires Full Disk Access. Pinned and Quick Notes listings cover notes in folders outside Recently Deleted; the locked listing includes trashed and folderless locked notes, flagged as such. Never reads locked note bodies.",
+    inputSchema: {
+      kind: external_exports.enum(["pinned", "quick-notes", "recently-deleted", "locked"]).describe("Which set of notes to list"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      limit: external_exports.number().int().min(1).max(SPECIAL_LIMIT.MAX).optional().describe(`Maximum notes to return (default ${SPECIAL_LIMIT.DEFAULT})`)
+    },
+    outputSchema: {
+      kind: external_exports.string().optional(),
+      notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      total: external_exports.number().optional(),
+      limit: external_exports.number().optional(),
+      supported: external_exports.boolean().optional(),
+      account: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ kind, account, limit }) => {
+    const result = listSpecialNotes({ kind, account, limit });
+    const label = SPECIAL_KIND_LABEL[kind];
+    const structured = result;
+    if (!result.supported) {
+      return successResponse(
+        `This macOS version's Notes database does not record ${label}.`,
+        structured
+      );
+    }
+    const scope2 = result.account ? ` in ${result.account}` : "";
+    if (result.count === 0) return successResponse(`No ${label}${scope2}.`, structured);
+    const lines = result.notes.map(
+      (row) => `  - ${row.title ?? "(untitled)"}${row.folder ? ` (${row.folder})` : ""} [id: ${row.id}]`
+    );
+    const more = result.total > result.count ? `
+
+Showing ${result.count} of ${result.total}; pass a higher limit to see more.` : "";
+    return successResponse(
+      `Found ${result.total} ${label}${scope2}:
+${lines.join("\n")}${more}`,
+      structured
+    );
+  }, "Error listing notes")
+);
 registerResourcesAndPrompts(server, notesManager);
 process.on("uncaughtException", (err) => {
   if (err?.code === "EPIPE") process.exit(0);
@@ -46379,12 +53648,7 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
-var _shuttingDown = false;
-var shutdown = () => {
-  if (_shuttingDown) return;
-  _shuttingDown = true;
-  process.exit(0);
-};
+var shutdown = createShutdown(process.stdout, () => process.exit(0));
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
 }
