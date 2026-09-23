@@ -555,6 +555,11 @@ changed after this read. With Full Disk Access, embedded URLs omitted by
 AppleScript are restored and returned in `links`. The response also reports
 actual `nativeTags`, `richContentComplete`, and `writable`. Textual `hashtags`
 remain a separate field and are not proof that Notes registered native tags.
+`writable` is also false when the note uses formatting that AppleScript's HTML
+does not carry (superscript, subscript, non-left paragraph alignment, or
+highlight): a full-body `update-note` would silently drop it, so it is refused
+and the `warning` names the formatting. `append-to-note` with `scopeText` still
+works through the native path, which verifies existing formatting.
 
 **⚠️ The returned body can be lossy — do not write it back verbatim.** Inline
 base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default

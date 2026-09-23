@@ -39275,21 +39275,13 @@ var WIRE_TYPE = {
 };
 function decodeVarint(buf, offset) {
   let result = 0;
-  let shift = 0;
-  let pos = offset;
-  while (pos < buf.length) {
-    const byte = buf[pos];
+  for (let pos = offset, shift = 0; pos < buf.length && shift < 28; shift += 7) {
+    const byte = buf[pos++];
     result |= (byte & 127) << shift;
-    pos++;
-    if ((byte & 128) === 0) {
-      return [result, pos];
-    }
-    shift += 7;
-    if (shift > 35) {
-      throw new Error(`Varint too long at offset ${offset}`);
-    }
+    if ((byte & 128) === 0) return [result, pos];
   }
-  throw new Error(`Unexpected end of buffer reading varint at offset ${offset}`);
+  const [value, next] = decodeVarint64(buf, offset);
+  return [Number(BigInt.asIntN(64, value)), next];
 }
 function decodeMessage(buf, options = {}) {
   const fields = [];
@@ -39306,7 +39298,7 @@ function decodeMessage(buf, options = {}) {
     } else if (wireType === WIRE_TYPE.LENGTH_DELIMITED) {
       let length;
       [length, offset] = decodeVarint(buf, offset);
-      if (offset + length > buf.length) {
+      if (length < 0 || offset + length > buf.length) {
         break;
       }
       const value = buf.slice(offset, offset + length);
@@ -39623,6 +39615,12 @@ import { createHash } from "node:crypto";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 import { gunzipSync as gunzipSync2 } from "node:zlib";
+var HTML_LOSSY_ORDER = [
+  "superscript",
+  "subscript",
+  "alignment",
+  "highlight"
+];
 var dbPath = join2(homedir2(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
 var safeUrl = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
 var escapeAttribute = (text2) => text2.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -39643,6 +39641,7 @@ function styleValue(field) {
         else if (wire === 5) offset += 4;
         else if (wire === 2) {
           [length, offset] = decodeVarint(data, offset);
+          if (length < 0) return Buffer.from(data).toString("hex");
           offset += length;
         } else return Buffer.from(data).toString("hex");
         if (offset > data.length) return Buffer.from(data).toString("hex");
@@ -39669,6 +39668,7 @@ function parseRichNote(data, nativeTags = []) {
   let position = 0;
   let hasNativeObjects = false;
   let hasChecklist = false;
+  const lossy = /* @__PURE__ */ new Set();
   for (const run of getFields(body, 5)) {
     const fields = embeddedMessage(run);
     if (!fields) throw new Error("Invalid Notes attribute run");
@@ -39686,6 +39686,13 @@ function parseRichNote(data, nativeTags = []) {
         fields.filter((f) => f.fieldNumber >= 2 && f.fieldNumber <= 12 || f.fieldNumber === 14).map((f) => [f.fieldNumber, styleValue(f)])
       )
     });
+    if (/[^\s\ufffc]/u.test(text2.slice(position, position + length))) {
+      const baseline = varintValue(getField(fields, 8)) ?? 0;
+      if (baseline > 0) lossy.add("superscript");
+      if (baseline < 0) lossy.add("subscript");
+      if (paragraph && (varintValue(getField(paragraph, 2)) ?? 0) !== 0) lossy.add("alignment");
+      if (varintValue(getField(fields, 14))) lossy.add("highlight");
+    }
     const url = stringValue(getField(fields, 9));
     if (url) {
       if (!safeUrl(url)) throw new Error("Unsupported link scheme in note");
@@ -39737,7 +39744,8 @@ function parseRichNote(data, nativeTags = []) {
     revision: createHash("sha256").update(data).digest("hex"),
     objects,
     checklistItems,
-    styleRuns
+    styleRuns,
+    ...lossy.size ? { htmlLossyFormatting: HTML_LOSSY_ORDER.filter((f) => lossy.has(f)) } : {}
   };
 }
 function readRichNote(id2) {
@@ -39854,17 +39862,26 @@ function enrichNoteRead(id2, rawBody) {
     const rich = readRichNote(id2);
     metadata = rich;
     const content = restoreNoteLinks(rawBody, rich);
-    const writable = !rich.hasNativeObjects && !rich.hasChecklist;
+    const complete = !rich.hasNativeObjects && !rich.hasChecklist;
+    const lossy = rich.htmlLossyFormatting ?? [];
+    const writable = complete && lossy.length === 0;
+    const warnings = [];
+    if (!complete)
+      warnings.push(
+        "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
+      );
+    if (lossy.length)
+      warnings.push(
+        `This note uses formatting that Notes' AppleScript HTML does not carry (${lossy.join(", ")}); a full-body edit would silently drop it, so full-body edits are blocked. Edit it in Notes.app, or use append-to-note with scopeText, which appends natively and verifies existing formatting.`
+      );
     return {
       content,
       links: rich.links,
       nativeTags: rich.nativeTags,
-      complete: writable,
+      complete,
       writable,
       revision: rich.revision,
-      ...!writable ? {
-        warning: "Native tags, inline objects or checklists are present. Their state is not writable through AppleScript; full-body edits are blocked to preserve them."
-      } : {}
+      ...warnings.length ? { warning: warnings.join(" ") } : {}
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

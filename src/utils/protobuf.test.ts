@@ -207,11 +207,42 @@ describe("fixed-width fields", () => {
   });
 });
 
+describe("decodeVarint beyond 28 bits (#188)", () => {
+  it("decodes 5-byte values as unsigned, not as a wrapped int32", () => {
+    // 2^31 = 0x80 0x80 0x80 0x80 0x08; the old 32-bit shift wrapped it negative.
+    expect(decodeVarint(new Uint8Array([0x80, 0x80, 0x80, 0x80, 0x08]), 0)).toEqual([2 ** 31, 5]);
+    expect(decodeVarint(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]), 0)).toEqual([
+      2 ** 32 - 1,
+      5,
+    ]);
+  });
+
+  it("decodes a negative int32 (-2) and keeps a hard stop at 10 bytes", () => {
+    const minusTwo = [0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+    expect(decodeVarint(new Uint8Array(minusTwo), 0)).toEqual([-2, 10]);
+    expect(() => decodeVarint(new Uint8Array(11).fill(0xff), 0)).toThrow(/too long/);
+    expect(() => decodeVarint(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff]), 0)).toThrow(
+      "Unexpected end of buffer"
+    );
+  });
+
+  it("decodes a message holding a subscript baseline of -1", () => {
+    const buf = new Uint8Array([0x40, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01]);
+    expect(decodeMessage(buf)).toEqual([{ fieldNumber: 8, wireType: 0, value: -1 }]);
+  });
+
+  it("stops at a negative length instead of reading backwards", () => {
+    const minusOne = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+    const buf = new Uint8Array([0x18, 0x01, 0x0a, ...minusOne, 0x01]);
+    expect(decodeMessage(buf)).toEqual([{ fieldNumber: 3, wireType: 0, value: 1 }]);
+  });
+});
+
 describe("decodeWireFields (lossless)", () => {
   const minusOne = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
 
-  it("reads 10-byte varints that the legacy decoder rejects", () => {
-    expect(() => decodeVarint(new Uint8Array(minusOne), 0)).toThrow(/too long/);
+  it("reads 10-byte varints in both decoders (#188)", () => {
+    expect(decodeVarint(new Uint8Array(minusOne), 0)).toEqual([-1, 10]);
     const [value, offset] = decodeVarint64(new Uint8Array(minusOne), 0);
     expect(offset).toBe(10);
     expect(signedVarint(value)).toBe(-1);

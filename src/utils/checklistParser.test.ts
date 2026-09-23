@@ -304,7 +304,7 @@ describe("getChecklistItems", () => {
  */
 function buildRunsProtobuf(
   text: string,
-  runs: Array<{ length: number; done?: boolean }>
+  runs: Array<{ length: number; done?: boolean; subscript?: true }>
 ): Uint8Array {
   const varint = (value: number): number[] => {
     const bytes: number[] = [];
@@ -324,6 +324,8 @@ function buildRunsProtobuf(
   const encodedRuns = runs.flatMap((run) =>
     field(5, [
       ...int(1, run.length),
+      // Field 8 = -1 (subscript): a sign-extended 10-byte varint (#188).
+      ...(run.subscript ? [0x40, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01] : []),
       ...(run.done === undefined
         ? []
         : field(2, [...int(1, 103), ...field(5, int(2, run.done ? 1 : 0))])),
@@ -332,6 +334,18 @@ function buildRunsProtobuf(
   const body = field(3, [...field(2, Array.from(new TextEncoder().encode(text))), ...encodedRuns]);
   return new Uint8Array(field(2, body));
 }
+
+describe("parseChecklistFromProtobuf with subscript text (#188)", () => {
+  it("reads checklist state from a note whose runs carry a negative baseline", () => {
+    const data = buildRunsProtobuf("Title\nH2O\nItem", [
+      { length: 7 },
+      { length: 1, subscript: true },
+      { length: 2 },
+      { length: 4, done: true },
+    ]);
+    expect(parseChecklistFromProtobuf(data)).toEqual([{ text: "Item", done: true }]);
+  });
+});
 
 describe("parseChecklistFromProtobuf line attribution (#187)", () => {
   it("gives a run that starts on the preceding newline to the line after it", () => {

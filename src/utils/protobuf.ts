@@ -35,34 +35,29 @@ export interface ProtoField {
 /**
  * Decodes a varint from the buffer at the given offset.
  *
- * Varints use 7 bits per byte with the high bit as a continuation flag.
- * Supports up to 64-bit values (though we only need small integers).
+ * Varints use 7 bits per byte with the high bit as a continuation flag. Values
+ * of up to 4 bytes (28 bits) take a 32-bit fast path; longer ones are read as
+ * the full 64-bit value (at most 10 bytes) and returned as a signed int64, so a
+ * negative int32 such as a subscript baseline offset of -1 (sign-extended to a
+ * 10-byte varint) decodes as -1 instead of throwing (#188). Values beyond
+ * 2^53 lose precision; Apple Notes stores nothing that large in a varint.
+ *
+ * Callers that treat the result as a length must reject negative values.
  *
  * @param buf - The protobuf binary data
  * @param offset - Starting byte position
  * @returns Tuple of [decoded value, new offset after the varint]
+ * @throws {ProtobufDecodeError} on a varint longer than 10 bytes or a truncated buffer
  */
 export function decodeVarint(buf: Uint8Array, offset: number): [number, number] {
   let result = 0;
-  let shift = 0;
-  let pos = offset;
-
-  while (pos < buf.length) {
-    const byte = buf[pos];
+  for (let pos = offset, shift = 0; pos < buf.length && shift < 28; shift += 7) {
+    const byte = buf[pos++];
     result |= (byte & 0x7f) << shift;
-    pos++;
-    if ((byte & 0x80) === 0) {
-      return [result, pos];
-    }
-    shift += 7;
-    if (shift > 35) {
-      // For our use case (small field numbers, small integers),
-      // values requiring more than 35 bits are unexpected
-      throw new Error(`Varint too long at offset ${offset}`);
-    }
+    if ((byte & 0x80) === 0) return [result, pos];
   }
-
-  throw new Error(`Unexpected end of buffer reading varint at offset ${offset}`);
+  const [value, next] = decodeVarint64(buf, offset);
+  return [Number(BigInt.asIntN(64, value)), next];
 }
 
 /**
@@ -100,7 +95,7 @@ export function decodeMessage(
     } else if (wireType === WIRE_TYPE.LENGTH_DELIMITED) {
       let length: number;
       [length, offset] = decodeVarint(buf, offset);
-      if (offset + length > buf.length) {
+      if (length < 0 || offset + length > buf.length) {
         break; // Truncated data, return what we have
       }
       const value = buf.slice(offset, offset + length);

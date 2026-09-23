@@ -1,5 +1,26 @@
 ## [Unreleased]
 
+## [2.8.40] - 2026-09-23
+
+### Fixed
+
+- Notes with subscript text can be read again (#188). Notes stores
+  subscript as a baseline offset of -1, a sign-extended 10-byte varint, and
+  the shared protobuf reader stopped at 35 bits, so `parseRichNote`,
+  `get-checklist-state` and every other reader of the note body failed on it
+  and the note read as not writable. `decodeVarint` now reads the full 64-bit
+  value (still refusing anything over 10 bytes) and returns it as a signed
+  number; 5-byte values no longer wrap through a 32-bit shift, and a negative
+  length stops decoding instead of reading backwards.
+- `update-note` no longer silently drops formatting that Notes' AppleScript
+  HTML does not carry (#189). When the stored body has superscript, subscript,
+  a non-left paragraph alignment or a highlight on visible text, the read
+  reports `writable: false` with a warning naming what would be lost, and
+  full-body edits (`update-note`, AppleScript `append-to-note`) are refused.
+  `append-to-note` with `scopeText` takes the native path, which already
+  verifies existing formatting. `richContentComplete` is unchanged, so native
+  tag and attachment operations still work on these notes.
+
 ## [2.8.39] - 2026-09-23
 
 ### Fixed

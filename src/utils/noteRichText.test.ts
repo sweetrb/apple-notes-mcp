@@ -216,6 +216,45 @@ describe("Notes rich text", () => {
     expect(result.complete).toBe(false);
     expect(result.revision).not.toBe("unavailable");
   });
+  describe("formatting that AppleScript HTML drops (#188, #189)", () => {
+    const id = "x-coredata://ABCDEF/ICNote/p12";
+    // Attribute-run field 8 = -1 (subscript), a sign-extended 10-byte varint.
+    const subscript = Buffer.from([
+      0x40, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01,
+    ]);
+    const stored = (text: string, runs: Buffer[]) =>
+      vi
+        .mocked(execFileSync)
+        .mockReturnValue(gzipSync(document(text, runs)).toString("hex") + "\n{}\n[]\n");
+
+    it("reads a subscript note and blocks the full-body rewrite that would drop it", () => {
+      stored("H2O", [n(1, 1), Buffer.concat([n(1, 1), subscript]), n(1, 1)]);
+      const result = enrichNoteRead(id, "<div>H2O</div>");
+      expect(result.revision).not.toBe("unavailable");
+      expect(result.complete).toBe(true);
+      expect(result.writable).toBe(false);
+      expect(result.warning).toContain("(subscript)");
+      expect(() => assertLinkedWrite(result, "<div>H2O!</div>", "html")).toThrow(/subscript/);
+    });
+
+    it("names superscript, alignment and highlight together", () => {
+      stored("x2\ny", [
+        n(1, 1),
+        Buffer.concat([n(1, 2), n(8, 1)]),
+        Buffer.concat([n(1, 1), b(2, n(2, 1)), n(14, 3)]),
+      ]);
+      const result = enrichNoteRead(id, "<div>x2</div><div>y</div>");
+      expect(result.writable).toBe(false);
+      expect(result.warning).toContain("(superscript, alignment, highlight)");
+    });
+
+    it("keeps plain formatted notes writable", () => {
+      stored("Bold", [Buffer.concat([n(1, 4), n(5, 1)])]);
+      const result = enrichNoteRead(id, "<div><b>Bold</b></div>");
+      expect(result).toMatchObject({ writable: true, complete: true });
+      expect(result.warning).toBeUndefined();
+    });
+  });
   it("allows explicit link changes but still blocks native-object replacement", () => {
     const current = read(rich("Link", 0, 4));
     expect(() => assertLinkedWrite(current, "<div>New content</div>", "html", true)).not.toThrow();
