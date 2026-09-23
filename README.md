@@ -1020,6 +1020,33 @@ Decodes a note's classic PencilKit drawings (`com.apple.drawing.2` and the older
 
 ---
 
+#### `transcribe-note-audio`
+
+Transcribes a note's voice recordings and audio attachments now, on this Mac, with Apple's Speech framework through the [public native helper](#public-native-helper). Recognition is on-device only: `SpeechAnalyzer` on macOS 26 and later, or `SFSpeechRecognizer` with on-device recognition required on older systems (a locale without on-device support is refused, never sent to a server). The audio files are opened read-only where Notes keeps them.
+
+**Requires:** Full Disk Access for the MCP host process, and the public native helper built once with `apple-notes-mcp setup --public-helper`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `locale` | string | No | BCP-47 language of the speech, such as `"en-US"` (default), `"it-IT"`, or `"fr-FR"` |
+| `attachmentId` | string | No | Only transcribe this audio attachment (an `x-coredata://…/ICAttachment/pN` id) |
+| `includeText` | boolean | No | Include transcript text (default `true`); `false` returns statuses and word counts only |
+
+**Returns:** Overall `status` and, per audio attachment, `status`, `durationSeconds`, `wordCount`, `transcript`, and `takes` (a Notes recording can hold several takes; each is transcribed and the texts are joined in stored order). Statuses:
+
+- `ok`: the whole recording was transcribed.
+- `partial`: some text came back, but a take failed or the helper stopped at its deadline (`code: "incomplete"`).
+- `error`: nothing was transcribed; `code` says why (`asset_unavailable` when the audio file is not on this Mac or the language model is still downloading, `unsupported_locale`, `unsupported_audio`, `permission_denied`, ...).
+- `indeterminate`: the helper did not answer in time, so the outcome is unknown and a retry may succeed.
+- `none` (overall only): the note has no audio.
+
+Each take gets a deadline of 1.5 times its length plus a minute (at most 30 minutes). On macOS 27 a 16-minute recording took about 22 seconds. Some MCP clients stop waiting for a tool after a fixed time, so transcribe long recordings one at a time with `attachmentId`. The first use of a language can make macOS download its on-device speech model; the call then returns `asset_unavailable` and a later call succeeds. Transcripts longer than `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` are shortened and marked `transcriptTruncated`.
+
+**Speech Recognition permission:** on macOS 26 and later, `SpeechAnalyzer` transcribed files without a Speech Recognition prompt in testing (authorization stayed "not determined"). On older macOS, the `SFSpeechRecognizer` path needs Speech Recognition access, and macOS attributes that grant to the app that launches the MCP server (Claude Desktop, Codex, Terminal, and so on), not to the helper. Allow it when prompted, or under System Settings > Privacy & Security > Speech Recognition. A refusal comes back as `code: "permission_denied"`.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -1400,13 +1427,13 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
-- `get-note-drawings` returns the same Full Disk Access error
+- `get-note-drawings` and `transcribe-note-audio` return the same Full Disk Access error
 
 ---
 
 ## Public native helper
 
-`get-note-drawings` needs Apple's PencilKit framework, which has no AppleScript or command-line interface. For it, the server uses a small Swift helper that links public Apple frameworks only (AppKit and PencilKit). No prebuilt binary ships with the package. Build it once on your Mac:
+`get-note-drawings` needs Apple's PencilKit framework and `transcribe-note-audio` needs the Speech framework; neither has an AppleScript or command-line interface. For them, the server uses a small Swift helper that links public Apple frameworks only (AppKit, PencilKit, AVFoundation, and Speech). No prebuilt binary ships with the package. Build it once on your Mac:
 
 ```bash
 apple-notes-mcp setup --public-helper          # compile, sign, verify, install
@@ -1415,7 +1442,7 @@ apple-notes-mcp setup --public-helper --check  # report the installed state only
 
 Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
 
-The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin; the helper answers with one JSON object on stdout.
+The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin, or, for transcription, names one audio file that the helper opens for reading; the helper answers with one JSON object on stdout.
 
 ---
 

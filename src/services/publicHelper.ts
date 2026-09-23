@@ -2,9 +2,9 @@
  * The public native helper: build, verify, and call.
  *
  * Some Notes content can only be read through Apple frameworks that have no
- * command-line or AppleScript surface (PencilKit for classic drawings). The
- * helper is a small Swift program that links PUBLIC frameworks only. No
- * prebuilt binary ships with the package:
+ * command-line or AppleScript surface (PencilKit for classic drawings, Speech
+ * for on-device transcription). The helper is a small Swift program that links
+ * PUBLIC frameworks only. No prebuilt binary ships with the package:
  *
  * - `apple-notes-mcp setup --public-helper` compiles the packaged source with
  *   `xcrun swiftc`, ad-hoc signs it, runs its `hello` handshake, and installs
@@ -16,7 +16,8 @@
  *   every response is schema-checked by the caller before use.
  *
  * The helper never opens the Notes database or writes to the Notes group
- * container: the server reads what it needs read-only and passes bytes in.
+ * container: the server reads what it needs read-only and passes bytes in, or
+ * names one audio file for the helper to open read-only.
  *
  * Shared-code note: the manifest, install inspection, spawn/timeout handling
  * and build steps mirror the opt-in private helper's; both could later move to
@@ -220,7 +221,10 @@ export const publicHelloSchema = z
 export interface PublicCallOptions {
   /** Run this binary without the installation check (setup's handshake only). */
   binaryPath?: string;
-  /** Per-call timeout; the env override still wins when set. */
+  /**
+   * Per-call timeout for actions whose run time depends on the input (for
+   * example transcription length). Takes precedence over the env default.
+   */
   timeoutMs?: number;
 }
 
@@ -243,8 +247,8 @@ export function callPublicHelper(
     binaryPath = install.binaryPath;
   }
   const timeout =
-    Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) ||
     options.timeoutMs ||
+    Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) ||
     DEFAULT_TIMEOUT_MS;
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
@@ -343,6 +347,8 @@ export function publicHelperInfoPlist(): string {
     "  <string>apple-notes-mcp public helper</string>",
     "  <key>CFBundleInfoDictionaryVersion</key>",
     "  <string>6.0</string>",
+    "  <key>NSSpeechRecognitionUsageDescription</key>",
+    "  <string>apple-notes-mcp transcribes voice recordings in your notes on this Mac.</string>",
     "</dict>",
     "</plist>",
     "",
@@ -364,6 +370,10 @@ export function publicHelperCompileArguments(
     "AppKit",
     "-framework",
     "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
     "-Xlinker",
     "-sectcreate",
     "-Xlinker",

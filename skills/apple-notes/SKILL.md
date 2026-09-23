@@ -72,6 +72,7 @@ Use this skill when the user:
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
 | `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
 | `get-note-drawings` | Decode classic PencilKit drawings to strokes or SVG (needs `apple-notes-mcp setup --public-helper` once) |
+| `transcribe-note-audio` | Transcribe a note's voice recordings on-device (same helper; pass `locale`, and `attachmentId` for long recordings) |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
 | `health-check` | Quickly verify Notes.app access |

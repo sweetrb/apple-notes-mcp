@@ -1,5 +1,31 @@
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-23
+
+### Added
+
+- `transcribe-note-audio` transcribes a note's voice recordings and audio
+  attachments on this Mac with the Speech framework, through the public native
+  helper. Recognition is on-device only (`SpeechAnalyzer` on macOS 26+,
+  `SFSpeechRecognizer` with on-device recognition required before that). Takes
+  a BCP-47 `locale`, an optional `attachmentId`, and `includeText`. Each
+  recording and take reports `ok`, `partial`, `error` (with a code), or
+  `indeterminate` when the helper timed out. Audio files are located read-only
+  from the recording's takes and their media rows, and resolved only inside the
+  Notes accounts folder.
+- The public native helper gains a `transcribe` action and links AVFoundation
+  and Speech. Its embedded Info.plist now carries a Speech Recognition usage
+  description. Rebuild it with `apple-notes-mcp setup --public-helper`; the
+  old binary is reported stale until you do.
+- `scripts/test-public-helper.mjs` also transcribes synthetic `say` speech.
+
+### Changed
+
+- A helper call's own timeout (used for transcription, which scales with the
+  recording length) now takes precedence over
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, which remains the default for
+  other calls.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added

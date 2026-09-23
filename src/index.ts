@@ -74,6 +74,11 @@ import {
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
 import { formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
+import {
+  fitTranscriptions,
+  formatTranscription,
+  transcribeNoteAudio,
+} from "@/services/noteTranscription.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -2657,6 +2662,53 @@ registerTool(
       ...(pointsOmitted ? { pointsOmitted } : {}),
     } as unknown as Record<string, unknown>);
   }, "Error reading drawings")
+);
+
+// --- transcribe-note-audio (public native helper, Speech framework) ---
+
+registerTool(
+  "transcribe-note-audio",
+  {
+    description:
+      "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed.",
+    inputSchema: {
+      id: z
+        .string()
+        .min(1, "Note ID is required. Use search-notes to find the note ID first.")
+        .max(MAX.ID),
+      locale: z
+        .string()
+        .max(35)
+        .optional()
+        .describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
+      attachmentId: z
+        .string()
+        .max(MAX.ATTACHMENT_ID)
+        .optional()
+        .describe("Only transcribe this audio attachment (x-coredata ICAttachment id)"),
+      includeText: z
+        .boolean()
+        .optional()
+        .describe("Include transcript text (default true); false returns statuses and counts only"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      locale: z.string().optional(),
+      status: z.string().optional(),
+      recordingCount: z.number().optional(),
+      recordings: z.array(z.object({}).passthrough()).optional(),
+    },
+  },
+  withErrorHandling(({ id, locale, attachmentId, includeText }) => {
+    const result = fitTranscriptions(
+      transcribeNoteAudio(id, { locale, attachmentId, includeText }),
+      exportMaxResponseBytes()
+    );
+    return successResponse(
+      formatTranscription(result),
+      result as unknown as Record<string, unknown>
+    );
+  }, "Error transcribing audio")
 );
 
 // =============================================================================

@@ -3,7 +3,8 @@
 // A small command-line helper for apple-notes-mcp that uses PUBLIC Apple
 // frameworks only. It never opens the Notes database and never writes to the
 // Notes group container: the TypeScript server reads the bytes it needs
-// (read-only) and hands them over on stdin.
+// (read-only) and hands them over on stdin, or names an audio file that the
+// helper opens for reading only.
 //
 // Protocol: one JSON object on stdin, one JSON object on stdout.
 //   request:  {"protocol": 1, "action": "<name>", ...fields}
@@ -15,6 +16,7 @@
 //   decode_drawing  PencilKit drawing bytes (base64) -> strokes
 //   encode_drawing  strokes -> PencilKit drawing bytes (base64); used to build
 //                   synthetic test fixtures, never to write to Notes
+//   transcribe      on-device Speech transcription of one audio file
 //
 // Build (done by `apple-notes-mcp setup --public-helper`, which also generates
 // the one-line source-digest file that defines helperSourceSHA256 and the
@@ -23,9 +25,11 @@
 //     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist \
 //     apple-notes-public-helper.swift source-digest.swift -o apple-notes-public-helper
 
+import AVFoundation
 import AppKit
 import Foundation
 import PencilKit
+import Speech
 
 let protocolVersion = 1
 let maxInputBytes = 96 * 1024 * 1024
@@ -211,11 +215,284 @@ func encodeDrawing(_ request: [String: Any]) throws -> [String: Any] {
     return ["status": "ok", "strokeCount": strokes.count, "dataBase64": data.base64EncodedString()]
 }
 
+// MARK: - Transcription
+//
+// On-device only. On macOS 26 and later, SpeechAnalyzer with SpeechTranscriber
+// runs entirely on the Mac (its language model is a local asset). On older
+// systems, SFSpeechRecognizer is used with requiresOnDeviceRecognition = true,
+// and a locale without on-device support is refused rather than sent to a
+// server. The helper stops at its own deadline and returns what it has with
+// complete = false, so the caller can report a partial transcript.
+
+/// Final transcript segments gathered so far; an actor so the deadline path can read them.
+actor TranscriptCollector {
+    private var segments: [String] = []
+    func add(_ segment: String) { segments.append(segment) }
+    func text() -> String { segments.joined(separator: " ") }
+    func isEmpty() -> Bool { segments.isEmpty }
+}
+
+/// The newest partial result (legacy recognizer), guarded by a lock because the
+/// recognizer calls back on its own queue.
+final class LatestText: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = ""
+    func set(_ text: String) { lock.withLock { value = text } }
+    func get() -> String { lock.withLock { value } }
+}
+
+enum RaceOutcome {
+    case completed
+    case failed(Error)
+    case timedOut
+}
+
+/// Resumes a continuation exactly once, whichever side of a race finishes first.
+final class RaceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<RaceOutcome, Never>?
+    private var expired = false
+    init(_ continuation: CheckedContinuation<RaceOutcome, Never>) { self.continuation = continuation }
+    /// Called when the deadline passes, before `stop`: whatever `work` reports
+    /// afterwards (usually a cancellation error) is a timeout, not a failure.
+    func expire() { lock.withLock { expired = true } }
+    func resume(_ outcome: RaceOutcome) {
+        let (pending, final): (CheckedContinuation<RaceOutcome, Never>?, RaceOutcome) = lock.withLock {
+            defer { continuation = nil }
+            return (continuation, expired ? .timedOut : outcome)
+        }
+        pending?.resume(returning: final)
+    }
+}
+
+/// Runs `work` against a deadline without waiting for it after the deadline:
+/// some framework calls (asset downloads) ignore cancellation, and the process
+/// exits right after it answers anyway. On timeout, `stop` runs first so a
+/// cooperative `work` can hand back what it has.
+func race(
+    seconds: Double,
+    work: @escaping @Sendable () async throws -> Void,
+    stop: @escaping @Sendable () async -> Void
+) async -> RaceOutcome {
+    await withCheckedContinuation { continuation in
+        let gate = RaceGate(continuation)
+        Task {
+            do {
+                try await work()
+                gate.resume(.completed)
+            } catch {
+                gate.resume(.failed(error))
+            }
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            gate.expire()
+            await stop()
+            gate.resume(.timedOut)
+        }
+    }
+}
+
+func authorizationName(_ status: SFSpeechRecognizerAuthorizationStatus) -> String {
+    switch status {
+    case .authorized: return "authorized"
+    case .denied: return "denied"
+    case .restricted: return "restricted"
+    case .notDetermined: return "notDetermined"
+    @unknown default: return "unknown"
+    }
+}
+
+/// Maps a Speech error to a stable code. Authorization failures get their own code
+/// because the fix (a Speech Recognition grant) lives outside this program.
+func speechFailure(_ error: Error) -> HelperFailure {
+    if let failure = error as? HelperFailure { return failure }
+    let description = error.localizedDescription
+    let lowered = description.lowercased()
+    if lowered.contains("not authorized") || lowered.contains("denied") || lowered.contains("authoriz") {
+        return HelperFailure(code: "permission_denied", message: description)
+    }
+    return HelperFailure(code: "transcription_failed", message: description)
+}
+
+@available(macOS 26, *)
+func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String) async throws {
+    switch await AssetInventory.status(forModules: [transcriber]) {
+    case .installed:
+        return
+    case .unsupported:
+        throw HelperFailure(code: "unsupported_locale", message: "No on-device speech model for \(localeID)")
+    default:
+        break
+    }
+    guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
+        return
+    }
+    let outcome = await race(seconds: 90, work: { try await installation.downloadAndInstall() }, stop: {})
+    switch outcome {
+    case .completed:
+        return
+    case .failed(let error):
+        throw HelperFailure(
+            code: "asset_unavailable",
+            message: "Could not install the on-device speech model for \(localeID): \(error.localizedDescription)"
+        )
+    case .timedOut:
+        throw HelperFailure(
+            code: "asset_unavailable",
+            message: "The on-device speech model for \(localeID) is still downloading; try again shortly"
+        )
+    }
+}
+
+@available(macOS 26, *)
+func transcribeWithAnalyzer(file: AVAudioFile, localeID: String, deadline: Double) async throws -> [String: Any] {
+    guard SpeechTranscriber.isAvailable else {
+        throw HelperFailure(code: "speech_unavailable", message: "On-device transcription is not available on this Mac")
+    }
+    guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: localeID)) else {
+        throw HelperFailure(code: "unsupported_locale", message: "No on-device transcription for \(localeID)")
+    }
+    let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+    try await ensureSpeechAssets(transcriber, localeID: localeID)
+    let analyzer = SpeechAnalyzer(modules: [transcriber])
+    let collector = TranscriptCollector()
+    let reader = Task {
+        for try await result in transcriber.results where result.isFinal {
+            let segment = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !segment.isEmpty { await collector.add(segment) }
+        }
+    }
+    let outcome = await race(
+        seconds: deadline,
+        work: {
+            _ = try await analyzer.analyzeSequence(from: file)
+            try await analyzer.finalizeAndFinishThroughEndOfInput()
+            try await reader.value
+        },
+        stop: {
+            await analyzer.cancelAndFinishNow()
+            reader.cancel()
+        }
+    )
+    var response: [String: Any] = ["status": "ok", "engine": "SpeechAnalyzer", "locale": locale.identifier(.bcp47)]
+    switch outcome {
+    case .completed:
+        response["complete"] = true
+    case .timedOut:
+        response["complete"] = false
+        response["stopReason"] = "deadline"
+    case .failed(let error):
+        await analyzer.cancelAndFinishNow()
+        reader.cancel()
+        if await collector.isEmpty() { throw speechFailure(error) }
+        response["complete"] = false
+        response["stopReason"] = speechFailure(error).message
+    }
+    response["transcript"] = await collector.text()
+    return response
+}
+
+/// Pre-macOS 26 path: SFSpeechRecognizer, forced on-device.
+func transcribeWithRecognizer(url: URL, localeID: String, deadline: Double) async throws -> [String: Any] {
+    let status = await withCheckedContinuation { continuation in
+        SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+    }
+    guard status == .authorized else {
+        throw HelperFailure(
+            code: "permission_denied",
+            message: "Speech Recognition access is \(authorizationName(status)) for the app hosting this server"
+        )
+    }
+    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeID)) else {
+        throw HelperFailure(code: "unsupported_locale", message: "No speech recognizer for \(localeID)")
+    }
+    guard recognizer.supportsOnDeviceRecognition else {
+        throw HelperFailure(code: "unsupported_locale", message: "No on-device recognition for \(localeID)")
+    }
+    recognizer.queue = OperationQueue()
+    let request = SFSpeechURLRecognitionRequest(url: url)
+    request.requiresOnDeviceRecognition = true
+    request.shouldReportPartialResults = true
+    let latest = LatestText()
+    final class TaskBox: @unchecked Sendable { var task: SFSpeechRecognitionTask? }
+    let box = TaskBox()
+    let outcome = await race(
+        seconds: deadline,
+        work: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                var resumed = false
+                box.task = recognizer.recognitionTask(with: request) { result, error in
+                    if resumed { return }
+                    if let result {
+                        latest.set(result.bestTranscription.formattedString)
+                        if result.isFinal {
+                            resumed = true
+                            continuation.resume()
+                            return
+                        }
+                    }
+                    if let error {
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        },
+        stop: { box.task?.cancel() }
+    )
+    // Partial results replace each other; the newest one is the transcript so far.
+    let transcript = await latest.get()
+    var response: [String: Any] = ["status": "ok", "engine": "SFSpeechRecognizer", "locale": localeID]
+    switch outcome {
+    case .completed:
+        response["complete"] = true
+    case .timedOut:
+        response["complete"] = false
+        response["stopReason"] = "deadline"
+    case .failed(let error):
+        if transcript.isEmpty { throw speechFailure(error) }
+        response["complete"] = false
+        response["stopReason"] = speechFailure(error).message
+    }
+    response["transcript"] = transcript
+    return response
+}
+
+func transcribe(_ request: [String: Any]) async throws -> [String: Any] {
+    guard let path = request["path"] as? String, path.hasPrefix("/") else {
+        throw HelperFailure(code: "invalid_request", message: "path must be an absolute file path")
+    }
+    let localeID = request["locale"] as? String ?? "en-US"
+    let deadline = min(max((request["timeoutSeconds"] as? NSNumber)?.doubleValue ?? 300, 5), 3600)
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+        throw HelperFailure(code: "file_not_found", message: "The audio file does not exist")
+    }
+    let url = URL(fileURLWithPath: path)
+    let file: AVAudioFile
+    do {
+        file = try AVAudioFile(forReading: url)
+    } catch {
+        throw HelperFailure(code: "unsupported_audio", message: "Could not read the audio: \(error.localizedDescription)")
+    }
+    let duration = file.fileFormat.sampleRate > 0 ? Double(file.length) / file.fileFormat.sampleRate : 0
+    var response: [String: Any]
+    if #available(macOS 26, *) {
+        response = try await transcribeWithAnalyzer(file: file, localeID: localeID, deadline: deadline)
+    } else {
+        response = try await transcribeWithRecognizer(url: url, localeID: localeID, deadline: deadline)
+    }
+    response["durationSeconds"] = Int(duration.rounded())
+    response["speechAuthorization"] = authorizationName(SFSpeechRecognizer.authorizationStatus())
+    return response
+}
+
 // MARK: - Dispatch
 
-let actions = ["hello", "decode_drawing", "encode_drawing"]
+let actions = ["hello", "decode_drawing", "encode_drawing", "transcribe"]
 
-func handle(_ request: [String: Any]) throws -> [String: Any] {
+func handle(_ request: [String: Any]) async throws -> [String: Any] {
     guard (request["protocol"] as? NSNumber)?.intValue == protocolVersion else {
         throw HelperFailure(code: "protocol_mismatch", message: "expected protocol \(protocolVersion)")
     }
@@ -231,6 +508,8 @@ func handle(_ request: [String: Any]) throws -> [String: Any] {
         return try decodeDrawing(request)
     case "encode_drawing":
         return try encodeDrawing(request)
+    case "transcribe":
+        return try await transcribe(request)
     default:
         throw HelperFailure(code: "unknown_action", message: "unknown action")
     }
@@ -238,7 +517,7 @@ func handle(_ request: [String: Any]) throws -> [String: Any] {
 
 @main
 struct PublicHelper {
-    static func main() {
+    static func main() async {
         let input = FileHandle.standardInput.readDataToEndOfFile()
         if input.count > maxInputBytes {
             fail(HelperFailure(code: "invalid_request", message: "request exceeds \(maxInputBytes) bytes"))
@@ -247,7 +526,7 @@ struct PublicHelper {
             fail(HelperFailure(code: "invalid_request", message: "stdin must be one JSON object"))
         }
         do {
-            finish(try handle(request))
+            finish(try await handle(request))
         } catch let failure as HelperFailure {
             fail(failure)
         } catch {

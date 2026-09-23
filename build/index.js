@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join13(output, replacement);
+        return join14(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join13(output, rule.append(self.options));
+          output = join14(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join13(output, replacement) {
+    function join14(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -44583,7 +44583,7 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
       throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || options.timeoutMs || DEFAULT_TIMEOUT_MS2;
+  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
@@ -44649,6 +44649,8 @@ function publicHelperInfoPlist() {
     "  <string>apple-notes-mcp public helper</string>",
     "  <key>CFBundleInfoDictionaryVersion</key>",
     "  <string>6.0</string>",
+    "  <key>NSSpeechRecognitionUsageDescription</key>",
+    "  <string>apple-notes-mcp transcribes voice recordings in your notes on this Mac.</string>",
     "</dict>",
     "</plist>",
     ""
@@ -44663,6 +44665,10 @@ function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputP
     "AppKit",
     "-framework",
     "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
     "-Xlinker",
     "-sectcreate",
     "-Xlinker",
@@ -45066,6 +45072,259 @@ function formatNoteDrawings(result) {
     lines.push(
       d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
     );
+  return lines.join("\n");
+}
+
+// src/utils/noteAudio.ts
+import { readdirSync, realpathSync as realpathSync2, statSync as statSync3 } from "node:fs";
+import { join as join13, sep as sep2 } from "node:path";
+var EXTRA_AUDIO_UTIS = [
+  "public.mp3",
+  "public.aiff-audio",
+  "public.aifc-audio",
+  "com.microsoft.waveform-audio"
+];
+var COLUMNS_SQL = "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');";
+function audioRowsSql(generationColumn) {
+  const generation = generationColumn ? `m.${generationColumn}` : "NULL";
+  const media = (alias) => `json((SELECT json_object('identifier', m.ZIDENTIFIER, 'generation', ${generation}, 'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
+  const live = "COALESCE(ZMARKEDFORDELETION, 0) = 0";
+  const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'duration', a.ZDURATION, 'media', ${media("a")}, 'children', json((SELECT json_group_array(json_object('pk', c.Z_PK, 'identifier', c.ZIDENTIFIER, 'duration', c.ZDURATION, 'media', ${media("c")})) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE ZPARENTATTACHMENT = a.Z_PK AND ${live} ORDER BY Z_PK) c)))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE = :pk AND ZPARENTATTACHMENT IS NULL AND ${live} AND (ZTYPEUTI LIKE '%audio%' OR ZTYPEUTI IN (${utis})) ORDER BY Z_PK) a;`
+  ].join("\n");
+}
+function safeSegment(value) {
+  return !!value && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\0");
+}
+function resolveMediaPath(media, accountsRoot = NOTE_ACCOUNTS_PATH) {
+  if (!media || !safeSegment(media.identifier) || !safeSegment(media.filename)) return null;
+  let root;
+  let accounts;
+  try {
+    root = realpathSync2.native(accountsRoot);
+    accounts = readdirSync(root);
+  } catch {
+    return null;
+  }
+  for (const account of accounts.filter(safeSegment)) {
+    const base = join13(root, account, "Media", media.identifier);
+    const candidates = safeSegment(media.generation) ? [join13(base, media.generation, media.filename), join13(base, media.filename)] : [join13(base, media.filename)];
+    for (const candidate of candidates) {
+      try {
+        const real = realpathSync2.native(candidate);
+        if (real.startsWith(root + sep2) && statSync3(real).isFile()) return real;
+      } catch {
+      }
+    }
+  }
+  return null;
+}
+var positive = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+function readAudioAssets(noteId3, options = {}) {
+  const { store, pk } = parseNoteObjectId(noteId3);
+  const dbPath2 = options.dbPath ?? NOTE_STORE_PATH;
+  const columns = new Set(queryNoteStore(COLUMNS_SQL, {}, dbPath2).map((l) => l.trim()));
+  const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
+  if (missing.length)
+    throw new NoteStoreReadError(
+      "query_error",
+      `This macOS version's Notes database lacks ${missing.join(", ")}; audio files cannot be located.`
+    );
+  const generation = columns.has("ZGENERATION1") ? "ZGENERATION1" : columns.has("ZGENERATION") ? "ZGENERATION" : null;
+  const [stateLine, rowsLine] = queryNoteStore(audioRowsSql(generation), { pk }, dbPath2);
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  const attachmentId = (rowPk) => `x-coredata://${store}/ICAttachment/p${rowPk}`;
+  return rows.map((row) => {
+    const sources = row.children?.length ? row.children : [{ pk: row.pk, identifier: row.identifier, duration: row.duration, media: row.media }];
+    const takes = sources.map((take) => ({
+      attachmentId: attachmentId(take.pk),
+      identifier: take.identifier ?? "",
+      durationSeconds: positive(take.duration),
+      path: resolveMediaPath(take.media, options.accountsRoot)
+    }));
+    const total = takes.reduce((sum, t) => sum + (t.durationSeconds ?? 0), 0);
+    return {
+      pk: row.pk,
+      attachmentId: attachmentId(row.pk),
+      identifier: row.identifier ?? "",
+      typeUti: row.uti,
+      durationSeconds: positive(row.duration) ?? positive(total),
+      takes
+    };
+  });
+}
+function countWords(text) {
+  return text.split(/\s+/u).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+// src/services/noteTranscription.ts
+var DEFAULT_TRANSCRIPTION_LOCALE = "en-US";
+var LOCALE_PATTERN = /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8}){0,3}$/;
+function takeDeadlineSeconds(durationSeconds) {
+  const duration3 = durationSeconds ?? 600;
+  return Math.min(1800, Math.max(60, Math.ceil(duration3 * 1.5) + 60));
+}
+var KILL_GRACE_MS = 3e4;
+var helperTranscriptSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  transcript: external_exports.string(),
+  complete: external_exports.boolean(),
+  stopReason: external_exports.string().optional(),
+  engine: external_exports.string().optional(),
+  durationSeconds: external_exports.number().optional()
+});
+function transcribeTake(take, locale, deps) {
+  const base = {
+    attachmentId: take.attachmentId,
+    identifier: take.identifier,
+    status: "error",
+    ...take.durationSeconds !== null ? { durationSeconds: Math.round(take.durationSeconds) } : {}
+  };
+  if (!take.path)
+    return {
+      take: {
+        ...base,
+        code: "asset_unavailable",
+        message: "The audio file is not on this Mac (it may not have downloaded from iCloud yet)."
+      },
+      text: ""
+    };
+  const deadline = takeDeadlineSeconds(take.durationSeconds);
+  let raw;
+  try {
+    raw = callPublicHelper(
+      "transcribe",
+      { path: take.path, locale, timeoutSeconds: deadline },
+      deps,
+      { timeoutMs: deadline * 1e3 + KILL_GRACE_MS }
+    );
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    return {
+      take: {
+        ...base,
+        // A timeout means the helper was killed mid-run: the outcome is unknown.
+        status: code === "timeout" ? "indeterminate" : "error",
+        code,
+        message
+      },
+      text: ""
+    };
+  }
+  const parsed = helperTranscriptSchema.safeParse(raw);
+  if (!parsed.success)
+    return {
+      take: { ...base, code: "invalid_response", message: "Unexpected helper response." },
+      text: ""
+    };
+  const { transcript, complete, stopReason, engine, durationSeconds } = parsed.data;
+  const text = transcript.trim();
+  return {
+    take: {
+      ...base,
+      status: complete ? "ok" : text ? "partial" : "indeterminate",
+      ...complete ? {} : { code: "incomplete", message: stopReason ?? "stopped early" },
+      ...durationSeconds !== void 0 ? { durationSeconds } : {},
+      wordCount: countWords(text),
+      ...engine ? { engine } : {}
+    },
+    text
+  };
+}
+function combineStatus(parts) {
+  if (parts.length && parts.every((p) => p.status === "ok")) return "ok";
+  if (parts.some((p) => p.hasText)) return "partial";
+  if (parts.some((p) => p.status === "indeterminate")) return "indeterminate";
+  return "error";
+}
+function transcribeRecording(asset, locale, includeText, deps) {
+  const outcomes = asset.takes.map((take) => transcribeTake(take, locale, deps));
+  const transcript = outcomes.map((o) => o.text).filter(Boolean).join("\n\n");
+  const status = combineStatus(
+    outcomes.map((o) => ({ status: o.take.status, hasText: o.text.length > 0 }))
+  );
+  const firstProblem = outcomes.find((o) => o.take.status !== "ok")?.take;
+  return {
+    attachmentId: asset.attachmentId,
+    identifier: asset.identifier,
+    typeUti: asset.typeUti,
+    status,
+    ...status !== "ok" && firstProblem?.code ? { code: firstProblem.code, message: firstProblem.message } : {},
+    ...asset.durationSeconds !== null ? { durationSeconds: Math.round(asset.durationSeconds) } : {},
+    wordCount: countWords(transcript),
+    ...includeText ? { transcript } : {},
+    takes: outcomes.map((o) => o.take)
+  };
+}
+function transcribeNoteAudio(noteId3, options = {}) {
+  const locale = options.locale ?? DEFAULT_TRANSCRIPTION_LOCALE;
+  if (!LOCALE_PATTERN.test(locale))
+    throw new PublicHelperError("invalid_request", `"${locale}" is not a BCP-47 locale.`);
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  let assets = (options.readAssets ?? ((id2) => readAudioAssets(id2)))(noteId3);
+  if (options.attachmentId) {
+    assets = assets.filter((a) => a.attachmentId === options.attachmentId);
+    if (assets.length === 0)
+      throw new PublicHelperError(
+        "attachment_not_found",
+        `No audio attachment ${options.attachmentId} in note ${noteId3}.`
+      );
+  }
+  const empty = { id: noteId3, locale, recordingCount: 0, recordings: [] };
+  if (assets.length === 0) return { ...empty, status: "none" };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const recordings = assets.map(
+    (asset) => transcribeRecording(asset, locale, options.includeText ?? true, deps)
+  );
+  return {
+    ...empty,
+    status: combineStatus(
+      recordings.map((r) => ({ status: r.status, hasText: (r.wordCount ?? 0) > 0 }))
+    ),
+    recordingCount: recordings.length,
+    recordings
+  };
+}
+function fitTranscriptions(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
+  if (measure(result) <= maxBytes) return result;
+  let next = result;
+  for (let share = 0.5; measure(next) > maxBytes && share > 1e-4; share /= 2) {
+    next = {
+      ...result,
+      recordings: result.recordings.map(
+        (r) => r.transcript ? {
+          ...r,
+          transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
+          transcriptTruncated: true
+        } : r
+      )
+    };
+  }
+  return next;
+}
+function formatTranscription(result) {
+  if (result.recordingCount === 0) return `No audio attachments in note ${result.id}.`;
+  const lines = [
+    `${result.recordingCount} audio attachment${result.recordingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}, locale ${result.locale}):`
+  ];
+  result.recordings.forEach((r, i) => {
+    const facts = [
+      `status ${r.status}`,
+      ...r.durationSeconds !== void 0 ? [`${r.durationSeconds} s`] : [],
+      `${r.wordCount ?? 0} words`,
+      ...r.takes.length > 1 ? [`${r.takes.length} takes`] : [],
+      ...r.code ? [`${r.code}: ${r.message}`] : []
+    ];
+    lines.push("", `[${i + 1}] ${r.attachmentId} (${facts.join(", ")})`);
+    if (r.transcript)
+      lines.push(r.transcriptTruncated ? `${r.transcript} [truncated]` : r.transcript);
+  });
   return lines.join("\n");
 }
 
@@ -45905,10 +46164,10 @@ registerTool(
           return `<div>${escaped || "<br>"}</div>`;
         }).join("");
       };
-      const separatorToHtml = (sep2) => {
-        if (format === "html") return sep2;
-        if (sep2 === "\n\n") return "<div><br></div>";
-        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const separatorToHtml = (sep3) => {
+        if (format === "html") return sep3;
+        if (sep3 === "\n\n") return "<div><br></div>";
+        const escaped = sep3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         return `<div>${escaped}</div>`;
       };
       const snapshot = readExactNoteSnapshot(id2);
@@ -46899,6 +47158,35 @@ registerTool(
       ...pointsOmitted ? { pointsOmitted } : {}
     });
   }, "Error reading drawings")
+);
+registerTool(
+  "transcribe-note-audio",
+  {
+    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed.",
+    inputSchema: {
+      id: external_exports.string().min(1, "Note ID is required. Use search-notes to find the note ID first.").max(MAX.ID),
+      locale: external_exports.string().max(35).optional().describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
+      attachmentId: external_exports.string().max(MAX.ATTACHMENT_ID).optional().describe("Only transcribe this audio attachment (x-coredata ICAttachment id)"),
+      includeText: external_exports.boolean().optional().describe("Include transcript text (default true); false returns statuses and counts only")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      locale: external_exports.string().optional(),
+      status: external_exports.string().optional(),
+      recordingCount: external_exports.number().optional(),
+      recordings: external_exports.array(external_exports.object({}).passthrough()).optional()
+    }
+  },
+  withErrorHandling(({ id: id2, locale, attachmentId, includeText }) => {
+    const result = fitTranscriptions(
+      transcribeNoteAudio(id2, { locale, attachmentId, includeText }),
+      exportMaxResponseBytes()
+    );
+    return successResponse(
+      formatTranscription(result),
+      result
+    );
+  }, "Error transcribing audio")
 );
 registerResourcesAndPrompts(server, notesManager);
 process.on("uncaughtException", (err) => {
