@@ -34,6 +34,8 @@ import type {
   ExportNotesOptions,
   AudioTranscriptOptions,
   AudioTranscriptsResult,
+  NoteTablesResult,
+  SmartFolder,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -44,6 +46,8 @@ import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.j
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
+import { collectNoteTables } from "@/utils/tableMarkdown.js";
+import { readSmartFolders } from "@/utils/smartFolders.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -564,7 +568,7 @@ export function splitFolderPath(folderPath: string): string[] {
  * @param name - Raw folder name (may contain `/`)
  * @returns Folder name with `/` escaped as `\/`
  */
-function escapeFolderName(name: string): string {
+export function escapeFolderName(name: string): string {
   return name.replace(/\//g, "\\/");
 }
 
@@ -1373,6 +1377,22 @@ export class AppleNotesManager {
   }
 
   /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id: string): NoteTablesResult {
+    return collectNoteTables(readRichNote(id), id);
+  }
+
+  /**
    * Retrieves detailed metadata for a note by title.
    *
    * Similar to getNoteContent but returns structured metadata
@@ -1625,6 +1645,65 @@ export class AppleNotesManager {
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return resultList as text
       `;
+  }
+
+  /**
+   * Lists every smart folder with its decoded query, read-only.
+   *
+   * Folder metadata and queries come from the NoteStore database (Full Disk
+   * Access). With `includeMatchingNotes`, Notes.app itself is asked which notes
+   * each smart folder currently shows, so membership reflects Notes' own
+   * evaluation of the query rather than a reimplementation of it.
+   *
+   * @param options.includeMatchingNotes - Also list the notes each folder shows
+   * @param options.limit - Maximum matching notes per folder (default 50)
+   * @throws Error when the database cannot be read (message says why)
+   */
+  listSmartFolders(
+    options: { includeMatchingNotes?: boolean; limit?: number } = {}
+  ): SmartFolder[] {
+    const result = readSmartFolders();
+    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!options.includeMatchingNotes) return result.folders;
+    const limit = options.limit ?? 50;
+    return result.folders.map((folder) => {
+      try {
+        const { total, notes } = this.listSmartFolderNoteRefs(folder.id, limit);
+        return { ...folder, matchingNoteCount: total, matchingNotes: notes };
+      } catch (error) {
+        return {
+          ...folder,
+          matchingNotesError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
+  }
+
+  /**
+   * Asks Notes.app for the notes one smart folder currently shows.
+   *
+   * @returns The folder's total note count and up to `limit` (title, id) pairs
+   */
+  listSmartFolderNoteRefs(
+    folderId: string,
+    limit: number
+  ): { total: number; notes: { title: string; id: string }[] } {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICFolder\/p\d+$/i.test(folderId))
+      throw new Error("An exact folder ID is required");
+    const safeLimit = Math.max(1, Math.floor(limit));
+    const script = buildAppLevelScript(
+      this.buildBulkListCommand({ folderRef: `folder id "${folderId}"`, sliceLimit: safeLimit })
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) {
+      throw new Error(`Failed to list smart folder notes: ${result.error ?? "unknown error"}`);
+    }
+    const sepIdx = result.output.indexOf(RECORD_SEP);
+    const header = sepIdx === -1 ? result.output : result.output.slice(0, sepIdx);
+    const total = Number.parseInt(header.trim(), 10);
+    if (Number.isNaN(total)) throw new Error("Unexpected smart folder listing output");
+    const records = sepIdx === -1 ? "" : result.output.slice(sepIdx + 1);
+    return { total, notes: this.parseBulkListOutput(records, safeLimit) };
   }
 
   /**

@@ -116,16 +116,30 @@ export function addNativeTags(request: NativeTagRequest, deps: NativeTagDependen
   };
 }
 
-/** Resolve exactly one installed Native Tags Shortcut by name or UUID. */
-export function nativeTagsStatus(
-  shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT
-) {
-  const lines = execFileSync("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+/** List installed Shortcuts as `Name (UUID)` lines. Read-only; never runs a Shortcut. */
+export function listInstalledShortcuts(): string[] {
+  return execFileSync("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15000,
     maxBuffer: 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
   }).split(/\r?\n/u);
+}
+
+/** The configured Native Tags bridge name (env override or default). */
+export const nativeTagsShortcutName = () =>
+  process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
+
+/** Resolve exactly one installed Native Tags Shortcut by name or UUID. */
+export function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
+  return resolveShortcut(listInstalledShortcuts(), shortcut);
+}
+
+/**
+ * Resolve one Shortcut by exact name or UUID against `shortcuts list
+ * --show-identifiers` output. Installed means exactly one match.
+ */
+export function resolveShortcut(lines: string[], shortcut: string) {
   const matches = lines.flatMap((line) => {
     const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
     return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase())
