@@ -10,6 +10,7 @@ This skill enables you to manage Apple Notes on macOS through natural language. 
 ## When to Use This Skill
 
 Use this skill when the user:
+
 - Wants to create a new note or save information
 - Asks to find, search, or look up notes
 - Wants to read the contents of a note
@@ -23,59 +24,59 @@ Use this skill when the user:
 
 ### Note Operations
 
-| Tool | Purpose |
-|------|---------|
-| `create-note` | Create a new note with title and content |
-| `search-notes` | Find notes by title or content |
-| `get-note-content` | Read the full content of a note |
-| `get-note-plaintext` | Read a note's body as plain text (no HTML) |
-| `get-note-markdown` | Read note content as Markdown |
-| `get-note-by-id` | Get note metadata by ID |
-| `get-note-details` | Get metadata (created, modified, account) |
-| `get-note-link` | Get the shareable `notes://showNote?identifier=…` deep link for a note |
-| `update-note` | Replace a note's title and/or body |
-| `append-to-note` | Add content to a note without replacing it (`position: "after"` / `"before"`) |
-| `delete-note` | Remove a note (moves to Recently Deleted) |
-| `batch-delete-notes` | Delete multiple notes by ID (max 500 per call) |
-| `move-note` | Move a note to a different folder |
-| `batch-move-notes` | Move multiple notes by ID (max 500 per call) |
-| `list-notes` | List all notes or notes in a folder |
-| `show-note` | Reveal a note in the Notes.app UI by ID |
-| `get-selected-notes` | Read the notes currently selected in Notes.app |
-| `export-notes-json` | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
+| Tool                 | Purpose                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `create-note`        | Create a new note with title and content                                                                                       |
+| `search-notes`       | Find notes by title or content                                                                                                 |
+| `get-note-content`   | Read the full content of a note                                                                                                |
+| `get-note-plaintext` | Read a note's body as plain text (no HTML)                                                                                     |
+| `get-note-markdown`  | Read note content as Markdown                                                                                                  |
+| `get-note-by-id`     | Get note metadata by ID                                                                                                        |
+| `get-note-details`   | Get metadata (created, modified, account)                                                                                      |
+| `get-note-link`      | Get the shareable `notes://showNote?identifier=…` deep link for a note                                                         |
+| `update-note`        | Replace a note's title and/or body                                                                                             |
+| `append-to-note`     | Add content to a note without replacing it (`position: "after"` / `"before"`)                                                  |
+| `delete-note`        | Remove a note (moves to Recently Deleted)                                                                                      |
+| `batch-delete-notes` | Delete multiple notes by ID (max 500 per call)                                                                                 |
+| `move-note`          | Move a note to a different folder                                                                                              |
+| `batch-move-notes`   | Move multiple notes by ID (max 500 per call)                                                                                   |
+| `list-notes`         | List all notes or notes in a folder                                                                                            |
+| `show-note`          | Reveal a note in the Notes.app UI by ID                                                                                        |
+| `get-selected-notes` | Read the notes currently selected in Notes.app                                                                                 |
+| `export-notes-json`  | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore` |
 
 ### Folder Operations
 
-| Tool | Purpose |
-|------|---------|
-| `list-folders` | List all folders in an account |
-| `create-folder` | Create a new folder |
-| `delete-folder` | Delete an empty folder |
-| `show-folder` | Reveal a folder in the Notes.app UI by ID |
+| Tool            | Purpose                                   |
+| --------------- | ----------------------------------------- |
+| `list-folders`  | List all folders in an account            |
+| `create-folder` | Create a new folder                       |
+| `delete-folder` | Delete an empty folder                    |
+| `show-folder`   | Reveal a folder in the Notes.app UI by ID |
 
 ### Account Operations
 
-| Tool | Purpose |
-|------|---------|
-| `list-accounts` | List configured accounts (iCloud, Gmail, etc.) |
+| Tool                   | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `list-accounts`        | List configured accounts (iCloud, Gmail, etc.)         |
 | `get-default-location` | Read the default account and folder used for new notes |
-| `show-account` | Reveal an account in the Notes.app UI by ID |
+| `show-account`         | Reveal an account in the Notes.app UI by ID            |
 
 ### Attachments, Checklists, Collaboration, and Diagnostics
 
-| Tool | Purpose |
-|------|---------|
-| `list-attachments` | List attachments in a note |
-| `save-attachment` | Save an attachment to disk |
-| `fetch-attachment` | Fetch attachment bytes as base64 |
-| `show-attachment` | Reveal an attachment in the Notes.app UI |
-| `get-checklist-state` | Read checked/unchecked state for existing checklists |
-| `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
-| `list-shared-notes` | List notes shared with collaborators |
-| `get-sync-status` | Check whether iCloud sync is active |
-| `health-check` | Quickly verify Notes.app access |
-| `doctor` | Run detailed setup diagnostics |
-| `get-notes-stats` | Summarize note counts and recent activity |
+| Tool                  | Purpose                                                         |
+| --------------------- | --------------------------------------------------------------- |
+| `list-attachments`    | List attachments in a note                                      |
+| `save-attachment`     | Save an attachment to disk                                      |
+| `fetch-attachment`    | Fetch attachment bytes as base64                                |
+| `show-attachment`     | Reveal an attachment in the Notes.app UI                        |
+| `get-checklist-state` | Read checked/unchecked state for existing checklists            |
+| `get-note-metadata`   | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
+| `list-shared-notes`   | List notes shared with collaborators                            |
+| `get-sync-status`     | Check whether iCloud sync is active                             |
+| `health-check`        | Quickly verify Notes.app access                                 |
+| `doctor`              | Run detailed setup diagnostics                                  |
+| `get-notes-stats`     | Summarize note counts and recent activity                       |
 
 ## Usage Patterns
 
@@ -277,18 +278,21 @@ When the stored HTML looks suspicious, `get-note-plaintext` is the quickest chec
 ## Examples
 
 ### Save conversation to notes
+
 ```
 User: "Save our conversation about the API design to my notes"
 → create-note with title="API Design Discussion" and summarized content
 ```
 
 ### Daily workflow
+
 ```
 User: "What's on my todo list?"
 → search-notes with query="todo" or get-note-content with title="Todo"
 ```
 
 ### Multi-step organization
+
 ```
 User: "Archive all my completed project notes"
 → 1. list-notes to find notes
