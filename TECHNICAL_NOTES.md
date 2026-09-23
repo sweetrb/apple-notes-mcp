@@ -262,6 +262,61 @@ paragraph's first character. In the survey every run of a paragraph carried
 the same visual style (40,989 of 40,989 paragraphs). Field numbers it does
 not interpret are counted in `undecodedFields` rather than guessed.
 
+### Links, Attachments and Note State (verified 2026-09-23, macOS 27.2)
+
+`src/utils/noteLinks.ts` and `src/utils/noteStructure.ts` (the
+`get-note-structure` tool) read these. Counts come from a read-only survey of
+one live library with 843 note rows; no content was recorded.
+
+**Entity numbers and account keys vary.** Look up `Z_ENT` by class name in
+`Z_PRIMARYKEY` (`ICNote`, `ICAttachment`, `ICInlineAttachment`,
+`ICAttachmentPreviewImage`, `ICFolder`, `ICAccount`, `ICMedia`). Each entity
+stores its account in a different column (notes `ZACCOUNT7`, folders
+`ZACCOUNT8`, attachments `ZACCOUNT1`, inline attachments `ZACCOUNT4` on this
+schema), so the reader coalesces every `ZACCOUNT<n>` column.
+
+**Link kinds.**
+
+| Kind | Storage |
+|---|---|
+| inline | AttributeRun field 9 on the text run (see the block model above) |
+| card | `ICAttachment` with `ZTYPEUTI = 'public.url'`; destination in `ZURLSTRING`, card title in `ZTITLE` (39 of 39 cards had both; `ZTITLE1` was always null for attachments) |
+| note / section | `ICInlineAttachment` with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.link'`; URL in `ZTOKENCONTENTIDENTIFIER`, chip label in `ZALTTEXT`. A section chip's URL carries `paragraphID`. None existed in the surveyed library, so this row is from the Core Data model, not observation |
+
+**Notes deep-link format.** Notes.app registers the `notes` and `applenotes`
+URL schemes (`CFBundleURLTypes` in its Info.plist), and its binary contains
+the literal `applenotes://showNote?identifier=`. The URL handler's query-key
+string table in the system's shared library cache lists `identifier`,
+`paragraphID`, `attachmentID` and `contentOffsetY`, next to the selectors
+`appURLForNote:paragraphID:` and `paragraphIDForURL`. A paragraph link is
+therefore `applenotes://showNote?identifier=<NOTE-UUID>&paragraphID=<PARAGRAPH-UUID>`,
+with the key spelled exactly `paragraphID`.
+
+**Attachment hierarchy.** `ZPARENTATTACHMENT` links a child to its container:
+galleries hold their images, and each of the 6 audio recordings held one
+`public.mpeg-4-audio` child. Notes shows only the parent, so top-level counts
+exclude children.
+
+**Preview renditions.** Each `ICAttachmentPreviewImage` row (283 surveyed)
+points at its attachment through `ZATTACHMENT` and records `ZWIDTH`,
+`ZHEIGHT`, `ZSCALE` and `ZAPPEARANCETYPE` (0 light, 1 dark). Its
+`ZIDENTIFIER` (`<attachment-uuid>-<n>-<W>x<H>-<n>`) names the rendition under
+`Accounts/<account-identifier>/Previews/`: 165 were flat `<id>.png` files,
+102 were bundle directories holding `<n>_<uuid>/Preview.png`, and 16 had no
+file on disk. Resolving through these rows needs a few `stat` calls, never a
+scan of the Previews directory. 38 of 39 link cards resolved to a file.
+
+**Last viewed.** `ZLASTVIEWEDMODIFICATIONDATE` holds Apple-epoch seconds. The
+model makes it non-optional, and a note that was never opened holds exactly
+`-541228980` (1983-11-07T18:37:00Z): 748 of 843 notes, stored as an integer.
+The other 95 were real dates. The reader returns null for that value, for
+NULL, and for anything before 2007 or in the future.
+
+**Sharing.** This schema has no `ZISSHARED` column. A note counts as shared
+when its own `ZSERVERSHAREDATA` or that of its folder (or an enclosing
+folder) is set. That rule selected 53 notes, the same 53 distinct notes
+AppleScript reports with `shared = true`.
+
 ### Embedded Objects
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.

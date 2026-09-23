@@ -432,6 +432,49 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `get-note-structure`
+
+Returns a read-only overview of one note from the NoteStore database, in one
+call:
+
+- `text` (decoded body), `textLength`, `wordCount`, `charCount` (Unicode
+  characters, attachment placeholders excluded), and `blockSummary` (the
+  `get-note-blocks` summary counts).
+- `links`, each with a `kind`: `inline` (a hyperlink on text), `card` (a rich
+  link preview attachment, with `attachmentId` and `previewPath`), `note` (a
+  native link chip to another note), or `section` (a native link chip to a
+  heading or paragraph, with `section`). Notes deep links also carry
+  `targetNote` and `paragraphId`. `linkCounts` totals them.
+- `tags` (native tags in body order) and `attachments`, each with a `kind`
+  classified from its UTI (`image`, `scan`, `drawing`, `pdf`, `audio`, `video`,
+  `url`, `table`, `gallery`, `map`, `file`), its body position, and
+  `previewPath` when Notes stored a preview rendition. Gallery items and
+  recording parts are nested under `children`; `attachmentCount` counts
+  top-level attachments only.
+- `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `lastViewed`, `checklistTotal`, `checklistDone`,
+  `hasDrawing` (classic sketches and Paper drawings), and `firstImage` (the
+  first image in body order, else the first scan or drawing).
+
+`lastViewed` is an ISO date, or null with `lastViewedStatus` set to
+`never-viewed`, `not-recorded`, `malformed`, or `unsupported` (the column
+does not exist on this macOS version). A password-protected note returns its
+metadata and attachment rows with `bodyDecoded: false` and the body-derived
+fields null.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact note ID |
+| `includeText` | boolean | No | Include the decoded text (default true). Text larger than `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` is omitted with `textOmitted: true` |
+
+Link URLs are returned as stored; check `linkSafe` before emitting one into
+HTML. Errors carry a stable code in brackets, such as `[not-found]` or
+`[no-full-disk-access]`.
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags used within one explicit `account` and `folder`,
@@ -1362,7 +1405,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
@@ -1391,7 +1434,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `get-note-structure`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 

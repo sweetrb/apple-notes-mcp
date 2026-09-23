@@ -189,6 +189,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `link` is the stored URL; check `linkSafe` before emitting it into HTML
 - Read-only view: do not build a full-body update from it
 
+### get-note-structure
+- One read-only call for a note's overview by exact id: text, block summary, links with `kind` (`inline`, `card`, `note`, `section`), tags, attachments with `kind`, and metadata (`deepLink`, `isShared`, `isLocked`, `lastViewed`, word/char counts, `attachmentCount`, checklist counts, `hasDrawing`, `firstImage`)
+- Requires Full Disk Access. A locked note still returns metadata and attachments; `bodyDecoded` is false and body-derived fields are null, so do not read null counts as zero
+- `lastViewed: null` is normal: check `lastViewedStatus` (`never-viewed` for most notes)
+- `attachmentCount` counts top-level attachments; gallery items and recording parts are under `children`
+- `previewPath` is Notes' cached rendition (a thumbnail), not the attachment file itself; it is null when Notes has not rendered one
+- Check `linkSafe` before emitting a link into HTML
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

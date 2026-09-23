@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join12(output, replacement);
+        return join14(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join12(output, rule.append(self.options));
+          output = join14(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join12(output, replacement) {
+    function join14(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -44211,6 +44211,486 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH4 } = {}) {
   return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
 }
 
+// src/utils/noteStructure.ts
+import { dirname as dirname2 } from "node:path";
+import { existsSync as existsSync9 } from "node:fs";
+
+// src/utils/noteLinks.ts
+import { existsSync as existsSync8, readdirSync, realpathSync as realpathSync2, statSync as statSync3 } from "node:fs";
+import { join as join11, sep as sep2 } from "node:path";
+var NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
+var HASHTAG_UTI = "com.apple.notes.inlinetextattachment.hashtag";
+var SAFE_LINK = /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i;
+var isSafeLink2 = (url) => SAFE_LINK.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+function parseNotesShowUrl(url) {
+  const match = /^(?:apple)?notes:\/\/showNote\?(.*)$/i.exec(url);
+  if (!match) return void 0;
+  const query = new URLSearchParams(match[1]);
+  const note = query.get("identifier") ?? "";
+  const paragraph = query.get("paragraphID") ?? "";
+  const result = {};
+  if (UUID.test(note)) result.targetNote = note.toUpperCase();
+  if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
+  return result;
+}
+function classifyAttachmentKind(uti) {
+  const u = (uti ?? "").toLowerCase();
+  if (!u) return "file";
+  if (u === "public.url" || u.startsWith("public.url")) return "url";
+  if (u === "com.apple.notes.table") return "table";
+  if (u === "com.apple.notes.gallery") return "gallery";
+  if (u === "com.apple.paper.doc.scan" || u.endsWith(".scan")) return "scan";
+  if (u === "com.apple.paper.doc.pdf" || u === "com.adobe.pdf" || u.endsWith(".pdf")) return "pdf";
+  if (u === "com.apple.paper" || u.startsWith("com.apple.drawing")) return "drawing";
+  if (u.includes("audio") || u === "public.mp3") return "audio";
+  if (u.includes("movie") || u.includes("video") || u === "public.mpeg-4") return "video";
+  if (u.startsWith("com.apple.map") || u.includes("mapkit")) return "map";
+  if (u.includes("image") || u.includes("photo") || [
+    "public.jpeg",
+    "public.png",
+    "public.heic",
+    "public.heif",
+    "public.tiff",
+    "com.compuserve.gif"
+  ].includes(u))
+    return "image";
+  return "file";
+}
+var isDrawingUti = (uti) => classifyAttachmentKind(uti) === "drawing";
+function inlineLinks(doc) {
+  const links = [];
+  let last;
+  for (const block of doc.blocks)
+    for (const run of block.runs) {
+      if (!run.link) {
+        last = void 0;
+        continue;
+      }
+      if (last && last.url === run.link && last.start + last.length === run.start) {
+        last.length += run.length;
+        last.text += run.text;
+        continue;
+      }
+      last = {
+        kind: "inline",
+        url: run.link,
+        linkSafe: run.linkSafe === true,
+        text: run.text,
+        start: run.start,
+        length: run.length,
+        blockIndex: block.index,
+        ...parseNotesShowUrl(run.link)
+      };
+      links.push(last);
+    }
+  return links;
+}
+function markerPosition(doc, identifier) {
+  if (!doc) return {};
+  const wanted = identifier.toUpperCase();
+  const marker = doc.attachments.find((item) => item.id.toUpperCase() === wanted);
+  return marker ? { start: marker.start, blockIndex: marker.blockIndex, inBody: true } : { inBody: false };
+}
+function nativeLink(row, doc) {
+  if (!row.token) return void 0;
+  const target = parseNotesShowUrl(row.token) ?? {};
+  const kind = target.paragraphId ? "section" : "note";
+  return {
+    kind,
+    url: row.token,
+    linkSafe: isSafeLink2(row.token),
+    ...row.alt ? { text: row.alt } : {},
+    ...markerPosition(doc, row.identifier),
+    ...target,
+    ...kind === "section" && row.alt ? { section: row.alt } : {},
+    attachmentIdentifier: row.identifier
+  };
+}
+function cardLink(row, {
+  doc,
+  noteId: noteId3,
+  previewPath
+} = {}) {
+  if (!row.url) return void 0;
+  return {
+    kind: "card",
+    url: row.url,
+    linkSafe: isSafeLink2(row.url),
+    ...row.title ? { text: row.title } : {},
+    ...markerPosition(doc, row.identifier),
+    ...parseNotesShowUrl(row.url),
+    attachmentIdentifier: row.identifier,
+    ...noteId3 ? { attachmentId: attachmentIdFor(noteId3, row.pk) } : {},
+    ...previewPath !== void 0 ? { previewPath } : {}
+  };
+}
+var attachmentIdFor = (noteId3, pk) => noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
+function rankPreviews(rows) {
+  const area = (row) => (row.width ?? 0) * (row.height ?? 0) * (row.scale ?? 1) ** 2;
+  return [...rows].sort((a, b) => (a.appearance ?? 0) - (b.appearance ?? 0) || area(b) - area(a));
+}
+var SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+var MAX_BUNDLE_ENTRIES = 64;
+function confined(path4, root) {
+  try {
+    const real = realpathSync2(path4);
+    return real.startsWith(root + sep2) ? real : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolvePreviewPath(storeDir, accountIdentifier, previews) {
+  if (!accountIdentifier || !SAFE_COMPONENT.test(accountIdentifier)) return null;
+  const accountDir = join11(storeDir, "Accounts", accountIdentifier);
+  if (!existsSync8(accountDir)) return null;
+  const root = realpathSync2(accountDir);
+  for (const preview of rankPreviews(previews)) {
+    const id2 = preview.identifier;
+    if (!id2 || !SAFE_COMPONENT.test(id2)) continue;
+    const base = join11(accountDir, "Previews", id2);
+    for (const candidate of [`${base}.png`, base]) {
+      const real = confined(candidate, root);
+      if (!real) continue;
+      const stat = statSync3(real);
+      if (stat.isFile()) return real;
+      const inner = stat.isDirectory() ? previewInBundle(real, root) : void 0;
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+function previewInBundle(bundle, root) {
+  const children = readdirSync(bundle).sort();
+  if (children.length > MAX_BUNDLE_ENTRIES) return void 0;
+  for (const child of children) {
+    const file = confined(join11(bundle, child, "Preview.png"), root);
+    if (file && statSync3(file).isFile()) return file;
+  }
+  return void 0;
+}
+
+// src/utils/noteStoreSql.ts
+import { execFileSync as execFileSync9 } from "node:child_process";
+import { homedir as homedir9 } from "node:os";
+import { join as join12 } from "node:path";
+var NOTES_DB_PATH5 = join12(
+  homedir9(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var NoteStoreError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteStoreError";
+    this.code = code;
+  }
+};
+function notePrimaryKey(id2) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteStoreError(
+      "invalid-id",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number>"
+    );
+  return Number(pk);
+}
+function runStoreSql(dbPath2, sql, params = {}) {
+  const args = ["-readonly", "-cmd", ".parameter init"];
+  for (const [name, value] of Object.entries(params)) {
+    if (!/^[a-z]\w*$/i.test(name) || !Number.isSafeInteger(value))
+      throw new NoteStoreError("invalid-argument", "Invalid query parameter");
+    args.push("-cmd", `.parameter set @${name} ${value}`);
+  }
+  let output;
+  try {
+    output = execFileSync9("/usr/bin/sqlite3", [...args, dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 15e3,
+      maxBuffer: 128 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteStoreError("query-failed", "Failed to query the Notes database");
+  }
+  return output.split("\n").filter((line) => line !== "");
+}
+function parseJsonLine(line, fallback) {
+  if (line === void 0 || line === "") return fallback;
+  try {
+    return JSON.parse(line);
+  } catch {
+    throw new NoteStoreError("query-failed", "Unexpected Notes database response");
+  }
+}
+function objectColumns(dbPath2) {
+  const [line] = runStoreSql(
+    dbPath2,
+    "SELECT json_group_array(name) FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
+  );
+  const names = parseJsonLine(line, []);
+  if (!names.length)
+    throw new NoteStoreError("unsupported-schema", "The Notes database has no object table");
+  return new Set(names);
+}
+function schemaHelpers(columns) {
+  const col = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort();
+  const accountOf = (alias) => accountColumns.length ? `COALESCE(${accountColumns.map((name) => `${alias}.${name}`).join(", ")})` : "NULL";
+  const notDeleted = (alias) => `COALESCE(${col(alias, "ZMARKEDFORDELETION")}, 0) = 0`;
+  return { col, accountOf, notDeleted, has: (name) => columns.has(name) };
+}
+var entity = (name) => {
+  if (!/^IC[A-Za-z]+$/.test(name)) throw new NoteStoreError("invalid-argument", "Invalid entity");
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${name}')`;
+};
+
+// src/utils/noteStructure.ts
+var APPLE_EPOCH_OFFSET = 978307200;
+var LAST_VIEWED_NEVER = -541228980;
+function lastViewedOf(raw, columnPresent = true, now = Date.now()) {
+  if (!columnPresent) return { lastViewed: null, lastViewedStatus: "unsupported" };
+  if (raw === null || raw === void 0)
+    return { lastViewed: null, lastViewedStatus: "not-recorded" };
+  const seconds = typeof raw === "number" ? raw : Number.NaN;
+  if (seconds === LAST_VIEWED_NEVER) return { lastViewed: null, lastViewedStatus: "never-viewed" };
+  const ms = (seconds + APPLE_EPOCH_OFFSET) * 1e3;
+  if (!Number.isFinite(ms) || ms < Date.UTC(2007, 0, 1) || ms > now + 864e5)
+    return { lastViewed: null, lastViewedStatus: "malformed" };
+  return { lastViewed: new Date(ms).toISOString(), lastViewedStatus: "viewed" };
+}
+var visible = (text) => text.replace(/\ufffc/g, "");
+var wordCount = (text) => visible(text).split(/\s+/u).filter((word) => word !== "").length;
+var charCount = (text) => Array.from(visible(text)).length;
+function noteStructureSql(columns) {
+  const { col, accountOf, notDeleted } = schemaHelpers(columns);
+  const sharedExpr = columns.has("ZSERVERSHAREDATA") ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
+         WITH RECURSIVE up(pk, depth) AS (
+           SELECT n.ZFOLDER, 0 UNION ALL
+           SELECT ${col("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
+           WHERE depth < 64)
+         SELECT 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT s ON s.Z_PK = up.pk WHERE s.ZSERVERSHAREDATA IS NOT NULL))` : "NULL";
+  const noteAttachments = `SELECT att.Z_PK FROM ZICCLOUDSYNCINGOBJECT att
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND att.ZNOTE = @pk AND ${notDeleted("att")}`;
+  return [
+    `SELECT json_object(
+      'isNote', n.Z_ENT = ${entity("ICNote")},
+      'identifier', ${col("n", "ZIDENTIFIER")},
+      'title', ${col("n", "ZTITLE1")},
+      'folder', ${col("f", "ZTITLE2")},
+      'folderType', ${col("f", "ZFOLDERTYPE")},
+      'account', ${col("a", "ZNAME")},
+      'accountIdentifier', ${col("a", "ZIDENTIFIER")},
+      'locked', ${col("n", "ZISPASSWORDPROTECTED")},
+      'pinned', ${col("n", "ZISPINNED")},
+      'shared', ${sharedExpr},
+      'lastViewed', ${col("n", "ZLASTVIEWEDMODIFICATIONDATE")},
+      'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+      'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK))
+    FROM ZICCLOUDSYNCINGOBJECT n
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${col("n", "ZFOLDER")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountOf("n")}
+    WHERE n.Z_PK = @pk;`,
+    `SELECT json_group_array(json_object(
+      'pk', att.Z_PK,
+      'identifier', ${col("att", "ZIDENTIFIER")},
+      'uti', ${col("att", "ZTYPEUTI")},
+      'parent', ${col("att", "ZPARENTATTACHMENT")},
+      'title', ${col("att", "ZTITLE")},
+      'url', ${col("att", "ZURLSTRING")},
+      'fileSize', ${col("att", "ZFILESIZE")},
+      'filename', ${col("m", "ZFILENAME")},
+      'account', ${col("acc", "ZIDENTIFIER")}))
+    FROM ZICCLOUDSYNCINGOBJECT att
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON m.Z_PK = ${col("att", "ZMEDIA")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT acc ON acc.Z_PK = ${accountOf("att")}
+    WHERE att.Z_PK IN (${noteAttachments});`,
+    `SELECT json_group_array(json_object(
+      'attachment', ${col("p", "ZATTACHMENT")},
+      'identifier', ${col("p", "ZIDENTIFIER")},
+      'width', ${col("p", "ZWIDTH")},
+      'height', ${col("p", "ZHEIGHT")},
+      'scale', ${col("p", "ZSCALE")},
+      'appearance', ${col("p", "ZAPPEARANCETYPE")}))
+    FROM ZICCLOUDSYNCINGOBJECT p
+    WHERE p.Z_ENT = ${entity("ICAttachmentPreviewImage")} AND ${notDeleted("p")}
+      AND ${col("p", "ZATTACHMENT")} IN (${noteAttachments});`,
+    `SELECT json_group_array(json_object(
+      'identifier', ${col("i", "ZIDENTIFIER")},
+      'uti', ${col("i", "ZTYPEUTI1")},
+      'alt', ${col("i", "ZALTTEXT")},
+      'token', ${col("i", "ZTOKENCONTENTIDENTIFIER")}))
+    FROM ZICCLOUDSYNCINGOBJECT i
+    WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${col("i", "ZNOTE1")} = @pk
+      AND ${notDeleted("i")} AND ${col("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI}', '${NOTE_LINK_UTI}');`
+  ].join("\n");
+}
+function bodyOrder(rows) {
+  return [...rows].sort(
+    (a, b) => (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER) || Number(/\d+$/.exec(a.id)[0]) - Number(/\d+$/.exec(b.id)[0])
+  );
+}
+function selectFirstImage(attachments) {
+  const ordered = [];
+  for (const item of attachments) ordered.push(item, ...item.children ?? []);
+  for (const kinds of [["image"], ["image", "scan", "drawing"]]) {
+    const hit = ordered.find((item) => kinds.includes(item.kind));
+    if (hit)
+      return {
+        id: hit.id,
+        identifier: hit.identifier,
+        uti: hit.uti,
+        kind: hit.kind,
+        ...hit.parentId ? { parentId: hit.parentId } : {},
+        ...hit.previewPath !== void 0 ? { previewPath: hit.previewPath } : {}
+      };
+  }
+  return null;
+}
+function describeNoteStructure(s) {
+  const parts = [
+    s.bodyDecoded ? `${s.blockSummary.blocks} blocks, ${s.wordCount} words` : `body not decoded (${s.bodyError})`,
+    `${s.links.length} links (inline ${s.linkCounts.inline}, card ${s.linkCounts.card}, note ${s.linkCounts.note}, section ${s.linkCounts.section})`,
+    `${s.attachmentCount} attachments`,
+    `${s.tags.length} tags`
+  ];
+  if (s.checklistTotal) parts.push(`checklist ${s.checklistDone}/${s.checklistTotal} done`);
+  if (s.hasDrawing) parts.push("has a drawing");
+  if (s.isLocked) parts.push("locked");
+  if (s.isShared) parts.push("shared");
+  return `Note structure: ${parts.join("; ")}.`;
+}
+function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH5, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
+  const pk = notePrimaryKey(id2);
+  if (!existsSync9(dbPath2))
+    throw new NoteStoreError("no-full-disk-access", "The Notes database is not readable");
+  const columns = objectColumns(dbPath2);
+  const lines = runStoreSql(dbPath2, noteStructureSql(columns), { pk });
+  const note = parseJsonLine(lines[0], null);
+  if (!note || !note.isNote) throw new NoteStoreError("not-found", `No note found for ID "${id2}"`);
+  const attachmentRows = parseJsonLine(lines[1], []);
+  const previewRows = parseJsonLine(lines[2], []);
+  const inlineRows = parseJsonLine(lines[3], []);
+  let doc;
+  let bodyError;
+  if (note.encrypted || note.locked) bodyError = "encrypted";
+  else if (!note.data || !/^[0-9a-f]+$/i.test(note.data)) bodyError = "no-body";
+  else
+    try {
+      doc = decodeCompressedNoteBlocks(Buffer.from(note.data, "hex"));
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      bodyError = error2.code;
+    }
+  const storeDir = dirname2(dbPath2);
+  const previewsFor = (pkValue) => previewRows.filter((row) => row.attachment === pkValue);
+  const all = /* @__PURE__ */ new Map();
+  for (const row of attachmentRows) {
+    const previews = previewsFor(row.pk);
+    all.set(row.pk, {
+      id: attachmentIdFor(id2, row.pk),
+      identifier: row.identifier ?? "",
+      uti: row.uti,
+      kind: classifyAttachmentKind(row.uti),
+      ...row.title ? { title: row.title } : {},
+      ...row.filename ? { filename: row.filename } : {},
+      ...row.url ? { url: row.url } : {},
+      ...typeof row.fileSize === "number" ? { fileSize: row.fileSize } : {},
+      ...row.identifier ? markerPosition(doc, row.identifier) : {},
+      ...previews.length ? {
+        previewPath: resolvePreviewPath(
+          storeDir,
+          row.account ?? note.accountIdentifier,
+          previews
+        )
+      } : {},
+      ...row.parent !== null && row.parent !== row.pk ? { parentId: attachmentIdFor(id2, row.parent) } : {}
+    });
+  }
+  const roots = [];
+  for (const row of attachmentRows) {
+    const item = all.get(row.pk);
+    const parent = row.parent !== null && row.parent !== row.pk ? all.get(row.parent) : void 0;
+    if (parent && parent.parentId === void 0) (parent.children ||= []).push(item);
+    else {
+      delete item.parentId;
+      roots.push(item);
+    }
+  }
+  const attachments = bodyOrder(roots).map(
+    (item) => item.children ? { ...item, children: bodyOrder(item.children) } : item
+  );
+  const links = doc ? inlineLinks(doc) : [];
+  for (const row of attachmentRows) {
+    const item = all.get(row.pk);
+    if (item.kind !== "url" || !row.identifier) continue;
+    const link = cardLink(
+      { pk: row.pk, identifier: row.identifier, url: row.url, title: row.title },
+      { doc, noteId: id2, previewPath: item.previewPath ?? null }
+    );
+    if (link) links.push(link);
+  }
+  const tagOrder = [];
+  for (const row of inlineRows) {
+    if (!row.identifier) continue;
+    if (row.uti === NOTE_LINK_UTI) {
+      const link = nativeLink({ identifier: row.identifier, token: row.token, alt: row.alt }, doc);
+      if (link) links.push(link);
+    } else if (row.alt) {
+      const position = markerPosition(doc, row.identifier);
+      if (position.inBody !== false)
+        tagOrder.push({ tag: row.alt.replace(/^#/, ""), start: position.start ?? 0 });
+    }
+  }
+  links.sort((a, b) => (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER));
+  const tags = [...new Set(tagOrder.sort((a, b) => a.start - b.start).map((entry) => entry.tag))];
+  let text;
+  let textOmitted;
+  if (doc && includeText) {
+    if (Buffer.byteLength(doc.text) <= maxTextBytes) text = doc.text;
+    else textOmitted = true;
+  }
+  const flat = attachments.flatMap((item) => [item, ...item.children ?? []]);
+  const linkCounts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) linkCounts[link.kind]++;
+  const lastViewed = lastViewedOf(note.lastViewed, columns.has("ZLASTVIEWEDMODIFICATIONDATE"));
+  return {
+    id: id2,
+    identifier: note.identifier,
+    deepLink: note.identifier ? `notes://showNote?identifier=${note.identifier}` : null,
+    title: note.title,
+    folder: note.folder,
+    account: note.account,
+    inRecentlyDeleted: note.folderType === 1,
+    isShared: note.shared === null ? null : note.shared === 1,
+    isLocked: note.locked === 1 || note.encrypted === 1,
+    isPinned: note.pinned === null ? null : note.pinned === 1,
+    ...lastViewed,
+    bodyDecoded: doc !== void 0,
+    ...bodyError ? { bodyError } : {},
+    ...text !== void 0 ? { text } : {},
+    ...textOmitted ? { textOmitted } : {},
+    textLength: doc ? doc.textLength : null,
+    wordCount: doc ? wordCount(doc.text) : null,
+    charCount: doc ? charCount(doc.text) : null,
+    blockSummary: doc ? doc.summary : null,
+    links,
+    linkCounts,
+    linksComplete: doc !== void 0,
+    tags,
+    attachments,
+    attachmentCount: attachments.length,
+    checklistTotal: doc ? doc.summary.checklist.total : null,
+    checklistDone: doc ? doc.summary.checklist.done : null,
+    hasDrawing: flat.some((item) => isDrawingUti(item.uti)),
+    firstImage: selectFirstImage(attachments),
+    ...doc ? { undecodedFields: doc.undecodedFields } : {}
+  };
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -44224,7 +44704,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join13 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -44338,8 +44818,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join11(directory, basename(path4));
+      const directory = mkdtempSync4(join13(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join13(directory, basename(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44816,9 +45296,9 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync8 } from "node:fs";
+import { existsSync as existsSync10 } from "node:fs";
 import { release } from "node:os";
-import { dirname as dirname2, resolve as resolve2 } from "node:path";
+import { dirname as dirname3, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -44836,12 +45316,12 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync8;
+  const exists = dependencies.exists || existsSync10;
   const open = dependencies.open || ((path4) => {
     const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve2(dirname3(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
@@ -45589,6 +46069,66 @@ registerTool(
   }, "Error reading note blocks")
 );
 registerTool(
+  "get-note-structure",
+  {
+    description: "Use when: you want one read-only overview of a note by exact id: decoded text, a block summary, every link with its kind (inline hyperlink, rich link card, native note link, native section link, with target note and paragraph UUIDs when the URL carries them), native tags, attachments with a kind classified from their type (gallery and recording children nested), and metadata: deepLink, isShared, isLocked, isPinned, lastViewed, wordCount, charCount, attachmentCount, checklistTotal/checklistDone, hasDrawing, firstImage.\nReturns: the structure object. For a password-protected note, metadata and attachment rows only (bodyDecoded false, body-derived fields null). lastViewed is null with lastViewedStatus never-viewed, not-recorded, malformed or unsupported when Notes holds no real view date.\nDo not use when: you need per-paragraph formatting (get-note-blocks) or the editable HTML body (get-note-content).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Link URLs are returned as stored; check linkSafe before emitting them into HTML.",
+    inputSchema: {
+      id: noteIdInput,
+      includeText: external_exports.boolean().optional().describe(
+        "Include the decoded note text (default true). Text over APPLE_NOTES_MCP_BLOCKS_MAX_BYTES is omitted with textOmitted: true"
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      deepLink: external_exports.string().nullable().optional(),
+      title: external_exports.string().nullable().optional(),
+      folder: external_exports.string().nullable().optional(),
+      account: external_exports.string().nullable().optional(),
+      inRecentlyDeleted: external_exports.boolean().optional(),
+      isShared: external_exports.boolean().nullable().optional(),
+      isLocked: external_exports.boolean().optional(),
+      isPinned: external_exports.boolean().nullable().optional(),
+      lastViewed: external_exports.string().nullable().optional(),
+      lastViewedStatus: external_exports.string().optional(),
+      bodyDecoded: external_exports.boolean().optional(),
+      bodyError: external_exports.string().optional(),
+      text: external_exports.string().optional(),
+      textOmitted: external_exports.boolean().optional(),
+      textLength: external_exports.number().nullable().optional(),
+      wordCount: external_exports.number().nullable().optional(),
+      charCount: external_exports.number().nullable().optional(),
+      blockSummary: external_exports.record(external_exports.unknown()).nullable().optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      linkCounts: external_exports.record(external_exports.unknown()).optional(),
+      linksComplete: external_exports.boolean().optional(),
+      tags: external_exports.array(external_exports.string()).optional(),
+      attachments: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      attachmentCount: external_exports.number().optional(),
+      checklistTotal: external_exports.number().nullable().optional(),
+      checklistDone: external_exports.number().nullable().optional(),
+      hasDrawing: external_exports.boolean().optional(),
+      firstImage: external_exports.record(external_exports.unknown()).nullable().optional(),
+      undecodedFields: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, includeText }) => {
+    let structure;
+    try {
+      structure = readNoteStructure(id2, {
+        includeText: includeText ?? true,
+        maxTextBytes: blocksMaxResponseBytes()
+      });
+    } catch (error2) {
+      if (!(error2 instanceof NoteStoreError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error reading note structure [${error2.code}]: ${error2.message}${hint}`);
+    }
+    return successResponse(describeNoteStructure(structure), { ...structure });
+  }, "Error reading note structure")
+);
+registerTool(
   "list-native-tags",
   {
     description: "Use when: listing actual native Notes tags used in one explicit account and folder.\nReturns: each native tag mapped to exact matching note IDs, plus completeness and per-note errors.\nDo not use when: searching textual #hashtags in note bodies (search-notes).\nSafety: read-only; requires Full Disk Access and discloses partial reads.",
@@ -45770,10 +46310,10 @@ registerTool(
           return `<div>${escaped || "<br>"}</div>`;
         }).join("");
       };
-      const separatorToHtml = (sep2) => {
-        if (format === "html") return sep2;
-        if (sep2 === "\n\n") return "<div><br></div>";
-        const escaped = sep2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const separatorToHtml = (sep3) => {
+        if (format === "html") return sep3;
+        if (sep3 === "\n\n") return "<div><br></div>";
+        const escaped = sep3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         return `<div>${escaped}</div>`;
       };
       const snapshot = readExactNoteSnapshot(id2);

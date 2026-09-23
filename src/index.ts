@@ -59,7 +59,14 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
-import { NoteBlocksError, pageNoteBlocks, readNoteBlocks } from "@/utils/noteBlocks.js";
+import {
+  blocksMaxResponseBytes,
+  NoteBlocksError,
+  pageNoteBlocks,
+  readNoteBlocks,
+} from "@/utils/noteBlocks.js";
+import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
+import { NoteStoreError } from "@/utils/noteStoreSql.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -1098,6 +1105,76 @@ registerTool(
       { id, ...page }
     );
   }, "Error reading note blocks")
+);
+
+// --- get-note-structure ---
+
+registerTool(
+  "get-note-structure",
+  {
+    description:
+      "Use when: you want one read-only overview of a note by exact id: decoded text, a block summary, every link with its kind (inline hyperlink, rich link card, native note link, native section link, with target note and paragraph UUIDs when the URL carries them), native tags, attachments with a kind classified from their type (gallery and recording children nested), and metadata: deepLink, isShared, isLocked, isPinned, lastViewed, wordCount, charCount, attachmentCount, checklistTotal/checklistDone, hasDrawing, firstImage.\nReturns: the structure object. For a password-protected note, metadata and attachment rows only (bodyDecoded false, body-derived fields null). lastViewed is null with lastViewedStatus never-viewed, not-recorded, malformed or unsupported when Notes holds no real view date.\nDo not use when: you need per-paragraph formatting (get-note-blocks) or the editable HTML body (get-note-content).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Link URLs are returned as stored; check linkSafe before emitting them into HTML.",
+    inputSchema: {
+      id: noteIdInput,
+      includeText: z
+        .boolean()
+        .optional()
+        .describe(
+          "Include the decoded note text (default true). Text over APPLE_NOTES_MCP_BLOCKS_MAX_BYTES is omitted with textOmitted: true"
+        ),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      identifier: z.string().nullable().optional(),
+      deepLink: z.string().nullable().optional(),
+      title: z.string().nullable().optional(),
+      folder: z.string().nullable().optional(),
+      account: z.string().nullable().optional(),
+      inRecentlyDeleted: z.boolean().optional(),
+      isShared: z.boolean().nullable().optional(),
+      isLocked: z.boolean().optional(),
+      isPinned: z.boolean().nullable().optional(),
+      lastViewed: z.string().nullable().optional(),
+      lastViewedStatus: z.string().optional(),
+      bodyDecoded: z.boolean().optional(),
+      bodyError: z.string().optional(),
+      text: z.string().optional(),
+      textOmitted: z.boolean().optional(),
+      textLength: z.number().nullable().optional(),
+      wordCount: z.number().nullable().optional(),
+      charCount: z.number().nullable().optional(),
+      blockSummary: z.record(z.unknown()).nullable().optional(),
+      links: z.array(z.record(z.unknown())).optional(),
+      linkCounts: z.record(z.unknown()).optional(),
+      linksComplete: z.boolean().optional(),
+      tags: z.array(z.string()).optional(),
+      attachments: z.array(z.record(z.unknown())).optional(),
+      attachmentCount: z.number().optional(),
+      checklistTotal: z.number().nullable().optional(),
+      checklistDone: z.number().nullable().optional(),
+      hasDrawing: z.boolean().optional(),
+      firstImage: z.record(z.unknown()).nullable().optional(),
+      undecodedFields: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, includeText }) => {
+    let structure;
+    try {
+      structure = readNoteStructure(id, {
+        includeText: includeText ?? true,
+        maxTextBytes: blocksMaxResponseBytes(),
+      });
+    } catch (error) {
+      if (!(error instanceof NoteStoreError)) throw error;
+      const hint =
+        error.code === "no-full-disk-access"
+          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          : "";
+      return errorResponse(`Error reading note structure [${error.code}]: ${error.message}${hint}`);
+    }
+    return successResponse(describeNoteStructure(structure), { ...structure });
+  }, "Error reading note structure")
 );
 
 registerTool(

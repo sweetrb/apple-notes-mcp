@@ -72,6 +72,7 @@ Use this skill when the user:
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
 | `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
 | `get-note-blocks` | Read a note's paragraph styles, inline formatting, and attachment positions as typed blocks |
+| `get-note-structure` | Read a note's links by kind, tags, attachment kinds, counts, and view/lock/share state in one call |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
 | `health-check` | Quickly verify Notes.app access |
