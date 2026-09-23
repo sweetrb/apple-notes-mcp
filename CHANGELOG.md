@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.7] - 2026-09-23
+## [2.9.8] - 2026-09-23
 
 ### Added
 
@@ -18,6 +18,20 @@
   and entities, and external references are refused. The XML reader is
   written for this purpose and adds no dependency. Registered as the
   `svgAnalysis` feature in `get-capabilities`.
+
+## [2.9.7] - 2026-09-23
+
+### Fixed
+
+- `export-notes-markdown` escapes a body paragraph that starts with `##` to
+  `######` (previously only a single `#` was escaped), so a plain paragraph
+  such as `## Notes` no longer renders as a heading. A body line of `---` (or
+  `-----`) is escaped instead of rendering as a thematic break, and the text
+  after a list item's own marker gets the same treatment, so a bullet whose text
+  starts with `## ` or `1. ` no longer nests a heading or list. `wrap` no longer
+  breaks a line just before a word that would open a block at the start of the
+  next line (`#`, `-`, `+`, `*`, `1.`, `===`). Notes' own headings and lists
+  are unchanged. Reported by @oliverames (#232).
 
 ## [2.9.6] - 2026-09-23
 
