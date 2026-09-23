@@ -8,6 +8,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { constants as bufferConstants } from "node:buffer";
 import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { callTimeoutMs } from "@/utils/callTimeout.js";
@@ -43,8 +44,39 @@ function envPositiveNumber(name: string): number | undefined {
   return undefined;
 }
 
-function getMaxBuffer(): number {
+export function getMaxBuffer(): number {
   return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
+}
+
+/**
+ * Output cap for reading one note body. Notes.app returns a body with every
+ * inline image embedded as base64, so a 40 MB TIFF yields a body of about
+ * 110 MB, past the general 64 MB cap (#237). The cap stays below V8's largest
+ * string, since the output becomes one string.
+ */
+const NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, bufferConstants.MAX_STRING_LENGTH);
+
+/** Output cap for a note body read: the general cap or the body cap, whichever is larger. */
+export function noteBodyMaxBuffer(): number {
+  return Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES);
+}
+
+/**
+ * True when osascript printed more than maxBuffer allows. Node then kills the
+ * child with killSignal (SIGKILL here) and reports ENOBUFS, so this must be
+ * checked before isTimeoutError, which also matches SIGKILL. Before #237 an
+ * oversized note body was reported as a 30-second timeout and retried.
+ */
+function isOutputOverflowError(error: unknown): boolean {
+  return error instanceof Error && (error as Error & { code?: string }).code === "ENOBUFS";
+}
+
+/** Explains an output overflow; worded so RETRYABLE_ERROR_PATTERNS never match it. */
+function outputOverflowMessage(maxBufferBytes: number): string {
+  const mib = 1024 * 1024;
+  const limit =
+    maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.`;
 }
 
 /**
@@ -396,6 +428,7 @@ export function executeAppleScript(
     options.retryDelayMs ??
     envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ??
     DEFAULT_RETRY_DELAY_MS;
+  const maxBufferBytes = options.maxBufferBytes ?? getMaxBuffer();
 
   // Validate input - empty scripts are likely programmer errors
   if (!script || !script.trim()) {
@@ -441,7 +474,7 @@ export function executeAppleScript(
         killSignal: "SIGKILL",
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
-        maxBuffer: getMaxBuffer(),
+        maxBuffer: maxBufferBytes,
       });
 
       const duration = Date.now() - attemptStart;
@@ -465,8 +498,12 @@ export function executeAppleScript(
       let isTimeout = false;
       let rawError: string | undefined;
 
-      // Check for timeout first - provide specific message
-      if (isTimeoutError(error)) {
+      // An output overflow also kills osascript with SIGKILL, so it is told
+      // apart from a timeout first. Retrying cannot help: the output is the
+      // same size next time.
+      if (isOutputOverflowError(error)) {
+        errorMessage = outputOverflowMessage(maxBufferBytes);
+      } else if (isTimeoutError(error)) {
         isTimeout = true;
         const timeoutSecs = Math.round(timeoutMs / 1000);
         errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;

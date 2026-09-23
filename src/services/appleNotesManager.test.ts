@@ -13,11 +13,12 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
+import { writeFileSync, rmSync, mkdtempSync, readFileSync, statSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   AppleNotesManager,
+  ExpectedBodies,
   escapeForAppleScript,
   escapeHtmlForAppleScript,
   buildAppleScriptDateVar,
@@ -53,7 +54,7 @@ vi.mock("@/utils/checklistParser.js", () => ({
   getChecklistItems: vi.fn().mockReturnValue({ items: null }),
 }));
 
-import { executeAppleScript } from "@/utils/applescript.js";
+import { executeAppleScript, noteBodyMaxBuffer } from "@/utils/applescript.js";
 const mockExecuteAppleScript = vi.mocked(executeAppleScript);
 const NO_RETRY_OPTIONS = { maxRetries: 1 };
 
@@ -1217,8 +1218,22 @@ describe("AppleNotesManager", () => {
       manager.getNoteContent("My Note", "Gmail");
 
       expect(mockExecuteAppleScript).toHaveBeenCalledWith(
-        expect.stringContaining('every account whose name is "Gmail"')
+        expect.stringContaining('every account whose name is "Gmail"'),
+        { maxBufferBytes: noteBodyMaxBuffer() }
       );
+    });
+
+    it("reads bodies with the note-body output cap, by title and by id (#237)", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "<div>x</div>" });
+      manager.getNoteContent("Photo note", "iCloud");
+      manager.getNoteContentById("x-coredata://ABC/ICNote/p1");
+      const bodyReads = mockExecuteAppleScript.mock.calls.filter(([script]) =>
+        String(script).includes("get body of note")
+      );
+      expect(bodyReads).toHaveLength(2);
+      for (const [, options] of bodyReads) {
+        expect(options).toEqual({ maxBufferBytes: noteBodyMaxBuffer() });
+      }
     });
   });
 
@@ -2182,6 +2197,135 @@ describe("AppleNotesManager", () => {
         ])
       ).toThrow();
       expect(mockExecuteAppleScript).not.toHaveBeenCalled();
+    });
+  });
+
+  // A note's body carries its inline images as base64, so one large image makes
+  // a body far longer than a script literal should be (#237).
+  describe("deleteNoteByIdIfUnchanged with a body too long for a literal (#237)", () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const copy = "x-coredata://ABC/ICNote/p2";
+    const largeBody = (marker: string) =>
+      `<div>${marker} "quoted" \\ slash é 😀</div><img src="data:image/png;base64,${"A".repeat(5 * 1024 * 1024)}">`;
+    const filePaths = (script: string) =>
+      [...script.matchAll(/POSIX file "([^"]+)"/g)].map((match) => match[1]);
+
+    it("compares the whole body against a private temporary file, then removes it", () => {
+      const body = largeBody("Photo");
+      let seen: { script: string; contents: string[]; modes: number[] } | undefined;
+      mockExecuteAppleScript.mockImplementation((script: string) => {
+        const paths = filePaths(script);
+        seen = {
+          script,
+          contents: paths.map((path) => readFileSync(path, "utf8")),
+          modes: paths.map((path) => statSync(path).mode & 0o777),
+        };
+        return { success: true, output: "SAFETY_DELETED" };
+      });
+
+      expect(manager.deleteNoteByIdIfUnchanged(id, body)).toEqual({ status: "deleted" });
+
+      expect(seen!.contents).toEqual([body]);
+      expect(seen!.modes).toEqual([0o600]);
+      // The script stays small: the body is read from the file, not embedded.
+      expect(seen!.script.length).toBeLessThan(10_000);
+      expect(seen!.script).toContain(
+        'if currentBody is not __expectedBody and currentBody is not __expectedBody & linefeed then return "SAFETY_CONFLICT"'
+      );
+      expect(seen!.script.indexOf("set __expectedBody to read")).toBeLessThan(
+        seen!.script.indexOf("set currentBody to body of noteRef")
+      );
+      expect(existsSync(filePaths(seen!.script)[0])).toBe(false);
+    });
+
+    it("reads a large guard body from its own file", () => {
+      const body = largeBody("Original");
+      const guardBody = largeBody("Copy");
+      let contents: string[] = [];
+      let script = "";
+      mockExecuteAppleScript.mockImplementation((text: string) => {
+        script = text;
+        contents = filePaths(text).map((path) => readFileSync(path, "utf8"));
+        return { success: true, output: "SAFETY_GUARD_CONFLICT:0" };
+      });
+
+      expect(
+        manager.deleteNoteByIdIfUnchanged(id, body, undefined, [
+          { id: copy, expectedBody: guardBody },
+        ])
+      ).toEqual({ status: "guard-conflict", index: 0 });
+
+      expect(contents).toEqual([guardBody, body]);
+      expect(script).toContain(
+        'if __guardBody is not __expectedGuardBody0 and __guardBody is not __expectedGuardBody0 & linefeed then return "SAFETY_GUARD_CONFLICT:0"'
+      );
+      for (const path of filePaths(script)) expect(existsSync(path)).toBe(false);
+    });
+
+    it("removes the temporary file when the script run throws", () => {
+      let paths: string[] = [];
+      mockExecuteAppleScript.mockImplementation((script: string) => {
+        paths = filePaths(script);
+        throw new Error("osascript failed");
+      });
+
+      expect(() => manager.deleteNoteByIdIfUnchanged(id, largeBody("Photo"))).toThrow(
+        "osascript failed"
+      );
+      expect(paths).toHaveLength(1);
+      expect(existsSync(paths[0])).toBe(false);
+    });
+
+    it("generates a file-backed delete script that AppleScript compiles", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      manager.deleteNoteByIdIfUnchanged(id, largeBody("Photo"), undefined, [
+        { id: copy, expectedBody: largeBody("Copy") },
+      ]);
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
+      try {
+        writeFileSync(join(dir, "delete.applescript"), script);
+        expect(() =>
+          execFileSync(
+            "/usr/bin/osacompile",
+            ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
+            { stdio: "pipe" }
+          )
+        ).not.toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("ExpectedBodies", () => {
+    it("embeds a short body as an escaped literal and writes no file", () => {
+      const bodies = new ExpectedBodies();
+      expect(bodies.bind('<div>Say "hi" \\ there</div>', "__x")).toEqual({
+        setup: "",
+        operand: '"<div>Say \\"hi\\" \\\\ there</div>"',
+      });
+      bodies.cleanup();
+      bodies.cleanup();
+    });
+
+    it("reads a long body back through real osascript byte for byte", () => {
+      const body = `<div>Line one "q" \\ é 😀\ttab</div>\n<div>${"B".repeat(5 * 1024 * 1024)}</div>`;
+      const bodies = new ExpectedBodies();
+      try {
+        const { setup, operand } = bodies.bind(body, "__roundTrip");
+        expect(operand).toBe("__roundTrip");
+        // Inside a Notes tell block, as in the delete script, but without
+        // sending Notes anything: the read runs in osascript itself.
+        const output = execFileSync("osascript", ["-"], {
+          input: `${setup}\nreturn __roundTrip`,
+          encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+        });
+        expect(output).toBe(`${body}\n`);
+      } finally {
+        bodies.cleanup();
+      }
     });
   });
 

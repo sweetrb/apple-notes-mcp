@@ -7,8 +7,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "child_process";
+import { constants as bufferConstants } from "node:buffer";
 import {
   executeAppleScript,
+  getMaxBuffer,
+  noteBodyMaxBuffer,
   isPermissionDenied,
   PERMISSION_DENIED_MESSAGE,
 } from "./applescript.js";
@@ -126,6 +129,68 @@ describe("executeAppleScript", () => {
       mockExecFileSync.mockReturnValue("ok");
       executeAppleScript("get name of notes");
       expect(execOptions().maxBuffer).toBe(1048576);
+    });
+
+    it("lets one call set its own output cap", () => {
+      mockExecFileSync.mockReturnValue("ok");
+      executeAppleScript("get body of note 1", { maxBufferBytes: 123456789 });
+      expect(execOptions().maxBuffer).toBe(123456789);
+    });
+  });
+
+  // Node kills osascript with killSignal when output passes maxBuffer, so the
+  // error also carries SIGKILL. Before #237 it read as a timeout and retried.
+  describe("output overflow (#237)", () => {
+    afterEach(() => {
+      delete process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+    });
+
+    function makeOverflowError(): Error {
+      return Object.assign(new Error("spawnSync osascript ENOBUFS"), {
+        code: "ENOBUFS",
+        signal: "SIGKILL",
+      });
+    }
+
+    it("names the output cap instead of reporting a timeout, and does not retry", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw makeOverflowError();
+      });
+      const result = executeAppleScript("get body of note 1", { maxRetries: 3 });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "Notes.app returned more than 64 MB of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more."
+      );
+      expect(result.error).not.toMatch(/timed? out/i);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
+    });
+
+    it("states a cap under 1 MB in bytes", () => {
+      process.env.APPLE_NOTES_MCP_MAX_BUFFER = "50";
+      mockExecFileSync.mockImplementation(() => {
+        throw makeOverflowError();
+      });
+      expect(executeAppleScript("get name of notes").error).toContain(
+        "returned more than 50 bytes of output"
+      );
+    });
+  });
+
+  describe("noteBodyMaxBuffer (#237)", () => {
+    afterEach(() => {
+      delete process.env.APPLE_NOTES_MCP_MAX_BUFFER;
+    });
+
+    it("allows up to 512 MB, within V8's largest string", () => {
+      expect(noteBodyMaxBuffer()).toBe(
+        Math.min(512 * 1024 * 1024, bufferConstants.MAX_STRING_LENGTH)
+      );
+      expect(noteBodyMaxBuffer()).toBeGreaterThan(getMaxBuffer());
+    });
+
+    it("keeps a larger APPLE_NOTES_MCP_MAX_BUFFER", () => {
+      process.env.APPLE_NOTES_MCP_MAX_BUFFER = String(2 * 1024 * 1024 * 1024);
+      expect(noteBodyMaxBuffer()).toBe(2 * 1024 * 1024 * 1024);
     });
   });
 

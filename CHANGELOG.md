@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.9.9] - 2026-09-23
+
+### Fixed
+
+- A note holding a large image can be read and deleted again (#237). Notes.app
+  returns a body with each inline image embedded as base64, so a 40 MB TIFF
+  makes a body of about 110 MB. That exceeded the 64 MB AppleScript output cap,
+  and because Node stops osascript with the same signal it uses for a timeout,
+  `get-note-content` reported a 30-second timeout and retried. Body reads now
+  accept up to 512 MB. `delete-note` had a second limit: it embedded the
+  reviewed body in its AppleScript and refused any body over 5 MB, which a
+  single 5 MB image already exceeds. A longer body is now written to a private
+  temporary file (mode 0600, removed afterwards) that the delete script reads,
+  so the comparison before the delete still covers the whole body, including
+  a `guardNoteId` body. The `contentHash` of every note is unchanged.
+- Output past the AppleScript output cap now fails at once with an error that
+  names the cap and `APPLE_NOTES_MCP_MAX_BUFFER`, instead of being reported as
+  a timeout and retried.
+
 ## [2.9.8] - 2026-09-23
 
 ### Added
