@@ -71,6 +71,7 @@ Use this skill when the user:
 | `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
 | `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
+| `get-note-drawings` | Decode classic PencilKit drawings to strokes or SVG (needs `apple-notes-mcp setup --public-helper` once) |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
 | `health-check` | Quickly verify Notes.app access |

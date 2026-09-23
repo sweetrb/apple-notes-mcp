@@ -194,6 +194,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Falls back to plain list items if Full Disk Access is not granted (no error)
 - No action needed — enrichment happens transparently
 
+### get-note-drawings (classic PencilKit drawings)
+- Decodes `com.apple.drawing.2` / `com.apple.drawing` attachments into strokes (`inkType`, sRGB `color`, `width`, `points`) and/or SVG (`format: "json" | "svg" | "both"`). Modern Paper sketches (`com.apple.paper`) are not decoded.
+- Needs Full Disk Access and the public native helper, built once by the user with `apple-notes-mcp setup --public-helper`. An error mentioning `setup --public-helper` means it is not built or is stale after an upgrade; tell the user to run that command rather than retrying.
+- Overall `status` is `none` when the note has no classic drawing. A per-drawing `status: "error"` carries a `code` (`no_data`, `undecodable`, `timeout`, ...) and does not fail the call.
+- For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points itself (`pointsOmitted`) past the response size limit.
+
 ### Multi-account
 - Omitting `account` targets whatever Notes.app reports as its **`default account`** — which is often, but not necessarily, iCloud. Since 2.7.1 the server resolves that name at runtime instead of assuming the literal `"iCloud"`, so it is also correct for a localized account name, a non-iCloud default, or a name carrying a trailing U+F8FF ()
 - Use `list-accounts` to see available accounts

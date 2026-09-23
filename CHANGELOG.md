@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `get-note-drawings` decodes a note's classic PencilKit drawings
+  (`com.apple.drawing.2` and `com.apple.drawing` attachments) into strokes
+  (ink type, sRGB color with alpha, width, points in drawing coordinates) and
+  standalone SVG documents. The drawing bytes are read read-only from
+  `ZMERGEABLEDATA1` (or `ZMERGEABLEDATA` on older schemas) through a
+  parameterized query; each drawing reports its own `ok`/`error` status.
+- A public native helper, built on the user's Mac with
+  `apple-notes-mcp setup --public-helper` (`--check` to inspect). It is a Swift
+  program that links public frameworks only (AppKit, PencilKit), compiled with
+  `xcrun swiftc`, signed ad hoc, handshake-verified, and installed under
+  `~/Library/Application Support/apple-notes-mcp/public-helper/` with a
+  manifest of source and binary SHA-256 digests that is re-checked before
+  every call. No prebuilt binary ships; the package now includes `native/`.
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` and
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` override the install folder and
+  per-call timeout.
+- `scripts/test-public-helper.mjs` checks an installed helper against the
+  synthetic PencilKit fixture used by the unit tests.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

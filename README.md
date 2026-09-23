@@ -1004,6 +1004,22 @@ Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQ
 
 ---
 
+#### `get-note-drawings`
+
+Decodes a note's classic PencilKit drawings (`com.apple.drawing.2` and the older `com.apple.drawing` attachments) into strokes and SVG. The PencilKit bytes are read read-only from the NoteStore database and decoded by Apple's public `PKDrawing(data:)` in the [public native helper](#public-native-helper). Modern Paper sketches (`com.apple.paper`) are a different format and are not decoded here.
+
+**Requires:** Full Disk Access for the MCP host process, and the public native helper built once with `apple-notes-mcp setup --public-helper`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `format` | string | No | `"json"` (default) returns strokes, `"svg"` returns a standalone SVG document per drawing, `"both"` returns both |
+| `includePoints` | boolean | No | Include per-point `x`, `y`, `width`, `opacity`, and `force` in JSON strokes (default `true`) |
+
+**Returns:** `status` (`ok`, `partial`, `error`, or `none` when the note has no classic drawing), `drawingCount`, and one entry per drawing with `attachmentId`, `identifier`, `typeUti`, `status` (`ok`, or `error` with a `code` such as `no_data`, `undecodable`, or `timeout`), `strokeCount`, `bounds`, `truncated`, `strokes` (each with `inkType`, sRGB `color` with alpha, mean `width`, `pointCount`, `bounds`, and `points`), and `svg`. Points are already in drawing coordinates. When a response would exceed `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, points are dropped and `pointsOmitted` is set. The SVG draws one path per stroke; it is a faithful outline, not a pixel-exact copy of PencilKit's ink textures.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -1384,6 +1400,22 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
+- `get-note-drawings` returns the same Full Disk Access error
+
+---
+
+## Public native helper
+
+`get-note-drawings` needs Apple's PencilKit framework, which has no AppleScript or command-line interface. For it, the server uses a small Swift helper that links public Apple frameworks only (AppKit and PencilKit). No prebuilt binary ships with the package. Build it once on your Mac:
+
+```bash
+apple-notes-mcp setup --public-helper          # compile, sign, verify, install
+apple-notes-mcp setup --public-helper --check  # report the installed state only
+```
+
+Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
+
+The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin; the helper answers with one JSON object on stdout.
 
 ---
 
