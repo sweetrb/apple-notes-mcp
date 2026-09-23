@@ -37,8 +37,14 @@ import {
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
-import { listSpecialNotes, nativeTagInventory, SPECIAL_LIMIT } from "@/utils/noteListings.js";
-import type { SpecialNoteKind } from "@/types.js";
+import {
+  listSpecialNotes,
+  nativeTagInventory,
+  quickNoteFlag,
+  SPECIAL_LIMIT,
+} from "@/utils/noteListings.js";
+import { NoteStoreError } from "@/utils/noteStoreSql.js";
+import type { DeleteGuardNote, SpecialNoteKind } from "@/types.js";
 import {
   exactIdArrayInput,
   exactIdInput,
@@ -443,6 +449,90 @@ function inRecentlyDeletedMessage(title: string): string {
 
 function revisionConflictMessage(title: string): string {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
+}
+
+/** delete-note's guard-note arguments (copy-then-retire). */
+interface DeleteGuardArgs {
+  id: string;
+  guardNoteId?: string;
+  expectedGuardContentHash?: string;
+  requireActiveNoteId?: string;
+}
+
+/** Guard notes ready for the delete script, with a label per entry for messages. */
+type PreparedDeleteGuards = {
+  guards: DeleteGuardNote[];
+  labels: string[];
+  guardContentHash?: string;
+};
+
+/**
+ * Refuses a Quick Note as a guard note. The flag lives only in the database,
+ * so this needs Full Disk Access. A note the database does not have yet (a
+ * copy made seconds ago) passes: it was not made as a Quick Note, and the
+ * delete script still proves it exists, is unlocked, is outside Recently
+ * Deleted, and, for guardNoteId, still has the verified body.
+ */
+function quickNoteGuardRefusal(label: string, id: string): string | null {
+  let quick: boolean | null;
+  try {
+    quick = quickNoteFlag(id);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (error instanceof NoteStoreError && error.kind === "no_fda") {
+      return `${label} note cannot be checked: the delete-note guard needs Full Disk Access to rule out a Quick Note. Nothing was deleted. ${detail}`;
+    }
+    return `${label} note could not be checked (${detail}). Nothing was deleted.`;
+  }
+  return quick
+    ? `${label} note is a Quick Note; a guard must be an ordinary note. Nothing was deleted.`
+    : null;
+}
+
+/**
+ * Pre-checks delete-note's guard notes and collects them for the delete
+ * script, which repeats the live checks immediately before the delete.
+ */
+function prepareDeleteGuards(args: DeleteGuardArgs): PreparedDeleteGuards | { error: string } {
+  const { id, guardNoteId, expectedGuardContentHash, requireActiveNoteId } = args;
+  if ((guardNoteId === undefined) !== (expectedGuardContentHash === undefined)) {
+    return { error: "Pass guardNoteId and expectedGuardContentHash together." };
+  }
+  if (guardNoteId === id || requireActiveNoteId === id) {
+    return { error: "A guard note must be a different note from the one being deleted." };
+  }
+  if (guardNoteId !== undefined && guardNoteId === requireActiveNoteId) {
+    return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId." };
+  }
+
+  const prepared: PreparedDeleteGuards = { guards: [], labels: [] };
+  if (guardNoteId !== undefined) {
+    const refusal = quickNoteGuardRefusal("Guard", guardNoteId);
+    if (refusal) return { error: refusal };
+    const guard = readExactNoteSnapshot(guardNoteId);
+    if ("error" in guard) return { error: `Guard note: ${guard.error}` };
+    if (guard.contentHash !== expectedGuardContentHash) {
+      return {
+        error: `Guard note "${guard.note.title}" changed after it was read. Verify the copy again before retiring the original. Nothing was deleted.`,
+      };
+    }
+    prepared.guards.push({ id: guardNoteId, expectedBody: guard.body });
+    prepared.labels.push("Guard");
+    prepared.guardContentHash = guard.contentHash;
+  }
+  if (requireActiveNoteId !== undefined) {
+    const refusal = quickNoteGuardRefusal("Required active", requireActiveNoteId);
+    if (refusal) return { error: refusal };
+    const active = notesManager.getNoteById(requireActiveNoteId);
+    if (!active)
+      return { error: `Required active note with ID "${requireActiveNoteId}" not found.` };
+    if (active.passwordProtected) {
+      return { error: `Required active note "${active.title}" is password-protected.` };
+    }
+    prepared.guards.push({ id: requireActiveNoteId });
+    prepared.labels.push("Required active");
+  }
+  return prepared;
 }
 
 /**
@@ -2161,10 +2251,23 @@ registerTool(
   "delete-note",
   {
     description:
-      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
+      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too. Copy-then-retire: pass guardNoteId and expectedGuardContentHash (the verified copy's contentHash) to delete only while the copy still has that revision, is unlocked, is outside Recently Deleted, and is not a Quick Note; requireActiveNoteId requires the same of a second note without fingerprinting it. The guard needs Full Disk Access to rule out a Quick Note. The copy's body, lock state, and folder are checked again inside the delete AppleScript, but the pair is not one transaction.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note (usually the verified copy) that must still match expectedGuardContentHash, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Needs Full Disk Access"
+        ),
+      expectedGuardContentHash: expectedContentHashInput
+        .optional()
+        .describe("get-note-content contentHash of guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted. Needs Full Disk Access"
+        ),
       timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs,
     },
@@ -2174,51 +2277,91 @@ registerTool(
       title: z.string().optional(),
       wasShared: z.boolean().optional(),
       previousContentHash: z.string().optional(),
+      guardNoteId: z.string().optional(),
+      guardContentHash: z.string().optional(),
+      requireActiveNoteId: z.string().optional(),
     },
   },
-  withErrorHandling(({ id, expectedContentHash, ...scopeArgs }) => {
-    const snapshot = readExactNoteSnapshot(id);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-
-    const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body, scopeFrom(scopeArgs));
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status === "scope_conflict") {
-      return errorResponse(scopeConflictMessage(result.reason));
-    }
-    if (result.status === "in-recently-deleted") {
-      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
-    }
-    if (result.status === "container-unknown") {
-      return errorResponse(containerUnknownMessage(snapshot.note.title));
-    }
-    if (result.status === "not-deleted") {
-      return errorResponse(NOT_DELETED_MESSAGE);
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
-      );
-    }
-
-    const sharedWarning = snapshot.note.shared
-      ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
-      : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
+  withErrorHandling(
+    ({
+      id,
+      expectedContentHash,
+      guardNoteId,
+      expectedGuardContentHash,
+      requireActiveNoteId,
+      ...scopeArgs
+    }) => {
+      // Guard notes are checked first, so the delete note's revision read is the
+      // last step before the delete script.
+      const prepared = prepareDeleteGuards({
         id,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash,
+        guardNoteId,
+        expectedGuardContentHash,
+        requireActiveNoteId,
+      });
+      if ("error" in prepared) return errorResponse(prepared.error);
+
+      const snapshot = readExactNoteSnapshot(id);
+      if ("error" in snapshot) return errorResponse(snapshot.error);
+      if (snapshot.contentHash !== expectedContentHash) {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-    );
-  }, "Error deleting note")
+
+      const result = notesManager.deleteNoteByIdIfUnchanged(
+        id,
+        snapshot.body,
+        scopeFrom(scopeArgs),
+        prepared.guards
+      );
+      if (result.status === "guard-conflict") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note changed just before the delete. Nothing was deleted; verify it again before retrying.`
+        );
+      }
+      if (result.status === "guard-inactive") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note is no longer active (${result.reason}). Nothing was deleted.`
+        );
+      }
+      if (result.status === "conflict") {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
+      }
+      if (result.status === "scope_conflict") {
+        return errorResponse(scopeConflictMessage(result.reason));
+      }
+      if (result.status === "in-recently-deleted") {
+        return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
+      }
+      if (result.status === "container-unknown") {
+        return errorResponse(containerUnknownMessage(snapshot.note.title));
+      }
+      if (result.status === "not-deleted") {
+        return errorResponse(NOT_DELETED_MESSAGE);
+      }
+      if (result.status !== "deleted") {
+        return errorResponse(
+          `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
+        );
+      }
+
+      const sharedWarning = snapshot.note.shared
+        ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
+        : "";
+      return successResponse(
+        `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
+        {
+          ok: true,
+          id,
+          title: snapshot.note.title,
+          wasShared: snapshot.note.shared ?? false,
+          previousContentHash: expectedContentHash,
+          ...(guardNoteId ? { guardNoteId, guardContentHash: prepared.guardContentHash } : {}),
+          ...(requireActiveNoteId ? { requireActiveNoteId } : {}),
+        }
+      );
+    },
+    "Error deleting note"
+  )
 );
 
 // --- move-note ---

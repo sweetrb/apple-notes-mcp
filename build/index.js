@@ -42140,6 +42140,19 @@ function trashFolderIdList() {
   const ids = readTrashFolderIds().filter((id2) => FOLDER_ID_PATTERN.test(id2));
   return `{${ids.map((id2) => `"${id2}"`).join(", ")}}`;
 }
+function inRecentlyDeletedScript(containerVar, flagVar, trashIds) {
+  return `
+      set ${flagVar} to true
+      try
+        if (class of ${containerVar}) is folder then set ${flagVar} to false
+      end try
+      try
+        if ${trashIds} contains (id of ${containerVar}) then set ${flagVar} to true
+      end try
+      try
+        if (name of ${containerVar}) is "${RECENTLY_DELETED_FOLDER_NAME}" then set ${flagVar} to true
+      end try`;
+}
 function buildTrashNoteIdsCollector() {
   return `
         set __trashNoteIds to {}
@@ -43024,29 +43037,53 @@ var AppleNotesManager = class {
    * Deletes one exact note only when its complete body still matches the body
    * the caller reviewed. The comparison and delete are one AppleScript action,
    * so a concurrent edit cannot slip between the guard and deletion.
+   *
+   * `guards` are other notes that must still be active when the delete runs
+   * (the copy-then-retire guard of delete-note): each must exist, be unlocked,
+   * and sit in a folder other than Recently Deleted, and one with
+   * `expectedBody` must still have that body. They are checked in the same
+   * script, just before the delete; `index` in a guard outcome points into
+   * `guards`.
    */
-  deleteNoteByIdIfUnchanged(id2, expectedBody, scope2) {
+  deleteNoteByIdIfUnchanged(id2, expectedBody, scope2, guards = []) {
     const safeId = sanitizeNoteId(id2);
     validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
     const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
+    const trashIds = trashFolderIdList();
+    const guardChecks = guards.map((guard, index) => {
+      const safeGuardId = sanitizeNoteId(guard.id);
+      const ref = `__guardRef${index}`;
+      const folderVar = `__guardFolder${index}`;
+      const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+      let bodyCheck = "";
+      if (guard.expectedBody !== void 0) {
+        validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
+        const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
+        bodyCheck = `
+      set __guardBody to body of ${ref}
+      considering case
+        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+      end considering`;
+      }
+      return `
+      if not (exists note id "${safeGuardId}") then ${inactive("missing")}
+      set ${ref} to note id "${safeGuardId}"
+      if password protected of ${ref} then ${inactive("locked")}
+      set ${folderVar} to missing value
+      try
+        set ${folderVar} to container of ${ref}
+      end try
+      if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
+      if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
+    }).join("");
     const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
-      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"
-      set __inTrash to true
-      try
-        if (class of originalFolder) is folder then set __inTrash to false
-      end try
-      try
-        if ${trashFolderIdList()} contains (id of originalFolder) then set __inTrash to true
-      end try
-      try
-        if (name of originalFolder) is "${RECENTLY_DELETED_FOLDER_NAME}" then set __inTrash to true
-      end try
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"
+      if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
       set currentBody to body of noteRef
       considering case
         if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
@@ -43065,6 +43102,11 @@ var AppleNotesManager = class {
     const deleteScopeFailure = parseScopeFailure(result.output);
     if (deleteScopeFailure) return { status: "scope_conflict", reason: deleteScopeFailure };
     const status = result.output.trim();
+    const guardOutcome = /^SAFETY_GUARD_(CONFLICT|INACTIVE):(\d+)(?::(.+))?$/.exec(status);
+    if (guardOutcome && Number(guardOutcome[2]) < guards.length) {
+      const index = Number(guardOutcome[2]);
+      return guardOutcome[1] === "CONFLICT" ? { status: "guard-conflict", index } : { status: "guard-inactive", index, reason: guardOutcome[3] ?? "inactive" };
+    }
     if (status === "SAFETY_CONFLICT") return { status: "conflict" };
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
@@ -45567,6 +45609,23 @@ function toSpecialRow(row, uuid2, paths, accountNames, kind) {
   if (!locked) note.snippet = row.snippet ?? null;
   if (kind === "locked" && row.hint) note.passwordHint = row.hint;
   return note;
+}
+var EXACT_NOTE_ID = /^x-coredata:\/\/([0-9A-F-]+)\/ICNote\/p(\d+)$/i;
+function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH7) {
+  const match = EXACT_NOTE_ID.exec(noteId3);
+  if (!match) throw new NoteStoreError(`Not an exact note id: ${noteId3}`, "invalid_input");
+  const columns = readColumns(dbPath2);
+  const sql = `SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'quick', (SELECT ${flag(columns, "n", "ZISSYSTEMPAPER")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}));`;
+  const [row] = parseJsonLines(
+    runReadOnlySql(dbPath2, sql, { pk: { int: Number(match[2]) } })
+  );
+  if (row?.uuid?.toUpperCase() !== match[1].toUpperCase()) {
+    throw new NoteStoreError(
+      `Note id ${noteId3} belongs to a different Notes database.`,
+      "invalid_input"
+    );
+  }
+  return row.quick === null ? null : row.quick === 1;
 }
 var TAG_REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"];
 function buildTagInventorySql(columns, scoped) {
@@ -51564,6 +51623,59 @@ function inRecentlyDeletedMessage(title) {
 function revisionConflictMessage(title) {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
 }
+function quickNoteGuardRefusal(label, id2) {
+  let quick;
+  try {
+    quick = quickNoteFlag(id2);
+  } catch (error2) {
+    const detail = error2 instanceof Error ? error2.message : String(error2);
+    if (error2 instanceof NoteStoreError && error2.kind === "no_fda") {
+      return `${label} note cannot be checked: the delete-note guard needs Full Disk Access to rule out a Quick Note. Nothing was deleted. ${detail}`;
+    }
+    return `${label} note could not be checked (${detail}). Nothing was deleted.`;
+  }
+  return quick ? `${label} note is a Quick Note; a guard must be an ordinary note. Nothing was deleted.` : null;
+}
+function prepareDeleteGuards(args) {
+  const { id: id2, guardNoteId, expectedGuardContentHash, requireActiveNoteId } = args;
+  if (guardNoteId === void 0 !== (expectedGuardContentHash === void 0)) {
+    return { error: "Pass guardNoteId and expectedGuardContentHash together." };
+  }
+  if (guardNoteId === id2 || requireActiveNoteId === id2) {
+    return { error: "A guard note must be a different note from the one being deleted." };
+  }
+  if (guardNoteId !== void 0 && guardNoteId === requireActiveNoteId) {
+    return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId." };
+  }
+  const prepared = { guards: [], labels: [] };
+  if (guardNoteId !== void 0) {
+    const refusal = quickNoteGuardRefusal("Guard", guardNoteId);
+    if (refusal) return { error: refusal };
+    const guard = readExactNoteSnapshot(guardNoteId);
+    if ("error" in guard) return { error: `Guard note: ${guard.error}` };
+    if (guard.contentHash !== expectedGuardContentHash) {
+      return {
+        error: `Guard note "${guard.note.title}" changed after it was read. Verify the copy again before retiring the original. Nothing was deleted.`
+      };
+    }
+    prepared.guards.push({ id: guardNoteId, expectedBody: guard.body });
+    prepared.labels.push("Guard");
+    prepared.guardContentHash = guard.contentHash;
+  }
+  if (requireActiveNoteId !== void 0) {
+    const refusal = quickNoteGuardRefusal("Required active", requireActiveNoteId);
+    if (refusal) return { error: refusal };
+    const active = notesManager.getNoteById(requireActiveNoteId);
+    if (!active)
+      return { error: `Required active note with ID "${requireActiveNoteId}" not found.` };
+    if (active.passwordProtected) {
+      return { error: `Required active note "${active.title}" is password-protected.` };
+    }
+    prepared.guards.push({ id: requireActiveNoteId });
+    prepared.labels.push("Required active");
+  }
+  return prepared;
+}
 var folderNameSchema = {
   name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER),
   account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
@@ -52799,10 +52911,17 @@ registerTool(
 registerTool(
   "delete-note",
   {
-    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
+    description: "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too. Copy-then-retire: pass guardNoteId and expectedGuardContentHash (the verified copy's contentHash) to delete only while the copy still has that revision, is unlocked, is outside Recently Deleted, and is not a Quick Note; requireActiveNoteId requires the same of a second note without fingerprinting it. The guard needs Full Disk Access to rule out a Quick Note. The copy's body, lock state, and folder are checked again inside the delete AppleScript, but the pair is not one transaction.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput.optional().describe(
+        "A second note (usually the verified copy) that must still match expectedGuardContentHash, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Needs Full Disk Access"
+      ),
+      expectedGuardContentHash: expectedContentHashInput.optional().describe("get-note-content contentHash of guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput.optional().describe(
+        "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted. Needs Full Disk Access"
+      ),
       timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs
     },
@@ -52811,48 +52930,85 @@ registerTool(
       id: external_exports.string().optional(),
       title: external_exports.string().optional(),
       wasShared: external_exports.boolean().optional(),
-      previousContentHash: external_exports.string().optional()
+      previousContentHash: external_exports.string().optional(),
+      guardNoteId: external_exports.string().optional(),
+      guardContentHash: external_exports.string().optional(),
+      requireActiveNoteId: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ id: id2, expectedContentHash, ...scopeArgs }) => {
-    const snapshot = readExactNoteSnapshot(id2);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    const result = notesManager.deleteNoteByIdIfUnchanged(id2, snapshot.body, scopeFrom(scopeArgs));
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status === "scope_conflict") {
-      return errorResponse(scopeConflictMessage(result.reason));
-    }
-    if (result.status === "in-recently-deleted") {
-      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
-    }
-    if (result.status === "container-unknown") {
-      return errorResponse(containerUnknownMessage(snapshot.note.title));
-    }
-    if (result.status === "not-deleted") {
-      return errorResponse(NOT_DELETED_MESSAGE);
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
-      );
-    }
-    const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
+  withErrorHandling(
+    ({
+      id: id2,
+      expectedContentHash,
+      guardNoteId,
+      expectedGuardContentHash,
+      requireActiveNoteId,
+      ...scopeArgs
+    }) => {
+      const prepared = prepareDeleteGuards({
         id: id2,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash
+        guardNoteId,
+        expectedGuardContentHash,
+        requireActiveNoteId
+      });
+      if ("error" in prepared) return errorResponse(prepared.error);
+      const snapshot = readExactNoteSnapshot(id2);
+      if ("error" in snapshot) return errorResponse(snapshot.error);
+      if (snapshot.contentHash !== expectedContentHash) {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-    );
-  }, "Error deleting note")
+      const result = notesManager.deleteNoteByIdIfUnchanged(
+        id2,
+        snapshot.body,
+        scopeFrom(scopeArgs),
+        prepared.guards
+      );
+      if (result.status === "guard-conflict") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note changed just before the delete. Nothing was deleted; verify it again before retrying.`
+        );
+      }
+      if (result.status === "guard-inactive") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note is no longer active (${result.reason}). Nothing was deleted.`
+        );
+      }
+      if (result.status === "conflict") {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
+      }
+      if (result.status === "scope_conflict") {
+        return errorResponse(scopeConflictMessage(result.reason));
+      }
+      if (result.status === "in-recently-deleted") {
+        return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
+      }
+      if (result.status === "container-unknown") {
+        return errorResponse(containerUnknownMessage(snapshot.note.title));
+      }
+      if (result.status === "not-deleted") {
+        return errorResponse(NOT_DELETED_MESSAGE);
+      }
+      if (result.status !== "deleted") {
+        return errorResponse(
+          `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
+        );
+      }
+      const sharedWarning = snapshot.note.shared ? "\n\n\u26A0\uFE0F This note was shared with collaborators. They will no longer have access." : "";
+      return successResponse(
+        `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
+        {
+          ok: true,
+          id: id2,
+          title: snapshot.note.title,
+          wasShared: snapshot.note.shared ?? false,
+          previousContentHash: expectedContentHash,
+          ...guardNoteId ? { guardNoteId, guardContentHash: prepared.guardContentHash } : {},
+          ...requireActiveNoteId ? { requireActiveNoteId } : {}
+        }
+      );
+    },
+    "Error deleting note"
+  )
 );
 registerTool(
   "move-note",

@@ -21,6 +21,7 @@ import {
   kindSupported,
   listSpecialNotes,
   nativeTagInventory,
+  quickNoteFlag,
   referencedObjects,
 } from "./noteListings.js";
 import { NoteStoreError } from "./noteStoreSql.js";
@@ -417,5 +418,44 @@ describe("referencedObjects", () => {
     expect(referencedObjects("zz")).toBeNull();
     expect(referencedObjects(gzipSync(Buffer.from([0x08, 0x01])).toString("hex"))).toBeNull();
     expect(referencedObjects("1f8b")).toBeNull();
+  });
+});
+
+describe("quickNoteFlag", () => {
+  const idFor = (pk: number, uuid = UUID) => `x-coredata://${uuid}/ICNote/p${pk}`;
+
+  it("reads the Quick Note flag of one note", () => {
+    expect(quickNoteFlag(idFor(103), full)).toBe(true);
+    expect(quickNoteFlag(idFor(100), full)).toBe(false);
+    // The store UUID is compared case-insensitively.
+    expect(quickNoteFlag(idFor(103, UUID.toLowerCase()), full)).toBe(true);
+  });
+
+  it("returns null for a note the store does not have yet, or a non-note row", () => {
+    expect(quickNoteFlag(idFor(999), full)).toBeNull();
+    expect(quickNoteFlag(idFor(10), full)).toBeNull();
+  });
+
+  it("treats every note as ordinary on a store without Quick Notes", () => {
+    expect(quickNoteFlag(idFor(103), reduced)).toBe(false);
+    expect(quickNoteFlag(idFor(999), reduced)).toBeNull();
+  });
+
+  it("refuses an id from another store or of another shape", () => {
+    expect(() => quickNoteFlag(idFor(103, "11111111-2222-3333-4444-555555555555"), full)).toThrow(
+      /different Notes database/
+    );
+    expect(() => quickNoteFlag("x-coredata://ABC/ICFolder/p10", full)).toThrow(NoteStoreError);
+  });
+
+  it("reports a missing database as a Full Disk Access error", () => {
+    let caught: unknown;
+    try {
+      quickNoteFlag(idFor(103), join(dir, "missing.sqlite"));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(NoteStoreError);
+    expect((caught as NoteStoreError).kind).toBe("no_fda");
   });
 });

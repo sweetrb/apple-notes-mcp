@@ -124,6 +124,18 @@ export interface Note {
 }
 
 /**
+ * A second note that must still be active when `delete-note` runs: it must
+ * exist, be unlocked, and sit outside Recently Deleted. With `expectedBody`
+ * (the copy-then-retire guard) its body must also still match.
+ */
+export interface DeleteGuardNote {
+  /** Exact CoreData id of the guard note. */
+  id: string;
+  /** Body the guard note must still have; omitted for requireActiveNoteId. */
+  expectedBody?: string;
+}
+
+/**
  * Represents a folder in Apple Notes.
  *
  * Folders provide hierarchical organization for notes within an account.

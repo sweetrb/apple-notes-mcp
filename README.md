@@ -809,9 +809,25 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
 | `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
+| `guardNoteId` | string | No | A second note (usually a verified copy) that must still be intact; needs Full Disk Access |
+| `expectedGuardContentHash` | string | With `guardNoteId` | `contentHash` of the guard note from `get-note-content` |
+| `requireActiveNoteId` | string | No | A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note; its content is not fingerprinted. Needs Full Disk Access |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
+
+**Copy-then-retire.** To delete an original only while its copy is still good,
+read both notes, verify the copy, and pass the copy as `guardNoteId` with its
+`contentHash` as `expectedGuardContentHash`. The copy's revision is re-read just
+before the delete, and its body, lock state, and folder are checked again
+inside the delete AppleScript, with the same fail-closed Recently Deleted test
+as the note being deleted. The guard note must not be a Quick Note, a flag only
+the database holds, so the guard needs Full Disk Access. A copy the database
+has not saved yet passes on the live checks alone. The pair is still not one
+transaction: the rich revision (which also covers checklists and attachments)
+is a pre-check, and the in-script check covers the body and state Notes.app
+exposes. `requireActiveNoteId` is the narrower form for a destination you
+wrote yourself rather than copied.
 
 **Example - Using ID (recommended):**
 ```json

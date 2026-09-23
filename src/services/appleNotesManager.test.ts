@@ -2106,6 +2106,85 @@ describe("AppleNotesManager", () => {
     });
   });
 
+  describe("deleteNoteByIdIfUnchanged guard notes (copy-then-retire)", () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const copy = "x-coredata://ABC/ICNote/p2";
+    const other = "x-coredata://ABC/ICNote/p3";
+    const guards = [{ id: copy, expectedBody: '<div>Copy with "quotes"</div>' }, { id: other }];
+
+    it("checks every guard live, after the source trash check and before the delete", () => {
+      mockReadTrashFolderIds.mockReturnValue([TRASH_FOLDER]);
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>", undefined, guards)).toEqual({
+        status: "deleted",
+      });
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const sourceTrash = script.indexOf('return "SAFETY_IN_RECENTLY_DELETED"');
+      const guardStart = script.indexOf(`exists note id "${copy}"`);
+      expect(guardStart).toBeGreaterThan(sourceTrash);
+      for (const needle of [
+        'return "SAFETY_GUARD_INACTIVE:0:missing"',
+        "if password protected of __guardRef0",
+        'return "SAFETY_GUARD_INACTIVE:0:locked"',
+        'return "SAFETY_GUARD_INACTIVE:0:folder unknown"',
+        "if (class of __guardFolder0) is folder then set __guardInTrash to false",
+        `{"${TRASH_FOLDER}"} contains (id of __guardFolder0)`,
+        '(name of __guardFolder0) is "Recently Deleted"',
+        'return "SAFETY_GUARD_INACTIVE:0:in Recently Deleted"',
+        'return "SAFETY_GUARD_CONFLICT:0"',
+        `exists note id "${other}"`,
+        'return "SAFETY_GUARD_INACTIVE:1:in Recently Deleted"',
+      ]) {
+        const at = script.indexOf(needle);
+        expect(at, needle).toBeGreaterThan(sourceTrash);
+        expect(at, needle).toBeLessThan(script.indexOf("delete noteRef"));
+      }
+      // Only the fingerprinted guard compares its body.
+      expect(script).not.toContain("SAFETY_GUARD_CONFLICT:1");
+      expect(script).toContain('__guardBody is not "<div>Copy with \\"quotes\\"</div>"');
+      expect(() => compilesAsAppleScript(script)).not.toThrow();
+    });
+
+    it("maps guard outcomes to their index", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "SAFETY_GUARD_CONFLICT:0",
+      });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>", undefined, guards)).toEqual({
+        status: "guard-conflict",
+        index: 0,
+      });
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "SAFETY_GUARD_INACTIVE:1:in Recently Deleted",
+      });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>", undefined, guards)).toEqual({
+        status: "guard-inactive",
+        index: 1,
+        reason: "in Recently Deleted",
+      });
+    });
+
+    it("treats a guard outcome for an unknown index as failed", () => {
+      mockExecuteAppleScript.mockReturnValueOnce({
+        success: true,
+        output: "SAFETY_GUARD_INACTIVE:5:missing",
+      });
+      expect(manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>")).toEqual({
+        status: "failed",
+      });
+    });
+
+    it("rejects an invalid guard id before running anything", () => {
+      expect(() =>
+        manager.deleteNoteByIdIfUnchanged(id, "<div>Body</div>", undefined, [
+          { id: 'x" & do shell script "id' },
+        ])
+      ).toThrow();
+      expect(mockExecuteAppleScript).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Recently Deleted (#198, #207)", () => {
     const id = "x-coredata://ABC/ICNote/p1";
 
