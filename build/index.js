@@ -44070,6 +44070,72 @@ var common = {
   )
 };
 var htmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var MAX_CHECKLIST_BATCH = 50;
+var byPosition = (items = []) => [...items].sort((a, b) => a.start - b.start);
+function appendChecklistItems(args, deps, readRich) {
+  const existing = new Set(byPosition(readRich(args.id).checklistItems).map((item) => item.id));
+  const landed = [];
+  let contentHash = args.expectedContentHash;
+  for (const [index, text] of args.items.entries()) {
+    let wrote = false;
+    try {
+      const result = mutateBackground(
+        { ...args, expectedContentHash: contentHash },
+        "create-checklist-item",
+        { text },
+        (before, after) => {
+          wrote = true;
+          assertPreserved(before, after, { append: true });
+          const added = after.checklist.slice(before.checklist.length);
+          if (added.length !== 1 || added[0].text !== text || added[0].done)
+            throw new Error("Native checklist item not verified");
+        },
+        deps
+      );
+      const items = byPosition(readRich(args.id).checklistItems);
+      const fresh = items.filter(
+        (item) => !existing.has(item.id) && !landed.some((done) => done.id === item.id)
+      );
+      if (fresh.length !== 1 || fresh[0].text !== text || fresh[0].done)
+        throw new Error("Native checklist identity not verified");
+      for (const done of landed) {
+        const current = items.find((item) => item.id === done.id);
+        if (!current || current.text !== done.text || current.done)
+          throw new Error("An earlier appended item changed identity or text");
+      }
+      landed.push({ index, id: fresh[0].id, text });
+      contentHash = result.contentHash;
+    } catch (error2) {
+      return {
+        ok: false,
+        id: args.id,
+        landed,
+        stoppedAt: {
+          index,
+          text,
+          outcome: wrote ? "uncertain" : "not-written",
+          error: error2 instanceof Error ? error2.message : String(error2)
+        },
+        notAttempted: args.items.slice(index + 1),
+        contentHash,
+        message: `Stopped at item ${index + 1} of ${args.items.length}; ${landed.length} item(s) landed and were verified. Read the exact note before retrying, and retry only items that are not present.`
+      };
+    }
+  }
+  const finalItems = byPosition(readRich(args.id).checklistItems);
+  const tail = finalItems.slice(finalItems.length - landed.length);
+  const orderVerified = tail.length === landed.length && tail.every((item, i) => item.id === landed[i].id && item.text === landed[i].text);
+  return {
+    ok: orderVerified,
+    id: args.id,
+    contentHash,
+    items: landed,
+    orderVerified,
+    ...orderVerified ? {} : {
+      message: "Every item landed and was verified, but they are not the note's last checklist items in the requested order. Read the note before editing it further."
+    }
+  };
+}
 function registerNativeOperations(server2, manager) {
   function tool(name, description, input, handler, readOnly = false) {
     server2.registerTool(
@@ -44193,6 +44259,20 @@ function registerNativeOperations(server2, manager) {
         backgroundDependencies(manager)
       );
       return { ...result, items: readRichNote(args.id).checklistItems };
+    }
+  );
+  tool(
+    "create-checklist-items",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying.",
+    {
+      ...common,
+      items: external_exports.array(
+        external_exports.string().min(1).max(1e4).refine((s) => !/[\r\n\0]/u.test(s), "One line per checklist item")
+      ).min(1).max(MAX_CHECKLIST_BATCH).describe(`Item texts in the order they should appear (1-${MAX_CHECKLIST_BATCH})`)
+    },
+    (args) => {
+      requireValidated("create-checklist-item");
+      return appendChecklistItems(args, backgroundDependencies(manager), readRichNote);
     }
   );
   tool(

@@ -1169,6 +1169,36 @@ in the foreground.
 Appends one real unchecked Notes checklist item and verifies its native identity
 and text.
 
+#### `create-checklist-items`
+
+Appends several real unchecked checklist items, 1 to 50, in the order given.
+It takes the same `id`, `expectedContentHash` and `scopeText` as
+`create-checklist-item`, plus `items`, an array of one-line texts. Each item is
+one run of the same verified bridge, so the call takes a few seconds per item
+and is gated with `create-checklist-item` in `get-capabilities`.
+
+After every run the server checks that exactly one new unchecked item with that
+text and a new native identity appeared, that every item appended earlier in the
+call kept its identity and text, and that nothing else in the note changed. The
+verified revision feeds the next run. A final check confirms the new items are
+the note's last checklist items in the requested order.
+
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "scopeText": "Packing list for the trip",
+  "items": ["Passport", "Charger", "Rain jacket"]
+}
+```
+
+**Returns:** `items`, each with its `index`, native `id` and `text`, plus
+`orderVerified` and the new `contentHash`. The first uncertain result stops the
+call without a retry and returns `ok: false` with `landed` (the verified items),
+`stoppedAt` (the item's index, text, `outcome` of `"not-written"` or
+`"uncertain"`, and the error), and `notAttempted`. After an uncertain stop, read
+the note before retrying, and retry only the items that are not present.
+
 #### `create-table`
 
 Appends a native table from rectangular string rows and verifies every decoded
