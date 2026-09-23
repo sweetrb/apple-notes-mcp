@@ -166,7 +166,9 @@ export function col(
 }
 
 /** Subquery for an entity's Z_ENT, looked up rather than hard-coded. */
-export function entity(name: "ICNote" | "ICFolder" | "ICAccount" | "ICHashtag"): string {
+export function entity(
+  name: "ICNote" | "ICFolder" | "ICAccount" | "ICHashtag" | "ICAttachment" | "ICInlineAttachment"
+): string {
   return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
 }
 

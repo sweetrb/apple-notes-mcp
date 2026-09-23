@@ -883,6 +883,80 @@ export interface ExportNotesOptions {
 }
 
 // =============================================================================
+// Classic PencilKit drawings (public native helper)
+// =============================================================================
+
+/** sRGB color of a drawing stroke; channels 0-255, alpha 0-1. */
+export interface DrawingColor {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+}
+
+/** Axis-aligned rectangle in drawing coordinates (points). */
+export interface DrawingBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** One control point of a stroke, already in drawing coordinates. */
+export interface DrawingPoint {
+  x: number;
+  y: number;
+  width: number;
+  opacity: number;
+  force: number;
+}
+
+/** One PencilKit stroke. */
+export interface DrawingStroke {
+  /** PencilKit ink identifier, e.g. "com.apple.ink.pen" or "com.apple.ink.marker". */
+  inkType: string;
+  color: DrawingColor;
+  /** Mean control-point width. */
+  width: number;
+  pointCount: number;
+  bounds: DrawingBounds;
+  /** Control points; omitted when the caller asked for includePoints: false. */
+  points?: DrawingPoint[];
+  /** True when the stroke carried a non-identity transform, already applied to its points. */
+  transformApplied?: boolean;
+}
+
+/** Decode outcome for one classic drawing attachment. */
+export interface NoteDrawing {
+  /** x-coredata attachment id. */
+  attachmentId: string;
+  /** Notes UUID of the attachment. */
+  identifier: string;
+  /** "com.apple.drawing" or "com.apple.drawing.2". */
+  typeUti: string;
+  /** ok = decoded; error = see code and message. */
+  status: "ok" | "error";
+  code?: string;
+  message?: string;
+  strokeCount?: number;
+  bounds?: DrawingBounds;
+  strokes?: DrawingStroke[];
+  /** True when the helper stopped at its stroke or point limit. */
+  truncated?: boolean;
+  /** Standalone SVG document, when format is "svg" or "both". */
+  svg?: string;
+}
+
+/** Result of get-note-drawings. */
+export interface NoteDrawingsResult {
+  id: string;
+  drawingCount: number;
+  /** ok = all decoded, partial = some, error = none, none = the note has no classic drawing. */
+  status: "ok" | "partial" | "error" | "none";
+  drawings: NoteDrawing[];
+}
+
+// =============================================================================
 // Database-Backed Listings
 // =============================================================================
 
@@ -1321,4 +1395,99 @@ export interface PasteboardAttachmentSource {
   type: string;
   /** Default attachment name for the pasted content, before any filename override. */
   filename: string;
+}
+
+// =============================================================================
+// Database-Backed Recent Listing and Folder Tree
+// =============================================================================
+
+/** One row of `list-recent-notes`. Metadata unless a body option was requested. */
+export interface RecentNoteRow {
+  /** MCP note id (`x-coredata://<store>/ICNote/p<n>`). */
+  id: string;
+  /** The note's Notes UUID (ZIDENTIFIER). */
+  identifier: string | null;
+  title: string | null;
+  /** Folder path in list-folders syntax, or null for a folderless note. */
+  folder: string | null;
+  account: string | null;
+  created: string | null;
+  /** Modification time in ISO 8601 (millisecond precision). */
+  modified: string | null;
+  /**
+   * Opaque sync cursor: the exact stored modification timestamp plus the
+   * note's database key. Pass it back as `since` to list only notes that sort
+   * after this one. Null when the note has no modification date.
+   */
+  modifiedCheckpoint: string | null;
+  pinned: boolean;
+  locked: boolean;
+  inRecentlyDeleted: boolean;
+  markedForDeletion: boolean;
+  /** Words in the decoded body; null when the body is locked or unavailable. */
+  wordCount?: number | null;
+  /** Characters (code points) in the decoded body, attachment markers excluded. */
+  charCount?: number | null;
+  /** Up to 180 characters: the decoded body when decoded, else the stored snippet. */
+  bodyPreview?: string | null;
+  /** Whether bodyPreview and the counts came from the decoded body. */
+  textDecoded?: boolean;
+}
+
+/** Result of `list-recent-notes`. */
+export interface RecentNotesResult {
+  notes: RecentNoteRow[];
+  count: number;
+  limit: number;
+  /**
+   * Row order: `oldest-first` for a `since` query (sync), `newest-first`
+   * without one (browse).
+   */
+  order: "oldest-first" | "newest-first";
+  /**
+   * True when count reached limit. With `since`, more changes may follow:
+   * call again with `nextSince`. Without `since`, older notes were cut off.
+   */
+  saturated: boolean;
+  /**
+   * Cursor to pass as the next `since`. With `since`, the last returned row's
+   * cursor, or the incoming boundary when nothing matched, so every call
+   * advances. Without `since`, the newest row's cursor, set only when the call
+   * returned every matching note. Null when there is no complete cursor.
+   */
+  nextSince: string | null;
+  account?: string;
+  folder?: string;
+}
+
+/** One node of `list-folder-tree`. */
+export interface FolderTreeNode {
+  /** MCP folder id (`x-coredata://<store>/ICFolder/p<n>`). */
+  id: string;
+  identifier: string | null;
+  name: string;
+  /** Full path in list-folders syntax. */
+  path: string;
+  kind: "folder" | "trash" | "smart";
+  /** Notes directly in this folder (tombstones excluded). */
+  noteCount: number;
+  /** Notes in this folder and every descendant folder. */
+  totalNoteCount: number;
+  /** Present only when deleted folders were requested. */
+  markedForDeletion?: boolean;
+  children: FolderTreeNode[];
+}
+
+/** One account's folders in `list-folder-tree`. */
+export interface FolderTreeAccount {
+  account: string;
+  identifier: string | null;
+  noteCount: number;
+  folders: FolderTreeNode[];
+}
+
+/** Result of `list-folder-tree`. */
+export interface FolderTreeResult {
+  accounts: FolderTreeAccount[];
+  folderCount: number;
 }

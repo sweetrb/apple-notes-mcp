@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -634,6 +634,169 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 ---
 
+#### `list-note-paragraphs`
+
+Lists one note's non-empty paragraphs in body order, read-only from the
+NoteStore database. Each paragraph has `blockIndex` (its index in
+`get-note-blocks`, where empty paragraphs also count), `text`, `style`,
+`styleType`, `paragraphId` (the UUID Notes stores on the paragraph's first
+text run), and `paragraphIdStatus`:
+
+- `unique`: no other paragraph in the note carries this ID. The paragraph also
+  gets `url`, a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link that
+  opens Notes at that paragraph.
+- `shared`: other paragraphs carry the same ID (`sharedWith` counts them).
+  Notes copies the ID when a paragraph is split, so this is common for body
+  text. No `url` is given, because it could open the wrong paragraph.
+- `missing`: no ID is stored.
+
+`mixedParagraphIds: true` marks a paragraph whose text runs carry more than
+one ID; only the first-run ID is used. Titles and headings usually have unique
+IDs.
+
+**Requires:** Full Disk Access. Password-protected notes are refused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`, `title` | Exact note ID, or the note's Notes UUID |
+| `title` | string | One of `id`, `title` | Exact note title; must match one note. Notes in Recently Deleted are ignored, as in `list-notes` |
+| `folder` | string | No | With `title`: the folder's name or full path as `list-folders` shows it, such as `Work/Clients` |
+| `linkableOnly` | boolean | No | Return only paragraphs with a `url` |
+| `offset` | number | No | First paragraph to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum paragraphs per page (default 500, max 5000) |
+
+---
+
+#### `get-paragraph-link`
+
+Returns a direct link to one paragraph of a note:
+`applenotes://showNote?identifier=<note>&paragraphID=<paragraph>`. It selects
+the note like `list-note-paragraphs` and the paragraph by exactly one of:
+
+- `contains`: a snippet of the paragraph. Case, runs of spaces, and Unicode
+  width are ignored.
+- `match`: the whole paragraph, compared the same way.
+- `blockIndex`: from `list-note-paragraphs`.
+
+When `contains` or `match` hits several paragraphs, pass `occurrence` (1-based)
+or a longer snippet.
+
+The link is returned only when the paragraph's ID is `unique` in the note.
+Otherwise the result is an error whose `structuredContent` carries the usual
+`code` plus a `reason`: `paragraph-id-shared`, `paragraph-id-missing`,
+`no-match`, `ambiguous-paragraph`, `occurrence-out-of-range`, `ambiguous-note`
+(several notes have that title; the message lists their folders), `not-found`,
+`encrypted`, or `no-body`. The tool never creates or changes a paragraph ID,
+and an edit in Notes can later replace the ID and break the link.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id`, `title`, `folder` | string | One of `id`, `title` | Note selector, as in `list-note-paragraphs` |
+| `contains` | string | One of `contains`, `match`, `blockIndex` | Snippet of the paragraph |
+| `match` | string | One of `contains`, `match`, `blockIndex` | The whole paragraph |
+| `blockIndex` | number | One of `contains`, `match`, `blockIndex` | The paragraph's `blockIndex` |
+| `occurrence` | number | No | Which match to use when several paragraphs match |
+
+---
+
+#### `get-note-structure`
+
+Returns a read-only overview of one note from the NoteStore database, in one
+call:
+
+- `text` (decoded body), `textLength`, `wordCount`, `charCount` (Unicode
+  characters, attachment placeholders excluded), and `blockSummary` (the
+  `get-note-blocks` summary counts).
+- `links`, each with a `kind`: `inline` (a hyperlink on text), `card` (a rich
+  link preview attachment, with `attachmentId` and `previewPath`), `note` (a
+  native link chip to another note), or `section` (a native link chip to a
+  heading or paragraph, with `section`). Notes deep links also carry
+  `targetNote` and `paragraphId`. `linkCounts` totals them.
+- `tags` (native tags in body order) and `attachments`, listed the way
+  [`list-attachments`](#list-attachments) with `includePaths` lists them: the
+  same `kind` (`image`, `scan`, `drawing`, `pdf`, `audio`, `video`, `url`,
+  `table`, `other`), the same body order, and the same `previewPath`, plus the
+  card `title`/`url`, `fileSize`, and body position. Gallery items and
+  recording parts are nested under `children`; `attachmentCount` counts
+  top-level attachments only.
+- `deepLink`, `isShared` (the note or any enclosing folder is shared),
+  `isLocked`, `isPinned`, `inRecentlyDeleted`, `lastViewed`,
+  `checklistTotal`, `checklistDone`, `hasDrawing` (classic sketches and Paper
+  drawings), and `firstImage` (the same lead visual `list-attachments`
+  returns with `firstImage`, plus its attachment `id`).
+
+`lastViewed` is an ISO date, or null with `lastViewedStatus` set to
+`never-viewed`, `not-recorded`, `malformed`, or `unsupported` (the column
+does not exist on this macOS version). A password-protected note returns its
+metadata and attachment rows with `bodyDecoded: false` and the body-derived
+fields null.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact note ID: the `x-coredata://` id, or the note's Notes UUID or numeric key (see [Identifier forms](#identifier-forms)) |
+| `includeText` | boolean | No | Include the decoded text (default true). Text larger than `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` is omitted with `textOmitted: true` |
+
+Link URLs are returned as stored; check `linkSafe` before emitting one into
+HTML.
+
+---
+
+#### `list-note-links`
+
+Lists links, read-only from the NoteStore database, in one note (`id`) or
+across a `folder`, an `account`, or the whole library (no selector). Each link
+has a `kind`:
+
+| Kind | What it is | Where Notes stores it |
+|------|------------|-----------------------|
+| `inline` | A hyperlink on text | Inside the note body |
+| `card` | A rich link preview | An attachment row with the URL and title |
+| `note` | A native link chip to another note | An inline-attachment row with a Notes deep link |
+| `section` | A native link chip to a heading or paragraph | Same, with `paragraphID` in the deep link |
+
+Each row has `url`, `text` (label), `linkSafe`, `targetNote` and `paragraphId`
+for Notes deep links, `section` for section chips, and for cards
+`attachmentId` and `previewPath` (Notes' largest cached preview image, found
+the same way [`list-attachments`](#list-attachments) finds it, or null when
+Notes has none). Each row also names its source: `noteId`, `noteIdentifier`,
+`noteTitle`, `noteModified`, `folder`, `folderPath` (as `list-folders` prints
+it), `account`, and `accountIdentifier`. When bodies were decoded, `start` and
+`blockIndex` give the link's position, and `inBody: false` marks a card or chip
+row with no marker left in the body.
+
+Inline links need every body in scope decompressed and decoded, so a folder,
+account, or library scan includes them only with `includeInline: true`
+(slower). A single note always includes them. A `folder` scope includes its
+subfolders unless `includeSubfolders` is false. Scans skip Recently Deleted
+and folderless notes; a note requested by `id` is read wherever it is. Links
+come newest-modified note first, in body order within a note.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | No | One exact note ID (x-coredata id, Notes UUID, or numeric key). Do not combine with `account` or `folder` |
+| `account` | string | No | Account name (exact or unique-prefix match, as in the other tools) |
+| `folder` | string | No | Folder name (any depth, must be unique) or path from the top level as `list-folders` prints it, such as `Work/Clients`; escape a literal slash as `\/` |
+| `includeSubfolders` | boolean | No | With `folder`, also list notes in its subfolders (default true) |
+| `includeInline` | boolean | No | Decode bodies for inline links (default true for `id`, false otherwise) |
+| `kinds` | string[] | No | Only these kinds: `inline`, `card`, `note`, `section` |
+| `offset` | number | No | First link to return (default 0). Use `page.nextOffset` |
+| `limit` | number | No | Maximum links per page (default 200, max 2000) |
+
+The response also reports `scope`, `counts` per kind, `notesInScope`,
+`notesWithoutBody` (locked, empty or undecodable bodies when inline links were
+requested), and `page`. A page stops early to stay under
+`APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`. An ambiguous folder name is refused with a
+message that lists the matching paths.
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags. This differs from textual hashtag search. It is
@@ -1096,6 +1259,46 @@ Use the returned `id` for any follow-up read/update/move/delete rather than re-r
 
 > **Changed in 2.7.0:** `notes` was previously `string[]` (titles only). Callers that treated the array as strings must now read `.title`.
 
+For date order, incremental sync cursors, Recently Deleted, or word counts, use [`list-recent-notes`](#list-recent-notes).
+
+---
+
+#### `list-recent-notes`
+
+Lists notes from the NoteStore database (read-only) by stored modification time, with an exact cursor for incremental sync. With `since`, it pages through changes oldest first; without it, it shows the newest notes first. Unlike `list-notes`, it can include Recently Deleted and can count words.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `folder` | string | No | Only notes directly in this folder: a full path in `list-folders` syntax, or a unique folder name |
+| `since` | string | No | Return notes after this point, **oldest first**. A `modifiedCheckpoint` cursor (from a row or `nextSince`), or an ISO 8601 date (local midnight) or date-time (local time unless it carries `Z` or an offset), meaning modified strictly after it |
+| `limit` | number | No | Maximum rows, 1–1000 (default 50) |
+| `includeDeleted` | boolean | No | Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default `false`) |
+| `wordCounts` | boolean | No | Decode each body and add `wordCount` and `charCount` (default `false`) |
+| `bodyPreview` | boolean | No | Add `bodyPreview` (up to 180 characters) and `textDecoded` (default `false`) |
+
+**Returns:** `notes`, each with `id`, `identifier`, `title`, `folder`, `account`, `created`, `modified`, `modifiedCheckpoint`, `pinned`, `locked`, `inRecentlyDeleted`, and `markedForDeletion`. Also `count`, `limit`, `order` (`oldest-first` or `newest-first`), `saturated`, and `nextSince`.
+
+- **Cursors.** `modifiedCheckpoint` is an opaque token (`cdts1:`, 16 hex digits, `:`, the note's database key). It carries the exact stored timestamp bits, so it never loses precision the way an ISO string can, and the key orders notes that share one timestamp. Pass it back as `since`.
+- **Syncing.** Call with `since`, store `nextSince`, and pass it as the next `since`. `nextSince` is the last returned row's cursor, or the incoming boundary when nothing matched, so every call advances. `saturated` is `true` when `count` equals `limit`: more changes may follow, so call again right away. When it is `false`, you are caught up. Notes that share a timestamp are split across pages by key, so none is skipped or repeated.
+- **First sync.** Start with `since: "1970-01-01"` and page the same way. A library larger than the 1000-row maximum is reached in full.
+- **Browsing.** Without `since`, rows come newest first. `nextSince` is then the newest row's cursor, set only when the call returned every matching note (`saturated` is `false`); otherwise it is `null`.
+- **Late edits.** A modification-date cursor can miss an edit that iCloud delivers later from another device with an older timestamp, for example after that device was offline. The row then sorts before the cursor. Run a full pass from the start now and then to catch these.
+- **Deletions.** Deleted notes are invisible unless `includeDeleted` is `true`. With it, notes in Recently Deleted and notes awaiting deletion appear, flagged, when their modification date is after the cursor. A note purged from the database leaves no row, so compare ids against a full pass to detect it.
+- **Word counts.** A word is a whitespace-separated token containing a letter or digit; `charCount` counts Unicode code points. Attachment markers are not counted. Both are `null` for locked notes and bodies that are not downloaded or cannot be decoded, and `0` for a body known to be empty.
+- **Previews.** With `wordCounts`, `bodyPreview` comes from the decoded body and `textDecoded` is `true`. Otherwise it is the stored snippet. Locked notes never get a preview.
+- Folderless notes (abandoned Quick Note drafts Notes.app never shows) and Recently Deleted appear only with `includeDeleted`. Notes without a stored modification date never match a `since` query.
+
+**Example - incremental sync:**
+```json
+{
+  "since": "cdts1:41c7e0ef438fcd6f:4312",
+  "limit": 200
+}
+```
+
 ---
 
 #### `get-selected-notes`
@@ -1165,6 +1368,21 @@ With `includeMatchingNotes`, each folder also carries `matchingNoteCount` and
 evaluates the folder's rules, so they need Automation permission. The server
 does not re-evaluate the rules on its own. A folder whose notes cannot be read
 carries `matchingNotesError` instead.
+
+---
+
+#### `list-folder-tree`
+
+Returns the folder hierarchy with note counts for each account, read from the NoteStore database in one pass.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `includeDeleted` | boolean | No | Include folders marked for deletion (flagged `markedForDeletion`) and folders whose account no longer exists (default `false`) |
+
+**Returns:** `accounts`, each with `account`, `identifier`, `noteCount`, and `folders`. Each folder node has `id`, `identifier`, `name`, `path` (in `list-folders` syntax), `kind` (`folder`, `smart`, or `trash`), `noteCount` (notes directly inside), `totalNoteCount` (including subfolders), and `children`. Regular folders sort by name, then smart folders, then Recently Deleted. An account's `noteCount` sums its regular folders. Smart folders report 0 because their contents are a saved search. Also returns `folderCount`.
 
 ---
 
@@ -1440,8 +1658,12 @@ or `mailto:`. Tables render as GitHub tables. Attachments stay in body order:
 with `assetsDir` they link to copies of their files (images inline, drawings
 through Notes' fallback image, scans as their PDF), and without it they render
 as labeled placeholders such as `\[Image: name\]`. An attachment whose file
-cannot be found renders as `\[Image unavailable: name\]`. This tool leaves
-`get-note-markdown` unchanged.
+cannot be found renders as `\[Image unavailable: name\]`. Body text that
+Markdown would read as block syntax (a leading `#` to `######`, `>`, `-`, `+`,
+`*`, `1.` or `1)`, a `---` line, a code fence or a table row) is
+backslash-escaped, so a plain paragraph such as `## Notes` stays a paragraph,
+and `wrap` never starts a continuation line with such a marker. This tool
+leaves `get-note-markdown` unchanged.
 
 A folder export is one presentation document with notes separated by `---`.
 It is not a backup or restore format; use `export-notes-json` for that.
@@ -1616,6 +1838,22 @@ A recording extended with more takes has several fragments. Their transcripts ar
 
 ---
 
+#### `get-note-drawings`
+
+Decodes a note's classic PencilKit drawings (`com.apple.drawing.2` and the older `com.apple.drawing` attachments) into strokes and SVG. The PencilKit bytes are read read-only from the NoteStore database and decoded by Apple's public `PKDrawing(data:)` in the [public native helper](#public-native-helper). Modern Paper sketches (`com.apple.paper`) are a different format and are not decoded here.
+
+**Requires:** Full Disk Access for the MCP host process, and the public native helper built once with `apple-notes-mcp setup --public-helper`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `format` | string | No | `"json"` (default) returns strokes, `"svg"` returns a standalone SVG document per drawing, `"both"` returns both |
+| `includePoints` | boolean | No | Include per-point `x`, `y`, `width`, `opacity`, and `force` in JSON strokes (default `true`) |
+
+**Returns:** `status` (`ok`, `partial`, `error`, or `none` when the note has no classic drawing), `drawingCount`, and one entry per drawing with `attachmentId`, `identifier`, `typeUti`, `status` (`ok`, or `error` with a `code` such as `no_data`, `undecodable`, or `timeout`), `strokeCount`, `bounds`, `truncated`, `strokes` (each with `inkType`, sRGB `color` with alpha, mean `width`, `pointCount`, `bounds`, and `points`), and `svg`. Points are already in drawing coordinates. When a response would exceed `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, points are dropped and `pointsOmitted` is set. The SVG draws one path per stroke; it is a faithful outline, not a pixel-exact copy of PencilKit's ink textures.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -1775,6 +2013,35 @@ Saves Notes' rendered image of one Paper drawing or classic drawing to a new fil
 **Returns:** `savedPath`, `format`, `width`, `height`, `bytes`, `source` (`fallback` for Notes' full rendering, `preview` for its largest thumbnail when no full rendering exists), and the drawing's `attachmentId`, `identifier`, `kind`, and `handwritingSummary`.
 
 **⚠️ Safety:** Writes one new file, readable only by you (mode 0600). `savePath` follows the `save-attachment` allowlist (home, temp, or `/Volumes`), may not be inside the Notes data folder, and must not exist yet. The image header (PNG signature and IHDR, or JPEG frame) is checked before copying and the written file is checked again; a file that fails is removed.
+
+---
+
+#### `analyze-svg`
+
+Analyzes one local SVG file and reports whether it can be represented as editable monoline strokes (a list of strokes, each a solid color, a width, and a polyline) and what that conversion would approximate or drop. It is a standalone preflight: it reads only the file, opens no Notes data, and makes no network request.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | Yes | Absolute path of one `.svg` file: a regular file, not a symbolic link, at most 1 MiB of UTF-8, in home, temp, or `/Volumes` |
+| `includeDrawing` | boolean | No | Also return the normalized drawing. Off by default because it can be large |
+
+**Returns:** `classification`, `importable`, `defaultWriteAllowed`, `requiredLosses`, `issues` (each with a `code`, the `loss` it causes or `null`, an element `location` such as `svg/g[2]/path[1]#id`, and a message), `viewport`, `counts` (elements, references, path segments, output strokes and points, and the `geometryWork`, `dashWork`, and `scanWork` budgets as `{used, max}`), `source` (`sha256`, `bytes`), `drawingBytes`, and `analysisDigest`.
+
+| Classification | Meaning |
+|---|---|
+| `safe` | The output needs no reported approximation or omission. `defaultWriteAllowed` is true |
+| `lossy` | The output needs `geometry-approximation` or `paint-approximation` |
+| `unsupported` | Visible content would be dropped (`drop-content`), or nothing drawable remains (`importable: false`) |
+
+The loss modes:
+
+- `geometry-approximation`: non-round caps or joins are drawn round, a non-uniformly scaled stroke gets one width, or centerlines are clipped at a viewport. Curves are flattened to within 0.25 px, which is not reported as a loss.
+- `paint-approximation`: solid fills become overlapping strokes, group opacity is applied to each stroke, and blend modes or a non-default paint order are ignored.
+- `drop-content`: text, images, gradient and pattern paint, filters, masks, clip paths, markers, `<switch>`, and unknown elements are omitted.
+
+Supported input: `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`; `g`, `a`, nested `svg`; local `defs`, `symbol`, and `use`; transforms; `viewBox` and `preserveAspectRatio`; solid named, hex, `rgb()`/`rgba()`, and `hsl()` colors, `currentColor`, opacity, fill rules, and dashes, from attributes or the `style` attribute. `analysisDigest` is a SHA-256 over the canonical analysis and normalized drawing, so equal digests mean the same result.
+
+**⚠️ Safety:** Read-only. Active or unsafe input is refused as an error with `code: "validation_error"` and an `svgCode`: `svg_unsafe` for scripts, event-handler attributes, `<style>` elements, animation, embedded objects, DOCTYPE or entity declarations, processing instructions, and any external reference (only local `#id` references and embedded raster images are allowed); `svg_invalid` for malformed XML; `svg_reference_invalid` for cyclic or duplicate-id references; `svg_complexity_limit` or `svg_geometry_invalid` when a limit is exceeded (16,384 elements, 100,000 path segments, 4,096 output strokes, 100,000 points, 5,000,000 fill scan checks); `svg_file_invalid` for a path or file that cannot be read.
 
 ---
 
@@ -2196,7 +2463,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
-| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
+| `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. A [`list-note-paragraphs`](#list-note-paragraphs) or [`list-note-links`](#list-note-links) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
 | `APPLE_NOTES_MCP_ENABLE_PRIVATE` | unset | Set to `1` to allow the opt-in [private helper](#private-helper-opt-in-unsupported-apple-api). Any other value keeps it off. |
@@ -2229,7 +2496,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-paragraphs`, `get-paragraph-link`, `get-note-structure`, `list-note-links`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -2251,9 +2518,26 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-checklist-state` returns an error explaining that database access is needed
 - `get-note-metadata` returns the same kind of error — it has no non-database path
 - `list-special-notes` and the `list-native-tags` inventory return the same kind of error
+- `list-recent-notes` and `list-folder-tree` return the same kind of error
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
+- `get-note-drawings` returns the same Full Disk Access error
+
+---
+
+## Public native helper
+
+`get-note-drawings` needs Apple's PencilKit framework, which has no AppleScript or command-line interface. For it, the server uses a small Swift helper that links public Apple frameworks only (AppKit and PencilKit). No prebuilt binary ships with the package. Build it once on your Mac:
+
+```bash
+apple-notes-mcp setup --public-helper          # compile, sign, verify, install
+apple-notes-mcp setup --public-helper --check  # report the installed state only
+```
+
+Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
+
+The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin; the helper answers with one JSON object on stdout.
 
 ---
 

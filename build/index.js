@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants7);
+          this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants7);
+        this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants7) {
-        this.code = optimizeExpr(this.code, names, constants7);
+      optimizeNames(names, constants8) {
+        this.code = optimizeExpr(this.code, names, constants8);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants7))
+          if (n.optimizeNames(names, constants8))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
-        if (!(super.optimizeNames(names, constants7) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        if (!(super.optimizeNames(names, constants8) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants7);
+        this.condition = optimizeExpr(this.condition, names, constants8);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants7) {
-        if (!super.optimizeNames(names, constants7))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants7);
+        this.iteration = optimizeExpr(this.iteration, names, constants8);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants7) {
-        if (!super.optimizeNames(names, constants7))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants7);
+        this.iterable = optimizeExpr(this.iterable, names, constants8);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         var _a, _b;
-        super.optimizeNames(names, constants7);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants7);
+        super.optimizeNames(names, constants8);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants7) {
+    function optimizeExpr(expr, names, constants8) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants7[n.str];
+        const c = constants8[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants7[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve6.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve6(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3558,14 +3558,14 @@ var require_utils = __commonJS({
       }
       return output;
     }
-    function recomposeAuthority(component) {
+    function recomposeAuthority(component2) {
       const uriTokens = [];
-      if (component.userinfo !== void 0) {
-        uriTokens.push(encodeUserinfo(component.userinfo));
+      if (component2.userinfo !== void 0) {
+        uriTokens.push(encodeUserinfo(component2.userinfo));
         uriTokens.push("@");
       }
-      if (component.host !== void 0) {
-        let host = component.host;
+      if (component2.host !== void 0) {
+        let host = component2.host;
         if (!isIPv4(host)) {
           let ipV6res = normalizeIPv6(host);
           if (ipV6res.isIPV6 !== true && ipV6res.isIPVFuture !== true) {
@@ -3580,9 +3580,9 @@ var require_utils = __commonJS({
         }
         uriTokens.push(host);
       }
-      if (typeof component.port === "number" || typeof component.port === "string") {
+      if (typeof component2.port === "number" || typeof component2.port === "string") {
         uriTokens.push(":");
-        uriTokens.push(String(component.port));
+        uriTokens.push(String(component2.port));
       }
       return uriTokens.length ? uriTokens.join("") : void 0;
     }
@@ -3641,21 +3641,21 @@ var require_schemes = __commonJS({
         return false;
       }
     }
-    function httpParse(component) {
-      if (!component.host) {
-        component.error = component.error || "HTTP URIs must have a host.";
+    function httpParse(component2) {
+      if (!component2.host) {
+        component2.error = component2.error || "HTTP URIs must have a host.";
       }
-      return component;
+      return component2;
     }
-    function httpSerialize(component) {
-      const secure = String(component.scheme).toLowerCase() === "https";
-      if (component.port === (secure ? 443 : 80) || component.port === "") {
-        component.port = void 0;
+    function httpSerialize(component2) {
+      const secure = String(component2.scheme).toLowerCase() === "https";
+      if (component2.port === (secure ? 443 : 80) || component2.port === "") {
+        component2.port = void 0;
       }
-      if (!component.path) {
-        component.path = "/";
+      if (!component2.path) {
+        component2.path = "/";
       }
-      return component;
+      return component2;
     }
     function wsParse(wsComponent) {
       wsComponent.secure = wsIsSecure(wsComponent);
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve6(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -3935,7 +3935,7 @@ var require_fast_uri = __commonJS({
       return normalizedA !== void 0 && normalizedB !== void 0 && normalizedA === normalizedB;
     }
     function serialize(cmpts, opts) {
-      const component = {
+      const component2 = {
         host: cmpts.host,
         scheme: cmpts.scheme,
         userinfo: cmpts.userinfo,
@@ -3953,36 +3953,36 @@ var require_fast_uri = __commonJS({
       };
       const options = Object.assign({}, opts);
       const uriTokens = [];
-      if (component.scheme) {
-        component.scheme = decodeValidScheme(component.scheme);
+      if (component2.scheme) {
+        component2.scheme = decodeValidScheme(component2.scheme);
       }
-      const schemeHandler = getSchemeHandler(options.scheme || component.scheme);
-      if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options);
-      const hasAuthority = component.userinfo !== void 0 || component.host !== void 0 || component.port !== void 0;
-      const pathNoScheme = !options.skipEscape && component.scheme === void 0 && !hasAuthority;
-      if (component.path !== void 0) {
+      const schemeHandler = getSchemeHandler(options.scheme || component2.scheme);
+      if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component2, options);
+      const hasAuthority = component2.userinfo !== void 0 || component2.host !== void 0 || component2.port !== void 0;
+      const pathNoScheme = !options.skipEscape && component2.scheme === void 0 && !hasAuthority;
+      if (component2.path !== void 0) {
         if (!options.skipEscape) {
-          component.path = serializePathEncoding(component.path, pathNoScheme);
+          component2.path = serializePathEncoding(component2.path, pathNoScheme);
         } else {
-          component.path = normalizePercentEncoding(component.path);
+          component2.path = normalizePercentEncoding(component2.path);
         }
       }
-      if (options.reference !== "suffix" && component.scheme) {
-        component.scheme = decodeValidScheme(component.scheme);
-        uriTokens.push(component.scheme, ":");
+      if (options.reference !== "suffix" && component2.scheme) {
+        component2.scheme = decodeValidScheme(component2.scheme);
+        uriTokens.push(component2.scheme, ":");
       }
-      const authority = recomposeAuthority(component);
+      const authority = recomposeAuthority(component2);
       if (authority !== void 0) {
         if (options.reference !== "suffix") {
           uriTokens.push("//");
         }
         uriTokens.push(authority);
-        if (component.path && component.path[0] !== "/") {
+        if (component2.path && component2.path[0] !== "/") {
           uriTokens.push("/");
         }
       }
-      if (component.path !== void 0) {
-        let s = component.path;
+      if (component2.path !== void 0) {
+        let s = component2.path;
         if (!options.absolutePath && (!schemeHandler || !schemeHandler.absolutePath)) {
           s = removeDotSegments(s);
         }
@@ -3994,11 +3994,11 @@ var require_fast_uri = __commonJS({
         }
         uriTokens.push(s);
       }
-      if (component.query !== void 0) {
-        uriTokens.push("?", encodeQuery(component.query));
+      if (component2.query !== void 0) {
+        uriTokens.push("?", encodeQuery(component2.query));
       }
-      if (component.fragment !== void 0) {
-        uriTokens.push("#", encodeFragment(component.fragment));
+      if (component2.fragment !== void 0) {
+        uriTokens.push("#", encodeFragment(component2.fragment));
       }
       return uriTokens.join("");
     }
@@ -4014,14 +4014,14 @@ var require_fast_uri = __commonJS({
       }
       return void 0;
     }
-    function hasMalformedPercentEncoding(component) {
-      if (component === void 0) return false;
-      let percent = component.indexOf("%");
+    function hasMalformedPercentEncoding(component2) {
+      if (component2 === void 0) return false;
+      let percent = component2.indexOf("%");
       while (percent !== -1) {
-        if (percent + 2 >= component.length || !/^[\da-f]{2}$/iu.test(component.slice(percent + 1, percent + 3))) {
+        if (percent + 2 >= component2.length || !/^[\da-f]{2}$/iu.test(component2.slice(percent + 1, percent + 3))) {
           return true;
         }
-        percent = component.indexOf("%", percent + 3);
+        percent = component2.indexOf("%", percent + 3);
       }
       return false;
     }
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve6,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants7 = {
+    var constants8 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants7) {
-      v = { value: constants7[c] };
+    for (c in constants8) {
+      v = { value: constants8[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -8859,23 +8859,23 @@ var require_attributes = __commonJS({
   "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/lib/attributes.js"(exports) {
     "use strict";
     var utils = require_utils2();
-    exports.property = function(attr) {
-      if (Array.isArray(attr.type)) {
+    exports.property = function(attr2) {
+      if (Array.isArray(attr2.type)) {
         var valid = /* @__PURE__ */ Object.create(null);
-        attr.type.forEach(function(val) {
+        attr2.type.forEach(function(val) {
           valid[val.value || val] = val.alias || val;
         });
-        var missingValueDefault = attr.missing;
+        var missingValueDefault = attr2.missing;
         if (missingValueDefault === void 0) {
           missingValueDefault = null;
         }
-        var invalidValueDefault = attr.invalid;
+        var invalidValueDefault = attr2.invalid;
         if (invalidValueDefault === void 0) {
           invalidValueDefault = missingValueDefault;
         }
         return {
           get: function() {
-            var v = this._getattr(attr.name);
+            var v = this._getattr(attr2.name);
             if (v === null) return missingValueDefault;
             v = valid[v.toLowerCase()];
             if (v !== void 0) return v;
@@ -8883,38 +8883,38 @@ var require_attributes = __commonJS({
             return v;
           },
           set: function(v) {
-            this._setattr(attr.name, v);
+            this._setattr(attr2.name, v);
           }
         };
-      } else if (attr.type === Boolean) {
+      } else if (attr2.type === Boolean) {
         return {
           get: function() {
-            return this.hasAttribute(attr.name);
+            return this.hasAttribute(attr2.name);
           },
           set: function(v) {
             if (v) {
-              this._setattr(attr.name, "");
+              this._setattr(attr2.name, "");
             } else {
-              this.removeAttribute(attr.name);
+              this.removeAttribute(attr2.name);
             }
           }
         };
-      } else if (attr.type === Number || attr.type === "long" || attr.type === "unsigned long" || attr.type === "limited unsigned long with fallback") {
-        return numberPropDesc(attr);
-      } else if (!attr.type || attr.type === String) {
+      } else if (attr2.type === Number || attr2.type === "long" || attr2.type === "unsigned long" || attr2.type === "limited unsigned long with fallback") {
+        return numberPropDesc(attr2);
+      } else if (!attr2.type || attr2.type === String) {
         return {
           get: function() {
-            return this._getattr(attr.name) || "";
+            return this._getattr(attr2.name) || "";
           },
           set: function(v) {
-            if (attr.treatNullAsEmptyString && v === null) {
+            if (attr2.treatNullAsEmptyString && v === null) {
               v = "";
             }
-            this._setattr(attr.name, v);
+            this._setattr(attr2.name, v);
           }
         };
-      } else if (typeof attr.type === "function") {
-        return attr.type(attr.name, attr);
+      } else if (typeof attr2.type === "function") {
+        return attr2.type(attr2.name, attr2);
       }
       throw new Error("Invalid attribute definition");
     };
@@ -9382,23 +9382,23 @@ var require_select = __commonJS({
       "attr": function(key, op, val, i) {
         op = operators[op];
         return function(el) {
-          var attr;
+          var attr2;
           switch (key) {
             case "for":
-              attr = el.htmlFor;
+              attr2 = el.htmlFor;
               break;
             case "class":
-              attr = el.className;
-              if (attr === "" && el.getAttribute("class") == null) {
-                attr = null;
+              attr2 = el.className;
+              if (attr2 === "" && el.getAttribute("class") == null) {
+                attr2 = null;
               }
               break;
             case "href":
             case "src":
-              attr = el.getAttribute(key, 2);
+              attr2 = el.getAttribute(key, 2);
               break;
             case "title":
-              attr = el.getAttribute("title") || null;
+              attr2 = el.getAttribute("title") || null;
               break;
             // careful with attributes with special getter functions
             case "id":
@@ -9409,7 +9409,7 @@ var require_select = __commonJS({
             case "tabIndex":
             case "style":
               if (el.getAttribute) {
-                attr = el.getAttribute(key);
+                attr2 = el.getAttribute(key);
                 break;
               }
             /* falls through */
@@ -9417,16 +9417,16 @@ var require_select = __commonJS({
               if (el.hasAttribute && !el.hasAttribute(key)) {
                 break;
               }
-              attr = el[key] != null ? el[key] : el.getAttribute && el.getAttribute(key);
+              attr2 = el[key] != null ? el[key] : el.getAttribute && el.getAttribute(key);
               break;
           }
-          if (attr == null) return;
-          attr = attr + "";
+          if (attr2 == null) return;
+          attr2 = attr2 + "";
           if (i) {
-            attr = attr.toLowerCase();
+            attr2 = attr2.toLowerCase();
             val = val.toLowerCase();
           }
-          return op(attr, val);
+          return op(attr2, val);
         };
       },
       ":first-child": function(el) {
@@ -9554,8 +9554,8 @@ var require_select = __commonJS({
         var param = +el + 1;
         return function(el2) {
           if (!el2.href) return;
-          var url = window2.location + "", href = el2 + "";
-          return truncateUrl(url, param) === truncateUrl(href, param);
+          var url = window2.location + "", href2 = el2 + "";
+          return truncateUrl(url, param) === truncateUrl(href2, param);
         };
       },
       ":default": function(el) {
@@ -9581,9 +9581,9 @@ var require_select = __commonJS({
       },
       ":read-only": function(el) {
         if (el.readOnly) return true;
-        var attr = el.getAttribute("contenteditable"), prop = el.contentEditable, name = el.nodeName.toLowerCase();
+        var attr2 = el.getAttribute("contenteditable"), prop = el.contentEditable, name = el.nodeName.toLowerCase();
         name = name !== "input" && name !== "textarea";
-        return (name || el.disabled) && attr == null && prop !== "true";
+        return (name || el.disabled) && attr2 == null && prop !== "true";
       },
       ":read-write": function(el) {
         return !selectors[":read-only"](el);
@@ -9638,38 +9638,38 @@ var require_select = __commonJS({
       "-": function() {
         return true;
       },
-      "=": function(attr, val) {
-        return attr === val;
+      "=": function(attr2, val) {
+        return attr2 === val;
       },
-      "*=": function(attr, val) {
-        return attr.indexOf(val) !== -1;
+      "*=": function(attr2, val) {
+        return attr2.indexOf(val) !== -1;
       },
-      "~=": function(attr, val) {
+      "~=": function(attr2, val) {
         var i, s, f, l;
         for (s = 0; true; s = i + 1) {
-          i = attr.indexOf(val, s);
+          i = attr2.indexOf(val, s);
           if (i === -1) return false;
-          f = attr[i - 1];
-          l = attr[i + val.length];
+          f = attr2[i - 1];
+          l = attr2[i + val.length];
           if ((!f || f === " ") && (!l || l === " ")) return true;
         }
       },
-      "|=": function(attr, val) {
-        var i = attr.indexOf(val), l;
+      "|=": function(attr2, val) {
+        var i = attr2.indexOf(val), l;
         if (i !== 0) return;
-        l = attr[i + val.length];
+        l = attr2[i + val.length];
         return l === "-" || !l;
       },
-      "^=": function(attr, val) {
-        return attr.indexOf(val) === 0;
+      "^=": function(attr2, val) {
+        return attr2.indexOf(val) === 0;
       },
-      "$=": function(attr, val) {
-        var i = attr.lastIndexOf(val);
-        return i !== -1 && i + val.length === attr.length;
+      "$=": function(attr2, val) {
+        var i = attr2.lastIndexOf(val);
+        return i !== -1 && i + val.length === attr2.length;
       },
       // non-standard
-      "!=": function(attr, val) {
-        return attr !== val;
+      "!=": function(attr2, val) {
+        return attr2 !== val;
       }
     };
     var combinators = {
@@ -9721,9 +9721,9 @@ var require_select = __commonJS({
         }
         ref.combinator = function(el) {
           if (!node || !node.getAttribute) return;
-          var attr = node.getAttribute(name) || "";
-          if (attr[0] === "#") attr = attr.substring(1);
-          if (attr === el.id && test(node)) {
+          var attr2 = node.getAttribute(name) || "";
+          if (attr2[0] === "#") attr2 = attr2.substring(1);
+          if (attr2 === el.id && test(node)) {
             return node;
           }
         };
@@ -10107,18 +10107,18 @@ var require_NamedNodeMap = __commonJS({
       setNamedItem: { value: utils.nyi },
       setNamedItemNS: { value: utils.nyi },
       removeNamedItem: { value: function removeNamedItem(qualifiedName) {
-        var attr = this.element.getAttributeNode(qualifiedName);
-        if (attr) {
+        var attr2 = this.element.getAttributeNode(qualifiedName);
+        if (attr2) {
           this.element.removeAttribute(qualifiedName);
-          return attr;
+          return attr2;
         }
         utils.NotFoundError();
       } },
       removeNamedItemNS: { value: function removeNamedItemNS(ns, lname) {
-        var attr = this.element.getAttributeNodeNS(ns, lname);
-        if (attr) {
+        var attr2 = this.element.getAttributeNodeNS(ns, lname);
+        if (attr2) {
           this.element.removeAttributeNS(ns, lname);
-          return attr;
+          return attr2;
         }
         utils.NotFoundError();
       } }
@@ -10558,28 +10558,28 @@ var require_Element = __commonJS({
        *
        */
       getAttribute: { value: function getAttribute(qname) {
-        var attr = this.getAttributeNode(qname);
-        return attr ? attr.value : null;
+        var attr2 = this.getAttributeNode(qname);
+        return attr2 ? attr2.value : null;
       } },
       getAttributeNS: { value: function getAttributeNS(ns, lname) {
-        var attr = this.getAttributeNodeNS(ns, lname);
-        return attr ? attr.value : null;
+        var attr2 = this.getAttributeNodeNS(ns, lname);
+        return attr2 ? attr2.value : null;
       } },
       getAttributeNode: { value: function getAttributeNode(qname) {
         qname = String(qname);
         if (/[A-Z]/.test(qname) && this.isHTML)
           qname = utils.toASCIILowerCase(qname);
-        var attr = this._attrsByQName[qname];
-        if (!attr) return null;
-        if (Array.isArray(attr))
-          attr = attr[0];
-        return attr;
+        var attr2 = this._attrsByQName[qname];
+        if (!attr2) return null;
+        if (Array.isArray(attr2))
+          attr2 = attr2[0];
+        return attr2;
       } },
       getAttributeNodeNS: { value: function getAttributeNodeNS(ns, lname) {
         ns = ns === void 0 || ns === null ? "" : String(ns);
         lname = String(lname);
-        var attr = this._attrsByLName[ns + "|" + lname];
-        return attr ? attr : null;
+        var attr2 = this._attrsByLName[ns + "|" + lname];
+        return attr2 ? attr2 : null;
       } },
       hasAttribute: { value: function hasAttribute(qname) {
         qname = String(qname);
@@ -10618,16 +10618,16 @@ var require_Element = __commonJS({
       } },
       // Set the attribute without error checking. The parser uses this.
       _setAttribute: { value: function _setAttribute(qname, value) {
-        var attr = this._attrsByQName[qname];
+        var attr2 = this._attrsByQName[qname];
         var isnew;
-        if (!attr) {
-          attr = this._newattr(qname);
+        if (!attr2) {
+          attr2 = this._newattr(qname);
           isnew = true;
         } else {
-          if (Array.isArray(attr)) attr = attr[0];
+          if (Array.isArray(attr2)) attr2 = attr2[0];
         }
-        attr.value = value;
-        if (this._attributes) this._attributes[qname] = attr;
+        attr2.value = value;
+        if (this._attributes) this._attributes[qname] = attr2;
         if (isnew && this._newattrhook) this._newattrhook(qname, value);
       } },
       // Check for errors, and then set the attribute
@@ -10650,25 +10650,25 @@ var require_Element = __commonJS({
         }
         if (ns === "" || ns === void 0) ns = null;
         var key = (ns === null ? "" : ns) + "|" + lname;
-        var attr = this._attrsByLName[key];
+        var attr2 = this._attrsByLName[key];
         var isnew;
-        if (!attr) {
-          attr = new Attr(this, lname, prefix, ns);
+        if (!attr2) {
+          attr2 = new Attr(this, lname, prefix, ns);
           isnew = true;
-          this._attrsByLName[key] = attr;
+          this._attrsByLName[key] = attr2;
           if (this._attributes) {
-            this._attributes[this._attrKeys.length] = attr;
+            this._attributes[this._attrKeys.length] = attr2;
           }
           this._attrKeys.push(key);
-          this._addQName(attr);
+          this._addQName(attr2);
         } else if (false) {
-          if (attr.prefix !== prefix) {
-            this._removeQName(attr);
-            attr.prefix = prefix;
-            this._addQName(attr);
+          if (attr2.prefix !== prefix) {
+            this._removeQName(attr2);
+            attr2.prefix = prefix;
+            this._addQName(attr2);
           }
         }
-        attr.value = value;
+        attr2.value = value;
         if (isnew && this._newattrhook) this._newattrhook(qname, value);
       } },
       // Do error checking then call _setAttributeNS
@@ -10682,21 +10682,21 @@ var require_Element = __commonJS({
           utils.NamespaceError();
         this._setAttributeNS(ns, qname, String(value));
       } },
-      setAttributeNode: { value: function setAttributeNode(attr) {
-        if (attr.ownerElement !== null && attr.ownerElement !== this) {
+      setAttributeNode: { value: function setAttributeNode(attr2) {
+        if (attr2.ownerElement !== null && attr2.ownerElement !== this) {
           throw new DOMException(DOMException.INUSE_ATTRIBUTE_ERR);
         }
         var result = null;
-        var oldAttrs = this._attrsByQName[attr.name];
+        var oldAttrs = this._attrsByQName[attr2.name];
         if (oldAttrs) {
           if (!Array.isArray(oldAttrs)) {
             oldAttrs = [oldAttrs];
           }
           if (oldAttrs.some(function(a) {
-            return a === attr;
+            return a === attr2;
           })) {
-            return attr;
-          } else if (attr.ownerElement !== null) {
+            return attr2;
+          } else if (attr2.ownerElement !== null) {
             throw new DOMException(DOMException.INUSE_ATTRIBUTE_ERR);
           }
           oldAttrs.forEach(function(a) {
@@ -10704,47 +10704,47 @@ var require_Element = __commonJS({
           }, this);
           result = oldAttrs[0];
         }
-        this.setAttributeNodeNS(attr);
+        this.setAttributeNodeNS(attr2);
         return result;
       } },
-      setAttributeNodeNS: { value: function setAttributeNodeNS(attr) {
-        if (attr.ownerElement !== null) {
+      setAttributeNodeNS: { value: function setAttributeNodeNS(attr2) {
+        if (attr2.ownerElement !== null) {
           throw new DOMException(DOMException.INUSE_ATTRIBUTE_ERR);
         }
-        var ns = attr.namespaceURI;
-        var key = (ns === null ? "" : ns) + "|" + attr.localName;
+        var ns = attr2.namespaceURI;
+        var key = (ns === null ? "" : ns) + "|" + attr2.localName;
         var oldAttr = this._attrsByLName[key];
         if (oldAttr) {
           this.removeAttributeNode(oldAttr);
         }
-        attr._setOwnerElement(this);
-        this._attrsByLName[key] = attr;
+        attr2._setOwnerElement(this);
+        this._attrsByLName[key] = attr2;
         if (this._attributes) {
-          this._attributes[this._attrKeys.length] = attr;
+          this._attributes[this._attrKeys.length] = attr2;
         }
         this._attrKeys.push(key);
-        this._addQName(attr);
-        if (this._newattrhook) this._newattrhook(attr.name, attr.value);
+        this._addQName(attr2);
+        if (this._newattrhook) this._newattrhook(attr2.name, attr2.value);
         return oldAttr || null;
       } },
       removeAttribute: { value: function removeAttribute(qname) {
         qname = String(qname);
         if (/[A-Z]/.test(qname) && this.isHTML)
           qname = utils.toASCIILowerCase(qname);
-        var attr = this._attrsByQName[qname];
-        if (!attr) return;
-        if (Array.isArray(attr)) {
-          if (attr.length > 2) {
-            attr = attr.shift();
+        var attr2 = this._attrsByQName[qname];
+        if (!attr2) return;
+        if (Array.isArray(attr2)) {
+          if (attr2.length > 2) {
+            attr2 = attr2.shift();
           } else {
-            this._attrsByQName[qname] = attr[1];
-            attr = attr[0];
+            this._attrsByQName[qname] = attr2[1];
+            attr2 = attr2[0];
           }
         } else {
           this._attrsByQName[qname] = void 0;
         }
-        var ns = attr.namespaceURI;
-        var key = (ns === null ? "" : ns) + "|" + attr.localName;
+        var ns = attr2.namespaceURI;
+        var key = (ns === null ? "" : ns) + "|" + attr2.localName;
         this._attrsByLName[key] = void 0;
         var i = this._attrKeys.indexOf(key);
         if (this._attributes) {
@@ -10752,41 +10752,41 @@ var require_Element = __commonJS({
           this._attributes[qname] = void 0;
         }
         this._attrKeys.splice(i, 1);
-        var onchange = attr.onchange;
-        attr._setOwnerElement(null);
+        var onchange = attr2.onchange;
+        attr2._setOwnerElement(null);
         if (onchange) {
-          onchange.call(attr, this, attr.localName, attr.value, null);
+          onchange.call(attr2, this, attr2.localName, attr2.value, null);
         }
-        if (this.rooted) this.ownerDocument.mutateRemoveAttr(attr);
+        if (this.rooted) this.ownerDocument.mutateRemoveAttr(attr2);
       } },
       removeAttributeNS: { value: function removeAttributeNS(ns, lname) {
         ns = ns === void 0 || ns === null ? "" : String(ns);
         lname = String(lname);
         var key = ns + "|" + lname;
-        var attr = this._attrsByLName[key];
-        if (!attr) return;
+        var attr2 = this._attrsByLName[key];
+        if (!attr2) return;
         this._attrsByLName[key] = void 0;
         var i = this._attrKeys.indexOf(key);
         if (this._attributes) {
           Array.prototype.splice.call(this._attributes, i, 1);
         }
         this._attrKeys.splice(i, 1);
-        this._removeQName(attr);
-        var onchange = attr.onchange;
-        attr._setOwnerElement(null);
+        this._removeQName(attr2);
+        var onchange = attr2.onchange;
+        attr2._setOwnerElement(null);
         if (onchange) {
-          onchange.call(attr, this, attr.localName, attr.value, null);
+          onchange.call(attr2, this, attr2.localName, attr2.value, null);
         }
-        if (this.rooted) this.ownerDocument.mutateRemoveAttr(attr);
+        if (this.rooted) this.ownerDocument.mutateRemoveAttr(attr2);
       } },
-      removeAttributeNode: { value: function removeAttributeNode(attr) {
-        var ns = attr.namespaceURI;
-        var key = (ns === null ? "" : ns) + "|" + attr.localName;
-        if (this._attrsByLName[key] !== attr) {
+      removeAttributeNode: { value: function removeAttributeNode(attr2) {
+        var ns = attr2.namespaceURI;
+        var key = (ns === null ? "" : ns) + "|" + attr2.localName;
+        if (this._attrsByLName[key] !== attr2) {
           utils.NotFoundError();
         }
-        this.removeAttributeNS(ns, attr.localName);
-        return attr;
+        this.removeAttributeNS(ns, attr2.localName);
+        return attr2;
       } },
       getAttributeNames: { value: function getAttributeNames() {
         var elt = this;
@@ -10798,57 +10798,57 @@ var require_Element = __commonJS({
       // of reflected attributes. It skips some error checking and
       // namespace steps
       _getattr: { value: function _getattr(qname) {
-        var attr = this._attrsByQName[qname];
-        return attr ? attr.value : null;
+        var attr2 = this._attrsByQName[qname];
+        return attr2 ? attr2.value : null;
       } },
       // The raw version of setAttribute for reflected idl attributes.
       _setattr: { value: function _setattr(qname, value) {
-        var attr = this._attrsByQName[qname];
+        var attr2 = this._attrsByQName[qname];
         var isnew;
-        if (!attr) {
-          attr = this._newattr(qname);
+        if (!attr2) {
+          attr2 = this._newattr(qname);
           isnew = true;
         }
-        attr.value = String(value);
-        if (this._attributes) this._attributes[qname] = attr;
+        attr2.value = String(value);
+        if (this._attributes) this._attributes[qname] = attr2;
         if (isnew && this._newattrhook) this._newattrhook(qname, value);
       } },
       // Create a new Attr object, insert it, and return it.
       // Used by setAttribute() and by set()
       _newattr: { value: function _newattr(qname) {
-        var attr = new Attr(this, qname, null, null);
+        var attr2 = new Attr(this, qname, null, null);
         var key = "|" + qname;
-        this._attrsByQName[qname] = attr;
-        this._attrsByLName[key] = attr;
+        this._attrsByQName[qname] = attr2;
+        this._attrsByLName[key] = attr2;
         if (this._attributes) {
-          this._attributes[this._attrKeys.length] = attr;
+          this._attributes[this._attrKeys.length] = attr2;
         }
         this._attrKeys.push(key);
-        return attr;
+        return attr2;
       } },
       // Add a qname->Attr mapping to the _attrsByQName object, taking into
       // account that there may be more than one attr object with the
       // same qname
-      _addQName: { value: function(attr) {
-        var qname = attr.name;
+      _addQName: { value: function(attr2) {
+        var qname = attr2.name;
         var existing = this._attrsByQName[qname];
         if (!existing) {
-          this._attrsByQName[qname] = attr;
+          this._attrsByQName[qname] = attr2;
         } else if (Array.isArray(existing)) {
-          existing.push(attr);
+          existing.push(attr2);
         } else {
-          this._attrsByQName[qname] = [existing, attr];
+          this._attrsByQName[qname] = [existing, attr2];
         }
-        if (this._attributes) this._attributes[qname] = attr;
+        if (this._attributes) this._attributes[qname] = attr2;
       } },
       // Remove a qname->Attr mapping to the _attrsByQName object, taking into
       // account that there may be more than one attr object with the
       // same qname
-      _removeQName: { value: function(attr) {
-        var qname = attr.name;
+      _removeQName: { value: function(attr2) {
+        var qname = attr2.name;
         var target = this._attrsByQName[qname];
         if (Array.isArray(target)) {
-          var idx = target.indexOf(attr);
+          var idx = target.indexOf(attr2);
           utils.assert(idx !== -1);
           if (target.length === 2) {
             this._attrsByQName[qname] = target[1 - idx];
@@ -10857,12 +10857,12 @@ var require_Element = __commonJS({
             }
           } else {
             target.splice(idx, 1);
-            if (this._attributes && this._attributes[qname] === attr) {
+            if (this._attributes && this._attributes[qname] === attr2) {
               this._attributes[qname] = target[0];
             }
           }
         } else {
-          utils.assert(target === attr);
+          utils.assert(target === attr2);
           this._attrsByQName[qname] = void 0;
           if (this._attributes) {
             this._attributes[qname] = void 0;
@@ -12814,10 +12814,10 @@ var require_defineElement = __commonJS({
         var props = spec.props || {};
         if (spec.attributes) {
           for (var n in spec.attributes) {
-            var attr = spec.attributes[n];
-            if (typeof attr !== "object" || Array.isArray(attr)) attr = { type: attr };
-            if (!attr.name) attr.name = n.toLowerCase();
-            props[n] = attributes.property(attr);
+            var attr2 = spec.attributes[n];
+            if (typeof attr2 !== "object" || Array.isArray(attr2)) attr2 = { type: attr2 };
+            if (!attr2.name) attr2.name = n.toLowerCase();
+            props[n] = attributes.property(attr2);
           }
         }
         props.constructor = { value: c, writable: isApiWritable };
@@ -12885,10 +12885,10 @@ var require_htmlelts = __commonJS({
     function define(spec) {
       return defineElement(spec, HTMLElement, htmlElements, htmlNameToImpl);
     }
-    function URL2(attr) {
+    function URL2(attr2) {
       return {
         get: function() {
-          var v = this._getattr(attr);
+          var v = this._getattr(attr2);
           if (v === null) {
             return "";
           }
@@ -12896,14 +12896,14 @@ var require_htmlelts = __commonJS({
           return url === null ? v : url;
         },
         set: function(value) {
-          this._setattr(attr, value);
+          this._setattr(attr2, value);
         }
       };
     }
-    function CORS(attr) {
+    function CORS(attr2) {
       return {
         get: function() {
-          var v = this._getattr(attr);
+          var v = this._getattr(attr2);
           if (v === null) {
             return null;
           }
@@ -12914,9 +12914,9 @@ var require_htmlelts = __commonJS({
         },
         set: function(value) {
           if (value === null || value === void 0) {
-            this.removeAttribute(attr);
+            this.removeAttribute(attr2);
           } else {
-            this._setattr(attr, value);
+            this._setattr(attr2, value);
           }
         }
       };
@@ -15050,22 +15050,22 @@ var require_Document = __commonJS({
       // Invoked when an attribute's value changes. Attr holds the new
       // value.  oldval is the old value.  Attribute mutations can also
       // involve changes to the prefix (and therefore the qualified name)
-      mutateAttr: { value: function(attr, oldval) {
+      mutateAttr: { value: function(attr2, oldval) {
         if (this.mutationHandler) {
           this.mutationHandler({
             type: MUTATE.ATTR,
-            target: attr.ownerElement,
-            attr
+            target: attr2.ownerElement,
+            attr: attr2
           });
         }
       } },
       // Used by removeAttribute and removeAttributeNS for attributes.
-      mutateRemoveAttr: { value: function(attr) {
+      mutateRemoveAttr: { value: function(attr2) {
         if (this.mutationHandler) {
           this.mutationHandler({
             type: MUTATE.REMOVE_ATTR,
-            target: attr.ownerElement,
-            attr
+            target: attr2.ownerElement,
+            attr: attr2
           });
         }
       } },
@@ -15131,8 +15131,8 @@ var require_Document = __commonJS({
           this.byId[id2] = void 0;
         }
       } },
-      _resolve: { value: function(href) {
-        return new URL2(this._documentBaseURL).resolve(href);
+      _resolve: { value: function(href2) {
+        return new URL2(this._documentBaseURL).resolve(href2);
       } },
       _documentBaseURL: { get: function() {
         var url = this._address;
@@ -15367,7 +15367,7 @@ var require_HTMLParser = __commonJS({
     var impl = html.elements;
     var pushAll = Function.prototype.apply.bind(Array.prototype.push);
     var EOF = -1;
-    var TEXT = 1;
+    var TEXT2 = 1;
     var TAG = 2;
     var ENDTAG = 3;
     var COMMENT = 4;
@@ -18636,7 +18636,7 @@ var require_HTMLParser = __commonJS({
             if (s[0] === "\n") s = s.substring(1);
             if (s.length === 0) return;
           }
-          insertToken(TEXT, s);
+          insertToken(TEXT2, s);
           textIncludesNUL = false;
         }
         ignore_linefeed = false;
@@ -18671,7 +18671,7 @@ var require_HTMLParser = __commonJS({
           if (s[0] === "\n") s = s.substring(1);
           if (s.length === 0) return;
         }
-        insertToken(TEXT, s);
+        insertToken(TEXT2, s);
       }
       function emitTag() {
         if (is_end_tag) insertToken(ENDTAG, tagnamebuf);
@@ -18727,10 +18727,10 @@ var require_HTMLParser = __commonJS({
         if (!current || current.namespaceURI === NAMESPACE.HTML) {
           parser(t, value, arg3, arg4);
         } else {
-          if (t !== TAG && t !== TEXT) {
+          if (t !== TAG && t !== TEXT2) {
             insertForeignToken(t, value, arg3, arg4);
           } else {
-            if (isMathmlTextIntegrationPoint(current) && (t === TEXT || t === TAG && value !== "mglyph" && value !== "malignmark") || t === TAG && value === "svg" && current.namespaceURI === NAMESPACE.MATHML && current.localName === "annotation-xml" || isHTMLIntegrationPoint(current)) {
+            if (isMathmlTextIntegrationPoint(current) && (t === TEXT2 || t === TAG && value !== "mglyph" && value !== "malignmark") || t === TAG && value === "svg" && current.namespaceURI === NAMESPACE.MATHML && current.localName === "annotation-xml" || isHTMLIntegrationPoint(current)) {
               text_integration_mode = true;
               parser(t, value, arg3, arg4);
               text_integration_mode = false;
@@ -18809,11 +18809,11 @@ var require_HTMLParser = __commonJS({
           var elt = doc2._createElementNS(name, ns, null);
           if (attrs) {
             for (var i = 0, n = attrs.length; i < n; i++) {
-              var attr = attrs[i];
-              if (attr.length === 2)
-                elt._setAttribute(attr[0], attr[1]);
+              var attr2 = attrs[i];
+              if (attr2.length === 2)
+                elt._setAttribute(attr2[0], attr2[1]);
               else {
-                elt._setAttributeNS(attr[2], attr[0], attr[1]);
+                elt._setAttributeNS(attr2[2], attr2[0], attr2[1]);
               }
             }
           }
@@ -22695,7 +22695,7 @@ var require_HTMLParser = __commonJS({
         foster_parent_mode = false;
       }
       function in_table_text_mode(t, value, arg3, arg4) {
-        if (t === TEXT) {
+        if (t === TEXT2) {
           if (textIncludesNUL) {
             value = value.replace(NULCHARS, "");
             if (value.length === 0) return;
@@ -22706,7 +22706,7 @@ var require_HTMLParser = __commonJS({
           pending_table_text.length = 0;
           if (NONWS.test(s)) {
             foster_parent_mode = true;
-            in_body_mode(TEXT, s);
+            in_body_mode(TEXT2, s);
             foster_parent_mode = false;
           } else {
             insertText(s);
@@ -23602,9 +23602,9 @@ var require_Location = __commonJS({
     var URL2 = require_URL();
     var URLUtils = require_URLUtils();
     module.exports = Location;
-    function Location(window2, href) {
+    function Location(window2, href2) {
       this._window = window2;
-      this._href = href;
+      this._href = href2;
     }
     Location.prototype = Object.create(URLUtils.prototype, {
       constructor: { value: Location },
@@ -24011,10 +24011,10 @@ var require_turndown_cjs = __commonJS({
         return options.linkStyle === "inlined" && node.nodeName === "A" && node.getAttribute("href");
       },
       replacement: function(content, node) {
-        var href = escapeLinkDestination(node.getAttribute("href"));
+        var href2 = escapeLinkDestination(node.getAttribute("href"));
         var title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
         var titlePart = title ? ' "' + title + '"' : "";
-        return "[" + content + "](" + href + titlePart + ")";
+        return "[" + content + "](" + href2 + titlePart + ")";
       }
     };
     rules.referenceLink = {
@@ -24022,7 +24022,7 @@ var require_turndown_cjs = __commonJS({
         return options.linkStyle === "referenced" && node.nodeName === "A" && node.getAttribute("href");
       },
       replacement: function(content, node, options) {
-        var href = escapeLinkDestination(node.getAttribute("href"));
+        var href2 = escapeLinkDestination(node.getAttribute("href"));
         var title = cleanAttribute(node.getAttribute("title"));
         if (title) title = ' "' + escapeLinkTitle(title) + '"';
         var replacement;
@@ -24030,16 +24030,16 @@ var require_turndown_cjs = __commonJS({
         switch (options.linkReferenceStyle) {
           case "collapsed":
             replacement = "[" + content + "][]";
-            reference = "[" + content + "]: " + href + title;
+            reference = "[" + content + "]: " + href2 + title;
             break;
           case "shortcut":
             replacement = "[" + content + "]";
-            reference = "[" + content + "]: " + href + title;
+            reference = "[" + content + "]: " + href2 + title;
             break;
           default:
             var id2 = this.references.length + 1;
             replacement = "[" + content + "][" + id2 + "]";
-            reference = "[" + id2 + "]: " + href + title;
+            reference = "[" + id2 + "]: " + href2 + title;
         }
         this.references.push(reference);
         return replacement;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join27(output, replacement);
+        return join28(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join27(output, rule.append(self.options));
+          output = join28(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join27(output, replacement) {
+    function join28(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -29878,7 +29878,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
     try {
       const orig = payload.value;
       const url = new URL(orig);
-      const href = url.href;
+      const href2 = url.href;
       if (def.hostname) {
         def.hostname.lastIndex = 0;
         if (!def.hostname.test(url.hostname)) {
@@ -29907,10 +29907,10 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
           });
         }
       }
-      if (!orig.endsWith("/") && href.endsWith("/")) {
-        payload.value = href.slice(0, -1);
+      if (!orig.endsWith("/") && href2.endsWith("/")) {
+        payload.value = href2.slice(0, -1);
       } else {
-        payload.value = href;
+        payload.value = href2;
       }
       return;
     } catch (_) {
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve6(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve6, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve6();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve6);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
@@ -40618,7 +40618,7 @@ var Decoder = class {
    * positively and negated by the caller.
    */
   leaf(key, value, excluded) {
-    const flag2 = (description, negative) => typeof value === "boolean" ? {
+    const flag3 = (description, negative) => typeof value === "boolean" ? {
       type: key,
       value,
       ...excluded ? { excluded: true } : {},
@@ -40626,25 +40626,25 @@ var Decoder = class {
     } : null;
     switch (key) {
       case "checklist":
-        return flag2("has a checklist", "has no checklist");
+        return flag3("has a checklist", "has no checklist");
       case "checklistInProgress":
-        return flag2("has an unfinished checklist", "has no unfinished checklist");
+        return flag3("has an unfinished checklist", "has no unfinished checklist");
       case "checklistCompleted":
-        return flag2("has a completed checklist", "has no completed checklist");
+        return flag3("has a completed checklist", "has no completed checklist");
       case "attachment":
-        return flag2("has attachments", "has no attachments");
+        return flag3("has attachments", "has no attachments");
       case "pinned":
-        return flag2("is pinned", "is not pinned");
+        return flag3("is pinned", "is not pinned");
       case "systemPaper":
-        return flag2("is a Quick Note", "is not a Quick Note");
+        return flag3("is a Quick Note", "is not a Quick Note");
       case "passwordProtected":
-        return flag2("is locked", "is not locked");
+        return flag3("is locked", "is not locked");
       case "shared":
-        return flag2("is shared", "is not shared");
+        return flag3("is shared", "is not shared");
       case "mention":
-        return flag2("mentions anyone", "mentions no one");
+        return flag3("mentions anyone", "mentions no one");
       case "tagged":
-        return flag2("has any tag", "has no tags");
+        return flag3("has any tag", "has no tags");
       case "attachmentSection": {
         if (typeof value !== "number" || !ATTACHMENT_SECTIONS[value]) return null;
         return {
@@ -41076,9 +41076,9 @@ function fileSize(p) {
 function makeTempDir() {
   return mkdtempSync(resolve(tmpdir(), "apple-notes-att-"));
 }
-function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
-  if (!p || !p.trim()) throw new Error("A content file path is required.");
-  if (!isAbsolute(p)) throw new Error(`Content file path must be absolute: "${p}"`);
+function assertReadableInRoots(p, roots = allowedSaveRoots(), label = "Content file") {
+  if (!p || !p.trim()) throw new Error(`A ${label.toLowerCase()} path is required.`);
+  if (!isAbsolute(p)) throw new Error(`${label} path must be absolute: "${p}"`);
   const abs = resolve(p);
   if (!isWithinRoots(abs, roots))
     throw new Error(`Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}"`);
@@ -41086,12 +41086,16 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
   try {
     canonical = canonicalize(abs);
   } catch {
-    throw new Error(`Content file does not exist or cannot be resolved: "${abs}"`);
+    throw new Error(`${label} does not exist or cannot be resolved: "${abs}"`);
   }
   if (!isWithinRoots(canonical, canonicalRoots(roots)))
     throw new Error(
       `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${canonical}".`
     );
+  return abs;
+}
+function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
+  const abs = assertReadableInRoots(p, roots);
   let descriptor;
   try {
     descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -45724,12 +45728,681 @@ function assembleInventory(rows, accounts, scope2) {
   };
 }
 
+// src/utils/noteBlocks.ts
+import { execFileSync as execFileSync12 } from "node:child_process";
+import { existsSync as existsSync9 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { join as join13 } from "node:path";
+import { gunzipSync as gunzipSync7 } from "node:zlib";
+var NoteBlocksError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteBlocksError";
+    this.code = code;
+  }
+};
+var STYLE_NAMES = {
+  0: "title",
+  1: "heading",
+  2: "subheading",
+  4: "monospaced",
+  100: "bulleted",
+  101: "dashed",
+  102: "numbered",
+  103: "checklist"
+};
+var ALIGNMENTS = {
+  0: "left",
+  1: "center",
+  2: "right",
+  3: "justify"
+};
+var HIGHLIGHTS = {
+  1: "purple",
+  2: "pink",
+  3: "orange",
+  4: "mint",
+  5: "blue"
+};
+var KNOWN_RUN_FIELDS = /* @__PURE__ */ new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
+var KNOWN_PARAGRAPH_FIELDS = /* @__PURE__ */ new Set([1, 2, 4, 5, 8, 9]);
+var isSafeLink = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var utf8 = new TextDecoder();
+var first = (fields, n) => fields.find((f) => f.fieldNumber === n);
+var varintOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 0 && f.varint !== void 0 ? signedVarint(f.varint) : void 0;
+};
+var bytesOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 2 ? f.bytes : void 0;
+};
+var stringOf = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? utf8.decode(b) : void 0;
+};
+var sub3 = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? decodeWireFields(b) : void 0;
+};
+var hex2 = (bytes) => Buffer.from(bytes).toString("hex");
+var uuidString = (bytes) => {
+  const h = hex2(bytes).toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+var channel = (value) => Math.max(0, Math.min(255, Math.round((Number.isFinite(value) ? value : 0) * 255))).toString(16).toUpperCase().padStart(2, "0");
+function colorOf(fields) {
+  const [r, g, b, a] = [1, 2, 3, 4].map((n) => fixed32Float(first(fields, n)));
+  if (r === void 0 && g === void 0 && b === void 0) return void 0;
+  const rgb = `#${channel(r)}${channel(g)}${channel(b)}`;
+  return a === void 0 || a >= 0.999 ? rgb : `${rgb}${channel(a)}`;
+}
+var DEFAULT_PARAGRAPH = {
+  styleType: null,
+  alignmentValue: 0,
+  indent: 0,
+  blockQuote: false
+};
+function decodeParagraph(fields, tally) {
+  if (!fields) return DEFAULT_PARAGRAPH;
+  for (const n of new Set(fields.map((f) => f.fieldNumber)))
+    if (!KNOWN_PARAGRAPH_FIELDS.has(n)) tally.set(n, (tally.get(n) || 0) + 1);
+  const attrs = {
+    styleType: varintOf(fields, 1) ?? null,
+    alignmentValue: varintOf(fields, 2) ?? 0,
+    indent: Math.max(0, varintOf(fields, 4) ?? 0),
+    blockQuote: (varintOf(fields, 8) ?? 0) !== 0
+  };
+  if (attrs.styleType === -1) attrs.styleType = null;
+  const checklist = sub3(fields, 5);
+  const checklistId = checklist && bytesOf(checklist, 1);
+  if (attrs.styleType === 103 && checklistId)
+    attrs.checklist = { id: hex2(checklistId), done: varintOf(checklist, 2) === 1 };
+  const uuid2 = bytesOf(fields, 9);
+  if (uuid2?.length === 16) attrs.paragraphUuid = uuidString(uuid2);
+  return attrs;
+}
+function decodeInline(fields) {
+  const inline = {};
+  const font = sub3(fields, 3);
+  const hints = font ? varintOf(font, 3) ?? 0 : 0;
+  const weight = varintOf(fields, 5) ?? 0;
+  if (weight === 1 || weight === 3 || hints & 1) inline.bold = true;
+  if (weight === 2 || weight === 3 || hints & 2) inline.italic = true;
+  if (varintOf(fields, 6)) inline.underline = true;
+  if (varintOf(fields, 7)) inline.strikethrough = true;
+  const baseline = varintOf(fields, 8) ?? 0;
+  if (baseline > 0) inline.superscript = true;
+  if (baseline < 0) inline.subscript = true;
+  const color = sub3(fields, 10);
+  const colorValue = color && colorOf(color);
+  if (colorValue) inline.color = colorValue;
+  const emphasis = varintOf(fields, 14);
+  if (emphasis !== void 0 && emphasis !== 0) {
+    inline.highlight = HIGHLIGHTS[emphasis] ?? "unknown";
+    if (inline.highlight === "unknown") inline.highlightValue = emphasis;
+  }
+  const link = stringOf(fields, 9);
+  if (link) {
+    inline.link = link;
+    inline.linkSafe = isSafeLink(link);
+  }
+  if (font) {
+    const name = stringOf(font, 1);
+    const size = fixed32Float(first(font, 2));
+    if (name || size !== void 0)
+      inline.font = {
+        ...name ? { name } : {},
+        ...size !== void 0 && Number.isFinite(size) ? { size } : {}
+      };
+  }
+  const attachment = sub3(fields, 12);
+  const attachmentId = attachment && stringOf(attachment, 1);
+  if (attachmentId)
+    inline.attachment = { id: attachmentId, uti: stringOf(attachment, 2) || "unknown" };
+  return inline;
+}
+function wrap(error2) {
+  if (error2 instanceof NoteBlocksError) throw error2;
+  if (error2 instanceof ProtobufDecodeError)
+    throw new NoteBlocksError("malformed-protobuf", error2.message);
+  throw error2;
+}
+function decodeNoteBlocks(data) {
+  let note;
+  try {
+    const document = sub3(decodeWireFields(data), 2);
+    note = document && sub3(document, 3);
+  } catch (error2) {
+    wrap(error2);
+  }
+  const textBytes = note && bytesOf(note, 2);
+  if (!note || !textBytes)
+    throw new NoteBlocksError("unsupported-structure", "Unsupported Notes document structure");
+  const text2 = utf8.decode(textBytes);
+  const runTally = /* @__PURE__ */ new Map();
+  const paragraphTally = /* @__PURE__ */ new Map();
+  const runs = [];
+  let position = 0;
+  try {
+    for (const field of note.filter((f) => f.fieldNumber === 5)) {
+      if (field.wireType !== 2 || !field.bytes)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes attribute run");
+      const fields = decodeWireFields(field.bytes);
+      const length = varintOf(fields, 1);
+      if (length === void 0 || length < 0 || position + length > text2.length)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes run length");
+      for (const n of new Set(fields.map((f) => f.fieldNumber)))
+        if (!KNOWN_RUN_FIELDS.has(n)) runTally.set(n, (runTally.get(n) || 0) + 1);
+      runs.push({
+        start: position,
+        length,
+        paragraph: decodeParagraph(sub3(fields, 2), paragraphTally),
+        inline: decodeInline(fields)
+      });
+      position += length;
+    }
+  } catch (error2) {
+    wrap(error2);
+  }
+  if (position !== text2.length)
+    throw new NoteBlocksError("invalid-runs", "Incomplete Notes attribute runs");
+  const blocks = [];
+  const attachments = [];
+  let runIndex = 0;
+  let paragraphStart = 0;
+  while (paragraphStart < text2.length) {
+    const newline = text2.indexOf("\n", paragraphStart);
+    const end = newline === -1 ? text2.length : newline;
+    while (runIndex < runs.length - 1 && runs[runIndex].start + runs[runIndex].length <= paragraphStart)
+      runIndex++;
+    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
+    const style = attrs.styleType === null ? "body" : STYLE_NAMES[attrs.styleType] ?? "unknown";
+    const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";
+    const block = {
+      index: blocks.length,
+      start: paragraphStart,
+      length: end - paragraphStart,
+      text: text2.slice(paragraphStart, end),
+      style,
+      styleType: attrs.styleType,
+      indent: attrs.indent,
+      alignment,
+      ...alignment === "unknown" ? { alignmentValue: attrs.alignmentValue } : {},
+      blockQuote: attrs.blockQuote,
+      ...attrs.checklist ? { checklist: attrs.checklist } : {},
+      ...attrs.paragraphUuid ? { paragraphUuid: attrs.paragraphUuid } : {},
+      runs: [],
+      attachments: []
+    };
+    for (let i = runIndex; i < runs.length && runs[i].start < end; i++) {
+      const run = runs[i];
+      const start = Math.max(run.start, paragraphStart);
+      const stop = Math.min(run.start + run.length, end);
+      if (stop <= start) continue;
+      block.runs.push({
+        start,
+        length: stop - start,
+        text: text2.slice(start, stop),
+        ...run.inline
+      });
+      if (run.inline.attachment)
+        for (let at = text2.indexOf("\uFFFC", start); at !== -1 && at < stop; at = text2.indexOf("\uFFFC", at + 1)) {
+          const marker = { ...run.inline.attachment, start: at, blockIndex: block.index };
+          block.attachments.push(marker);
+          attachments.push(marker);
+        }
+    }
+    blocks.push(block);
+    paragraphStart = end + 1;
+  }
+  return {
+    text: text2,
+    textLength: text2.length,
+    blocks,
+    attachments,
+    undecodedFields: {
+      attributeRun: Object.fromEntries([...runTally].sort((a, b) => a[0] - b[0])),
+      paragraphStyle: Object.fromEntries([...paragraphTally].sort((a, b) => a[0] - b[0]))
+    },
+    summary: summarize(blocks, attachments)
+  };
+}
+function summarize(blocks, attachments) {
+  const summary = {
+    blocks: blocks.length,
+    styles: {},
+    alignments: {},
+    blockQuotes: 0,
+    indented: 0,
+    checklist: { total: 0, done: 0 },
+    inline: {
+      bold: 0,
+      italic: 0,
+      underline: 0,
+      strikethrough: 0,
+      superscript: 0,
+      subscript: 0,
+      color: 0,
+      highlight: 0,
+      link: 0,
+      unsafeLink: 0
+    },
+    attachments: attachments.length
+  };
+  for (const block of blocks) {
+    summary.styles[block.style] = (summary.styles[block.style] || 0) + 1;
+    summary.alignments[block.alignment] = (summary.alignments[block.alignment] || 0) + 1;
+    if (block.blockQuote) summary.blockQuotes++;
+    if (block.indent > 0) summary.indented++;
+    if (block.checklist) {
+      summary.checklist.total++;
+      if (block.checklist.done) summary.checklist.done++;
+    }
+    for (const run of block.runs) {
+      for (const key of [
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "superscript",
+        "subscript",
+        "color",
+        "highlight",
+        "link"
+      ])
+        if (run[key]) summary.inline[key]++;
+      if (run.link && !run.linkSafe) summary.inline.unsafeLink++;
+    }
+  }
+  return summary;
+}
+function decodeCompressedNoteBlocks(compressed) {
+  let data;
+  try {
+    data = gunzipSync7(compressed, { maxOutputLength: 32 * 1024 * 1024 });
+  } catch (error2) {
+    throw new NoteBlocksError(
+      "decompress-failed",
+      `Failed to decompress note data: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+  return decodeNoteBlocks(data);
+}
+var DEFAULT_BLOCKS_MAX_BYTES = 4 * 1024 * 1024;
+function blocksMaxResponseBytes(env = process.env) {
+  const raw = env.APPLE_NOTES_MCP_BLOCKS_MAX_BYTES;
+  if (raw !== void 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return DEFAULT_BLOCKS_MAX_BYTES;
+}
+function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResponseBytes() } = {}) {
+  const total = doc.blocks.length;
+  const start = Math.min(Math.max(0, offset), total);
+  const blocks = [];
+  let bytes = 0;
+  for (let i = start; i < total && blocks.length < limit; i++) {
+    let block = doc.blocks[i];
+    let size = Buffer.byteLength(JSON.stringify(block));
+    if (bytes + size > maxBytes) {
+      if (blocks.length) break;
+      block = {
+        ...block,
+        text: "",
+        textOmitted: true,
+        runs: block.runs.map((run) => ({ ...run, text: "" }))
+      };
+      size = Buffer.byteLength(JSON.stringify(block));
+    }
+    blocks.push(block);
+    bytes += size;
+  }
+  const next = start + blocks.length;
+  return {
+    textLength: doc.textLength,
+    blocks,
+    page: {
+      offset: start,
+      returned: blocks.length,
+      total,
+      hasMore: next < total,
+      ...next < total ? { nextOffset: next } : {}
+    },
+    summary: doc.summary,
+    undecodedFields: doc.undecodedFields
+  };
+}
+var NOTES_DB_PATH8 = join13(
+  homedir12(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH8 } = {}) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteBlocksError(
+      "invalid-id",
+      `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
+    );
+  if (!existsSync9(dbPath2))
+    throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+  const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
+  let output;
+  try {
+    output = execFileSync12(
+      "/usr/bin/sqlite3",
+      ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
+      {
+        encoding: "utf8",
+        timeout: 5e3,
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    ).trim();
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
+  }
+  let row;
+  try {
+    row = JSON.parse(output);
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  if (!row.exists) throw new NoteBlocksError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted)
+    throw new NoteBlocksError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted and cannot be decoded"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new NoteBlocksError("no-body", "No body data is stored for this note");
+  return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
+}
+
+// src/utils/noteRecentList.ts
+var RECENT_LIMIT = { DEFAULT: 50, MAX: 1e3 };
+var CHECKPOINT_PREFIX = "cdts1:";
+var PREVIEW_LENGTH = 180;
+var OBJECT_REPLACEMENT = new RegExp(String.fromCharCode(65532), "gu");
+function formatCursor(cursor) {
+  const base = CHECKPOINT_PREFIX + doubleToHex(cursor.modified);
+  return cursor.pk === void 0 ? base : `${base}:${cursor.pk}`;
+}
+function checkpointFromBits(bits, pk) {
+  if (!bits) return null;
+  try {
+    return formatCursor({ modified: hexToDouble(bits), pk });
+  } catch {
+    return null;
+  }
+}
+var CURSOR = /^([0-9a-f]{16})(?::(0|[1-9]\d{0,15}))?$/i;
+function parseCursorBody(body, input) {
+  const match = CURSOR.exec(body);
+  const pk = match?.[2] !== void 0 ? Number(match[2]) : void 0;
+  try {
+    if (!match || pk !== void 0 && !Number.isSafeInteger(pk)) throw new Error("bad");
+    return pk === void 0 ? { modified: hexToDouble(match[1]) } : { modified: hexToDouble(match[1]), pk };
+  } catch {
+    throw new NoteStoreError(`Invalid checkpoint "${input}".`, "invalid_input");
+  }
+}
+var DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+var DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i;
+function parseSince(input) {
+  const text2 = input.trim();
+  if (text2.startsWith(CHECKPOINT_PREFIX)) {
+    return parseCursorBody(text2.slice(CHECKPOINT_PREFIX.length), input);
+  }
+  let ms = Number.NaN;
+  const dateOnly = DATE_ONLY.exec(text2);
+  if (dateOnly) {
+    const [year, month, day] = dateOnly.slice(1).map(Number);
+    const local = new Date(year, month - 1, day);
+    if (local.getMonth() === month - 1 && local.getDate() === day) ms = local.getTime();
+  } else if (DATE_TIME.test(text2)) {
+    ms = Date.parse(text2.replace(/(\.\d{3})\d+/, "$1"));
+  }
+  if (!Number.isFinite(ms)) {
+    throw new NoteStoreError(
+      `Invalid since value "${input}". Use an ISO 8601 date or date-time (e.g. 2026-08-01 or 2026-08-01T09:30:00+02:00) or a modifiedCheckpoint token.`,
+      "invalid_input"
+    );
+  }
+  return { modified: (ms - CORE_DATA_EPOCH_MS) / 1e3 };
+}
+function textStats(text2) {
+  const visible2 = text2.replace(OBJECT_REPLACEMENT, "");
+  let wordCount2 = 0;
+  for (const token of visible2.split(/\s+/u)) if (/[\p{L}\p{N}]/u.test(token)) wordCount2++;
+  return { wordCount: wordCount2, charCount: [...visible2].length };
+}
+function previewText(text2) {
+  const flat = text2.replace(OBJECT_REPLACEMENT, " ").replace(/\s+/gu, " ").trim();
+  return [...flat].slice(0, PREVIEW_LENGTH).join("");
+}
+function decodeBodyText(hex3) {
+  if (!hex3 || !/^[0-9a-f]+$/i.test(hex3)) return null;
+  try {
+    return decodeCompressedNoteBlocks(Buffer.from(hex3, "hex")).text;
+  } catch {
+    return null;
+  }
+}
+var flag2 = (columns, alias, name) => columns.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
+var REQUIRED2 = ["Z_PK", "Z_ENT", "ZFOLDER", "ZTITLE1", "ZMODIFICATIONDATE1"];
+function buildRecentNotesSql(columns, options) {
+  requireColumns(columns, REQUIRED2, "list-recent-notes");
+  const owner = col(columns, "f", "ZOWNER");
+  const account = owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
+  const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
+  const locked = flag2(columns, "n", "ZISPASSWORDPROTECTED");
+  const cloud = ["ZNEEDSTOBEFETCHEDFROMCLOUD", "ZNEEDSINITIALFETCHFROMCLOUD"].filter((name) => columns.has(name)).map((name) => `COALESCE(n.${name}, 0)`);
+  const where = [`n.Z_ENT = ${entity("ICNote")}`];
+  if (!options.includeDeleted) where.push(activeNoteSql(columns, "n", "f"));
+  if (options.scoped) where.push("a.Z_PK = @account");
+  if (options.inFolder) where.push("n.ZFOLDER = @folder");
+  if (options.since) {
+    where.push(
+      options.sinceKey ? "(n.ZMODIFICATIONDATE1 > @since OR (n.ZMODIFICATIONDATE1 = @since AND n.Z_PK > @sincePk))" : "n.ZMODIFICATIONDATE1 > @since"
+    );
+  }
+  const order = options.since ? "n.ZMODIFICATIONDATE1 ASC, n.Z_PK ASC" : "n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC";
+  const data = options.withBodies ? `CASE WHEN ${locked} = 1 THEN NULL ELSE (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1) END` : "NULL";
+  return `SELECT json_object('pk', n.Z_PK, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'bits', hex(ieee754_to_blob(n.ZMODIFICATIONDATE1)), 'pinned', ${flag2(columns, "n", "ZISPINNED")}, 'locked', ${locked}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "n")}, 'cloud', ${cloud.length ? cloud.join(" + ") : "0"}, 'snippet', CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns, "n", "ZSNIPPET")} END, 'data', ${data}) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT @limit;`;
+}
+function resolveFolderPath(folders, paths, input, accountPk) {
+  const candidates = folders.filter(
+    (folder) => !folder.tombstoned && (accountPk === void 0 || folder.account === accountPk)
+  );
+  const wanted = input.trim().replace(/^\/+|\/+$/g, "").toLocaleLowerCase();
+  const byPath = candidates.filter((f) => (paths.get(f.pk) ?? "").toLocaleLowerCase() === wanted);
+  const byName = candidates.filter(
+    (f) => (f.name ?? "").toLocaleLowerCase() === wanted.replace(/\\\//g, "/")
+  );
+  const matches = byPath.length ? byPath : byName;
+  if (matches.length === 1) return matches[0];
+  if (!matches.length) {
+    throw new NoteStoreError(`No folder "${input}" found.`, "invalid_input");
+  }
+  const options = matches.map((f) => paths.get(f.pk)).join(", ");
+  throw new NoteStoreError(
+    `Folder "${input}" is ambiguous (${options}). Pass the full path, or an account.`,
+    "invalid_input"
+  );
+}
+function listRecentNotes(options = {}) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const limit = Math.min(
+    Math.max(1, Math.trunc(options.limit ?? RECENT_LIMIT.DEFAULT)),
+    RECENT_LIMIT.MAX
+  );
+  const since = options.since !== void 0 ? parseSince(options.since) : void 0;
+  const columns = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const folder = options.folder ? resolveFolderPath(context.folders, paths, options.folder, scope2?.pk) : void 0;
+  const withBodies = Boolean(options.wordCounts);
+  const params = { limit: { int: limit } };
+  if (scope2) params.account = { int: scope2.pk };
+  if (folder) params.folder = { int: folder.pk };
+  if (since) params.since = { double: since.modified };
+  if (since?.pk !== void 0) params.sincePk = { int: since.pk };
+  const sql = buildRecentNotesSql(columns, {
+    includeDeleted: Boolean(options.includeDeleted),
+    scoped: Boolean(scope2),
+    inFolder: Boolean(folder),
+    since: Boolean(since),
+    sinceKey: since?.pk !== void 0,
+    withBodies
+  });
+  const raw = parseJsonLines(runReadOnlySql(dbPath2, sql, params));
+  const accountNames = new Map(context.accounts.map((account) => [account.pk, account.name]));
+  const notes = raw.map((row) => toRecentRow(row, context, paths, accountNames, options));
+  const saturated = notes.length === limit;
+  let nextSince;
+  if (since) {
+    nextSince = notes.length ? notes[notes.length - 1].modifiedCheckpoint : formatCursor(since);
+  } else {
+    nextSince = !saturated && notes.length ? notes[0].modifiedCheckpoint : null;
+  }
+  return {
+    notes,
+    count: notes.length,
+    limit,
+    order: since ? "oldest-first" : "newest-first",
+    saturated,
+    nextSince,
+    ...scope2 ? { account: scope2.name } : {},
+    ...folder ? { folder: paths.get(folder.pk) } : {}
+  };
+}
+function toRecentRow(row, context, paths, accountNames, options) {
+  const note = {
+    id: noteIdFor(context.uuid, row.pk),
+    identifier: row.identifier ?? null,
+    title: row.title ?? null,
+    folder: row.folder !== null ? paths.get(row.folder) ?? null : null,
+    account: row.account !== null ? accountNames.get(row.account) ?? null : null,
+    created: coreDataToIso(row.created),
+    modified: coreDataToIso(row.modified),
+    modifiedCheckpoint: checkpointFromBits(row.bits, row.pk),
+    pinned: Boolean(row.pinned),
+    locked: Boolean(row.locked),
+    inRecentlyDeleted: Boolean(row.trash),
+    markedForDeletion: Boolean(row.tombstoned)
+  };
+  const text2 = row.locked || row.cloud ? null : decodeBodyText(row.data);
+  if (options.wordCounts) {
+    const stats = text2 === null ? null : textStats(text2);
+    note.wordCount = stats?.wordCount ?? null;
+    note.charCount = stats?.charCount ?? null;
+  }
+  if (options.bodyPreview) {
+    note.textDecoded = text2 !== null;
+    note.bodyPreview = text2 !== null ? previewText(text2) : row.snippet ? previewText(row.snippet) : null;
+  }
+  return note;
+}
+function buildFolderCountsSql(columns) {
+  requireColumns(columns, ["Z_PK", "Z_ENT", "ZFOLDER"], "list-folder-tree");
+  return `SELECT json_object('folder', n.ZFOLDER, 'n', COUNT(*)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZFOLDER IS NOT NULL AND ${notTombstonedSql(columns, "n")} GROUP BY n.ZFOLDER;`;
+}
+var KIND_ORDER = { folder: 0, smart: 1, trash: 2 };
+function compareNodes(a, b) {
+  return KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name);
+}
+function folderTree(options = {}) {
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const columns = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns);
+  const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
+  const counts = new Map(
+    parseJsonLines(
+      runReadOnlySql(dbPath2, buildFolderCountsSql(columns))
+    ).map((row) => [row.folder, row.n])
+  );
+  return assembleFolderTree(context, counts, Boolean(options.includeDeleted), scope2);
+}
+function assembleFolderTree(context, counts, includeDeleted, scope2) {
+  const paths = folderPaths(context.folders);
+  const visible2 = context.folders.filter(
+    (folder) => (includeDeleted || !folder.tombstoned) && (!scope2 || folder.account === scope2.pk)
+  );
+  const byPk = new Map(visible2.map((folder) => [folder.pk, folder]));
+  const nodes = /* @__PURE__ */ new Map();
+  for (const folder of visible2) {
+    const node = {
+      id: `x-coredata://${context.uuid}/ICFolder/p${folder.pk}`,
+      identifier: folder.identifier,
+      name: folder.name ?? "",
+      path: paths.get(folder.pk) ?? "",
+      kind: folder.trash ? "trash" : folder.folderType === 2 ? "smart" : "folder",
+      noteCount: counts.get(folder.pk) ?? 0,
+      totalNoteCount: 0,
+      children: []
+    };
+    if (includeDeleted) node.markedForDeletion = Boolean(folder.tombstoned);
+    nodes.set(folder.pk, node);
+  }
+  const parentOf = (folder) => {
+    if (folder.parent === null || !byPk.has(folder.parent)) return void 0;
+    const seen = /* @__PURE__ */ new Set([folder.pk]);
+    for (let at = byPk.get(folder.parent); at; at = at.parent !== null ? byPk.get(at.parent) : void 0) {
+      if (seen.has(at.pk)) return void 0;
+      seen.add(at.pk);
+    }
+    return folder.parent;
+  };
+  const roots = /* @__PURE__ */ new Map();
+  for (const folder of visible2) {
+    const node = nodes.get(folder.pk);
+    const parent = parentOf(folder);
+    if (parent !== void 0) nodes.get(parent).children.push(node);
+    else {
+      const key = folder.account !== null && context.accounts.some((a) => a.pk === folder.account) ? folder.account : null;
+      roots.set(key, [...roots.get(key) ?? [], node]);
+    }
+  }
+  const finish = (node) => {
+    node.children.sort(compareNodes);
+    node.totalNoteCount = node.noteCount + node.children.reduce((sum, c) => sum + finish(c), 0);
+    return node.totalNoteCount;
+  };
+  const accounts = [];
+  const addAccount = (name, identifier, folders) => {
+    folders.sort(compareNodes);
+    let noteCount = 0;
+    for (const node of folders) {
+      const total = finish(node);
+      if (node.kind === "folder") noteCount += total;
+    }
+    accounts.push({ account: name, identifier, noteCount, folders });
+  };
+  for (const account of scope2 ? [scope2] : context.accounts) {
+    addAccount(account.name, account.identifier, roots.get(account.pk) ?? []);
+  }
+  const orphans = roots.get(null);
+  if (orphans && includeDeleted) addAccount("unknown", null, orphans);
+  return { accounts, folderCount: accounts.reduce((sum, a) => sum + countNodes(a.folders), 0) };
+}
+function countNodes(nodes) {
+  return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children), 0);
+}
+
 // src/utils/noteIdentifiers.ts
-import { execFileSync as execFileSync12 } from "child_process";
+import { execFileSync as execFileSync13 } from "child_process";
 import * as fs7 from "fs";
 import * as os7 from "os";
 import * as path7 from "path";
-var NOTES_DB_PATH8 = path7.join(
+var NOTES_DB_PATH9 = path7.join(
   os7.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
@@ -45807,7 +46480,7 @@ function runJsonQuery(sql, dbPath2) {
   if (!fs7.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
   let out;
   try {
-    out = execFileSync12("sqlite3", ["-readonly", dbPath2, sql], {
+    out = execFileSync13("sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -45827,7 +46500,7 @@ function runJsonQuery(sql, dbPath2) {
 function coreDataId(store, entity3, pk) {
   return `x-coredata://${store}/${entity3}/p${pk}`;
 }
-function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH8) {
+function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH9) {
   const resolved = /* @__PURE__ */ new Map();
   const keys = [];
   const uuids = [];
@@ -45873,7 +46546,7 @@ function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH8) {
   return resolved;
 }
 var COREDATA_PARTS = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(ICNote|ICFolder|ICAccount)\/p(\d{1,18})$/;
-function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH8) {
+function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH9) {
   const result = /* @__PURE__ */ new Map();
   const wanted = /* @__PURE__ */ new Map();
   for (const id2 of ids) {
@@ -45909,7 +46582,7 @@ function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH8) {
   }
   return result;
 }
-function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH8) {
+function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH9) {
   const ids = items.map((item) => item.id).filter((id2) => typeof id2 === "string");
   if (ids.length === 0) return items;
   const found = lookupStableIdentifiers(ids, entity3, dbPath2);
@@ -46052,11 +46725,11 @@ function describeSearchScope(searchContent, resultCount) {
 }
 
 // src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync13 } from "child_process";
+import { execFileSync as execFileSync14 } from "child_process";
 import * as fs8 from "fs";
 import * as os8 from "os";
 import * as path8 from "path";
-import { gunzipSync as gunzipSync7 } from "zlib";
+import { gunzipSync as gunzipSync8 } from "zlib";
 
 // src/utils/noteQuery.ts
 var QUERY_LIMITS = {
@@ -46504,7 +47177,7 @@ function positiveTextTerms(node, negated = false) {
 }
 
 // src/utils/noteQueryStore.ts
-var NOTES_DB_PATH9 = path8.join(
+var NOTES_DB_PATH10 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
@@ -46640,7 +47313,7 @@ function buildScanSql(available, options) {
   ].join(" ");
 }
 function runSqlite6(dbPath2, query2) {
-  return execFileSync13("sqlite3", ["-readonly", dbPath2, query2], {
+  return execFileSync14("sqlite3", ["-readonly", dbPath2, query2], {
     encoding: "utf8",
     timeout: 3e4,
     maxBuffer: 512 * 1024 * 1024,
@@ -46659,13 +47332,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve6 = (pk, seen) => {
+  const resolve7 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve6(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -46679,7 +47352,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve6(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -46710,7 +47383,7 @@ function runNoteQuery(ast, options = {}) {
   const includeDeleted = options.includeDeleted ?? false;
   const withBodies = needsContent(ast);
   const withTags = needsTags(ast);
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH9;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH10;
   if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
   let output;
   try {
@@ -46771,7 +47444,7 @@ function runNoteQuery(ast, options = {}) {
       try {
         decoded = decodeNoteBody(
           new Uint8Array(
-            gunzipSync7(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
+            gunzipSync8(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
           )
         );
       } catch {
@@ -46906,10 +47579,10 @@ function contentSearchFailureHint(message, dbUnavailable) {
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
-import { execFileSync as execFileSync14 } from "node:child_process";
+import { execFileSync as execFileSync15 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join15 } from "node:path";
+import { join as join16 } from "node:path";
 
 // src/services/shortcutConsent.ts
 function shortcutConsentHint(shortcut) {
@@ -46985,7 +47658,7 @@ function addNativeTags(request, deps) {
   };
 }
 function listInstalledShortcuts() {
-  return execFileSync14("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  return execFileSync15("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
@@ -47011,11 +47684,11 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join15(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync2(join16(tmpdir2(), "apple-notes-native-tags-"));
   try {
-    const path10 = join15(directory, "request.json");
+    const path10 = join16(directory, "request.json");
     writeFileSync(path10, JSON.stringify(input), { mode: 384 });
-    execFileSync14("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path10], {
+    execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path10], {
       encoding: "utf8",
       timeout: 6e4,
       maxBuffer: 1024 * 1024,
@@ -47034,10 +47707,10 @@ function runNativeTagsShortcut(input) {
 }
 
 // src/services/backgroundNotes.ts
-import { execFileSync as execFileSync15 } from "node:child_process";
+import { execFileSync as execFileSync16 } from "node:child_process";
 import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join16 } from "node:path";
+import { join as join17 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -47121,7 +47794,7 @@ function renderMarkdown(markdown, options = {}) {
     }
     return text2;
   };
-  const visible = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const visible2 = (html2) => withoutTags(html2).replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
   let html = "", list, quote = false, code, previousBlank = true;
   const close = () => {
     if (list) {
@@ -47168,7 +47841,7 @@ function renderMarkdown(markdown, options = {}) {
         }
         const rendered = inline(text2);
         html += `<div>${rendered}</div>`;
-        expect.quotes[expect.quotes.length - 1] += ` ${visible(rendered)}`;
+        expect.quotes[expect.quotes.length - 1] += ` ${visible2(rendered)}`;
         previousBlank = false;
         continue;
       }
@@ -47191,7 +47864,7 @@ function renderMarkdown(markdown, options = {}) {
         }
         const rendered = inline(task[2]);
         html += `<li>${rendered}</li>`;
-        expect.checklist.push({ text: visible(rendered).trim(), done: task[1] === "x" });
+        expect.checklist.push({ text: visible2(rendered).trim(), done: task[1] === "x" });
         previousBlank = false;
         continue;
       }
@@ -47362,9 +48035,9 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync3(join17(tmpdir3(), "apple-notes-background-"));
   try {
-    const file = join16(directory, "request.json");
+    const file = join17(directory, "request.json");
     writeFileSync2(
       file,
       JSON.stringify({
@@ -47384,7 +48057,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       { mode: 384 }
     );
     try {
-      execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
+      execFileSync16("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
         encoding: "utf8",
         timeout: callTimeoutMs() ?? 6e4,
         maxBuffer: 1024 * 1024,
@@ -47709,7 +48382,7 @@ ${request.content}`
 }
 
 // src/services/capabilityMatrix.ts
-import { execFileSync as execFileSync16 } from "node:child_process";
+import { execFileSync as execFileSync17 } from "node:child_process";
 import { release } from "node:os";
 var MACOS_SHORTCUTS_CLI = "12.0";
 var MACOS_MARKDOWN_IMPORT = "26.0";
@@ -47820,6 +48493,13 @@ var FEATURES = [
     requirements: [{ kind: "native_write_helper" }]
   },
   {
+    name: "svgAnalysis",
+    description: "Analyze a local SVG file for conversion into editable strokes: classification, required losses, and a digest",
+    tools: ["analyze-svg"],
+    minimumMacOSVersion: null,
+    requirements: []
+  },
+  {
     name: "paragraphLinks",
     description: "Link to a specific paragraph or heading inside a note",
     tools: [],
@@ -47918,7 +48598,7 @@ function evaluateFeatures(env, features = FEATURES) {
 function readMacOSVersion() {
   if (process.platform !== "darwin") return null;
   try {
-    const out = execFileSync16("/usr/bin/sw_vers", ["-productVersion"], {
+    const out = execFileSync17("/usr/bin/sw_vers", ["-productVersion"], {
       encoding: "utf8",
       timeout: 3e3,
       stdio: ["ignore", "pipe", "ignore"]
@@ -48075,18 +48755,18 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync11, readFileSync as readFileSync2 } from "fs";
-import { join as join17 } from "path";
-import { homedir as homedir14 } from "os";
+import { existsSync as existsSync12, readFileSync as readFileSync2 } from "fs";
+import { join as join18 } from "path";
+import { homedir as homedir15 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join17(homedir14(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join18(homedir15(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path10 = fileConfigPath(env)) {
   const applied = [];
   try {
-    if (!existsSync11(path10)) return applied;
+    if (!existsSync12(path10)) return applied;
     const parsed = JSON.parse(readFileSync2(path10, "utf8"));
     if (!parsed || typeof parsed !== "object") return applied;
     for (const [k, v] of Object.entries(parsed)) {
@@ -48383,400 +49063,740 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
   };
 }
 
-// src/utils/noteBlocks.ts
-import { execFileSync as execFileSync17 } from "node:child_process";
-import { existsSync as existsSync12 } from "node:fs";
-import { homedir as homedir15 } from "node:os";
-import { join as join18 } from "node:path";
-import { gunzipSync as gunzipSync8 } from "node:zlib";
-var NoteBlocksError = class extends Error {
-  code;
-  constructor(code, message) {
-    super(message);
-    this.name = "NoteBlocksError";
-    this.code = code;
+// src/utils/noteParagraphs.ts
+import { gunzipSync as gunzipSync9 } from "node:zlib";
+var ENVELOPE_CODE = {
+  "invalid-argument": "validation_error",
+  "not-found": "not_found",
+  encrypted: "unsupported",
+  "no-body": "unsupported",
+  "ambiguous-note": "ambiguous",
+  "no-match": "not_found",
+  "ambiguous-paragraph": "ambiguous",
+  "occurrence-out-of-range": "validation_error",
+  "paragraph-id-missing": "unsupported",
+  "paragraph-id-shared": "unsupported"
+};
+var ParagraphLinkError = class extends CodedError {
+  reason;
+  constructor(reason, message) {
+    super(message, { code: ENVELOPE_CODE[reason], reason });
+    this.name = "ParagraphLinkError";
+    this.reason = reason;
   }
 };
-var STYLE_NAMES = {
-  0: "title",
-  1: "heading",
-  2: "subheading",
-  4: "monospaced",
-  100: "bulleted",
-  101: "dashed",
-  102: "numbered",
-  103: "checklist"
-};
-var ALIGNMENTS = {
-  0: "left",
-  1: "center",
-  2: "right",
-  3: "justify"
-};
-var HIGHLIGHTS = {
-  1: "purple",
-  2: "pink",
-  3: "orange",
-  4: "mint",
-  5: "blue"
-};
-var KNOWN_RUN_FIELDS = /* @__PURE__ */ new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
-var KNOWN_PARAGRAPH_FIELDS = /* @__PURE__ */ new Set([1, 2, 4, 5, 8, 9]);
-var isSafeLink = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
-var utf8 = new TextDecoder();
-var first = (fields, n) => fields.find((f) => f.fieldNumber === n);
-var varintOf = (fields, n) => {
-  const f = first(fields, n);
-  return f?.wireType === 0 && f.varint !== void 0 ? signedVarint(f.varint) : void 0;
-};
-var bytesOf = (fields, n) => {
-  const f = first(fields, n);
-  return f?.wireType === 2 ? f.bytes : void 0;
-};
-var stringOf = (fields, n) => {
-  const b = bytesOf(fields, n);
-  return b ? utf8.decode(b) : void 0;
-};
-var sub3 = (fields, n) => {
-  const b = bytesOf(fields, n);
-  return b ? decodeWireFields(b) : void 0;
-};
-var hex2 = (bytes) => Buffer.from(bytes).toString("hex");
-var uuidString = (bytes) => {
-  const h = hex2(bytes).toUpperCase();
+var paragraphUrl = (noteIdentifier, paragraphId) => `applenotes://showNote?identifier=${noteIdentifier.toUpperCase()}&paragraphID=${paragraphId.toUpperCase()}`;
+var normalizeParagraphText = (text2) => text2.normalize("NFKC").replace(/\ufffc/g, "").split(/\s+/u).filter(Boolean).join(" ").toLowerCase();
+var bytesField = (fields, n) => fields.find((f) => f.fieldNumber === n && f.wireType === 2)?.bytes;
+var uuidOf = (bytes) => {
+  if (bytes?.length !== 16) return void 0;
+  const h = Buffer.from(bytes).toString("hex").toUpperCase();
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 };
-var channel = (value) => Math.max(0, Math.min(255, Math.round((Number.isFinite(value) ? value : 0) * 255))).toString(16).toUpperCase().padStart(2, "0");
-function colorOf(fields) {
-  const [r, g, b, a] = [1, 2, 3, 4].map((n) => fixed32Float(first(fields, n)));
-  if (r === void 0 && g === void 0 && b === void 0) return void 0;
-  const rgb = `#${channel(r)}${channel(g)}${channel(b)}`;
-  return a === void 0 || a >= 0.999 ? rgb : `${rgb}${channel(a)}`;
-}
-var DEFAULT_PARAGRAPH = {
-  styleType: null,
-  alignmentValue: 0,
-  indent: 0,
-  blockQuote: false
-};
-function decodeParagraph(fields, tally) {
-  if (!fields) return DEFAULT_PARAGRAPH;
-  for (const n of new Set(fields.map((f) => f.fieldNumber)))
-    if (!KNOWN_PARAGRAPH_FIELDS.has(n)) tally.set(n, (tally.get(n) || 0) + 1);
-  const attrs = {
-    styleType: varintOf(fields, 1) ?? null,
-    alignmentValue: varintOf(fields, 2) ?? 0,
-    indent: Math.max(0, varintOf(fields, 4) ?? 0),
-    blockQuote: (varintOf(fields, 8) ?? 0) !== 0
-  };
-  if (attrs.styleType === -1) attrs.styleType = null;
-  const checklist = sub3(fields, 5);
-  const checklistId = checklist && bytesOf(checklist, 1);
-  if (attrs.styleType === 103 && checklistId)
-    attrs.checklist = { id: hex2(checklistId), done: varintOf(checklist, 2) === 1 };
-  const uuid2 = bytesOf(fields, 9);
-  if (uuid2?.length === 16) attrs.paragraphUuid = uuidString(uuid2);
-  return attrs;
-}
-function decodeInline(fields) {
-  const inline = {};
-  const font = sub3(fields, 3);
-  const hints = font ? varintOf(font, 3) ?? 0 : 0;
-  const weight = varintOf(fields, 5) ?? 0;
-  if (weight === 1 || weight === 3 || hints & 1) inline.bold = true;
-  if (weight === 2 || weight === 3 || hints & 2) inline.italic = true;
-  if (varintOf(fields, 6)) inline.underline = true;
-  if (varintOf(fields, 7)) inline.strikethrough = true;
-  const baseline = varintOf(fields, 8) ?? 0;
-  if (baseline > 0) inline.superscript = true;
-  if (baseline < 0) inline.subscript = true;
-  const color = sub3(fields, 10);
-  const colorValue = color && colorOf(color);
-  if (colorValue) inline.color = colorValue;
-  const emphasis = varintOf(fields, 14);
-  if (emphasis !== void 0 && emphasis !== 0) {
-    inline.highlight = HIGHLIGHTS[emphasis] ?? "unknown";
-    if (inline.highlight === "unknown") inline.highlightValue = emphasis;
-  }
-  const link = stringOf(fields, 9);
-  if (link) {
-    inline.link = link;
-    inline.linkSafe = isSafeLink(link);
-  }
-  if (font) {
-    const name = stringOf(font, 1);
-    const size = fixed32Float(first(font, 2));
-    if (name || size !== void 0)
-      inline.font = {
-        ...name ? { name } : {},
-        ...size !== void 0 && Number.isFinite(size) ? { size } : {}
-      };
-  }
-  const attachment = sub3(fields, 12);
-  const attachmentId = attachment && stringOf(attachment, 1);
-  if (attachmentId)
-    inline.attachment = { id: attachmentId, uti: stringOf(attachment, 2) || "unknown" };
-  return inline;
-}
-function wrap(error2) {
-  if (error2 instanceof NoteBlocksError) throw error2;
-  if (error2 instanceof ProtobufDecodeError)
-    throw new NoteBlocksError("malformed-protobuf", error2.message);
-  throw error2;
-}
-function decodeNoteBlocks(data) {
-  let note;
-  try {
-    const document = sub3(decodeWireFields(data), 2);
-    note = document && sub3(document, 3);
-  } catch (error2) {
-    wrap(error2);
-  }
-  const textBytes = note && bytesOf(note, 2);
-  if (!note || !textBytes)
-    throw new NoteBlocksError("unsupported-structure", "Unsupported Notes document structure");
-  const text2 = utf8.decode(textBytes);
-  const runTally = /* @__PURE__ */ new Map();
-  const paragraphTally = /* @__PURE__ */ new Map();
+function runParagraphIds(data) {
+  const document = decodeWireFields(bytesField(decodeWireFields(data), 2));
+  const note = decodeWireFields(bytesField(document, 3));
   const runs = [];
-  let position = 0;
-  try {
-    for (const field of note.filter((f) => f.fieldNumber === 5)) {
-      if (field.wireType !== 2 || !field.bytes)
-        throw new NoteBlocksError("invalid-runs", "Invalid Notes attribute run");
-      const fields = decodeWireFields(field.bytes);
-      const length = varintOf(fields, 1);
-      if (length === void 0 || length < 0 || position + length > text2.length)
-        throw new NoteBlocksError("invalid-runs", "Invalid Notes run length");
-      for (const n of new Set(fields.map((f) => f.fieldNumber)))
-        if (!KNOWN_RUN_FIELDS.has(n)) runTally.set(n, (runTally.get(n) || 0) + 1);
-      runs.push({
-        start: position,
-        length,
-        paragraph: decodeParagraph(sub3(fields, 2), paragraphTally),
-        inline: decodeInline(fields)
-      });
-      position += length;
-    }
-  } catch (error2) {
-    wrap(error2);
+  let start = 0;
+  for (const field of note.filter((f) => f.fieldNumber === 5)) {
+    const run = decodeWireFields(field.bytes);
+    const length = Number(run.find((f) => f.fieldNumber === 1).varint);
+    const style = bytesField(run, 2);
+    const paragraphId = style ? uuidOf(bytesField(decodeWireFields(style), 9)) : void 0;
+    runs.push({ start, length, ...paragraphId ? { paragraphId } : {} });
+    start += length;
   }
-  if (position !== text2.length)
-    throw new NoteBlocksError("invalid-runs", "Incomplete Notes attribute runs");
-  const blocks = [];
-  const attachments = [];
-  let runIndex = 0;
-  let paragraphStart = 0;
-  while (paragraphStart < text2.length) {
-    const newline = text2.indexOf("\n", paragraphStart);
-    const end = newline === -1 ? text2.length : newline;
-    while (runIndex < runs.length - 1 && runs[runIndex].start + runs[runIndex].length <= paragraphStart)
-      runIndex++;
-    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
-    const style = attrs.styleType === null ? "body" : STYLE_NAMES[attrs.styleType] ?? "unknown";
-    const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";
-    const block = {
-      index: blocks.length,
-      start: paragraphStart,
-      length: end - paragraphStart,
-      text: text2.slice(paragraphStart, end),
-      style,
-      styleType: attrs.styleType,
-      indent: attrs.indent,
-      alignment,
-      ...alignment === "unknown" ? { alignmentValue: attrs.alignmentValue } : {},
-      blockQuote: attrs.blockQuote,
-      ...attrs.checklist ? { checklist: attrs.checklist } : {},
-      ...attrs.paragraphUuid ? { paragraphUuid: attrs.paragraphUuid } : {},
-      runs: [],
-      attachments: []
-    };
-    for (let i = runIndex; i < runs.length && runs[i].start < end; i++) {
-      const run = runs[i];
-      const start = Math.max(run.start, paragraphStart);
-      const stop = Math.min(run.start + run.length, end);
-      if (stop <= start) continue;
-      block.runs.push({
-        start,
-        length: stop - start,
-        text: text2.slice(start, stop),
-        ...run.inline
-      });
-      if (run.inline.attachment)
-        for (let at = text2.indexOf("\uFFFC", start); at !== -1 && at < stop; at = text2.indexOf("\uFFFC", at + 1)) {
-          const marker = { ...run.inline.attachment, start: at, blockIndex: block.index };
-          block.attachments.push(marker);
-          attachments.push(marker);
-        }
-    }
-    blocks.push(block);
-    paragraphStart = end + 1;
-  }
-  return {
-    text: text2,
-    textLength: text2.length,
-    blocks,
-    attachments,
-    undecodedFields: {
-      attributeRun: Object.fromEntries([...runTally].sort((a, b) => a[0] - b[0])),
-      paragraphStyle: Object.fromEntries([...paragraphTally].sort((a, b) => a[0] - b[0]))
-    },
-    summary: summarize(blocks, attachments)
-  };
+  return runs;
 }
-function summarize(blocks, attachments) {
-  const summary = {
-    blocks: blocks.length,
-    styles: {},
-    alignments: {},
-    blockQuotes: 0,
-    indented: 0,
-    checklist: { total: 0, done: 0 },
-    inline: {
-      bold: 0,
-      italic: 0,
-      underline: 0,
-      strikethrough: 0,
-      superscript: 0,
-      subscript: 0,
-      color: 0,
-      highlight: 0,
-      link: 0,
-      unsafeLink: 0
-    },
-    attachments: attachments.length
-  };
-  for (const block of blocks) {
-    summary.styles[block.style] = (summary.styles[block.style] || 0) + 1;
-    summary.alignments[block.alignment] = (summary.alignments[block.alignment] || 0) + 1;
-    if (block.blockQuote) summary.blockQuotes++;
-    if (block.indent > 0) summary.indented++;
-    if (block.checklist) {
-      summary.checklist.total++;
-      if (block.checklist.done) summary.checklist.done++;
-    }
-    for (const run of block.runs) {
-      for (const key of [
-        "bold",
-        "italic",
-        "underline",
-        "strikethrough",
-        "superscript",
-        "subscript",
-        "color",
-        "highlight",
-        "link"
-      ])
-        if (run[key]) summary.inline[key]++;
-      if (run.link && !run.linkSafe) summary.inline.unsafeLink++;
-    }
-  }
-  return summary;
-}
-function decodeCompressedNoteBlocks(compressed) {
-  let data;
-  try {
-    data = gunzipSync8(compressed, { maxOutputLength: 32 * 1024 * 1024 });
-  } catch (error2) {
-    throw new NoteBlocksError(
-      "decompress-failed",
-      `Failed to decompress note data: ${error2 instanceof Error ? error2.message : String(error2)}`
-    );
-  }
-  return decodeNoteBlocks(data);
-}
-var DEFAULT_BLOCKS_MAX_BYTES = 4 * 1024 * 1024;
-function blocksMaxResponseBytes(env = process.env) {
-  const raw = env.APPLE_NOTES_MCP_BLOCKS_MAX_BYTES;
-  if (raw !== void 0) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return Math.floor(n);
-  }
-  return DEFAULT_BLOCKS_MAX_BYTES;
-}
-function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResponseBytes() } = {}) {
-  const total = doc.blocks.length;
-  const start = Math.min(Math.max(0, offset), total);
-  const blocks = [];
-  let bytes = 0;
-  for (let i = start; i < total && blocks.length < limit; i++) {
-    let block = doc.blocks[i];
-    let size = Buffer.byteLength(JSON.stringify(block));
-    if (bytes + size > maxBytes) {
-      if (blocks.length) break;
-      block = {
-        ...block,
-        text: "",
-        textOmitted: true,
-        runs: block.runs.map((run) => ({ ...run, text: "" }))
-      };
-      size = Buffer.byteLength(JSON.stringify(block));
-    }
-    blocks.push(block);
-    bytes += size;
-  }
-  const next = start + blocks.length;
-  return {
-    textLength: doc.textLength,
-    blocks,
-    page: {
-      offset: start,
-      returned: blocks.length,
-      total,
-      hasMore: next < total,
-      ...next < total ? { nextOffset: next } : {}
-    },
-    summary: doc.summary,
-    undecodedFields: doc.undecodedFields
-  };
-}
-var NOTES_DB_PATH10 = join18(
-  homedir15(),
-  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
-);
-function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH10 } = {}) {
-  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
-  if (!pk)
-    throw new NoteBlocksError(
-      "invalid-id",
-      `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
-    );
-  if (!existsSync12(dbPath2))
-    throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
-  const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
-  let output;
-  try {
-    output = execFileSync17(
-      "/usr/bin/sqlite3",
-      ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
-      {
-        encoding: "utf8",
-        timeout: 5e3,
-        maxBuffer: 64 * 1024 * 1024,
-        stdio: ["pipe", "pipe", "pipe"]
+function classifyParagraphIds(doc, runs) {
+  const ranges = doc.blocks.map((block) => [block.start, block.start + block.length + 1]);
+  const blocksOfId = /* @__PURE__ */ new Map();
+  const idsOfBlock = doc.blocks.map(() => /* @__PURE__ */ new Set());
+  let b = 0;
+  for (const run of runs) {
+    const end = run.start + run.length;
+    while (b < ranges.length && ranges[b][1] <= run.start) b++;
+    for (let i = b; i < ranges.length && ranges[i][0] < end; i++) {
+      idsOfBlock[i].add(run.paragraphId);
+      if (run.paragraphId) {
+        const owners = blocksOfId.get(run.paragraphId) ?? /* @__PURE__ */ new Set();
+        owners.add(i);
+        blocksOfId.set(run.paragraphId, owners);
       }
-    ).trim();
-  } catch (error2) {
-    const message = error2 instanceof Error ? error2.message : String(error2);
-    if (/authorization denied|unable to open database/i.test(message))
-      throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
-    throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
+    }
   }
-  let row;
-  try {
-    row = JSON.parse(output);
-  } catch {
-    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  return doc.blocks.map((block, i) => {
+    const paragraphId = block.paragraphUuid ?? null;
+    const mixed = idsOfBlock[i].size > 1;
+    if (!paragraphId) return { status: "missing", paragraphId, mixed };
+    const owners = blocksOfId.get(paragraphId).size;
+    return owners === 1 ? { status: "unique", paragraphId, mixed } : { status: "shared", paragraphId, sharedWith: owners - 1, mixed };
+  });
+}
+function paragraphsOf(doc, runs, noteIdentifier) {
+  const ids = classifyParagraphIds(doc, runs);
+  const out = [];
+  doc.blocks.forEach((block, i) => {
+    if (!normalizeParagraphText(block.text)) return;
+    const { status, paragraphId, sharedWith, mixed } = ids[i];
+    out.push({
+      blockIndex: block.index,
+      text: block.text,
+      style: block.style,
+      styleType: block.styleType,
+      paragraphId,
+      paragraphIdStatus: status,
+      ...sharedWith !== void 0 ? { sharedWith } : {},
+      ...mixed ? { mixedParagraphIds: true } : {},
+      ...status === "unique" && noteIdentifier ? { url: paragraphUrl(noteIdentifier, paragraphId) } : {}
+    });
+  });
+  return out;
+}
+function selectParagraph(paragraphs, selector) {
+  const given = [selector.contains, selector.match, selector.blockIndex].filter(
+    (value) => value !== void 0
+  ).length;
+  if (given !== 1)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Choose exactly one paragraph selector: contains, match, or blockIndex"
+    );
+  if (selector.blockIndex !== void 0) {
+    const hit = paragraphs.find((p) => p.blockIndex === selector.blockIndex);
+    if (!hit)
+      throw new ParagraphLinkError(
+        "no-match",
+        `Block ${selector.blockIndex} is not a non-empty paragraph of this note`
+      );
+    return hit;
   }
-  if (!row.exists) throw new NoteBlocksError("not-found", `No note found for ID "${id2}"`);
-  if (row.encrypted)
-    throw new NoteBlocksError(
+  const wanted = normalizeParagraphText(selector.contains ?? selector.match);
+  if (!wanted)
+    throw new ParagraphLinkError("invalid-argument", "The paragraph selector has no visible text");
+  const matches = paragraphs.filter(
+    (p) => selector.match !== void 0 ? normalizeParagraphText(p.text) === wanted : normalizeParagraphText(p.text).includes(wanted)
+  );
+  if (!matches.length)
+    throw new ParagraphLinkError("no-match", "No paragraph matches the selector");
+  if (selector.occurrence === void 0 && matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-paragraph",
+      `The selector matches ${matches.length} paragraphs; use a longer snippet or pass occurrence (1-${matches.length})`
+    );
+  const occurrence = selector.occurrence ?? 1;
+  if (occurrence > matches.length)
+    throw new ParagraphLinkError(
+      "occurrence-out-of-range",
+      `Occurrence ${occurrence} requested but only ${matches.length} paragraphs match`
+    );
+  return matches[occurrence - 1];
+}
+var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+function titleMatchSql(columns) {
+  return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
+}
+function checkNoteSelector(selector) {
+  const given = [selector.id, selector.title].filter((value) => value !== void 0).length;
+  if (given !== 1)
+    throw new ParagraphLinkError("invalid-argument", "Choose exactly one of id or title");
+  if (selector.folder !== void 0 && selector.title === void 0)
+    throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
+  if (selector.id === void 0) return void 0;
+  const pk = NOTE_ID.exec(selector.id)?.[1];
+  if (!pk)
+    throw new ParagraphLinkError(
+      "invalid-argument",
+      "Invalid note ID: expected x-coredata://<store>/ICNote/p<number> or a Notes UUID"
+    );
+  return Number(pk);
+}
+function resolveNote(dbPath2, columns, selector) {
+  const idPk = checkNoteSelector(selector);
+  if (idPk !== void 0) return { pk: idPk, id: selector.id };
+  requireColumns(columns, ["ZTITLE1", "ZFOLDER"], "title lookup");
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const names = new Map(context.folders.map((f) => [f.pk, escapeFolderName(f.name ?? "")]));
+  let matches = parseJsonLines(
+    runReadOnlySql(dbPath2, titleMatchSql(columns), {
+      title: { blob: Buffer.from(selector.title, "utf8") }
+    })
+  );
+  if (selector.folder !== void 0) {
+    const wanted = selector.folder;
+    matches = matches.filter(
+      (n) => paths.get(n.folder) === wanted || names.get(n.folder) === wanted
+    );
+  }
+  if (!matches.length) throw new ParagraphLinkError("not-found", "No note matches the selector");
+  if (matches.length > 1)
+    throw new ParagraphLinkError(
+      "ambiguous-note",
+      `${matches.length} notes match; pass folder (a name or a path as list-folders shows it) or use the note id. Folders: ${matches.map((n) => paths.get(n.folder)).join(", ")}`
+    );
+  return { pk: matches[0].pk, id: noteIdFor(context.uuid, matches[0].pk) };
+}
+function noteBodySql(columns) {
+  return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
+}
+function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH7 } = {}) {
+  checkNoteSelector(selector);
+  const columns = readColumns(dbPath2);
+  const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
+  const [row] = parseJsonLines(runReadOnlySql(dbPath2, noteBodySql(columns), { pk: { int: pk } }));
+  if (!row?.isNote) throw new ParagraphLinkError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted || row.locked)
+    throw new ParagraphLinkError(
       "encrypted",
-      "This note is password-protected; its body is encrypted and cannot be decoded"
+      "This note is password-protected; its body is encrypted"
     );
   if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
-    throw new NoteBlocksError("no-body", "No body data is stored for this note");
-  return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
+    throw new ParagraphLinkError("no-body", "No body data is stored for this note");
+  let doc;
+  let runs;
+  try {
+    const data = gunzipSync9(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 });
+    doc = decodeNoteBlocks(data);
+    runs = runParagraphIds(data);
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    throw new ParagraphLinkError("no-body", `The note body could not be decoded: ${message}`);
+  }
+  const paragraphs = paragraphsOf(doc, runs, row.identifier);
+  const counts = { unique: 0, shared: 0, missing: 0 };
+  for (const p of paragraphs) counts[p.paragraphIdStatus]++;
+  return { id: id2, identifier: row.identifier, paragraphs, counts };
+}
+function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 1024 * 1024, linkableOnly = false } = {}) {
+  const list = linkableOnly ? paragraphs.filter((p) => p.url) : paragraphs;
+  const start = Math.min(Math.max(0, offset), list.length);
+  const out = [];
+  let bytes = 0;
+  for (let i = start; i < list.length && out.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(list[i]));
+    if (out.length && bytes + size > maxBytes) break;
+    out.push(list[i]);
+    bytes += size;
+  }
+  const next = start + out.length;
+  return {
+    paragraphs: out,
+    page: {
+      offset: start,
+      returned: out.length,
+      total: list.length,
+      hasMore: next < list.length,
+      ...next < list.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function paragraphLink(note, selector) {
+  const paragraph = selectParagraph(note.paragraphs, selector);
+  if (paragraph.paragraphIdStatus === "shared")
+    throw new ParagraphLinkError(
+      "paragraph-id-shared",
+      `This paragraph's ID is shared with ${paragraph.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
+    );
+  if (!paragraph.url)
+    throw new ParagraphLinkError(
+      "paragraph-id-missing",
+      paragraph.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
+    );
+  return { url: paragraph.url, paragraph };
+}
+
+// src/utils/noteStructure.ts
+import { dirname as dirname4 } from "node:path";
+
+// src/utils/noteLinks.ts
+var NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
+var HASHTAG_UTI2 = "com.apple.notes.inlinetextattachment.hashtag";
+var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+function parseNotesShowUrl(url) {
+  const match = /^(?:apple)?notes:\/\/showNote\?(.*)$/i.exec(url);
+  if (!match) return void 0;
+  const query2 = new URLSearchParams(match[1]);
+  const note = query2.get("identifier") ?? "";
+  const paragraph = query2.get("paragraphID") ?? "";
+  const result = {};
+  if (UUID.test(note)) result.targetNote = note.toUpperCase();
+  if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
+  return result;
+}
+function inlineLinks(doc) {
+  const links = [];
+  let last;
+  for (const block of doc.blocks)
+    for (const run of block.runs) {
+      if (!run.link) {
+        last = void 0;
+        continue;
+      }
+      if (last && last.url === run.link && last.start + last.length === run.start) {
+        last.length += run.length;
+        last.text += run.text;
+        continue;
+      }
+      last = {
+        kind: "inline",
+        url: run.link,
+        linkSafe: run.linkSafe === true,
+        text: run.text,
+        start: run.start,
+        length: run.length,
+        blockIndex: block.index,
+        ...parseNotesShowUrl(run.link)
+      };
+      links.push(last);
+    }
+  return links;
+}
+function markerPosition(doc, identifier) {
+  if (!doc) return {};
+  const wanted = identifier.toUpperCase();
+  const marker = doc.attachments.find((item) => item.id.toUpperCase() === wanted);
+  return marker ? { start: marker.start, blockIndex: marker.blockIndex, inBody: true } : { inBody: false };
+}
+function nativeLink(row, doc) {
+  if (!row.token) return void 0;
+  const target = parseNotesShowUrl(row.token) ?? {};
+  const kind = target.paragraphId ? "section" : "note";
+  return {
+    kind,
+    url: row.token,
+    linkSafe: isSafeLink(row.token),
+    ...row.alt ? { text: row.alt } : {},
+    ...markerPosition(doc, row.identifier),
+    ...target,
+    ...kind === "section" && row.alt ? { section: row.alt } : {},
+    attachmentIdentifier: row.identifier
+  };
+}
+function cardLink(row, {
+  doc,
+  noteId: noteId3,
+  previewPath
+} = {}) {
+  if (!row.url) return void 0;
+  return {
+    kind: "card",
+    url: row.url,
+    linkSafe: isSafeLink(row.url),
+    ...row.title ? { text: row.title } : {},
+    ...markerPosition(doc, row.identifier),
+    ...parseNotesShowUrl(row.url),
+    attachmentIdentifier: row.identifier,
+    ...noteId3 ? { attachmentId: attachmentCoreDataId(noteId3, row.pk) } : {},
+    ...previewPath !== void 0 ? { previewPath } : {}
+  };
+}
+
+// src/utils/noteStructure.ts
+var APPLE_EPOCH_OFFSET = 978307200;
+var LAST_VIEWED_NEVER = -541228980;
+function lastViewedOf(raw, columnPresent = true, now = Date.now()) {
+  if (!columnPresent) return { lastViewed: null, lastViewedStatus: "unsupported" };
+  if (raw === null || raw === void 0)
+    return { lastViewed: null, lastViewedStatus: "not-recorded" };
+  const seconds = typeof raw === "number" ? raw : Number.NaN;
+  if (seconds === LAST_VIEWED_NEVER) return { lastViewed: null, lastViewedStatus: "never-viewed" };
+  const ms = (seconds + APPLE_EPOCH_OFFSET) * 1e3;
+  if (!Number.isFinite(ms) || ms < Date.UTC(2007, 0, 1) || ms > now + 864e5)
+    return { lastViewed: null, lastViewedStatus: "malformed" };
+  return { lastViewed: new Date(ms).toISOString(), lastViewedStatus: "viewed" };
+}
+var visible = (text2) => text2.replace(/\ufffc/g, "");
+var wordCount = (text2) => visible(text2).split(/\s+/u).filter((word) => word !== "").length;
+var charCount = (text2) => Array.from(visible(text2)).length;
+function noteStructureSql(columns) {
+  const c = (alias, name) => col(columns, alias, name);
+  const sharedExpr = columns.has("ZSERVERSHAREDATA") ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
+         WITH RECURSIVE up(pk, depth) AS (
+           SELECT n.ZFOLDER, 0 UNION ALL
+           SELECT ${c("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
+           WHERE depth < 64)
+         SELECT 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT s ON s.Z_PK = up.pk WHERE s.ZSERVERSHAREDATA IS NOT NULL))` : "NULL";
+  const children = columns.has("ZPARENTATTACHMENT") ? ` OR att.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE ${c("p", "ZNOTE")} = @pk)` : "";
+  return [
+    "BEGIN;",
+    `SELECT json_object('k', 'note',
+      'isNote', n.Z_ENT = ${entity("ICNote")},
+      'identifier', ${c("n", "ZIDENTIFIER")},
+      'title', ${c("n", "ZTITLE1")},
+      'folder', ${c("f", "ZTITLE2")},
+      'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns, "f")} END,
+      'account', ${c("a", "ZNAME")},
+      'locked', ${c("n", "ZISPASSWORDPROTECTED")},
+      'pinned', ${c("n", "ZISPINNED")},
+      'shared', ${sharedExpr},
+      'lastViewed', ${c("n", "ZLASTVIEWEDMODIFICATIONDATE")},
+      'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+      'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK))
+    FROM ZICCLOUDSYNCINGOBJECT n
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${c("n", "ZFOLDER")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountRef(columns, "n")} AND a.Z_ENT = ${entity("ICAccount")}
+    WHERE n.Z_PK = @pk;`,
+    `SELECT json_object('k', 'attachment',
+      'pk', att.Z_PK,
+      'title', ${c("att", "ZTITLE")},
+      'url', ${c("att", "ZURLSTRING")},
+      'fileSize', ${c("att", "ZFILESIZE")})
+    FROM ZICCLOUDSYNCINGOBJECT att
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+      AND (${c("att", "ZNOTE")} = @pk${children});`,
+    `SELECT json_object('k', 'inline',
+      'identifier', ${c("i", "ZIDENTIFIER")},
+      'uti', ${c("i", "ZTYPEUTI1")},
+      'alt', ${c("i", "ZALTTEXT")},
+      'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")})
+    FROM ZICCLOUDSYNCINGOBJECT i
+    WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${c("i", "ZNOTE1")} = @pk
+      AND ${notTombstonedSql(columns, "i")} AND ${c("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI2}', '${NOTE_LINK_UTI}');`,
+    "COMMIT;"
+  ].join("\n");
+}
+function describeNoteStructure(s) {
+  const parts = [
+    s.bodyDecoded ? `${s.blockSummary.blocks} blocks, ${s.wordCount} words` : `body not decoded (${s.bodyError})`,
+    `${s.links.length} links (inline ${s.linkCounts.inline}, card ${s.linkCounts.card}, note ${s.linkCounts.note}, section ${s.linkCounts.section})`,
+    `${s.attachmentCount} attachments`,
+    `${s.tags.length} tags`
+  ];
+  if (s.checklistTotal) parts.push(`checklist ${s.checklistDone}/${s.checklistTotal} done`);
+  if (s.hasDrawing) parts.push("has a drawing");
+  if (s.isLocked) parts.push("locked");
+  if (s.isShared) parts.push("shared");
+  return `Note structure: ${parts.join("; ")}.`;
+}
+function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
+  const { pk } = parseNoteId2(id2);
+  const columns = readColumns(dbPath2);
+  const rows = parseJsonLines(
+    runReadOnlySql(dbPath2, noteStructureSql(columns), { pk: { int: pk } })
+  );
+  const note = rows.find((row) => row.k === "note");
+  if (!note?.isNote) throw new NoteStoreError(`No note found for ID "${id2}".`, "invalid_input");
+  const details = new Map(
+    rows.filter((row) => row.k === "attachment").map((row) => [row.pk, row])
+  );
+  const inlineRows = rows.filter((row) => row.k === "inline");
+  let doc;
+  let bodyError;
+  if (note.encrypted || note.locked) bodyError = "encrypted";
+  else if (!note.data || !/^[0-9a-f]+$/i.test(note.data)) bodyError = "no-body";
+  else
+    try {
+      doc = decodeCompressedNoteBlocks(Buffer.from(note.data, "hex"));
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      bodyError = error2.code;
+    }
+  const { rows: attachmentRows, bodyOrder } = readNoteAttachmentRows(id2, dbPath2);
+  const assets = assembleAttachmentAssets(attachmentRows, bodyOrder, dirname4(dbPath2));
+  const roots = /* @__PURE__ */ new Map();
+  const attachments = [];
+  const pks = /* @__PURE__ */ new Map();
+  for (const record2 of assets.attachments) {
+    const detail = details.get(record2.pk);
+    const parent = record2.parentIdentifier !== null ? roots.get(record2.parentIdentifier) : void 0;
+    const item = {
+      id: attachmentCoreDataId(id2, record2.pk),
+      identifier: record2.identifier,
+      uti: record2.uti,
+      kind: record2.kind,
+      ...detail?.title ? { title: detail.title } : {},
+      ...record2.filename ? { filename: record2.filename } : {},
+      ...detail?.url ? { url: detail.url } : {},
+      ...typeof detail?.fileSize === "number" ? { fileSize: detail.fileSize } : {},
+      ...markerPosition(doc, record2.identifier),
+      previewPath: record2.previewPath,
+      ...parent ? { parentId: parent.id } : {}
+    };
+    pks.set(item, record2.pk);
+    if (parent) (parent.children ||= []).push(item);
+    else {
+      roots.set(record2.identifier, item);
+      attachments.push(item);
+    }
+  }
+  const flat = attachments.flatMap((item) => [item, ...item.children ?? []]);
+  const links = doc ? inlineLinks(doc) : [];
+  for (const item of flat) {
+    if (item.kind !== "url") continue;
+    const link = cardLink(
+      {
+        pk: pks.get(item),
+        identifier: item.identifier,
+        url: item.url ?? null,
+        title: item.title ?? null
+      },
+      { doc, noteId: id2, previewPath: item.previewPath }
+    );
+    if (link) links.push(link);
+  }
+  const tagOrder = [];
+  for (const row of inlineRows) {
+    if (!row.identifier) continue;
+    if (row.uti === NOTE_LINK_UTI) {
+      const link = nativeLink({ identifier: row.identifier, token: row.token, alt: row.alt }, doc);
+      if (link) links.push(link);
+    } else if (row.alt) {
+      const position = markerPosition(doc, row.identifier);
+      if (position.inBody !== false)
+        tagOrder.push({ tag: row.alt.replace(/^#/, ""), start: position.start ?? 0 });
+    }
+  }
+  links.sort((a, b) => (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER));
+  const tags = [...new Set(tagOrder.sort((a, b) => a.start - b.start).map((entry) => entry.tag))];
+  let text2;
+  let textOmitted;
+  if (doc && includeText) {
+    if (Buffer.byteLength(doc.text) <= maxTextBytes) text2 = doc.text;
+    else textOmitted = true;
+  }
+  const linkCounts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) linkCounts[link.kind]++;
+  const lastViewed = lastViewedOf(note.lastViewed, columns.has("ZLASTVIEWEDMODIFICATIONDATE"));
+  const first2 = selectFirstImage(assets);
+  return {
+    id: id2,
+    identifier: note.identifier,
+    deepLink: note.identifier ? `notes://showNote?identifier=${note.identifier}` : null,
+    title: note.title,
+    folder: note.folder,
+    account: note.account,
+    inRecentlyDeleted: note.inTrash === 1,
+    isShared: note.shared === null ? null : note.shared === 1,
+    isLocked: note.locked === 1 || note.encrypted === 1,
+    isPinned: note.pinned === null ? null : note.pinned === 1,
+    ...lastViewed,
+    bodyDecoded: doc !== void 0,
+    ...bodyError ? { bodyError } : {},
+    ...text2 !== void 0 ? { text: text2 } : {},
+    ...textOmitted ? { textOmitted } : {},
+    textLength: doc ? doc.textLength : null,
+    wordCount: doc ? wordCount(doc.text) : null,
+    charCount: doc ? charCount(doc.text) : null,
+    blockSummary: doc ? doc.summary : null,
+    links,
+    linkCounts,
+    linksComplete: doc !== void 0,
+    tags,
+    attachments,
+    attachmentCount: attachments.length,
+    checklistTotal: doc ? doc.summary.checklist.total : null,
+    checklistDone: doc ? doc.summary.checklist.done : null,
+    hasDrawing: flat.some((item) => item.kind === "drawing"),
+    firstImage: first2 ? { ...first2, id: attachmentCoreDataId(id2, first2.pk) } : null,
+    ...doc ? { undecodedFields: doc.undecodedFields } : {}
+  };
+}
+
+// src/utils/noteLinkInventory.ts
+import { dirname as dirname5 } from "node:path";
+var BODY_BATCH = 100;
+function matchFolder(folders, wanted, account) {
+  const paths = folderPaths(folders);
+  const segments = splitFolderPath(wanted);
+  const key = (parts) => parts.join("\0");
+  const pool = folders.filter(
+    (f) => !f.tombstoned && !f.trash && (account === void 0 || f.account === account)
+  );
+  const byPath = segments.length === 1 ? pool.filter((f) => f.name === segments[0]) : pool.filter((f) => key(splitFolderPath(paths.get(f.pk))) === key(segments));
+  const matches = byPath.length ? byPath : pool.filter((f) => f.name === wanted);
+  if (!matches.length) throw new NoteStoreError(`No folder matches "${wanted}".`, "invalid_input");
+  if (matches.length > 1)
+    throw new NoteStoreError(
+      `Folder "${wanted}" is ambiguous; use one of these paths: ${matches.map((f) => paths.get(f.pk)).join(", ")}.`,
+      "invalid_input"
+    );
+  return { folder: matches[0], path: paths.get(matches[0].pk) };
+}
+function inventorySql(columns) {
+  requireColumns(columns, ["ZFOLDER"], "list-note-links");
+  const c = (alias, name) => col(columns, alias, name);
+  const subtree = columns.has("ZPARENT") ? `WITH RECURSIVE sub(pk) AS (SELECT @folder UNION
+         SELECT x.Z_PK FROM ZICCLOUDSYNCINGOBJECT x JOIN sub ON x.ZPARENT = sub.pk
+         WHERE @subfolders <> 0 AND x.Z_ENT = ${entity("ICFolder")})
+       SELECT pk FROM sub` : "SELECT @folder";
+  const scopeWhere = `n.Z_ENT = ${entity("ICNote")} AND (
+      (@note <> 0 AND n.Z_PK = @note) OR
+      (@note = 0 AND ${activeNoteSql(columns, "n", "f")}
+        AND (@account = 0 OR a.Z_PK = @account)
+        AND (@folder = 0 OR n.ZFOLDER IN (${subtree}))))`;
+  const scope2 = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere}`;
+  return {
+    rows: [
+      "BEGIN;",
+      `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${c("n", "ZIDENTIFIER")},
+        'title', ${c("n", "ZTITLE1")}, 'folder', n.ZFOLDER, 'account', a.Z_PK,
+        'modified', ${c("n", "ZMODIFICATIONDATE1")})
+      FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere};`,
+      `SELECT json_object('k', 'card', 'pk', att.Z_PK, 'note', ${c("att", "ZNOTE")},
+        'identifier', ${c("att", "ZIDENTIFIER")}, 'url', ${c("att", "ZURLSTRING")},
+        'title', ${c("att", "ZTITLE")})
+      FROM ZICCLOUDSYNCINGOBJECT att
+      WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+        AND ${c("att", "ZTYPEUTI")} LIKE 'public.url%' AND ${c("att", "ZURLSTRING")} IS NOT NULL
+        AND ${c("att", "ZNOTE")} IN (${scope2});`,
+      `SELECT json_object('k', 'chip', 'note', ${c("i", "ZNOTE1")},
+        'identifier', ${c("i", "ZIDENTIFIER")}, 'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")},
+        'alt', ${c("i", "ZALTTEXT")})
+      FROM ZICCLOUDSYNCINGOBJECT i
+      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notTombstonedSql(columns, "i")}
+        AND ${c("i", "ZTYPEUTI1")} = '${NOTE_LINK_UTI}' AND ${c("i", "ZNOTE1")} IN (${scope2});`,
+      "COMMIT;"
+    ].join("\n"),
+    bodies: `SELECT json_object('note', d.ZNOTE, 'data', hex(d.ZDATA),
+        'encrypted', d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL)
+      FROM ZICNOTEDATA d WHERE d.ZNOTE IN (${scope2}) AND d.ZNOTE > @after
+      ORDER BY d.ZNOTE LIMIT ${BODY_BATCH};`
+  };
+}
+function decodeBodies(dbPath2, sql, params) {
+  const docs = /* @__PURE__ */ new Map();
+  let after = 0;
+  for (; ; ) {
+    const rows = parseJsonLines(
+      runReadOnlySql(dbPath2, sql, { ...params, after: { int: after } })
+    );
+    for (const row of rows) {
+      after = Math.max(after, row.note);
+      if (row.encrypted || !row.data) continue;
+      try {
+        docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
+      } catch {
+      }
+    }
+    if (rows.length < BODY_BATCH) return docs;
+  }
+}
+var KIND_ORDER2 = { inline: 0, card: 1, note: 2, section: 3 };
+function listNoteLinks(options = {}) {
+  const { dbPath: dbPath2 = NOTES_DB_PATH7, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
+  if (options.id && (options.account || options.folder))
+    throw new NoteStoreError("Pass either id or account/folder, not both.", "invalid_input");
+  const notePk = options.id ? parseNoteId2(options.id).pk : 0;
+  const columns = readColumns(dbPath2);
+  const sql = inventorySql(columns);
+  const context = readStoreContext(dbPath2, columns);
+  const paths = folderPaths(context.folders);
+  const scope2 = {};
+  let accountPk = 0;
+  let folderPk = 0;
+  const includeSubfolders = options.includeSubfolders ?? true;
+  if (options.account) {
+    const account = resolveAccountName(context.accounts, options.account);
+    accountPk = account.pk;
+    scope2.account = account.name;
+    scope2.accountIdentifier = account.identifier;
+  }
+  if (options.folder) {
+    const { folder, path: path10 } = matchFolder(context.folders, options.folder, accountPk || void 0);
+    folderPk = folder.pk;
+    scope2.folder = folder.name;
+    scope2.folderPath = path10;
+    scope2.includeSubfolders = includeSubfolders;
+  }
+  if (options.id) scope2.note = options.id;
+  const params = {
+    note: { int: notePk },
+    account: { int: accountPk },
+    folder: { int: folderPk },
+    subfolders: { int: includeSubfolders ? 1 : 0 }
+  };
+  const rows = parseJsonLines(runReadOnlySql(dbPath2, sql.rows, params));
+  const notes = rows.filter((row) => row.k === "note");
+  if (options.id && !notes.length)
+    throw new NoteStoreError(`No note found for ID "${options.id}".`, "invalid_input");
+  const includeInline = options.includeInline ?? Boolean(options.id);
+  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params) : /* @__PURE__ */ new Map();
+  const noteById = new Map(notes.map((note) => [note.pk, note]));
+  const accountById = new Map(context.accounts.map((account) => [account.pk, account]));
+  const folderById = new Map(context.folders.map((folder) => [folder.pk, folder]));
+  const source = (pk) => {
+    const note = noteById.get(pk);
+    const account = accountById.get(note.account ?? -1);
+    const folder = folderById.get(note.folder ?? -1);
+    return {
+      noteId: noteIdFor(context.uuid, pk),
+      noteIdentifier: note.identifier,
+      noteTitle: note.title,
+      noteModified: coreDataToIso(note.modified),
+      folder: folder?.name ?? null,
+      folderPath: folder ? paths.get(folder.pk) : null,
+      account: account?.name ?? null,
+      accountIdentifier: account?.identifier ?? null
+    };
+  };
+  const containerDir = dirname5(dbPath2);
+  const previewEntries = /* @__PURE__ */ new Map();
+  const previewFor = (identifier, account) => {
+    const accountDir = identifier ? resolveAccountDir(containerDir, account) : null;
+    if (!accountDir || !identifier) return null;
+    if (!previewEntries.has(accountDir))
+      previewEntries.set(accountDir, listPreviewEntries(accountDir));
+    return previewPaths(accountDir, identifier, previewEntries.get(accountDir))[0] ?? null;
+  };
+  const all = [];
+  const add = (pk, link) => all.push({ pk, link: { ...link, ...source(pk) } });
+  for (const [pk, doc] of docs) for (const link of inlineLinks(doc)) add(pk, link);
+  for (const row of rows) {
+    if (row.k === "card") {
+      const noteId3 = noteIdFor(context.uuid, row.note);
+      const link = cardLink(
+        { pk: row.pk, identifier: row.identifier ?? "", url: row.url, title: row.title },
+        {
+          doc: docs.get(row.note),
+          noteId: noteId3,
+          previewPath: previewFor(row.identifier, source(row.note).accountIdentifier)
+        }
+      );
+      if (link) add(row.note, link);
+    } else if (row.k === "chip") {
+      const link = nativeLink(
+        { identifier: row.identifier ?? "", token: row.token, alt: row.alt },
+        docs.get(row.note)
+      );
+      if (link) add(row.note, link);
+    }
+  }
+  const wanted = options.kinds?.length ? new Set(options.kinds) : void 0;
+  const links = all.filter(({ link }) => !wanted || wanted.has(link.kind)).sort(
+    (a, b) => (b.link.noteModified ?? "").localeCompare(a.link.noteModified ?? "") || a.pk - b.pk || (a.link.start ?? Number.MAX_SAFE_INTEGER) - (b.link.start ?? Number.MAX_SAFE_INTEGER) || KIND_ORDER2[a.link.kind] - KIND_ORDER2[b.link.kind]
+  ).map(({ link }) => link);
+  const counts = { inline: 0, card: 0, note: 0, section: 0 };
+  for (const link of links) counts[link.kind]++;
+  const start = Math.min(Math.max(0, offset), links.length);
+  const page = [];
+  let bytes = 0;
+  for (let i = start; i < links.length && page.length < limit; i++) {
+    const size = Buffer.byteLength(JSON.stringify(links[i]));
+    if (page.length && bytes + size > maxBytes) break;
+    page.push(links[i]);
+    bytes += size;
+  }
+  const next = start + page.length;
+  return {
+    scope: scope2,
+    inlineIncluded: includeInline,
+    notesInScope: notes.length,
+    notesWithoutBody: includeInline ? notes.length - docs.size : 0,
+    counts,
+    links: page,
+    page: {
+      offset: start,
+      returned: page.length,
+      total: links.length,
+      hasMore: next < links.length,
+      ...next < links.length ? { nextOffset: next } : {}
+    }
+  };
+}
+function describeLinkInventory(result) {
+  const { counts, page } = result;
+  return `Found ${page.total} links in ${result.notesInScope} notes (inline ${counts.inline}${result.inlineIncluded ? "" : " not scanned"}, card ${counts.card}, note ${counts.note}, section ${counts.section}); returned ${page.returned} from offset ${page.offset}` + (page.hasMore ? `; more at offset ${page.nextOffset}` : "") + ".";
 }
 
 // src/utils/linkInsert.ts
@@ -48896,7 +49916,7 @@ function insertLink(request, deps) {
 
 // src/services/notesExport.ts
 import { mkdirSync as mkdirSync5 } from "node:fs";
-import { basename as basename4, dirname as dirname4, extname as extname4, join as join21 } from "node:path";
+import { basename as basename4, dirname as dirname6, extname as extname4, join as join21 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -49773,11 +50793,13 @@ function escapeMarkdown(text2) {
   return text2.replace(/[\\`*_[\]<>~|]/g, (char) => `\\${char}`).replace(/&(?=#?[A-Za-z0-9]+;)/g, "&amp;").replace(/==/g, "\\=\\=");
 }
 function escapeLineStart(line) {
+  if (/^\s*(?:-[ \t]*){3,}$/.test(line)) return line.replace("-", "\\-");
   return line.replace(
-    /^(\s*)([#>+-]|\d+[.)])(?=\s|$)/,
+    /^(\s*)(#{1,6}|[>+-]|\d{1,9}[.)])(?=\s|$)/,
     (_, space, marker) => /^\d/.test(marker) ? `${space}${marker.slice(0, -1)}\\${marker.slice(-1)}` : `${space}\\${marker}`
   );
 }
+var BLOCK_START_WORD = /^(?:#{1,6}|[-+*]|-+|=+|\d{1,9}[.)])$/;
 function linkDestination(url) {
   return url.replace(
     /[\s()<>]/g,
@@ -49949,7 +50971,7 @@ function renderLine(block, body, first2, isTitle, counters) {
     counters[level] = 0;
     if (block.style === "checklist") marker = block.checklist?.done ? "- [x]" : "- [ ]";
   }
-  return { text: `${indent}${marker} ${body}`, group: "list", quote };
+  return { text: `${indent}${marker} ${escapeLineStart(body)}`, group: "list", quote };
 }
 function joinLines(lines) {
   let out = "";
@@ -49982,7 +51004,7 @@ function wrapMarkdown(markdown, width) {
     let current = prefix;
     let empty = true;
     for (const word of words) {
-      if (!empty && current.length + 1 + word.length > width) {
+      if (!empty && current.length + 1 + word.length > width && !BLOCK_START_WORD.test(word)) {
         out.push(current);
         current = hang + word;
       } else current += (empty ? "" : " ") + word;
@@ -50219,7 +51241,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync5(dirname4(output), { recursive: true });
+  mkdirSync5(dirname6(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -50244,7 +51266,7 @@ function exportNotesMarkdown(request, deps) {
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = output ? openOutput(output) : void 0;
-  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname4(output) : void 0) : void 0;
+  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
     stats: emptyStats(),
     ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
@@ -50274,7 +51296,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join21(dirname4(output), `${basename4(output, extname4(output))}.assets`);
+  return join21(dirname6(output), `${basename4(output, extname4(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -50295,7 +51317,7 @@ function exportNotesHtml(request, deps) {
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
-  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname4(output)) : new DataUrlWriter();
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname6(output)) : new DataUrlWriter();
   const ctx = {
     stats: emptyStats(),
     writer,
@@ -51082,6 +52104,2071 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
   );
 }
 
+// src/utils/svgAnalyzer.ts
+import { createHash as createHash4 } from "node:crypto";
+import { closeSync as closeSync7, constants as constants7, fstatSync as fstatSync7, openSync as openSync7, readSync as readSync4 } from "node:fs";
+
+// src/utils/svgColor.ts
+var NAMED = {
+  aliceblue: "f0f8ff",
+  antiquewhite: "faebd7",
+  aqua: "00ffff",
+  aquamarine: "7fffd4",
+  azure: "f0ffff",
+  beige: "f5f5dc",
+  bisque: "ffe4c4",
+  black: "000000",
+  blanchedalmond: "ffebcd",
+  blue: "0000ff",
+  blueviolet: "8a2be2",
+  brown: "a52a2a",
+  burlywood: "deb887",
+  cadetblue: "5f9ea0",
+  chartreuse: "7fff00",
+  chocolate: "d2691e",
+  coral: "ff7f50",
+  cornflowerblue: "6495ed",
+  cornsilk: "fff8dc",
+  crimson: "dc143c",
+  cyan: "00ffff",
+  darkblue: "00008b",
+  darkcyan: "008b8b",
+  darkgoldenrod: "b8860b",
+  darkgray: "a9a9a9",
+  darkgreen: "006400",
+  darkgrey: "a9a9a9",
+  darkkhaki: "bdb76b",
+  darkmagenta: "8b008b",
+  darkolivegreen: "556b2f",
+  darkorange: "ff8c00",
+  darkorchid: "9932cc",
+  darkred: "8b0000",
+  darksalmon: "e9967a",
+  darkseagreen: "8fbc8f",
+  darkslateblue: "483d8b",
+  darkslategray: "2f4f4f",
+  darkslategrey: "2f4f4f",
+  darkturquoise: "00ced1",
+  darkviolet: "9400d3",
+  deeppink: "ff1493",
+  deepskyblue: "00bfff",
+  dimgray: "696969",
+  dimgrey: "696969",
+  dodgerblue: "1e90ff",
+  firebrick: "b22222",
+  floralwhite: "fffaf0",
+  forestgreen: "228b22",
+  fuchsia: "ff00ff",
+  gainsboro: "dcdcdc",
+  ghostwhite: "f8f8ff",
+  gold: "ffd700",
+  goldenrod: "daa520",
+  gray: "808080",
+  green: "008000",
+  greenyellow: "adff2f",
+  grey: "808080",
+  honeydew: "f0fff0",
+  hotpink: "ff69b4",
+  indianred: "cd5c5c",
+  indigo: "4b0082",
+  ivory: "fffff0",
+  khaki: "f0e68c",
+  lavender: "e6e6fa",
+  lavenderblush: "fff0f5",
+  lawngreen: "7cfc00",
+  lemonchiffon: "fffacd",
+  lightblue: "add8e6",
+  lightcoral: "f08080",
+  lightcyan: "e0ffff",
+  lightgoldenrodyellow: "fafad2",
+  lightgray: "d3d3d3",
+  lightgreen: "90ee90",
+  lightgrey: "d3d3d3",
+  lightpink: "ffb6c1",
+  lightsalmon: "ffa07a",
+  lightseagreen: "20b2aa",
+  lightskyblue: "87cefa",
+  lightslategray: "778899",
+  lightslategrey: "778899",
+  lightsteelblue: "b0c4de",
+  lightyellow: "ffffe0",
+  lime: "00ff00",
+  limegreen: "32cd32",
+  linen: "faf0e6",
+  magenta: "ff00ff",
+  maroon: "800000",
+  mediumaquamarine: "66cdaa",
+  mediumblue: "0000cd",
+  mediumorchid: "ba55d3",
+  mediumpurple: "9370db",
+  mediumseagreen: "3cb371",
+  mediumslateblue: "7b68ee",
+  mediumspringgreen: "00fa9a",
+  mediumturquoise: "48d1cc",
+  mediumvioletred: "c71585",
+  midnightblue: "191970",
+  mintcream: "f5fffa",
+  mistyrose: "ffe4e1",
+  moccasin: "ffe4b5",
+  navajowhite: "ffdead",
+  navy: "000080",
+  oldlace: "fdf5e6",
+  olive: "808000",
+  olivedrab: "6b8e23",
+  orange: "ffa500",
+  orangered: "ff4500",
+  orchid: "da70d6",
+  palegoldenrod: "eee8aa",
+  palegreen: "98fb98",
+  paleturquoise: "afeeee",
+  palevioletred: "db7093",
+  papayawhip: "ffefd5",
+  peachpuff: "ffdab9",
+  peru: "cd853f",
+  pink: "ffc0cb",
+  plum: "dda0dd",
+  powderblue: "b0e0e6",
+  purple: "800080",
+  rebeccapurple: "663399",
+  red: "ff0000",
+  rosybrown: "bc8f8f",
+  royalblue: "4169e1",
+  saddlebrown: "8b4513",
+  salmon: "fa8072",
+  sandybrown: "f4a460",
+  seagreen: "2e8b57",
+  seashell: "fff5ee",
+  sienna: "a0522d",
+  silver: "c0c0c0",
+  skyblue: "87ceeb",
+  slateblue: "6a5acd",
+  slategray: "708090",
+  slategrey: "708090",
+  snow: "fffafa",
+  springgreen: "00ff7f",
+  steelblue: "4682b4",
+  tan: "d2b48c",
+  teal: "008080",
+  thistle: "d8bfd8",
+  tomato: "ff6347",
+  turquoise: "40e0d0",
+  violet: "ee82ee",
+  wheat: "f5deb3",
+  white: "ffffff",
+  whitesmoke: "f5f5f5",
+  yellow: "ffff00",
+  yellowgreen: "9acd32"
+};
+var clamp01 = (v) => Math.min(1, Math.max(0, v));
+function hexToRgba(hex3) {
+  if (!/^[0-9a-f]+$/i.test(hex3)) return null;
+  const expand = hex3.length <= 4 ? [...hex3].map((c) => c + c).join("") : hex3;
+  if (expand.length !== 6 && expand.length !== 8) return null;
+  const byte = (i) => Number.parseInt(expand.slice(i, i + 2), 16) / 255;
+  return [byte(0), byte(2), byte(4), expand.length === 8 ? byte(6) : 1];
+}
+function component(text2, scale) {
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%?)$/i.exec(text2.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return m[2] ? n / 100 * scale : n;
+}
+function hslToRgb(h, s, l) {
+  const hue = (h % 360 + 360) % 360 / 360;
+  const f = (n) => {
+    const k = (n + hue * 12) % 12;
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [f(0), f(8), f(4)];
+}
+function functional(name, args) {
+  if (args.length !== 3 && args.length !== 4) return null;
+  const alpha = args.length === 4 ? component(args[3], 1) : 1;
+  if (alpha === null) return null;
+  if (name === "rgb" || name === "rgba") {
+    const channels = args.slice(0, 3).map((a) => component(a, 255));
+    if (channels.some((c) => c === null)) return null;
+    const [r2, g2, b2] = channels.map((c) => clamp01(c / 255));
+    return [r2, g2, b2, clamp01(alpha)];
+  }
+  const h = component(args[0].replace(/deg$/i, ""), 360);
+  const s = component(args[1], 1);
+  const l = component(args[2], 1);
+  if (h === null || s === null || l === null || !args[1].includes("%") || !args[2].includes("%"))
+    return null;
+  const [r, g, b] = hslToRgb(h, clamp01(s), clamp01(l));
+  return [r, g, b, clamp01(alpha)];
+}
+function parseColor(value) {
+  const v = value.trim().toLowerCase();
+  if (v === "transparent") return [0, 0, 0, 0];
+  if (v.startsWith("#")) return hexToRgba(v.slice(1));
+  if (v in NAMED) return hexToRgba(NAMED[v]);
+  const fn = /^(rgba?|hsla?)\(\s*(.*?)\s*\)$/.exec(v);
+  if (!fn) return null;
+  const body = fn[2];
+  const args = body.includes(",") ? body.split(",").map((a) => a.trim()) : body.replace(/\s*\/\s*/, " ").split(/\s+/).filter(Boolean);
+  if (args.some((a) => !a)) return null;
+  return functional(fn[1], args);
+}
+function parsePaint(value) {
+  const v = value.trim();
+  if (v === "none") return { kind: "none" };
+  if (/^currentcolor$/i.test(v)) return { kind: "current" };
+  const url = /^url\(\s*['"]?([^'")]*)['"]?\s*\)/i.exec(v);
+  if (url) return { kind: "url", target: url[1].trim() };
+  const rgba = parseColor(v);
+  return rgba ? { kind: "color", rgba } : { kind: "invalid" };
+}
+
+// src/utils/svgGeometry.ts
+var IDENTITY = [1, 0, 0, 1, 0, 0];
+function multiply(left, right) {
+  const [a, b, c, d, e, f] = left;
+  const [A, B, C, D, E, F] = right;
+  return [
+    a * A + c * B,
+    b * A + d * B,
+    a * C + c * D,
+    b * C + d * D,
+    a * E + c * F + e,
+    b * E + d * F + f
+  ];
+}
+function apply(m, p) {
+  return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
+}
+function scales(m) {
+  const [a, b, c, d] = m;
+  const s1 = a * a + b * b + c * c + d * d;
+  const det = a * d - b * c;
+  const root = Math.sqrt(Math.max(0, s1 * s1 - 4 * det * det));
+  return [Math.sqrt((s1 + root) / 2), Math.sqrt(Math.max(0, (s1 - root) / 2))];
+}
+var NUMBER = /[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
+var NumberScanner = class {
+  constructor(text2) {
+    this.text = text2;
+  }
+  text;
+  pos = 0;
+  /** A comma was consumed since the last token (one comma separates two tokens). */
+  comma = true;
+  skip() {
+    while (this.pos < this.text.length) {
+      const ch = this.text[this.pos];
+      if (ch === " " || ch === "	" || ch === "\n" || ch === "\r" || ch === "\f") this.pos++;
+      else if (ch === "," && !this.comma) {
+        this.pos++;
+        this.comma = true;
+      } else break;
+    }
+  }
+  done() {
+    this.skip();
+    return this.pos >= this.text.length;
+  }
+  /** The next character, after separators, without consuming it. */
+  peek() {
+    this.skip();
+    return this.text[this.pos] ?? "";
+  }
+  take() {
+    this.skip();
+    this.comma = false;
+    return this.text[this.pos++] ?? "";
+  }
+  number() {
+    this.skip();
+    NUMBER.lastIndex = this.pos;
+    const m = NUMBER.exec(this.text);
+    if (!m) return null;
+    this.pos += m[0].length;
+    this.comma = false;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+  flag() {
+    this.skip();
+    const ch = this.text[this.pos];
+    if (ch !== "0" && ch !== "1") return null;
+    this.pos++;
+    this.comma = false;
+    return ch === "1" ? 1 : 0;
+  }
+};
+function parseNumberList(text2) {
+  const scanner = new NumberScanner(text2);
+  const out = [];
+  while (!scanner.done()) {
+    const n = scanner.number();
+    if (n === null) return null;
+    out.push(n);
+  }
+  return out;
+}
+function parseTransform(text2) {
+  let m = IDENTITY;
+  const re = /\s*,?\s*([a-zA-Z]+)\s*\(([^)]*)\)/y;
+  let pos = 0;
+  const trimmed = text2.trim();
+  while (pos < trimmed.length) {
+    re.lastIndex = pos;
+    const hit = re.exec(trimmed);
+    if (!hit) return null;
+    pos = re.lastIndex;
+    const args = parseNumberList(hit[2]);
+    if (!args) return null;
+    const n = args.length;
+    let t;
+    switch (hit[1]) {
+      case "matrix":
+        if (n !== 6) return null;
+        t = args;
+        break;
+      case "translate":
+        if (n !== 1 && n !== 2) return null;
+        t = [1, 0, 0, 1, args[0], args[1] ?? 0];
+        break;
+      case "scale":
+        if (n !== 1 && n !== 2) return null;
+        t = [args[0], 0, 0, args[1] ?? args[0], 0, 0];
+        break;
+      case "rotate": {
+        if (n !== 1 && n !== 3) return null;
+        const r = args[0] * Math.PI / 180;
+        const [cos, sin] = [Math.cos(r), Math.sin(r)];
+        t = [cos, sin, -sin, cos, 0, 0];
+        if (n === 3)
+          t = multiply(multiply([1, 0, 0, 1, args[1], args[2]], t), [
+            1,
+            0,
+            0,
+            1,
+            -args[1],
+            -args[2]
+          ]);
+        break;
+      }
+      case "skewX":
+        if (n !== 1) return null;
+        t = [1, 0, Math.tan(args[0] * Math.PI / 180), 1, 0, 0];
+        break;
+      case "skewY":
+        if (n !== 1) return null;
+        t = [1, Math.tan(args[0] * Math.PI / 180), 0, 1, 0, 0];
+        break;
+      default:
+        return null;
+    }
+    m = multiply(m, t);
+  }
+  return m.every(Number.isFinite) ? m : null;
+}
+var KAPPA = 0.5522847498307936;
+function arcToCubics(from, rxIn, ryIn, angleDeg, largeArc, sweep, to) {
+  if (from[0] === to[0] && from[1] === to[1]) return [];
+  let rx = Math.abs(rxIn);
+  let ry = Math.abs(ryIn);
+  if (rx === 0 || ry === 0) return [{ kind: "L", to }];
+  const phi = angleDeg * Math.PI / 180;
+  const cos = Math.cos(phi);
+  const sin = Math.sin(phi);
+  const dx = (from[0] - to[0]) / 2;
+  const dy = (from[1] - to[1]) / 2;
+  const x1 = cos * dx + sin * dy;
+  const y1 = -sin * dx + cos * dy;
+  const lambda = x1 * x1 / (rx * rx) + y1 * y1 / (ry * ry);
+  if (lambda > 1) {
+    rx *= Math.sqrt(lambda);
+    ry *= Math.sqrt(lambda);
+  }
+  const num2 = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+  const coef = (largeArc === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num2 / den));
+  const cx1 = coef * rx * y1 / ry;
+  const cy1 = -coef * ry * x1 / rx;
+  const cx = cos * cx1 - sin * cy1 + (from[0] + to[0]) / 2;
+  const cy = sin * cx1 + cos * cy1 + (from[1] + to[1]) / 2;
+  const angle = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const theta1 = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry);
+  let delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
+  if (!sweep && delta > 0) delta -= 2 * Math.PI;
+  if (sweep && delta < 0) delta += 2 * Math.PI;
+  const pieces = Math.max(1, Math.ceil(Math.abs(delta) / (Math.PI / 2) - 1e-9));
+  const step = delta / pieces;
+  const k = 4 / 3 * Math.tan(step / 4);
+  const map = (x, y) => [cos * x - sin * y + cx, sin * x + cos * y + cy];
+  const out = [];
+  for (let i = 0; i < pieces; i++) {
+    const t1 = theta1 + i * step;
+    const t2 = t1 + step;
+    const [e1x, e1y] = [rx * Math.cos(t1), ry * Math.sin(t1)];
+    const [e2x, e2y] = [rx * Math.cos(t2), ry * Math.sin(t2)];
+    const [d1x, d1y] = [-rx * Math.sin(t1), ry * Math.cos(t1)];
+    const [d2x, d2y] = [-rx * Math.sin(t2), ry * Math.cos(t2)];
+    out.push({
+      kind: "C",
+      c1: map(e1x + k * d1x, e1y + k * d1y),
+      c2: map(e2x - k * d2x, e2y - k * d2y),
+      to: i === pieces - 1 ? to : map(e2x, e2y)
+    });
+  }
+  return out;
+}
+function parsePathData(d) {
+  const s = new NumberScanner(d);
+  const subpaths = [];
+  let current = null;
+  let pen = [0, 0];
+  let start = [0, 0];
+  let lastCubic = null;
+  let lastQuad = null;
+  let curved = false;
+  let command = "";
+  const result = (error2) => ({ subpaths, error: error2, curved });
+  const lineTo = (to) => {
+    current.segments.push({ kind: "L", to });
+    pen = to;
+  };
+  while (!s.done()) {
+    const next = s.peek();
+    if (/[a-zA-Z]/.test(next)) command = s.take();
+    else if (!command || command === "z" || command === "Z") return result(true);
+    const rel = command === command.toLowerCase();
+    const base = rel ? pen : [0, 0];
+    const num2 = () => s.number();
+    const pt = () => {
+      const x = num2();
+      const y = x === null ? null : num2();
+      return x === null || y === null ? null : [x + base[0], y + base[1]];
+    };
+    const upper = command.toUpperCase();
+    if (!current && upper !== "M") return result(true);
+    let cubicCtrl = null;
+    let quadCtrl = null;
+    switch (upper) {
+      case "M": {
+        const p = pt();
+        if (!p) return result(true);
+        current = { start: p, segments: [], closed: false };
+        subpaths.push(current);
+        pen = p;
+        start = p;
+        command = rel ? "l" : "L";
+        break;
+      }
+      case "L": {
+        const p = pt();
+        if (!p) return result(true);
+        lineTo(p);
+        break;
+      }
+      case "H": {
+        const x = num2();
+        if (x === null) return result(true);
+        lineTo([x + base[0], pen[1]]);
+        break;
+      }
+      case "V": {
+        const y = num2();
+        if (y === null) return result(true);
+        lineTo([pen[0], y + base[1]]);
+        break;
+      }
+      case "C":
+      case "S": {
+        let c1;
+        if (upper === "C") c1 = pt();
+        else c1 = lastCubic ? [2 * pen[0] - lastCubic[0], 2 * pen[1] - lastCubic[1]] : pen;
+        const c2 = c1 ? pt() : null;
+        const to = c2 ? pt() : null;
+        if (!c1 || !c2 || !to) return result(true);
+        current.segments.push({ kind: "C", c1, c2, to });
+        cubicCtrl = c2;
+        pen = to;
+        curved = true;
+        break;
+      }
+      case "Q":
+      case "T": {
+        let q;
+        if (upper === "Q") q = pt();
+        else q = lastQuad ? [2 * pen[0] - lastQuad[0], 2 * pen[1] - lastQuad[1]] : pen;
+        const to = q ? pt() : null;
+        if (!q || !to) return result(true);
+        current.segments.push({
+          kind: "C",
+          c1: [pen[0] + 2 / 3 * (q[0] - pen[0]), pen[1] + 2 / 3 * (q[1] - pen[1])],
+          c2: [to[0] + 2 / 3 * (q[0] - to[0]), to[1] + 2 / 3 * (q[1] - to[1])],
+          to
+        });
+        quadCtrl = q;
+        pen = to;
+        curved = true;
+        break;
+      }
+      case "A": {
+        const rx = num2();
+        const ry = rx === null ? null : num2();
+        const rot = ry === null ? null : num2();
+        const large = rot === null ? null : s.flag();
+        const sweep = large === null ? null : s.flag();
+        const to = sweep === null ? null : pt();
+        if (!to) return result(true);
+        const segs = arcToCubics(pen, rx, ry, rot, large, sweep, to);
+        current.segments.push(...segs);
+        if (segs.some((g) => g.kind === "C")) curved = true;
+        pen = to;
+        break;
+      }
+      case "Z":
+        current.closed = true;
+        pen = start;
+        current = { start, segments: [], closed: false };
+        subpaths.push(current);
+        break;
+      default:
+        return result(true);
+    }
+    lastCubic = cubicCtrl;
+    lastQuad = quadCtrl;
+  }
+  return result(false);
+}
+function ellipseSubpath(cx, cy, rx, ry) {
+  const kx = rx * KAPPA;
+  const ky = ry * KAPPA;
+  return {
+    start: [cx + rx, cy],
+    closed: true,
+    segments: [
+      { kind: "C", c1: [cx + rx, cy + ky], c2: [cx + kx, cy + ry], to: [cx, cy + ry] },
+      { kind: "C", c1: [cx - kx, cy + ry], c2: [cx - rx, cy + ky], to: [cx - rx, cy] },
+      { kind: "C", c1: [cx - rx, cy - ky], c2: [cx - kx, cy - ry], to: [cx, cy - ry] },
+      { kind: "C", c1: [cx + kx, cy - ry], c2: [cx + rx, cy - ky], to: [cx + rx, cy] }
+    ]
+  };
+}
+function rectSubpath(x, y, w, h, rx, ry) {
+  if (rx <= 0 || ry <= 0)
+    return {
+      start: [x, y],
+      closed: true,
+      segments: [
+        { kind: "L", to: [x + w, y] },
+        { kind: "L", to: [x + w, y + h] },
+        { kind: "L", to: [x, y + h] },
+        { kind: "L", to: [x, y] }
+      ]
+    };
+  const kx = rx * KAPPA;
+  const ky = ry * KAPPA;
+  const r = x + w;
+  const b = y + h;
+  return {
+    start: [x + rx, y],
+    closed: true,
+    segments: [
+      { kind: "L", to: [r - rx, y] },
+      { kind: "C", c1: [r - rx + kx, y], c2: [r, y + ry - ky], to: [r, y + ry] },
+      { kind: "L", to: [r, b - ry] },
+      { kind: "C", c1: [r, b - ry + ky], c2: [r - rx + kx, b], to: [r - rx, b] },
+      { kind: "L", to: [x + rx, b] },
+      { kind: "C", c1: [x + rx - kx, b], c2: [x, b - ry + ky], to: [x, b - ry] },
+      { kind: "L", to: [x, y + ry] },
+      { kind: "C", c1: [x, y + ry - ky], c2: [x + rx - kx, y], to: [x + rx, y] }
+    ]
+  };
+}
+function distanceToChord(p, a, b) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+  return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / len;
+}
+function flattenCubic(p0, c1, c2, p3, tolerance, out, depth = 0) {
+  if (depth >= 16 || Math.max(distanceToChord(c1, p0, p3), distanceToChord(c2, p0, p3)) <= tolerance) {
+    out.push(p3);
+    return;
+  }
+  const mid = (a2, b2) => [(a2[0] + b2[0]) / 2, (a2[1] + b2[1]) / 2];
+  const a = mid(p0, c1);
+  const b = mid(c1, c2);
+  const c = mid(c2, p3);
+  const d = mid(a, b);
+  const e = mid(b, c);
+  const m = mid(d, e);
+  flattenCubic(p0, a, d, m, tolerance, out, depth + 1);
+  flattenCubic(m, e, c, p3, tolerance, out, depth + 1);
+}
+function flattenSubpath(sub4, m, tolerance) {
+  const points = [apply(m, sub4.start)];
+  let pen = sub4.start;
+  for (const seg of sub4.segments) {
+    if (seg.kind === "L") points.push(apply(m, seg.to));
+    else
+      flattenCubic(
+        apply(m, pen),
+        apply(m, seg.c1),
+        apply(m, seg.c2),
+        apply(m, seg.to),
+        tolerance,
+        points
+      );
+    pen = seg.to;
+  }
+  if (sub4.closed) {
+    const first2 = points[0];
+    const last = points[points.length - 1];
+    if (last[0] !== first2[0] || last[1] !== first2[1]) points.push(first2);
+  }
+  return points;
+}
+function clipSegment(a, b, r) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  let t0 = 0;
+  let t1 = 1;
+  const edges = [
+    [-dx, a[0] - r.x0],
+    [dx, r.x1 - a[0]],
+    [-dy, a[1] - r.y0],
+    [dy, r.y1 - a[1]]
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return null;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return null;
+  }
+  return [
+    [a[0] + t0 * dx, a[1] + t0 * dy],
+    [a[0] + t1 * dx, a[1] + t1 * dy]
+  ];
+}
+function clipPolyline(points, r) {
+  const inside = (p) => p[0] >= r.x0 && p[0] <= r.x1 && p[1] >= r.y0 && p[1] <= r.y1;
+  if (points.every(inside)) return { parts: [points], clipped: false };
+  if (points.length === 1) return { parts: [], clipped: true };
+  const parts = [];
+  let run = [];
+  for (let i = 1; i < points.length; i++) {
+    const seg = clipSegment(points[i - 1], points[i], r);
+    if (!seg) {
+      if (run.length) parts.push(run);
+      run = [];
+      continue;
+    }
+    const [a, b] = seg;
+    const last = run[run.length - 1];
+    if (!run.length || last[0] !== a[0] || last[1] !== a[1]) {
+      if (run.length) parts.push(run);
+      run = [a];
+    }
+    run.push(b);
+    if (b[0] !== points[i][0] || b[1] !== points[i][1]) {
+      parts.push(run);
+      run = [];
+    }
+  }
+  if (run.length) parts.push(run);
+  return { parts, clipped: true };
+}
+function dashPolyline(points, pattern, offset, charge) {
+  const total = pattern.reduce((s, v) => s + v, 0);
+  let index = 0;
+  let remaining = pattern[0];
+  let on = true;
+  let shift = (offset % total + total) % total;
+  while (shift > 0) {
+    const step = Math.min(shift, remaining);
+    remaining -= step;
+    shift -= step;
+    if (remaining <= 0) {
+      index = (index + 1) % pattern.length;
+      remaining = pattern[index];
+      on = !on;
+    }
+  }
+  const dashes = [];
+  let currentDash = on ? [points[0]] : null;
+  for (let i = 1; i < points.length; i++) {
+    let a = points[i - 1];
+    const b = points[i];
+    let segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    while (segLen > remaining) {
+      const t = remaining / segLen;
+      const cut = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      if (on && currentDash) {
+        currentDash.push(cut);
+        dashes.push(currentDash);
+        charge(1);
+        currentDash = null;
+      } else currentDash = [cut];
+      on = !on;
+      segLen -= remaining;
+      a = cut;
+      index = (index + 1) % pattern.length;
+      remaining = pattern[index];
+    }
+    remaining -= segLen;
+    if (on && currentDash) currentDash.push(b);
+  }
+  if (on && currentDash && currentDash.length > 1) {
+    dashes.push(currentDash);
+    charge(1);
+  }
+  return dashes;
+}
+function scanFill(rings, evenOdd, brush, spacing, charge) {
+  const edges = [];
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const ring of rings)
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      if (a[1] !== b[1]) edges.push([a, b]);
+      minY = Math.min(minY, a[1]);
+      maxY = Math.max(maxY, a[1]);
+    }
+  if (!edges.length) return [];
+  const height = maxY - minY;
+  const lines = Math.max(1, Math.round(height / spacing));
+  const step = height / lines;
+  const out = [];
+  let chains = [];
+  let previous = [];
+  for (let k = 0; k < lines; k++) {
+    const y = minY + step * (k + 0.5);
+    charge(edges.length);
+    const crossings = [];
+    for (const [a, b] of edges) {
+      const lo = Math.min(a[1], b[1]);
+      const hi = Math.max(a[1], b[1]);
+      if (y < lo || y >= hi) continue;
+      crossings.push({
+        x: a[0] + (y - a[1]) / (b[1] - a[1]) * (b[0] - a[0]),
+        dir: b[1] > a[1] ? 1 : -1
+      });
+    }
+    crossings.sort((p, q) => p.x - q.x);
+    const spans = [];
+    let winding = 0;
+    for (let i = 0; i < crossings.length - 1; i++) {
+      winding = evenOdd ? winding ^ 1 : winding + crossings[i].dir;
+      if (winding !== 0 && crossings[i + 1].x > crossings[i].x)
+        spans.push([crossings[i].x, crossings[i + 1].x]);
+    }
+    const merged = [];
+    for (const span of spans) {
+      const last = merged[merged.length - 1];
+      if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1]);
+      else merged.push([...span]);
+    }
+    const continues = merged.length === previous.length && merged.every((s, i) => s[0] <= previous[i][1] && s[1] >= previous[i][0]);
+    if (!continues) {
+      out.push(...chains);
+      chains = merged.map(() => []);
+    }
+    merged.forEach(([x0, x1], i) => {
+      const inset = Math.min(brush / 2, (x1 - x0) / 2);
+      const left = [x0 + inset, y];
+      const right = [x1 - inset, y];
+      const forward = k % 2 === 0;
+      const pts = left[0] === right[0] ? [left] : forward ? [left, right] : [right, left];
+      chains[i].push(...pts);
+    });
+    previous = merged;
+  }
+  out.push(...chains);
+  return out.filter((c) => c.length > 0);
+}
+
+// src/utils/svgXml.ts
+var SVG_NS = "http://www.w3.org/2000/svg";
+var XLINK_NS = "http://www.w3.org/1999/xlink";
+var XML_NS = "http://www.w3.org/XML/1998/namespace";
+var SvgError = class extends Error {
+  constructor(code, message, location = null) {
+    super(message);
+    this.code = code;
+    this.location = location;
+    this.name = "SvgError";
+  }
+  code;
+  location;
+};
+var NAME_START = /[A-Za-z_À-￿]/;
+var NAME_CHAR = /[A-Za-z0-9_.\-:·À-￿]/;
+var PREDEFINED = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+function decodeEntities(raw, line) {
+  if (!raw.includes("&")) return raw;
+  return raw.replace(/&([^;&\s]*);?/g, (match, body) => {
+    if (!match.endsWith(";"))
+      throw new SvgError("svg_invalid", `Unterminated character reference on line ${line}`);
+    if (body.startsWith("#")) {
+      const hex3 = body[1] === "x" || body[1] === "X";
+      const digits = body.slice(hex3 ? 2 : 1);
+      const valid = hex3 ? /^[0-9A-Fa-f]{1,6}$/.test(digits) : /^[0-9]{1,7}$/.test(digits);
+      const code = valid ? Number.parseInt(digits, hex3 ? 16 : 10) : NaN;
+      if (!valid || code === 0 || code > 1114111 || code >= 55296 && code <= 57343)
+        throw new SvgError("svg_invalid", `Invalid character reference on line ${line}`);
+      return String.fromCodePoint(code);
+    }
+    if (body in PREDEFINED) return PREDEFINED[body];
+    throw new SvgError(
+      "svg_unsafe",
+      `Named entity "&${body.slice(0, 40)};" on line ${line}: only the five XML entities are allowed`
+    );
+  });
+}
+function parseXml(source, limits) {
+  let pos = 0;
+  let line = 1;
+  let elementCount = 0;
+  const stack = [];
+  let root = null;
+  const fail = (message) => {
+    throw new SvgError("svg_invalid", `${message} on line ${line}`);
+  };
+  const advance = (to) => {
+    for (let i = pos; i < to; i++) if (source.charCodeAt(i) === 10) line++;
+    pos = to;
+  };
+  const indexOrFail = (needle, what) => {
+    const at = source.indexOf(needle, pos);
+    if (at < 0) fail(`Unterminated ${what}`);
+    return at;
+  };
+  if (source.startsWith("<?xml") && /^<\?xml[\s?]/.test(source)) {
+    const end = indexOrFail("?>", "XML declaration");
+    advance(end + 2);
+  }
+  while (pos < source.length) {
+    const lt = source.indexOf("<", pos);
+    const textEnd = lt < 0 ? source.length : lt;
+    if (textEnd > pos) {
+      const raw = source.slice(pos, textEnd);
+      if (stack.length) stack[stack.length - 1].element.text += decodeEntities(raw, line);
+      else if (raw.trim()) fail("Text outside the root element");
+      advance(textEnd);
+      if (lt < 0) break;
+    }
+    if (source.startsWith("<!--", pos)) {
+      const end = indexOrFail("-->", "comment");
+      advance(end + 3);
+      continue;
+    }
+    if (source.startsWith("<![CDATA[", pos)) {
+      if (!stack.length) fail("CDATA outside the root element");
+      const end = indexOrFail("]]>", "CDATA section");
+      stack[stack.length - 1].element.text += source.slice(pos + 9, end);
+      advance(end + 3);
+      continue;
+    }
+    if (source.startsWith("<!", pos))
+      throw new SvgError(
+        "svg_unsafe",
+        `DOCTYPE, ENTITY and other declarations are not allowed (line ${line})`
+      );
+    if (source.startsWith("<?", pos))
+      throw new SvgError("svg_unsafe", `Processing instructions are not allowed (line ${line})`);
+    if (source.startsWith("</", pos)) {
+      const end = indexOrFail(">", "end tag");
+      const name2 = source.slice(pos + 2, end).trim();
+      const open = stack.pop();
+      if (!open || open.element.name !== name2) fail(`Mismatched end tag </${name2.slice(0, 40)}>`);
+      advance(end + 1);
+      continue;
+    }
+    const tagLine = line;
+    let i = pos + 1;
+    if (!NAME_START.test(source[i] ?? "")) fail("Invalid tag");
+    while (i < source.length && NAME_CHAR.test(source[i])) i++;
+    const name = source.slice(pos + 1, i);
+    const rawAttributes = [];
+    let selfClosing = false;
+    for (; ; ) {
+      const ws = i;
+      while (i < source.length && /\s/.test(source[i])) i++;
+      if (i >= source.length) fail("Unterminated start tag");
+      if (source[i] === ">") {
+        i++;
+        break;
+      }
+      if (source.startsWith("/>", i)) {
+        selfClosing = true;
+        i += 2;
+        break;
+      }
+      if (i === ws) fail("Missing whitespace between attributes");
+      const nameStart = i;
+      if (!NAME_START.test(source[i])) fail("Invalid attribute name");
+      while (i < source.length && NAME_CHAR.test(source[i])) i++;
+      const attrName = source.slice(nameStart, i);
+      while (/\s/.test(source[i] ?? "")) i++;
+      if (source[i] !== "=") fail(`Attribute ${attrName.slice(0, 40)} has no value`);
+      i++;
+      while (/\s/.test(source[i] ?? "")) i++;
+      const quote = source[i];
+      if (quote !== '"' && quote !== "'") fail("Attribute values must be quoted");
+      const close = source.indexOf(quote, i + 1);
+      if (close < 0) fail("Unterminated attribute value");
+      const rawValue = source.slice(i + 1, close);
+      if (rawValue.includes("<")) fail("'<' in an attribute value");
+      if (rawAttributes.some((a) => a.name === attrName))
+        fail(`Duplicate attribute ${attrName.slice(0, 40)}`);
+      rawAttributes.push({
+        name: attrName,
+        value: decodeEntities(rawValue.replace(/[\t\n\r]/g, " "), line)
+      });
+      i = close + 1;
+    }
+    advance(i);
+    if (!stack.length && root) fail("More than one root element");
+    elementCount++;
+    if (elementCount > limits.maxElements)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `The document has more than ${limits.maxElements} elements`
+      );
+    if (stack.length + 1 > limits.maxDepth)
+      throw new SvgError("svg_complexity_limit", `Elements nest deeper than ${limits.maxDepth}`);
+    const parentScope = stack.length ? stack[stack.length - 1].scope : /* @__PURE__ */ new Map();
+    const scope2 = new Map(parentScope);
+    for (const a of rawAttributes) {
+      if (a.name === "xmlns") scope2.set("", a.value);
+      else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
+    }
+    const resolve7 = (qualified, isAttribute) => {
+      const colon = qualified.indexOf(":");
+      if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
+      const prefix = qualified.slice(0, colon);
+      const local = qualified.slice(colon + 1);
+      if (prefix === "xml") return { local, ns: XML_NS };
+      const ns = scope2.get(prefix);
+      if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
+      return { local, ns };
+    };
+    const resolved = resolve7(name, false);
+    const element = {
+      name,
+      local: resolved.local,
+      ns: resolved.ns,
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve7(a.name, true) })),
+      children: [],
+      text: "",
+      line: tagLine
+    };
+    if (stack.length) stack[stack.length - 1].element.children.push(element);
+    else root = element;
+    if (!selfClosing) stack.push({ element, scope: scope2 });
+  }
+  if (stack.length) fail(`Unclosed element <${stack[stack.length - 1].element.name}>`);
+  if (!root) fail("No root element");
+  return root;
+}
+
+// src/utils/svgAnalyzer.ts
+var SVG_ANALYZER_VERSION = "apple-notes-mcp/svg-analyzer@1";
+var SVG_LIMITS = {
+  maxSourceBytes: 1048576,
+  maxSourceElements: 16384,
+  maxExpandedElements: 16384,
+  maxReferenceExpansions: 8192,
+  maxDepth: 64,
+  maxReferenceDepth: 32,
+  maxPathSegments: 1e5,
+  maxGeometryWork: 1e5,
+  maxDashWork: 1e5,
+  maxScanWork: 5e6,
+  maxStrokes: 4096,
+  maxPoints: 1e5,
+  maxDrawingBytes: 8388608,
+  maxCoordinate: 1e6,
+  maxStrokeWidth: 8192,
+  maxIssues: 128,
+  maxLocationLength: 240
+};
+var TOLERANCE = 0.25;
+var FILL_SCANLINES = 80;
+var MIN_FILL_BRUSH = 2;
+var MAX_FILL_BRUSH = 16;
+var SVG_LOSSES = [
+  "drop-content",
+  "geometry-approximation",
+  "paint-approximation"
+];
+var UNSAFE_ELEMENTS = /* @__PURE__ */ new Set([
+  "script",
+  "style",
+  "foreignObject",
+  "iframe",
+  "object",
+  "embed",
+  "audio",
+  "video",
+  "canvas",
+  "animate",
+  "animateMotion",
+  "animateTransform",
+  "animateColor",
+  "set",
+  "discard",
+  "handler",
+  "listener"
+]);
+var NON_RENDERING = /* @__PURE__ */ new Set([
+  "title",
+  "desc",
+  "metadata",
+  "defs",
+  "symbol",
+  "linearGradient",
+  "radialGradient",
+  "meshgradient",
+  "stop",
+  "clipPath",
+  "mask",
+  "pattern",
+  "marker",
+  "filter",
+  "view",
+  "cursor",
+  "font",
+  "font-face",
+  "glyph",
+  "missing-glyph",
+  "hkern",
+  "vkern",
+  "color-profile"
+]);
+var GEOMETRY = /* @__PURE__ */ new Set(["path", "rect", "circle", "ellipse", "line", "polyline", "polygon"]);
+var TEXT = /* @__PURE__ */ new Set(["text", "tspan", "textPath", "tref"]);
+var STYLE_PROPERTIES = /* @__PURE__ */ new Set([
+  "fill",
+  "stroke",
+  "color",
+  "stroke-width",
+  "opacity",
+  "fill-opacity",
+  "stroke-opacity",
+  "fill-rule",
+  "visibility",
+  "display",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-miterlimit",
+  "stroke-dasharray",
+  "stroke-dashoffset",
+  "vector-effect",
+  "overflow"
+]);
+var DROPPED_MODIFIERS = /* @__PURE__ */ new Set([
+  "clip-path",
+  "mask",
+  "filter",
+  "marker",
+  "marker-start",
+  "marker-mid",
+  "marker-end"
+]);
+var IGNORED_PROPERTY = /^(?:font(?:-.*)?|text-.*|letter-spacing|word-spacing|line-height|writing-mode|direction|unicode-bidi|dominant-baseline|alignment-baseline|baseline-shift|shape-rendering|color-rendering|color-interpolation(?:-filters)?|image-rendering|stop-.*|flood-.*|lighting-color|enable-background|solid-.*|clip-rule|isolation|pointer-events|cursor|shape-inside|shape-padding|inline-size|white-space|transform-origin|transform-box|-inkscape-.*|-webkit-.*|-moz-.*)$/;
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object")
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+function sha256(text2) {
+  return createHash4("sha256").update(text2).digest("hex");
+}
+var round = (v, digits) => {
+  const r = Number(v.toFixed(digits));
+  return r === 0 ? 0 : r;
+};
+var UNITS = {
+  "": 1,
+  px: 1,
+  pt: 4 / 3,
+  pc: 16,
+  mm: 96 / 25.4,
+  cm: 96 / 2.54,
+  in: 96
+};
+function parseLength(value, percentOf) {
+  if (value === void 0) return null;
+  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*(px|pt|pc|mm|cm|in|%)?\s*$/i.exec(
+    value
+  );
+  if (!m) return null;
+  const n = Number(m[1]);
+  const unit = (m[2] ?? "").toLowerCase();
+  const px = unit === "%" ? n / 100 * percentOf : n * UNITS[unit];
+  return Number.isFinite(px) ? px : null;
+}
+function parseOpacity(value) {
+  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%?)\s*$/i.exec(value);
+  if (!m) return null;
+  const n = Number(m[1]) / (m[2] ? 100 : 1);
+  return Math.min(1, Math.max(0, n));
+}
+function viewBoxMatrix(viewBox, width, height, preserve) {
+  const [vx, vy, vw, vh] = viewBox;
+  const parts = (preserve ?? "xMidYMid meet").trim().split(/\s+/);
+  const align = parts[0] === "defer" ? parts[1] ?? "xMidYMid" : parts[0];
+  const slice = parts.includes("slice");
+  let sx = width / vw;
+  let sy = height / vh;
+  if (align !== "none") {
+    const s = slice ? Math.max(sx, sy) : Math.min(sx, sy);
+    sx = s;
+    sy = s;
+  }
+  let tx = -vx * sx;
+  let ty = -vy * sy;
+  if (align !== "none") {
+    const xAlign = /xMid/.test(align) ? 0.5 : /xMax/.test(align) ? 1 : 0;
+    const yAlign = /YMid/.test(align) ? 0.5 : /YMax/.test(align) ? 1 : 0;
+    tx += (width - vw * sx) * xAlign;
+    ty += (height - vh * sy) * yAlign;
+  }
+  return [sx + 0, 0, 0, sy + 0, tx + 0, ty + 0];
+}
+function parseViewBox(value) {
+  if (value === void 0) return null;
+  const nums = parseNumberList(value);
+  if (!nums || nums.length !== 4 || nums[2] <= 0 || nums[3] <= 0) return null;
+  return nums;
+}
+function attr(el, local) {
+  return el.attributes.find((a) => a.local === local && a.ns === null)?.value;
+}
+function href(el) {
+  return el.attributes.find((a) => a.local === "href" && (a.ns === null || a.ns === XLINK_NS))?.value ?? void 0;
+}
+function parseStyleAttribute(value) {
+  const out = [];
+  for (const decl of value.split(";")) {
+    const colon = decl.indexOf(":");
+    if (colon < 0) continue;
+    const name = decl.slice(0, colon).trim().toLowerCase();
+    const val = decl.slice(colon + 1).replace(/!important\s*$/i, "").trim();
+    if (name) out.push([name, val]);
+  }
+  return out;
+}
+function hasText(el) {
+  return el.text.trim().length > 0 || el.children.some(hasText);
+}
+var ACTIVE_SCHEME = /^\s*(?:javascript|vbscript|data)\s*:/i;
+function assertInert(el, location) {
+  if (UNSAFE_ELEMENTS.has(el.local))
+    throw new SvgError(
+      "svg_unsafe",
+      `<${el.local}> is not allowed (scripts, styles, animation and embedded content are refused)`,
+      location
+    );
+  for (const a of el.attributes) {
+    if (/^on/i.test(a.local))
+      throw new SvgError(
+        "svg_unsafe",
+        `Event handler attribute ${a.name} is not allowed`,
+        location
+      );
+    const value = a.value;
+    if (a.local === "href" && (a.ns === null || a.ns === XLINK_NS)) {
+      const target = value.trim();
+      if (el.local === "a") {
+        if (ACTIVE_SCHEME.test(target))
+          throw new SvgError("svg_unsafe", "Link uses an active URL scheme", location);
+      } else if (el.local === "image" && /^data:image\/(?:png|jpeg|gif|webp);/i.test(target)) {
+      } else if (!target.startsWith("#")) {
+        throw new SvgError(
+          "svg_unsafe",
+          `External reference ${target.slice(0, 80)} is not allowed`,
+          location
+        );
+      }
+    }
+    for (const m of value.matchAll(/url\(\s*['"]?([^'")]*)/gi))
+      if (!m[1].trim().startsWith("#"))
+        throw new SvgError("svg_unsafe", "url() references must be local (#id)", location);
+    if (a.local === "style" && /@import|expression\s*\(|javascript\s*:/i.test(value))
+      throw new SvgError("svg_unsafe", "Active content in a style attribute", location);
+  }
+  const counts = /* @__PURE__ */ new Map();
+  for (const child of el.children) {
+    const n = (counts.get(child.local) ?? 0) + 1;
+    counts.set(child.local, n);
+    assertInert(child, `${location}/${child.local}[${n}]`);
+  }
+}
+var INITIAL_STYLE = {
+  fill: { kind: "color", rgba: [0, 0, 0, 1] },
+  stroke: { kind: "none" },
+  color: [0, 0, 0, 1],
+  fillOpacity: 1,
+  strokeOpacity: 1,
+  strokeWidth: 1,
+  linecap: "butt",
+  linejoin: "miter",
+  dasharray: null,
+  dashoffset: 0,
+  evenOdd: false,
+  visible: true
+};
+var Analyzer = class {
+  constructor(root) {
+    this.root = root;
+    const index = (el) => {
+      this.sourceElements++;
+      const id2 = attr(el, "id");
+      if (id2 !== void 0) this.ids.set(id2, [...this.ids.get(id2) ?? [], el]);
+      el.children.forEach(index);
+    };
+    index(root);
+  }
+  root;
+  issues = [];
+  issueKeys = /* @__PURE__ */ new Set();
+  issuesTruncated = false;
+  strokes = [];
+  points = 0;
+  layers = 0;
+  sourceElements = 0;
+  expandedElements = 0;
+  referenceExpansions = 0;
+  pathSegments = 0;
+  geometryWork = 0;
+  dashWork = 0;
+  scanWork = 0;
+  ids = /* @__PURE__ */ new Map();
+  issue(code, loss, location, message) {
+    const loc = location.length > SVG_LIMITS.maxLocationLength ? "\u2026" + location.slice(-(SVG_LIMITS.maxLocationLength - 1)) : location;
+    const key = `${code}\0${loc}`;
+    if (this.issueKeys.has(key)) return;
+    this.issueKeys.add(key);
+    if (this.issues.length >= SVG_LIMITS.maxIssues) {
+      this.issuesTruncated = true;
+      if (loss && !this.issues.some((i) => i.loss === loss))
+        this.issues.push({ code, loss, location: loc, message });
+      return;
+    }
+    this.issues.push({ code, loss, location: loc, message });
+  }
+  charge(kind, n) {
+    const max = kind === "geometryWork" ? SVG_LIMITS.maxGeometryWork : kind === "dashWork" ? SVG_LIMITS.maxDashWork : SVG_LIMITS.maxScanWork;
+    if (this[kind] + n > max)
+      throw new SvgError("svg_complexity_limit", `The ${kind} budget of ${max} was exceeded`);
+    this[kind] += n;
+  }
+  /** Apply presentation attributes, then the style attribute, onto an inherited style. */
+  resolveStyle(el, inherited, ctx) {
+    const style = { ...inherited };
+    let opacity = 1;
+    let display = true;
+    const declarations = [];
+    for (const a of el.attributes)
+      if (a.ns === null && (STYLE_PROPERTIES.has(a.local) || DROPPED_MODIFIERS.has(a.local) || a.local === "mix-blend-mode" || a.local === "paint-order"))
+        declarations.push([a.local, a.value.trim()]);
+    const styleAttr = attr(el, "style");
+    if (styleAttr) declarations.push(...parseStyleAttribute(styleAttr));
+    const diag = Math.hypot(ctx.viewport[0], ctx.viewport[1]) / Math.SQRT2;
+    for (const [name, value] of declarations) {
+      if (value === "inherit") continue;
+      const invalid2 = () => this.issue(
+        "invalid_value",
+        null,
+        ctx.location,
+        `Ignored invalid ${name} value "${value.slice(0, 40)}"`
+      );
+      switch (name) {
+        case "fill":
+        case "stroke": {
+          const paint = parsePaint(value);
+          if (paint.kind === "invalid") invalid2();
+          else if (name === "fill") style.fill = paint;
+          else style.stroke = paint;
+          break;
+        }
+        case "color": {
+          const c = parseColor(value);
+          if (c) style.color = c;
+          else invalid2();
+          break;
+        }
+        case "stroke-width": {
+          const w = parseLength(value, diag);
+          if (w === null || w < 0) invalid2();
+          else style.strokeWidth = w;
+          break;
+        }
+        case "opacity":
+        case "fill-opacity":
+        case "stroke-opacity": {
+          const o = parseOpacity(value);
+          if (o === null) invalid2();
+          else if (name === "opacity") opacity = o;
+          else if (name === "fill-opacity") style.fillOpacity = o;
+          else style.strokeOpacity = o;
+          break;
+        }
+        case "fill-rule":
+          if (value === "evenodd" || value === "nonzero") style.evenOdd = value === "evenodd";
+          else invalid2();
+          break;
+        case "visibility":
+          style.visible = value === "visible";
+          break;
+        case "display":
+          if (value === "none") display = false;
+          break;
+        case "stroke-linecap":
+          style.linecap = value;
+          break;
+        case "stroke-linejoin":
+          style.linejoin = value;
+          break;
+        case "stroke-dasharray": {
+          if (value === "none") {
+            style.dasharray = null;
+            break;
+          }
+          const list = parseNumberList(value);
+          if (!list || list.some((v) => v < 0)) invalid2();
+          else
+            style.dasharray = list.reduce((s, v) => s + v, 0) > 0 ? list.length % 2 ? [...list, ...list] : list : null;
+          break;
+        }
+        case "stroke-dashoffset": {
+          const o = parseLength(value, diag);
+          if (o === null) invalid2();
+          else style.dashoffset = o;
+          break;
+        }
+        case "stroke-miterlimit":
+        case "vector-effect":
+        case "overflow":
+          break;
+        case "mix-blend-mode":
+          if (value !== "normal")
+            this.issue(
+              "blend_mode_ignored",
+              "paint-approximation",
+              ctx.location,
+              `mix-blend-mode ${value.slice(0, 20)} is drawn as normal`
+            );
+          break;
+        case "paint-order":
+          if (value !== "normal" && !/^fill(\s+stroke)?(\s+markers)?$/.test(value))
+            this.issue(
+              "paint_order_ignored",
+              "paint-approximation",
+              ctx.location,
+              "paint-order is drawn as fill then stroke"
+            );
+          break;
+        default:
+          if (DROPPED_MODIFIERS.has(name)) {
+            if (value !== "none")
+              this.issue(
+                "modifier_dropped",
+                "drop-content",
+                ctx.location,
+                `${name} is not supported and its effect is dropped`
+              );
+          } else if (!IGNORED_PROPERTY.test(name)) {
+            this.issue(
+              "ignored_property",
+              null,
+              ctx.location,
+              `Ignored style property ${name.slice(0, 40)}`
+            );
+          }
+      }
+    }
+    return { style, opacity, display };
+  }
+  propertyValue(el, name) {
+    const styleAttr = attr(el, "style");
+    const fromStyle = styleAttr ? parseStyleAttribute(styleAttr).filter(([n]) => n === name).pop() : void 0;
+    return fromStyle ? fromStyle[1] : attr(el, name);
+  }
+  run() {
+    const root = this.root;
+    if (root.local !== "svg" || root.ns !== null && root.ns !== SVG_NS)
+      throw new SvgError("svg_invalid", "The root element is not <svg>");
+    assertInert(root, "svg");
+    const viewBox = parseViewBox(attr(root, "viewBox"));
+    if (attr(root, "viewBox") !== void 0 && !viewBox)
+      this.issue("invalid_value", null, "svg", "Ignored an invalid viewBox");
+    let width = parseLength(attr(root, "width"), viewBox ? viewBox[2] : 300);
+    let height = parseLength(attr(root, "height"), viewBox ? viewBox[3] : 150);
+    if (width === null || width <= 0) width = viewBox ? viewBox[2] : 300;
+    if (height === null || height <= 0) height = viewBox ? viewBox[3] : 150;
+    if (!viewBox && (attr(root, "width") === void 0 || attr(root, "height") === void 0))
+      this.issue(
+        "viewport_assumed",
+        null,
+        "svg",
+        `No viewBox or size; assumed a ${width}x${height} viewport`
+      );
+    if (width > SVG_LIMITS.maxCoordinate || height > SVG_LIMITS.maxCoordinate)
+      throw new SvgError("svg_complexity_limit", "The viewport is too large");
+    const matrix = viewBox ? viewBoxMatrix(viewBox, width, height, attr(root, "preserveAspectRatio")) : IDENTITY;
+    const ctx = {
+      matrix,
+      style: INITIAL_STYLE,
+      opacity: 1,
+      clip: { x0: 0, y0: 0, x1: width, y1: height },
+      viewport: viewBox ? [viewBox[2], viewBox[3]] : [width, height],
+      location: "svg",
+      refDepth: 0,
+      depth: 0,
+      refStack: []
+    };
+    const { style, opacity, display } = this.resolveStyle(root, INITIAL_STYLE, ctx);
+    if (display) {
+      const layersBefore = this.layers;
+      this.container(root, { ...ctx, style, opacity });
+      if (opacity < 1 && this.layers - layersBefore > 1)
+        this.issue(
+          "group_opacity",
+          "paint-approximation",
+          "svg",
+          "Group opacity is applied to each stroke separately"
+        );
+    }
+    return { width: round(width, 3), height: round(height, 3) };
+  }
+  expand() {
+    this.expandedElements++;
+    if (this.expandedElements > SVG_LIMITS.maxExpandedElements)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `More than ${SVG_LIMITS.maxExpandedElements} elements after expanding references`
+      );
+  }
+  /** Walk an element's children with its own style and transform applied. */
+  container(el, ctx) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of el.children) {
+      const n = (counts.get(child.local) ?? 0) + 1;
+      counts.set(child.local, n);
+      const id2 = attr(child, "id");
+      this.element(child, {
+        ...ctx,
+        depth: ctx.depth + 1,
+        location: `${ctx.location}/${child.local}[${n}]${id2 ? `#${id2}` : ""}`
+      });
+    }
+  }
+  element(el, parent) {
+    this.expand();
+    if (parent.depth > SVG_LIMITS.maxDepth)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `Elements nest deeper than ${SVG_LIMITS.maxDepth}`
+      );
+    if (el.ns !== null && el.ns !== SVG_NS) return;
+    const name = el.local;
+    if (NON_RENDERING.has(name)) return;
+    const { style, opacity, display } = this.resolveStyle(el, parent.style, parent);
+    if (!display) return;
+    let matrix = parent.matrix;
+    const transform2 = attr(el, "transform");
+    if (transform2 !== void 0) {
+      const t = parseTransform(transform2);
+      if (!t) {
+        this.issue(
+          "invalid_transform",
+          "drop-content",
+          parent.location,
+          "An element with an invalid transform is not drawn"
+        );
+        return;
+      }
+      matrix = multiply(matrix, t);
+    }
+    const ctx = { ...parent, matrix, style, opacity: parent.opacity * opacity };
+    const layersBefore = this.layers;
+    if (name === "g" || name === "a") this.container(el, ctx);
+    else if (name === "svg") this.nestedViewport(el, ctx, el, void 0);
+    else if (name === "use") this.use(el, ctx);
+    else if (GEOMETRY.has(name)) this.shape(el, ctx);
+    else if (TEXT.has(name)) {
+      if (hasText(el))
+        this.issue(
+          "text_dropped",
+          "drop-content",
+          ctx.location,
+          "Text is not converted to strokes"
+        );
+    } else if (name === "image")
+      this.issue(
+        "image_dropped",
+        "drop-content",
+        ctx.location,
+        "Embedded images are not converted to strokes"
+      );
+    else if (name === "switch")
+      this.issue(
+        "switch_dropped",
+        "drop-content",
+        ctx.location,
+        "Conditional <switch> content is not evaluated"
+      );
+    else
+      this.issue(
+        "unsupported_element",
+        "drop-content",
+        ctx.location,
+        `<${name.slice(0, 40)}> is not supported`
+      );
+    if (opacity < 1 && this.layers - layersBefore > 1)
+      this.issue(
+        "group_opacity",
+        "paint-approximation",
+        ctx.location,
+        "Group opacity is applied to each stroke separately"
+      );
+  }
+  /** A nested <svg> or a <use>d <symbol>: a new viewport with its own viewBox. */
+  nestedViewport(el, ctx, sizeFrom, useEl) {
+    const [pw, ph] = ctx.viewport;
+    const x = useEl ? 0 : parseLength(attr(el, "x"), pw) ?? 0;
+    const y = useEl ? 0 : parseLength(attr(el, "y"), ph) ?? 0;
+    const viewBox = parseViewBox(attr(el, "viewBox"));
+    const w = parseLength(attr(sizeFrom, "width") ?? attr(el, "width"), pw) ?? (useEl && viewBox ? viewBox[2] : pw);
+    const h = parseLength(attr(sizeFrom, "height") ?? attr(el, "height"), ph) ?? (useEl && viewBox ? viewBox[3] : ph);
+    if (w <= 0 || h <= 0) return;
+    let matrix = multiply(ctx.matrix, [1, 0, 0, 1, x, y]);
+    let clip = ctx.clip;
+    const overflow = this.propertyValue(el, "overflow");
+    if (overflow !== "visible" && overflow !== "auto") {
+      const [a, b, c, d, e, f] = matrix;
+      if (b === 0 && c === 0) {
+        const xs = [e, a * w + e].sort((p, q) => p - q);
+        const ys = [f, d * h + f].sort((p, q) => p - q);
+        const r = { x0: xs[0], y0: ys[0], x1: xs[1], y1: ys[1] };
+        clip = clip ? {
+          x0: Math.max(clip.x0, r.x0),
+          y0: Math.max(clip.y0, r.y0),
+          x1: Math.min(clip.x1, r.x1),
+          y1: Math.min(clip.y1, r.y1)
+        } : r;
+      } else {
+        this.issue(
+          "viewport_clip_skipped",
+          "geometry-approximation",
+          ctx.location,
+          "A rotated or skewed nested viewport is not clipped"
+        );
+      }
+    }
+    if (viewBox)
+      matrix = multiply(matrix, viewBoxMatrix(viewBox, w, h, attr(el, "preserveAspectRatio")));
+    this.container(el, {
+      ...ctx,
+      matrix,
+      clip,
+      viewport: viewBox ? [viewBox[2], viewBox[3]] : [w, h]
+    });
+  }
+  use(el, ctx) {
+    const ref = href(el);
+    if (!ref) return;
+    const id2 = ref.trim().slice(1);
+    const targets = this.ids.get(id2) ?? [];
+    if (targets.length === 0) {
+      this.issue(
+        "reference_missing",
+        null,
+        ctx.location,
+        `#${id2.slice(0, 60)} does not exist; nothing is drawn`
+      );
+      return;
+    }
+    if (targets.length > 1)
+      throw new SvgError(
+        "svg_reference_invalid",
+        `More than one element has id ${id2.slice(0, 60)}`,
+        ctx.location
+      );
+    if (ctx.refStack.includes(id2))
+      throw new SvgError(
+        "svg_reference_invalid",
+        `Reference cycle through #${id2.slice(0, 60)}`,
+        ctx.location
+      );
+    if (ctx.refDepth + 1 > SVG_LIMITS.maxReferenceDepth)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `References nest deeper than ${SVG_LIMITS.maxReferenceDepth}`
+      );
+    this.referenceExpansions++;
+    if (this.referenceExpansions > SVG_LIMITS.maxReferenceExpansions)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `More than ${SVG_LIMITS.maxReferenceExpansions} reference expansions`
+      );
+    const target = targets[0];
+    const [pw, ph] = ctx.viewport;
+    const x = parseLength(attr(el, "x"), pw) ?? 0;
+    const y = parseLength(attr(el, "y"), ph) ?? 0;
+    const inner = {
+      ...ctx,
+      matrix: multiply(ctx.matrix, [1, 0, 0, 1, x, y]),
+      location: `${ctx.location}>#${id2}`,
+      refDepth: ctx.refDepth + 1,
+      refStack: [...ctx.refStack, id2]
+    };
+    if (target.ns !== null && target.ns !== SVG_NS) return;
+    if (target.local === "symbol" || target.local === "svg") {
+      this.expand();
+      const { style, opacity, display } = this.resolveStyle(target, inner.style, inner);
+      if (!display) return;
+      const layersBefore = this.layers;
+      const symbolCtx = { ...inner, style, opacity: inner.opacity * opacity };
+      this.nestedViewport(target, symbolCtx, el, el);
+      if (opacity < 1 && this.layers - layersBefore > 1)
+        this.issue(
+          "group_opacity",
+          "paint-approximation",
+          inner.location,
+          "Group opacity is applied to each stroke separately"
+        );
+    } else {
+      this.element(target, inner);
+    }
+  }
+  subpathsFor(el, ctx) {
+    const [pw, ph] = ctx.viewport;
+    const diag = Math.hypot(pw, ph) / Math.SQRT2;
+    const len = (name, of) => parseLength(attr(el, name), of);
+    const bad = (what) => {
+      this.issue("invalid_geometry", null, ctx.location, `${what}; the element is not drawn`);
+      return null;
+    };
+    switch (el.local) {
+      case "path": {
+        const d = attr(el, "d");
+        if (d === void 0 || !d.trim()) return null;
+        const parsed = parsePathData(d);
+        const segs = parsed.subpaths.reduce((s, p) => s + p.segments.length, 0);
+        this.pathSegments += segs;
+        if (this.pathSegments > SVG_LIMITS.maxPathSegments)
+          throw new SvgError(
+            "svg_complexity_limit",
+            `More than ${SVG_LIMITS.maxPathSegments} path segments`
+          );
+        if (parsed.error)
+          this.issue(
+            "path_data_error",
+            "drop-content",
+            ctx.location,
+            "Path data has an error; the part after it is dropped"
+          );
+        return { subpaths: parsed.subpaths, fillable: true };
+      }
+      case "rect": {
+        const x = len("x", pw) ?? 0;
+        const y = len("y", ph) ?? 0;
+        const w = len("width", pw) ?? 0;
+        const h = len("height", ph) ?? 0;
+        if (w < 0 || h < 0) return bad("Negative rectangle size");
+        if (w === 0 || h === 0) return null;
+        let rx = len("rx", pw);
+        let ry = len("ry", ph);
+        if (rx !== null && rx < 0) rx = null;
+        if (ry !== null && ry < 0) ry = null;
+        rx = Math.min(rx ?? ry ?? 0, w / 2);
+        ry = Math.min(ry ?? rx, h / 2);
+        return {
+          subpaths: [rectSubpath(x, y, w, h, rx, ry)],
+          fillable: true
+        };
+      }
+      case "circle":
+      case "ellipse": {
+        const cx = len("cx", pw) ?? 0;
+        const cy = len("cy", ph) ?? 0;
+        let rx;
+        let ry;
+        if (el.local === "circle") rx = ry = len("r", diag) ?? 0;
+        else {
+          rx = len("rx", pw);
+          ry = len("ry", ph);
+          rx = rx ?? ry ?? 0;
+          ry = ry ?? rx;
+        }
+        if (rx < 0 || ry < 0) return bad("Negative radius");
+        if (rx === 0 || ry === 0) return null;
+        return { subpaths: [ellipseSubpath(cx, cy, rx, ry)], fillable: true };
+      }
+      case "line": {
+        const p0 = [len("x1", pw) ?? 0, len("y1", ph) ?? 0];
+        const p1 = [len("x2", pw) ?? 0, len("y2", ph) ?? 0];
+        return {
+          subpaths: [{ start: p0, segments: [{ kind: "L", to: p1 }], closed: false }],
+          fillable: false
+        };
+      }
+      default: {
+        const nums = parseNumberList(attr(el, "points") ?? "");
+        if (!nums) return bad("Malformed points list");
+        const pts = [];
+        for (let i = 0; i + 1 < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+        if (nums.length % 2)
+          this.issue(
+            "invalid_geometry",
+            null,
+            ctx.location,
+            "Odd number of coordinates; the last one is ignored"
+          );
+        if (pts.length < 2) return null;
+        return {
+          subpaths: [
+            {
+              start: pts[0],
+              segments: pts.slice(1).map((to) => ({ kind: "L", to })),
+              closed: el.local === "polygon"
+            }
+          ],
+          fillable: true
+        };
+      }
+    }
+  }
+  emit(points, color, width, ctx) {
+    const rounded = [];
+    for (const p of points) {
+      const q = [round(p[0], 3), round(p[1], 3)];
+      const last = rounded[rounded.length - 1];
+      if (!last || last[0] !== q[0] || last[1] !== q[1]) rounded.push(q);
+    }
+    if (!rounded.length) return;
+    if (width > SVG_LIMITS.maxStrokeWidth)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `A stroke is wider than ${SVG_LIMITS.maxStrokeWidth}`,
+        ctx.location
+      );
+    this.strokes.push({
+      ink: "monoline",
+      color: [round(color[0], 4), round(color[1], 4), round(color[2], 4), round(color[3], 4)],
+      width: round(width, 3),
+      points: rounded
+    });
+    this.points += rounded.length;
+    if (this.strokes.length > SVG_LIMITS.maxStrokes)
+      throw new SvgError(
+        "svg_complexity_limit",
+        `More than ${SVG_LIMITS.maxStrokes} output strokes`
+      );
+    if (this.points > SVG_LIMITS.maxPoints)
+      throw new SvgError("svg_complexity_limit", `More than ${SVG_LIMITS.maxPoints} output points`);
+  }
+  clipped(polyline, ctx) {
+    if (!ctx.clip) return [polyline];
+    const { parts, clipped } = clipPolyline(polyline, ctx.clip);
+    if (clipped)
+      this.issue(
+        "viewport_clipped",
+        "geometry-approximation",
+        ctx.location,
+        "Content outside the viewport is clipped"
+      );
+    return parts;
+  }
+  paintColor(paint, style) {
+    if (paint.kind === "color") return paint.rgba;
+    if (paint.kind === "current") return style.color;
+    if (paint.kind === "url") return "url";
+    return null;
+  }
+  shape(el, ctx) {
+    const geometry = this.subpathsFor(el, ctx);
+    if (!geometry || !ctx.style.visible) return;
+    const { style } = ctx;
+    const polylines = geometry.subpaths.filter((s) => s.segments.length > 0).map((s) => {
+      const pts = flattenSubpath(s, ctx.matrix, TOLERANCE);
+      this.charge("geometryWork", pts.length);
+      if (pts.some(
+        (p) => !(Math.abs(p[0]) <= SVG_LIMITS.maxCoordinate && Math.abs(p[1]) <= SVG_LIMITS.maxCoordinate)
+      ))
+        throw new SvgError(
+          "svg_geometry_invalid",
+          "Geometry is not finite or exceeds the coordinate limit",
+          ctx.location
+        );
+      return pts;
+    });
+    if (!polylines.length) return;
+    const fill = this.paintColor(style.fill, style);
+    const stroke = style.strokeWidth > 0 ? this.paintColor(style.stroke, style) : null;
+    if (fill === "url")
+      this.issue(
+        "paint_server_dropped",
+        "drop-content",
+        ctx.location,
+        "Gradient or pattern fill is not supported and is dropped"
+      );
+    if (stroke === "url")
+      this.issue(
+        "paint_server_dropped",
+        "drop-content",
+        ctx.location,
+        "Gradient or pattern stroke is not supported and is dropped"
+      );
+    if (fill && fill !== "url" && geometry.fillable) {
+      const alpha = fill[3] * style.fillOpacity * ctx.opacity;
+      const rings = polylines.filter((p) => p.length >= 3);
+      if (alpha > 0 && rings.length) {
+        const ys = rings.flat().map((p) => p[1]);
+        const h = Math.max(...ys) - Math.min(...ys);
+        const brush = Math.min(MAX_FILL_BRUSH, Math.max(MIN_FILL_BRUSH, h / FILL_SCANLINES));
+        const chains = scanFill(
+          rings,
+          style.evenOdd,
+          brush,
+          brush * 0.8,
+          (n) => this.charge("scanWork", n)
+        );
+        if (chains.length) {
+          this.issue(
+            "fill_as_strokes",
+            "paint-approximation",
+            ctx.location,
+            "Filled area is drawn with overlapping strokes"
+          );
+          this.layers++;
+          for (const chain of chains)
+            for (const part of this.clipped(chain, ctx))
+              this.emit(part, [fill[0], fill[1], fill[2], alpha], brush, ctx);
+        }
+      }
+    }
+    if (stroke && stroke !== "url") {
+      const alpha = stroke[3] * style.strokeOpacity * ctx.opacity;
+      if (alpha > 0) {
+        const nonScaling = this.propertyValue(el, "vector-effect") === "non-scaling-stroke";
+        const [s1, s2] = scales(ctx.matrix);
+        const mean = Math.sqrt(s1 * s2);
+        if (!nonScaling && s2 > 0 && s1 / s2 > 1.001)
+          this.issue(
+            "nonuniform_stroke",
+            "geometry-approximation",
+            ctx.location,
+            "Non-uniformly scaled stroke is drawn with one width"
+          );
+        const width = nonScaling ? style.strokeWidth : style.strokeWidth * mean;
+        if (width > 0) {
+          const openPath = geometry.subpaths.some((s) => s.segments.length > 0 && !s.closed) || style.dasharray;
+          if (style.linecap !== "round" && openPath)
+            this.issue(
+              "cap_approximated",
+              "geometry-approximation",
+              ctx.location,
+              `stroke-linecap ${style.linecap.slice(0, 20)} is drawn round`
+            );
+          if (style.linejoin !== "round" && polylines.some((p) => p.length > 2))
+            this.issue(
+              "join_approximated",
+              "geometry-approximation",
+              ctx.location,
+              `stroke-linejoin ${style.linejoin.slice(0, 20)} is drawn round`
+            );
+          let pieces = polylines;
+          if (style.dasharray) {
+            const k = nonScaling ? 1 : mean;
+            const pattern = style.dasharray.map((v) => v * k);
+            pieces = polylines.flatMap(
+              (p) => dashPolyline(p, pattern, style.dashoffset * k, (n) => this.charge("dashWork", n))
+            );
+          }
+          this.layers++;
+          for (const piece of pieces) {
+            const zeroLength = piece.every((p) => p[0] === piece[0][0] && p[1] === piece[0][1]);
+            if (zeroLength && style.linecap !== "round") continue;
+            for (const part of this.clipped(zeroLength ? [piece[0]] : piece, ctx))
+              this.emit(part, [stroke[0], stroke[1], stroke[2], alpha], width, ctx);
+          }
+        }
+      }
+    }
+  }
+};
+function analysisFor(source, analyzer, viewport) {
+  const drawing = {
+    version: 1,
+    width: viewport.width,
+    height: viewport.height,
+    strokes: analyzer.strokes
+  };
+  const drawingJson = canonicalJson(drawing);
+  if (drawingJson.length > SVG_LIMITS.maxDrawingBytes)
+    throw new SvgError(
+      "normalized_drawing_too_large",
+      `The normalized drawing exceeds ${SVG_LIMITS.maxDrawingBytes} bytes`
+    );
+  const importable = drawing.strokes.length > 0;
+  if (!importable)
+    analyzer.issue("empty_drawing", null, "svg", "Nothing drawable remains after conversion");
+  const requiredLosses = SVG_LOSSES.filter((loss) => analyzer.issues.some((i) => i.loss === loss));
+  const classification = !importable || requiredLosses.includes("drop-content") ? "unsupported" : requiredLosses.length ? "lossy" : "safe";
+  const analysis = {
+    analyzer: SVG_ANALYZER_VERSION,
+    source: { sha256: sha256(source), bytes: source.length },
+    classification,
+    importable,
+    defaultWriteAllowed: importable && classification === "safe",
+    requiredLosses,
+    viewport,
+    counts: {
+      sourceElements: analyzer.sourceElements,
+      expandedElements: analyzer.expandedElements,
+      referenceExpansions: analyzer.referenceExpansions,
+      pathSegments: analyzer.pathSegments,
+      strokes: drawing.strokes.length,
+      points: analyzer.points,
+      geometryWork: { used: analyzer.geometryWork, max: SVG_LIMITS.maxGeometryWork },
+      dashWork: { used: analyzer.dashWork, max: SVG_LIMITS.maxDashWork },
+      scanWork: { used: analyzer.scanWork, max: SVG_LIMITS.maxScanWork }
+    },
+    drawingBytes: drawingJson.length,
+    issues: analyzer.issues,
+    issuesTruncated: analyzer.issuesTruncated
+  };
+  const analysisDigest = "sha256:" + sha256(canonicalJson({ analysis, drawing }));
+  return { analysis: { ...analysis, analysisDigest }, drawing };
+}
+function analyzeSvgBuffer(source) {
+  if (source.length > SVG_LIMITS.maxSourceBytes)
+    throw new SvgError(
+      "svg_file_invalid",
+      `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
+    );
+  let text2;
+  try {
+    text2 = new TextDecoder("utf-8", { fatal: true }).decode(source);
+  } catch {
+    throw new SvgError("svg_file_invalid", "The SVG is not valid UTF-8");
+  }
+  if (text2.charCodeAt(0) === 65279) text2 = text2.slice(1);
+  const root = parseXml(text2, {
+    maxElements: SVG_LIMITS.maxSourceElements,
+    maxDepth: SVG_LIMITS.maxDepth
+  });
+  const analyzer = new Analyzer(root);
+  const viewport = analyzer.run();
+  return analysisFor(source, analyzer, viewport);
+}
+function readSvgSource(path10) {
+  let fd;
+  try {
+    fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW | constants7.O_NONBLOCK);
+  } catch (error2) {
+    if (error2.code === "ELOOP")
+      throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
+    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
+  }
+  try {
+    const info = fstatSync7(fd);
+    if (!info.isFile())
+      throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
+    if (info.size > SVG_LIMITS.maxSourceBytes)
+      throw new SvgError(
+        "svg_file_invalid",
+        `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
+      );
+    const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
+    let total = 0;
+    for (; ; ) {
+      const n = readSync4(fd, buffer, total, buffer.length - total, null);
+      if (n === 0) break;
+      total += n;
+      if (total > SVG_LIMITS.maxSourceBytes)
+        throw new SvgError(
+          "svg_file_invalid",
+          `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
+        );
+    }
+    return buffer.subarray(0, total);
+  } finally {
+    closeSync7(fd);
+  }
+}
+function analyzeSvgFile(path10) {
+  return analyzeSvgBuffer(readSvgSource(path10));
+}
+
+// src/tools/svgAnalysis.ts
+function runSvgAnalysis(args, roots = allowedSaveRoots()) {
+  let abs;
+  try {
+    abs = assertReadableInRoots(args.path, roots, "SVG file");
+  } catch (error2) {
+    throw new CodedError(error2.message, {
+      code: "validation_error",
+      svgCode: "svg_file_invalid"
+    });
+  }
+  try {
+    const result = analyzeSvgFile(abs);
+    return {
+      ...result.analysis,
+      ...args.includeDrawing ? { drawing: result.drawing } : {}
+    };
+  } catch (error2) {
+    if (error2 instanceof SvgError)
+      throw new CodedError(`SVG refused (${error2.code}): ${error2.message}`, {
+        code: "validation_error",
+        svgCode: error2.code,
+        ...error2.location ? { location: error2.location } : {}
+      });
+    throw error2;
+  }
+}
+function registerSvgAnalysis(server2) {
+  const inputSchema = {
+    path: external_exports.string().min(1).max(4096).describe(
+      `Absolute path of one .svg file (home, temp, or /Volumes; not a symbolic link; at most ${SVG_LIMITS.maxSourceBytes} bytes of UTF-8)`
+    ),
+    includeDrawing: external_exports.boolean().optional().describe(
+      "Also return the normalized drawing (strokes with sRGB color, width and points). Off by default: it can be large."
+    )
+  };
+  server2.registerTool(
+    "analyze-svg",
+    {
+      description: "Use when: checking whether an SVG file can be represented as editable monoline strokes, and what that conversion would approximate or drop.\nReturns: classification (safe, lossy, unsupported), importable, defaultWriteAllowed, requiredLosses (geometry-approximation, paint-approximation, drop-content), issues with element locations, counts and work budgets, the source SHA-256, and analysisDigest, a SHA-256 over the canonical analysis and normalized drawing. includeDrawing adds the drawing.\nDo not use when: you want to attach the SVG file itself to a note (add-attachment).\nSafety: read-only and local. Opens no Notes data and makes no network request. Scripts, event handlers, style elements, animation, DOCTYPE/entities and external resources are refused with svgCode svg_unsafe; malformed files with svg_invalid; oversized work with svg_complexity_limit.",
+      inputSchema,
+      outputSchema: external_exports.object({ classification: external_exports.string().optional() }).passthrough(),
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    (async (args) => {
+      try {
+        const result = runSvgAnalysis(args);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result
+        };
+      } catch (error2) {
+        return errorResult(error2 instanceof Error ? error2.message : String(error2), error2);
+      }
+    })
+  );
+}
+
 // src/tools/nativeTagsBridge.ts
 var noteId2 = exactIdInput(
   "ICNote",
@@ -51588,7 +54675,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname5, resolve as resolve4 } from "node:path";
+import { dirname as dirname7, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -51611,7 +54698,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve4(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve4(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
@@ -51673,27 +54760,627 @@ function formatShortcutSetup(report) {
   return lines.join("\n");
 }
 
-// src/services/privateHelperBuild.ts
-import { spawnSync as spawnSync4 } from "node:child_process";
+// src/services/publicHelper.ts
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { createHash as createHash5 } from "node:crypto";
 import {
   chmodSync,
-  existsSync as existsSync15,
+  existsSync as existsSync14,
   mkdirSync as mkdirSync6,
   mkdtempSync as mkdtempSync6,
+  readFileSync as readFileSync5,
   renameSync,
   rmSync as rmSync6,
   writeFileSync as writeFileSync5
 } from "node:fs";
-import { release as release3 } from "node:os";
-import { join as join26 } from "node:path";
+import { homedir as homedir19, release as release3 } from "node:os";
+import { dirname as dirname8, join as join25, resolve as resolve5 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+var PUBLIC_HELPER_PROTOCOL = 1;
+var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
+var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
+var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
+var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
+var PUBLIC_HELPER_MANIFEST = "manifest.json";
+var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set(["hello", "decode_drawing"]);
+var DEFAULT_TIMEOUT_MS2 = 3e4;
+var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var publicManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join25(dir, "package.json");
+    if (existsSync14(candidate)) {
+      try {
+        if (JSON.parse(readFileSync5(candidate, "utf8")).name === "apple-notes-mcp")
+          return dir;
+      } catch {
+      }
+    }
+    const parent = dirname8(dir);
+    if (parent === dir) return resolve5(fromDir, "..");
+    dir = parent;
+  }
+}
+function defaultPublicHelperDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
+    exists: existsSync14,
+    readFile: (path10) => readFileSync5(path10),
+    spawn: spawnSync3,
+    ...overrides
+  };
+}
+function publicHelperInstallDir(env = process.env) {
+  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+}
+function sha256Hex(data) {
+  return createHash5("sha256").update(data).digest("hex");
+}
+function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
+  const installDir = publicHelperInstallDir(deps.env);
+  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
+  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail(
+      "helper_manifest_invalid",
+      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
+    return {
+      ...fail(
+        "helper_stale",
+        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
+      ),
+      manifest
+    };
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return {
+      ...fail(
+        "helper_modified",
+        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
+      ),
+      manifest
+    };
+  return { ...base, manifest, ready: true, reason: null, detail: null };
+}
+var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid"
+]);
+var PublicHelperError = class extends CodedError {
+  constructor(code, message) {
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      helperCode: code
+    });
+    this.code = code;
+    this.name = "PublicHelperError";
+  }
+  code;
+};
+var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
+var publicHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || options.timeoutMs || DEFAULT_TIMEOUT_MS2;
+  const result = deps.spawn(binaryPath, [], {
+    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PublicHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  let parsed;
+  try {
+    parsed = JSON.parse(String(result.stdout ?? "").trim());
+  } catch {
+    throw new PublicHelperError(
+      "invalid_response",
+      `The helper exited with status ${result.status} and no JSON response.`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
+  const object3 = parsed;
+  if (result.status !== 0 || object3.status !== "ok") {
+    const error2 = errorSchema.safeParse(object3);
+    if (!error2.success)
+      throw new PublicHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized response (exit ${result.status}).`
+      );
+    throw new PublicHelperError(error2.data.code, error2.data.message);
+  }
+  return object3;
+}
+function defaultPublicHelperBuildDeps() {
+  return {
+    ...defaultPublicHelperDeps(),
+    osVersion: () => {
+      const r = spawnSync3("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function sourceDigestSwift(sourceSha) {
+  return `let helperSourceSHA256 = "${sourceSha}"
+`;
+}
+var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
+function publicHelperInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>apple-notes-mcp public helper</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "PencilKit",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
+  const steps = [];
+  const done = (ok) => ({
+    ok,
+    checkOnly,
+    steps,
+    installation: inspectPublicHelper(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectPublicHelper(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = publicHelperInstallDir(deps.env);
+  mkdirSync6(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join25(installDir, ".staging-"));
+  try {
+    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join25(staging, "source-digest.swift");
+    const plistPath = join25(staging, "Info.plist");
+    writeFileSync5(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync5(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = publicHelloSchema.parse(
+        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync(stagedBinary, 448);
+    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync5(
+      join25(installDir, PUBLIC_HELPER_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync6(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPublicHelper(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatPublicHelperBuild(report) {
+  const lines = ["Apple Notes MCP public native helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
+  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+
+// src/utils/noteStoreQuery.ts
+function parseNoteObjectId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/.exec(noteId3);
+  if (!match)
+    throw new NoteStoreError(
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`,
+      "invalid_input"
+    );
+  return { store: match[1], pk: Number(match[2]) };
+}
+function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH7) {
+  return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
+}
+var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
+function assertNoteReadable(stateLine, noteId3) {
+  let state;
+  try {
+    state = JSON.parse(stateLine || "{}");
+  } catch {
+    throw new NoteStoreError("Unexpected response from the Notes database.", "query_error");
+  }
+  if (!state.found)
+    throw new CodedError(`No note found in the database for ID "${noteId3}".`, {
+      code: "not_found"
+    });
+  if (state.locked)
+    throw new CodedError(
+      "This note is password-protected; its attachments are encrypted and cannot be read.",
+      { code: "unsupported" }
+    );
+}
+
+// src/utils/noteDrawings.ts
+function drawingRowsSql(columns, dataColumn) {
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`
+  ].join("\n");
+}
+function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH7) {
+  const { store, pk } = parseNoteObjectId(noteId3);
+  const columns = readColumns(dbPath2);
+  const dataColumn = columns.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
+  if (!dataColumn)
+    throw new NoteStoreError(
+      "This macOS version's Notes database has no drawing data column.",
+      "schema"
+    );
+  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns, dataColumn), pk, dbPath2);
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  return rows.map((row) => ({
+    pk: row.pk,
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier ?? "",
+    typeUti: row.uti,
+    data: row.data ? Buffer.from(row.data, "hex") : null
+  }));
+}
+function svgNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+function escapeAttribute2(value) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+var clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value || 0)));
+var clampUnit = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+function drawingViewBox(strokes, fallback) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const stroke of strokes) {
+    const pad = stroke.width / 2;
+    const extend2 = (x, y, r) => {
+      minX = Math.min(minX, x - r);
+      minY = Math.min(minY, y - r);
+      maxX = Math.max(maxX, x + r);
+      maxY = Math.max(maxY, y + r);
+    };
+    if (stroke.points?.length) for (const p of stroke.points) extend2(p.x, p.y, pad);
+    else {
+      extend2(stroke.bounds.x, stroke.bounds.y, 0);
+      extend2(stroke.bounds.x + stroke.bounds.width, stroke.bounds.y + stroke.bounds.height, 0);
+    }
+  }
+  if (minX === Infinity) return fallback ?? { x: 0, y: 0, width: 1, height: 1 };
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+function drawingToSvg(strokes, fallback) {
+  const box = drawingViewBox(strokes, fallback);
+  const parts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${svgNumber(box.x)} ${svgNumber(box.y)} ${svgNumber(box.width)} ${svgNumber(box.height)}" width="${svgNumber(box.width)}" height="${svgNumber(box.height)}">`
+  ];
+  for (const stroke of strokes) {
+    const points = stroke.points ?? [];
+    if (points.length === 0) continue;
+    const c = stroke.color;
+    const color = `rgb(${clampChannel(c.red)},${clampChannel(c.green)},${clampChannel(c.blue)})`;
+    const shared = `stroke="${color}" stroke-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"`;
+    if (points.length === 1) {
+      parts.push(
+        `<circle cx="${svgNumber(points[0].x)}" cy="${svgNumber(points[0].y)}" r="${svgNumber(stroke.width / 2)}" fill="${color}" fill-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"/>`
+      );
+      continue;
+    }
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${svgNumber(p.x)} ${svgNumber(p.y)}`).join(" ");
+    parts.push(
+      `<path d="${d}" fill="none" ${shared} stroke-width="${svgNumber(stroke.width)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    );
+  }
+  parts.push("</svg>");
+  return parts.join("\n");
+}
+
+// src/services/noteDrawings.ts
+var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
+var strokeSchema = external_exports.object({
+  inkType: external_exports.string(),
+  color: external_exports.object({
+    red: external_exports.number(),
+    green: external_exports.number(),
+    blue: external_exports.number(),
+    alpha: external_exports.number()
+  }),
+  width: external_exports.number(),
+  pointCount: external_exports.number().int(),
+  bounds,
+  points: external_exports.array(
+    external_exports.object({
+      x: external_exports.number(),
+      y: external_exports.number(),
+      width: external_exports.number(),
+      opacity: external_exports.number(),
+      force: external_exports.number()
+    })
+  ).optional(),
+  transformApplied: external_exports.boolean().optional()
+}).strip();
+var decodedDrawingSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  strokeCount: external_exports.number().int(),
+  strokes: external_exports.array(strokeSchema),
+  truncated: external_exports.boolean(),
+  bounds
+});
+function decodeRow(row, format, includePoints, deps) {
+  const base = {
+    attachmentId: row.attachmentId,
+    identifier: row.identifier,
+    typeUti: row.typeUti,
+    status: "error"
+  };
+  if (!row.data || row.data.length === 0)
+    return { ...base, code: "no_data", message: "This drawing has no stored PencilKit data." };
+  let decoded;
+  try {
+    const needPoints = includePoints || format !== "json";
+    const raw = callPublicHelper(
+      "decode_drawing",
+      { dataBase64: row.data.toString("base64"), includePoints: needPoints },
+      deps
+    );
+    const parsed = decodedDrawingSchema.safeParse(raw);
+    if (!parsed.success)
+      return { ...base, code: "invalid_response", message: "Unexpected helper response." };
+    decoded = parsed.data;
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
+  }
+  const strokes = decoded.strokes;
+  const result = {
+    ...base,
+    status: "ok",
+    strokeCount: decoded.strokeCount,
+    bounds: decoded.bounds,
+    truncated: decoded.truncated
+  };
+  if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
+  if (format !== "svg")
+    result.strokes = includePoints ? strokes : strokes.map(({ points: _points, ...rest }) => rest);
+  return result;
+}
+function getNoteDrawings(noteId3, options = {}) {
+  const format = options.format ?? "json";
+  const includePoints = options.includePoints ?? true;
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  const rows = (options.readRows ?? readDrawingRows2)(noteId3, options.dbPath);
+  if (rows.length === 0) return { id: noteId3, drawingCount: 0, status: "none", drawings: [] };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
+  const ok = drawings.filter((d) => d.status === "ok").length;
+  return {
+    id: noteId3,
+    drawingCount: drawings.length,
+    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
+    drawings
+  };
+}
+function formatNoteDrawings(result) {
+  if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
+  const lines = [
+    `${result.drawingCount} classic drawing${result.drawingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}):`
+  ];
+  for (const d of result.drawings)
+    lines.push(
+      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
+    );
+  return lines.join("\n");
+}
+
+// src/services/privateHelperBuild.ts
+import { spawnSync as spawnSync5 } from "node:child_process";
+import {
+  chmodSync as chmodSync2,
+  existsSync as existsSync16,
+  mkdirSync as mkdirSync7,
+  mkdtempSync as mkdtempSync7,
+  renameSync as renameSync2,
+  rmSync as rmSync7,
+  writeFileSync as writeFileSync6
+} from "node:fs";
+import { release as release4 } from "node:os";
+import { join as join27 } from "node:path";
 
 // src/services/privateHelper.ts
-import { spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash4 } from "node:crypto";
-import { existsSync as existsSync14, readFileSync as readFileSync5 } from "node:fs";
-import { homedir as homedir19 } from "node:os";
-import { dirname as dirname6, join as join25, resolve as resolve5 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { spawnSync as spawnSync4 } from "node:child_process";
+import { createHash as createHash6 } from "node:crypto";
+import { existsSync as existsSync15, readFileSync as readFileSync6 } from "node:fs";
+import { homedir as homedir20 } from "node:os";
+import { dirname as dirname9, join as join26, resolve as resolve6 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
 var HELPER_DIR_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_DIR";
@@ -51706,8 +55393,8 @@ var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
 var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
-var DEFAULT_TIMEOUT_MS2 = 2e4;
-var MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+var DEFAULT_TIMEOUT_MS3 = 2e4;
+var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -51717,19 +55404,19 @@ var manifestSchema = external_exports.object({
   osVersion: external_exports.string(),
   compiler: external_exports.string()
 });
-function packageRoot(fromDir = dirname6(fileURLToPath2(import.meta.url))) {
+function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
-    if (existsSync14(candidate)) {
+    const candidate = join26(dir, "package.json");
+    if (existsSync15(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
+        const pkg = JSON.parse(readFileSync6(candidate, "utf8"));
         if (pkg.name === "apple-notes-mcp") return dir;
       } catch {
       }
     }
-    const parent = dirname6(dir);
-    if (parent === dir) return resolve5(fromDir, "..");
+    const parent = dirname9(dir);
+    if (parent === dir) return resolve6(fromDir, "..");
     dir = parent;
   }
 }
@@ -51737,10 +55424,10 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot(), HELPER_SOURCE_RELATIVE),
-    exists: existsSync14,
-    readFile: (path10) => readFileSync5(path10),
-    spawn: spawnSync3,
+    sourcePath: join26(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    exists: existsSync15,
+    readFile: (path10) => readFileSync6(path10),
+    spawn: spawnSync4,
     ...overrides
   };
 }
@@ -51750,14 +55437,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
-function sha256Hex(data) {
-  return createHash4("sha256").update(data).digest("hex");
+function sha256Hex2(data) {
+  return createHash6("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join26(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -51774,8 +55461,8 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  base.expectedSourceSha256 = sha256Hex(deps.readFile(deps.sourcePath));
-  const manifestPath = join25(installDir, MANIFEST_NAME);
+  base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
+  const manifestPath = join26(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -51796,7 +55483,7 @@ function inspectInstallation(deps = defaultDeps2()) {
       "helper_stale",
       "The installed helper was built from a different helper source or protocol than this apple-notes-mcp version ships. Run `apple-notes-mcp setup --native-helper` again."
     );
-  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+  if (sha256Hex2(deps.readFile(binaryPath)) !== manifest.binarySha256)
     return fail(
       "helper_modified",
       "The helper binary does not match the checksum recorded when it was built. Run `apple-notes-mcp setup --native-helper` to rebuild it."
@@ -51813,7 +55500,7 @@ var PrivateHelperError = class extends Error {
   code;
   details;
 };
-var errorSchema = external_exports.object({
+var errorSchema2 = external_exports.object({
   status: external_exports.literal("error"),
   code: external_exports.string(),
   message: external_exports.string()
@@ -51885,13 +55572,13 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
       throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS3;
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES,
+    maxBuffer: MAX_OUTPUT_BYTES2,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -51916,7 +55603,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
   const object3 = parsed;
   if (result.status !== 0 || object3.status === "error") {
-    const error2 = errorSchema.safeParse(object3);
+    const error2 = errorSchema2.safeParse(object3);
     if (!error2.success)
       throw new PrivateHelperError(
         "invalid_response",
@@ -51937,9 +55624,9 @@ function parseOrThrow(schema, value) {
     );
   return parsed.data;
 }
-var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+var UUID2 = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 function assertNoteIdentifier(identifier) {
-  if (!UUID.test(identifier))
+  if (!UUID2.test(identifier))
     throw new PrivateHelperError("invalid_request", "identifier must be a Notes UUID");
 }
 function probePrivateHelper(deps = defaultDeps2()) {
@@ -52019,8 +55706,8 @@ function defaultBuildDeps() {
   return {
     ...defaultDeps2(),
     osVersion: () => {
-      const r = spawnSync4("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
-      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
+      const r = spawnSync5("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release4()}`;
     },
     now: () => /* @__PURE__ */ new Date()
   };
@@ -52070,7 +55757,7 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
     return done(false);
   }
   const source = deps.readFile(deps.sourcePath);
-  const sourceSha = sha256Hex(source);
+  const sourceSha = sha256Hex2(source);
   steps.push({
     step: "locate source",
     ok: true,
@@ -52089,10 +55776,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync6(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join26(installDir, ".staging-"));
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync7(join27(installDir, ".staging-"));
   try {
-    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join27(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -52163,19 +55850,19 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       schemaVersion: 1,
       protocolVersion: hello.protocolVersion,
       sourceSha256: sourceSha,
-      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      binarySha256: sha256Hex2(deps.readFile(stagedBinary)),
       builtAt: deps.now().toISOString(),
       osVersion: deps.osVersion(),
       compiler
     };
-    chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
-    writeFileSync5(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    chmodSync2(stagedBinary, 448);
+    renameSync2(stagedBinary, join27(installDir, HELPER_BINARY_NAME));
+    writeFileSync6(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync15(staging)) rmSync6(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync7(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
@@ -52315,6 +56002,11 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPublicHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
   const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatHelperBuild(report) + "\n");
@@ -52333,6 +56025,7 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 registerPrivateHelperTools(server, notesManager);
@@ -53349,6 +57042,177 @@ registerTool(
     );
   }, "Error reading note blocks")
 );
+var paragraphNoteSelector = {
+  id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
+  title: external_exports.string().min(1).max(MAX.TITLE).optional().describe("Exact note title; must match one note unless folder narrows it"),
+  folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("With title only: the note's folder name or full path as list-folders shows it")
+};
+registerTool(
+  "list-note-paragraphs",
+  {
+    description: "Use when: you need a note's paragraphs with their style and stored paragraph ID, for example to choose one to link to.\nReturns: one page of non-empty paragraphs in body order, each with blockIndex (as in get-note-blocks), text, style, paragraphId, paragraphIdStatus (unique, shared, missing) and, only when unique, a direct applenotes:// url that opens that paragraph; plus counts per status and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you need inline formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Paragraph IDs repeat often (Notes copies them when a paragraph is split), so shared IDs get no url. Title lookups ignore Recently Deleted. Password-protected notes are refused.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      linkableOnly: external_exports.boolean().optional().describe("Return only paragraphs that have a direct url (default false)"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      paragraphs: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, linkableOnly, offset, limit }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const page = pageParagraphs(note.paragraphs, {
+      offset,
+      limit,
+      linkableOnly,
+      maxBytes: blocksMaxResponseBytes()
+    });
+    const { unique, shared, missing } = note.counts;
+    return successResponse(
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + ".",
+      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+    );
+  }, "Error listing paragraphs")
+);
+registerTool(
+  "get-paragraph-link",
+  {
+    description: "Use when: you need a link that opens Notes at one paragraph (for example a heading) of a note.\nReturns: a direct applenotes://showNote?identifier=<note>&paragraphID=<paragraph> url and the selected paragraph, only when that paragraph's stored ID is present and appears in no other paragraph of the note. Otherwise an error whose structuredContent.reason says why: paragraph-id-shared, paragraph-id-missing, no-match, ambiguous-paragraph (pass occurrence or a longer snippet), occurrence-out-of-range, ambiguous-note, encrypted.\nDo not use when: you want a link to the whole note (get-note-link).\nSafety: read-only; never creates or changes a paragraph ID, so a paragraph without a unique ID cannot be linked. Requires Full Disk Access. A later edit in Notes can replace the ID and break the link.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: external_exports.string().min(1).max(MAX.CONTENT).optional().describe(
+        "Snippet of the paragraph (case, spacing and Unicode width are ignored); give one of contains, match, blockIndex"
+      ),
+      match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text, compared the same way"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+    },
+    outputSchema: {
+      url: external_exports.string().optional(),
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      paragraph: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, title, folder, contains, match, blockIndex, occurrence }) => {
+    const note = readNoteParagraphs({ id: id2, title, folder });
+    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+    return successResponse(`Paragraph link: ${result.url}`, {
+      url: result.url,
+      id: note.id,
+      identifier: note.identifier,
+      paragraph: { ...result.paragraph }
+    });
+  }, "No paragraph link")
+);
+registerTool(
+  "get-note-structure",
+  {
+    description: "Use when: you want one read-only overview of a note by exact id: decoded text, a block summary, every link with its kind (inline hyperlink, rich link card, native note link, native section link, with target note and paragraph UUIDs when the URL carries them), native tags, attachments with the same kind, body order and preview list-attachments reports (gallery and recording children nested), and metadata: deepLink, isShared, isLocked, isPinned, inRecentlyDeleted, lastViewed, wordCount, charCount, attachmentCount, checklistTotal/checklistDone, hasDrawing, firstImage.\nReturns: the structure object. For a password-protected note, metadata and attachment rows only (bodyDecoded false, body-derived fields null). lastViewed is null with lastViewedStatus never-viewed, not-recorded, malformed or unsupported when Notes holds no real view date.\nDo not use when: you need per-paragraph formatting (get-note-blocks) or the editable HTML body (get-note-content).\nSafety: read-only; reads the NoteStore database and the Notes data folder directly and requires Full Disk Access. Link URLs are returned as stored; check linkSafe before emitting them into HTML.",
+    inputSchema: {
+      id: noteIdInput,
+      includeText: external_exports.boolean().optional().describe(
+        "Include the decoded note text (default true). Text over APPLE_NOTES_MCP_BLOCKS_MAX_BYTES is omitted with textOmitted: true"
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      identifier: external_exports.string().nullable().optional(),
+      deepLink: external_exports.string().nullable().optional(),
+      title: external_exports.string().nullable().optional(),
+      folder: external_exports.string().nullable().optional(),
+      account: external_exports.string().nullable().optional(),
+      inRecentlyDeleted: external_exports.boolean().optional(),
+      isShared: external_exports.boolean().nullable().optional(),
+      isLocked: external_exports.boolean().optional(),
+      isPinned: external_exports.boolean().nullable().optional(),
+      lastViewed: external_exports.string().nullable().optional(),
+      lastViewedStatus: external_exports.string().optional(),
+      bodyDecoded: external_exports.boolean().optional(),
+      bodyError: external_exports.string().optional(),
+      text: external_exports.string().optional(),
+      textOmitted: external_exports.boolean().optional(),
+      textLength: external_exports.number().nullable().optional(),
+      wordCount: external_exports.number().nullable().optional(),
+      charCount: external_exports.number().nullable().optional(),
+      blockSummary: external_exports.record(external_exports.unknown()).nullable().optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      linkCounts: external_exports.record(external_exports.unknown()).optional(),
+      linksComplete: external_exports.boolean().optional(),
+      tags: external_exports.array(external_exports.string()).optional(),
+      attachments: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      attachmentCount: external_exports.number().optional(),
+      checklistTotal: external_exports.number().nullable().optional(),
+      checklistDone: external_exports.number().nullable().optional(),
+      hasDrawing: external_exports.boolean().optional(),
+      firstImage: external_exports.record(external_exports.unknown()).nullable().optional(),
+      undecodedFields: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, includeText }) => {
+    const structure = readNoteStructure(id2, {
+      includeText: includeText ?? true,
+      maxTextBytes: blocksMaxResponseBytes()
+    });
+    return successResponse(describeNoteStructure(structure), { ...structure });
+  }, "Error reading note structure")
+);
+registerTool(
+  "list-note-links",
+  {
+    description: "Use when: you need the links in one note (by exact id) or across a folder (with its subfolders by default), an account, or the whole library, with each link's kind: inline (a hyperlink on text), card (a rich link preview), note (a native link chip to another note) or section (a native link chip to a heading or paragraph).\nReturns: one page of links, newest-modified note first, each with its URL, label, linkSafe, target note and paragraph UUIDs for Notes deep links, card previewPath, and its source noteId, note title, folder path (as list-folders prints it) and account; plus per-kind counts and page info (call again with offset set to page.nextOffset while page.hasMore is true).\nDo not use when: you want one note's full structure (get-note-structure) or its formatting (get-note-blocks).\nSafety: read-only; reads the NoteStore database directly and requires Full Disk Access. Inline links need every body in scope decoded, so they are included only with includeInline (default true for id, false for a folder, account or library scan). Recently Deleted is skipped unless the note is requested by id.",
+    inputSchema: {
+      id: noteIdInput.optional().describe("One exact note ID (do not combine with account/folder)"),
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Account name (exact or unique-prefix match)"),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe(
+        "Folder name or path as list-folders prints it, such as Work/Clients (escape a literal slash as \\/)"
+      ),
+      includeSubfolders: external_exports.boolean().optional().describe("With folder, also list notes in its subfolders (default true)"),
+      includeInline: external_exports.boolean().optional().describe(
+        "Also decode note bodies for inline hyperlinks (slower). Default true for id, false otherwise"
+      ),
+      kinds: external_exports.array(external_exports.enum(["inline", "card", "note", "section"])).max(4).optional().describe("Only these link kinds"),
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first link to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(2e3).optional().describe("Maximum links to return (default 200, max 2000)")
+    },
+    outputSchema: {
+      scope: external_exports.record(external_exports.unknown()).optional(),
+      inlineIncluded: external_exports.boolean().optional(),
+      notesInScope: external_exports.number().optional(),
+      notesWithoutBody: external_exports.number().optional(),
+      counts: external_exports.record(external_exports.unknown()).optional(),
+      links: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(
+    ({ id: id2, account, folder, includeSubfolders, includeInline, kinds, offset, limit }) => {
+      const result = listNoteLinks({
+        id: id2,
+        account,
+        folder,
+        includeSubfolders,
+        includeInline,
+        kinds,
+        offset,
+        limit,
+        maxBytes: blocksMaxResponseBytes()
+      });
+      return successResponse(describeLinkInventory(result), { ...result });
+    },
+    "Error listing note links"
+  )
+);
 registerTool(
   "list-native-tags",
   {
@@ -53891,7 +57755,7 @@ registerTool(
 registerTool(
   "list-notes",
   {
-    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
+    description: "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated \u2014 see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content), or date order, incremental sync cursors, or word counts (list-recent-notes).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: external_exports.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
@@ -55172,6 +59036,145 @@ ${lines.join("\n")}${more}`,
       structured
     );
   }, "Error listing notes")
+);
+registerTool(
+  "get-note-drawings",
+  {
+    description: "Use when: reading the strokes of a note's classic PencilKit drawings (com.apple.drawing / com.apple.drawing.2 attachments), by note id, as JSON or SVG.\nReturns: per drawing its attachment id, status (ok/error with a code), stroke count, bounds, and strokes (ink type, sRGB color, width, points) and/or a standalone SVG document; overall status ok/partial/error/none.\nDo not use when: the drawing is a modern Paper sketch (com.apple.paper is not decoded here) or you want the attachment file itself (save-attachment).\nNote: read-only. Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper` (compiled locally with PencilKit; no Notes writes).",
+    inputSchema: {
+      id: noteIdInput,
+      format: external_exports.enum(["json", "svg", "both"]).optional().describe(
+        '"json" (default) returns strokes, "svg" returns SVG documents, "both" returns both'
+      ),
+      includePoints: external_exports.boolean().optional().describe(
+        "Include per-point x/y/width/opacity/force in JSON strokes (default true). SVG output always uses the points."
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      drawingCount: external_exports.number().optional(),
+      status: external_exports.string().optional(),
+      drawings: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      pointsOmitted: external_exports.boolean().optional()
+    }
+  },
+  withErrorHandling(({ id: id2, format, includePoints }) => {
+    let result = getNoteDrawings(id2, { format, includePoints });
+    let pointsOmitted = false;
+    if (Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() && includePoints !== false && format !== "svg") {
+      result = getNoteDrawings(id2, { format, includePoints: false });
+      pointsOmitted = true;
+    }
+    const text2 = formatNoteDrawings(result) + (pointsOmitted ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "");
+    return successResponse(text2, {
+      ...result,
+      ...pointsOmitted ? { pointsOmitted } : {}
+    });
+  }, "Error reading drawings")
+);
+registerTool(
+  "list-recent-notes",
+  {
+    description: "Use when: syncing notes incrementally from the Notes database, or listing notes by modification date. Pass since (a modifiedCheckpoint cursor or ISO 8601) to page through changes oldest first; omit it for the newest notes first.\nReturns: metadata rows (id, identifier, title, folder path, account, created, modified, modifiedCheckpoint, pinned, locked, inRecentlyDeleted, markedForDeletion), plus optional wordCount/charCount (wordCounts) and bodyPreview/textDecoded (bodyPreview); order, saturated, and nextSince drive sync.\nDo not use when: you need full content (get-note-content) or keyword search (search-notes).\nNote: read-only NoteStore access; requires Full Disk Access. Sync rule: store nextSince and pass it as the next since; every since call advances, and saturated true means more changes may follow, so call again. For a first full sync start from since 1970-01-01. The cursor can miss edits iCloud delivers later with an older timestamp from another device, and deletions are invisible unless includeDeleted is true.",
+    inputSchema: {
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe(
+        "Only notes directly in this folder: full path (list-folders syntax) or a unique name"
+      ),
+      since: external_exports.string().min(1).max(64).optional().describe(
+        "Return notes after this point, oldest first: a modifiedCheckpoint cursor from a row or nextSince, or an ISO 8601 date (local midnight) or date-time (local unless it has an offset), meaning modified strictly after it"
+      ),
+      limit: external_exports.number().int().min(1).max(RECENT_LIMIT.MAX).optional().describe(`Maximum notes to return (default ${RECENT_LIMIT.DEFAULT})`),
+      includeDeleted: external_exports.boolean().optional().describe(
+        "Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default false)"
+      ),
+      wordCounts: external_exports.boolean().optional().describe(
+        "Decode each body for wordCount and charCount; null when the body is locked or not available (default false)"
+      ),
+      bodyPreview: external_exports.boolean().optional().describe(
+        "Add bodyPreview (180 characters: decoded body with wordCounts, else the stored snippet) and textDecoded"
+      )
+    },
+    outputSchema: {
+      notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      count: external_exports.number().optional(),
+      limit: external_exports.number().optional(),
+      order: external_exports.string().optional(),
+      saturated: external_exports.boolean().optional(),
+      nextSince: external_exports.string().nullable().optional(),
+      account: external_exports.string().optional(),
+      folder: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling((params) => {
+    const result = listRecentNotes(params);
+    const syncing = result.order === "oldest-first";
+    const scope2 = [
+      result.folder ? ` in folder "${result.folder}"` : "",
+      result.account ? ` (${result.account})` : "",
+      params.since ? ` modified after ${params.since}` : ""
+    ].join("");
+    const lines = result.notes.map(
+      (row) => `  - ${row.title ?? "(untitled)"} \u2014 ${row.modified ?? "no date"} [id: ${row.id}]`
+    );
+    let tail = "";
+    if (syncing && result.nextSince) {
+      tail = result.saturated ? `
+
+More changes may follow: call again with since ${result.nextSince}.` : `
+
+Caught up. Next since: ${result.nextSince}`;
+    } else if (result.saturated) {
+      tail = `
+
+Limit reached: older notes were not listed. Page with since to reach them.`;
+    } else if (result.nextSince) {
+      tail = `
+
+Next since: ${result.nextSince}`;
+    }
+    return successResponse(
+      (result.count ? `${result.count} notes${scope2}, ${syncing ? "oldest" : "newest"} first:
+${lines.join("\n")}` : `No notes${scope2}.`) + tail,
+      result
+    );
+  }, "Error listing recent notes")
+);
+registerTool(
+  "list-folder-tree",
+  {
+    description: "Use when: you need the folder hierarchy with note counts, per account, in one read.\nReturns: accounts, each with nested folders (id, identifier, name, path, kind folder/smart/trash, noteCount direct, totalNoteCount including subfolders, children) and the account's noteCount.\nDo not use when: you only need folder paths (list-folders) or notes (list-notes, list-recent-notes).\nNote: read-only NoteStore access; requires Full Disk Access. includeDeleted adds folders awaiting deletion (markedForDeletion) and folders whose account is gone.",
+    inputSchema: {
+      account: external_exports.string().min(1).max(MAX.ACCOUNT).optional().describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      includeDeleted: external_exports.boolean().optional().describe("Include folders marked for deletion (default false)")
+    },
+    outputSchema: {
+      accounts: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      folderCount: external_exports.number().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ account, includeDeleted }) => {
+    const result = folderTree({ account, includeDeleted });
+    const lines = [];
+    const walk = (nodes, depth) => {
+      for (const node of nodes) {
+        const counts = node.totalNoteCount === node.noteCount ? `${node.noteCount}` : `${node.noteCount}, ${node.totalNoteCount} with subfolders`;
+        lines.push(`${"  ".repeat(depth + 1)}- ${node.name} (${counts})`);
+        walk(node.children, depth + 1);
+      }
+    };
+    for (const entry of result.accounts) {
+      lines.push(`${entry.account}: ${entry.noteCount} notes`);
+      walk(entry.folders, 0);
+    }
+    return successResponse(
+      `${result.folderCount} folders:
+${lines.join("\n")}`,
+      result
+    );
+  }, "Error listing folder tree")
 );
 registerResourcesAndPrompts(server, notesManager);
 process.on("uncaughtException", (err) => {
