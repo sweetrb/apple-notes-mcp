@@ -19,6 +19,7 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { escapeFolderName } from "@/services/appleNotesManager.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 
 /** Default location of the live NoteStore database. */
@@ -302,7 +303,8 @@ export function readStoreContext(dbPath: string, columns: ReadonlySet<string>): 
 
 /**
  * Full folder paths in list-folders syntax: nested names joined by `/`, with a
- * literal `/` inside a name escaped as `\/`. Missing or cyclic parents end the
+ * literal `/` inside a name escaped as `\/` by the same escapeFolderName the
+ * list-folders tool uses. Missing or cyclic parents end the
  * walk, so a damaged hierarchy still yields a path.
  */
 export function folderPaths(folders: StoreFolder[]): Map<number, string> {
@@ -314,7 +316,7 @@ export function folderPaths(folders: StoreFolder[]): Map<number, string> {
     let current: StoreFolder | undefined = folder;
     while (current && !seen.has(current.pk)) {
       seen.add(current.pk);
-      segments.unshift((current.name ?? "").replace(/\//g, "\\/"));
+      segments.unshift(escapeFolderName(current.name ?? ""));
       current = current.parent !== null ? byPk.get(current.parent) : undefined;
     }
     paths.set(folder.pk, segments.join("/"));
