@@ -6,20 +6,19 @@
  * see Recently Deleted, or read a stored timestamp exactly. This reader goes
  * to NoteStore instead (read-only, one transaction per call) and adds:
  *
- * - newest-first ordering on the stored modification timestamp;
- * - a strict `since` boundary (modified strictly after), taking either an ISO
- *   8601 value or an opaque checkpoint token;
- * - `modifiedCheckpoint` on every row: the stored Core Data double's exact
- *   IEEE-754 bits, read with sqlite3's `ieee754_to_blob` and bound back with
- *   `ieee754_from_blob`, so the value never passes through a JavaScript Date
- *   or a decimal rendering that could round it;
+ * - a sync cursor on every row (`modifiedCheckpoint`): the stored Core Data
+ *   double's exact IEEE-754 bits, read with sqlite3's `ieee754_to_blob` and
+ *   bound back with `ieee754_from_blob` so the value never passes through a
+ *   JavaScript Date or a rounded decimal, plus the row's `Z_PK` to break ties;
+ * - `since` queries that walk rows oldest first in `(modified, Z_PK)` order
+ *   after the cursor, and newest-first browsing without `since`;
  * - optional word and character counts from the shared body decoder
  *   (noteBlocks.ts) and a body preview.
  *
- * Checkpoint rule: a listing returns the newest `limit` matches. When `count`
- * equals `limit` (`saturated`), older matches after `since` may have been cut
- * off, so repeat from the same `since` with a larger limit. Advance to
- * `nextSince` only after a listing that was not saturated.
+ * Sync rule: with `since`, `nextSince` is the last returned row's cursor, so
+ * every call advances whether or not it filled `limit`. Rows that share one
+ * timestamp are ordered by key, so paging never skips or repeats them.
+ * `saturated` (count equals limit) only says more rows may follow.
  *
  * @module utils/noteRecentList
  */
@@ -62,8 +61,17 @@ import type {
 /** Row caps for `list-recent-notes`. */
 export const RECENT_LIMIT = { DEFAULT: 50, MAX: 1000 } as const;
 
-/** Prefix of a modification checkpoint token (versioned so the format can change). */
+/** Prefix of a sync cursor token (versioned so the format can change). */
 export const CHECKPOINT_PREFIX = "cdts1:";
+
+/**
+ * A position in `(modified, Z_PK)` order. Without `pk`, the position sits
+ * after every row stored at `modified` (a strict timestamp boundary).
+ */
+export interface SyncCursor {
+  modified: number;
+  pk?: number;
+}
 
 const PREVIEW_LENGTH = 180;
 /** U+FFFC OBJECT REPLACEMENT CHARACTER, which marks each inline attachment. */
@@ -73,13 +81,38 @@ const OBJECT_REPLACEMENT = new RegExp(String.fromCharCode(0xfffc), "gu");
 // Checkpoints and `since`
 // -----------------------------------------------------------------------------
 
-/** Token for a stored timestamp given as 16 hex digits of IEEE-754 bits. */
-export function checkpointFromBits(bits: string | null | undefined): string | null {
+/** Renders a cursor as an opaque `cdts1:<16 hex bits>[:<Z_PK>]` token. */
+export function formatCursor(cursor: SyncCursor): string {
+  const base = CHECKPOINT_PREFIX + doubleToHex(cursor.modified);
+  return cursor.pk === undefined ? base : `${base}:${cursor.pk}`;
+}
+
+/**
+ * Cursor token for a stored row, from the timestamp's IEEE-754 bits (16 hex
+ * digits) and its key. Null when the row has no usable timestamp.
+ */
+export function checkpointFromBits(bits: string | null | undefined, pk: number): string | null {
   if (!bits) return null;
   try {
-    return CHECKPOINT_PREFIX + doubleToHex(hexToDouble(bits));
+    return formatCursor({ modified: hexToDouble(bits), pk });
   } catch {
     return null;
+  }
+}
+
+const CURSOR = /^([0-9a-f]{16})(?::(0|[1-9]\d{0,15}))?$/i;
+
+/** Parses the part of a cursor token after {@link CHECKPOINT_PREFIX}. */
+function parseCursorBody(body: string, input: string): SyncCursor {
+  const match = CURSOR.exec(body);
+  const pk = match?.[2] !== undefined ? Number(match[2]) : undefined;
+  try {
+    if (!match || (pk !== undefined && !Number.isSafeInteger(pk))) throw new Error("bad");
+    return pk === undefined
+      ? { modified: hexToDouble(match[1]) }
+      : { modified: hexToDouble(match[1]), pk };
+  } catch {
+    throw new NoteStoreError(`Invalid checkpoint "${input}".`, "invalid_input");
   }
 }
 
@@ -87,18 +120,15 @@ const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i;
 
 /**
- * Parses `since` into Core Data seconds. A checkpoint token yields its exact
- * double. An ISO date without a time is local midnight; a date-time without
- * an offset is local time; an explicit offset or `Z` is honored.
+ * Parses `since` into a cursor. A token yields its exact double and key. An
+ * ISO date without a time is local midnight; a date-time without an offset is
+ * local time; an explicit offset or `Z` is honored. ISO values carry no key,
+ * so they select rows modified strictly after that moment.
  */
-export function parseSince(input: string): number {
+export function parseSince(input: string): SyncCursor {
   const text = input.trim();
   if (text.startsWith(CHECKPOINT_PREFIX)) {
-    try {
-      return hexToDouble(text.slice(CHECKPOINT_PREFIX.length));
-    } catch {
-      throw new NoteStoreError(`Invalid checkpoint "${input}".`, "invalid_input");
-    }
+    return parseCursorBody(text.slice(CHECKPOINT_PREFIX.length), input);
   }
   let ms = Number.NaN;
   const dateOnly = DATE_ONLY.exec(text);
@@ -117,7 +147,7 @@ export function parseSince(input: string): number {
       "invalid_input"
     );
   }
-  return (ms - CORE_DATA_EPOCH_MS) / 1000;
+  return { modified: (ms - CORE_DATA_EPOCH_MS) / 1000 };
 }
 
 // -----------------------------------------------------------------------------
@@ -169,8 +199,13 @@ export interface RecentSqlOptions {
   scoped: boolean;
   /** Bind `@folder`. */
   inFolder: boolean;
-  /** Bind `@since`. */
+  /**
+   * `since` query: bind `@since` (and `@sincePk` when `sinceKey`) and walk
+   * rows oldest first. Otherwise rows come newest first.
+   */
   since: boolean;
+  /** The `since` cursor carries a key: bind `@sincePk` to break ties. */
+  sinceKey?: boolean;
   /** Fetch compressed bodies for decoding. */
   withBodies: boolean;
 }
@@ -198,7 +233,16 @@ export function buildRecentNotesSql(columns: ReadonlySet<string>, options: Recen
   if (!options.includeDeleted) where.push(activeNoteSql(columns, "n", "f"));
   if (options.scoped) where.push("a.Z_PK = @account");
   if (options.inFolder) where.push("n.ZFOLDER = @folder");
-  if (options.since) where.push("n.ZMODIFICATIONDATE1 > @since");
+  if (options.since) {
+    where.push(
+      options.sinceKey
+        ? "(n.ZMODIFICATIONDATE1 > @since OR (n.ZMODIFICATIONDATE1 = @since AND n.Z_PK > @sincePk))"
+        : "n.ZMODIFICATIONDATE1 > @since"
+    );
+  }
+  const order = options.since
+    ? "n.ZMODIFICATIONDATE1 ASC, n.Z_PK ASC"
+    : "n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC";
   const data = options.withBodies
     ? `CASE WHEN ${locked} = 1 THEN NULL ELSE ` +
       `(SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1) END`
@@ -217,7 +261,7 @@ export function buildRecentNotesSql(columns: ReadonlySet<string>, options: Recen
     `LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} ` +
     `LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")} ` +
     `WHERE ${where.join(" AND ")} ` +
-    `ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT @limit;`
+    `ORDER BY ${order} LIMIT @limit;`
   );
 }
 
@@ -285,7 +329,10 @@ export function resolveFolderPath(
   );
 }
 
-/** Lists notes newest first, optionally only those modified strictly after `since`. */
+/**
+ * With `since`, lists notes after that cursor oldest first and returns the
+ * last row's cursor as `nextSince`. Without it, lists the newest notes first.
+ */
 export function listRecentNotes(options: RecentNotesOptions = {}): RecentNotesResult {
   const dbPath = options.dbPath ?? NOTES_DB_PATH;
   const limit = Math.min(
@@ -305,12 +352,14 @@ export function listRecentNotes(options: RecentNotesOptions = {}): RecentNotesRe
   const params: Record<string, BoundValue> = { limit: { int: limit } };
   if (scope) params.account = { int: scope.pk };
   if (folder) params.folder = { int: folder.pk };
-  if (since !== undefined) params.since = { double: since };
+  if (since) params.since = { double: since.modified };
+  if (since?.pk !== undefined) params.sincePk = { int: since.pk };
   const sql = buildRecentNotesSql(columns, {
     includeDeleted: Boolean(options.includeDeleted),
     scoped: Boolean(scope),
     inFolder: Boolean(folder),
-    since: since !== undefined,
+    since: Boolean(since),
+    sinceKey: since?.pk !== undefined,
     withBodies,
   });
   const raw = parseJsonLines<RawRecentRow>(runReadOnlySql(dbPath, sql, params));
@@ -318,18 +367,20 @@ export function listRecentNotes(options: RecentNotesOptions = {}): RecentNotesRe
   const notes = raw.map((row) => toRecentRow(row, context, paths, accountNames, options));
 
   const saturated = notes.length === limit;
-  let nextSince: string | null = null;
-  if (!saturated) {
-    nextSince = notes.length
-      ? notes[0].modifiedCheckpoint
-      : since !== undefined
-        ? CHECKPOINT_PREFIX + doubleToHex(since)
-        : null;
+  let nextSince: string | null;
+  if (since) {
+    // A since query can only return dated rows, so the last row has a cursor.
+    nextSince = notes.length ? notes[notes.length - 1].modifiedCheckpoint : formatCursor(since);
+  } else {
+    // Browsing newest first: the newest row is a complete cursor only when
+    // nothing older was cut off.
+    nextSince = !saturated && notes.length ? notes[0].modifiedCheckpoint : null;
   }
   return {
     notes,
     count: notes.length,
     limit,
+    order: since ? "oldest-first" : "newest-first",
     saturated,
     nextSince,
     ...(scope ? { account: scope.name } : {}),
@@ -352,7 +403,7 @@ function toRecentRow(
     account: row.account !== null ? (accountNames.get(row.account) ?? null) : null,
     created: coreDataToIso(row.created),
     modified: coreDataToIso(row.modified),
-    modifiedCheckpoint: checkpointFromBits(row.bits),
+    modifiedCheckpoint: checkpointFromBits(row.bits, row.pk),
     pinned: Boolean(row.pinned),
     locked: Boolean(row.locked),
     inRecentlyDeleted: Boolean(row.trash),

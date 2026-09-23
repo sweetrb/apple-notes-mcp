@@ -10,6 +10,7 @@
 import { execFileSync } from "child_process";
 import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
+import { callTimeoutMs } from "@/utils/callTimeout.js";
 
 /**
  * Default execution timeout for AppleScript commands in milliseconds.
@@ -382,9 +383,13 @@ export function executeAppleScript(
   script: string,
   options: AppleScriptOptions = {}
 ): AppleScriptResult {
-  // Per-call options win; then process-wide env knobs; then built-in defaults.
+  // Per-call options win; then a tool call's timeoutSeconds override; then
+  // process-wide env knobs; then built-in defaults.
   const timeoutMs =
-    options.timeoutMs ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
+    options.timeoutMs ??
+    callTimeoutMs() ??
+    envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ??
+    DEFAULT_TIMEOUT_MS;
   const maxRetries =
     options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs =

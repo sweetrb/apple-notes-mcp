@@ -6,10 +6,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<unknown>>());
+const configs = vi.hoisted(() => new Map<string, unknown>());
 const manager = vi.hoisted(() => ({
   createNote: vi.fn(),
   getNoteById: vi.fn(),
   getNoteContentById: vi.fn(),
+  deleteNoteByIdIfUnchanged: vi.fn(),
+  listNoteRefsDetailed: vi.fn(),
 }));
 
 vi.mock(import("@modelcontextprotocol/sdk/server/mcp.js"), async (importOriginal) => ({
@@ -17,8 +20,10 @@ vi.mock(import("@modelcontextprotocol/sdk/server/mcp.js"), async (importOriginal
   McpServer: vi.fn().mockImplementation(function () {
     return {
       registerTool: vi.fn(
-        (name: string, _config: unknown, cb: (args: unknown) => Promise<unknown>) =>
-          registered.set(name, cb)
+        (name: string, config: unknown, cb: (args: unknown) => Promise<unknown>) => {
+          configs.set(name, config);
+          registered.set(name, cb);
+        }
       ),
       resource: vi.fn(),
       prompt: vi.fn(),
@@ -51,7 +56,11 @@ vi.mock("@/utils/noteRichText.js", async (importOriginal) => ({
   richContentHash: vi.fn(() => "sha256:plain"),
 }));
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createMarkdownNote } from "@/services/backgroundNotes.js";
+import { callTimeoutMs } from "@/utils/callTimeout.js";
 import { requireValidated } from "@/tools/nativeOperations.js";
 
 type Response = {
@@ -100,6 +109,30 @@ describe("create-note format markdown (#172)", () => {
       "Error creating note: create-note-markdown has not passed live background validation"
     );
     expect(createMarkdownNote).not.toHaveBeenCalled();
+  });
+
+  it("gates Markdown block constructs separately and leaves the existing subset ungated", async () => {
+    vi.mocked(requireValidated).mockImplementation((name: string) => {
+      if (name === "create-note-markdown-blocks")
+        throw new Error("create-note-markdown-blocks awaits a live readback");
+    });
+    const response = await createNote({
+      title: "Plan",
+      content: "- [ ] open task",
+      format: "markdown",
+    });
+    expect(requireValidated).toHaveBeenCalledWith("create-note-markdown-blocks");
+    expect(response.isError).toBe(true);
+    expect(createMarkdownNote).not.toHaveBeenCalled();
+    vi.mocked(createMarkdownNote).mockReturnValueOnce({ ok: true, id: "x" } as never);
+    await createNote({ title: "Plan", content: "## Goals", format: "markdown" });
+    expect(vi.mocked(requireValidated).mock.calls.map(([name]) => name)).toEqual([
+      "create-note-markdown",
+      "create-note-markdown-blocks",
+      "create-note-markdown",
+    ]);
+    expect(createMarkdownNote).toHaveBeenCalledTimes(1);
+    vi.mocked(requireValidated).mockReset();
   });
 
   it("refuses tags before the gate or any write", async () => {
@@ -174,5 +207,280 @@ describe("create-note format markdown (#172)", () => {
     expect(response.structuredContent).toMatchObject({ ok: true, verified: true });
     expect(requireValidated).not.toHaveBeenCalled();
     expect(createMarkdownNote).not.toHaveBeenCalled();
+  });
+});
+
+const created = (id = "x-coredata://ABCDEF/ICNote/p4") => {
+  manager.createNote.mockReturnValueOnce({ id, title: "Plan" });
+  manager.getNoteById.mockReturnValueOnce({ id, title: "Plan" });
+  manager.getNoteContentById.mockReturnValueOnce("<div>Plan</div>");
+};
+
+describe("create-note content sources", () => {
+  let dir: string;
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "create-note-source-"));
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("reads the body from contentPath", async () => {
+    const file = join(dir, "body.txt");
+    writeFileSync(file, "\uFEFFFrom a file\nsecond line");
+    created();
+    const response = await createNote({ title: "Plan", contentPath: file });
+    expect(response.isError).toBeUndefined();
+    expect(manager.createNote).toHaveBeenCalledWith(
+      "Plan",
+      "From a file\nsecond line",
+      [],
+      undefined,
+      undefined,
+      "plaintext"
+    );
+  });
+
+  it("requires exactly one of content and contentPath", async () => {
+    for (const args of [{}, { content: "x", contentPath: join(dir, "body.txt") }]) {
+      const response = await createNote({ title: "Plan", ...args });
+      expect(response.isError).toBe(true);
+      expect(response.content[0].text).toMatch(/exactly one of content or contentPath/);
+    }
+    expect(manager.createNote).not.toHaveBeenCalled();
+  });
+
+  it("refuses a content file outside the allowed roots before any write", async () => {
+    const response = await createNote({ title: "Plan", contentPath: "/etc/hosts" });
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/outside allowed locations/);
+    expect(manager.createNote).not.toHaveBeenCalled();
+  });
+
+  it("refuses markdownRoute for a non-Markdown format", async () => {
+    const response = await createNote({ title: "Plan", content: "x", markdownRoute: "html" });
+    expect(response.content[0].text).toMatch(/markdownRoute applies to format "markdown" only/);
+    expect(manager.createNote).not.toHaveBeenCalled();
+  });
+});
+
+describe("create-note Markdown title heading and HTML route", () => {
+  it("strips an exact duplicate title heading before the Shortcut import", async () => {
+    vi.mocked(createMarkdownNote).mockReturnValueOnce({
+      ok: true,
+      id: "x-coredata://ABCDEF/ICNote/p5",
+      title: "Plan",
+      folder: undefined,
+      account: "iCloud",
+      contentHash: "sha256:created",
+      verified: true,
+    });
+    const response = await createNote({
+      title: "Plan",
+      content: "# Plan\n\n## Goals",
+      format: "markdown",
+    });
+    expect(createMarkdownNote).toHaveBeenCalledWith(manager, {
+      title: "Plan",
+      content: "## Goals",
+      folder: undefined,
+    });
+    expect(response.structuredContent).toMatchObject({ strippedDuplicateTitle: true });
+  });
+
+  it("keeps a first heading that differs from the title", async () => {
+    vi.mocked(createMarkdownNote).mockReturnValueOnce({ ok: true, id: "x" } as never);
+    const response = await createNote({
+      title: "Plan",
+      content: "# plan\n\nbody",
+      format: "markdown",
+    });
+    expect(vi.mocked(createMarkdownNote).mock.calls[0][1].content).toBe("# plan\n\nbody");
+    expect(response.structuredContent).not.toHaveProperty("strippedDuplicateTitle");
+  });
+
+  it("refuses Markdown that holds only the title heading", async () => {
+    const response = await createNote({ title: "Plan", content: "# Plan\n", format: "markdown" });
+    expect(response.content[0].text).toMatch(/only the title heading/);
+    expect(createMarkdownNote).not.toHaveBeenCalled();
+  });
+
+  it("creates through AppleScript HTML with visible task glyphs on the html route", async () => {
+    created();
+    const response = await createNote({
+      title: "Plan",
+      content: "# Plan\n\n## Goals\n- [ ] draft\n- [x] **review**\n- plain",
+      format: "markdown",
+      markdownRoute: "html",
+      account: "Work",
+      tags: ["kept"],
+    });
+    expect(response.isError).toBeUndefined();
+    expect(manager.createNote).toHaveBeenCalledWith(
+      "Plan",
+      "<h2>Goals</h2><ul><li>☐ draft</li><li>☑ <b>review</b></li><li>plain</li></ul>",
+      ["kept"],
+      undefined,
+      "Work",
+      "html"
+    );
+    expect(requireValidated).not.toHaveBeenCalled();
+    expect(createMarkdownNote).not.toHaveBeenCalled();
+    expect(response.structuredContent).toMatchObject({
+      ok: true,
+      verified: true,
+      taskItemsRendered: 2,
+      strippedDuplicateTitle: true,
+    });
+    expect(response.content[0].text).toMatch(/2 task item\(s\) were rendered as visible/);
+  });
+});
+
+describe("per-call timeoutSeconds", () => {
+  it("scopes the override to the automation steps of one call", async () => {
+    const seen: Array<number | undefined> = [];
+    manager.createNote.mockImplementationOnce(() => {
+      seen.push(callTimeoutMs());
+      return { id: "x-coredata://ABCDEF/ICNote/p6", title: "Plan" };
+    });
+    manager.getNoteById.mockReturnValueOnce({ id: "x-coredata://ABCDEF/ICNote/p6", title: "P" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Plan</div>");
+    await createNote({ title: "Plan", content: "x", timeoutSeconds: 7 });
+    expect(seen).toEqual([7000]);
+    expect(callTimeoutMs()).toBeUndefined();
+  });
+
+  it("is advertised on every public note write", () => {
+    for (const name of [
+      "create-note",
+      "update-note",
+      "append-to-note",
+      "delete-note",
+      "move-note",
+    ]) {
+      const config = configs.get(name) as {
+        inputSchema: Record<string, { safeParse: (v: unknown) => { success: boolean } }>;
+      };
+      expect(config.inputSchema.timeoutSeconds.safeParse(120).success).toBe(true);
+      expect(config.inputSchema.timeoutSeconds.safeParse(0).success).toBe(false);
+      expect(config.inputSchema.timeoutSeconds.safeParse(121).success).toBe(false);
+      expect(config.inputSchema.timeoutSeconds.safeParse(1.5).success).toBe(false);
+    }
+  });
+});
+
+describe("delete-note placement check", () => {
+  it("reports a delete that left the note in its folder as not deleted", async () => {
+    const id = "x-coredata://ABCDEF/ICNote/p7";
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Plan" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Plan</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "not-deleted" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/still in its original folder.*Nothing was deleted/);
+  });
+});
+
+describe("Recently Deleted handling (#198, #207)", () => {
+  const id = "x-coredata://ABCDEF/ICNote/p8";
+
+  it("delete-note refuses a note already in Recently Deleted", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "in-recently-deleted" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(
+      /"Old" is already in Recently Deleted.*permanently.*Nothing was deleted/
+    );
+  });
+
+  it("batch-delete-notes refuses a note already in Recently Deleted", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "in-recently-deleted" });
+    const response = (await registered.get("batch-delete-notes")!({
+      notes: [{ id, expectedContentHash: "sha256:plain" }],
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/0 succeeded, 1 failed/);
+    expect(response.content[0].text).toMatch(/already in Recently Deleted/);
+  });
+
+  it("delete-note refuses a note whose folder cannot be read, with a retry hint", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "container-unknown" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(
+      /Could not read which folder note "Old" is in.*Nothing was deleted.*Retry/
+    );
+  });
+
+  it("batch-delete-notes refuses a note whose folder cannot be read", async () => {
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Old" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Old</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "container-unknown" });
+    const response = (await registered.get("batch-delete-notes")!({
+      notes: [{ id, expectedContentHash: "sha256:plain" }],
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/0 succeeded, 1 failed/);
+    expect(response.content[0].text).toMatch(/Could not read which folder.*Retry/);
+  });
+
+  it("list-notes excludes Recently Deleted by default and reports the skip", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({
+      refs: [{ title: "Live", id }],
+      excludedRecentlyDeleted: 2,
+    });
+    const response = (await registered.get("list-notes")!({})) as Response;
+    expect(manager.listNoteRefsDetailed).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false
+    );
+    expect(response.structuredContent?.excludedRecentlyDeleted).toBe(2);
+    expect(response.content[0].text).toMatch(/Skipped 2 note\(s\) in Recently Deleted/);
+  });
+
+  it("list-notes reports the skip even when nothing else is listed", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({ refs: [], excludedRecentlyDeleted: 1 });
+    const response = (await registered.get("list-notes")!({
+      folder: "Recently Deleted",
+    })) as Response;
+    expect(response.structuredContent).toMatchObject({ count: 0, excludedRecentlyDeleted: 1 });
+    expect(response.content[0].text).toMatch(/No notes found.*\n\nSkipped 1 note/s);
+  });
+
+  it("list-notes flags Recently Deleted notes when asked to include them", async () => {
+    manager.listNoteRefsDetailed.mockReturnValueOnce({
+      refs: [{ title: "Gone", id, inRecentlyDeleted: true }],
+      excludedRecentlyDeleted: 0,
+    });
+    const response = (await registered.get("list-notes")!({
+      includeRecentlyDeleted: true,
+    })) as Response;
+    expect(manager.listNoteRefsDetailed).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    const notes = response.structuredContent?.notes as Array<Record<string, unknown>>;
+    expect(notes[0]).toMatchObject({ id, inRecentlyDeleted: true });
+    expect(response.content[0].text).toContain("Gone [RECENTLY DELETED]");
+    expect(response.structuredContent).not.toHaveProperty("excludedRecentlyDeleted");
   });
 });

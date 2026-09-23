@@ -143,12 +143,43 @@ treat them as version-specific and feature-detect with `PRAGMA table_info` befor
 | `ZISPINNED` | Pinned state (boolean) | AppleScript has no `pinned` property, so this is the only read path for pin state |
 | `ZHASCHECKLIST`, `ZHASCHECKLISTINPROGRESS` | Whether a note has a checklist, and whether any item is still unchecked | Cheap flags without decoding the body |
 | `ZISRECOVERINGFROMTRASH` | Trash / recovery state | Distinguishes a recently deleted note |
-| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | Smart Folders are otherwise not scriptable |
+| `ZSMARTFOLDERQUERYJSON` | Smart Folder query as JSON | The rules are not scriptable. AppleScript can still list a smart folder's current notes by folder id (`notes of folder id "…/ICFolder/pN"`, verified macOS 27.2, Notes 4.13); `list-smart-folders` uses both |
 | `ZSNIPPET`, `ZWIDGETSNIPPET` | Preview snippet text | Fast preview without reading the full body |
 | `ZISPASSWORDPROTECTED`, `ZLOCKEDNOTESMODE`, `ZPASSWORDHINT` | Lock state and hint | Richer than AppleScript's single `password protected` boolean |
 | `ZFOLDERTYPE`, `ZCROPPINGQUAD*` | Folder kind; document-scan crop geometry | Smart vs regular folder; scan bounds |
 
-#### Exact modification checkpoints (`list-recent-notes`)
+#### Listing special sets (`list-special-notes`, `list-native-tags` inventory)
+
+Each listing is one read-only transaction over the same table. Column detection
+(`PRAGMA table_info`) and the folder/account context used to label rows are
+separate `sqlite3 -readonly` runs, so paths and account names can come from a
+slightly different snapshot than the rows. Findings from a
+live macOS 27 store (counts only):
+
+- **Quick Notes** carry `ZISSYSTEMPAPER = 1`. The column arrived with Quick Notes
+  (macOS 12); without it the listing reports `supported: false`. Many flagged rows have
+  no folder, a NULL title, and a NULL modification date. They are abandoned drafts
+  Notes.app never shows (111 folderless note rows on the test store, all untitled), so
+  every "active note" listing requires a folder. All 15 Quick Notes the listing returned
+  also appeared in AppleScript's `list-notes`, confirming the filter.
+- **Recently Deleted** is a folder, not a flag: `ZFOLDERTYPE = 1` with an identifier
+  that starts `TrashFolder`. The reader accepts either signal, so a store without
+  `ZFOLDERTYPE` still works. Rows with `ZMARKEDFORDELETION = 1` are tombstones awaiting
+  sync and are left out. `ZISRECOVERINGFROMTRASH` is not a trash marker.
+- **Accounts** hang off a numbered `ZACCOUNTn` column whose number differs by entity and
+  release (notes use `ZACCOUNT7` on macOS 27). The reader takes the folder's `ZOWNER`
+  first and otherwise coalesces every present `ZACCOUNTn`, joined against `ICAccount`
+  rows so a column belonging to another relation cannot match.
+- **Native tags** are `ICHashtag` rows plus one `ICInlineAttachment` per use
+  (`ZTYPEUTI1 = com.apple.notes.inlinetextattachment.hashtag`, `ZNOTE1` = note,
+  `ZALTTEXT` = `#tag`). A use counts only while the note body still references that
+  inline object's identifier (attribute run field 12). Locked or undecodable bodies are
+  counted from the object rows and reported as `unverifiedNotes`.
+- Values are bound with the sqlite3 shell's `.parameter set`; entity numbers come from
+  `Z_PRIMARYKEY`; note ids are rebuilt as `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`,
+  which matched every AppleScript id checked.
+
+#### Exact sync cursors (`list-recent-notes`)
 
 `ZMODIFICATIONDATE1` is a Core Data double: seconds since 2001-01-01 UTC with
 sub-microsecond fraction bits. Every text path out of SQLite rounds it:
@@ -157,32 +188,104 @@ reliable either, and a JavaScript `Date` keeps only milliseconds. So neither an
 ISO string nor a decimal can serve as an exact incremental-sync boundary.
 
 The sqlite3 command-line shell ships the `ieee754` extension. The reader selects
-`hex(ieee754_to_blob(ZMODIFICATIONDATE1))`, the raw big-endian IEEE-754 bits, and
-emits them as an opaque `cdts1:<16 hex>` token. A `since` token is validated,
-decoded to a finite double, re-encoded canonically, and bound with
-`.parameter set @since ieee754_from_blob(x'…')`, so the comparison
-`ZMODIFICATIONDATE1 > @since` runs against the identical double. A fixture test
-stores two timestamps one unit in the last place apart, which render to the
-same ISO string, and shows the token separates them. On a live store, listing
-from the tenth-newest note's token returned exactly the nine newer notes.
+`hex(ieee754_to_blob(ZMODIFICATIONDATE1))`, the raw big-endian IEEE-754 bits,
+and pairs them with the row's `Z_PK` in an opaque `cdts1:<16 hex>:<Z_PK>`
+cursor. A `since` cursor is validated, decoded to a finite double, re-encoded
+canonically, and bound with `.parameter set @since ieee754_from_blob(x'…')`,
+so the comparison runs against the identical double. A fixture test stores two
+timestamps one unit in the last place apart, which render to the same ISO
+string, and shows the cursor separates them.
 
-Because a listing returns the newest `limit` matches, a result with
-`count == limit` may have skipped older matches after the boundary. Callers
-repeat from the same boundary with a larger limit and advance only after a
-result that was not saturated.
+A `since` query walks the notes in ascending `(ZMODIFICATIONDATE1, Z_PK)` order
+and keeps rows strictly after the cursor:
+`ZMODIFICATIONDATE1 > @since OR (ZMODIFICATIONDATE1 = @since AND Z_PK > @sincePk)`.
+`nextSince` is the last row's cursor, so every call advances, including one
+that fills its `limit`. `Z_PK` breaks ties: notes sharing one stored
+timestamp are split across pages by key and none is skipped or repeated. An
+ISO `since`, or a cursor without the key, keeps only rows whose timestamp is
+strictly later. Rows with no modification date never match a `since` query.
 
-AppleScript's per-account note enumeration includes notes in Recently Deleted.
-On the test store (2026-09-23) `list-notes` returned 735 ids: all 449 active
-notes and all 286 notes the database places in Recently Deleted.
+Limits of a modification-date cursor:
+
+- **Late-arriving edits.** iCloud can deliver an edit made on another device
+  after the cursor has moved past that edit's timestamp, for example when the
+  device was offline or its clock was behind. The row then carries a timestamp
+  at or before the cursor and is never returned. A periodic full pass from the
+  beginning catches these.
+- **Deletions.** Without `includeDeleted`, notes in Recently Deleted or
+  awaiting deletion are filtered out, so a deletion looks like silence. With
+  it, those rows appear, flagged, when their modification date is after the
+  cursor. A note purged from the database has no row, so no cursor query can
+  report it; compare ids against a full pass instead.
 
 Reading these is safe under the existing rules: copy the three database files first, open
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
 To *change* pin state or tags, use the Shortcuts bridge (below), not a SQL `UPDATE`.
 
+### query-notes Data Sources
+
+`query-notes` (`src/utils/noteQuery.ts` for the grammar, `src/utils/noteQueryStore.ts`
+for the reader) evaluates every predicate from the database, read-only, in two
+`sqlite3 -readonly` calls: `PRAGMA table_info` for feature detection, then one
+`BEGIN … COMMIT` read transaction. Entity numbers are looked up by name in
+`Z_PRIMARYKEY` (`ICNote`, `ICFolder`, `ICAccount`) because they differ between
+stores. The sources below were checked against a live store on macOS 27.2 on
+2026-09-23:
+
+| Predicate | Source |
+|-----------|--------|
+| Note id | `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`; the UUID matched AppleScript's `id of note` |
+| Title, dates | `ZTITLE1`; `ZMODIFICATIONDATE1`; `COALESCE(ZCREATIONDATE3, ZCREATIONDATE1)` (Core Data seconds since 2001-01-01 UTC) |
+| Folder, path | note `ZFOLDER` → folder `ZTITLE2`, walked up `ZPARENT` |
+| Account | folder `ZOWNER` (inherited from the parent) → account `ZNAME` |
+| Recently Deleted | folder `ZFOLDERTYPE = 1` (identifier `TrashFolder-…`); also `ZMARKEDFORDELETION` and `ZFOLDER IS NULL` |
+| `pinned`, `locked` | `ZISPINNED`, `ZISPASSWORDPROTECTED` |
+| `shared` | `ZSERVERSHAREDATA IS NOT NULL` on the note or any ancestor folder. On the live store this set equalled AppleScript's `shared` set exactly |
+| Text, words, links, checklists, attachments | The gzipped `ZICNOTEDATA.ZDATA` document, decoded per note: text (field 2), attribute-run links (field 9), `AttachmentInfo` type UTIs (field 12.2), checklist style 103 with done state (field 2.5.2) |
+| `tag:` | `ICInlineAttachment` rows with `ZTYPEUTI1 = 'com.apple.notes.inlinetextattachment.hashtag'`, `ZNOTE1` = note, `ZALTTEXT` = `#tag`, counted only when their `ZIDENTIFIER` is still an object in the body |
+
+Facets come from the body's `AttachmentInfo` types rather than from `ICAttachment`
+rows, because rows outlive their objects: on the live store, some top-level
+attachment rows (tables and URL previews) were no longer referenced by any note
+body, while every referenced row's UTI equalled the body's UTI. The UTI mapping is
+`public.url` and inline note links → `has:link` (as are attribute-run links);
+`com.apple.notes.table` → `has:table`; `com.apple.paper.doc.scan` and the legacy
+`com.apple.notes.gallery` → `has:scan`; `com.adobe.pdf` and `com.apple.paper.doc.pdf`
+→ `has:pdf`; `com.apple.paper` and the legacy `com.apple.drawing*` /
+`com.apple.notes.sketch` → `has:drawing`; image, video, and audio UTIs → their
+facet. Every non-inline object except a table also counts as `has:attachment`.
+`has:video` and `tag:` are verified against fixtures only; the store used for
+live verification had no video attachments or native tags.
+
+Password-protected notes store an encrypted `ZDATA`, so only title and metadata
+predicates can match them.
+
 ---
 
 ## Protobuf Data Format
+
+### search-notes Body Search
+
+`search-notes` with `searchContent: true` goes through the same reader
+(`src/utils/searchContentDb.ts`) before it asks Notes.app. AppleScript's
+`notes where body contains "…"` makes Notes.app render and scan every body before
+the result loop starts, so `limit` cannot bound it and a broad term ("the") times
+out at 30 s even on an ordinary library (#100). The database path builds the query
+AST directly — the caller's text is one literal `text` term, never tokenized, so
+`title:`, `OR`, `-` and quotes in it are searched literally — plus `folder:`,
+`account:` and a `modified >=` node for the other parameters. With no `account`,
+it scopes to Notes.app's default account, as the AppleScript path does. It scans
+the 5000 most recently modified notes (`QUERY_SCAN.MAX`) and discloses a truncated
+window; `limit` is applied as given, not capped at query-notes' 500.
+
+Differences from the AppleScript path, by design: text is matched against the
+decoded plain text (title line included) instead of the HTML `body`, so markup
+never matches; Recently Deleted and folderless notes are excluded, as in
+list-notes; `folder` in results is the list-folders path, not only the leaf name.
+Any `NoteQueryStoreError` (no Full Disk Access, unknown schema, sqlite failure)
+falls back to AppleScript, and a fallback timeout names Full Disk Access as the fix
+when that was why the database was skipped.
 
 ### Document Structure
 
@@ -296,6 +399,18 @@ The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Eac
 ### CRDT Implementation
 
 Tables and collaborative editing use Conflict-Free Replicated Data Types (CRDTs). Apple uses "topotext" for synchronization with first-write-wins conflict resolution via iCloud.
+
+### Stored Audio Transcripts (verified macOS 27)
+
+Notes stores the transcript it computes for an audio recording on the recording's attachment row (`ZTYPEUTI = 'com.apple.m4a-audio'`, `ZPARENTATTACHMENT IS NULL`) in `ZICCLOUDSYNCINGOBJECT.ZMERGEABLEDATA1`. Unlike table data, the blob is plain protobuf, not gzipped. Its root holds the object entries (field 3), the key names (4), the type names (5) and the UUIDs (6). The dedicated columns `ZTEMPORARYTRANSCRIPTDATA` and `ZSUMMARY` were empty on every audio row checked. `get-audio-transcripts` decodes the blob as follows:
+
+- One `com.apple.notes.ICTTAudioRecording` custom map (entry field 13). Its `fragments` key points to a list (entry field 5) of `ICTTAudioRecording.Fragment` maps.
+- Each fragment's `identity` is the `ZIDENTIFIER` of a child attachment (`public.mpeg-4-audio`, `ZPARENTATTACHMENT` = the recording). The child row carries that take's `ZDURATION`. The parent's `ZDURATION` was 0 on some recordings, so the tool falls back to the sum of the child durations.
+- A fragment's `transcript` points to an ordered set in entry field 15. Field 15.1 holds a topotext note plus `{1: index, 2: 16-byte UUID}` pairs that give the order. Field 15.2 is a dictionary from an `NSUUID` map (whose `UUIDIndex` points into root field 6) to a segment object.
+- Each `ICTTTranscriptSegment` is one recognized word. `text` and `speaker` are registers (entry field 1) that point to an `NSString` map (`self`, field 4). `timestamp` and `duration` point to an `NSNumber` map (`doubleValue`, a little-endian fixed64 double in field 3, in seconds). Words usually carry their own leading space.
+- `summary` and `topLineSummary` are registers that point to a topotext note (entry field 10). They are empty unless Notes generated a summary.
+
+On the test library, 6 of 6 recordings decoded, each with one fragment. Timestamps in ordering-index order are mostly monotonic, with small backward steps where speakers overlap. Recordings with several fragments were not available, so fragment concatenation in list order is covered by synthetic fixtures only.
 
 ---
 

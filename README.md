@@ -56,7 +56,7 @@ Install as a Claude Code plugin for automatic configuration and enhanced AI beha
 
 This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
 
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
+On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** (under Claude Desktop, to the Node binary that runs the server; from a terminal, to the terminal app) to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
 
 Native tag, checklist, table, pin, and rich append operations use two packaged
 Apple Shortcuts. A third, `Apple Notes MCP - Create Markdown Note`, is optional:
@@ -160,6 +160,7 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 |---------|-------------|
 | **Create Notes** | Create notes with titles, content, and optional folder/account targeting |
 | **Search Notes** | Find notes by title or search within note content |
+| **Query Language** | `query-notes` combines text, folder, account, tag, attachment, checklist, flag, word-count, and date conditions with AND/OR/NOT, read from the Notes database (requires Full Disk Access) |
 | **Read Notes** | Retrieve note content and metadata |
 | **Update Notes** | Modify existing notes (title and/or content) |
 | **Delete Notes** | Remove notes (moves to Recently Deleted) |
@@ -168,8 +169,9 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account, including account IDs and default folders |
 | **Batch Operations** | Delete or move multiple notes at once |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
+| **Audio Transcripts** | Read the transcripts and summaries Notes stored for audio recordings (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
-| **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
+| **Attachments** | List attachments with their on-disk asset and preview paths, find a note's lead image, save or batch-export them to disk, or fetch their bytes as base64 |
 | **Notes.app UI State** | Reveal a note in Notes.app or read the current Notes.app selection |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
@@ -200,6 +202,49 @@ for the investigation and verification behind each:
 
 This section documents all available tools. AI agents should use these tool names and parameters exactly as specified.
 
+### Identifier forms
+
+Every tool that takes a note id (`id`, `noteId`, `ids`, `linkedNoteId`, or the `id` inside a batch entry) accepts any of three forms of the same note:
+
+| Form | Example shape | Needs Full Disk Access |
+|------|---------------|------------------------|
+| AppleScript id (canonical) | `x-coredata://<store-uuid>/ICNote/p123` | No |
+| Notes UUID (`identifier`) | `8-4-4-4-12` hex digits, as in `notes://showNote?identifier=` links | Yes |
+| Numeric Core Data key | `123` (the digits after `p`) | Yes |
+
+The server turns a UUID or numeric key into the canonical id before the tool runs, reading the Notes database read-only. A numeric key or UUID resolves only to a note, never to a folder or attachment. Without Full Disk Access those two forms fail with an error that says so, while `x-coredata` ids keep working as before. Folder-id inputs (`show-folder`, `get-folder-by-id`, `rename-folder`) accept a folder's UUID or numeric key the same way, resolving only to folders.
+
+When Full Disk Access is granted, list and read tools also return stable identifiers next to each `id`: notes carry `identifier`, `folderIdentifier`, and `accountIdentifier`; folders carry `identifier`, `parentIdentifier` (nested folders only), and `accountIdentifier`; accounts carry `identifier`. These fields come from one batched read-only query per call and are omitted when the database cannot be read. Tools that return them: `search-notes`, `list-notes`, `get-selected-notes`, `list-shared-notes`, `get-note-content`, `get-note-by-id`, `get-note-details`, `list-folders`, `get-folder-by-id`, `list-accounts`, and `get-default-location`.
+
+### Error results
+
+A failed call returns `isError: true` with the same human-readable text as
+before, plus `structuredContent` carrying a stable machine-readable `code`.
+Branch on `code`, not on the prose, which may be reworded.
+
+| `code` | Meaning |
+|--------|---------|
+| `not_found` | The note, folder, account, attachment, or checklist does not exist |
+| `ambiguous` | More than one item matched; use an exact id |
+| `permission_denied` | macOS refused Automation access to Notes.app |
+| `full_disk_access_missing` | The Notes database is not readable; grant Full Disk Access |
+| `shortcut_not_installed` | A native-write bridge Shortcut is not installed exactly once |
+| `timeout_indeterminate` | The operation timed out; for a write, the outcome is unknown |
+| `verification_failed` | The write ran, but exact-ID readback did not confirm it |
+| `revision_conflict` | The note changed since it was read |
+| `validation_error` | The request was rejected before anything ran |
+| `unsupported` | Not supported for this note or in this mode, such as a locked note |
+| `notes_unavailable` | Notes.app is not running, busy, or not responding |
+| `operation_failed` | The server could not classify the failure; read the text |
+
+Two optional booleans describe a write's outcome when it is known.
+`indeterminate: true` means the outcome is uncertain: read the target by exact
+id before any retry, and never retry blindly. `committed: true` means the write
+took effect even though its verification failed; `committed: false` means
+nothing was written (for example a `revision_conflict`). An absent flag means
+unknown. Errors the MCP SDK raises itself before a tool runs, such as an
+argument that fails the input schema, carry no `structuredContent`.
+
 ### Note Operations
 
 #### `create-note`
@@ -209,11 +254,14 @@ Creates a new note in Apple Notes.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
-| `content` | string | Yes | The body content of the note (do not repeat the title here) |
+| `content` | string | One of `content`/`contentPath` | The body content of the note (do not repeat the title here) |
+| `contentPath` | string | One of `content`/`contentPath` | Absolute path of a local UTF-8 file to use as the body instead of `content`. Allowed in the same places [`save-attachment`](#save-attachment) may write (home, temp, `/Volumes`); symbolic links, non-regular files, invalid UTF-8 and files over 1 MiB are refused before anything is written. A leading byte-order mark is dropped |
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags). Refused with `format: "markdown"` |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
+| `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
+| `timeoutSeconds` | number | No | Whole seconds, 1–120, for each Notes.app automation step this call runs; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only. A timed-out write is uncertain, not failed: read the note by id before any retry. Also accepted by `update-note`, `append-to-note`, `delete-note` and `move-note` |
 
 **Example (tagged with inline hashtags):**
 ```json
@@ -284,13 +332,42 @@ title line, with no seed line.
   It also refuses Markdown that Notes would rewrite and the server could not
   verify: `_` emphasis (underscores inside a word, as in `snake_case`, and
   inside a link destination, as in `[docs](https://example.com/_next/static)`,
-  are fine), backslash escapes, character references such as `&amp;`, `---` or
-  `===` lines, indented headings or list items, `1)` lists, closing `#`s, and
+  are fine), backslash escapes, character references such as `&amp;`, `===` lines
+  and rule lines other than the `---` divider described below, indented headings or list items, `1)` lists, closing `#`s, and
   formatting inside link labels. Content that needs one of these literally, such
   as a `/_next` path or a literal `\*`, has no Markdown form here: use
   `format: "html"` for that note (or `append-native` with `format: "html"` on an
   existing one), which keeps the characters but not the Heading and Subheading
   styles. Markdown punctuation in `title` is escaped, so the title stays literal.
+- Notes' importer also maps these block constructs to native styles. They are
+  gated separately, and `get-capabilities` reports them as
+  `create-note-markdown-blocks`. Each mapping below was live-verified on
+  macOS 27.2 by reading the created note's stored styles.
+
+  | Markdown | Native result |
+  |----------|---------------|
+  | `- [ ] item` / `- [x] item` | Checklist item, unchecked / checked |
+  | `> text` (consecutive lines form one quote) | Body paragraph with a block quote |
+  | A fence of bare ```` ``` ```` lines (no language) | Monospaced paragraphs; the code text is kept literally |
+  | `---` on its own line, after a blank line | Divider line |
+  | `` `inline code` `` | **Highlighted** text, not monospace |
+
+  Constructs Notes would not render faithfully, or that this server cannot yet
+  verify, are refused before anything is created: `~~~` fences, a language
+  after the opening fence, nested (`>>`) or indented quotes, lists or headings
+  inside a quote, a quote followed directly by text (Markdown would join that
+  text to the quote), `---` directly under text (Markdown would make that text
+  a heading), `***`/`___`/`----` rules, `[X]`, `* [ ]` or `+ [ ]` items, checklist
+  items directly next to ordinary list items, inline code padded with spaces or
+  inside a link label, tables, and `~~strikethrough~~`. The readback checks the
+  block-quote text, the Monospaced text, each checklist item's text and done
+  state, the divider count, and the highlighted text. These mappings apply to
+  the default Shortcut route only; see
+  [Markdown through HTML](#markdown-through-html) for `markdownRoute: "html"`.
+- [`append-native`](#append-native)'s `format: "markdown"` refuses all of the
+  constructs above: its Shortcuts converter is a different one, which renders
+  a quote and a fenced block as plain body text, `- [ ]` as a bullet with
+  literal brackets, and inline code as plain text, and drops `---`.
 - The server finds the new note among the notes added to the default folder
   during the run by verifying each one's visible text, heading levels and links
   by exact-ID readback, and moves it only after exactly one verifies. On any
@@ -300,6 +377,37 @@ title line, with no seed line.
   as `create-note-markdown`. The Create Markdown Note Shortcut is optional and
   needed only for this format (macOS 26+); install and approve it as described in
   [`shortcuts/README.md`](shortcuts/README.md).
+- A first line that is exactly `# <title>` (same case and spacing as `title`) is
+  removed together with one blank line after it, because the title is supplied
+  separately; the response then carries `strippedDuplicateTitle: true`. A
+  different first heading stays in the body. This applies to both Markdown
+  routes, and Markdown that holds only that heading is refused.
+
+##### Markdown through HTML
+
+`markdownRoute: "html"` imports the same bounded Markdown subset without the
+Shortcut: the server converts it to HTML and creates the note through AppleScript,
+like `format: "html"`. It works in any account, accepts `tags`, and needs no
+Shortcut, but headings get the plain bold styling described in the known
+limitation above rather than real Heading and Subheading styles.
+
+On this route, bullet task items (`- [ ] item`, `- [x] item`) become ordinary
+list rows that start with a visible `☐` or `☑` character, and the response
+reports how many as `taskItemsRendered`. They are text, not native checkable
+checklist items. Use this route as the glyph fallback when the Shortcut is not
+installed or the note is outside iCloud. Block quotes, fenced code and inline code, which
+the Shortcut route maps natively, are refused on this route, and a `---` line
+stays literal text rather than becoming a divider.
+
+```json
+{
+  "title": "Weekly Review",
+  "contentPath": "/Users/me/Documents/weekly-review.md",
+  "format": "markdown",
+  "markdownRoute": "html",
+  "folder": "Work"
+}
+```
 
 **Returns:** Confirmation message with note title and ID. Save the ID for subsequent operations like `update-note`, `delete-note`, etc.
 
@@ -312,7 +420,7 @@ Searches for notes by title or content.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | string | Yes | Text to search for |
-| `searchContent` | boolean | No | If `true`, searches note body; if `false` (default), searches titles only |
+| `searchContent` | boolean | No | If `true`, searches note content (title line included); if `false` (default), searches titles only. With Full Disk Access, content search reads the Notes database (well under a second, the 5000 most recently modified notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on a broad term |
 | `account` | string | No | Account to search in (defaults to Notes.app's default account; exact or unique-prefix match) |
 | `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
@@ -343,7 +451,74 @@ Searches for notes by title or content.
 }
 ```
 
-**Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc.
+**Returns:** List of matching notes with titles, folder names, and IDs. Use the returned ID for subsequent operations like `get-note-content`, `update-note`, etc. A content search also returns `source` (`"database"` or `"applescript"`), and `scanTruncated` when the database path left older notes unsearched.
+
+---
+
+#### `query-notes`
+
+Finds notes with a boolean query expression evaluated against the NoteStore
+database, read-only. Because it does not go through AppleScript, a query over
+several hundred notes typically returns in well under a second, and one call
+can match titles and bodies together.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)). Without it, use `search-notes`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Query expression (syntax below), at most 2000 characters |
+| `limit` | number | No | Maximum notes to return. Defaults to 50, maximum 500. The response reports the total match count. |
+| `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 5000. The response says when older notes were left unscanned. |
+| `includeDeleted` | boolean | No | Also scan notes in Recently Deleted, notes pending deletion, and folderless notes. Defaults to `false`. |
+
+**Syntax:**
+
+| Form | Matches |
+|------|---------|
+| `budget`, `"quarterly budget"` | Title or body contains the word or phrase (case-insensitive substring) |
+| `title:x`, `body:x`, `text:x` | Title only, body only (text after the first line), or either |
+| `folder:Work`, `folder:"Work/Clients"` | The note's own folder, by name or full path, case-insensitive (notes in subfolders are not included); a literal `/` in a name can be written `\/` as in `list-folders` |
+| `account:iCloud` | Account name, case-insensitive |
+| `tag:finance` | Native Notes tag (with or without `#`); textual hashtags are ordinary words |
+| `has:link`, `has:attachment`, `has:checklist`, `has:drawing`, `has:image`, `has:video`, `has:audio`, `has:pdf`, `has:table`, `has:scan`, `has:tag` | The note body contains that kind of object |
+| `checklist:open`, `checklist:done` | At least one unchecked item; or items present and all checked |
+| `pinned`, `locked`, `shared` (or `is:pinned` …) | Note flags; `shared` includes notes in a shared folder |
+| `words:>250` | Word count, with `=`, `>`, `>=`, `<`, `<=` |
+| `created:>=2026-07-01`, `modified:<2026-09-01` | Dates as `YYYY-MM-DD` in local time, with the same operators; `=` means that whole day |
+| `a b`, `a AND b`, `a OR b`, `NOT a`, `-a`, `( … )` | AND is implicit and binds tighter than OR |
+
+Operators are case-insensitive. Quote an operator or flag word to search it
+literally, for example `"and"` or `"pinned"`. Queries are capped at 256 tokens
+and 64 levels of nesting. An unknown field such as `titel:x` is an error rather
+than a silent text search; quote it to search the literal text.
+
+Password-protected notes match on title and metadata only. Their bodies are
+encrypted, so body predicates never match them, and `-body:x` therefore does.
+Their snippets are always empty.
+
+**Example - Open to-dos in a folder:**
+```json
+{
+  "query": "folder:\"Work Projects\" has:checklist -checklist:done"
+}
+```
+
+**Example - Invoices or finance-tagged notes since July, scanning more history:**
+```json
+{
+  "query": "(title:invoice OR tag:finance) modified:>=2026-07-01",
+  "scanLimit": 2000,
+  "limit": 20
+}
+```
+
+**Returns:** Matching notes, most recently modified first, each with `id`,
+`title`, `folder`, `account`, `modified`, `created`, and a `snippet` centred on
+the first matched phrase. The ids are the same `x-coredata://…/ICNote/p…` form
+every other tool accepts. `structuredContent` also reports `matched` (total
+matches), `scanned`, `eligible`, `scanTruncated`, `truncated`, and `unreadable`
+(bodies that could not be decoded). A malformed query returns an error naming
+the problem and its position.
 
 ---
 
@@ -380,6 +555,11 @@ changed after this read. With Full Disk Access, embedded URLs omitted by
 AppleScript are restored and returned in `links`. The response also reports
 actual `nativeTags`, `richContentComplete`, and `writable`. Textual `hashtags`
 remain a separate field and are not proof that Notes registered native tags.
+`writable` is also false when the note uses formatting that AppleScript's HTML
+does not carry (superscript, subscript, non-left paragraph alignment, or
+highlight): a full-body `update-note` would silently drop it, so it is refused
+and the `warning` names the formatting. `append-to-note` with `scopeText` still
+works through the native path, which verifies existing formatting.
 
 **⚠️ The returned body can be lossy — do not write it back verbatim.** Inline
 base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
@@ -399,6 +579,28 @@ native tags, and native table data from one exact note ID. Table output includes
 stable row and column identifiers. `tableCellsComplete` is false when Notes
 metadata cannot be decoded completely. This tool is read-only and requires Full
 Disk Access.
+
+---
+
+#### `get-note-tables`
+
+Reads every native table in one exact note, in body order, from the NoteStore
+database. Each table is returned as GitHub-flavored Markdown and as JSON `rows`
+with stable `rowIds` and `columnIds`. Notes tables have no header row, so the
+Markdown uses the first row as the header. Pipes are escaped as `\|`,
+backslashes are doubled, and line breaks inside a cell become `<br>`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact note ID (`x-coredata://…/ICNote/pNNN`) |
+
+`tableCellsComplete` is false when any table or cell could not be decoded. A
+cell holding an embedded object is `null` in `rows`, listed in
+`incompleteCells`, and shown as `[undecoded cell]` in Markdown. A table whose
+data cannot be decoded at all has `complete: false`, a `reason`, and no rows.
+Cell text is never guessed. Links and styling inside cells are not rendered.
+A note without tables returns an empty `tables` list. This tool is read-only,
+requires Full Disk Access, and refuses password-protected notes.
 
 ---
 
@@ -434,11 +636,25 @@ stable code in brackets, such as `[encrypted]` or `[no-full-disk-access]`.
 
 #### `list-native-tags`
 
-Lists actual native Notes tags used within one explicit `account` and `folder`,
-mapping each tag to its matching note IDs. This differs from textual hashtag
-search. The response reports `complete: false` and per-note errors when some
-native metadata is unavailable. This tool is read-only and requires Full Disk
-Access.
+Lists actual native Notes tags. This differs from textual hashtag search. It is
+read-only and requires Full Disk Access.
+
+- **Folder mode** (pass `folder`, optionally `account`): maps each tag used in that
+  folder to its matching note IDs. The response reports `complete: false` and per-note
+  errors when some native metadata is unavailable.
+- **Inventory mode** (omit `folder`): an account-wide inventory with counts, read-only from the
+  database. `account` narrows it to one account; omit it to count every
+  account. Each `inventory` entry has `tag`, `noteCount` (distinct notes, Recently
+  Deleted excluded), per-account counts in `accounts`, and any other `spellings` Notes
+  treats as the same tag. Tags with no remaining notes are listed with `noteCount: 0`.
+  A tag counts for a note only while the note body still references it. Locked or
+  unreadable bodies are counted from the tag objects alone and reported through
+  `unverifiedNotes` and `complete: false`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `folder` | string | No | Folder to list (nested paths supported). Omit for the inventory |
+| `account` | string | No | Account name, exact or unique prefix |
 
 ---
 
@@ -516,9 +732,9 @@ Retrieves a note using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`) |
+| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`), or the note's Notes UUID or numeric key (see [Identifier forms](#identifier-forms)) |
 
-**Returns:** JSON with note metadata, or error if not found.
+**Returns:** JSON with note metadata, plus `identifier`, `folderIdentifier`, and `accountIdentifier` when Full Disk Access is granted, or error if not found.
 
 ---
 
@@ -528,7 +744,7 @@ Reveals a note in Notes.app using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`) |
+| `id` | string | Yes | The CoreData URL identifier (e.g., `x-coredata://...`), or the note's Notes UUID or numeric key |
 | `separately` | boolean | No | Open in a separate note window when supported by Notes.app |
 
 **Returns:** Confirmation that Notes.app accepted the show command.
@@ -547,6 +763,7 @@ Updates an existing note's content and/or title.
 | `newContent` | string | Yes | New content for the note body |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
 | `allowLinkChanges` | boolean | No | Set to `true` only when intentionally changing or removing existing links |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only updates are rejected because Apple Notes titles are not unique.
 
@@ -591,6 +808,7 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
@@ -603,7 +821,19 @@ was read, deletion is also rejected.
 }
 ```
 
-**Returns:** Confirmation message, or error if note not found.
+**Returns:** Confirmation message, or error if note not found. The delete and a
+check of the note's original folder run in one AppleScript: if Notes.app accepts
+the delete but the note is still listed in that folder, the call reports that
+nothing was deleted instead of claiming success.
+
+A note that is already in Recently Deleted is refused, because deleting it there
+removes it permanently. The folder is read live from Notes.app in the same
+AppleScript; the Recently Deleted folder is recognised by its database id (with
+Full Disk Access) or by its English name. The check fails closed: a note whose
+folder Notes.app reports as something other than a folder (as it does for a note
+trashed earlier in the same Notes session) is refused the same way, and a note
+whose folder cannot be read at all is refused with a message to retry. To remove
+such a note for good, do it in Notes.app.
 
 **⚠️ Safety:** Irreversible from the agent's side — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact id(s) being deleted.
 
@@ -617,6 +847,7 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only moves are rejected.
 
@@ -633,6 +864,35 @@ actual destination folder ID matches the requested folder.
 
 ---
 
+#### Folder scope guards
+
+`update-note`, `append-to-note`, `delete-note`, and `move-note` accept three
+optional folder preconditions. Use exact folder ids from `list-folders`.
+
+- `ifFolderId`: the note must currently be in exactly this folder.
+- `ifAncestorFolderId`: the note must be inside this folder or any of its
+  subfolders.
+- `forbiddenAncestorFolderIds` (up to 50): the note must not be inside any of
+  these folders or their subfolders. For `move-note`, the destination must not
+  be either.
+
+The checks read Notes.app's live folders inside the same AppleScript as the
+write, immediately before it, so a note moved after you reviewed it is left
+alone and the call fails with `Scope guard failed: …`. The one exception is a
+native append to a protected note (it runs through Shortcuts): there the check
+is a separate read just before the append, so it is not atomic.
+
+**Example - retire a note only while it is still in the inbox:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "ifFolderId": "x-coredata://ABC123/ICFolder/p12"
+}
+```
+
+---
+
 #### `append-to-note`
 
 Appends or prepends content to an existing note without replacing it. Always reads and writes as HTML, preserving all existing rich formatting.
@@ -642,9 +902,10 @@ Appends or prepends content to an existing note without replacing it. Always rea
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being extended |
 | `content` | string | Yes | Text to append to the note body |
-| `position` | string | No | `"after"` (default) appends to the end; `"before"` prepends to the start |
+| `position` | string | No | `"after"` (default) appends to the end; `"before"` inserts directly below the note's title line, so the title stays first |
 | `separator` | string | No | String placed between existing content and new content (default: two newlines → `<div><br></div>` in HTML) |
 | `format` | string | No | Format of the content being appended: `"plaintext"` (default) or `"html"` |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only appends are rejected.
 
@@ -693,6 +954,69 @@ Ordinary notes take the guarded HTML path and are not restricted to that subset.
 
 ---
 
+#### `insert-link`
+
+Adds one web, mail or Notes link to an exact note as its own paragraph, then
+proves it from the link runs Notes actually stored. Use `mode: "raw"` to show
+the URL itself, or `mode: "hyperlink"` with a `label` to show text that links to
+the URL. For a link to another note by id, use
+[`insert-note-link`](#insert-note-link), which looks up that note's real deep
+link.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+| `expectedContentHash` | string | Yes | `contentHash` from the exact note version being extended |
+| `url` | string | Yes | Absolute `http(s)` URL with a host, or a `mailto:`, `notes://` or `applenotes:` link. No spaces, `<`, `>` or `"` |
+| `mode` | string | No | `"raw"` (default) shows the URL; `"hyperlink"` shows `label` |
+| `label` | string | Hyperlink only | Visible text for `mode: "hyperlink"`; refused in raw mode |
+| `linked` | boolean | No | Raw mode only. `true` (default) stores a real link on the URL text. `false` writes plain text with no stored link |
+| `position` | string | No | `"end"` (default) or `"after-title"` (first paragraph under the title) |
+| `blankLine` | boolean | No | Leave a blank line between existing text and the link paragraph (default `true`) |
+| `scopeText` | string | Native-object notes only | Unique existing phrase, as for [`append-native`](#append-native) |
+
+**Example - Hyperlink under the title:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "url": "https://example.com/report",
+  "mode": "hyperlink",
+  "label": "Quarterly report",
+  "position": "after-title"
+}
+```
+
+**Returns:** `route` (`"applescript"` for ordinary notes, `"native"` for notes
+with native objects), `linkStored`, `storedUrl` (the destination read back from
+the note, for example `https://example.com/` for a bare origin), and the new
+`contentHash`.
+
+**Safety:** The same guards as [`append-to-note`](#append-to-note): a fresh
+`expectedContentHash`, the attachment block, and every existing link must
+survive. A linked insert must add exactly one stored link with the requested
+label and destination; if the text lands but that proof fails, the error says
+the write happened so it is not repeated.
+
+**Limits:**
+
+- Plain URL text is not linked by Notes when written this way. With
+  `linked: false`, the note stores no link and readers of the body see ordinary
+  text; Notes.app may still underline the URL on screen through its own data
+  detection. The result reports `linkStored: false`.
+- Notes with native objects (a table, a checklist, native tags) take the native
+  end-append path, so only `position: "end"` with `blankLine: true` works there.
+- The link always gets its own paragraph. Placing it at the end of one existing
+  paragraph, or inside the text, is not available.
+- Rich URL preview cards (the link tile Notes makes when you paste a URL) are
+  not produced. No public automation route creates one: the Shortcuts Notes
+  actions write text, and AppleScript's `body` has no card markup.
+- To start a new note with a link, use [`create-note`](#create-note) with
+  `format: "html"` and an `<a href>` in `content`; the link is stored the same
+  way.
+
+---
+
 #### `get-note-link`
 
 Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The URL opens the note in Notes.app on iOS and macOS and can be stored in Reminders tasks or shared links.
@@ -714,7 +1038,7 @@ Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The U
 
 **Returns:** `notes://showNote?identifier=<uuid>` URL string, plus the note id and title.
 
-**Note:** Requires Full Disk Access for the app that launches the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
+**Note:** Requires Full Disk Access for the process that runs the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
 
 ---
 
@@ -728,6 +1052,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 | `folder` | string | No | Filter to notes in this folder only (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of notes to return |
+| `includeRecentlyDeleted` | boolean | No | Also list notes in Recently Deleted, each flagged `inRecentlyDeleted: true` (default `false`) |
 
 **Example - All notes:**
 ```json
@@ -749,19 +1074,19 @@ Lists all notes, optionally filtered by folder, date, and limit.
 }
 ```
 
-**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`.
+**Returns:** List of notes as `{title, id}` pairs — `notes: Array<{title, id}>`, plus `count`. The human-readable line is `  - <title> [id: <id>]`. Notes in Recently Deleted are left out by default and counted in `excludedRecentlyDeleted` (present only when nonzero); with `includeRecentlyDeleted: true` they are listed with `inRecentlyDeleted: true` and a `[RECENTLY DELETED]` marker. Notes.app's own listing includes them, so the Recently Deleted folder is recognised by its database id (with Full Disk Access) or by its English name. With Full Disk Access each entry also carries `identifier`, `folderIdentifier`, and `accountIdentifier` (see [Identifier forms](#identifier-forms)).
 
 Use the returned `id` for any follow-up read/update/move/delete rather than re-resolving the title: titles are not unique, and a by-title lookup resolves a duplicated title to the same one note every time, silently skipping the others.
 
 > **Changed in 2.7.0:** `notes` was previously `string[]` (titles only). Callers that treated the array as strings must now read `.title`.
 
-For newest-first order, a strict boundary, exact change checkpoints, Recently Deleted, or word counts, use [`list-recent-notes`](#list-recent-notes).
+For date order, incremental sync cursors, Recently Deleted, or word counts, use [`list-recent-notes`](#list-recent-notes).
 
 ---
 
 #### `list-recent-notes`
 
-Lists notes newest first from the NoteStore database (read-only), with an exact checkpoint for incremental sync. Unlike `list-notes`, it orders by the stored modification time, can include Recently Deleted, and can count words.
+Lists notes from the NoteStore database (read-only) by stored modification time, with an exact cursor for incremental sync. With `since`, it pages through changes oldest first; without it, it shows the newest notes first. Unlike `list-notes`, it can include Recently Deleted and can count words.
 
 **Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
 
@@ -769,24 +1094,28 @@ Lists notes newest first from the NoteStore database (read-only), with an exact 
 |-----------|------|----------|-------------|
 | `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
 | `folder` | string | No | Only notes directly in this folder: a full path in `list-folders` syntax, or a unique folder name |
-| `since` | string | No | Only notes modified **strictly after** this. An ISO 8601 date (local midnight), an ISO date-time (local time unless it carries `Z` or an offset), or a `modifiedCheckpoint` token |
+| `since` | string | No | Return notes after this point, **oldest first**. A `modifiedCheckpoint` cursor (from a row or `nextSince`), or an ISO 8601 date (local midnight) or date-time (local time unless it carries `Z` or an offset), meaning modified strictly after it |
 | `limit` | number | No | Maximum rows, 1–1000 (default 50) |
 | `includeDeleted` | boolean | No | Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default `false`) |
 | `wordCounts` | boolean | No | Decode each body and add `wordCount` and `charCount` (default `false`) |
 | `bodyPreview` | boolean | No | Add `bodyPreview` (up to 180 characters) and `textDecoded` (default `false`) |
 
-**Returns:** `notes`, each with `id`, `identifier`, `title`, `folder`, `account`, `created`, `modified`, `modifiedCheckpoint`, `pinned`, `locked`, `inRecentlyDeleted`, and `markedForDeletion`. Also `count`, `limit`, `saturated`, and `nextSince`.
+**Returns:** `notes`, each with `id`, `identifier`, `title`, `folder`, `account`, `created`, `modified`, `modifiedCheckpoint`, `pinned`, `locked`, `inRecentlyDeleted`, and `markedForDeletion`. Also `count`, `limit`, `order` (`oldest-first` or `newest-first`), `saturated`, and `nextSince`.
 
-- **Checkpoints.** `modifiedCheckpoint` is an opaque token (`cdts1:` plus 16 hex digits) carrying the exact stored timestamp bits, so it never loses precision the way an ISO string can. Pass it back as `since`.
-- **The saturated-limit rule.** A call returns the newest `limit` matches. When `count` equals `limit`, `saturated` is `true` and `nextSince` is `null`: older matches after `since` may have been cut off, so repeat from the **same** `since` with a larger `limit`. Advance to `nextSince` only after a call where `saturated` is `false`. `nextSince` is the newest returned row's checkpoint, or the incoming boundary when nothing matched.
+- **Cursors.** `modifiedCheckpoint` is an opaque token (`cdts1:`, 16 hex digits, `:`, the note's database key). It carries the exact stored timestamp bits, so it never loses precision the way an ISO string can, and the key orders notes that share one timestamp. Pass it back as `since`.
+- **Syncing.** Call with `since`, store `nextSince`, and pass it as the next `since`. `nextSince` is the last returned row's cursor, or the incoming boundary when nothing matched, so every call advances. `saturated` is `true` when `count` equals `limit`: more changes may follow, so call again right away. When it is `false`, you are caught up. Notes that share a timestamp are split across pages by key, so none is skipped or repeated.
+- **First sync.** Start with `since: "1970-01-01"` and page the same way. A library larger than the 1000-row maximum is reached in full.
+- **Browsing.** Without `since`, rows come newest first. `nextSince` is then the newest row's cursor, set only when the call returned every matching note (`saturated` is `false`); otherwise it is `null`.
+- **Late edits.** A modification-date cursor can miss an edit that iCloud delivers later from another device with an older timestamp, for example after that device was offline. The row then sorts before the cursor. Run a full pass from the start now and then to catch these.
+- **Deletions.** Deleted notes are invisible unless `includeDeleted` is `true`. With it, notes in Recently Deleted and notes awaiting deletion appear, flagged, when their modification date is after the cursor. A note purged from the database leaves no row, so compare ids against a full pass to detect it.
 - **Word counts.** A word is a whitespace-separated token containing a letter or digit; `charCount` counts Unicode code points. Attachment markers are not counted. Both are `null` for locked notes and bodies that are not downloaded or cannot be decoded, and `0` for a body known to be empty.
 - **Previews.** With `wordCounts`, `bodyPreview` comes from the decoded body and `textDecoded` is `true`. Otherwise it is the stored snippet. Locked notes never get a preview.
-- Folderless notes (abandoned Quick Note drafts Notes.app never shows) and Recently Deleted appear only with `includeDeleted`.
+- Folderless notes (abandoned Quick Note drafts Notes.app never shows) and Recently Deleted appear only with `includeDeleted`. Notes without a stored modification date never match a `since` query.
 
 **Example - incremental sync:**
 ```json
 {
-  "since": "cdts1:41c7e0ef438fcd6f",
+  "since": "cdts1:41c7e0ef438fcd6f:4312",
   "limit": 200
 }
 ```
@@ -818,7 +1147,48 @@ Lists all folders in an account with full hierarchical paths.
 {}
 ```
 
-**Returns:** List of folders with IDs, paths, account names, and shared state. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+**Returns:** List of folders with IDs, paths, account names, and shared state, plus `identifier`, `parentIdentifier`, and `accountIdentifier` when Full Disk Access is granted. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+
+---
+
+#### `list-smart-folders`
+
+Lists every Smart Folder with the rules that define it, read from the NoteStore
+database. Requires Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `includeMatchingNotes` | boolean | No | Also list the notes each smart folder currently shows (default `false`) |
+| `limit` | number | No | Maximum matching notes per folder, 1–500 (default 50). `matchingNoteCount` is always the total |
+
+**Example:**
+```json
+{
+  "includeMatchingNotes": true,
+  "limit": 20
+}
+```
+
+**Returns:** For each smart folder: `name`, `id`, `identifier`, `account`,
+`accountId`, `accountIdentifier`, `parent`, `parentId`, and `parentIdentifier`
+(the parent fields are `null` at the account root). Its rules are decoded as
+`match` (`"all"`, `"any"`, or `"none"`) and `filters`. Each filter has a `type`
+(the stored rule key, such as `folder`, `tag`, `checklist`, or
+`creationDateRelativeRange`), its stored `value`, `excluded` for an Exclude
+rule, and a readable `description`. Folder filters add the folder's `name` and
+`folderId`, and a nested rule group is a filter of type `group` with its own
+`match` and `filters`. Notes stores each query inside an outer
+`{"deleted": false}` wrapper that keeps Recently Deleted out. `query` is the
+stored query with that wrapper removed, `includesRecentlyDeleted` reports the
+wrapper's value, and `rawQuery` is the stored JSON verbatim. A rule this server
+does not recognize is kept as a filter of type `unknown`, and `fullyDecoded` is
+then `false`.
+
+With `includeMatchingNotes`, each folder also carries `matchingNoteCount` and
+`matchingNotes` (`title` and `id`). These come from Notes.app itself, which
+evaluates the folder's rules, so they need Automation permission. The server
+does not re-evaluate the rules on its own. A folder whose notes cannot be read
+carries `matchingNotesError` instead.
 
 ---
 
@@ -862,12 +1232,18 @@ Creates a new folder, including a whole nested hierarchy in one call.
 
 **Returns:** Confirmation message. The call is **idempotent** — an already-existing folder (or path segment) is skipped rather than treated as an error, so it is safe to call before every `create-note` that targets a folder.
 
+Existence is decided by folder id, not by name: a folder deleted earlier in the same Notes session no longer counts as existing, and the call succeeds only once the created folder is confirmed by its id. Otherwise it reports failure.
+
 ---
 
 #### `get-folder-by-id`
 
-Reads one exact folder's current name and parent ID. Use these values with
-`rename-folder`; this avoids relying on ambiguous folder names or paths.
+Reads one exact folder's current name, parent ID, and account ID (`accountId`,
+plus `isRoot`, true when the folder sits at the account root). Use these values
+with `rename-folder` or `delete-folder-by-id`; this avoids relying on ambiguous
+folder names or paths. The `id` may also be the folder's Notes UUID or numeric
+key, and the result adds `identifier`, `parentIdentifier`, and
+`accountIdentifier` when Full Disk Access is granted.
 
 ---
 
@@ -876,6 +1252,54 @@ Reads one exact folder's current name and parent ID. Use these values with
 Renames an existing folder in place using its exact `id`, `expectedName`,
 `expectedParentId`, and `newName`. The operation preserves the folder ID, notes,
 and descendants. It refuses stale metadata and a conflicting sibling name.
+
+---
+
+#### `delete-folder-by-id`
+
+Deletes one exact, empty, ordinary folder through a plan-then-apply handshake.
+Read the folder first with `get-folder-by-id`, call once with `dryRun: true`,
+then repeat the same guards with `dryRun: false` and the returned `revision`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact folder id (`x-coredata://…/ICFolder/pN`), or the folder's Notes UUID or numeric key |
+| `expectedName` | string | Yes | Current folder name (not a path), matched case-sensitively |
+| `expectedAccountId` | string | Yes | Owning account id (`x-coredata://…/ICAccount/pN`) |
+| `expectedParentId` | string | One of these two | Current parent folder id (same forms as `id`) |
+| `expectedRoot` | `true` | One of these two | The folder sits at the account root |
+| `dryRun` | boolean | Yes | `true` plans; `false` applies |
+| `expectedRevision` | string | On apply | The `revision` from the dry run |
+
+**Example (plan, then apply with the returned revision):**
+```json
+{
+  "id": "x-coredata://ABC/ICFolder/p42",
+  "expectedName": "Old Projects",
+  "expectedAccountId": "x-coredata://ABC/ICAccount/p3",
+  "expectedRoot": true,
+  "dryRun": true
+}
+```
+
+**Returns:** `status: "planned"` with `wouldDelete`, `identifier`, `name`,
+`accountId`, `parentId`, `folderType: 0`, zero `childFolderCount` and
+`noteCount`, and `revision`; on apply, `status: "deleted"`, `committed: true`,
+`verified: true` (Notes.app no longer resolves the id), and `storeTombstoned`.
+
+**Safety:** it always refuses Recently Deleted, smart folders, the account's
+default and other system folders, shared folders (or folders inside a shared
+folder), and any folder that still holds notes or subfolders. There is no
+override. It is **not atomic**: the guard is a pre-check followed by an
+AppleScript delete. The name, parent, account, sharing, and emptiness checks
+repeat inside the delete script, but the folder type and stable identifier come
+from the local Notes database just before it. It needs Full Disk Access and
+fails closed without it.
+
+**Errors** carry the standard `code`: `revision_conflict` (a `Conflict:` message;
+read and plan again), `unsupported` (a `Refused:` message), `verification_failed`
+with `indeterminate: true` (read the folder before any retry), and
+`full_disk_access_missing`.
 
 ---
 
@@ -907,7 +1331,7 @@ Reveals a folder in Notes.app using its unique CoreData identifier.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The folder's CoreData identifier (from `list-folders`) |
+| `id` | string | Yes | The folder's CoreData identifier (from `list-folders`), or its Notes UUID or numeric key |
 | `separately` | boolean | No | Open in a separate window when supported by Notes.app |
 
 **Returns:** Confirmation that Notes.app accepted the show command.
@@ -927,7 +1351,7 @@ Lists all configured Notes accounts.
 {}
 ```
 
-**Returns:** List of accounts with names, IDs, upgraded state, and default folder metadata.
+**Returns:** List of accounts with names, IDs, upgraded state, and default folder metadata, plus each account's `identifier` (Notes UUID) when Full Disk Access is granted.
 
 ---
 
@@ -964,7 +1388,7 @@ Deletes multiple notes at once by ID.
 |-----------|------|----------|-------------|
 | `notes` | object[] | Yes | Array of `{id, expectedContentHash}` snapshots to delete (max 500 per request) |
 
-**Returns:** Summary of successes and failures.
+**Returns:** Summary of successes and failures. A note already in Recently Deleted fails without being deleted, as in `delete-note`.
 
 **⚠️ Safety:** Irreversible — requires explicit user confirmation before calling. Prefer `search-notes` / `list-notes` first to confirm the exact ids being deleted.
 
@@ -1041,6 +1465,99 @@ Gets a note's content as Markdown instead of HTML. If the note contains checklis
 
 ---
 
+#### `export-notes-markdown`
+
+Exports one note, or the notes of one folder, as a single Markdown document
+rendered from the decoded note body (the same block model as
+[`get-note-blocks`](#get-note-blocks)). Titles render as `#`, headings as `##`,
+subheadings as `###`. Bulleted, dashed and numbered lists keep their indent
+(four spaces per level), checklists render as `- [x]`/`- [ ]`, block quotes as
+`>`, and monospaced paragraphs as fenced code. Inline runs keep bold, italic,
+strikethrough, underline (`<u>`), highlight (`==`), superscript and subscript
+(`<sup>`/`<sub>`), and links whose scheme is http(s), `notes:`, `applenotes:`
+or `mailto:`. Tables render as GitHub tables. Attachments stay in body order:
+with `assetsDir` they link to copies of their files (images inline, drawings
+through Notes' fallback image, scans as their PDF), and without it they render
+as labeled placeholders such as `\[Image: name\]`. An attachment whose file
+cannot be found renders as `\[Image unavailable: name\]`. This tool leaves
+`get-note-markdown` unchanged.
+
+A folder export is one presentation document with notes separated by `---`.
+It is not a backup or restore format; use `export-notes-json` for that.
+
+**Requires:** Full Disk Access. Password-protected notes are skipped in a
+folder export (listed in `skipped` with code `encrypted`) and refused for a
+single note.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`/`folder` | Exact note ID |
+| `folder` | string | One of `id`/`folder` | Folder path, as for `list-notes` |
+| `account` | string | No | Account holding `folder` |
+| `limit` | number | No | Maximum notes read from the folder (default 100, max 1000) |
+| `outputPath` | string | No | Absolute file to create. Create-only: an existing file (or symlink) is refused with `[output_exists]` |
+| `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
+| `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
+
+Both paths follow the `save-attachment` rules (absolute, under the home
+directory, a temp directory, or `/Volumes`, no symlink escapes) and may not
+point inside the Notes library container. With `outputPath`, asset links are
+relative to the document's directory; without it they are absolute paths.
+
+**Returns:** without `outputPath`, the Markdown itself (refused with
+`[too-large]` above half of `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, because the
+document travels in both the text and structured result). With `outputPath`, a
+receipt: `format`, `count`, `bytes`, `output`, and `assets` (`dir`, `files`).
+Both carry `stats` (attachments, placed, placeholders, unavailable, tables,
+unreadableTables, unreferenced) and `skipped`. Nothing already written is
+deleted if a later step fails.
+
+---
+
+#### `export-notes-html`
+
+Exports one note, or the notes of one folder, as one standalone HTML file
+rendered from the decoded note body. It uses the same block model and
+attachment handling as [`export-notes-markdown`](#export-notes-markdown).
+Headings become `h1`-`h3`, lists nest by indent as `ul`/`ol`, checklists show
+disabled checkboxes, block quotes and monospaced paragraphs become
+`blockquote` and `pre`, and inline runs keep bold, italic, underline,
+strikethrough, highlight, superscript, subscript, text color and safe links.
+Tables are semantic `<table>` elements with a header row. Images, drawings
+(Notes' fallback image, or its preview), scans (PDF with preview), audio,
+video, files and link cards (title, domain and preview thumbnail) appear in
+body order. Attachments with no body marker are appended in creation order.
+An attachment with no usable source renders a visible
+`[Image unavailable: name]` marker. The document contains no script, no
+`file:` URL and no Notes library path.
+
+A folder export is one presentation document with notes separated by
+`<hr class="note-separator">`. It is not a backup or restore format.
+
+**Requires:** Full Disk Access. Password-protected notes are skipped in a
+folder export and refused for a single note.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | One of `id`/`folder` | Exact note ID |
+| `folder` | string | One of `id`/`folder` | Folder path, as for `list-notes` |
+| `account` | string | No | Account holding `folder` |
+| `limit` | number | No | Maximum notes read from the folder (default 100, max 1000) |
+| `outputPath` | string | Yes | Absolute HTML file to create. Create-only: an existing file is refused with `[output_exists]` |
+| `embedAssets` | boolean | No | Embed assets as data URLs (default `true`). Each asset is capped at 10 MiB and a document at 256 MiB of embedded assets; a larger one renders as unavailable with a hint to use `embedAssets: false` |
+| `assetsDir` | string | No | With `embedAssets: false`, the sidecar directory (default `<output stem>.assets` beside the file). Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
+
+The HTML is always written to a file, because an embedded document is too
+large for an MCP message. Paths follow the `save-attachment` rules and may not
+point inside the Notes library container. Sidecar URLs are relative to the
+HTML file, so the file and its `.assets` directory can be moved together.
+
+**Returns:** `format`, `count`, `bytes`, `output`, either `embedded` (assets
+embedded) or `assets` (`dir`, `files`), `stats`, and `skipped`. Nothing
+already written is deleted if a later step fails.
+
+---
+
 #### `get-checklist-state`
 
 Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
@@ -1085,12 +1602,109 @@ Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQ
 
 ---
 
+#### `list-special-notes`
+
+Lists a set of notes that AppleScript cannot enumerate: pinned notes, Quick Notes, notes in Recently Deleted, or password-protected notes. It reads the NoteStore database read-only and returns metadata only, never body text.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `kind` | string | Yes | `pinned`, `quick-notes`, `recently-deleted`, or `locked` |
+| `account` | string | No | Only this account (exact or unique-prefix name). Omit for every account |
+| `limit` | number | No | Maximum rows, 1–1000 (default 100) |
+
+**Returns:** `notes`, newest first, each with `id`, `identifier` (Notes UUID), `title`, `folder` (path in `list-folders` syntax, or `null`), `account`, `created`, `modified`, and the flags `pinned`, `locked`, `quickNote`, `inRecentlyDeleted`, and `markedForDeletion`. Unlocked rows add the stored `snippet`. The `locked` listing adds `passwordHint` when one is set. Also returns `count`, `total` (matches before `limit`), `limit`, and `supported`.
+
+- `pinned` and `quick-notes` cover notes in folders outside Recently Deleted. Folderless Quick Note drafts, which Notes.app never shows, are left out.
+- `recently-deleted` lists notes in each account's Recently Deleted folder and skips tombstones already waiting to sync away.
+- `locked` lists every password-protected note, including trashed and folderless ones, so a misplaced locked note can still be found. Their flags and `folder` say where each one is.
+- `supported: false` means this macOS version's database has no column for that kind (for example, Quick Notes before macOS 12).
+
+---
+
+#### `get-audio-transcripts`
+
+Reads the transcript, and the summary when one exists, that Notes already computed for the audio recordings in a note. It does not transcribe anything itself. Notes keeps each recording's transcript as word-level mergeable data on the audio attachment's database row, and this tool decodes it read-only.
+
+**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)). Password-protected notes are refused.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `includeSegments` | boolean | No | Also return word-level segments: `text`, `start` and `duration` in seconds, and `speaker`. Default `false` |
+| `maxSegments` | number | No | Cap on segments per attachment when `includeSegments` is set (default 2000, at most 20000) |
+
+**Example:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "includeSegments": true,
+  "maxSegments": 500
+}
+```
+
+**Returns:** `structuredContent.attachments` holds one entry per top-level audio attachment, in the order the recordings appear in the note. Each entry has:
+
+- `attachmentId` (usable with `save-attachment`), `identifier`, `typeUti`, and `durationSeconds` when known
+- `status`: `ok` (a transcript is stored), `none` (no transcript is stored, for example a recording Notes has not transcribed, or an audio file attached from elsewhere), or `undecodable` with a `reason`
+- `text` (the words joined into readable text), `wordCount`, `fragmentCount`, `speakers`, `summary` and `topLineSummary` when stored, and `needsTranscription` when the database records it
+- `segments`, only when `includeSegments` is set, with `segmentsTruncated` when the cap cut them short
+
+A recording extended with more takes has several fragments. Their transcripts are joined in stored order, separated by a blank line, and each segment carries a `fragment` index. Recordings with more than one fragment have been verified against synthetic fixtures only. A response that would exceed `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` (default 8 MB) drops segments first and then shortens `text`, marking `truncated`, `segmentsTruncated` and `textTruncated`. When the note body cannot be parsed, attachments come back in database order with `bodyOrder: false`.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
 latest `expectedContentHash`, and an absolute `path`. The server never retries
 the insertion. It verifies that existing rich content survived and compares the
 fetched attachment bytes with the source before reporting success.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+| `expectedContentHash` | string | Yes | `contentHash` from the note version being extended |
+| `path` | string | Yes | Absolute path of the local file; symbolic links are refused |
+| `filename` | string | No | Name the attachment gets in Notes instead of the source file's name. One path component that keeps the source file's extension, with no slash, colon, backslash, control character, leading dot or surrounding spaces. Notes names a file attachment after the file it receives, so the server gives its private temporary copy this name |
+
+**Returns:** `attachmentId`, `bytes`, the `name` Notes reports, and the new
+`contentHash`. With `filename`, `filenameVerified` says whether Notes reports
+that exact name. A mismatch is a warning (`filenameWarning`), not a failure,
+because the attachment and its bytes are already verified.
+
+---
+
+#### `create-note-with-attachment`
+
+Creates a note and attaches one local file to it in a single call. It checks the
+file and `filename` before creating anything, creates the note through Notes.app
+the way [`create-note`](#create-note) does in plaintext, then attaches with the
+same verification as [`add-attachment`](#add-attachment).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `title` | string | Yes | One-line note title |
+| `content` | string | No | Plain-text body placed above the attachment |
+| `folder` | string | No | Existing folder or nested path; create it first with [`create-folder`](#create-folder) |
+| `account` | string | No | Account name; defaults to Notes.app's default account |
+| `path` | string | Yes | Absolute path of the local file (at most 64 MiB) |
+| `filename` | string | No | Attachment name override, as in `add-attachment` |
+
+```json
+{
+  "title": "Signed lease",
+  "folder": "Home",
+  "path": "/Users/me/Downloads/scan-0042.pdf",
+  "filename": "Lease 2026.pdf"
+}
+```
+
+**Returns:** the new note's `id` with `noteCreated: true` and the
+`add-attachment` result. If the attachment step fails after the note exists,
+the error names the new note's id: attach to it with `add-attachment` instead of
+calling this tool again, which would create a second note.
 
 ---
 
@@ -1103,10 +1717,22 @@ Lists attachments in a note.
 | `id` | string | No | Note ID (preferred) |
 | `title` | string | No | Note title |
 | `account` | string | No | Account containing the note |
+| `includePaths` | boolean | No | Also report where each attachment's files are on disk (needs `id` and Full Disk Access) |
+| `firstImage` | boolean | No | Return only the note's lead visual instead of the list (needs `id` and Full Disk Access) |
 
 **Returns:** List of attachments with IDs, names, content identifiers, URLs when available, created/modified dates, and shared state.
 
-**⚠️ Safety:** A lookup failure is reported as an error, never as an empty list — so an empty result reliably means the note has no attachments and is safe to replace wholesale. Treat an error as "unknown", not "none".
+With `includePaths`, each attachment also carries `identifier`, `uti`, `kind` (`image`, `scan`, `drawing`, `pdf`, `audio`, `video`, `url`, `table`, `other`), `bodyIndex`, and three path fields read from NoteStore and the Notes data folder (read-only):
+
+- `assetPaths`: the attachment's own files, best first (the media file, or Notes' fallback image or PDF rendering).
+- `previewPath`: Notes' largest rendered thumbnail, chosen by pixel area from the `Previews` entries named `<identifier>-<scale>-<W>x<H>-<appearance>`. It is always the image file, including when the entry is a directory holding `<n>_<uuid>/Preview.png`. `null` when there is none.
+- `paths`: `assetPaths` followed by `previewPath`.
+
+Container attachments (a scan gallery) list their child rows under `children`. If the database cannot be read, the list is still returned with a `pathsError`.
+
+With `firstImage`, the result is `{firstImage, orderSource}`. `firstImage` is the first image in the note's body order, even when its asset has not downloaded (`path: null`, possibly with a `previewPath`). A scan or drawing stands in only when the note has no image, and a gallery's pages are considered at the gallery's position (`parentIdentifier`, `galleryIndex`). `orderSource` is `body`, or `creation` when the body did not record attachment order. `firstImage` is `null` when the note has no visual.
+
+**⚠️ Safety:** A lookup failure is reported as an error, never as an empty list — so an empty result reliably means the note has no attachments and is safe to replace wholesale. Treat an error as "unknown", not "none". Treat returned paths as local data: copy files out with [`export-attachments`](#export-attachments) instead of passing raw paths on.
 
 ---
 
@@ -1118,9 +1744,55 @@ Saves a note attachment to disk.
 |-----------|------|----------|-------------|
 | `noteId` | string | Yes | CoreData note ID (from `search-notes`/`list-notes`) |
 | `attachmentId` | string | Yes | Attachment ID (from `list-attachments`) |
-| `savePath` | string | Yes | Absolute destination file path. Must be under your home directory, a temp directory, or `/Volumes` |
+| `savePath` | string | Yes | Absolute destination file path. Must be under your home directory, a temp directory, or `/Volumes`, and never inside the Notes data folder (`~/Library/Group Containers/group.com.apple.notes`), however it is reached (symlink or different letter case) |
 
 **Returns:** Confirmation with the saved path, name, and content type (also in `structuredContent`).
+
+---
+
+#### `list-paper-attachments`
+
+Lists the Paper drawings (`com.apple.paper`) and classic drawings (`com.apple.drawing`, `com.apple.drawing.2`) in one note, and whether Notes has a rendered image of each. Read-only; needs Full Disk Access and does not open Notes.app.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact CoreData note ID |
+
+**Returns:** Per drawing: `attachmentId`, `identifier`, `uti`, `kind` (`paper` or `drawing`), `handwritingSummary` (the handwriting text Notes recognized, or `null` when it stored none), `bundlePresent` (the Paper data bundle is on disk), `fallbackImagePath` (Notes' full rendering), `previewPath` (its largest thumbnail), and `raster` `{source, format, width, height}`: the validated image `export-paper-image` would copy, or `null`.
+
+Strokes are not decoded. Notes' Paper bundle has no public reader, so the image is Notes' own rendering.
+
+---
+
+#### `export-paper-image`
+
+Saves Notes' rendered image of one Paper drawing or classic drawing to a new file.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | Exact CoreData note ID |
+| `savePath` | string | Yes | Absolute path for the new file. It must end in the image's extension (`.png`, or `.jpg`/`.jpeg` for a JPEG rendering) |
+| `attachmentId` | string | No | The drawing to export (`attachmentId` or `identifier` from `list-paper-attachments`). Required when the note has more than one |
+
+**Returns:** `savedPath`, `format`, `width`, `height`, `bytes`, `source` (`fallback` for Notes' full rendering, `preview` for its largest thumbnail when no full rendering exists), and the drawing's `attachmentId`, `identifier`, `kind`, and `handwritingSummary`.
+
+**⚠️ Safety:** Writes one new file, readable only by you (mode 0600). `savePath` follows the `save-attachment` allowlist (home, temp, or `/Volumes`), may not be inside the Notes data folder, and must not exist yet. The image header (PNG signature and IHDR, or JPEG frame) is checked before copying and the written file is checked again; a file that fails is removed.
+
+---
+
+#### `export-attachments`
+
+Copies a note's attachment files into a directory without opening Notes.app.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteId` | string | Yes | Exact CoreData note ID |
+| `exportDir` | string | Yes | Absolute destination directory, created if missing. Same allowlist as `save-attachment` (home, temp, or `/Volumes`), and never inside the Notes data folder |
+| `firstImageOnly` | boolean | No | Export only the lead visual that `list-attachments` `firstImage` reports |
+
+**Returns:** `exportDir`, counts (`exported`, `previews`, `skipped`, `failed`), and per attachment its `attachmentId`, `identifier`, `kind`, `exportedTo`, and `exportedKind`: `"asset"` for the real file, `"preview"` when the asset never downloaded and only Notes' thumbnail was on disk, or `null` when nothing was on disk. A preview is never chosen over an available asset, and it is named `<name>-preview.<ext>` so it is not mistaken for the original. A scan gallery with no file of its own exports its pages.
+
+**⚠️ Safety:** Existing files are never replaced. A name that is taken gets `-2`, `-3`, and so on. Reads NoteStore and the Notes data folder read-only and needs Full Disk Access.
 
 ---
 
@@ -1170,6 +1842,10 @@ Run a full setup diagnostic: Notes.app reachability, the Automation permission, 
 **Parameters:** None
 
 **Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).
+
+The report ends with the same feature matrix as [`get-capabilities`](#get-capabilities)
+(`structuredContent.runtimeOS` and `structuredContent.features`). It is
+informational: an unavailable optional feature never changes `healthy`.
 
 ---
 
@@ -1223,6 +1899,30 @@ resolve the same note. Creating a note from Markdown is
 Reports which background operations are implemented, live-verified, installed,
 and currently available, with a specific reason for each unavailable operation.
 
+It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
+`darwinRelease`) and a `features` matrix, one entry per feature group:
+`applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
+`backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
+placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
+`audioTranscription`, which need a native helper this server does not ship.
+Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
+`requirements`, `missing`, `unverified`, `tools`, and a machine-readable
+`reason` that is `null` when available and otherwise the first that applies:
+
+| `reason` | Meaning |
+|----------|---------|
+| `unsupported_platform` | Not running on macOS |
+| `not_implemented` | The server has no implementation for this feature yet |
+| `unknown_os_version` | The feature has a macOS floor and `sw_vers` could not be read |
+| `requires_macos_<major>` | macOS is older than `minimumMacOSVersion`, e.g. `requires_macos_26` |
+| `full_disk_access_missing` | The Notes database is not readable by this process |
+| `shortcuts_unavailable` | The `shortcuts` command could not be run |
+| `shortcut_not_installed` | A bridge Shortcut is missing or installed more than once |
+
+The probe never opens Notes.app or runs a Shortcut, so the Automation
+permission for Notes.app appears under `unverified` rather than being guessed;
+`doctor` and `health-check` confirm it by contacting Notes.
+
 #### `append-native`
 
 Appends bounded plaintext, semantic HTML, or Markdown while preserving existing
@@ -1250,10 +1950,44 @@ in the foreground.
 Appends one real unchecked Notes checklist item and verifies its native identity
 and text.
 
+#### `create-checklist-items`
+
+Appends several real unchecked checklist items, 1 to 20, in the order given.
+It takes the same `id`, `expectedContentHash` and `scopeText` as
+`create-checklist-item`, plus `items`, an array of one-line texts. Each item is
+one run of the same verified bridge, so the call takes a few seconds per item
+(a full batch of 20 can run about a minute; if your client times out first,
+read the note before retrying rather than resending the whole batch) and is
+gated with `create-checklist-item` in `get-capabilities`.
+
+After every run the server checks that exactly one new unchecked item with that
+text and a new native identity appeared, that every item appended earlier in the
+call kept its identity and text, and that nothing else in the note changed. The
+verified revision feeds the next run. A final check confirms the new items are
+the note's last checklist items in the requested order.
+
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "scopeText": "Packing list for the trip",
+  "items": ["Passport", "Charger", "Rain jacket"]
+}
+```
+
+**Returns:** `items`, each with its `index`, native `id` and `text`, plus
+`orderVerified` and the new `contentHash`. The first uncertain result stops the
+call without a retry and returns `ok: false` with `landed` (the verified items),
+`stoppedAt` (the item's index, text, `outcome` of `"not-written"` or
+`"uncertain"`, and the error), and `notAttempted`. After an uncertain stop, read
+the note before retrying, and retry only the items that are not present.
+
 #### `create-table`
 
 Appends a native table from rectangular string rows and verifies every decoded
-cell. It never substitutes a text table.
+cell. It never substitutes a text table. Omit `rows` for an empty 2 × 2 table,
+the size Notes itself inserts from Format > Table; its four empty cells are
+verified the same way.
 
 #### `set-note-pinned`
 
@@ -1411,8 +2145,8 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` | `26214400` (25 MB) | Max size of an attachment that [`fetch-attachment`](#fetch-attachment) will base64-encode inline. Larger attachments are rejected with an error pointing at [`save-attachment`](#save-attachment) (which streams to disk and has no such limit). Raise it to fetch bigger attachments inline; lower it to cap memory. |
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
-| `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win. |
-| `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
+| `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
+| `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
 | `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
 | `APPLE_NOTES_MCP_RETRY_DELAY_MS` | `1000` (1 s) | Base delay before the first retry; subsequent retries back off exponentially (1s, 2s, 4s, ...). |
@@ -1442,7 +2176,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
@@ -1451,18 +2185,19 @@ Several tools read directly from the Apple Notes SQLite database, which lives in
 1. Open **System Settings** (or System Preferences on older macOS)
 2. Go to **Privacy & Security > Full Disk Access**
 3. Click the **+** button
-4. Add the application that hosts the MCP server:
-   - **Claude Desktop**: Add `/Applications/Claude.app`
+4. Add the entry that matches how the server runs:
+   - **Claude Desktop**: add the **Node binary** that runs the server (the `doctor` tool prints its path, e.g. `~/.nvm/versions/node/v24.11.1/bin/node`; press ⌘⇧G in the file picker to paste it). Claude Desktop launches MCP servers as their own responsible process, so a grant on `/Applications/Claude.app` alone does not reach them ([#220](https://github.com/sweetrb/apple-notes-mcp/issues/220)).
    - **Terminal**: Add `/Applications/Utilities/Terminal.app`
    - **VS Code**: Add `/Applications/Visual Studio Code.app`
    - **iTerm**: Add `/Applications/iTerm.app`
-5. Restart the application after granting access
+5. Fully quit (⌘Q) and relaunch the host app after granting access; if `doctor` still reports it missing, restart the Mac
 
 ### Without Full Disk Access
 
 Every tool that does not read the Notes database works normally without Full Disk Access — that is the whole AppleScript surface (create, read, search, update, move, delete, folders, accounts, attachments, stats, export). The database-backed tools degrade like this:
 - `get-checklist-state` returns an error explaining that database access is needed
 - `get-note-metadata` returns the same kind of error — it has no non-database path
+- `list-special-notes` and the `list-native-tags` inventory return the same kind of error
 - `list-recent-notes` and `list-folder-tree` return the same kind of error
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
@@ -1508,7 +2243,7 @@ Apple Notes stores checklists as a paragraph style (`style_type=103`) inside a g
 **Workarounds:**
 
 1. **Create the note with bulleted list items, then convert manually in Notes.app.** Select the items and press <kbd>⇧⌘L</kbd> (or **Format → Checklist**). This converts the list in place and the resulting checklist will be readable by `get-checklist-state` and annotated by `get-note-markdown`.
-2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript.
+2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript. This server does that for you in two ways: [`create-checklist-item`](#create-checklist-item) appends one unchecked item to an existing note, and [`create-note`](#create-note) with `format: "markdown"` turns `- [ ]` / `- [x]` lines into checklist items with that done state through Notes' own Markdown importer, (see [Markdown notes](#markdown-notes)).
 3. **Read-only checklist support is fully implemented** — once a checklist exists (created manually or by another app), `get-checklist-state` and `get-note-markdown` will read its done/undone state correctly (with Full Disk Access).
 
 If you need to *track* todos programmatically and don't strictly need them rendered as Apple Notes checklist UI, plain markdown-style `- [ ] item` / `- [x] item` lines in a `plaintext` note are a reasonable alternative — they are searchable, human-readable, and can be parsed by downstream tooling.
