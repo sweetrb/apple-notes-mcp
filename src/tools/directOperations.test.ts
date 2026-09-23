@@ -12,7 +12,13 @@ vi.mock("../utils/noteRichText.js", async (original) => ({
   readRichNote: rich.read,
   richContentHash: rich.hash,
 }));
+const pasteboard = vi.hoisted(() => ({ freeze: vi.fn() }));
+vi.mock("../utils/pasteboardFreeze.js", async (original) => ({
+  ...(await original<typeof import("../utils/pasteboardFreeze.js")>()),
+  freezePasteboard: pasteboard.freeze,
+}));
 import { registerDirectOperations } from "./directOperations.js";
+import { PasteboardError } from "../utils/pasteboardFreeze.js";
 
 const directories: string[] = [];
 afterEach(() => {
@@ -178,6 +184,102 @@ describe("attachment filename override and create-then-attach", () => {
       }>;
     return { manager, handler };
   };
+
+  /** A frozen pasteboard copy named like the real one would be. */
+  const frozen = (name: string, kind: "data" | "file" = "data", type = "public.png") => {
+    const directory = mkdtempSync(join(tmpdir(), "direct-operation-pasteboard-test-"));
+    directories.push(directory);
+    const path = join(directory, name);
+    writeFileSync(path, bytes);
+    const cleanup = vi.fn();
+    pasteboard.freeze.mockReturnValue({
+      kind,
+      type,
+      path,
+      filename: name,
+      bytes: bytes.length,
+      cleanup,
+    });
+    return cleanup;
+  };
+
+  it("attaches the frozen pasteboard copy through add-attachment's verified path", async () => {
+    const cleanup = frozen("Pasted image.png");
+    const { manager, handler } = setup("Pasted image.png");
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+    });
+    expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+    expect(manager.addAttachmentById.mock.calls[0][2]).toMatch(/\/Pasted image\.png$/);
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      attachmentId,
+      bytes: bytes.length,
+      name: "Pasted image.png",
+      source: { kind: "data", type: "public.png", filename: "Pasted image.png" },
+    });
+    expect(result.structuredContent).not.toHaveProperty("filenameVerified");
+    expect(pasteboard.freeze).toHaveBeenCalledWith({ pasteboardName: undefined });
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads a named pasteboard when the testing variable is set", async () => {
+    frozen("Pasted image.png");
+    const { handler } = setup("Pasted image.png");
+    vi.stubEnv("APPLE_NOTES_MCP_PASTEBOARD_NAME", " live-test-board ");
+    try {
+      await handler("add-attachment-from-pasteboard")({ id, expectedContentHash: "revision" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(pasteboard.freeze).toHaveBeenCalledWith({ pasteboardName: "live-test-board" });
+  });
+
+  it("applies a filename override, adding the pasted type's extension when missing", async () => {
+    const cleanup = frozen("report.pdf", "file", "public.file-url");
+    const { manager, handler } = setup("Q3 receipt.pdf");
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+      filename: "Q3 receipt",
+    });
+    expect(manager.addAttachmentById.mock.calls[0][2]).toMatch(/\/Q3 receipt\.pdf$/);
+    expect(result.structuredContent).toMatchObject({
+      name: "Q3 receipt.pdf",
+      filenameVerified: true,
+      source: { kind: "file", filename: "report.pdf" },
+    });
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an override whose extension does not match the pasted type, then cleans up", async () => {
+    const cleanup = frozen("Pasted image.png");
+    const { manager, handler } = setup("x");
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+      filename: "photo.jpg",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/extension/);
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a pasteboard failure without touching the note", async () => {
+    pasteboard.freeze.mockImplementation(() => {
+      throw new PasteboardError("unsupported_content", "no image on the pasteboard");
+    });
+    const { manager, handler } = setup("x");
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("no image on the pasteboard");
+    expect(manager.getNoteById).not.toHaveBeenCalled();
+  });
 
   it("names the private copy after the override and verifies the reported name", async () => {
     const { manager, handler } = setup("Renamed Report.txt");

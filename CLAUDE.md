@@ -229,6 +229,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `filename` sets the name the attachment shows in Notes. It must keep the source file's extension and be a single path component.
 - `create-note-with-attachment` creates the note, then attaches. If the attach step fails, the error names the new note's id: call `add-attachment` on that id rather than repeating the tool, which would create a second note.
 
+### add-attachment-from-pasteboard
+- Use when the user says "attach what I copied" or "put this screenshot in the note". Same `id`, `expectedContentHash`, and `filename` as `add-attachment`; a `filename` without an extension gets the pasted type's extension.
+- It reads the pasteboard once, freezes the bytes into a private temporary file, and never writes to the pasteboard. A copied file wins over image data; text-only contents are refused (use `append-to-note` for text).
+- `source` in the result says what was attached (`kind`, pasteboard `type`, default `filename`). An "unreachable" error means the MCP host is not running in the user's GUI session.
+- A pasted PDF is inserted but reported as "insertion outcome uncertain" on macOS 27 (issue #236: AppleScript does not list PDF attachments, so neither this tool nor `add-attachment` can verify them). Read the note with `list-attachments includePaths` or in Notes.app before any retry; never retry blindly.
+
 ### create-table
 - Omit `rows` for an empty 2 × 2 table (the size Notes inserts from Format > Table).
 

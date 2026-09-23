@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants6) {
+      optimizeNames(names, constants7) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants6);
+          this.rhs = optimizeExpr(this.rhs, names, constants7);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants6) {
+      optimizeNames(names, constants7) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants6);
+        this.rhs = optimizeExpr(this.rhs, names, constants7);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants6) {
-        this.code = optimizeExpr(this.code, names, constants6);
+      optimizeNames(names, constants7) {
+        this.code = optimizeExpr(this.code, names, constants7);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants6) {
+      optimizeNames(names, constants7) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants6))
+          if (n.optimizeNames(names, constants7))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants6) {
+      optimizeNames(names, constants7) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants6);
-        if (!(super.optimizeNames(names, constants6) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
+        if (!(super.optimizeNames(names, constants7) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants6);
+        this.condition = optimizeExpr(this.condition, names, constants7);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants6) {
-        if (!super.optimizeNames(names, constants6))
+      optimizeNames(names, constants7) {
+        if (!super.optimizeNames(names, constants7))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants6);
+        this.iteration = optimizeExpr(this.iteration, names, constants7);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants6) {
-        if (!super.optimizeNames(names, constants6))
+      optimizeNames(names, constants7) {
+        if (!super.optimizeNames(names, constants7))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants6);
+        this.iterable = optimizeExpr(this.iterable, names, constants7);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants6) {
+      optimizeNames(names, constants7) {
         var _a, _b;
-        super.optimizeNames(names, constants6);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants6);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants6);
+        super.optimizeNames(names, constants7);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants7);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants6) {
+    function optimizeExpr(expr, names, constants7) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants6[n.str];
+        const c = constants7[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants6[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants7[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants6 = {
+    var constants7 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants6) {
-      v = { value: constants6[c] };
+    for (c in constants7) {
+      v = { value: constants7[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join26(output, replacement);
+        return join27(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join26(output, rule.append(self.options));
+          output = join27(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join26(output, replacement) {
+    function join27(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -50318,6 +50318,21 @@ function exportNotesHtml(request, deps) {
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
+  closeSync as closeSync6,
+  constants as constants6,
+  fstatSync as fstatSync6,
+  mkdtempSync as mkdtempSync5,
+  openSync as openSync6,
+  readFileSync as readFileSync4,
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
+} from "node:fs";
+import { tmpdir as tmpdir5 } from "node:os";
+import { basename as basename6, extname as extname6, isAbsolute as isAbsolute3, join as join23 } from "node:path";
+
+// src/utils/pasteboardFreeze.ts
+import { execFileSync as execFileSync19 } from "node:child_process";
+import {
   closeSync as closeSync5,
   constants as constants5,
   fstatSync as fstatSync5,
@@ -50325,10 +50340,148 @@ import {
   openSync as openSync5,
   readFileSync as readFileSync3,
   rmSync as rmSync4,
+  statSync as statSync4,
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join22 } from "node:path";
+import { basename as basename5, extname as extname5, join as join22 } from "node:path";
+var PASTEBOARD_NAME_ENV = "APPLE_NOTES_MCP_PASTEBOARD_NAME";
+var MAX_PASTEBOARD_BYTES = 64 * 1024 * 1024;
+var PASTEBOARD_DATA_TYPES = [
+  { type: "public.png", ext: "png", label: "image" },
+  { type: "public.jpeg", ext: "jpg", label: "image" },
+  { type: "public.heic", ext: "heic", label: "image" },
+  { type: "com.compuserve.gif", ext: "gif", label: "image" },
+  { type: "public.tiff", ext: "tiff", label: "image" },
+  { type: "com.adobe.pdf", ext: "pdf", label: "document" }
+];
+var PASTEBOARD_FREEZE_JXA = `
+ObjC.import("AppKit");
+function run(argv) {
+  var dir = argv[0], name = argv[1], limit = Number(argv[2]), prefs = JSON.parse(argv[3]);
+  var pb = name ? $.NSPasteboard.pasteboardWithName(name) : $.NSPasteboard.generalPasteboard;
+  if (!pb || pb.isNil()) return JSON.stringify({ status: "error", code: "pasteboard_unavailable" });
+  var before = pb.changeCount;
+  var types = ObjC.deepUnwrap(pb.types) || [];
+  if (types.length === 0) return JSON.stringify({ status: "error", code: "pasteboard_empty" });
+  var result = null;
+  if (types.indexOf("public.file-url") >= 0) {
+    var value = ObjC.unwrap(pb.stringForType("public.file-url"));
+    var url = value ? $.NSURL.URLWithString(value) : null;
+    if (url && !url.isNil() && url.isFileURL) {
+      result = { status: "ok", kind: "file", type: "public.file-url", path: ObjC.unwrap(url.path) };
+    }
+  }
+  if (!result) {
+    for (var i = 0; i < prefs.length && !result; i++) {
+      if (types.indexOf(prefs[i][0]) < 0) continue;
+      var data = pb.dataForType(prefs[i][0]);
+      if (!data || data.isNil() || data.length === 0) continue;
+      if (data.length > limit) return JSON.stringify({ status: "error", code: "too_large", bytes: data.length });
+      var path = dir + "/pasteboard." + prefs[i][1];
+      if (!data.writeToFileAtomically(path, true))
+        return JSON.stringify({ status: "error", code: "write_failed" });
+      result = { status: "ok", kind: "data", type: prefs[i][0], path: path, bytes: data.length };
+    }
+  }
+  if (pb.changeCount !== before) return JSON.stringify({ status: "error", code: "pasteboard_changed" });
+  return JSON.stringify(result || { status: "error", code: "unsupported_content", types: types.slice(0, 20) });
+}
+`;
+var PasteboardError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "PasteboardError";
+  }
+  code;
+};
+var MESSAGES = {
+  pasteboard_unavailable: "The pasteboard is not reachable from this process. The MCP host must run in your logged-in GUI session (not over SSH or as a background daemon).",
+  pasteboard_empty: "The pasteboard is empty. Copy an image or a file first.",
+  pasteboard_changed: "The pasteboard changed while it was being read. Try again.",
+  unsupported_content: "The pasteboard holds no image, PDF, or file. Text belongs in append-to-note, not in an attachment.",
+  too_large: "The pasteboard contents exceed the 64 MiB attachment limit.",
+  write_failed: "Could not write the pasteboard contents to a temporary file.",
+  file_unreadable: "The copied file could not be read as a regular file of at most 64 MiB."
+};
+function defaultRunJxa(args) {
+  return execFileSync19("osascript", ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
+    encoding: "utf8",
+    timeout: 3e4,
+    maxBuffer: 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
+function pasteboardFilename(requested, frozenFilename) {
+  if (requested === void 0) return void 0;
+  const ext = extname5(frozenFilename);
+  return ext && !extname5(requested) ? requested + ext : requested;
+}
+function readRegularFile(path10) {
+  let descriptor;
+  try {
+    descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+  } catch {
+    throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
+  }
+  try {
+    const stat = fstatSync5(descriptor);
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_PASTEBOARD_BYTES)
+      throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
+    return readFileSync3(descriptor);
+  } finally {
+    closeSync5(descriptor);
+  }
+}
+function freezePasteboard(options = {}) {
+  const directory = mkdtempSync4(join22(tmpdir4(), "notes-pasteboard-"));
+  const cleanup = () => rmSync4(directory, { recursive: true, force: true });
+  try {
+    const prefs = JSON.stringify(PASTEBOARD_DATA_TYPES.map((t) => [t.type, t.ext]));
+    let raw;
+    try {
+      raw = (options.runJxa ?? defaultRunJxa)([
+        directory,
+        options.pasteboardName ?? "",
+        String(MAX_PASTEBOARD_BYTES),
+        prefs
+      ]);
+    } catch {
+      throw new PasteboardError("pasteboard_unavailable", MESSAGES.pasteboard_unavailable);
+    }
+    let reply;
+    try {
+      reply = JSON.parse(raw.trim());
+    } catch {
+      throw new PasteboardError("pasteboard_unavailable", MESSAGES.pasteboard_unavailable);
+    }
+    if (reply.status !== "ok" || !reply.path || !reply.type) {
+      const code = reply.code && reply.code in MESSAGES ? reply.code : "pasteboard_unavailable";
+      throw new PasteboardError(code, MESSAGES[code]);
+    }
+    if (reply.kind === "file") {
+      const bytes = readRegularFile(reply.path);
+      const filename2 = basename5(reply.path);
+      const path11 = join22(directory, filename2);
+      writeFileSync3(path11, bytes, { mode: 384 });
+      return { kind: "file", type: reply.type, path: path11, filename: filename2, bytes: bytes.length, cleanup };
+    }
+    if (join22(directory, basename5(reply.path)) !== reply.path)
+      throw new PasteboardError("write_failed", MESSAGES.write_failed);
+    const label = PASTEBOARD_DATA_TYPES.find((t) => t.type === reply.type)?.label ?? "item";
+    const filename = `Pasted ${label}${extname5(reply.path)}`;
+    const path10 = join22(directory, filename);
+    writeFileSync3(path10, readFileSync3(reply.path), { mode: 384 });
+    rmSync4(reply.path, { force: true });
+    return { kind: "data", type: reply.type, path: path10, filename, bytes: statSync4(path10).size, cleanup };
+  } catch (error2) {
+    cleanup();
+    throw error2;
+  }
+}
+
+// src/tools/directOperations.ts
 var noteId = exactIdInput(
   "ICNote",
   /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
@@ -50373,17 +50526,17 @@ function assertExistingContentPreserved(before, after) {
 }
 function localAttachment(path10) {
   if (!isAbsolute3(path10)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+  const descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
   try {
-    const stat = fstatSync5(descriptor);
+    const stat = fstatSync6(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
-    const bytes = readFileSync3(descriptor);
+    const bytes = readFileSync4(descriptor);
     if (bytes.length !== stat.size)
       throw new Error("Attachment changed while it was being read; try again");
     return bytes;
   } finally {
-    closeSync5(descriptor);
+    closeSync6(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -50494,9 +50647,43 @@ function registerDirectOperations(server2, manager) {
       }
     }
   );
+  tool(
+    "add-attachment-from-pasteboard",
+    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note) or you have a file path (use add-attachment).\nSafety: reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
+    {
+      id: noteId,
+      expectedContentHash: revision,
+      filename: attachmentInput.filename.describe(
+        `Name the attachment gets in Notes (default: the copied file's name, or "Pasted image.png" / "Pasted document.pdf"). Without an extension, the pasted type's extension is added; with one, it must match the pasted type. Same rules as add-attachment otherwise.`
+      )
+    },
+    ({ id: id2, expectedContentHash, filename }) => {
+      const frozen = freezePasteboard({
+        pasteboardName: process.env[PASTEBOARD_NAME_ENV]?.trim() || void 0
+      });
+      try {
+        const source = {
+          kind: frozen.kind,
+          type: frozen.type,
+          filename: frozen.filename
+        };
+        return {
+          ...attachFile(manager, {
+            id: id2,
+            expectedContentHash,
+            path: frozen.path,
+            filename: pasteboardFilename(filename, frozen.filename)
+          }),
+          source
+        };
+      } finally {
+        frozen.cleanup();
+      }
+    }
+  );
 }
 function attachmentName(path10, filename) {
-  const source = basename5(path10);
+  const source = basename6(path10);
   if (filename === void 0) return source;
   if (Buffer.byteLength(filename, "utf8") > 255)
     throw new Error("filename must be at most 255 bytes");
@@ -50504,9 +50691,9 @@ function attachmentName(path10, filename) {
     throw new Error(
       "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
     );
-  if (extname5(filename).toLowerCase() !== extname5(source).toLowerCase())
+  if (extname6(filename).toLowerCase() !== extname6(source).toLowerCase())
     throw new Error(
-      `filename must keep the source file's extension (${extname5(source) || "none"})`
+      `filename must keep the source file's extension (${extname6(source) || "none"})`
     );
   return filename;
 }
@@ -50517,10 +50704,10 @@ function attachFile(manager, args) {
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
-  const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
-  const temporaryFile = join22(directory, name);
+  const directory = mkdtempSync5(join23(tmpdir5(), "notes-attachment-add-"));
+  const temporaryFile = join23(directory, name);
   try {
-    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    writeFileSync4(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
@@ -50568,7 +50755,7 @@ function attachFile(manager, args) {
       } : {}
     };
   } finally {
-    rmSync4(directory, { recursive: true, force: true });
+    rmSync5(directory, { recursive: true, force: true });
   }
 }
 
@@ -50576,7 +50763,7 @@ function attachFile(manager, args) {
 import { createHash as createHash3 } from "node:crypto";
 
 // src/utils/folderStore.ts
-import { execFileSync as execFileSync19 } from "child_process";
+import { execFileSync as execFileSync20 } from "child_process";
 import * as os9 from "os";
 import * as path9 from "path";
 var NOTE_STORE_PATH = path9.join(
@@ -50640,7 +50827,7 @@ function runSqlite7(dbPath2, sql, pk) {
   const args = ["-readonly"];
   if (pk !== void 0) args.push("-cmd", `.parameter set @pk ${pk}`);
   args.push(dbPath2, sql);
-  return execFileSync19("sqlite3", args, {
+  return execFileSync20("sqlite3", args, {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -51492,20 +51679,20 @@ import {
   chmodSync,
   existsSync as existsSync15,
   mkdirSync as mkdirSync6,
-  mkdtempSync as mkdtempSync5,
+  mkdtempSync as mkdtempSync6,
   renameSync,
-  rmSync as rmSync5,
-  writeFileSync as writeFileSync4
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
 } from "node:fs";
 import { release as release3 } from "node:os";
-import { join as join25 } from "node:path";
+import { join as join26 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
-import { existsSync as existsSync14, readFileSync as readFileSync4 } from "node:fs";
+import { existsSync as existsSync14, readFileSync as readFileSync5 } from "node:fs";
 import { homedir as homedir19 } from "node:os";
-import { dirname as dirname6, join as join24, resolve as resolve5 } from "node:path";
+import { dirname as dirname6, join as join25, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -51533,10 +51720,10 @@ var manifestSchema = external_exports.object({
 function packageRoot(fromDir = dirname6(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join24(dir, "package.json");
+    const candidate = join25(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync4(candidate, "utf8"));
+        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
         if (pkg.name === "apple-notes-mcp") return dir;
       } catch {
       }
@@ -51550,9 +51737,9 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join24(packageRoot(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join25(packageRoot(), HELPER_SOURCE_RELATIVE),
     exists: existsSync14,
-    readFile: (path10) => readFileSync4(path10),
+    readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync3,
     ...overrides
   };
@@ -51563,14 +51750,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join24(homedir19(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex(data) {
   return createHash4("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join24(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -51588,7 +51775,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex(deps.readFile(deps.sourcePath));
-  const manifestPath = join24(installDir, MANIFEST_NAME);
+  const manifestPath = join25(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -51903,9 +52090,9 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
   mkdirSync6(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join25(installDir, ".staging-"));
+  const staging = mkdtempSync6(join26(installDir, ".staging-"));
   try {
-    const stagedBinary = join25(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -51982,13 +52169,13 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join25(installDir, HELPER_BINARY_NAME));
-    writeFileSync4(join25(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
+    writeFileSync5(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync15(staging)) rmSync5(staging, { recursive: true, force: true });
+    if (existsSync15(staging)) rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({

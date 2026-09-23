@@ -146,6 +146,7 @@ const STRICT_NOTE_ID: Array<[string, string]> = [
   ["insert-link", "id"],
   ["add-native-tags", "id"],
   ["add-attachment", "id"],
+  ["add-attachment-from-pasteboard", "id"],
 ];
 /** Tools whose note-id field was free-form (title-or-id tools and friends). */
 const LOOSE_NOTE_ID: Array<[string, string]> = [

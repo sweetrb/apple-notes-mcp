@@ -1669,6 +1669,43 @@ calling this tool again, which would create a second note.
 
 ---
 
+#### `add-attachment-from-pasteboard`
+
+Attaches whatever image, PDF, or file is on the pasteboard (a screenshot, "Copy
+Image", or a file copied in Finder) to an exact note. The pasteboard is read once
+through AppKit's public `NSPasteboard` API (via JXA, no native build) and its
+bytes are frozen into a private temporary file before anything touches the note.
+The pasteboard itself is never written. The frozen file then goes through
+[`add-attachment`](#add-attachment)'s checks.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID |
+| `expectedContentHash` | string | Yes | The note's current `contentHash` (from `get-note-content`) |
+| `filename` | string | No | Attachment name. Defaults to the copied file's name, or `Pasted image.png` / `Pasted document.pdf` for image or PDF data. Without an extension, the pasted type's extension is added; with one, it must match the pasted type. Otherwise the same rules as `add-attachment` |
+
+**Returns:** the `add-attachment` result plus `source` (`kind`: `file` or
+`data`, the pasteboard `type`, and the default `filename`). A copied file wins
+over image data; among data types PNG is preferred, then JPEG, HEIC, GIF, TIFF,
+and PDF.
+
+**Errors** name the cause: an empty pasteboard, text-only contents (use
+`append-to-note` instead), more than 64 MiB, a copied symlink or unreadable file,
+a pasteboard that changed while it was being read, or a pasteboard that is
+unreachable because the MCP host is not running in your logged-in GUI session
+(for example over SSH).
+
+**Known limitation ([#236](https://github.com/sweetrb/apple-notes-mcp/issues/236)):** on macOS 27, Notes' AppleScript dictionary does not list
+PDF attachments, so a PDF (pasted or from `add-attachment`) is inserted but
+cannot be verified and the call reports "insertion outcome uncertain". Read the
+note before retrying.
+
+For testing, `APPLE_NOTES_MCP_PASTEBOARD_NAME` makes the tool read a private
+named pasteboard instead of the general one, so a test never touches your
+clipboard.
+
+---
+
 #### `list-attachments`
 
 Lists attachments in a note.

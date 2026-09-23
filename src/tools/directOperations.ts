@@ -28,6 +28,12 @@ import {
   richContentHash,
   type RichNote,
 } from "../utils/noteRichText.js";
+import {
+  freezePasteboard,
+  PASTEBOARD_NAME_ENV,
+  pasteboardFilename,
+} from "../utils/pasteboardFreeze.js";
+import type { PasteboardAttachmentSource } from "../types.js";
 
 // Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
 // Core Data key, resolved to the x-coredata id before the handler runs.
@@ -245,6 +251,42 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
         };
       } catch (error) {
         throw new Error(`${handOff}. ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  tool(
+    "add-attachment-from-pasteboard",
+    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note) or you have a file path (use add-attachment).\nSafety: reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
+    {
+      id: noteId,
+      expectedContentHash: revision,
+      filename: attachmentInput.filename.describe(
+        'Name the attachment gets in Notes (default: the copied file\'s name, or "Pasted image.png" / "Pasted document.pdf"). Without an extension, the pasted type\'s extension is added; with one, it must match the pasted type. Same rules as add-attachment otherwise.'
+      ),
+    },
+    ({ id, expectedContentHash, filename }) => {
+      // A named pasteboard lets live tests run without touching the user's clipboard.
+      const frozen = freezePasteboard({
+        pasteboardName: process.env[PASTEBOARD_NAME_ENV]?.trim() || undefined,
+      });
+      try {
+        const source: PasteboardAttachmentSource = {
+          kind: frozen.kind,
+          type: frozen.type,
+          filename: frozen.filename,
+        };
+        return {
+          ...attachFile(manager, {
+            id,
+            expectedContentHash,
+            path: frozen.path,
+            filename: pasteboardFilename(filename, frozen.filename),
+          }),
+          source,
+        };
+      } finally {
+        frozen.cleanup();
       }
     }
   );
