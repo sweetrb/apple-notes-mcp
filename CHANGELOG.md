@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.8.46] - 2026-09-23
+
+### Fixed
+
+- `create-folder` no longer reports success without creating anything when a
+  folder at the same path was deleted earlier in the Notes session (#213).
+  Notes.app keeps resolving a name reference (`folder "A" of folder ...`) to
+  the deleted folder for the rest of the session, while `exists folder id`
+  reports it gone. Each path segment is now resolved to a folder that still
+  exists by id, and the new folder is confirmed by id afterwards; if it cannot
+  be, the call fails instead of claiming success. The confirmation also reads
+  the bare folder id Notes returns, so the created folder's id is reported
+  instead of an empty string.
+- `delete-folder`, `create-note` with a `folder`, `move-note` and
+  `batch-move-notes` resolve their folder the same way, so they never target a
+  folder deleted earlier in the session, and a live folder is chosen over a
+  deleted one with the same name.
+
 ## [2.8.45] - 2026-09-23
 
 ### Added

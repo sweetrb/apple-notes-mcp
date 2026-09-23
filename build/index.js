@@ -42321,6 +42321,58 @@ function buildFolderReference(folderPath) {
   return parts.reverse().map((part) => `folder "${escapePlainStringForAppleScript(part)}"`).join(" of ");
 }
 var AS_ACCOUNT_REF = "__acctRef";
+var LIVE_FOLDER_NOT_FOUND = "Folder not found";
+function buildLiveFolderResolution(folderPath, varName, opts = {}) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) throw new Error("Invalid AppleScript variable");
+  buildFolderReference(folderPath);
+  const parts = splitFolderPath(folderPath);
+  const c = `${varName}_c`;
+  const cid = `${varName}_cid`;
+  const any = `${varName}_any`;
+  const parent = `${varName}_p`;
+  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${escapePlainStringForAppleScript(folderPath)}" number -1728`;
+  const lines = [];
+  parts.forEach((part, i) => {
+    const name = escapePlainStringForAppleScript(part);
+    if (i === 0) {
+      lines.push(
+        `set ${varName} to missing value`,
+        `set ${any} to missing value`,
+        `repeat with ${c} in (folders of ${AS_ACCOUNT_REF} whose name is "${name}")`,
+        `  try`,
+        `    set ${cid} to id of ${c}`,
+        `    if exists folder id ${cid} then`,
+        `      if class of (container of ${c}) is not folder then`,
+        `        set ${varName} to folder id ${cid}`,
+        `        exit repeat`,
+        `      else if ${any} is missing value then`,
+        `        set ${any} to folder id ${cid}`,
+        `      end if`,
+        `    end if`,
+        `  end try`,
+        `end repeat`
+      );
+      if (!opts.rootOnly)
+        lines.push(`if ${varName} is missing value then set ${varName} to ${any}`);
+    } else {
+      lines.push(
+        `set ${parent} to ${varName}`,
+        `set ${varName} to missing value`,
+        `repeat with ${c} in (folders of ${parent} whose name is "${name}")`,
+        `  try`,
+        `    set ${cid} to id of ${c}`,
+        `    if exists folder id ${cid} then`,
+        `      set ${varName} to folder id ${cid}`,
+        `      exit repeat`,
+        `    end if`,
+        `  end try`,
+        `end repeat`
+      );
+    }
+    lines.push(`if ${varName} is missing value then ${notFound}`);
+  });
+  return lines.join("\n");
+}
 var ACCOUNT_RESOLUTION_ERROR = "AccountResolutionError:";
 function throwIfAccountResolutionFailed(error2) {
   if (!error2) return;
@@ -42550,8 +42602,8 @@ var AppleNotesManager = class {
     const safeBody = escapeHtmlForAppleScript(`<h1>${htmlTitle}</h1>${bodyContent}`);
     let createCommand;
     if (folder) {
-      const folderRef = buildFolderReference(folder);
-      createCommand = `make new note at ${folderRef} with properties {body:"${safeBody}"}`;
+      createCommand = `${buildLiveFolderResolution(folder, "__folder")}
+      make new note at __folder with properties {body:"${safeBody}"}`;
     } else {
       createCommand = `
         set newNote to make new note with properties {body:"${safeBody}"}
@@ -43663,10 +43715,10 @@ var AppleNotesManager = class {
     }
     for (let i = 0; i < parts.length; i++) {
       const currentPath = parts.slice(0, i + 1).map((p) => escapeFolderName(p)).join("/");
-      const currentRef = buildFolderReference(currentPath);
       const checkScript = buildAccountScopedScript(
         { account: targetAccount },
-        `return id of ${currentRef}`
+        `${buildLiveFolderResolution(currentPath, "__folder", { rootOnly: true })}
+        return id of __folder`
       );
       const checkResult = executeAppleScript(checkScript);
       if (checkResult.success) {
@@ -43678,8 +43730,8 @@ var AppleNotesManager = class {
         createCommand = `make new folder with properties {name:"${segmentName}"}`;
       } else {
         const parentPath = parts.slice(0, i).map((p) => escapeFolderName(p)).join("/");
-        const parentRef = buildFolderReference(parentPath);
-        createCommand = `make new folder at ${parentRef} with properties {name:"${segmentName}"}`;
+        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", { rootOnly: true })}
+        make new folder at __parent with properties {name:"${segmentName}"}`;
       }
       const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
       const result = executeMutationAppleScript(script);
@@ -43689,14 +43741,23 @@ var AppleNotesManager = class {
         return null;
       }
     }
-    const fullRef = buildFolderReference(name);
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `return (id of ${fullRef}) & ${AS_FIELD_SEP} & (name of it)`
+      `${buildLiveFolderResolution(name, "__folder", { rootOnly: true })}
+      return (id of __folder) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
     const [rawId = "", rawAccount = ""] = idResult.success ? idResult.output.split(FIELD_SEP) : [];
-    const folderId2 = idResult.success ? extractCoreDataId(rawId, "folder") : "";
+    const bareId = rawId.trim();
+    const folderId2 = !idResult.success ? "" : FOLDER_ID_PATTERN.test(bareId) ? bareId : extractCoreDataId(rawId, "folder");
+    if (!folderId2) {
+      throwIfAccountResolutionFailed(idResult.error);
+      console.error(
+        `Folder "${name}" could not be confirmed after creation:`,
+        idResult.error ?? "no folder id returned"
+      );
+      return null;
+    }
     return {
       id: folderId2,
       name,
@@ -43714,7 +43775,8 @@ var AppleNotesManager = class {
    */
   deleteFolder(name, account) {
     const targetAccount = this.resolveAccount(account);
-    const deleteCommand = `delete ${buildFolderReference(name)}`;
+    const deleteCommand = `${buildLiveFolderResolution(name, "__folder")}
+    delete __folder`;
     const script = buildAccountScopedScript({ account: targetAccount }, deleteCommand);
     const result = executeMutationAppleScript(script);
     if (!result.success) {
@@ -43740,10 +43802,10 @@ var AppleNotesManager = class {
   moveNoteById(id2, destinationFolder, account, scope2) {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeNoteId(id2);
-    const destFolderRef = `${buildFolderReference(destinationFolder)} of ${AS_ACCOUNT_REF}`;
+    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder");
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
-      set destFolder to ${destFolderRef}
+      ${destFolderSetup}
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2, "destFolder")}
       move noteRef to destFolder
       set movedNoteRef to note id "${safeId}"
@@ -44649,7 +44711,7 @@ var AppleNotesManager = class {
   batchMoveNotes(ids, folder, account) {
     if (ids.length === 0) return [];
     const targetAccount = this.resolveAccount(account);
-    const destFolderRef = `${buildFolderReference(folder)} of ${AS_ACCOUNT_REF}`;
+    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder");
     const results = new Array(ids.length);
     const runnable = [];
     ids.forEach((id2, i) => {
@@ -44667,7 +44729,7 @@ var AppleNotesManager = class {
       const idList2 = runnable.map((r) => `"${r.safe}"`).join(", ");
       const script = buildAppLevelScript(`
         ${buildAccountResolution(targetAccount)}
-        set destFolder to ${destFolderRef}
+        ${destFolderSetup}
         set out to ""
         repeat with rawId in {${idList2}}
           set theId to (rawId as text)

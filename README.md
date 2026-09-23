@@ -1174,6 +1174,8 @@ Creates a new folder, including a whole nested hierarchy in one call.
 
 **Returns:** Confirmation message. The call is **idempotent** — an already-existing folder (or path segment) is skipped rather than treated as an error, so it is safe to call before every `create-note` that targets a folder.
 
+Existence is decided by folder id, not by name: a folder deleted earlier in the same Notes session no longer counts as existing, and the call succeeds only once the created folder is confirmed by its id. Otherwise it reports failure.
+
 ---
 
 #### `get-folder-by-id`
