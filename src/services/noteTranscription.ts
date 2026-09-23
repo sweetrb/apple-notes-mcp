@@ -4,7 +4,13 @@
  *
  * Audio files are opened read-only by the helper. Recognition never leaves the
  * Mac: SpeechAnalyzer on macOS 26+, or SFSpeechRecognizer with on-device
- * recognition required on older systems.
+ * recognition required on older systems. The helper never asks for Speech
+ * Recognition access and never downloads a speech model unless the caller
+ * opts in with `downloadAssets`.
+ *
+ * Each take runs in an asynchronous child process, so the server keeps
+ * answering other requests. The whole call has one time budget
+ * (`maxSeconds`), and cancelling the MCP request kills the running helper.
  *
  * @module services/noteTranscription
  */
@@ -22,7 +28,7 @@ import {
   type AudioTake,
 } from "@/utils/noteAudio.js";
 import {
-  callPublicHelper,
+  callPublicHelperAsync,
   defaultPublicHelperDeps,
   inspectPublicHelper,
   PublicHelperError,
@@ -33,6 +39,9 @@ export const DEFAULT_TRANSCRIPTION_LOCALE = "en-US";
 /** BCP-47-shaped: a 2-3 letter language, then letter/digit subtags. */
 export const LOCALE_PATTERN = /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8}){0,3}$/;
 
+/** Total time one call may spend across all takes, in seconds. */
+export const TRANSCRIBE_MAX_SECONDS = { default: 900, min: 30, max: 3600 } as const;
+
 /** Seconds the helper may spend on one take before returning what it has. */
 export function takeDeadlineSeconds(durationSeconds: number | null): number {
   const duration = durationSeconds ?? 600;
@@ -41,6 +50,22 @@ export function takeDeadlineSeconds(durationSeconds: number | null): number {
 
 /** Grace after the helper's own deadline before the server gives up on it. */
 const KILL_GRACE_MS = 30_000;
+/** Budget kept back from a take's helper deadline so the kill still lands inside the call's budget. */
+const BUDGET_MARGIN_MS = 10_000;
+/** The helper's own minimum deadline; a take with less budget left is not started. */
+const MIN_TAKE_SECONDS = 5;
+
+/**
+ * Helper codes that hold for every take in the call (the host app's Speech
+ * Recognition access, the locale's model, the Mac's support). After the first
+ * one, the remaining takes reuse it instead of starting the helper again.
+ */
+const CALL_WIDE_CODES: ReadonlySet<string> = new Set([
+  "permission_required",
+  "asset_unavailable",
+  "unsupported_locale",
+  "speech_unavailable",
+]);
 
 const helperTranscriptSchema = z.object({
   status: z.literal("ok"),
@@ -57,9 +82,19 @@ export interface TranscribeOptions {
   attachmentId?: string;
   /** Include transcript text (default true). false returns statuses and counts only. */
   includeText?: boolean;
+  /**
+   * Let macOS download the locale's on-device speech model when it is missing
+   * (default false: the take returns `asset_unavailable` at once).
+   */
+  downloadAssets?: boolean;
+  /** Total time budget for the call in seconds (default 900, 30 to 3600). */
+  maxSeconds?: number;
+  /** Aborting (the MCP request was cancelled) kills the running helper and rejects. */
+  signal?: AbortSignal;
   /** Test seams. */
   deps?: PublicHelperDeps;
   readAssets?: (noteId: string) => AudioRecordingAsset[];
+  now?: () => number;
 }
 
 interface TakeOutcome {
@@ -67,34 +102,65 @@ interface TakeOutcome {
   text: string;
 }
 
-function transcribeTake(take: AudioTake, locale: string, deps: PublicHelperDeps): TakeOutcome {
+/** Per-call state shared by every take: the fixed request fields, the budget, and a call-wide failure. */
+interface CallContext {
+  locale: string;
+  downloadAssets: boolean;
+  deps: PublicHelperDeps;
+  signal?: AbortSignal;
+  now: () => number;
+  deadlineAt: number;
+  maxSeconds: number;
+  callWide: { code: string; message: string } | null;
+}
+
+async function transcribeTake(take: AudioTake, ctx: CallContext): Promise<TakeOutcome> {
   const base: TranscribedTake = {
     attachmentId: take.attachmentId,
     identifier: take.identifier,
     status: "error",
     ...(take.durationSeconds !== null ? { durationSeconds: Math.round(take.durationSeconds) } : {}),
   };
+  const failed = (code: string, message: string): TakeOutcome => ({
+    take: { ...base, code, message },
+    text: "",
+  });
   if (!take.path)
-    return {
-      take: {
-        ...base,
-        code: "asset_unavailable",
-        message: "The audio file is not on this Mac (it may not have downloaded from iCloud yet).",
-      },
-      text: "",
-    };
-  const deadline = takeDeadlineSeconds(take.durationSeconds);
+    return failed(
+      "asset_unavailable",
+      "The audio file is not on this Mac (it may not have downloaded from iCloud yet)."
+    );
+  if (ctx.callWide) return failed(ctx.callWide.code, ctx.callWide.message);
+  const remainingMs = ctx.deadlineAt - ctx.now();
+  const deadline = Math.min(
+    takeDeadlineSeconds(take.durationSeconds),
+    Math.floor((remainingMs - BUDGET_MARGIN_MS) / 1000)
+  );
+  if (deadline < MIN_TAKE_SECONDS)
+    return failed(
+      "time_limit",
+      `Not started: the call's ${ctx.maxSeconds}-second limit was reached. ` +
+        "Transcribe this recording on its own with attachmentId, or raise maxSeconds."
+    );
   let raw: Record<string, unknown>;
   try {
-    raw = callPublicHelper(
+    raw = await callPublicHelperAsync(
       "transcribe",
-      { path: take.path, locale, timeoutSeconds: deadline },
-      deps,
-      { timeoutMs: deadline * 1000 + KILL_GRACE_MS }
+      {
+        path: take.path,
+        locale: ctx.locale,
+        timeoutSeconds: deadline,
+        downloadAssets: ctx.downloadAssets,
+      },
+      ctx.deps,
+      { timeoutMs: Math.min(deadline * 1000 + KILL_GRACE_MS, remainingMs), signal: ctx.signal }
     );
   } catch (error) {
     const code = error instanceof PublicHelperError ? error.code : "internal_error";
+    // A cancelled request has no one to answer; stop the whole call.
+    if (code === "aborted") throw error;
     const message = error instanceof Error ? error.message : String(error);
+    if (CALL_WIDE_CODES.has(code)) ctx.callWide = { code, message };
     return {
       take: {
         ...base,
@@ -107,11 +173,7 @@ function transcribeTake(take: AudioTake, locale: string, deps: PublicHelperDeps)
     };
   }
   const parsed = helperTranscriptSchema.safeParse(raw);
-  if (!parsed.success)
-    return {
-      take: { ...base, code: "invalid_response", message: "Unexpected helper response." },
-      text: "",
-    };
+  if (!parsed.success) return failed("invalid_response", "Unexpected helper response.");
   const { transcript, complete, stopReason, engine, durationSeconds } = parsed.data;
   const text = transcript.trim();
   return {
@@ -137,13 +199,14 @@ export function combineStatus(
   return "error";
 }
 
-function transcribeRecording(
+async function transcribeRecording(
   asset: AudioRecordingAsset,
-  locale: string,
   includeText: boolean,
-  deps: PublicHelperDeps
-): TranscribedRecording {
-  const outcomes = asset.takes.map((take) => transcribeTake(take, locale, deps));
+  ctx: CallContext
+): Promise<TranscribedRecording> {
+  // Takes run one after another: the budget and call-wide failures carry over.
+  const outcomes: TakeOutcome[] = [];
+  for (const take of asset.takes) outcomes.push(await transcribeTake(take, ctx));
   const transcript = outcomes
     .map((o) => o.text)
     .filter(Boolean)
@@ -172,15 +235,26 @@ function transcribeRecording(
 /**
  * Transcribes every audio attachment in the note (or one, with attachmentId).
  * Per-recording failures do not fail the call. Note-level problems throw
- * NoteStoreError or a coded error; an unusable helper throws PublicHelperError once.
+ * NoteStoreError or a coded error; an unusable helper throws PublicHelperError
+ * once; a cancelled request rejects with PublicHelperError code `aborted`.
  */
-export function transcribeNoteAudio(
+export async function transcribeNoteAudio(
   noteId: string,
   options: TranscribeOptions = {}
-): NoteTranscriptionResult {
+): Promise<NoteTranscriptionResult> {
   const locale = options.locale ?? DEFAULT_TRANSCRIPTION_LOCALE;
   if (!LOCALE_PATTERN.test(locale))
     throw new PublicHelperError("invalid_request", `"${locale}" is not a BCP-47 locale.`);
+  const maxSeconds = options.maxSeconds ?? TRANSCRIBE_MAX_SECONDS.default;
+  if (
+    !Number.isInteger(maxSeconds) ||
+    maxSeconds < TRANSCRIBE_MAX_SECONDS.min ||
+    maxSeconds > TRANSCRIBE_MAX_SECONDS.max
+  )
+    throw new PublicHelperError(
+      "invalid_request",
+      `maxSeconds must be a whole number from ${TRANSCRIBE_MAX_SECONDS.min} to ${TRANSCRIBE_MAX_SECONDS.max}.`
+    );
   const deps = options.deps ?? defaultPublicHelperDeps();
   let assets = (options.readAssets ?? ((id: string) => readAudioAssets(id)))(noteId);
   if (options.attachmentId) {
@@ -196,9 +270,20 @@ export function transcribeNoteAudio(
   const install = inspectPublicHelper(deps);
   if (!install.ready)
     throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-  const recordings = assets.map((asset) =>
-    transcribeRecording(asset, locale, options.includeText ?? true, deps)
-  );
+  const now = options.now ?? Date.now;
+  const ctx: CallContext = {
+    locale,
+    downloadAssets: options.downloadAssets ?? false,
+    deps,
+    signal: options.signal,
+    now,
+    deadlineAt: now() + maxSeconds * 1000,
+    maxSeconds,
+    callWide: null,
+  };
+  const recordings: TranscribedRecording[] = [];
+  for (const asset of assets)
+    recordings.push(await transcribeRecording(asset, options.includeText ?? true, ctx));
   return {
     ...empty,
     status: combineStatus(

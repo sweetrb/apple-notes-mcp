@@ -303,27 +303,73 @@ func authorizationName(_ status: SFSpeechRecognizerAuthorizationStatus) -> Strin
     }
 }
 
-/// Maps a Speech error to a stable code. Authorization failures get their own code
-/// because the fix (a Speech Recognition grant) lives outside this program.
-func speechFailure(_ error: Error) -> HelperFailure {
-    if let failure = error as? HelperFailure { return failure }
-    let description = error.localizedDescription
-    let lowered = description.lowercased()
-    if lowered.contains("not authorized") || lowered.contains("denied") || lowered.contains("authoriz") {
-        return HelperFailure(code: "permission_denied", message: description)
+// Speech Recognition access. The helper runs under an MCP server that nobody
+// may be watching, so it never calls SFSpeechRecognizer.requestAuthorization:
+// a system prompt would block the helper until the server killed it. It reads
+// the current status instead and stops with `permission_required` when the
+// engine it is about to use needs a grant that is missing.
+
+/// The failure returned instead of prompting. The grant belongs to the app that
+/// runs the MCP server (Claude, a terminal, ...), which macOS treats as responsible.
+func permissionRequired(_ status: SFSpeechRecognizerAuthorizationStatus) -> HelperFailure {
+    let settings = "System Settings > Privacy & Security > Speech Recognition"
+    let detail: String
+    switch status {
+    case .denied:
+        detail = "Speech Recognition access was denied for the app running this server. Turn it on in \(settings), then try again."
+    case .restricted:
+        detail = "Speech Recognition is restricted on this Mac (for example by a device management profile), so it cannot be used."
+    default:
+        detail = "Speech Recognition access has not been granted to the app running this server, and the server never shows the permission prompt. Allow the app in \(settings), then try again."
     }
-    return HelperFailure(code: "transcription_failed", message: description)
+    return HelperFailure(code: "permission_required", message: detail)
 }
 
+/// Stops before any Speech call when access is missing. The legacy recognizer
+/// needs `.authorized`. SpeechAnalyzer (macOS 26+) runs on-device without a
+/// grant and does not prompt, so there only an explicit refusal (`.denied` or
+/// `.restricted`) stops it; that also covers a future macOS that gates it.
+func checkSpeechAccess(requireGrant: Bool) throws {
+    let status = SFSpeechRecognizer.authorizationStatus()
+    if status == .authorized { return }
+    if requireGrant || status == .denied || status == .restricted {
+        throw permissionRequired(status)
+    }
+}
+
+/// Maps a Speech error to a stable code. Permission is decided from the
+/// explicit authorization status, never from the error's text.
+func speechFailure(_ error: Error, requireGrant: Bool) -> HelperFailure {
+    if let failure = error as? HelperFailure { return failure }
+    do {
+        try checkSpeechAccess(requireGrant: requireGrant)
+    } catch let failure as HelperFailure {
+        return failure
+    } catch {}
+    return HelperFailure(code: "transcription_failed", message: error.localizedDescription)
+}
+
+/// Makes sure the locale's on-device model is installed. A download starts only
+/// when the caller opted in: otherwise a missing model is `asset_unavailable` at once.
 @available(macOS 26, *)
-func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String) async throws {
+func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String, allowDownload: Bool) async throws {
     switch await AssetInventory.status(forModules: [transcriber]) {
     case .installed:
         return
     case .unsupported:
         throw HelperFailure(code: "unsupported_locale", message: "No on-device speech model for \(localeID)")
+    case .downloading where !allowDownload:
+        throw HelperFailure(
+            code: "asset_unavailable",
+            message: "macOS is still downloading the on-device speech model for \(localeID); try again shortly"
+        )
     default:
-        break
+        if !allowDownload {
+            throw HelperFailure(
+                code: "asset_unavailable",
+                message: "The on-device speech model for \(localeID) is not installed. Retry with downloadAssets: true to let macOS download it."
+            )
+        }
     }
     guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
         return
@@ -346,7 +392,10 @@ func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String) asyn
 }
 
 @available(macOS 26, *)
-func transcribeWithAnalyzer(file: AVAudioFile, localeID: String, deadline: Double) async throws -> [String: Any] {
+func transcribeWithAnalyzer(
+    file: AVAudioFile, localeID: String, deadline: Double, allowDownload: Bool
+) async throws -> [String: Any] {
+    try checkSpeechAccess(requireGrant: false)
     guard SpeechTranscriber.isAvailable else {
         throw HelperFailure(code: "speech_unavailable", message: "On-device transcription is not available on this Mac")
     }
@@ -354,7 +403,7 @@ func transcribeWithAnalyzer(file: AVAudioFile, localeID: String, deadline: Doubl
         throw HelperFailure(code: "unsupported_locale", message: "No on-device transcription for \(localeID)")
     }
     let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-    try await ensureSpeechAssets(transcriber, localeID: localeID)
+    try await ensureSpeechAssets(transcriber, localeID: localeID, allowDownload: allowDownload)
     let analyzer = SpeechAnalyzer(modules: [transcriber])
     let collector = TranscriptCollector()
     let reader = Task {
@@ -385,25 +434,19 @@ func transcribeWithAnalyzer(file: AVAudioFile, localeID: String, deadline: Doubl
     case .failed(let error):
         await analyzer.cancelAndFinishNow()
         reader.cancel()
-        if await collector.isEmpty() { throw speechFailure(error) }
+        let failure = speechFailure(error, requireGrant: false)
+        if await collector.isEmpty() { throw failure }
         response["complete"] = false
-        response["stopReason"] = speechFailure(error).message
+        response["stopReason"] = failure.message
     }
     response["transcript"] = await collector.text()
     return response
 }
 
-/// Pre-macOS 26 path: SFSpeechRecognizer, forced on-device.
+/// Pre-macOS 26 path: SFSpeechRecognizer, forced on-device. It needs a Speech
+/// Recognition grant, which is checked here and never requested.
 func transcribeWithRecognizer(url: URL, localeID: String, deadline: Double) async throws -> [String: Any] {
-    let status = await withCheckedContinuation { continuation in
-        SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-    }
-    guard status == .authorized else {
-        throw HelperFailure(
-            code: "permission_denied",
-            message: "Speech Recognition access is \(authorizationName(status)) for the app hosting this server"
-        )
-    }
+    try checkSpeechAccess(requireGrant: true)
     guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeID)) else {
         throw HelperFailure(code: "unsupported_locale", message: "No speech recognizer for \(localeID)")
     }
@@ -451,9 +494,10 @@ func transcribeWithRecognizer(url: URL, localeID: String, deadline: Double) asyn
         response["complete"] = false
         response["stopReason"] = "deadline"
     case .failed(let error):
-        if transcript.isEmpty { throw speechFailure(error) }
+        let failure = speechFailure(error, requireGrant: true)
+        if transcript.isEmpty { throw failure }
         response["complete"] = false
-        response["stopReason"] = speechFailure(error).message
+        response["stopReason"] = failure.message
     }
     response["transcript"] = transcript
     return response
@@ -479,7 +523,10 @@ func transcribe(_ request: [String: Any]) async throws -> [String: Any] {
     let duration = file.fileFormat.sampleRate > 0 ? Double(file.length) / file.fileFormat.sampleRate : 0
     var response: [String: Any]
     if #available(macOS 26, *) {
-        response = try await transcribeWithAnalyzer(file: file, localeID: localeID, deadline: deadline)
+        response = try await transcribeWithAnalyzer(
+            file: file, localeID: localeID, deadline: deadline,
+            allowDownload: request["downloadAssets"] as? Bool ?? false
+        )
     } else {
         response = try await transcribeWithRecognizer(url: url, localeID: localeID, deadline: deadline)
     }

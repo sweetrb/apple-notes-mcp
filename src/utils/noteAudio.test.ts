@@ -5,15 +5,21 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createNoteStoreFixture } from "./fixtures/noteStoreFixture.js";
 import { audioRowsSql, countWords, readAudioAssets, resolveMediaPath } from "./noteAudio.js";
-import { NoteStoreError } from "./noteStoreSql.js";
+import { AttachmentStoreError } from "./attachmentAssets.js";
 
 const STORE = "ABCDEF01-2345-6789-ABCD-EF0123456789";
 const noteId = (pk: number) => `x-coredata://${STORE}/ICNote/p${pk}`;
 
-// A synthetic Accounts tree: two account folders, files in the second one.
-const accounts = realpathSync.native(mkdtempSync(join(tmpdir(), "notes-accounts-")));
+// A synthetic group container whose Accounts tree has two account folders,
+// with files in the second one.
+const container = realpathSync.native(mkdtempSync(join(tmpdir(), "notes-container-")));
+const accounts = join(container, "Accounts");
 const outside = realpathSync.native(mkdtempSync(join(tmpdir(), "notes-outside-")));
-mkdirSync(join(accounts, "ACCOUNT-A"));
+mkdirSync(join(accounts, "ACCOUNT-A"), { recursive: true });
+// The same media identifier in the other account, to prove the note's account wins.
+mkdirSync(join(accounts, "ACCOUNT-A", "Media", "M-3"), { recursive: true });
+const otherAccountVoice = join(accounts, "ACCOUNT-A", "Media", "M-3", "voice.mp3");
+writeFileSync(otherAccountVoice, "other account");
 const media = (id: string, gen: string | null, file: string) => {
   const dir = gen
     ? join(accounts, "ACCOUNT-B", "Media", id, gen)
@@ -34,8 +40,9 @@ symlinkSync(
 );
 
 const fixture = createNoteStoreFixture([
-  { pk: 1, ent: "ICNote" },
+  { pk: 1, ent: "ICNote", account: 50 },
   { pk: 2, ent: "ICNote", locked: 1 },
+  { pk: 50, ent: "ICAccount", identifier: "ACCOUNT-B" },
   // A recording with two live takes and one take marked for deletion.
   {
     pk: 10,
@@ -100,13 +107,13 @@ const fixture = createNoteStoreFixture([
 ]);
 afterAll(() => {
   fixture.cleanup();
-  rmSync(accounts, { recursive: true, force: true });
+  rmSync(container, { recursive: true, force: true });
   rmSync(outside, { recursive: true, force: true });
 });
 
 describe("readAudioAssets (real sqlite3, fixture database)", () => {
   it("returns recordings with their live takes and plain audio files, with resolved paths", () => {
-    const assets = readAudioAssets(noteId(1), { dbPath: fixture.dbPath, accountsRoot: accounts });
+    const assets = readAudioAssets(noteId(1), { dbPath: fixture.dbPath, containerDir: container });
     expect(assets.map((a) => [a.pk, a.typeUti, a.identifier, a.durationSeconds])).toEqual([
       [10, "com.apple.m4a-audio", "REC", 42.5],
       [20, "public.mp3", "MP3", 4],
@@ -138,10 +145,10 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
   });
 
   it("refuses locked and missing notes and malformed ids", () => {
-    const opts = { dbPath: fixture.dbPath, accountsRoot: accounts };
+    const opts = { dbPath: fixture.dbPath, containerDir: container };
     expect(() => readAudioAssets(noteId(2), opts)).toThrow(/password-protected/);
     expect(() => readAudioAssets(noteId(3), opts)).toThrow(/No note found/);
-    expect(() => readAudioAssets("x-coredata://X/ICNote/p1'", opts)).toThrow(NoteStoreError);
+    expect(() => readAudioAssets("x-coredata://X/ICNote/p1'", opts)).toThrow(AttachmentStoreError);
   });
 
   it("works without a generation column and reports missing required columns", () => {
@@ -153,14 +160,15 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
           "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZNOTE, ZTYPEUTI, ZIDENTIFIER, ZMEDIA, ZMARKEDFORDELETION) VALUES (5, 5, 1, 'public.mp3', 'A', 6, 0);" +
           "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZIDENTIFIER, ZFILENAME) VALUES (6, 11, 'M-3', 'voice.mp3');",
       ]);
-      const [asset] = readAudioAssets(noteId(1), { dbPath: old.dbPath, accountsRoot: accounts });
-      expect(asset.takes[0].path).toBe(plain);
+      // This note has no account link, so every account folder is probed in order.
+      const [asset] = readAudioAssets(noteId(1), { dbPath: old.dbPath, containerDir: container });
+      expect(asset.takes[0].path).toBe(otherAccountVoice);
       execFileSync("sqlite3", [
         old.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT ADD COLUMN ZGENERATION VARCHAR;",
       ]);
       expect(
-        readAudioAssets(noteId(1), { dbPath: old.dbPath, accountsRoot: accounts })
+        readAudioAssets(noteId(1), { dbPath: old.dbPath, containerDir: container })
       ).toHaveLength(1);
       expect(audioRowsSql(new Set(), "ZGENERATION")).toContain("m.ZGENERATION,");
       execFileSync("sqlite3", [
@@ -180,7 +188,11 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
       expect(sql).toContain("COALESCE(t.ZMARKEDFORDELETION, 0) = 0");
       expect(sql).toContain("COALESCE(k.ZMARKEDFORDELETION, 0) = 0");
       expect(sql).not.toMatch(/ZNOTE = \d/);
+      expect(sql.endsWith("SELECT NULL;")).toBe(true);
     }
+    expect(audioRowsSql(new Set(["ZACCOUNT2", "ZACCOUNT6"]), null)).toContain(
+      "acc.Z_PK IN (n.ZACCOUNT2, n.ZACCOUNT6)"
+    );
   });
 });
 
@@ -193,22 +205,47 @@ describe("resolveMediaPath", () => {
       { identifier: null, generation: null, filename: "x" },
       null,
     ])
-      expect(resolveMediaPath(bad, accounts)).toBeNull();
+      expect(resolveMediaPath(bad, "ACCOUNT-B", container)).toBeNull();
   });
 
-  it("falls back to the flat layout and refuses symlinks that leave the root", () => {
+  it("falls back to the flat layout and refuses symlinks that leave the account folder", () => {
     expect(
-      resolveMediaPath({ identifier: "M-3", generation: "GX", filename: "voice.mp3" }, accounts)
+      resolveMediaPath(
+        { identifier: "M-3", generation: "GX", filename: "voice.mp3" },
+        "ACCOUNT-B",
+        container
+      )
     ).toBe(plain);
     expect(
-      resolveMediaPath({ identifier: "M-4", generation: "G4", filename: "escape.m4a" }, accounts)
+      resolveMediaPath(
+        { identifier: "M-4", generation: "G4", filename: "escape.m4a" },
+        "ACCOUNT-B",
+        container
+      )
     ).toBeNull();
   });
 
-  it("returns null when the accounts root cannot be read", () => {
+  it("uses the note's account, and probes every account folder when it is unknown", () => {
+    const voice = { identifier: "M-3", generation: null, filename: "voice.mp3" };
+    expect(resolveMediaPath(voice, "ACCOUNT-A", container)).toBe(otherAccountVoice);
+    expect(resolveMediaPath(voice, "ACCOUNT-B", container)).toBe(plain);
+    // Unknown or unsafe account: the first account folder (sorted) holding the file.
+    expect(resolveMediaPath(voice, null, container)).toBe(otherAccountVoice);
+    expect(resolveMediaPath(voice, "../ACCOUNT-B", container)).toBe(otherAccountVoice);
     expect(
       resolveMediaPath(
         { identifier: "M-1", generation: "G1", filename: "take1.m4a" },
+        "NOPE",
+        container
+      )
+    ).toBe(take1);
+  });
+
+  it("returns null when the container cannot be read", () => {
+    expect(
+      resolveMediaPath(
+        { identifier: "M-1", generation: "G1", filename: "take1.m4a" },
+        null,
         join(outside, "nope")
       )
     ).toBeNull();

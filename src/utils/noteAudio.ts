@@ -8,26 +8,30 @@
  *
  *   Accounts/<account identifier>/Media/<media identifier>/<generation>/<filename>
  *
- * (older layouts omit the generation folder). The account folder is found by
- * probing the account directories that exist, so no account-column mapping is
- * needed. Nothing here writes: the database is opened read-only and files are
- * only stat'ed and resolved.
+ * (older layouts omit the generation folder). The account folder comes from the
+ * note's account, resolved with the same helpers `list-attachments` uses; when
+ * that is unknown, each account folder is probed. Nothing here writes: the
+ * database is opened read-only and files are only stat'ed and resolved.
  *
  * @module utils/noteAudio
  */
-import { readdirSync, realpathSync, statSync } from "node:fs";
-import { join, sep } from "node:path";
-import { NOTES_CONTAINER_DIR } from "./attachmentAssets.js";
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
-  assertNoteReadable,
-  NOTE_STATE_SQL,
-  parseNoteObjectId,
-  queryNoteScoped,
-} from "./noteStoreQuery.js";
-import { NOTES_DB_PATH, NoteStoreError, notTombstonedSql, readColumns } from "./noteStoreSql.js";
-
-/** Root of the per-account attachment folders (Media, Previews, ...). */
-export const NOTE_ACCOUNTS_PATH = join(NOTES_CONTAINER_DIR, "Accounts");
+  NOTES_CONTAINER_DIR,
+  parseNoteId,
+  realInside,
+  resolveAccountDir,
+  safeComponent,
+} from "./attachmentAssets.js";
+import { assertNoteReadable, NOTE_STATE_SQL, queryNoteScoped } from "./noteStoreQuery.js";
+import {
+  entity,
+  NOTES_DB_PATH,
+  NoteStoreError,
+  notTombstonedSql,
+  readColumns,
+} from "./noteStoreSql.js";
 
 /** One audio file that can be transcribed. */
 export interface AudioTake {
@@ -91,6 +95,14 @@ export function audioRowsSql(
     `'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
   const live = (alias: string) => notTombstonedSql(columns, alias);
   const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
+  // The note's account identifier names its folder under Accounts/. The link
+  // column's suffix differs between macOS releases, so every ZACCOUNT* is tried.
+  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const account = accountCols.length
+    ? `SELECT (SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = ${entity("ICAccount")} ` +
+      `AND acc.Z_PK IN (${accountCols.map((c) => `n.${c}`).join(", ")}) LIMIT 1) ` +
+      "FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;"
+    : "SELECT NULL;";
   return [
     NOTE_STATE_SQL,
     "SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, " +
@@ -101,48 +113,60 @@ export function audioRowsSql(
       "ORDER BY k.Z_PK) c)))) FROM " +
       "(SELECT * FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE = @pk AND t.ZPARENTATTACHMENT IS NULL " +
       `AND ${live("t")} AND (t.ZTYPEUTI LIKE '%audio%' OR t.ZTYPEUTI IN (${utis})) ORDER BY t.Z_PK) a;`,
+    account,
   ].join("\n");
 }
 
-/** A single path segment from the database: no separators, no dot segments. */
-function safeSegment(value: string | null): value is string {
-  return (
-    !!value && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\0")
-  );
+/**
+ * The account folders to look in: the note's own when it resolves, otherwise
+ * every folder under Accounts/ (an unknown account in a multi-account library).
+ */
+function accountDirsFor(containerDir: string, accountIdentifier: string | null): string[] {
+  const own = resolveAccountDir(containerDir, accountIdentifier);
+  if (own) return [own];
+  let names: string[];
+  try {
+    names = readdirSync(join(containerDir, "Accounts")).sort();
+  } catch {
+    return [];
+  }
+  return names
+    .map((name) => (safeComponent(name) ? resolveAccountDir(containerDir, name) : null))
+    .filter((dir): dir is string => dir !== null);
 }
 
 /**
- * Finds a media file under the accounts root. Returns the real path only when
- * it is a regular file that resolves inside the root (no symlink escapes).
+ * Finds a media file in the note's account folder. Returns the real path only
+ * when it is a regular file that resolves inside that folder (no symlink escapes).
  */
 export function resolveMediaPath(
   media: MediaRef | null,
-  accountsRoot: string = NOTE_ACCOUNTS_PATH
+  accountIdentifier: string | null = null,
+  containerDir: string = NOTES_CONTAINER_DIR
 ): string | null {
-  if (!media || !safeSegment(media.identifier) || !safeSegment(media.filename)) return null;
-  let root: string;
-  let accounts: string[];
-  try {
-    root = realpathSync.native(accountsRoot);
-    accounts = readdirSync(root);
-  } catch {
-    return null;
-  }
-  for (const account of accounts.filter(safeSegment)) {
-    const base = join(root, account, "Media", media.identifier);
-    const candidates = safeSegment(media.generation)
-      ? [join(base, media.generation, media.filename), join(base, media.filename)]
-      : [join(base, media.filename)];
+  const id = safeComponent(media?.identifier);
+  const filename = safeComponent(media?.filename);
+  if (!id || !filename) return null;
+  const generation = safeComponent(media?.generation);
+  for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
+    const base = join(dir, "Media", id);
+    const candidates = generation
+      ? [join(base, generation, filename), join(base, filename)]
+      : [join(base, filename)];
     for (const candidate of candidates) {
-      try {
-        const real = realpathSync.native(candidate);
-        if (real.startsWith(root + sep) && statSync(real).isFile()) return real;
-      } catch {
-        // not in this account folder
-      }
+      const real = realInside(candidate, dir);
+      if (real && isFile(real)) return real;
     }
   }
   return null;
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 const positive = (value: number | null | undefined): number | null =>
@@ -150,7 +174,8 @@ const positive = (value: number | null | undefined): number | null =>
 
 export interface ReadAudioOptions {
   dbPath?: string;
-  accountsRoot?: string;
+  /** The Notes group container (holds Accounts/); tests point it at a fixture tree. */
+  containerDir?: string;
 }
 
 /** Reads every live top-level audio attachment of one note, in primary-key order. */
@@ -158,7 +183,7 @@ export function readAudioAssets(
   noteId: string,
   options: ReadAudioOptions = {}
 ): AudioRecordingAsset[] {
-  const { store, pk } = parseNoteObjectId(noteId);
+  const { store, pk } = parseNoteId(noteId);
   const dbPath = options.dbPath ?? NOTES_DB_PATH;
   const columns = readColumns(dbPath);
   const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
@@ -172,9 +197,14 @@ export function readAudioAssets(
     : columns.has("ZGENERATION")
       ? "ZGENERATION"
       : null;
-  const [stateLine, rowsLine] = queryNoteScoped(audioRowsSql(columns, generation), pk, dbPath);
+  const [stateLine, rowsLine, accountLine] = queryNoteScoped(
+    audioRowsSql(columns, generation),
+    pk,
+    dbPath
+  );
   assertNoteReadable(stateLine, noteId);
   const rows = JSON.parse(rowsLine || "[]") as AudioRow[];
+  const account = accountLine?.trim() || null;
   const attachmentId = (rowPk: number) => `x-coredata://${store}/ICAttachment/p${rowPk}`;
   return rows.map((row) => {
     // A recording's audio lives in its takes; a plain audio file is its own take.
@@ -185,7 +215,7 @@ export function readAudioAssets(
       attachmentId: attachmentId(take.pk),
       identifier: take.identifier ?? "",
       durationSeconds: positive(take.duration),
-      path: resolveMediaPath(take.media, options.accountsRoot),
+      path: resolveMediaPath(take.media, account, options.containerDir),
     }));
     const total = takes.reduce((sum, t) => sum + (t.durationSeconds ?? 0), 0);
     return {

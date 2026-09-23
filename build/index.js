@@ -52498,7 +52498,7 @@ function formatShortcutSetup(report) {
 }
 
 // src/services/publicHelper.ts
-import { spawnSync as spawnSync3 } from "node:child_process";
+import { spawn, spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
 import {
   chmodSync,
@@ -52560,6 +52560,7 @@ function defaultPublicHelperDeps(overrides = {}) {
     exists: existsSync14,
     readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
+    spawnAsync: spawn,
     ...overrides
   };
 }
@@ -52647,21 +52648,9 @@ var publicHelloSchema = external_exports.object({
   actions: external_exports.array(external_exports.string())
 }).passthrough();
 function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  if (!PUBLIC_HELPER_ACTIONS.has(action))
-    throw new PublicHelperError(
-      "unknown_action",
-      `"${action}" is not an action the server sends to the public helper.`
-    );
-  let binaryPath = options.binaryPath;
-  if (!binaryPath) {
-    const install = inspectPublicHelper(deps);
-    if (!install.ready)
-      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-    binaryPath = install.binaryPath;
-  }
-  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
   const result = deps.spawn(binaryPath, [], {
-    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    input,
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
@@ -52675,24 +52664,100 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
       "helper_unreachable",
       `Could not run the helper: ${result.error.message}`
     );
+  return parseHelperOutput(result.status, String(result.stdout ?? ""));
+}
+async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const { signal } = options;
+  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
+  if (signal?.aborted) throw aborted2();
+  return new Promise((resolvePromise, reject) => {
+    const child = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+      stdio: ["pipe", "pipe", "ignore"]
+    });
+    const chunks = [];
+    let size = 0;
+    let failure = null;
+    const stop = (error2) => {
+      failure ??= error2;
+      child.kill("SIGKILL");
+    };
+    const timer = setTimeout(
+      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
+      timeout
+    );
+    const onAbort = () => stop(aborted2());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    child.stdout?.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES)
+        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
+      else chunks.push(chunk);
+    });
+    child.on("error", (error2) => {
+      settle();
+      reject(
+        failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+      );
+    });
+    child.on("close", (status, exitSignal) => {
+      settle();
+      if (failure) return reject(failure);
+      if (status === null && exitSignal)
+        return reject(
+          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
+        );
+      try {
+        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
+      } catch (error2) {
+        reject(error2);
+      }
+    });
+    child.stdin?.on("error", () => {
+    });
+    child.stdin?.end(input);
+  });
+}
+function prepareCall(action, fields, deps, options) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
+  return { binaryPath, timeout, input };
+}
+function parseHelperOutput(status, stdout) {
   let parsed;
   try {
-    parsed = JSON.parse(String(result.stdout ?? "").trim());
+    parsed = JSON.parse(stdout.trim());
   } catch {
     throw new PublicHelperError(
       "invalid_response",
-      `The helper exited with status ${result.status} and no JSON response.`
+      `The helper exited with status ${status} and no JSON response.`
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
     throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
   const object3 = parsed;
-  if (result.status !== 0 || object3.status !== "ok") {
+  if (status !== 0 || object3.status !== "ok") {
     const error2 = errorSchema.safeParse(object3);
     if (!error2.success)
       throw new PublicHelperError(
         "invalid_response",
-        `The helper failed with an unrecognized response (exit ${result.status}).`
+        `The helper failed with an unrecognized response (exit ${status}).`
       );
     throw new PublicHelperError(error2.data.code, error2.data.message);
   }
@@ -52725,8 +52790,6 @@ function publicHelperInfoPlist() {
     "  <string>apple-notes-mcp public helper</string>",
     "  <key>CFBundleInfoDictionaryVersion</key>",
     "  <string>6.0</string>",
-    "  <key>NSSpeechRecognitionUsageDescription</key>",
-    "  <string>apple-notes-mcp transcribes voice recordings in your notes on this Mac.</string>",
     "</dict>",
     "</plist>",
     ""
@@ -53112,9 +53175,8 @@ function formatNoteDrawings(result) {
 }
 
 // src/utils/noteAudio.ts
-import { readdirSync as readdirSync4, realpathSync as realpathSync4, statSync as statSync4 } from "node:fs";
-import { join as join25, sep as sep4 } from "node:path";
-var NOTE_ACCOUNTS_PATH = join25(NOTES_CONTAINER_DIR, "Accounts");
+import { readdirSync as readdirSync4, statSync as statSync4 } from "node:fs";
+import { join as join25 } from "node:path";
 var EXTRA_AUDIO_UTIS = [
   "public.mp3",
   "public.aiff-audio",
@@ -53126,40 +53188,50 @@ function audioRowsSql(columns, generationColumn) {
   const media = (alias) => `json((SELECT json_object('identifier', m.ZIDENTIFIER, 'generation', ${generation}, 'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
   const live = (alias) => notTombstonedSql(columns, alias);
   const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
+  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const account = accountCols.length ? `SELECT (SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = ${entity("ICAccount")} AND acc.Z_PK IN (${accountCols.map((c) => `n.${c}`).join(", ")}) LIMIT 1) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;` : "SELECT NULL;";
   return [
     NOTE_STATE_SQL,
-    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'duration', a.ZDURATION, 'media', ${media("a")}, 'children', json((SELECT json_group_array(json_object('pk', c.Z_PK, 'identifier', c.ZIDENTIFIER, 'duration', c.ZDURATION, 'media', ${media("c")})) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT k WHERE k.ZPARENTATTACHMENT = a.Z_PK AND ${live("k")} ORDER BY k.Z_PK) c)))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE = @pk AND t.ZPARENTATTACHMENT IS NULL AND ${live("t")} AND (t.ZTYPEUTI LIKE '%audio%' OR t.ZTYPEUTI IN (${utis})) ORDER BY t.Z_PK) a;`
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'duration', a.ZDURATION, 'media', ${media("a")}, 'children', json((SELECT json_group_array(json_object('pk', c.Z_PK, 'identifier', c.ZIDENTIFIER, 'duration', c.ZDURATION, 'media', ${media("c")})) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT k WHERE k.ZPARENTATTACHMENT = a.Z_PK AND ${live("k")} ORDER BY k.Z_PK) c)))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE = @pk AND t.ZPARENTATTACHMENT IS NULL AND ${live("t")} AND (t.ZTYPEUTI LIKE '%audio%' OR t.ZTYPEUTI IN (${utis})) ORDER BY t.Z_PK) a;`,
+    account
   ].join("\n");
 }
-function safeSegment(value) {
-  return !!value && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\0");
-}
-function resolveMediaPath(media, accountsRoot = NOTE_ACCOUNTS_PATH) {
-  if (!media || !safeSegment(media.identifier) || !safeSegment(media.filename)) return null;
-  let root;
-  let accounts;
+function accountDirsFor(containerDir, accountIdentifier) {
+  const own = resolveAccountDir(containerDir, accountIdentifier);
+  if (own) return [own];
+  let names;
   try {
-    root = realpathSync4.native(accountsRoot);
-    accounts = readdirSync4(root);
+    names = readdirSync4(join25(containerDir, "Accounts")).sort();
   } catch {
-    return null;
+    return [];
   }
-  for (const account of accounts.filter(safeSegment)) {
-    const base = join25(root, account, "Media", media.identifier);
-    const candidates = safeSegment(media.generation) ? [join25(base, media.generation, media.filename), join25(base, media.filename)] : [join25(base, media.filename)];
+  return names.map((name) => safeComponent(name) ? resolveAccountDir(containerDir, name) : null).filter((dir) => dir !== null);
+}
+function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_CONTAINER_DIR) {
+  const id2 = safeComponent(media?.identifier);
+  const filename = safeComponent(media?.filename);
+  if (!id2 || !filename) return null;
+  const generation = safeComponent(media?.generation);
+  for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
+    const base = join25(dir, "Media", id2);
+    const candidates = generation ? [join25(base, generation, filename), join25(base, filename)] : [join25(base, filename)];
     for (const candidate of candidates) {
-      try {
-        const real = realpathSync4.native(candidate);
-        if (real.startsWith(root + sep4) && statSync4(real).isFile()) return real;
-      } catch {
-      }
+      const real = realInside(candidate, dir);
+      if (real && isFile2(real)) return real;
     }
   }
   return null;
 }
+function isFile2(path10) {
+  try {
+    return statSync4(path10).isFile();
+  } catch {
+    return false;
+  }
+}
 var positive = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 function readAudioAssets(noteId3, options = {}) {
-  const { store, pk } = parseNoteObjectId(noteId3);
+  const { store, pk } = parseNoteId2(noteId3);
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
   const columns = readColumns(dbPath2);
   const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
@@ -53169,9 +53241,14 @@ function readAudioAssets(noteId3, options = {}) {
       "schema"
     );
   const generation = columns.has("ZGENERATION1") ? "ZGENERATION1" : columns.has("ZGENERATION") ? "ZGENERATION" : null;
-  const [stateLine, rowsLine] = queryNoteScoped(audioRowsSql(columns, generation), pk, dbPath2);
+  const [stateLine, rowsLine, accountLine] = queryNoteScoped(
+    audioRowsSql(columns, generation),
+    pk,
+    dbPath2
+  );
   assertNoteReadable(stateLine, noteId3);
   const rows = JSON.parse(rowsLine || "[]");
+  const account = accountLine?.trim() || null;
   const attachmentId = (rowPk) => `x-coredata://${store}/ICAttachment/p${rowPk}`;
   return rows.map((row) => {
     const sources = row.children?.length ? row.children : [{ pk: row.pk, identifier: row.identifier, duration: row.duration, media: row.media }];
@@ -53179,7 +53256,7 @@ function readAudioAssets(noteId3, options = {}) {
       attachmentId: attachmentId(take.pk),
       identifier: take.identifier ?? "",
       durationSeconds: positive(take.duration),
-      path: resolveMediaPath(take.media, options.accountsRoot)
+      path: resolveMediaPath(take.media, account, options.containerDir)
     }));
     const total = takes.reduce((sum, t) => sum + (t.durationSeconds ?? 0), 0);
     return {
@@ -53199,11 +53276,20 @@ function countWords2(text2) {
 // src/services/noteTranscription.ts
 var DEFAULT_TRANSCRIPTION_LOCALE = "en-US";
 var LOCALE_PATTERN = /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8}){0,3}$/;
+var TRANSCRIBE_MAX_SECONDS = { default: 900, min: 30, max: 3600 };
 function takeDeadlineSeconds(durationSeconds) {
   const duration3 = durationSeconds ?? 600;
   return Math.min(1800, Math.max(60, Math.ceil(duration3 * 1.5) + 60));
 }
 var KILL_GRACE_MS = 3e4;
+var BUDGET_MARGIN_MS = 1e4;
+var MIN_TAKE_SECONDS = 5;
+var CALL_WIDE_CODES = /* @__PURE__ */ new Set([
+  "permission_required",
+  "asset_unavailable",
+  "unsupported_locale",
+  "speech_unavailable"
+]);
 var helperTranscriptSchema = external_exports.object({
   status: external_exports.literal("ok"),
   transcript: external_exports.string(),
@@ -53212,34 +53298,51 @@ var helperTranscriptSchema = external_exports.object({
   engine: external_exports.string().optional(),
   durationSeconds: external_exports.number().optional()
 });
-function transcribeTake(take, locale, deps) {
+async function transcribeTake(take, ctx) {
   const base = {
     attachmentId: take.attachmentId,
     identifier: take.identifier,
     status: "error",
     ...take.durationSeconds !== null ? { durationSeconds: Math.round(take.durationSeconds) } : {}
   };
+  const failed = (code, message) => ({
+    take: { ...base, code, message },
+    text: ""
+  });
   if (!take.path)
-    return {
-      take: {
-        ...base,
-        code: "asset_unavailable",
-        message: "The audio file is not on this Mac (it may not have downloaded from iCloud yet)."
-      },
-      text: ""
-    };
-  const deadline = takeDeadlineSeconds(take.durationSeconds);
+    return failed(
+      "asset_unavailable",
+      "The audio file is not on this Mac (it may not have downloaded from iCloud yet)."
+    );
+  if (ctx.callWide) return failed(ctx.callWide.code, ctx.callWide.message);
+  const remainingMs = ctx.deadlineAt - ctx.now();
+  const deadline = Math.min(
+    takeDeadlineSeconds(take.durationSeconds),
+    Math.floor((remainingMs - BUDGET_MARGIN_MS) / 1e3)
+  );
+  if (deadline < MIN_TAKE_SECONDS)
+    return failed(
+      "time_limit",
+      `Not started: the call's ${ctx.maxSeconds}-second limit was reached. Transcribe this recording on its own with attachmentId, or raise maxSeconds.`
+    );
   let raw;
   try {
-    raw = callPublicHelper(
+    raw = await callPublicHelperAsync(
       "transcribe",
-      { path: take.path, locale, timeoutSeconds: deadline },
-      deps,
-      { timeoutMs: deadline * 1e3 + KILL_GRACE_MS }
+      {
+        path: take.path,
+        locale: ctx.locale,
+        timeoutSeconds: deadline,
+        downloadAssets: ctx.downloadAssets
+      },
+      ctx.deps,
+      { timeoutMs: Math.min(deadline * 1e3 + KILL_GRACE_MS, remainingMs), signal: ctx.signal }
     );
   } catch (error2) {
     const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    if (code === "aborted") throw error2;
     const message = error2 instanceof Error ? error2.message : String(error2);
+    if (CALL_WIDE_CODES.has(code)) ctx.callWide = { code, message };
     return {
       take: {
         ...base,
@@ -53252,11 +53355,7 @@ function transcribeTake(take, locale, deps) {
     };
   }
   const parsed = helperTranscriptSchema.safeParse(raw);
-  if (!parsed.success)
-    return {
-      take: { ...base, code: "invalid_response", message: "Unexpected helper response." },
-      text: ""
-    };
+  if (!parsed.success) return failed("invalid_response", "Unexpected helper response.");
   const { transcript, complete, stopReason, engine, durationSeconds } = parsed.data;
   const text2 = transcript.trim();
   return {
@@ -53277,8 +53376,9 @@ function combineStatus(parts) {
   if (parts.some((p) => p.status === "indeterminate")) return "indeterminate";
   return "error";
 }
-function transcribeRecording(asset, locale, includeText, deps) {
-  const outcomes = asset.takes.map((take) => transcribeTake(take, locale, deps));
+async function transcribeRecording(asset, includeText, ctx) {
+  const outcomes = [];
+  for (const take of asset.takes) outcomes.push(await transcribeTake(take, ctx));
   const transcript = outcomes.map((o) => o.text).filter(Boolean).join("\n\n");
   const status = combineStatus(
     outcomes.map((o) => ({ status: o.take.status, hasText: o.text.length > 0 }))
@@ -53296,10 +53396,16 @@ function transcribeRecording(asset, locale, includeText, deps) {
     takes: outcomes.map((o) => o.take)
   };
 }
-function transcribeNoteAudio(noteId3, options = {}) {
+async function transcribeNoteAudio(noteId3, options = {}) {
   const locale = options.locale ?? DEFAULT_TRANSCRIPTION_LOCALE;
   if (!LOCALE_PATTERN.test(locale))
     throw new PublicHelperError("invalid_request", `"${locale}" is not a BCP-47 locale.`);
+  const maxSeconds = options.maxSeconds ?? TRANSCRIBE_MAX_SECONDS.default;
+  if (!Number.isInteger(maxSeconds) || maxSeconds < TRANSCRIBE_MAX_SECONDS.min || maxSeconds > TRANSCRIBE_MAX_SECONDS.max)
+    throw new PublicHelperError(
+      "invalid_request",
+      `maxSeconds must be a whole number from ${TRANSCRIBE_MAX_SECONDS.min} to ${TRANSCRIBE_MAX_SECONDS.max}.`
+    );
   const deps = options.deps ?? defaultPublicHelperDeps();
   let assets = (options.readAssets ?? ((id2) => readAudioAssets(id2)))(noteId3);
   if (options.attachmentId) {
@@ -53315,9 +53421,20 @@ function transcribeNoteAudio(noteId3, options = {}) {
   const install = inspectPublicHelper(deps);
   if (!install.ready)
     throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-  const recordings = assets.map(
-    (asset) => transcribeRecording(asset, locale, options.includeText ?? true, deps)
-  );
+  const now = options.now ?? Date.now;
+  const ctx = {
+    locale,
+    downloadAssets: options.downloadAssets ?? false,
+    deps,
+    signal: options.signal,
+    now,
+    deadlineAt: now() + maxSeconds * 1e3,
+    maxSeconds,
+    callWide: null
+  };
+  const recordings = [];
+  for (const asset of assets)
+    recordings.push(await transcribeRecording(asset, options.includeText ?? true, ctx));
   return {
     ...empty,
     status: combineStatus(
@@ -54048,6 +54165,16 @@ function withErrorHandling(handler, errorPrefix) {
         typeof seconds === "number" ? seconds : void 0,
         () => handler(params)
       );
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : "Unknown error";
+      return errorResponse(`${errorPrefix}: ${message}`, error2);
+    }
+  };
+}
+function withAsyncErrorHandling(handler, errorPrefix) {
+  return async (params, extra) => {
+    try {
+      return await handler(params, extra?.signal);
     } catch (error2) {
       const message = error2 instanceof Error ? error2.message : "Unknown error";
       return errorResponse(`${errorPrefix}: ${message}`, error2);
@@ -55409,10 +55536,10 @@ function guardedAppend({
       return `<div>${escaped || "<br>"}</div>`;
     }).join("");
   };
-  const separatorToHtml = (sep5) => {
-    if (format === "html") return sep5;
-    if (sep5 === "\n\n") return "<div><br></div>";
-    const escaped = sep5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const separatorToHtml = (sep4) => {
+    if (format === "html") return sep4;
+    if (sep4 === "\n\n") return "<div><br></div>";
+    const escaped = sep4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return `<div>${escaped}</div>`;
   };
   const snapshot = readExactNoteSnapshot(id2);
@@ -57078,12 +57205,18 @@ registerTool(
 registerTool(
   "transcribe-note-audio",
   {
-    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed.",
+    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
     inputSchema: {
       id: noteIdInput,
       locale: external_exports.string().max(35).optional().describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
       attachmentId: external_exports.string().max(MAX.ATTACHMENT_ID).optional().describe("Only transcribe this audio attachment (x-coredata ICAttachment id)"),
-      includeText: external_exports.boolean().optional().describe("Include transcript text (default true); false returns statuses and counts only")
+      includeText: external_exports.boolean().optional().describe("Include transcript text (default true); false returns statuses and counts only"),
+      downloadAssets: external_exports.boolean().optional().describe(
+        "Let macOS download the language's on-device speech model if it is missing (default false: returns asset_unavailable at once)"
+      ),
+      maxSeconds: external_exports.number().int().min(TRANSCRIBE_MAX_SECONDS.min).max(TRANSCRIBE_MAX_SECONDS.max).optional().describe(
+        `Total time budget for the call in seconds (default ${TRANSCRIBE_MAX_SECONDS.default}); recordings not started in time report code time_limit`
+      )
     },
     outputSchema: {
       id: external_exports.string().optional(),
@@ -57093,9 +57226,17 @@ registerTool(
       recordings: external_exports.array(external_exports.object({}).passthrough()).optional()
     }
   },
-  withErrorHandling(({ id: id2, locale, attachmentId, includeText }) => {
+  withAsyncErrorHandling(async (params, signal) => {
+    const { id: id2, locale, attachmentId, includeText, downloadAssets, maxSeconds } = params;
     const result = fitTranscriptions(
-      transcribeNoteAudio(id2, { locale, attachmentId, includeText }),
+      await transcribeNoteAudio(id2, {
+        locale,
+        attachmentId,
+        includeText,
+        downloadAssets,
+        maxSeconds,
+        signal
+      }),
       exportMaxResponseBytes()
     );
     return successResponse(
