@@ -180,6 +180,45 @@ live macOS 27 store (counts only):
   `Z_PRIMARYKEY`; note ids are rebuilt as `x-coredata://<Z_METADATA.Z_UUID>/ICNote/p<Z_PK>`,
   which matched every AppleScript id checked.
 
+#### Exact sync cursors (`list-recent-notes`)
+
+`ZMODIFICATIONDATE1` is a Core Data double: seconds since 2001-01-01 UTC with
+sub-microsecond fraction bits. Every text path out of SQLite rounds it:
+`json_object()` renders 15 significant digits and `printf('%.17g')` is not
+reliable either, and a JavaScript `Date` keeps only milliseconds. So neither an
+ISO string nor a decimal can serve as an exact incremental-sync boundary.
+
+The sqlite3 command-line shell ships the `ieee754` extension. The reader selects
+`hex(ieee754_to_blob(ZMODIFICATIONDATE1))`, the raw big-endian IEEE-754 bits,
+and pairs them with the row's `Z_PK` in an opaque `cdts1:<16 hex>:<Z_PK>`
+cursor. A `since` cursor is validated, decoded to a finite double, re-encoded
+canonically, and bound with `.parameter set @since ieee754_from_blob(x'…')`,
+so the comparison runs against the identical double. A fixture test stores two
+timestamps one unit in the last place apart, which render to the same ISO
+string, and shows the cursor separates them.
+
+A `since` query walks the notes in ascending `(ZMODIFICATIONDATE1, Z_PK)` order
+and keeps rows strictly after the cursor:
+`ZMODIFICATIONDATE1 > @since OR (ZMODIFICATIONDATE1 = @since AND Z_PK > @sincePk)`.
+`nextSince` is the last row's cursor, so every call advances, including one
+that fills its `limit`. `Z_PK` breaks ties: notes sharing one stored
+timestamp are split across pages by key and none is skipped or repeated. An
+ISO `since`, or a cursor without the key, keeps only rows whose timestamp is
+strictly later. Rows with no modification date never match a `since` query.
+
+Limits of a modification-date cursor:
+
+- **Late-arriving edits.** iCloud can deliver an edit made on another device
+  after the cursor has moved past that edit's timestamp, for example when the
+  device was offline or its clock was behind. The row then carries a timestamp
+  at or before the cursor and is never returned. A periodic full pass from the
+  beginning catches these.
+- **Deletions.** Without `includeDeleted`, notes in Recently Deleted or
+  awaiting deletion are filtered out, so a deletion looks like silence. With
+  it, those rows appear, flagged, when their modification date is after the
+  cursor. A note purged from the database has no row, so no cursor query can
+  report it; compare ids against a full pass instead.
+
 Reading these is safe under the existing rules: copy the three database files first, open
 the copy read-only, and never touch the live store. Writing any of these values directly
 is unsafe. It bypasses CloudKit's sync bookkeeping and can corrupt notes or desync iCloud.
@@ -426,6 +465,38 @@ included unless the caller turns that off.
 ### Embedded Objects
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.
+
+### Paragraph Links (verified 2026-09-23, macOS 27.2)
+
+`src/utils/noteParagraphs.ts` (the `list-note-paragraphs` and
+`get-paragraph-link` tools) builds and guards these links.
+
+**Format.** Notes opens a paragraph from
+`applenotes://showNote?identifier=<NOTE-UUID>&paragraphID=<PARAGRAPH-UUID>`.
+No note in the surveyed library held a Notes-generated section link to copy
+the format from, so it was confirmed from Notes itself without opening a
+link: Notes.app registers the `notes` and `applenotes` URL schemes
+(`CFBundleURLTypes`), its binary holds the literal
+`applenotes://showNote?identifier=`, and the URL handler's query-key string
+table in the system's shared library cache lists `paragraphID` (with
+`identifier`, `attachmentID` and `contentOffsetY`) beside the selectors
+`appURLForNote:paragraphID:` and `paragraphIDForURL`. The key is spelled
+exactly `paragraphID`. UUIDs are written uppercase, as `NSUUID` prints them.
+
+**Where the paragraph UUID lives.** ParagraphStyle field 9 (16 bytes) on each
+attribute run, as in the block model above. A run that crosses a paragraph
+break carries one UUID for both paragraphs, which is how Notes ends up with
+repeated IDs after a split.
+
+**When a link is safe.** The reader takes the UUID on the paragraph's first
+run and returns a link only if no run outside that paragraph (from its first
+character through its newline) carries the same UUID. Otherwise the link
+could open another paragraph, so the tools refuse. A survey of 738 decodable
+note bodies in one live library (counts only) found 30,362 non-empty
+paragraphs: 17,553 with a unique ID, 12,807 sharing one, and 2 with none.
+Every title (78), heading (18) and subheading (7) was unique; body text was
+roughly half and half. A paragraph whose runs carry more than one UUID is
+common and reported as `mixedParagraphIds`; its first-run UUID is still used.
 
 ### CRDT Implementation
 

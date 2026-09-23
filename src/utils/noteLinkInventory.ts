@@ -203,7 +203,8 @@ export function inventorySql(columns: ReadonlySet<string>) {
         'title', ${c("att", "ZTITLE")})
       FROM ZICCLOUDSYNCINGOBJECT att
       WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
-        AND ${c("att", "ZURLSTRING")} IS NOT NULL AND ${c("att", "ZNOTE")} IN (${scope});`,
+        AND ${c("att", "ZTYPEUTI")} LIKE 'public.url%' AND ${c("att", "ZURLSTRING")} IS NOT NULL
+        AND ${c("att", "ZNOTE")} IN (${scope});`,
       `SELECT json_object('k', 'chip', 'note', ${c("i", "ZNOTE1")},
         'identifier', ${c("i", "ZIDENTIFIER")}, 'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")},
         'alt', ${c("i", "ZALTTEXT")})

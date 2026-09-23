@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.2] - 2026-09-23
+## [2.9.5] - 2026-09-23
 
 ### Added
 
@@ -14,13 +14,37 @@
   and modification date, folder path and account. Folder paths, account
   matching (exact name, then a unique prefix), the Recently Deleted and
   folderless exclusions and card previews come from the same shared helpers
-  as `list-folders`, `list-special-notes` and `list-attachments`. A `folder`
+  as `list-folders`, `list-special-notes` and `list-attachments`. Cards are
+  identified by the `public.url` attachment type, the same rule
+  `get-note-structure` uses, so both tools count the same cards. A `folder`
   scope includes its subfolders unless `includeSubfolders` is false. Inline
   links need every body in scope decoded, so a folder, account or library
   scan includes them only with `includeInline: true`. Results page with
-  `offset`/`limit` and can be filtered by `kinds`.
+  `offset`/`limit` and can be filtered by `kinds`. Contributed by
+  @oliverames (#217).
 
-## [2.9.1] - 2026-09-23
+## [2.9.4] - 2026-09-23
+
+### Added
+
+- `list-note-paragraphs` lists a note's non-empty paragraphs, read-only from
+  the NoteStore database, with `blockIndex`, text, style, the stored
+  `paragraphId`, and `paragraphIdStatus` (`unique`, `shared`, `missing`).
+  A `unique` paragraph also gets a direct
+  `applenotes://showNote?identifier=<note>&paragraphID=<paragraph>` link. The
+  note is chosen by `id` (including a Notes UUID) or by exact `title`,
+  optionally narrowed by `folder` as list-folders writes it. Title lookups
+  skip Recently Deleted, as list-notes does.
+- `get-paragraph-link` selects one paragraph by snippet (`contains`), whole
+  text (`match`) or `blockIndex`, with `occurrence` for repeated text, and
+  returns its direct link only when the paragraph's ID appears in no other
+  paragraph of the note. Notes copies paragraph IDs when a paragraph is split,
+  so a shared ID is refused rather than risk opening the wrong paragraph.
+  Refusals use the standard error envelope, with the specific cause in
+  `structuredContent.reason` (for example `paragraph-id-shared`). The tool
+  never creates or repairs an ID.
+
+## [2.9.3] - 2026-09-23
 
 ### Added
 
@@ -45,6 +69,58 @@
 - TECHNICAL_NOTES.md documents where Notes stores each link kind, how preview
   renditions map to files, the never-viewed `lastViewed` value, and how sharing
   is derived.
+
+## [2.9.2] - 2026-09-23
+
+### Added
+
+- `list-recent-notes` lists notes from NoteStore (read-only) by stored
+  modification time, for incremental sync. With `since`, rows come oldest
+  first after that point and `nextSince` is the last row's cursor, so every
+  call advances, including one that fills its `limit`. `saturated` (count
+  equals limit) means more changes may follow; call again with `nextSince`
+  until it is `false`. `since` takes a `modifiedCheckpoint` cursor, an ISO
+  8601 date (local midnight), or an ISO date-time (local unless it carries an
+  offset). Each row's `modifiedCheckpoint` is an opaque
+  `cdts1:<bits>:<key>` cursor: the stored timestamp's exact IEEE-754 bits,
+  read and bound through sqlite3's `ieee754` functions so they never pass
+  through a JavaScript `Date` or a rounded decimal, plus the note's database
+  key, which orders notes that share one timestamp so paging never skips or
+  repeats them. A first full sync starts from `since: "1970-01-01"` and
+  reaches a library of any size. Without `since`, rows come newest first and
+  `nextSince` is set only when every match was returned. Options: `account`,
+  `folder`, `limit` (default 50, max 1000), `includeDeleted` (Recently
+  Deleted, notes awaiting deletion, and folderless rows), `wordCounts`
+  (`wordCount`/`charCount` from the shared body decoder; `null` for locked or
+  unavailable bodies, `0` for known-empty ones), and `bodyPreview` (180
+  characters plus `textDecoded`). The docs note two limits of a
+  modification-date cursor: an edit iCloud delivers later from another device
+  with an older timestamp can be missed, and deletions are invisible unless
+  `includeDeleted` is set.
+- `list-folder-tree` returns each account's folder hierarchy with direct
+  (`noteCount`) and cumulative (`totalNoteCount`) note counts, folder kind
+  (regular, smart, Recently Deleted), ids, and paths in one read.
+  `includeDeleted` adds folders marked for deletion.
+
+### Changed
+
+- `list-notes`' description now points to `list-recent-notes` for date
+  order, sync cursors, or word counts. Its behavior is unchanged.
+
+## [2.9.1] - 2026-09-23
+
+### Added
+
+- `delete-note` accepts `guardNoteId` and `expectedGuardContentHash` for
+  copy-then-retire: the original is deleted only while a second note still has
+  the reviewed revision and is active (unlocked, outside Recently Deleted, not
+  a Quick Note). The guard's revision is re-read just before the delete, and
+  its body, lock state, and folder are checked again inside the delete
+  AppleScript, with the same fail-closed Recently Deleted test as the note
+  being deleted. `requireActiveNoteId` requires a second note to stay active
+  without fingerprinting its content. The Quick Note check reads the database,
+  so the guard needs Full Disk Access; a guard note the database has not saved
+  yet passes on the live checks. The pair is not one transaction.
 
 ## [2.9.0] - 2026-09-23
 

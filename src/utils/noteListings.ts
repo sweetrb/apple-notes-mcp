@@ -39,6 +39,7 @@ import {
   entity,
   folderPaths,
   NOTES_DB_PATH,
+  NoteStoreError,
   noteIdFor,
   notTombstonedSql,
   parseJsonLines,
@@ -253,6 +254,41 @@ function toSpecialRow(
   if (!locked) note.snippet = row.snippet ?? null;
   if (kind === "locked" && row.hint) note.passwordHint = row.hint;
   return note;
+}
+
+/** Exact note id: store UUID and primary key. */
+const EXACT_NOTE_ID = /^x-coredata:\/\/([0-9A-F-]+)\/ICNote\/p(\d+)$/i;
+
+/**
+ * Whether one exact note is a Quick Note, for the delete-note guard, which
+ * must not rest on one. Reads the same ZISSYSTEMPAPER flag as the
+ * `quick-notes` listing.
+ *
+ * @returns the flag, or null when this store has no row for the note yet
+ *   (Notes.app can save a new note to the database some time after
+ *   AppleScript already sees it). A store without the column predates Quick
+ *   Notes, so every note it has is ordinary.
+ * @throws NoteStoreError `no_fda` without Full Disk Access, `invalid_input`
+ *   for an id that is not an exact note id of this store
+ */
+export function quickNoteFlag(noteId: string, dbPath: string = NOTES_DB_PATH): boolean | null {
+  const match = EXACT_NOTE_ID.exec(noteId);
+  if (!match) throw new NoteStoreError(`Not an exact note id: ${noteId}`, "invalid_input");
+  const columns = readColumns(dbPath);
+  const sql =
+    "SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'quick', " +
+    `(SELECT ${flag(columns, "n", "ZISSYSTEMPAPER")} FROM ZICCLOUDSYNCINGOBJECT n ` +
+    `WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}));`;
+  const [row] = parseJsonLines<{ uuid: string | null; quick: number | null }>(
+    runReadOnlySql(dbPath, sql, { pk: { int: Number(match[2]) } })
+  );
+  if (row?.uuid?.toUpperCase() !== match[1].toUpperCase()) {
+    throw new NoteStoreError(
+      `Note id ${noteId} belongs to a different Notes database.`,
+      "invalid_input"
+    );
+  }
+  return row.quick === null ? null : row.quick === 1;
 }
 
 // -----------------------------------------------------------------------------

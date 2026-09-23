@@ -201,6 +201,16 @@ beforeAll(() => {
       ZNOTE: 23,
       ZURLSTRING: "https://example.net/t",
     }),
+    // A non-URL attachment that carries a ZURLSTRING is not a card
+    // (get-note-structure classifies cards by the public.url UTI too).
+    insert({
+      Z_PK: 46,
+      Z_ENT: 4,
+      ZIDENTIFIER: "PDF-U",
+      ZTYPEUTI: "com.adobe.pdf",
+      ZNOTE: 20,
+      ZURLSTRING: "https://example.com/source.pdf",
+    }),
     insert({
       Z_PK: 43,
       Z_ENT: 4,
