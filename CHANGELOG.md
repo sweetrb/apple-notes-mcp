@@ -1,5 +1,34 @@
 ## [Unreleased]
 
+### Added
+
+- `create-note` with `format: "markdown"` accepts the block constructs Notes'
+  own Markdown importer maps to native styles: `- [ ]`/`- [x]` lines become
+  checklist items with that done state, `>` lines a block quote, a bare
+  ```` ``` ```` fence Monospaced paragraphs (code text kept literal), a `---`
+  line after a blank line a divider, and `` `inline code` `` highlighted text
+  (not monospace). The readback now checks block-quote text, Monospaced text,
+  each checklist item's text and done state, the divider count and the
+  highlighted text before the note is moved or reported. Constructs the
+  importer would not render faithfully or the server cannot yet verify stay
+  refused, with a specific reason (language after a fence, `~~~` fences,
+  nested or indented quotes, a quote followed directly by text, `---` directly
+  under text, `[X]` or `*`/`+` checklist markers, checklist items next to
+  ordinary list items, padded inline code, tables and strikethrough). These
+  constructs have their own gate, `create-note-markdown-blocks` in
+  `get-capabilities`, which stays unverified until a live readback of the
+  Create Markdown Note Shortcut passes on this build.
+- `readRichNote` style runs carry the decoded paragraph style, block-quote flag
+  and highlight flag alongside the existing comparison signature.
+
+### Unchanged
+
+- `append-native`'s `format: "markdown"` still refuses these constructs. Its
+  Shortcuts Markdown converter is a different one: a live test on macOS 27.2
+  rendered a quote and a fenced block as plain body text, `- [ ]`/`- [x]` as
+  bullets with literal brackets, and inline code as plain text, and dropped
+  `---`.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

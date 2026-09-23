@@ -15,7 +15,13 @@ import {
 } from "../utils/noteRichText.js";
 import { getNoteMetadata } from "../utils/noteMetadata.js";
 import { getChecklistItems } from "../utils/checklistParser.js";
-import { appendMarkdownHtml } from "../utils/appendMarkdown.js";
+import {
+  appendMarkdownHtml,
+  renderMarkdown,
+  usesMarkdownBlocks,
+  withoutMarkdownCode,
+  type MarkdownBlockExpectations,
+} from "../utils/appendMarkdown.js";
 import { comparableVisibleText } from "../utils/noteRevision.js";
 
 export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
@@ -145,8 +151,18 @@ const UNMODELED_MARKDOWN: Array<[RegExp, string]> = [
   [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"],
 ];
 
-/** Validate imported rich text conservatively. No external image fetching or embedded code. */
-export function validateAppendContent(content: string, format: "plaintext" | "html" | "markdown") {
+/**
+ * Validate imported rich text conservatively. No external image fetching or embedded code.
+ *
+ * `blocks` is for Notes' own Markdown importer (create-note): fenced code and
+ * inline code spans are literal there, so they are left out of the syntax
+ * checks, and a bare `---` line is a divider rather than a refused rule line.
+ */
+export function validateAppendContent(
+  content: string,
+  format: "plaintext" | "html" | "markdown",
+  options: { blocks?: boolean } = {}
+) {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
   if (format === "html") {
@@ -180,15 +196,18 @@ export function validateAppendContent(content: string, format: "plaintext" | "ht
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
   if (format === "markdown") {
-    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+    const checked = options.blocks
+      ? withoutMarkdownCode(content).replace(/^---[ \t]*$/gm, "")
+      : content;
+    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(checked))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
     // CommonMark never forms emphasis inside an inline link destination, so a
     // URL such as https://example.com/_next/static is kept literal. Strip the
     // destinations of the links appendMarkdownHtml recognizes before the
     // underscore test only; every other pattern still sees the full content.
-    const withoutLinkDestinations = content.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
+    const withoutLinkDestinations = checked.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
     for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : content))
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
@@ -540,6 +559,45 @@ export function headingLevels(html: string): number[] {
     .map((match) => Number(match[1]));
 }
 
+/** Type identifier Notes stores for a native divider line. */
+export const DIVIDER_UTI = "com.apple.notes.inlinetextattachment.dividerline";
+
+/**
+ * Verify, by readback, that Notes' Markdown importer produced every native block
+ * construct the Markdown asked for, and no stray one: block-quote text, monospaced
+ * code text, checklist items with their done state, divider count, and
+ * highlighted inline-code text. Text is compared with whitespace collapsed.
+ */
+export function assertMarkdownBlocks(rich: RichNote, expected: MarkdownBlockExpectations) {
+  const tidy = (s: string) => s.replace(/[\s￼]+/gu, " ").trim();
+  const runs = rich.styleRuns || [];
+  const styledText = (matches: (run: (typeof runs)[number]) => boolean) => {
+    let out = "",
+      previous = false;
+    for (const run of runs) {
+      const hit = matches(run);
+      if (hit) out += (previous ? "" : " ") + rich.text.slice(run.start, run.start + run.length);
+      previous = hit;
+    }
+    return tidy(out);
+  };
+  if (styledText((run) => run.blockQuote === true) !== tidy(expected.quotes.join(" ")))
+    throw new Error("Block quotes not verified");
+  if (styledText((run) => run.paragraphStyle === 4) !== tidy(expected.code.join(" ")))
+    throw new Error("Monospaced code blocks not verified");
+  if (styledText((run) => run.highlight === true) !== tidy(expected.highlights.join(" ")))
+    throw new Error("Inline code highlights not verified");
+  const items = (rich.checklistItems || []).map((item) => ({
+    text: tidy(item.text),
+    done: item.done,
+  }));
+  const wanted = expected.checklist.map((item) => ({ text: tidy(item.text), done: item.done }));
+  if (JSON.stringify(items) !== JSON.stringify(wanted))
+    throw new Error("Checklist items or their done state not verified");
+  if ((rich.objects || []).filter((o) => o.type === DIVIDER_UTI).length !== expected.dividers)
+    throw new Error("Dividers not verified");
+}
+
 export interface MarkdownNoteRequest {
   title: string;
   content: string;
@@ -564,8 +622,11 @@ export function createMarkdownNote(
   ) => void = runBackgroundShortcut
 ) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
-  validateAppendContent(request.content, "markdown");
-  const bodyHtml = appendMarkdownHtml(request.content);
+  validateAppendContent(request.content, "markdown", { blocks: true });
+  const { html: bodyHtml, expect: blockExpectations } = renderMarkdown(request.content, {
+    blocks: true,
+  });
+  const checkBlocks = usesMarkdownBlocks(request.content);
   if (request.folder) buildFolderReference(request.folder);
   const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`
     .replace(/\s+/gu, " ")
@@ -637,6 +698,7 @@ export function createMarkdownNote(
         if (headingLevels(note.html).join() !== expectedLevels)
           throw new Error("Heading styles not verified");
         assertAppendedHtmlLinks(0, note.rich.links, bodyHtml);
+        if (checkBlocks) assertMarkdownBlocks(note.rich, blockExpectations);
         return [{ id: noteId, account, note }];
       } catch (error) {
         failures.push(`${noteId}: ${reason(error)}`);

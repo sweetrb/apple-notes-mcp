@@ -284,13 +284,40 @@ title line, with no seed line.
   It also refuses Markdown that Notes would rewrite and the server could not
   verify: `_` emphasis (underscores inside a word, as in `snake_case`, and
   inside a link destination, as in `[docs](https://example.com/_next/static)`,
-  are fine), backslash escapes, character references such as `&amp;`, `---` or
-  `===` lines, indented headings or list items, `1)` lists, closing `#`s, and
+  are fine), backslash escapes, character references such as `&amp;`, `===` lines
+  and rule lines other than the `---` divider described below, indented headings or list items, `1)` lists, closing `#`s, and
   formatting inside link labels. Content that needs one of these literally, such
   as a `/_next` path or a literal `\*`, has no Markdown form here: use
   `format: "html"` for that note (or `append-native` with `format: "html"` on an
   existing one), which keeps the characters but not the Heading and Subheading
   styles. Markdown punctuation in `title` is escaped, so the title stays literal.
+- Notes' importer also maps these block constructs to native styles. They are
+  gated separately: `get-capabilities` reports them as
+  `create-note-markdown-blocks`, and they are refused until that operation is
+  live-verified on the build (or `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` is set).
+
+  | Markdown | Native result |
+  |----------|---------------|
+  | `- [ ] item` / `- [x] item` | Checklist item, unchecked / checked |
+  | `> text` (consecutive lines form one quote) | Body paragraph with a block quote |
+  | A fence of bare ```` ``` ```` lines (no language) | Monospaced paragraphs; the code text is kept literally |
+  | `---` on its own line, after a blank line | Divider line |
+  | `` `inline code` `` | **Highlighted** text, not monospace |
+
+  Constructs Notes would not render faithfully, or that this server cannot yet
+  verify, are refused before anything is created: `~~~` fences, a language
+  after the opening fence, nested (`>>`) or indented quotes, lists or headings
+  inside a quote, a quote followed directly by text (Markdown would join that
+  text to the quote), `---` directly under text (Markdown would make that text
+  a heading), `***`/`___`/`----` rules, `[X]`, `* [ ]` or `+ [ ]` items, checklist
+  items directly next to ordinary list items, inline code padded with spaces or
+  inside a link label, tables, and `~~strikethrough~~`. The readback checks the
+  block-quote text, the Monospaced text, each checklist item's text and done
+  state, the divider count, and the highlighted text.
+- [`append-native`](#append-native)'s `format: "markdown"` refuses all of the
+  constructs above: its Shortcuts converter is a different one, which renders
+  a quote and a fenced block as plain body text, `- [ ]` as a bullet with
+  literal brackets, and inline code as plain text, and drops `---`.
 - The server finds the new note among the notes added to the default folder
   during the run by verifying each one's visible text, heading levels and links
   by exact-ID readback, and moves it only after exactly one verifies. On any
@@ -1425,7 +1452,7 @@ Apple Notes stores checklists as a paragraph style (`style_type=103`) inside a g
 **Workarounds:**
 
 1. **Create the note with bulleted list items, then convert manually in Notes.app.** Select the items and press <kbd>⇧⌘L</kbd> (or **Format → Checklist**). This converts the list in place and the resulting checklist will be readable by `get-checklist-state` and annotated by `get-note-markdown`.
-2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript.
+2. **Use the Apple Shortcuts app** to script the checklist creation, since Shortcuts can manipulate Notes content at a higher level than AppleScript. This server does that for you in two ways: [`create-checklist-item`](#create-checklist-item) appends one unchecked item to an existing note, and [`create-note`](#create-note) with `format: "markdown"` turns `- [ ]` / `- [x]` lines into checklist items with that done state through Notes' own Markdown importer, once `get-capabilities` reports `create-note-markdown-blocks` available (see [Markdown notes](#markdown-notes)).
 3. **Read-only checklist support is fully implemented** — once a checklist exists (created manually or by another app), `get-checklist-state` and `get-note-markdown` will read its done/undone state correctly (with Full Disk Access).
 
 If you need to *track* todos programmatically and don't strictly need them rendered as Apple Notes checklist UI, plain markdown-style `- [ ] item` / `- [x] item` lines in a `plaintext` note are a reasonable alternative — they are searchable, human-readable, and can be parsed by downstream tooling.

@@ -9,7 +9,7 @@ vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
   nativeTagBridgeStatus: vi.fn(() => ({ installed: false })),
   markdownNoteStatus: vi.fn(() => ({ installed: false })),
 }));
-import { registerNativeOperations } from "./nativeOperations.js";
+import { registerNativeOperations, requireValidated } from "./nativeOperations.js";
 import { backgroundStatus, markdownNoteStatus } from "../services/backgroundNotes.js";
 afterEach(() => vi.unstubAllEnvs());
 function fixture() {
@@ -64,6 +64,23 @@ describe("background capability boundaries", () => {
     expect(r.structuredContent.operations["append-native"].available).toBe(false);
     expect(r.structuredContent.operations["append-native"].verified).toBe(true);
     expect(r.structuredContent.unavailable["set-checklist-item"]).toMatch(/unsupported features/);
+  });
+  it("reports Markdown block import as implemented but awaiting live validation", async () => {
+    vi.mocked(markdownNoteStatus).mockReturnValueOnce({
+      installed: true,
+      shortcut: "Apple Notes MCP - Create Markdown Note",
+    });
+    const r = await fixture()("get-capabilities")[2]({});
+    expect(r.structuredContent.operations["create-note-markdown-blocks"]).toMatchObject({
+      implemented: true,
+      verified: false,
+      available: false,
+      reason: expect.stringMatching(/live readback of the Create Markdown Note Shortcut/),
+    });
+    expect(() => requireValidated("create-note-markdown-blocks")).toThrow(/live readback/);
+    vi.stubEnv("APPLE_NOTES_MCP_ALLOW_UNVERIFIED", "1");
+    expect(() => requireValidated("create-note-markdown-blocks")).not.toThrow();
+    vi.unstubAllEnvs();
   });
   it("reports live-verified native creation as available with v5 installed", async () => {
     vi.mocked(backgroundStatus).mockReturnValueOnce({

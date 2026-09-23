@@ -116,6 +116,8 @@ Apple Notes stores checklists as a paragraph style inside a gzipped protobuf blo
 
 Do not try alternative HTML class names, data attributes, or Unicode characters like `☐` — none of them produce a real checklist. The interface to set paragraph styles simply isn't exposed.
 
+**Exception — Notes' own Markdown importer.** `create-note` with `format: "markdown"` runs the Create Markdown Note Shortcut, and Notes' importer turns `- [ ] item` / `- [x] item` into real checklist items with that done state, `> text` into a block quote, a bare ```` ``` ```` fence into Monospaced paragraphs, a `---` line (after a blank line) into a divider, and `` `inline code` `` into highlighted text (not monospace). The server verifies each construct by exact-ID readback. These constructs are gated separately as `create-note-markdown-blocks`: use them only when `get-capabilities` reports it available. `append-native`'s Markdown refuses them, because its converter flattens them to plain text.
+
 ### Whitespace Accumulation on Iterative Updates
 
 **Important:** When repeatedly updating a note (especially with HTML content), Apple Notes can accumulate whitespace artifacts - specifically `<div><br></div>` tags that persist between sections even after removing them from your content.

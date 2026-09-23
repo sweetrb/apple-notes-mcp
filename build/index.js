@@ -39582,7 +39582,11 @@ function parseRichNote(data, nativeTags = []) {
     const length = varintValue(getField(fields, 1));
     if (length === void 0 || length < 0 || position + length > text.length)
       throw new Error("Invalid Notes run length");
+    const paragraph = embeddedMessage(getField(fields, 2));
     styleRuns.push({
+      paragraphStyle: paragraph ? varintValue(getField(paragraph, 1)) ?? 3 : 3,
+      blockQuote: Boolean(paragraph && varintValue(getField(paragraph, 8))),
+      highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
       signature: JSON.stringify(
@@ -39610,7 +39614,6 @@ function parseRichNote(data, nativeTags = []) {
         start: position,
         length
       });
-    const paragraph = embeddedMessage(getField(fields, 2));
     hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
     if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
       const checklist = embeddedMessage(getField(paragraph, 5));
@@ -42859,53 +42862,163 @@ import { join as join8 } from "node:path";
 
 // src/utils/appendMarkdown.ts
 var escape2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function appendMarkdownHtml(markdown) {
-  if (markdown.includes("\uE000") || markdown.includes("\uE001"))
+var FENCE = "```";
+var CHECKLIST_ITEM = /^- \[( |x)\] (.+)$/;
+function withoutMarkdownCode(markdown) {
+  let inCode = false;
+  return markdown.replace(/\r\n/g, "\n").split("\n").map((line) => {
+    if (line === FENCE) {
+      inCode = !inCode;
+      return "";
+    }
+    return inCode ? "" : line.replace(/`[^`\n]+`/g, "x");
+  }).join("\n");
+}
+function usesMarkdownBlocks(markdown) {
+  return /`/.test(markdown) || /^>/m.test(markdown) || /^---[ \t]*$/m.test(markdown) || /^- \[[ x]\] /m.test(markdown);
+}
+function renderMarkdown(markdown, options = {}) {
+  const blocks = options.blocks === true;
+  if (blocks ? /[-]/u.test(markdown) : /[]/u.test(markdown))
     throw new Error("Unsupported reserved characters");
   if (Array.from(markdown).some((c) => c.charCodeAt(0) < 32 && !["\n", "\r", "	"].includes(c)))
     throw new Error("Unsupported control characters");
-  if (/[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(markdown))
+  const checked = blocks ? withoutMarkdownCode(markdown) : markdown;
+  if (blocks ? /[`~|]|^#{4,}\s|^[ \t]+>|^>[ \t]*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(checked) : /[`~|]|^#{4,}\s|^\s*>|^\s*\[.+\]:|!\[|<\/?[a-z]/im.test(checked))
     throw new Error(
-      "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
+      blocks ? "Markdown import supports paragraphs, headings, flat lists, checklist items, block quotes, fenced code, dividers, emphasis, inline code and inline links; use semantic HTML for other formatting" : "Markdown append supports paragraphs, headings, flat lists, emphasis and inline links; use semantic HTML for other formatting"
     );
+  const expect = {
+    quotes: [],
+    code: [],
+    checklist: [],
+    dividers: 0,
+    highlights: []
+  };
   const inline = (text) => {
+    const spans = [];
+    let value = text;
+    if (blocks)
+      value = value.replace(/`([^`\n]+)`/g, (_s, code2) => {
+        if (/^\s|\s$/.test(code2)) throw new Error("Inline code cannot start or end with a space");
+        expect.highlights.push(code2);
+        spans.push(`<code>${escape2(code2)}</code>`);
+        return `\uE002${spans.length - 1}\uE003`;
+      });
     const links = [];
-    let value = text.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
+    value = value.replace(/\[([^\]\n]+)\]\(([^()\s]+)\)/g, (_s, label, url) => {
       if (!/^(https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url))
         throw new Error("Unsupported Markdown link URL");
+      if (/[]/u.test(label)) throw new Error("Inline code inside a link is unsupported");
       links.push(`<a href="${escape2(url)}">${escape2(label)}</a>`);
       return `\uE000${links.length - 1}\uE001`;
     });
     value = escape2(value).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
     if (value.includes("[") || value.includes("]") || value.includes("*"))
       throw new Error("Unsupported or unbalanced Markdown inline syntax");
-    return value.replace(/\uE000(\d+)\uE001/g, (_s, i) => links[Number(i)]);
+    return value.replace(/(\d+)/g, (_s, i) => links[Number(i)]).replace(/(\d+)/g, (_s, i) => spans[Number(i)]);
   };
-  let html = "", list;
+  const visible = (html2) => html2.replace(/<[^>]*>/g, "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  let html = "", list, quote = false, code, previousBlank = true;
   const close = () => {
     if (list) {
-      html += `</${list}>`;
+      html += list === "checklist" ? "</ul>" : `</${list}>`;
       list = void 0;
+    }
+    if (quote) {
+      html += "</blockquote>";
+      quote = false;
     }
   };
   for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
+    if (code) {
+      if (line === FENCE) {
+        if (!code.length) throw new Error("Empty fenced code blocks are unsupported");
+        html += `<pre>${escape2(code.join("\n"))}</pre>`;
+        expect.code.push(code.join("\n"));
+        code = void 0;
+        previousBlank = false;
+      } else code.push(line);
+      continue;
+    }
+    const blank = !line.trim();
+    if (blocks) {
+      if (quote && !blank && !line.startsWith(">"))
+        throw new Error("End a block quote with a blank line before other text");
+      if (line.startsWith(FENCE)) {
+        if (line !== FENCE)
+          throw new Error("Fenced code must open and close with a bare ``` line (no language)");
+        close();
+        code = [];
+        continue;
+      }
+      if (line.startsWith(">")) {
+        const text = line.replace(/^> ?/, "");
+        if (!text.trim()) throw new Error("Empty block quote lines are unsupported");
+        if (/^(?:#|[-+*][ \t]|\d+[.)][ \t]|>|```)/.test(text))
+          throw new Error("Block quotes support text and inline formatting only");
+        if (!quote) {
+          close();
+          html += "<blockquote>";
+          quote = true;
+          expect.quotes.push("");
+        }
+        const rendered = inline(text);
+        html += `<div>${rendered}</div>`;
+        expect.quotes[expect.quotes.length - 1] += ` ${visible(rendered)}`;
+        previousBlank = false;
+        continue;
+      }
+      if (/^---[ \t]*$/.test(line)) {
+        if (!previousBlank) throw new Error("Put a blank line before a --- divider");
+        close();
+        html += "<hr>";
+        expect.dividers++;
+        previousBlank = false;
+        continue;
+      }
+      const task = CHECKLIST_ITEM.exec(line);
+      if (task) {
+        if (list && list !== "checklist")
+          throw new Error("Separate checklist items from other list items with a blank line");
+        if (list !== "checklist") {
+          close();
+          list = "checklist";
+          html += '<ul class="checklist">';
+        }
+        const rendered = inline(task[2]);
+        html += `<li>${rendered}</li>`;
+        expect.checklist.push({ text: visible(rendered).trim(), done: task[1] === "x" });
+        previousBlank = false;
+        continue;
+      }
+    }
     if (/^\s{2,}\S/.test(line)) throw new Error("Nested lists and indented code are unsupported");
     const heading = /^(#{1,3})\s+(.+)$/.exec(line), item = /^(?:([-+*])|\d+\.)\s+(.+)$/.exec(line);
     if (item) {
       const kind = item[1] ? "ul" : "ol";
+      if (list === "checklist")
+        throw new Error("Separate checklist items from other list items with a blank line");
       if (list !== kind) {
         close();
         list = kind;
         html += `<${kind}>`;
       }
       html += `<li>${inline(item[2])}</li>`;
+      previousBlank = false;
       continue;
     }
     close();
-    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : line.trim() ? `<div>${inline(line)}</div>` : "<div><br></div>";
+    html += heading ? `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>` : !blank ? `<div>${inline(line)}</div>` : "<div><br></div>";
+    previousBlank = blank;
   }
+  if (code) throw new Error("Unclosed fenced code block");
   close();
-  return html;
+  expect.quotes = expect.quotes.map((q) => q.trim());
+  return { html, expect };
+}
+function appendMarkdownHtml(markdown) {
+  return renderMarkdown(markdown).html;
 }
 
 // src/utils/noteRevision.ts
@@ -42985,7 +43098,7 @@ var UNMODELED_MARKDOWN = [
   [/^#{1,3}[ \t].*[ \t]#+[ \t]*$/m, "closing # sequences"],
   [/\[[^\]\n]*[*_][^\]\n]*\]\(/m, "formatting inside link labels"]
 ];
-function validateAppendContent(content, format) {
+function validateAppendContent(content, format, options = {}) {
   if (!content || content.length > 1024 * 1024 || content.includes("\0"))
     throw new Error("Invalid append content (limit 1 MiB)");
   if (format === "html") {
@@ -43015,11 +43128,12 @@ function validateAppendContent(content, format) {
     if (/<!--|<!|<\?|<[^>]*$/u.test(content)) throw new Error("Unsupported HTML markup");
   }
   if (format === "markdown") {
-    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(content))
+    const checked = options.blocks ? withoutMarkdownCode(content).replace(/^---[ \t]*$/gm, "") : content;
+    if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(checked))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
-    const withoutLinkDestinations = content.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
+    const withoutLinkDestinations = checked.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
     for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : content))
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
@@ -43243,10 +43357,42 @@ var literalMarkdown = (text) => text.replace(/[!-/:-@[-`{-~]/g, "\\$&");
 function headingLevels(html) {
   return [...html.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].filter((match) => comparableVisibleText(match[2])).map((match) => Number(match[1]));
 }
+var DIVIDER_UTI = "com.apple.notes.inlinetextattachment.dividerline";
+function assertMarkdownBlocks(rich, expected) {
+  const tidy = (s) => s.replace(/[\s￼]+/gu, " ").trim();
+  const runs = rich.styleRuns || [];
+  const styledText = (matches) => {
+    let out = "", previous = false;
+    for (const run of runs) {
+      const hit = matches(run);
+      if (hit) out += (previous ? "" : " ") + rich.text.slice(run.start, run.start + run.length);
+      previous = hit;
+    }
+    return tidy(out);
+  };
+  if (styledText((run) => run.blockQuote === true) !== tidy(expected.quotes.join(" ")))
+    throw new Error("Block quotes not verified");
+  if (styledText((run) => run.paragraphStyle === 4) !== tidy(expected.code.join(" ")))
+    throw new Error("Monospaced code blocks not verified");
+  if (styledText((run) => run.highlight === true) !== tidy(expected.highlights.join(" ")))
+    throw new Error("Inline code highlights not verified");
+  const items = (rich.checklistItems || []).map((item) => ({
+    text: tidy(item.text),
+    done: item.done
+  }));
+  const wanted = expected.checklist.map((item) => ({ text: tidy(item.text), done: item.done }));
+  if (JSON.stringify(items) !== JSON.stringify(wanted))
+    throw new Error("Checklist items or their done state not verified");
+  if ((rich.objects || []).filter((o) => o.type === DIVIDER_UTI).length !== expected.dividers)
+    throw new Error("Dividers not verified");
+}
 function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
-  validateAppendContent(request.content, "markdown");
-  const bodyHtml = appendMarkdownHtml(request.content);
+  validateAppendContent(request.content, "markdown", { blocks: true });
+  const { html: bodyHtml, expect: blockExpectations } = renderMarkdown(request.content, {
+    blocks: true
+  });
+  const checkBlocks = usesMarkdownBlocks(request.content);
   if (request.folder) buildFolderReference(request.folder);
   const expectedText = `${request.title} ${comparableVisibleText(bodyHtml)}`.replace(/\s+/gu, " ").trim();
   const expectedLevels = [1, ...headingLevels(bodyHtml)].join();
@@ -43299,6 +43445,7 @@ ${request.content}`
         if (headingLevels(note2.html).join() !== expectedLevels)
           throw new Error("Heading styles not verified");
         assertAppendedHtmlLinks(0, note2.rich.links, bodyHtml);
+        if (checkBlocks) assertMarkdownBlocks(note2.rich, blockExpectations);
         return [{ id: noteId3, account: account2, note: note2 }];
       } catch (error2) {
         failures.push(`${noteId3}: ${reason(error2)}`);
@@ -44030,7 +44177,9 @@ var VERIFIED_BACKGROUND = /* @__PURE__ */ new Set([
   "replace-native-tag",
   "create-note-markdown"
 ]);
-var LIVE_VALIDATION_BLOCKERS = {};
+var LIVE_VALIDATION_BLOCKERS = {
+  "create-note-markdown-blocks": "Markdown block quotes, fenced code, checklist items, dividers and inline code in create-note await a live readback of the Create Markdown Note Shortcut on this build"
+};
 var signingRefusal = "Installed Shortcuts refuses to sign this Notes action (unsupported features); no background fallback is enabled";
 var UNAVAILABLE = {
   "set-checklist-item": signingRefusal,
@@ -44117,7 +44266,8 @@ function registerNativeOperations(server2, manager) {
         "remove-native-tags",
         "replace-native-tag",
         "insert-note-link",
-        "create-note-markdown"
+        "create-note-markdown",
+        "create-note-markdown-blocks"
       ];
       let tagBridgeInstalled = false;
       try {
@@ -44129,7 +44279,7 @@ function registerNativeOperations(server2, manager) {
         markdownBridgeInstalled = markdownNoteStatus().installed;
       } catch {
       }
-      const installed = (name) => name === "create-note-markdown" ? markdownBridgeInstalled : bridge.installed;
+      const installed = (name) => name.startsWith("create-note-markdown") ? markdownBridgeInstalled : bridge.installed;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
@@ -44547,7 +44697,7 @@ registerTool(
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
       content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).describe(
-        'Note body. AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L.'
+        'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles once get-capabilities reports create-note-markdown-blocks available.'
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown' for real Title/Heading/Subheading styles through the Create Markdown Note Shortcut (iCloud only; see get-capabilities)"
@@ -44583,6 +44733,7 @@ registerTool(
           'tags are not supported with format "markdown"; create the note without tags, then add them with add-native-tags using the returned id'
         );
       requireValidated("create-note-markdown");
+      if (usesMarkdownBlocks(content)) requireValidated("create-note-markdown-blocks");
       const result = createMarkdownNote(notesManager, { title, content, folder });
       return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
     }

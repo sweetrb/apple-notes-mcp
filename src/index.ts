@@ -72,6 +72,7 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
+import { usesMarkdownBlocks } from "@/utils/appendMarkdown.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -325,7 +326,7 @@ registerTool(
         .min(1, "Content is required")
         .max(MAX.CONTENT)
         .describe(
-          'Note body. AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items. To produce a checklist, create the note with a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L.'
+          'Note body. In plaintext and HTML, AppleScript cannot create true Apple Notes checklists — `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with ⇧⌘L. With format "markdown", `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles once get-capabilities reports create-note-markdown-blocks available.'
         ),
       format: z
         .enum(["plaintext", "html", "markdown"])
@@ -379,6 +380,9 @@ registerTool(
           'tags are not supported with format "markdown"; create the note without tags, then add them with add-native-tags using the returned id'
         );
       requireValidated("create-note-markdown");
+      // Block quotes, fenced code, checklist items, dividers and inline code
+      // have their own gate until a live readback on this build confirms them.
+      if (usesMarkdownBlocks(content)) requireValidated("create-note-markdown-blocks");
       const result = createMarkdownNote(notesManager, { title, content, folder });
       return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, result);
     }

@@ -102,6 +102,30 @@ describe("create-note format markdown (#172)", () => {
     expect(createMarkdownNote).not.toHaveBeenCalled();
   });
 
+  it("gates Markdown block constructs separately and leaves the existing subset ungated", async () => {
+    vi.mocked(requireValidated).mockImplementation((name: string) => {
+      if (name === "create-note-markdown-blocks")
+        throw new Error("create-note-markdown-blocks awaits a live readback");
+    });
+    const response = await createNote({
+      title: "Plan",
+      content: "- [ ] open task",
+      format: "markdown",
+    });
+    expect(requireValidated).toHaveBeenCalledWith("create-note-markdown-blocks");
+    expect(response.isError).toBe(true);
+    expect(createMarkdownNote).not.toHaveBeenCalled();
+    vi.mocked(createMarkdownNote).mockReturnValueOnce({ ok: true, id: "x" } as never);
+    await createNote({ title: "Plan", content: "## Goals", format: "markdown" });
+    expect(vi.mocked(requireValidated).mock.calls.map(([name]) => name)).toEqual([
+      "create-note-markdown",
+      "create-note-markdown-blocks",
+      "create-note-markdown",
+    ]);
+    expect(createMarkdownNote).toHaveBeenCalledTimes(1);
+    vi.mocked(requireValidated).mockReset();
+  });
+
   it("refuses tags before the gate or any write", async () => {
     const response = await createNote({
       title: "Plan",

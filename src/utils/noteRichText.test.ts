@@ -71,6 +71,28 @@ describe("Notes rich text", () => {
     expect(before.styleRuns).toEqual(after.styleRuns);
     expect(before.revision).not.toBe(after.revision);
   });
+  it("decodes the paragraph style, block-quote level and highlight of each run", () => {
+    const runs = parseRichNote(
+      document("Qcode\nhi", [
+        Buffer.concat([run(1), b(2, Buffer.concat([n(1, 3), n(8, 1)]))]),
+        Buffer.concat([run(5), b(2, n(1, 4))]),
+        Buffer.concat([run(1)]),
+        Buffer.concat([run(1), n(14, 2)]),
+      ])
+    ).styleRuns;
+    expect(
+      runs?.map(({ paragraphStyle, blockQuote, highlight }) => [
+        paragraphStyle,
+        blockQuote,
+        highlight,
+      ])
+    ).toEqual([
+      [3, true, false],
+      [4, false, false],
+      [3, false, false],
+      [3, false, true],
+    ]);
+  });
   it("retains paragraph formatting, checklist identities and unknown fields in style comparison", () => {
     const style = (paragraph: Buffer) =>
       parseRichNote(document("A", [Buffer.concat([run(1), b(2, paragraph)])])).styleRuns;
