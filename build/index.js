@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants7);
+          this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants7);
+        this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants7) {
-        this.code = optimizeExpr(this.code, names, constants7);
+      optimizeNames(names, constants8) {
+        this.code = optimizeExpr(this.code, names, constants8);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants7))
+          if (n.optimizeNames(names, constants8))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
-        if (!(super.optimizeNames(names, constants7) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        if (!(super.optimizeNames(names, constants8) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants7);
+        this.condition = optimizeExpr(this.condition, names, constants8);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants7) {
-        if (!super.optimizeNames(names, constants7))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants7);
+        this.iteration = optimizeExpr(this.iteration, names, constants8);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants7) {
-        if (!super.optimizeNames(names, constants7))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants7);
+        this.iterable = optimizeExpr(this.iterable, names, constants8);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants7) {
+      optimizeNames(names, constants8) {
         var _a, _b;
-        super.optimizeNames(names, constants7);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants7);
+        super.optimizeNames(names, constants8);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants7) {
+    function optimizeExpr(expr, names, constants8) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants7[n.str];
+        const c = constants8[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants7[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve6.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve6(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve6(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve6,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants7 = {
+    var constants8 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants7) {
-      v = { value: constants7[c] };
+    for (c in constants8) {
+      v = { value: constants8[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join25(output, replacement);
+        return join26(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join25(output, rule.append(self.options));
+          output = join26(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join25(output, replacement) {
+    function join26(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve6(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve6, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve6, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve6) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve6();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve6);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
@@ -46600,13 +46600,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve6 = (pk, seen) => {
+  const resolve7 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve6(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -46620,7 +46620,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve6(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -47771,6 +47771,19 @@ var FEATURES = [
     tools: [],
     minimumMacOSVersion: null,
     requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "markdownTemplateLibrary",
+    description: "Validate, save, list, show and delete Markdown export templates (local JSON files; exporting with one still needs Full Disk Access)",
+    tools: [
+      "list-markdown-templates",
+      "show-markdown-template",
+      "validate-markdown-template",
+      "save-markdown-template",
+      "delete-markdown-template"
+    ],
+    minimumMacOSVersion: null,
+    requirements: []
   }
 ];
 function requirementLabel(requirement) {
@@ -50252,16 +50265,16 @@ var NOTE_PLACEHOLDERS = [
   "exportStem"
 ];
 var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join25) => ({
+var wrap2 = (before, after = "", join26) => ({
   mode: "wrap",
   before,
   after,
-  ...join25 ? { join: join25 } : {}
+  ...join26 ? { join: join26 } : {}
 });
-var pattern = (value, join25) => ({
+var pattern = (value, join26) => ({
   mode: "pattern",
   value,
-  ...join25 ? { join: join25 } : {}
+  ...join26 ? { join: join26 } : {}
 });
 var STANDARD = {
   schemaVersion: 1,
@@ -52187,6 +52200,423 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
   );
 }
 
+// src/services/templateStore.ts
+import { randomBytes } from "node:crypto";
+import {
+  closeSync as closeSync7,
+  constants as constants7,
+  fstatSync as fstatSync7,
+  linkSync,
+  lstatSync as lstatSync5,
+  mkdirSync as mkdirSync7,
+  openSync as openSync7,
+  readdirSync as readdirSync4,
+  readSync as readSync5,
+  renameSync,
+  unlinkSync as unlinkSync3,
+  writeSync as writeSync5
+} from "node:fs";
+import { homedir as homedir19 } from "node:os";
+import { isAbsolute as isAbsolute5, join as join25, resolve as resolve5 } from "node:path";
+var TEMPLATE_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+var TemplateStoreError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TemplateStoreError";
+  }
+  code;
+};
+function templateDir(env = process.env) {
+  const override = env.APPLE_NOTES_MCP_TEMPLATE_DIR?.trim();
+  if (override) {
+    if (!isAbsolute5(override))
+      throw new TemplateStoreError(
+        "unsafe-path",
+        "APPLE_NOTES_MCP_TEMPLATE_DIR must be an absolute path."
+      );
+    return resolve5(override);
+  }
+  return join25(homedir19(), "Library/Application Support/apple-notes-mcp/templates");
+}
+function checkName(name, action) {
+  if (isBuiltinTemplate(name) && action !== "read")
+    throw new TemplateStoreError(
+      "reserved-name",
+      `"${name}" is a built-in template and cannot be ${action === "save" ? "saved over" : "deleted"}.`
+    );
+  if (!TEMPLATE_SLUG.test(name))
+    throw new TemplateStoreError(
+      "invalid-name",
+      `Template names are 1-64 characters of a-z, 0-9, "-" and "_", starting with a letter or digit; got "${name}".`
+    );
+}
+var TemplateStore = class {
+  constructor(dir = templateDir()) {
+    this.dir = dir;
+  }
+  dir;
+  /** The library root, which must be a real directory (not a symlink) when it exists. */
+  root(create) {
+    let stat;
+    try {
+      stat = lstatSync5(this.dir);
+    } catch {
+      if (!create) return void 0;
+      mkdirSync7(this.dir, { recursive: true, mode: 448 });
+      stat = lstatSync5(this.dir);
+    }
+    if (!stat.isDirectory())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `The template library ${this.dir} is not a directory (symlinks are refused).`
+      );
+    return this.dir;
+  }
+  file(name) {
+    return join25(this.dir, `${name}.json`);
+  }
+  /** Read a saved template's text, refusing symlinks and non-regular files. */
+  readText(path10) {
+    let fd;
+    try {
+      fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
+    } catch (error2) {
+      if (error2.code === "ENOENT") return void 0;
+      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path10}: not a regular file.`);
+    }
+    try {
+      const stat = fstatSync7(fd);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to read ${path10}: not a regular file.`
+        );
+      if (stat.size > MAX_TEMPLATE_BYTES)
+        throw new TemplateValidationError([
+          {
+            path: "$",
+            message: `template is ${stat.size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`
+          }
+        ]);
+      const data = Buffer.alloc(stat.size);
+      let read = 0;
+      while (read < stat.size) {
+        const n = readSync5(fd, data, read, stat.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      return { text: data.subarray(0, read).toString("utf8"), bytes: read, mtime: stat.mtime };
+    } finally {
+      closeSync7(fd);
+    }
+  }
+  /** Saved templates in name order; `skipped` counts entries that are not usable. */
+  list() {
+    const templates = [];
+    let skipped = 0;
+    if (!this.root(false)) return { templates, skipped, dir: this.dir };
+    for (const entry of readdirSync4(this.dir).sort()) {
+      if (!entry.endsWith(".json") || entry.startsWith(".")) continue;
+      const name = entry.slice(0, -5);
+      if (!TEMPLATE_SLUG.test(name) || isBuiltinTemplate(name)) {
+        skipped++;
+        continue;
+      }
+      try {
+        const read = this.readText(this.file(name));
+        if (!read) continue;
+        const template = parseTemplate(read.text);
+        templates.push({
+          name,
+          ...template.name && template.name !== name ? { displayName: template.name } : {},
+          ...template.description ? { description: template.description } : {},
+          ...template.extends ? { extends: template.extends } : {},
+          bytes: read.bytes,
+          modified: read.mtime.toISOString()
+        });
+      } catch {
+        skipped++;
+      }
+    }
+    return { templates, skipped, dir: this.dir };
+  }
+  /**
+   * A saved template in its portable (as stored) form, or undefined when
+   * there is none. Throws {@link TemplateValidationError} for a corrupt file.
+   */
+  find(name) {
+    checkName(name, "read");
+    if (!this.root(false)) return void 0;
+    const read = this.readText(this.file(name));
+    return read ? parseTemplate(read.text) : void 0;
+  }
+  /** Like {@link find}, but a missing template is an error. */
+  get(name) {
+    const template = this.find(name);
+    if (!template)
+      throw new TemplateStoreError(
+        "template-not-found",
+        `No saved template named "${name}". Built-in templates: ${BUILTIN_TEMPLATE_NAMES.join(", ")}.`
+      );
+    return template;
+  }
+  /**
+   * Validate and save a template under `name`. Create-only unless `force`.
+   * Returns the file path and whether an existing template was replaced.
+   */
+  save(name, text2, { force = false } = {}) {
+    checkName(name, "save");
+    const template = parseTemplate(text2);
+    const body = JSON.stringify(template, null, 2) + "\n";
+    this.root(true);
+    const path10 = this.file(name);
+    let exists = false;
+    try {
+      const stat = lstatSync5(path10);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to replace ${path10}: it is not a regular file.`
+        );
+      exists = true;
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+    }
+    if (exists && !force)
+      throw new TemplateStoreError(
+        "template-exists",
+        `A template named "${name}" already exists. Pass force: true to replace it.`
+      );
+    const temp = join25(this.dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
+    const fd = openSync7(
+      temp,
+      constants7.O_WRONLY | constants7.O_CREAT | constants7.O_EXCL | constants7.O_NOFOLLOW,
+      384
+    );
+    try {
+      const data = Buffer.from(body, "utf8");
+      let written = 0;
+      while (written < data.length) written += writeSync5(fd, data, written);
+    } finally {
+      closeSync7(fd);
+    }
+    try {
+      if (force) renameSync(temp, path10);
+      else {
+        try {
+          linkSync(temp, path10);
+        } catch (error2) {
+          if (error2.code === "EEXIST")
+            throw new TemplateStoreError(
+              "template-exists",
+              `A template named "${name}" already exists. Pass force: true to replace it.`
+            );
+          throw error2;
+        }
+      }
+    } finally {
+      try {
+        unlinkSync3(temp);
+      } catch {
+      }
+    }
+    return { path: path10, replaced: exists, bytes: Buffer.byteLength(body), template };
+  }
+  /** Delete a saved template. Built-ins cannot be deleted. */
+  delete(name) {
+    checkName(name, "delete");
+    const path10 = this.file(name);
+    let stat;
+    try {
+      if (!this.root(false)) throw new Error("absent");
+      stat = lstatSync5(path10);
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+      throw new TemplateStoreError("template-not-found", `No saved template named "${name}".`);
+    }
+    if (!stat.isFile())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `Refusing to delete ${path10}: not a regular file.`
+      );
+    unlinkSync3(path10);
+    return { path: path10 };
+  }
+};
+
+// src/tools/markdownTemplates.ts
+var ok = (text2, structured) => ({
+  content: [{ type: "text", text: text2 }],
+  structuredContent: structured
+});
+function failure(action, error2) {
+  if (error2 instanceof TemplateValidationError)
+    return errorResult(
+      `Error ${action} [invalid-template]: the template is invalid:
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+      error2
+    );
+  if (error2 instanceof TemplateStoreError)
+    return errorResult(`Error ${action} [${error2.code}]: ${error2.message}`, error2);
+  const message = error2 instanceof Error ? error2.message : String(error2);
+  return errorResult(`Error ${action}: ${message}`, error2);
+}
+var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
+var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
+var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
+  "Absolute path of a JSON template file (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+);
+function sourceText(args) {
+  if (args.template === void 0 === (args.templateFile === void 0))
+    throw new Error("Provide exactly one of 'template' or 'templateFile'.");
+  if (args.templateFile !== void 0) return readTemplateFile(args.templateFile);
+  return typeof args.template === "string" ? args.template : JSON.stringify(args.template);
+}
+function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
+  const loose = external_exports.object({}).passthrough();
+  server2.registerTool(
+    "list-markdown-templates",
+    {
+      description: "Use when: choosing a Markdown export template, or checking which saved templates exist.\nReturns: the built-in templates, the saved templates (name, display name, description, size, modified date), the library directory, and how many unusable files were skipped.\nDo not use when: you need a template's rules (show-markdown-template).\nSafety: read-only; never opens Notes.",
+      inputSchema: {},
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async () => {
+      try {
+        const listing = store().list();
+        const builtins = BUILTIN_TEMPLATE_NAMES.map((name) => ({
+          name,
+          description: builtinTemplate(name).description ?? ""
+        }));
+        return ok(
+          `${builtins.length} built-in and ${listing.templates.length} saved template(s)` + (listing.skipped ? `; skipped ${listing.skipped} unusable file(s)` : "") + ".",
+          { builtins, ...listing }
+        );
+      } catch (error2) {
+        return failure("listing templates", error2);
+      }
+    })
+  );
+  const showInput = {
+    name: nameInput,
+    expanded: external_exports.boolean().optional().describe("Also return the fully expanded template (every rule filled from its base)")
+  };
+  server2.registerTool(
+    "show-markdown-template",
+    {
+      description: "Use when: reading a built-in or saved template, to copy it as the start of a new one or to see what an export will do.\nReturns: the template in its portable form (as saved, overrides only), its source, and with expanded: true every rule filled in.\nDo not use when: listing names (list-markdown-templates).\nSafety: read-only.",
+      inputSchema: showInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async ({ name, expanded }) => {
+      try {
+        const builtin = isBuiltinTemplate(name);
+        const template = builtin ? builtinTemplate(name) : store().get(name);
+        const structured = {
+          name,
+          source: builtin ? "builtin" : "saved",
+          template,
+          ...expanded ? { expanded: resolveTemplate(template, name) } : {}
+        };
+        return ok(JSON.stringify(template, null, 2), structured);
+      } catch (error2) {
+        return failure("showing template", error2);
+      }
+    })
+  );
+  const validateInput = {
+    name: nameInput.optional(),
+    template: templateInput,
+    templateFile: templateFileInput
+  };
+  server2.registerTool(
+    "validate-markdown-template",
+    {
+      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.',
+      inputSchema: validateInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async (args) => {
+      try {
+        const given = [args.name, args.template, args.templateFile].filter(
+          (value) => value !== void 0
+        ).length;
+        if (given !== 1)
+          throw new Error("Provide exactly one of 'name', 'template' or 'templateFile'.");
+        try {
+          if (args.name !== void 0) {
+            if (!isBuiltinTemplate(args.name)) store().get(args.name);
+          } else parseTemplate(sourceText(args));
+        } catch (error2) {
+          if (!(error2 instanceof TemplateValidationError)) throw error2;
+          return ok(
+            `Invalid template (${error2.errors.length} problem(s)):
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+            { valid: false, errors: error2.errors }
+          );
+        }
+        return ok("The template is valid.", { valid: true, errors: [] });
+      } catch (error2) {
+        return failure("validating template", error2);
+      }
+    })
+  );
+  const saveInput = {
+    name: external_exports.string().min(1).max(64).describe(
+      'Name to save under: lowercase a-z, 0-9, "-" and "_", starting with a letter or digit'
+    ),
+    template: templateInput,
+    templateFile: templateFileInput,
+    force: external_exports.boolean().optional().describe("Replace an existing saved template of this name (default false: create-only)")
+  };
+  server2.registerTool(
+    "save-markdown-template",
+    {
+      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
+      inputSchema: saveInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+    },
+    (async (args) => {
+      try {
+        const saved = store().save(args.name, sourceText(args), { force: args.force });
+        return ok(
+          `${saved.replaced ? "Replaced" : "Saved"} template "${args.name}" (${saved.bytes} bytes) at ${saved.path}.`,
+          { name: args.name, path: saved.path, bytes: saved.bytes, replaced: saved.replaced }
+        );
+      } catch (error2) {
+        return failure("saving template", error2);
+      }
+    })
+  );
+  const deleteInput = { name: external_exports.string().min(1).max(64).describe("Saved template to delete") };
+  server2.registerTool(
+    "delete-markdown-template",
+    {
+      description: "Use when: removing a saved Markdown template the user no longer wants.\nReturns: the name and the path of the removed file.\nDo not use when: the template is built in (standard-markdown, obsidian cannot be deleted).\nSafety: permanently removes one file from the template library; never touches Notes.",
+      inputSchema: deleteInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false }
+    },
+    (async ({ name }) => {
+      try {
+        const removed = store().delete(name);
+        return ok(`Deleted template "${name}" (${removed.path}).`, {
+          name,
+          path: removed.path,
+          deleted: true
+        });
+      } catch (error2) {
+        return failure("deleting template", error2);
+      }
+    })
+  );
+}
+
 // src/tools/nativeTagsBridge.ts
 var noteId2 = exactIdInput(
   "ICNote",
@@ -52693,7 +53123,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname5, resolve as resolve5 } from "node:path";
+import { dirname as dirname5, resolve as resolve6 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -52716,11 +53146,11 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve5(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve6(dirname5(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve5(baseDirectory, file);
+    const path10 = resolve6(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -52795,6 +53225,7 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerMarkdownTemplates(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 function successResponse(message, structured) {
@@ -55294,7 +55725,7 @@ registerTool(
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
       wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
       template: external_exports.string().min(1).max(64).optional().describe(
-        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
+        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
       ),
       templateFile: exportPathInput(
         "JSON template file to render through (exclusive with template; at most 256 KiB)"
@@ -55323,6 +55754,7 @@ registerTool(
     try {
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        findTemplate: (name) => TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : void 0,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024
       });

@@ -118,6 +118,8 @@ import {
 import { BUILTIN_TEMPLATE_NAMES } from "@/utils/markdownTemplate.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
+import { registerMarkdownTemplates } from "@/tools/markdownTemplates.js";
+import { TEMPLATE_SLUG, TemplateStore } from "@/services/templateStore.js";
 import {
   hasScopeGuard,
   MAX_FORBIDDEN_FOLDERS,
@@ -171,6 +173,7 @@ const server = new McpServer({
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerMarkdownTemplates(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 
@@ -3671,7 +3674,7 @@ registerTool(
         .max(64)
         .optional()
         .describe(
-          `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
+          `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
         ),
       templateFile: exportPathInput(
         "JSON template file to render through (exclusive with template; at most 256 KiB)"
@@ -3703,6 +3706,8 @@ registerTool(
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) =>
           notesManager.listNoteRefs(account, folder, since, limit),
+        findTemplate: (name) =>
+          TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : undefined,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024,
       });

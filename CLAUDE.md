@@ -284,6 +284,12 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `[invalid-template]` lists one `$.json.path: problem` per line: fix those fields, do not guess a new template
 - Templated `warnings` (for example `missing_asset`, `assets_dir_required`) do not fail the export; report them
 
+### Markdown template library
+- `list-markdown-templates`, `show-markdown-template`, `validate-markdown-template`, `save-markdown-template`, `delete-markdown-template` manage JSON templates for `export-notes-markdown` (`template: "<name>"`)
+- Library: `~/Library/Application Support/apple-notes-mcp/templates` or `APPLE_NOTES_MCP_TEMPLATE_DIR`; names are lowercase slugs; `standard-markdown` and `obsidian` are built in and reserved
+- Save is create-only: `[template-exists]` means ask before passing `force: true`
+- Start a new template from `show-markdown-template` output and validate before saving
+
 ### export-notes-html
 - Same selection as `export-notes-markdown`; `outputPath` is required (the HTML is never returned inline) and create-only
 - Assets are embedded as data URLs by default. Use `embedAssets: false` (optionally with `assetsDir`) for large media: embedded assets over 10 MiB render as an unavailable marker

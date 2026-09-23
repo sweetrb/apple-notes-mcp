@@ -11,11 +11,20 @@ Templates change only the exported Markdown. They never change a note.
 
 ## Choosing a template
 
+Built-in and saved templates are managed with `list-markdown-templates`,
+`show-markdown-template`, `validate-markdown-template`,
+`save-markdown-template` and `delete-markdown-template`. Saved templates live
+in `~/Library/Application Support/apple-notes-mcp/templates` (or the absolute
+directory in `APPLE_NOTES_MCP_TEMPLATE_DIR`) as `<name>.json`, where the name
+is a lowercase slug of `a-z`, `0-9`, `-` and `_`. Saving is create-only unless
+`force` is true, and the built-in names are reserved. The library skips files
+it cannot read or validate instead of trusting them.
+
 Pass exactly one of these to `export-notes-markdown`:
 
 | Parameter | Meaning |
 | --- | --- |
-| `template` | A built-in name: `standard-markdown` or `obsidian` |
+| `template` | A built-in name (`standard-markdown` or `obsidian`) or a saved template's name |
 | `templateFile` | An absolute path to a JSON template file (home, a temp directory, or `/Volumes`; at most 256 KiB; symlinks refused) |
 
 The template is read and validated before any note is opened. An invalid
