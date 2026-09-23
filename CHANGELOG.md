@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- Folder scope guards on `update-note`, `append-to-note`, `delete-note`, and
+  `move-note`: optional `ifFolderId` (the note is in exactly this folder),
+  `ifAncestorFolderId` (the note is inside this folder's subtree), and
+  `forbiddenAncestorFolderIds` (the note, and a move destination, are outside
+  these subtrees). The checks walk Notes.app's live folder chain inside the
+  same AppleScript as the write, immediately before it. A native append to a
+  protected note runs through Shortcuts, so there the check is a separate read
+  just before the append.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

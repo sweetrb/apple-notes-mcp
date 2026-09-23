@@ -147,6 +147,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
+### Folder scope guards
+- `update-note`, `append-to-note`, `delete-note`, and `move-note` accept optional `ifFolderId`, `ifAncestorFolderId`, and `forbiddenAncestorFolderIds` (exact folder ids from `list-folders`).
+- Use them when a write should only happen while the note is still where you reviewed it, or must never touch a protected subtree (for `move-note`, the destination is checked against the forbidden list too).
+- They are re-checked inside the write's own AppleScript. A failure reads `Scope guard failed: …` and nothing is changed; re-read the note before retrying.
+
 ### search-notes
 - Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive

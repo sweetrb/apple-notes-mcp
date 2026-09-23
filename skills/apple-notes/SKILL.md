@@ -35,7 +35,7 @@ Use this skill when the user:
 | `get-note-link` | Get the shareable `notes://showNote?identifier=…` deep link for a note |
 | `update-note` | Replace a note's title and/or body |
 | `append-to-note` | Add content to a note without replacing it (`position: "after"` / `"before"`) |
-| `delete-note` | Remove a note (moves to Recently Deleted) |
+| `delete-note` | Remove a note (moves to Recently Deleted); like `update-note`, `append-to-note`, and `move-note` it accepts `ifFolderId`, `ifAncestorFolderId`, and `forbiddenAncestorFolderIds` folder preconditions |
 | `batch-delete-notes` | Delete multiple notes by ID (max 500 per call) |
 | `move-note` | Move a note to a different folder |
 | `batch-move-notes` | Move multiple notes by ID (max 500 per call) |

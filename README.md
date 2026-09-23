@@ -517,6 +517,7 @@ Updates an existing note's content and/or title.
 | `newContent` | string | Yes | New content for the note body |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. When `"html"`, content replaces the entire note body as raw HTML and `newTitle` is ignored (the first HTML element serves as the title) |
 | `allowLinkChanges` | boolean | No | Set to `true` only when intentionally changing or removing existing links |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only updates are rejected because Apple Notes titles are not unique.
 
@@ -561,6 +562,7 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `expectedContentHash` | string | Yes | `contentHash` from the exact note version being deleted |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
@@ -587,6 +589,7 @@ Moves a note to a different folder. The note is relocated in place via Notes.app
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID returned by a read or search |
 | `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only moves are rejected.
 
@@ -603,6 +606,35 @@ actual destination folder ID matches the requested folder.
 
 ---
 
+#### Folder scope guards
+
+`update-note`, `append-to-note`, `delete-note`, and `move-note` accept three
+optional folder preconditions. Use exact folder ids from `list-folders`.
+
+- `ifFolderId`: the note must currently be in exactly this folder.
+- `ifAncestorFolderId`: the note must be inside this folder or any of its
+  subfolders.
+- `forbiddenAncestorFolderIds` (up to 50): the note must not be inside any of
+  these folders or their subfolders. For `move-note`, the destination must not
+  be either.
+
+The checks read Notes.app's live folders inside the same AppleScript as the
+write, immediately before it, so a note moved after you reviewed it is left
+alone and the call fails with `Scope guard failed: …`. The one exception is a
+native append to a protected note (it runs through Shortcuts): there the check
+is a separate read just before the append, so it is not atomic.
+
+**Example - retire a note only while it is still in the inbox:**
+```json
+{
+  "id": "x-coredata://ABC123/ICNote/p456",
+  "expectedContentHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "ifFolderId": "x-coredata://ABC123/ICFolder/p12"
+}
+```
+
+---
+
 #### `append-to-note`
 
 Appends or prepends content to an existing note without replacing it. Always reads and writes as HTML, preserving all existing rich formatting.
@@ -615,6 +647,7 @@ Appends or prepends content to an existing note without replacing it. Always rea
 | `position` | string | No | `"after"` (default) appends to the end; `"before"` prepends to the start |
 | `separator` | string | No | String placed between existing content and new content (default: two newlines → `<div><br></div>` in HTML) |
 | `format` | string | No | Format of the content being appended: `"plaintext"` (default) or `"html"` |
+| `ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds` | string, string, string[] | No | Folder preconditions; see [Folder scope guards](#folder-scope-guards) |
 
 Title-only appends are rejected.
 
