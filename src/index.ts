@@ -1041,6 +1041,49 @@ registerTool(
   }, "Error reading native objects")
 );
 
+// --- get-note-tables ---
+
+registerTool(
+  "get-note-tables",
+  {
+    description:
+      "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: every table in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, and tableCellsComplete.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. Cell text only: links and styling inside cells are not rendered.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      id: z.string().optional(),
+      tables: z.array(z.record(z.unknown())).optional(),
+      tableCount: z.number().optional(),
+      tableCellsComplete: z.boolean().optional(),
+      markdown: z.string().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id }) => {
+    // Database-only path: the metadata read classifies missing notes and
+    // Full Disk Access failures before the rich-text read is attempted.
+    const { metadata, message } = getNoteMetadata(id);
+    if (!metadata) return errorResponse(message || `Failed to read note "${id}"`);
+    if (metadata.passwordProtected) {
+      return errorResponse(
+        `Note "${id}" is password-protected; its tables are encrypted. Unlock it in Notes.app first.`
+      );
+    }
+    const result = notesManager.getNoteTablesById(id);
+    const count = result.tables.length;
+    const summary =
+      count === 0
+        ? "This note has no native tables."
+        : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:\n\n${result.markdown}`;
+    return successResponse(summary, {
+      id,
+      tables: result.tables as unknown as Array<Record<string, unknown>>,
+      tableCount: count,
+      tableCellsComplete: result.tableCellsComplete,
+      markdown: result.markdown,
+    });
+  }, "Error reading note tables")
+);
+
 registerTool(
   "list-native-tags",
   {

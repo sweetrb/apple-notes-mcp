@@ -788,3 +788,49 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+/**
+ * One native table read by get-note-tables, in note body order.
+ *
+ * `complete` is false when the table could not be decoded at all (`reason` says
+ * why, and no rows are returned) or when some cells could not be decoded
+ * (listed in `incompleteCells`, and `null` in `rows`). Cell text is never guessed.
+ */
+export interface NoteTable {
+  /** 1-based position among the note's tables, in body order */
+  index: number;
+  /** Native attachment identifier (UUID) of the table */
+  id: string;
+  /** CoreData id of the table attachment, when known */
+  attachmentId?: string;
+  /** True only when every cell was decoded */
+  complete: boolean;
+  /** Why the table or some of its cells could not be decoded */
+  reason?: string;
+  /** Cell text by row then column, in display order; null marks an undecoded cell */
+  rows?: Array<Array<string | null>>;
+  /** Stable CRDT row identifiers, parallel to `rows` */
+  rowIds?: string[];
+  /** Stable CRDT column identifiers, parallel to each row */
+  columnIds?: string[];
+  /** Number of rows */
+  rowCount?: number;
+  /** Number of columns */
+  columnCount?: number;
+  /** Cells that could not be decoded (zero-based display positions) */
+  incompleteCells?: Array<{ row: number; column: number; reason: string }>;
+  /** GitHub-flavored Markdown rendering; the first row is the header row */
+  markdown?: string;
+}
+
+/**
+ * Result of reading every native table in one note.
+ */
+export interface NoteTablesResult {
+  /** Tables in body order */
+  tables: NoteTable[];
+  /** True when every table and every cell was decoded */
+  tableCellsComplete: boolean;
+  /** All tables as Markdown in body order, separated by blank lines */
+  markdown: string;
+}

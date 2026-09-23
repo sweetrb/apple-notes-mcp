@@ -402,6 +402,28 @@ Disk Access.
 
 ---
 
+#### `get-note-tables`
+
+Reads every native table in one exact note, in body order, from the NoteStore
+database. Each table is returned as GitHub-flavored Markdown and as JSON `rows`
+with stable `rowIds` and `columnIds`. Notes tables have no header row, so the
+Markdown uses the first row as the header. Pipes are escaped as `\|`,
+backslashes are doubled, and line breaks inside a cell become `<br>`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Exact note ID (`x-coredata://…/ICNote/pNNN`) |
+
+`tableCellsComplete` is false when any table or cell could not be decoded. A
+cell holding an embedded object is `null` in `rows`, listed in
+`incompleteCells`, and shown as `[undecoded cell]` in Markdown. A table whose
+data cannot be decoded at all has `complete: false`, a `reason`, and no rows.
+Cell text is never guessed. Links and styling inside cells are not rendered.
+A note without tables returns an empty `tables` list. This tool is read-only,
+requires Full Disk Access, and refuses password-protected notes.
+
+---
+
 #### `list-native-tags`
 
 Lists actual native Notes tags used within one explicit `account` and `folder`,

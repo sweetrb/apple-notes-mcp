@@ -39832,6 +39832,185 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
   }
 }
 
+// src/utils/noteTables.ts
+import { gunzipSync as gunzipSync3 } from "node:zlib";
+var sub = (f, n) => {
+  const value = embeddedMessage(getField(f, n));
+  if (!value) throw new Error(`Missing table field ${n}`);
+  return value;
+};
+var num = (f, n) => {
+  const v = varintValue(getField(f, n));
+  if (v === void 0) throw new Error(`Missing table index ${n}`);
+  return v;
+};
+var many = (f, n) => getFields(f, n).map((v) => {
+  const m = embeddedMessage(v);
+  if (!m) throw new Error("Invalid table entry");
+  return m;
+});
+var hex = (f) => {
+  if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
+  return Buffer.from(f.value).toString("hex");
+};
+function parseNoteTable(compressed) {
+  const table = decodeTable(compressed, true);
+  return { rows: table.rows, rowIds: table.rowIds, columnIds: table.columnIds };
+}
+function parseNoteTableCells(compressed) {
+  return decodeTable(compressed, false);
+}
+function decodeTable(compressed, strict) {
+  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
+  const data = sub(sub(root, 2), 3), entries = many(data, 3);
+  if (entries.length > 1e5) throw new Error("Table too large");
+  const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
+  const entry = (index) => {
+    if (!entries[index]) throw new Error("Invalid table reference");
+    return entries[index];
+  };
+  const uuidIndex = (index) => num(sub(many(sub(entry(index), 13), 3)[0], 2), 2);
+  const roots = entries.filter((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && types[num(map, 1)] === "com.apple.notes.ICTable";
+  });
+  if (roots.length !== 1) throw new Error("Ambiguous native table root");
+  const refs = new Map(
+    many(sub(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub(m, 2), 6)])
+  );
+  const ordered = (key) => {
+    const ref = refs.get(key);
+    if (ref === void 0) throw new Error("Missing table dimension");
+    const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
+    const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
+    const map = /* @__PURE__ */ new Map();
+    ids.forEach((id2, i) => {
+      const index = uuids.indexOf(id2);
+      if (index < 0) throw new Error("Missing dimension UUID");
+      map.set(index, i);
+    });
+    const aliases = many(sub(ordering, 2), 1).map((pair) => [
+      uuidIndex(num(sub(pair, 1), 6)),
+      uuidIndex(num(sub(pair, 2), 6))
+    ]);
+    for (let pass = 0; pass < aliases.length + 1; pass++) {
+      let changed = false;
+      for (const [key2, value] of aliases)
+        if (map.has(key2) && !map.has(value)) {
+          map.set(value, map.get(key2));
+          changed = true;
+        }
+      if (!changed) break;
+    }
+    return { ids, map };
+  };
+  const rows = ordered("crRows"), columns = ordered("crColumns");
+  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
+    throw new Error("Unsupported table size");
+  const values = rows.ids.map(() => columns.ids.map(() => ""));
+  const incomplete = [];
+  const cellRef = refs.get("cellColumns");
+  if (cellRef === void 0) throw new Error("Missing table cells");
+  for (const column of many(sub(entry(cellRef), 6), 1)) {
+    const ci = columns.map.get(uuidIndex(num(sub(column, 1), 6)));
+    const cells = entry(num(sub(column, 2), 6));
+    for (const row of many(sub(cells, 6), 1)) {
+      const ri = rows.map.get(uuidIndex(num(sub(row, 1), 6)));
+      if (ri === void 0 || ci === void 0) continue;
+      const note = sub(entry(num(sub(row, 2), 6)), 10);
+      const text = stringValue(getField(note, 2));
+      if (text === void 0 || text.includes("\uFFFC")) {
+        if (strict) throw new Error("Embedded or unsupported table cell");
+        values[ri][ci] = null;
+        incomplete.push({
+          ri,
+          ci,
+          reason: text === void 0 ? "Cell text is missing" : "Cell contains an embedded object"
+        });
+        continue;
+      }
+      values[ri][ci] = text.replace(/\n$/u, "");
+    }
+  }
+  const rtl = entries.some((e) => {
+    const map = embeddedMessage(getField(e, 13));
+    return map && many(map, 3).some(
+      (m) => stringValue(getField(sub(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
+    );
+  });
+  const width = columns.ids.length;
+  if (rtl) {
+    for (const row of values) row.reverse();
+    columns.ids.reverse();
+  }
+  const incompleteCells = incomplete.map(({ ri, ci, reason }) => ({ row: ri, column: rtl ? width - 1 - ci : ci, reason })).sort((a, b) => a.row - b.row || a.column - b.column);
+  return { rows: values, rowIds: rows.ids, columnIds: columns.ids, incompleteCells };
+}
+
+// src/utils/tableMarkdown.ts
+var UNDECODED_CELL_MARKER = "[undecoded cell]";
+function escapeMarkdownTableCell(text) {
+  return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r\n|[\r\n\u2028\u2029]/g, "<br>");
+}
+function renderMarkdownTable(rows) {
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (rows.length === 0 || width === 0) return "";
+  const line = (row) => "| " + Array.from({ length: width }, (_, i) => {
+    const cell = row[i];
+    return cell === null ? UNDECODED_CELL_MARKER : escapeMarkdownTableCell(cell ?? "");
+  }).join(" | ") + " |";
+  const [header, ...body] = rows;
+  return [line(header), "| " + Array(width).fill("---").join(" | ") + " |", ...body.map(line)].join(
+    "\n"
+  );
+}
+function collectNoteTables(rich, noteId3) {
+  const seen = /* @__PURE__ */ new Set();
+  const ordered = (rich.objects || []).filter((object3) => object3.type.includes("table")).sort((a, b) => a.start - b.start).filter((object3) => {
+    if (seen.has(object3.id)) return false;
+    seen.add(object3.id);
+    return true;
+  });
+  const tables = ordered.map((object3, i) => {
+    const index = i + 1;
+    const data = (rich.objectData || []).find((row) => row.id === object3.id);
+    if (!data || !data.mergeable) {
+      return { index, id: object3.id, complete: false, reason: "Native table data is unavailable" };
+    }
+    const attachmentId = noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${data.pk}`);
+    try {
+      const table = parseNoteTableCells(Buffer.from(data.mergeable, "hex"));
+      const complete = table.incompleteCells.length === 0;
+      return {
+        index,
+        id: object3.id,
+        attachmentId,
+        complete,
+        ...complete ? {} : { reason: `${table.incompleteCells.length} cell(s) could not be decoded` },
+        rows: table.rows,
+        rowIds: table.rowIds,
+        columnIds: table.columnIds,
+        rowCount: table.rowIds.length,
+        columnCount: table.columnIds.length,
+        incompleteCells: table.incompleteCells,
+        markdown: renderMarkdownTable(table.rows)
+      };
+    } catch (error2) {
+      return {
+        index,
+        id: object3.id,
+        attachmentId,
+        complete: false,
+        reason: error2 instanceof Error ? error2.message : String(error2)
+      };
+    }
+  });
+  const markdown = tables.map(
+    (table) => table.markdown !== void 0 ? table.markdown : `[table ${table.index} could not be decoded: ${table.reason}]`
+  ).join("\n\n");
+  return { tables, tableCellsComplete: tables.every((table) => table.complete), markdown };
+}
+
 // src/utils/attachmentFs.ts
 import {
   existsSync as existsSync2,
@@ -40641,6 +40820,21 @@ var AppleNotesManager = class {
       shared: parsed.shared,
       passwordProtected: parsed.passwordProtected
     };
+  }
+  /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id2) {
+    return collectNoteTables(readRichNote(id2), id2);
   }
   /**
    * Retrieves detailed metadata for a note by title.
@@ -43656,103 +43850,6 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
-// src/utils/noteTables.ts
-import { gunzipSync as gunzipSync3 } from "node:zlib";
-var sub = (f, n) => {
-  const value = embeddedMessage(getField(f, n));
-  if (!value) throw new Error(`Missing table field ${n}`);
-  return value;
-};
-var num = (f, n) => {
-  const v = varintValue(getField(f, n));
-  if (v === void 0) throw new Error(`Missing table index ${n}`);
-  return v;
-};
-var many = (f, n) => getFields(f, n).map((v) => {
-  const m = embeddedMessage(v);
-  if (!m) throw new Error("Invalid table entry");
-  return m;
-});
-var hex = (f) => {
-  if (!(f?.value instanceof Uint8Array)) throw new Error("Missing table UUID");
-  return Buffer.from(f.value).toString("hex");
-};
-function parseNoteTable(compressed) {
-  const root = decodeMessage(gunzipSync3(compressed, { maxOutputLength: 16 * 1024 * 1024 }));
-  const data = sub(sub(root, 2), 3), entries = many(data, 3);
-  if (entries.length > 1e5) throw new Error("Table too large");
-  const keys = getFields(data, 4).map(stringValue), types = getFields(data, 5).map(stringValue), uuids = getFields(data, 6).map(hex);
-  const entry = (index) => {
-    if (!entries[index]) throw new Error("Invalid table reference");
-    return entries[index];
-  };
-  const uuidIndex = (index) => num(sub(many(sub(entry(index), 13), 3)[0], 2), 2);
-  const roots = entries.filter((e) => {
-    const map = embeddedMessage(getField(e, 13));
-    return map && types[num(map, 1)] === "com.apple.notes.ICTable";
-  });
-  if (roots.length !== 1) throw new Error("Ambiguous native table root");
-  const refs = new Map(
-    many(sub(roots[0], 13), 3).filter((m) => ["crRows", "crColumns", "cellColumns"].includes(keys[num(m, 1)] || "")).map((m) => [keys[num(m, 1)], num(sub(m, 2), 6)])
-  );
-  const ordered = (key) => {
-    const ref = refs.get(key);
-    if (ref === void 0) throw new Error("Missing table dimension");
-    const ordering = sub(sub(entry(ref), 16), 1), array2 = sub(ordering, 1);
-    const ids = many(array2, 2).map((a) => hex(getField(a, 2)));
-    const map = /* @__PURE__ */ new Map();
-    ids.forEach((id2, i) => {
-      const index = uuids.indexOf(id2);
-      if (index < 0) throw new Error("Missing dimension UUID");
-      map.set(index, i);
-    });
-    const aliases = many(sub(ordering, 2), 1).map((pair) => [
-      uuidIndex(num(sub(pair, 1), 6)),
-      uuidIndex(num(sub(pair, 2), 6))
-    ]);
-    for (let pass = 0; pass < aliases.length + 1; pass++) {
-      let changed = false;
-      for (const [key2, value] of aliases)
-        if (map.has(key2) && !map.has(value)) {
-          map.set(value, map.get(key2));
-          changed = true;
-        }
-      if (!changed) break;
-    }
-    return { ids, map };
-  };
-  const rows = ordered("crRows"), columns = ordered("crColumns");
-  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
-    throw new Error("Unsupported table size");
-  const values = rows.ids.map(() => columns.ids.map(() => ""));
-  const cellRef = refs.get("cellColumns");
-  if (cellRef === void 0) throw new Error("Missing table cells");
-  for (const column of many(sub(entry(cellRef), 6), 1)) {
-    const ci = columns.map.get(uuidIndex(num(sub(column, 1), 6)));
-    const cells = entry(num(sub(column, 2), 6));
-    for (const row of many(sub(cells, 6), 1)) {
-      const ri = rows.map.get(uuidIndex(num(sub(row, 1), 6)));
-      if (ri === void 0 || ci === void 0) continue;
-      const note = sub(entry(num(sub(row, 2), 6)), 10);
-      const text = stringValue(getField(note, 2));
-      if (text === void 0 || text.includes("\uFFFC"))
-        throw new Error("Embedded or unsupported table cell");
-      values[ri][ci] = text.replace(/\n$/u, "");
-    }
-  }
-  const rtl = entries.some((e) => {
-    const map = embeddedMessage(getField(e, 13));
-    return map && many(map, 3).some(
-      (m) => stringValue(getField(sub(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
-    );
-  });
-  if (rtl) {
-    for (const row of values) row.reverse();
-    columns.ids.reverse();
-  }
-  return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
-}
-
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -45093,6 +45190,42 @@ registerTool(
       tableCellsComplete: tables.every((table) => table.complete)
     });
   }, "Error reading native objects")
+);
+registerTool(
+  "get-note-tables",
+  {
+    description: "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: every table in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, and tableCellsComplete.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. Cell text only: links and styling inside cells are not rendered.",
+    inputSchema: { id: noteIdInput },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      tables: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      tableCount: external_exports.number().optional(),
+      tableCellsComplete: external_exports.boolean().optional(),
+      markdown: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2 }) => {
+    const { metadata, message } = getNoteMetadata(id2);
+    if (!metadata) return errorResponse(message || `Failed to read note "${id2}"`);
+    if (metadata.passwordProtected) {
+      return errorResponse(
+        `Note "${id2}" is password-protected; its tables are encrypted. Unlock it in Notes.app first.`
+      );
+    }
+    const result = notesManager.getNoteTablesById(id2);
+    const count = result.tables.length;
+    const summary = count === 0 ? "This note has no native tables." : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:
+
+${result.markdown}`;
+    return successResponse(summary, {
+      id: id2,
+      tables: result.tables,
+      tableCount: count,
+      tableCellsComplete: result.tableCellsComplete,
+      markdown: result.markdown
+    });
+  }, "Error reading note tables")
 );
 registerTool(
   "list-native-tags",

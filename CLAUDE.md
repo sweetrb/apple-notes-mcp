@@ -180,6 +180,14 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
   - Plus note-not-found and password-protected errors raised before the database is touched.
 - Works independently of `get-note-content` — use both for full picture
 
+### get-note-tables
+- Requires the note ID; reads the NoteStore database read-only (Full Disk Access)
+- Returns every native table in body order as GitHub-flavored Markdown (`markdown`, first row as header) and as JSON (`tables[].rows`, `rowIds`, `columnIds`)
+- A note with no tables succeeds with an empty `tables` list; it is not an error
+- **Check `tableCellsComplete`.** When false, an undecodable cell is `null` in `rows`, listed in `incompleteCells`, and shown as `[undecoded cell]` in Markdown; a table that cannot be decoded at all has `complete: false`, a `reason`, and no rows. Never fill those cells in
+- Cell text only: links and styling inside cells are not rendered
+- Password-protected notes are refused
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

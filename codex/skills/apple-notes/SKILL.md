@@ -70,6 +70,7 @@ Use this skill when the user:
 | `fetch-attachment` | Fetch attachment bytes as base64 |
 | `show-attachment` | Reveal an attachment in the Notes.app UI |
 | `get-checklist-state` | Read checked/unchecked state for existing checklists |
+| `get-note-tables` | Read a note's native tables as Markdown and JSON rows, in body order |
 | `get-note-metadata` | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB |
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
@@ -117,6 +118,12 @@ When the user wants to see note contents:
 User: "Show me my shopping list"
 Action: Search by title if needed, then use get-note-content with the exact ID
 ```
+
+For a note's tables, use `get-note-tables` with the note ID. It returns each
+table as Markdown and as JSON rows. When `tableCellsComplete` is false, some
+cells could not be decoded: they are `null` in `rows` and shown as
+`[undecoded cell]` in Markdown. Report that to the user rather than filling
+them in.
 
 Use titles for discovery only. Mutations require the exact note ID; update,
 append, and delete also require the `contentHash` returned by

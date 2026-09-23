@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `get-note-tables` reads every native table in one note, in body order, as
+  GitHub-flavored Markdown and as JSON `rows` with stable `rowIds` and
+  `columnIds`. The first row is the Markdown header, pipes are escaped as `\|`,
+  backslashes are doubled, and line breaks inside a cell become `<br>`. A cell
+  holding an embedded object is returned as `null`, listed in
+  `incompleteCells`, and shown as `[undecoded cell]`; a table that cannot be
+  decoded at all is reported with `complete: false` and a `reason`, never with
+  guessed rows. `tableCellsComplete` summarizes both cases. The tool reads the
+  NoteStore database read-only, needs Full Disk Access, and refuses
+  password-protected notes.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

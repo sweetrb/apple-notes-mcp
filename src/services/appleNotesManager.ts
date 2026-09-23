@@ -32,6 +32,7 @@ import type {
   ExportedFolder,
   ExportedNote,
   ExportNotesOptions,
+  NoteTablesResult,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
@@ -41,6 +42,7 @@ import {
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
+import { collectNoteTables } from "@/utils/tableMarkdown.js";
 import {
   assertSafeSavePath,
   readFileBase64Capped,
@@ -1367,6 +1369,22 @@ export class AppleNotesManager {
       shared: parsed.shared,
       passwordProtected: parsed.passwordProtected,
     };
+  }
+
+  /**
+   * Reads every native table in one note, in body order, as JSON rows and
+   * GitHub-flavored Markdown.
+   *
+   * Reads the NoteStore database read-only (Full Disk Access required); no
+   * AppleScript is involved. Cells that cannot be decoded are returned as null
+   * and flagged, never guessed.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns Tables in body order with a combined Markdown rendering
+   * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
+   */
+  getNoteTablesById(id: string): NoteTablesResult {
+    return collectNoteTables(readRichNote(id), id);
   }
 
   /**
