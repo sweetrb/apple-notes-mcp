@@ -59,6 +59,7 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import { NoteBlocksError, pageNoteBlocks, readNoteBlocks } from "@/utils/noteBlocks.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerNativeTagsBridge } from "@/tools/nativeTagsBridge.js";
 import {
@@ -1039,6 +1040,64 @@ registerTool(
       tableCellsComplete: tables.every((table) => table.complete),
     });
   }, "Error reading native objects")
+);
+
+// --- get-note-blocks ---
+
+registerTool(
+  "get-note-blocks",
+  {
+    description:
+      "Use when: you need a note's structure, not just its text: paragraph styles (title, heading, subheading, body, monospaced, bulleted/dashed/numbered list, checklist with done state), indent, alignment, block quote, inline formatting (bold, italic, underline, strikethrough, superscript, subscript, color, highlight, links) and attachment positions, by exact id.\nReturns: one page of blocks in body order (default 500, stopped early under APPLE_NOTES_MCP_BLOCKS_MAX_BYTES, default 4 MB), whole-note summary counts, undecodedFields, and page info; while page.hasMore is true, call again with offset set to page.nextOffset. Offsets and lengths count UTF-16 code units.\nDo not use when: you want the editable HTML body (get-note-content) or Markdown (get-note-markdown).\nSafety: read-only; decodes the NoteStore database directly and requires Full Disk Access. Password-protected notes are refused. Link URLs are returned as stored; linkSafe is false for schemes other than http(s), notes, applenotes and mailto.",
+    inputSchema: {
+      id: noteIdInput,
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Index of the first block to return (default 0); use page.nextOffset"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(5000)
+        .optional()
+        .describe("Maximum blocks to return (default 500, max 5000)"),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      textLength: z.number().optional(),
+      blocks: z.array(z.record(z.unknown())).optional(),
+      page: z.record(z.unknown()).optional(),
+      summary: z.record(z.unknown()).optional(),
+      undecodedFields: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ id, offset, limit }) => {
+    let page;
+    try {
+      page = pageNoteBlocks(readNoteBlocks(id), { offset, limit });
+    } catch (error) {
+      if (!(error instanceof NoteBlocksError)) throw error;
+      const hint =
+        error.code === "no-full-disk-access"
+          ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}`
+          : "";
+      return errorResponse(`Error reading note blocks [${error.code}]: ${error.message}${hint}`);
+    }
+    const { summary } = page;
+    const styles = Object.entries(summary.styles)
+      .map(([style, count]) => `${style} ${count}`)
+      .join(", ");
+    return successResponse(
+      `Decoded ${summary.blocks} blocks (${styles || "none"}); returned ${page.page.returned} from offset ${page.page.offset}` +
+        (page.page.hasMore ? `; more available at offset ${page.page.nextOffset}` : "") +
+        ".",
+      { id, ...page }
+    );
+  }, "Error reading note blocks")
 );
 
 registerTool(

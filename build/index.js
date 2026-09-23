@@ -3358,9 +3358,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decodeUnreserved && isUnreserved(decoded)) {
               output += decoded;
@@ -3380,9 +3380,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (decoded !== "." && isUnreserved(decoded)) {
               output += decoded;
@@ -3422,9 +3422,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -3460,9 +3460,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -3507,9 +3507,9 @@ var require_utils = __commonJS({
       for (let i = 0; i < input.length; i++) {
         const ch = input[i];
         if (ch === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            const normalizedHex = hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            const normalizedHex = hex3.toUpperCase();
             const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
             if (isUnreserved(decoded)) {
               output += decoded;
@@ -3547,9 +3547,9 @@ var require_utils = __commonJS({
       let output = "";
       for (let i = 0; i < input.length; i++) {
         if (input[i] === "%" && i + 2 < input.length) {
-          const hex2 = input.slice(i + 1, i + 3);
-          if (isHexPair(hex2)) {
-            output += "%" + hex2.toUpperCase();
+          const hex3 = input.slice(i + 1, i + 3);
+          if (isHexPair(hex3)) {
+            output += "%" + hex3.toUpperCase();
             i += 2;
             continue;
           }
@@ -8768,25 +8768,25 @@ var require_ContainerNode = __commonJS({
         return this._firstChild;
       } },
       lastChild: { get: function() {
-        var kids = this._childNodes, first;
+        var kids = this._childNodes, first2;
         if (kids) {
           return kids.length === 0 ? null : kids[kids.length - 1];
         }
-        first = this._firstChild;
-        if (first === null) {
+        first2 = this._firstChild;
+        if (first2 === null) {
           return null;
         }
-        return first._previousSibling;
+        return first2._previousSibling;
       } },
       _ensureChildNodes: { value: function() {
         if (this._childNodes) {
           return;
         }
-        var first = this._firstChild, kid = first, childNodes = this._childNodes = new NodeList();
-        if (first) do {
+        var first2 = this._firstChild, kid = first2, childNodes = this._childNodes = new NodeList();
+        if (first2) do {
           childNodes.push(kid);
           kid = kid._nextSibling;
-        } while (kid !== first);
+        } while (kid !== first2);
         this._firstChild = null;
       } },
       // Remove all of this node's children.  This is a minor
@@ -10257,22 +10257,22 @@ var require_Element = __commonJS({
         }
       },
       _insertAdjacent: { value: function _insertAdjacent(position, node) {
-        var first = false;
+        var first2 = false;
         switch (position) {
           case "beforebegin":
-            first = true;
+            first2 = true;
           /* falls through */
           case "afterend":
             var parent = this.parentNode;
             if (parent === null) {
               return null;
             }
-            return parent.insertBefore(node, first ? this : this.nextSibling);
+            return parent.insertBefore(node, first2 ? this : this.nextSibling);
           case "afterbegin":
-            first = true;
+            first2 = true;
           /* falls through */
           case "beforeend":
-            return this.insertBefore(node, first ? this.firstChild : null);
+            return this.insertBefore(node, first2 ? this.firstChild : null);
           default:
             return utils.SyntaxError();
         }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join11(output, replacement);
+        return join12(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join11(output, rule.append(self.options));
+          output = join12(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join11(output, replacement) {
+    function join12(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -24675,9 +24675,9 @@ var util;
 })(util || (util = {}));
 var objectUtil;
 (function(objectUtil2) {
-  objectUtil2.mergeShapes = (first, second) => {
+  objectUtil2.mergeShapes = (first2, second) => {
     return {
-      ...first,
+      ...first2,
       ...second
       // second overwrites first
     };
@@ -24777,8 +24777,8 @@ var ZodError = class _ZodError extends Error {
   constructor(issues) {
     super();
     this.issues = [];
-    this.addIssue = (sub2) => {
-      this.issues = [...this.issues, sub2];
+    this.addIssue = (sub3) => {
+      this.issues = [...this.issues, sub3];
     };
     this.addIssues = (subs = []) => {
       this.issues = [...this.issues, ...subs];
@@ -24845,13 +24845,13 @@ var ZodError = class _ZodError extends Error {
   flatten(mapper = (issue2) => issue2.message) {
     const fieldErrors = {};
     const formErrors = [];
-    for (const sub2 of this.issues) {
-      if (sub2.path.length > 0) {
-        const firstEl = sub2.path[0];
+    for (const sub3 of this.issues) {
+      if (sub3.path.length > 0) {
+        const firstEl = sub3.path[0];
         fieldErrors[firstEl] = fieldErrors[firstEl] || [];
-        fieldErrors[firstEl].push(mapper(sub2));
+        fieldErrors[firstEl].push(mapper(sub3));
       } else {
-        formErrors.push(mapper(sub2));
+        formErrors.push(mapper(sub3));
       }
     }
     return { formErrors, fieldErrors };
@@ -27599,10 +27599,10 @@ var ZodRecord = class _ZodRecord extends ZodType {
   get element() {
     return this._def.valueType;
   }
-  static create(first, second, third) {
+  static create(first2, second, third) {
     if (second instanceof ZodType) {
       return new _ZodRecord({
-        keyType: first,
+        keyType: first2,
         valueType: second,
         typeName: ZodFirstPartyTypeKind.ZodRecord,
         ...processCreateParams(third)
@@ -27610,7 +27610,7 @@ var ZodRecord = class _ZodRecord extends ZodType {
     }
     return new _ZodRecord({
       keyType: ZodString.create(),
-      valueType: first,
+      valueType: first2,
       typeName: ZodFirstPartyTypeKind.ZodRecord,
       ...processCreateParams(second)
     });
@@ -29150,12 +29150,12 @@ var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
-  for (const sub2 of error2.issues) {
-    if (sub2.path.length > 0) {
-      fieldErrors[sub2.path[0]] = fieldErrors[sub2.path[0]] || [];
-      fieldErrors[sub2.path[0]].push(mapper(sub2));
+  for (const sub3 of error2.issues) {
+    if (sub3.path.length > 0) {
+      fieldErrors[sub3.path[0]] = fieldErrors[sub3.path[0]] || [];
+      fieldErrors[sub3.path[0]].push(mapper(sub3));
     } else {
-      formErrors.push(mapper(sub2));
+      formErrors.push(mapper(sub3));
     }
   }
   return { formErrors, fieldErrors };
@@ -39330,6 +39330,68 @@ function embeddedMessage(field) {
   if (!bytes) return void 0;
   return decodeMessage(bytes);
 }
+var ProtobufDecodeError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ProtobufDecodeError";
+  }
+};
+function decodeVarint64(buf, offset) {
+  let result = 0n;
+  let shift = 0n;
+  let pos = offset;
+  while (pos < buf.length) {
+    const byte = buf[pos++];
+    result |= BigInt(byte & 127) << shift;
+    if ((byte & 128) === 0) return [BigInt.asUintN(64, result), pos];
+    shift += 7n;
+    if (shift >= 70n) throw new ProtobufDecodeError(`Varint too long at offset ${offset}`);
+  }
+  throw new ProtobufDecodeError(`Unexpected end of buffer reading varint at offset ${offset}`);
+}
+function decodeWireFields(buf) {
+  const fields = [];
+  let offset = 0;
+  while (offset < buf.length) {
+    const [tag, afterTag] = decodeVarint64(buf, offset);
+    offset = afterTag;
+    const fieldNumber = Number(tag >> 3n);
+    const wireType = Number(tag & 7n);
+    if (fieldNumber === 0 || fieldNumber > 536870911)
+      throw new ProtobufDecodeError("Invalid field number");
+    if (wireType === 0) {
+      const [value, next] = decodeVarint64(buf, offset);
+      offset = next;
+      fields.push({ fieldNumber, wireType, varint: value });
+      continue;
+    }
+    let length;
+    if (wireType === 1) length = 8;
+    else if (wireType === 5) length = 4;
+    else if (wireType === 2) {
+      const [value, next] = decodeVarint64(buf, offset);
+      if (value > BigInt(buf.length)) throw new ProtobufDecodeError("Truncated field");
+      length = Number(value);
+      offset = next;
+    } else throw new ProtobufDecodeError(`Unsupported wire type ${wireType}`);
+    if (offset + length > buf.length) throw new ProtobufDecodeError("Truncated field");
+    fields.push({
+      fieldNumber,
+      wireType,
+      bytes: buf.subarray(offset, offset + length)
+    });
+    offset += length;
+  }
+  return fields;
+}
+function signedVarint(value) {
+  return Number(BigInt.asIntN(64, value));
+}
+function fixed32Float(field) {
+  if (!field || field.wireType !== 5 || !field.bytes || field.bytes.length !== 4) return void 0;
+  const bytes = field.bytes;
+  return new DataView(bytes.buffer, bytes.byteOffset, 4).getFloat32(0, true);
+}
 
 // src/utils/checklistParser.ts
 var CHECKLIST_STYLE_TYPE = 103;
@@ -39364,9 +39426,9 @@ function queryNoteData(noteId3) {
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
     });
-    const hex2 = result.trim();
-    if (!hex2) return { hex: null };
-    return { hex: hex2 };
+    const hex3 = result.trim();
+    if (!hex3) return { hex: null };
+    return { hex: hex3 };
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
     console.error(`Failed to query NoteStore database: ${message}`);
@@ -39376,10 +39438,10 @@ function queryNoteData(noteId3) {
     return { hex: null };
   }
 }
-function hexToBytes(hex2) {
-  const bytes = new Uint8Array(hex2.length / 2);
-  for (let i = 0; i < hex2.length; i += 2) {
-    bytes[i / 2] = parseInt(hex2.substring(i, i + 2), 16);
+function hexToBytes(hex3) {
+  const bytes = new Uint8Array(hex3.length / 2);
+  for (let i = 0; i < hex3.length; i += 2) {
+    bytes[i / 2] = parseInt(hex3.substring(i, i + 2), 16);
   }
   return bytes;
 }
@@ -42681,7 +42743,7 @@ function decodeHtmlEntities(text) {
     }
     return String.fromCodePoint(codePoint);
   };
-  return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex2) => decodeCodePoint(match, hex2, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
+  return text.replace(/&#x([0-9a-f]+);?/gi, (match, hex3) => decodeCodePoint(match, hex3, 16)).replace(/&#([0-9]+);?/g, (match, decimal) => decodeCodePoint(match, decimal, 10)).replace(/&nbsp(?:;|(?![0-9a-z]))/gi, " ").replace(/&quot(?:;|(?![0-9a-z]))/gi, '"').replace(/&apos(?:;|(?![0-9a-z]))/gi, "'").replace(/&lt(?:;|(?![0-9a-z]))/gi, "<").replace(/&gt(?:;|(?![0-9a-z]))/gi, ">").replace(/&amp(?:;|(?![0-9a-z]))/gi, "&");
 }
 function firstVisibleHtmlLine(html) {
   let text = html;
@@ -43753,6 +43815,402 @@ function parseNoteTable(compressed) {
   return { rows: values, rowIds: rows.ids, columnIds: columns.ids };
 }
 
+// src/utils/noteBlocks.ts
+import { execFileSync as execFileSync8 } from "node:child_process";
+import { existsSync as existsSync7 } from "node:fs";
+import { homedir as homedir8 } from "node:os";
+import { join as join10 } from "node:path";
+import { gunzipSync as gunzipSync4 } from "node:zlib";
+var NoteBlocksError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NoteBlocksError";
+    this.code = code;
+  }
+};
+var STYLE_NAMES = {
+  0: "title",
+  1: "heading",
+  2: "subheading",
+  4: "monospaced",
+  100: "bulleted",
+  101: "dashed",
+  102: "numbered",
+  103: "checklist"
+};
+var ALIGNMENTS = {
+  0: "left",
+  1: "center",
+  2: "right",
+  3: "justify"
+};
+var HIGHLIGHTS = {
+  1: "purple",
+  2: "pink",
+  3: "orange",
+  4: "mint",
+  5: "blue"
+};
+var KNOWN_RUN_FIELDS = /* @__PURE__ */ new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
+var KNOWN_PARAGRAPH_FIELDS = /* @__PURE__ */ new Set([1, 2, 4, 5, 8, 9]);
+var isSafeLink = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
+var utf8 = new TextDecoder();
+var first = (fields, n) => fields.find((f) => f.fieldNumber === n);
+var varintOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 0 && f.varint !== void 0 ? signedVarint(f.varint) : void 0;
+};
+var bytesOf = (fields, n) => {
+  const f = first(fields, n);
+  return f?.wireType === 2 ? f.bytes : void 0;
+};
+var stringOf = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? utf8.decode(b) : void 0;
+};
+var sub2 = (fields, n) => {
+  const b = bytesOf(fields, n);
+  return b ? decodeWireFields(b) : void 0;
+};
+var hex2 = (bytes) => Buffer.from(bytes).toString("hex");
+var uuidString = (bytes) => {
+  const h = hex2(bytes).toUpperCase();
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
+var channel = (value) => Math.max(0, Math.min(255, Math.round((Number.isFinite(value) ? value : 0) * 255))).toString(16).toUpperCase().padStart(2, "0");
+function colorOf(fields) {
+  const [r, g, b, a] = [1, 2, 3, 4].map((n) => fixed32Float(first(fields, n)));
+  if (r === void 0 && g === void 0 && b === void 0) return void 0;
+  const rgb = `#${channel(r)}${channel(g)}${channel(b)}`;
+  return a === void 0 || a >= 0.999 ? rgb : `${rgb}${channel(a)}`;
+}
+var DEFAULT_PARAGRAPH = {
+  styleType: null,
+  alignmentValue: 0,
+  indent: 0,
+  blockQuote: false
+};
+function decodeParagraph(fields, tally) {
+  if (!fields) return DEFAULT_PARAGRAPH;
+  for (const n of new Set(fields.map((f) => f.fieldNumber)))
+    if (!KNOWN_PARAGRAPH_FIELDS.has(n)) tally.set(n, (tally.get(n) || 0) + 1);
+  const attrs = {
+    styleType: varintOf(fields, 1) ?? null,
+    alignmentValue: varintOf(fields, 2) ?? 0,
+    indent: Math.max(0, varintOf(fields, 4) ?? 0),
+    blockQuote: (varintOf(fields, 8) ?? 0) !== 0
+  };
+  if (attrs.styleType === -1) attrs.styleType = null;
+  const checklist = sub2(fields, 5);
+  const checklistId = checklist && bytesOf(checklist, 1);
+  if (attrs.styleType === 103 && checklistId)
+    attrs.checklist = { id: hex2(checklistId), done: varintOf(checklist, 2) === 1 };
+  const uuid2 = bytesOf(fields, 9);
+  if (uuid2?.length === 16) attrs.paragraphUuid = uuidString(uuid2);
+  return attrs;
+}
+function decodeInline(fields) {
+  const inline = {};
+  const font = sub2(fields, 3);
+  const hints = font ? varintOf(font, 3) ?? 0 : 0;
+  const weight = varintOf(fields, 5) ?? 0;
+  if (weight === 1 || weight === 3 || hints & 1) inline.bold = true;
+  if (weight === 2 || weight === 3 || hints & 2) inline.italic = true;
+  if (varintOf(fields, 6)) inline.underline = true;
+  if (varintOf(fields, 7)) inline.strikethrough = true;
+  const baseline = varintOf(fields, 8) ?? 0;
+  if (baseline > 0) inline.superscript = true;
+  if (baseline < 0) inline.subscript = true;
+  const color = sub2(fields, 10);
+  const colorValue = color && colorOf(color);
+  if (colorValue) inline.color = colorValue;
+  const emphasis = varintOf(fields, 14);
+  if (emphasis !== void 0 && emphasis !== 0) {
+    inline.highlight = HIGHLIGHTS[emphasis] ?? "unknown";
+    if (inline.highlight === "unknown") inline.highlightValue = emphasis;
+  }
+  const link = stringOf(fields, 9);
+  if (link) {
+    inline.link = link;
+    inline.linkSafe = isSafeLink(link);
+  }
+  if (font) {
+    const name = stringOf(font, 1);
+    const size = fixed32Float(first(font, 2));
+    if (name || size !== void 0)
+      inline.font = {
+        ...name ? { name } : {},
+        ...size !== void 0 && Number.isFinite(size) ? { size } : {}
+      };
+  }
+  const attachment = sub2(fields, 12);
+  const attachmentId = attachment && stringOf(attachment, 1);
+  if (attachmentId)
+    inline.attachment = { id: attachmentId, uti: stringOf(attachment, 2) || "unknown" };
+  return inline;
+}
+function wrap(error2) {
+  if (error2 instanceof NoteBlocksError) throw error2;
+  if (error2 instanceof ProtobufDecodeError)
+    throw new NoteBlocksError("malformed-protobuf", error2.message);
+  throw error2;
+}
+function decodeNoteBlocks(data) {
+  let note;
+  try {
+    const document = sub2(decodeWireFields(data), 2);
+    note = document && sub2(document, 3);
+  } catch (error2) {
+    wrap(error2);
+  }
+  const textBytes = note && bytesOf(note, 2);
+  if (!note || !textBytes)
+    throw new NoteBlocksError("unsupported-structure", "Unsupported Notes document structure");
+  const text = utf8.decode(textBytes);
+  const runTally = /* @__PURE__ */ new Map();
+  const paragraphTally = /* @__PURE__ */ new Map();
+  const runs = [];
+  let position = 0;
+  try {
+    for (const field of note.filter((f) => f.fieldNumber === 5)) {
+      if (field.wireType !== 2 || !field.bytes)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes attribute run");
+      const fields = decodeWireFields(field.bytes);
+      const length = varintOf(fields, 1);
+      if (length === void 0 || length < 0 || position + length > text.length)
+        throw new NoteBlocksError("invalid-runs", "Invalid Notes run length");
+      for (const n of new Set(fields.map((f) => f.fieldNumber)))
+        if (!KNOWN_RUN_FIELDS.has(n)) runTally.set(n, (runTally.get(n) || 0) + 1);
+      runs.push({
+        start: position,
+        length,
+        paragraph: decodeParagraph(sub2(fields, 2), paragraphTally),
+        inline: decodeInline(fields)
+      });
+      position += length;
+    }
+  } catch (error2) {
+    wrap(error2);
+  }
+  if (position !== text.length)
+    throw new NoteBlocksError("invalid-runs", "Incomplete Notes attribute runs");
+  const blocks = [];
+  const attachments = [];
+  let runIndex = 0;
+  let paragraphStart = 0;
+  while (paragraphStart < text.length) {
+    const newline = text.indexOf("\n", paragraphStart);
+    const end = newline === -1 ? text.length : newline;
+    while (runIndex < runs.length - 1 && runs[runIndex].start + runs[runIndex].length <= paragraphStart)
+      runIndex++;
+    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
+    const style = attrs.styleType === null ? "body" : STYLE_NAMES[attrs.styleType] ?? "unknown";
+    const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";
+    const block = {
+      index: blocks.length,
+      start: paragraphStart,
+      length: end - paragraphStart,
+      text: text.slice(paragraphStart, end),
+      style,
+      styleType: attrs.styleType,
+      indent: attrs.indent,
+      alignment,
+      ...alignment === "unknown" ? { alignmentValue: attrs.alignmentValue } : {},
+      blockQuote: attrs.blockQuote,
+      ...attrs.checklist ? { checklist: attrs.checklist } : {},
+      ...attrs.paragraphUuid ? { paragraphUuid: attrs.paragraphUuid } : {},
+      runs: [],
+      attachments: []
+    };
+    for (let i = runIndex; i < runs.length && runs[i].start < end; i++) {
+      const run = runs[i];
+      const start = Math.max(run.start, paragraphStart);
+      const stop = Math.min(run.start + run.length, end);
+      if (stop <= start) continue;
+      block.runs.push({
+        start,
+        length: stop - start,
+        text: text.slice(start, stop),
+        ...run.inline
+      });
+      if (run.inline.attachment)
+        for (let at = text.indexOf("\uFFFC", start); at !== -1 && at < stop; at = text.indexOf("\uFFFC", at + 1)) {
+          const marker = { ...run.inline.attachment, start: at, blockIndex: block.index };
+          block.attachments.push(marker);
+          attachments.push(marker);
+        }
+    }
+    blocks.push(block);
+    paragraphStart = end + 1;
+  }
+  return {
+    text,
+    textLength: text.length,
+    blocks,
+    attachments,
+    undecodedFields: {
+      attributeRun: Object.fromEntries([...runTally].sort((a, b) => a[0] - b[0])),
+      paragraphStyle: Object.fromEntries([...paragraphTally].sort((a, b) => a[0] - b[0]))
+    },
+    summary: summarize(blocks, attachments)
+  };
+}
+function summarize(blocks, attachments) {
+  const summary = {
+    blocks: blocks.length,
+    styles: {},
+    alignments: {},
+    blockQuotes: 0,
+    indented: 0,
+    checklist: { total: 0, done: 0 },
+    inline: {
+      bold: 0,
+      italic: 0,
+      underline: 0,
+      strikethrough: 0,
+      superscript: 0,
+      subscript: 0,
+      color: 0,
+      highlight: 0,
+      link: 0,
+      unsafeLink: 0
+    },
+    attachments: attachments.length
+  };
+  for (const block of blocks) {
+    summary.styles[block.style] = (summary.styles[block.style] || 0) + 1;
+    summary.alignments[block.alignment] = (summary.alignments[block.alignment] || 0) + 1;
+    if (block.blockQuote) summary.blockQuotes++;
+    if (block.indent > 0) summary.indented++;
+    if (block.checklist) {
+      summary.checklist.total++;
+      if (block.checklist.done) summary.checklist.done++;
+    }
+    for (const run of block.runs) {
+      for (const key of [
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "superscript",
+        "subscript",
+        "color",
+        "highlight",
+        "link"
+      ])
+        if (run[key]) summary.inline[key]++;
+      if (run.link && !run.linkSafe) summary.inline.unsafeLink++;
+    }
+  }
+  return summary;
+}
+function decodeCompressedNoteBlocks(compressed) {
+  let data;
+  try {
+    data = gunzipSync4(compressed, { maxOutputLength: 32 * 1024 * 1024 });
+  } catch (error2) {
+    throw new NoteBlocksError(
+      "decompress-failed",
+      `Failed to decompress note data: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+  return decodeNoteBlocks(data);
+}
+var DEFAULT_BLOCKS_MAX_BYTES = 4 * 1024 * 1024;
+function blocksMaxResponseBytes(env = process.env) {
+  const raw = env.APPLE_NOTES_MCP_BLOCKS_MAX_BYTES;
+  if (raw !== void 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return DEFAULT_BLOCKS_MAX_BYTES;
+}
+function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResponseBytes() } = {}) {
+  const total = doc.blocks.length;
+  const start = Math.min(Math.max(0, offset), total);
+  const blocks = [];
+  let bytes = 0;
+  for (let i = start; i < total && blocks.length < limit; i++) {
+    let block = doc.blocks[i];
+    let size = Buffer.byteLength(JSON.stringify(block));
+    if (bytes + size > maxBytes) {
+      if (blocks.length) break;
+      block = {
+        ...block,
+        text: "",
+        textOmitted: true,
+        runs: block.runs.map((run) => ({ ...run, text: "" }))
+      };
+      size = Buffer.byteLength(JSON.stringify(block));
+    }
+    blocks.push(block);
+    bytes += size;
+  }
+  const next = start + blocks.length;
+  return {
+    textLength: doc.textLength,
+    blocks,
+    page: {
+      offset: start,
+      returned: blocks.length,
+      total,
+      hasMore: next < total,
+      ...next < total ? { nextOffset: next } : {}
+    },
+    summary: doc.summary,
+    undecodedFields: doc.undecodedFields
+  };
+}
+var NOTES_DB_PATH4 = join10(
+  homedir8(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH4 } = {}) {
+  const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
+  if (!pk)
+    throw new NoteBlocksError(
+      "invalid-id",
+      `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
+    );
+  if (!existsSync7(dbPath2))
+    throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+  const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
+  let output;
+  try {
+    output = execFileSync8(
+      "/usr/bin/sqlite3",
+      ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
+      {
+        encoding: "utf8",
+        timeout: 5e3,
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    ).trim();
+  } catch (error2) {
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (/authorization denied|unable to open database/i.test(message))
+      throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
+    throw new NoteBlocksError("query-failed", "Failed to query the Notes database");
+  }
+  let row;
+  try {
+    row = JSON.parse(output);
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  if (!row.exists) throw new NoteBlocksError("not-found", `No note found for ID "${id2}"`);
+  if (row.encrypted)
+    throw new NoteBlocksError(
+      "encrypted",
+      "This note is password-protected; its body is encrypted and cannot be decoded"
+    );
+  if (!row.data || !/^[0-9a-f]+$/i.test(row.data))
+    throw new NoteBlocksError("no-body", "No body data is stored for this note");
+  return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
@@ -43766,7 +44224,7 @@ import {
   writeFileSync as writeFileSync3
 } from "node:fs";
 import { tmpdir as tmpdir4 } from "node:os";
-import { basename, isAbsolute as isAbsolute2, join as join10 } from "node:path";
+import { basename, isAbsolute as isAbsolute2, join as join11 } from "node:path";
 var noteId = external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i);
 var revision = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 function readSnapshot(manager, id2) {
@@ -43880,8 +44338,8 @@ function registerDirectOperations(server2, manager) {
       if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const bytes = localAttachment(path4);
       const beforeAttachments = manager.listAttachmentsById(id2);
-      const directory = mkdtempSync4(join10(tmpdir4(), "notes-attachment-add-"));
-      const temporaryFile = join10(directory, basename(path4));
+      const directory = mkdtempSync4(join11(tmpdir4(), "notes-attachment-add-"));
+      const temporaryFile = join11(directory, basename(path4));
       try {
         writeFileSync3(temporaryFile, bytes, { mode: 384 });
         if (readSnapshot(manager, id2).hash !== before.hash)
@@ -44358,7 +44816,7 @@ function registerNativeOperations(server2, manager) {
 
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 import { release } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44378,7 +44836,7 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync7;
+  const exists = dependencies.exists || existsSync8;
   const open = dependencies.open || ((path4) => {
     const result = spawnSync2("/usr/bin/open", [path4], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
@@ -45093,6 +45551,42 @@ registerTool(
       tableCellsComplete: tables.every((table) => table.complete)
     });
   }, "Error reading native objects")
+);
+registerTool(
+  "get-note-blocks",
+  {
+    description: "Use when: you need a note's structure, not just its text: paragraph styles (title, heading, subheading, body, monospaced, bulleted/dashed/numbered list, checklist with done state), indent, alignment, block quote, inline formatting (bold, italic, underline, strikethrough, superscript, subscript, color, highlight, links) and attachment positions, by exact id.\nReturns: one page of blocks in body order (default 500, stopped early under APPLE_NOTES_MCP_BLOCKS_MAX_BYTES, default 4 MB), whole-note summary counts, undecodedFields, and page info; while page.hasMore is true, call again with offset set to page.nextOffset. Offsets and lengths count UTF-16 code units.\nDo not use when: you want the editable HTML body (get-note-content) or Markdown (get-note-markdown).\nSafety: read-only; decodes the NoteStore database directly and requires Full Disk Access. Password-protected notes are refused. Link URLs are returned as stored; linkSafe is false for schemes other than http(s), notes, applenotes and mailto.",
+    inputSchema: {
+      id: noteIdInput,
+      offset: external_exports.number().int().min(0).optional().describe("Index of the first block to return (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum blocks to return (default 500, max 5000)")
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      textLength: external_exports.number().optional(),
+      blocks: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      page: external_exports.record(external_exports.unknown()).optional(),
+      summary: external_exports.record(external_exports.unknown()).optional(),
+      undecodedFields: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ id: id2, offset, limit }) => {
+    let page;
+    try {
+      page = pageNoteBlocks(readNoteBlocks(id2), { offset, limit });
+    } catch (error2) {
+      if (!(error2 instanceof NoteBlocksError)) throw error2;
+      const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the app that launches this server: ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      return errorResponse(`Error reading note blocks [${error2.code}]: ${error2.message}${hint}`);
+    }
+    const { summary } = page;
+    const styles = Object.entries(summary.styles).map(([style, count]) => `${style} ${count}`).join(", ");
+    return successResponse(
+      `Decoded ${summary.blocks} blocks (${styles || "none"}); returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more available at offset ${page.page.nextOffset}` : "") + ".",
+      { id: id2, ...page }
+    );
+  }, "Error reading note blocks")
 );
 registerTool(
   "list-native-tags",

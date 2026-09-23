@@ -180,6 +180,15 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
   - Plus note-not-found and password-protected errors raised before the database is touched.
 - Works independently of `get-note-content` — use both for full picture
 
+### get-note-blocks
+- Read-only structure of one note by exact id: paragraph styles, indent, alignment, block quote, checklist state, inline formatting, links, and attachment positions
+- Requires Full Disk Access; password-protected notes are refused with `[encrypted]`
+- Paged: while `page.hasMore` is true, call again with `offset: page.nextOffset`
+- Offsets count UTF-16 code units, like `links` in `get-note-content`
+- `paragraphUuid` is not unique per paragraph. Do not use it as a key
+- `link` is the stored URL; check `linkSafe` before emitting it into HTML
+- Read-only view: do not build a full-body update from it
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

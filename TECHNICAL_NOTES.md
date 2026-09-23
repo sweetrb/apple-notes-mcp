@@ -200,6 +200,68 @@ message ParagraphStyle {
 }
 ```
 
+### Note Body Block Model: Verified Field Map (2026-09-23, macOS 27.2)
+
+`src/utils/noteBlocks.ts` (the `get-note-blocks` tool) decodes these fields.
+Evidence came from three places:
+
+- **Proto:** the public [apple_cloud_notes_parser](https://github.com/threeplanetssoftware/apple_cloud_notes_parser)
+  `proto/notestore.proto` and its `lib/ProtoPatches.rb` renderer.
+- **Survey:** a read-only scan of every `ZICNOTEDATA.ZDATA` blob in one live
+  library: 713 rows, 710 decoded, and 3 password-protected rows with encrypted
+  bodies. Only field numbers, wire types, and value counts were recorded.
+- **Probe:** synthetic notes created with AppleScript HTML in a scratch
+  folder, then read back from the database.
+
+Run lengths count UTF-16 code units. Varints are 64-bit, so a negative value
+is a 10-byte varint.
+
+**AttributeRun (`Note.5`)**
+
+| Field | Meaning | Evidence | Status |
+|---|---|---|---|
+| 1 | length (UTF-16 units) | proto; survey 63,400 runs | confirmed |
+| 2 | ParagraphStyle | proto; survey 63,393 runs | confirmed |
+| 3 | Font {1 name, 2 size (fixed32 float), 3 hints} | proto; probe (`Courier`, 24.0 for `<h1>`); survey hints 1 ×6,162 and 2 ×3 | confirmed. Hints bit 1 = bold, bit 2 = italic |
+| 5 | font weight: 1 bold, 2 italic, 3 bold+italic | proto; probe `<b>`=1, `<i>`=2; survey 1/2/3 | confirmed |
+| 6 | underline (1) | proto; probe `<u>`; survey 402 | confirmed |
+| 7 | strikethrough (1) | proto; probe `<s>`, `<strike>`; survey 8 | confirmed |
+| 8 | baseline: 1 superscript, -1 subscript | proto (`superscript`, "sign indicates super/sub"); probe `<sup>`=1, `<sub>`=-1 as a 10-byte varint | confirmed. None in the surveyed library |
+| 9 | link URL (string) | proto; probe `https:` and `tel:`; survey 401 | confirmed |
+| 10 | Color {1 red, 2 green, 3 blue, 4 alpha}, each a fixed32 float 0–1 | proto; probe `#ff0000` → (1,0,0,1); survey 29 | confirmed |
+| 12 | AttachmentInfo {1 identifier, 2 type UTI} | proto; survey 456 | confirmed |
+| 13 | varint whose values fall in the Unix-epoch-seconds range (2023–2026) | survey 3,324 runs in 138 notes. The proto names it `unknown_identifier` | **unconfirmed; not decoded** |
+| 14 | emphasis (highlight) style: 1 purple, 2 pink, 3 orange, 4 mint, 5 blue | proto (`emphasis_style`) and its renderer's color table | documented, **not observed**: 0 runs in the survey, and AppleScript HTML cannot set it. Decoded; any other value is reported as `unknown` with the raw number |
+| 15 | message with four length-delimited subfields | survey: 1 run | **unconfirmed; not decoded** |
+
+**ParagraphStyle (`AttributeRun.2`)**
+
+| Field | Meaning | Evidence | Status |
+|---|---|---|---|
+| 1 | style type: 0 title, 1 heading, 2 subheading, 4 monospaced, 100 bulleted, 101 dashed, 102 numbered, 103 checklist. Absent or -1 = body | proto; survey saw exactly these values; probe `<ul>`=100, `<ol>`=102, `<tt>`/`<pre>`=4 | confirmed. Other values decode as `unknown` with `styleType` kept |
+| 2 | alignment: 0 left, 1 center, 2 right, 3 justify | proto; probe `text-align` center=1, right=2, justify=3; survey 0 ×22,364 | confirmed |
+| 3 | varint, 1 on 60,663 of 63,393 styles | survey | **unconfirmed; not decoded** |
+| 4 | indent level | proto; probe nested `<ul>`=1; survey 38 | confirmed |
+| 5 | Checklist {1 UUID (16 bytes), 2 done 0/1} | proto; survey 301 (25 done) | confirmed |
+| 7 | varint 1–8 on list paragraphs (1 on the first numbered item) | survey 1,892; probe first `<ol>` item = 1 | **unconfirmed; not decoded** |
+| 8 | block quote (1) | proto (`block_quote`); survey 18 runs in 2 notes, all on body-style paragraphs | confirmed present. AppleScript `<blockquote>` does not set it |
+| 9 | paragraph UUID (16 bytes) | survey: all 63,393 styles carry exactly 16 bytes | confirmed as a UUID. **Not unique per paragraph**: 14,939 of 40,985 paragraph-ending runs repeat an earlier paragraph's UUID in the same note, 14,808 of them the adjacent paragraph's |
+
+Behavior the probe also showed:
+
+- AppleScript HTML `<h1>`, `<h2>` and `<h3>` import as bold body text with a
+  larger font. They do not set the Title, Heading or Subheading style.
+- AppleScript's HTML export drops superscript, subscript, alignment and
+  highlight. A full-body rewrite through AppleScript loses them.
+- The legacy `decodeVarint` in `protobuf.ts` rejects varints longer than 35
+  bits, so `parseRichNote` throws on a subscript run and such notes read as
+  non-writable. The block model uses the lossless `decodeWireFields` instead.
+
+The decoder takes paragraph attributes from the run that covers a
+paragraph's first character. In the survey every run of a paragraph carried
+the same visual style (40,989 of 40,989 paragraphs). Field numbers it does
+not interpret are counted in `undecodedFields` rather than guessed.
+
 ### Embedded Objects
 
 The Unicode replacement character `￼` (U+FFFC) marks attachment positions. Each has a corresponding `AttachmentInfo` in the AttributeRun with type and UUID.

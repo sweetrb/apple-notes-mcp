@@ -1,5 +1,34 @@
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `get-note-blocks` decodes one note's body, read-only, into typed blocks:
+  paragraph style (title, heading, subheading, body, monospaced, bulleted,
+  dashed, numbered, checklist with done state), indent, alignment, block quote
+  and paragraph UUID, plus inline runs with bold, italic, underline,
+  strikethrough, superscript, subscript, color, emphasis highlight, links and
+  fonts, and attachment markers in body order. Responses page by block
+  (`offset`/`limit`) and stay under `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`
+  (default 4 MB). Errors carry a stable code such as `[encrypted]`.
+- `src/utils/noteBlocks.ts` exposes the block model (`decodeNoteBlocks`,
+  `decodeCompressedNoteBlocks`, `readNoteBlocks`, `pageNoteBlocks`) for later
+  Markdown, HTML and link features. `protobuf.ts` gains a lossless wire
+  decoder (`decodeWireFields`) that keeps fixed32/fixed64 fields and reads
+  64-bit varints, so negative values such as subscript offsets decode.
+- TECHNICAL_NOTES.md documents the verified AttributeRun and ParagraphStyle
+  field map and how each field was confirmed. Fields whose meaning is not
+  confirmed are reported in `undecodedFields` rather than interpreted.
+
+### Unchanged
+
+- `parseRichNote`, its `revision` value and its `styleRuns` signatures are
+  untouched; a new golden test locks them. It still refuses links with
+  schemes outside http(s), notes, applenotes and mailto, which keeps such
+  notes out of full-body rewrites. `get-note-blocks` reports those links as
+  data with `linkSafe: false`.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed
