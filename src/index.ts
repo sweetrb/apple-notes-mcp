@@ -37,8 +37,15 @@ import {
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
-import { listSpecialNotes, nativeTagInventory, SPECIAL_LIMIT } from "@/utils/noteListings.js";
-import type { SpecialNoteKind } from "@/types.js";
+import {
+  listSpecialNotes,
+  nativeTagInventory,
+  quickNoteFlag,
+  SPECIAL_LIMIT,
+} from "@/utils/noteListings.js";
+import { NoteStoreError } from "@/utils/noteStoreSql.js";
+import type { DeleteGuardNote, FolderTreeNode, SpecialNoteKind } from "@/types.js";
+import { folderTree, listRecentNotes, RECENT_LIMIT } from "@/utils/noteRecentList.js";
 import {
   exactIdArrayInput,
   exactIdInput,
@@ -137,6 +144,8 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
+import { buildPrivateHelper, formatHelperBuild } from "@/services/privateHelperBuild.js";
+import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -146,6 +155,12 @@ loadFileConfig();
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
+  // Opt-in private helper: compiled locally from the packaged source (#181).
+  const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatHelperBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup") {
   const report = setupShortcuts(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatShortcutSetup(report) + "\n");
@@ -174,6 +189,7 @@ registerFolderDelete(server, notesManager);
 registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
+registerPrivateHelperTools(server, notesManager);
 
 // =============================================================================
 // Response Helpers
@@ -445,6 +461,90 @@ function inRecentlyDeletedMessage(title: string): string {
 
 function revisionConflictMessage(title: string): string {
   return `Note "${title}" changed after it was read. Read it again and review the newer version before retrying.`;
+}
+
+/** delete-note's guard-note arguments (copy-then-retire). */
+interface DeleteGuardArgs {
+  id: string;
+  guardNoteId?: string;
+  expectedGuardContentHash?: string;
+  requireActiveNoteId?: string;
+}
+
+/** Guard notes ready for the delete script, with a label per entry for messages. */
+type PreparedDeleteGuards = {
+  guards: DeleteGuardNote[];
+  labels: string[];
+  guardContentHash?: string;
+};
+
+/**
+ * Refuses a Quick Note as a guard note. The flag lives only in the database,
+ * so this needs Full Disk Access. A note the database does not have yet (a
+ * copy made seconds ago) passes: it was not made as a Quick Note, and the
+ * delete script still proves it exists, is unlocked, is outside Recently
+ * Deleted, and, for guardNoteId, still has the verified body.
+ */
+function quickNoteGuardRefusal(label: string, id: string): string | null {
+  let quick: boolean | null;
+  try {
+    quick = quickNoteFlag(id);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (error instanceof NoteStoreError && error.kind === "no_fda") {
+      return `${label} note cannot be checked: the delete-note guard needs Full Disk Access to rule out a Quick Note. Nothing was deleted. ${detail}`;
+    }
+    return `${label} note could not be checked (${detail}). Nothing was deleted.`;
+  }
+  return quick
+    ? `${label} note is a Quick Note; a guard must be an ordinary note. Nothing was deleted.`
+    : null;
+}
+
+/**
+ * Pre-checks delete-note's guard notes and collects them for the delete
+ * script, which repeats the live checks immediately before the delete.
+ */
+function prepareDeleteGuards(args: DeleteGuardArgs): PreparedDeleteGuards | { error: string } {
+  const { id, guardNoteId, expectedGuardContentHash, requireActiveNoteId } = args;
+  if ((guardNoteId === undefined) !== (expectedGuardContentHash === undefined)) {
+    return { error: "Pass guardNoteId and expectedGuardContentHash together." };
+  }
+  if (guardNoteId === id || requireActiveNoteId === id) {
+    return { error: "A guard note must be a different note from the one being deleted." };
+  }
+  if (guardNoteId !== undefined && guardNoteId === requireActiveNoteId) {
+    return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId." };
+  }
+
+  const prepared: PreparedDeleteGuards = { guards: [], labels: [] };
+  if (guardNoteId !== undefined) {
+    const refusal = quickNoteGuardRefusal("Guard", guardNoteId);
+    if (refusal) return { error: refusal };
+    const guard = readExactNoteSnapshot(guardNoteId);
+    if ("error" in guard) return { error: `Guard note: ${guard.error}` };
+    if (guard.contentHash !== expectedGuardContentHash) {
+      return {
+        error: `Guard note "${guard.note.title}" changed after it was read. Verify the copy again before retiring the original. Nothing was deleted.`,
+      };
+    }
+    prepared.guards.push({ id: guardNoteId, expectedBody: guard.body });
+    prepared.labels.push("Guard");
+    prepared.guardContentHash = guard.contentHash;
+  }
+  if (requireActiveNoteId !== undefined) {
+    const refusal = quickNoteGuardRefusal("Required active", requireActiveNoteId);
+    if (refusal) return { error: refusal };
+    const active = notesManager.getNoteById(requireActiveNoteId);
+    if (!active)
+      return { error: `Required active note with ID "${requireActiveNoteId}" not found.` };
+    if (active.passwordProtected) {
+      return { error: `Required active note "${active.title}" is password-protected.` };
+    }
+    prepared.guards.push({ id: requireActiveNoteId });
+    prepared.labels.push("Required active");
+  }
+  return prepared;
 }
 
 /**
@@ -2163,10 +2263,23 @@ registerTool(
   "delete-note",
   {
     description:
-      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too.",
+      "Use when: moving one exact note to Recently Deleted after reading and reviewing it.\nReturns: confirmation with the exact id.\nDo not use when: you only have a title or the note changed since review.\nSafety: requires id and expectedContentHash from get-note-content. The body comparison and delete happen in one AppleScript, so a newer edit is preserved. Refuses a note already in Recently Deleted, where a delete would be permanent. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds are re-checked inside that AppleScript too. Copy-then-retire: pass guardNoteId and expectedGuardContentHash (the verified copy's contentHash) to delete only while the copy still has that revision, is unlocked, is outside Recently Deleted, and is not a Quick Note; requireActiveNoteId requires the same of a second note without fingerprinting it. The guard needs Full Disk Access to rule out a Quick Note. The copy's body, lock state, and folder are checked again inside the delete AppleScript, but the pair is not one transaction.",
     inputSchema: {
       id: noteIdInput,
       expectedContentHash: expectedContentHashInput,
+      guardNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note (usually the verified copy) that must still match expectedGuardContentHash, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Needs Full Disk Access"
+        ),
+      expectedGuardContentHash: expectedContentHashInput
+        .optional()
+        .describe("get-note-content contentHash of guardNoteId; required with guardNoteId"),
+      requireActiveNoteId: noteIdInput
+        .optional()
+        .describe(
+          "A second note that must still exist, be unlocked, stay outside Recently Deleted, and not be a Quick Note. Its content is not fingerprinted. Needs Full Disk Access"
+        ),
       timeoutSeconds: timeoutSecondsInput,
       ...scopeGuardInputs,
     },
@@ -2176,51 +2289,91 @@ registerTool(
       title: z.string().optional(),
       wasShared: z.boolean().optional(),
       previousContentHash: z.string().optional(),
+      guardNoteId: z.string().optional(),
+      guardContentHash: z.string().optional(),
+      requireActiveNoteId: z.string().optional(),
     },
   },
-  withErrorHandling(({ id, expectedContentHash, ...scopeArgs }) => {
-    const snapshot = readExactNoteSnapshot(id);
-    if ("error" in snapshot) return errorResponse(snapshot.error);
-    if (snapshot.contentHash !== expectedContentHash) {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-
-    const result = notesManager.deleteNoteByIdIfUnchanged(id, snapshot.body, scopeFrom(scopeArgs));
-    if (result.status === "conflict") {
-      return errorResponse(revisionConflictMessage(snapshot.note.title));
-    }
-    if (result.status === "scope_conflict") {
-      return errorResponse(scopeConflictMessage(result.reason));
-    }
-    if (result.status === "in-recently-deleted") {
-      return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
-    }
-    if (result.status === "container-unknown") {
-      return errorResponse(containerUnknownMessage(snapshot.note.title));
-    }
-    if (result.status === "not-deleted") {
-      return errorResponse(NOT_DELETED_MESSAGE);
-    }
-    if (result.status !== "deleted") {
-      return errorResponse(
-        `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
-      );
-    }
-
-    const sharedWarning = snapshot.note.shared
-      ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
-      : "";
-    return successResponse(
-      `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
-      {
-        ok: true,
+  withErrorHandling(
+    ({
+      id,
+      expectedContentHash,
+      guardNoteId,
+      expectedGuardContentHash,
+      requireActiveNoteId,
+      ...scopeArgs
+    }) => {
+      // Guard notes are checked first, so the delete note's revision read is the
+      // last step before the delete script.
+      const prepared = prepareDeleteGuards({
         id,
-        title: snapshot.note.title,
-        wasShared: snapshot.note.shared ?? false,
-        previousContentHash: expectedContentHash,
+        guardNoteId,
+        expectedGuardContentHash,
+        requireActiveNoteId,
+      });
+      if ("error" in prepared) return errorResponse(prepared.error);
+
+      const snapshot = readExactNoteSnapshot(id);
+      if ("error" in snapshot) return errorResponse(snapshot.error);
+      if (snapshot.contentHash !== expectedContentHash) {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
       }
-    );
-  }, "Error deleting note")
+
+      const result = notesManager.deleteNoteByIdIfUnchanged(
+        id,
+        snapshot.body,
+        scopeFrom(scopeArgs),
+        prepared.guards
+      );
+      if (result.status === "guard-conflict") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note changed just before the delete. Nothing was deleted; verify it again before retrying.`
+        );
+      }
+      if (result.status === "guard-inactive") {
+        return errorResponse(
+          `${prepared.labels[result.index]} note is no longer active (${result.reason}). Nothing was deleted.`
+        );
+      }
+      if (result.status === "conflict") {
+        return errorResponse(revisionConflictMessage(snapshot.note.title));
+      }
+      if (result.status === "scope_conflict") {
+        return errorResponse(scopeConflictMessage(result.reason));
+      }
+      if (result.status === "in-recently-deleted") {
+        return errorResponse(inRecentlyDeletedMessage(snapshot.note.title));
+      }
+      if (result.status === "container-unknown") {
+        return errorResponse(containerUnknownMessage(snapshot.note.title));
+      }
+      if (result.status === "not-deleted") {
+        return errorResponse(NOT_DELETED_MESSAGE);
+      }
+      if (result.status !== "deleted") {
+        return errorResponse(
+          `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
+        );
+      }
+
+      const sharedWarning = snapshot.note.shared
+        ? "\n\n⚠️ This note was shared with collaborators. They will no longer have access."
+        : "";
+      return successResponse(
+        `Note moved to Recently Deleted: "${snapshot.note.title}"${sharedWarning}`,
+        {
+          ok: true,
+          id,
+          title: snapshot.note.title,
+          wasShared: snapshot.note.shared ?? false,
+          previousContentHash: expectedContentHash,
+          ...(guardNoteId ? { guardNoteId, guardContentHash: prepared.guardContentHash } : {}),
+          ...(requireActiveNoteId ? { requireActiveNoteId } : {}),
+        }
+      );
+    },
+    "Error deleting note"
+  )
 );
 
 // --- move-note ---
@@ -2282,7 +2435,7 @@ registerTool(
   "list-notes",
   {
     description:
-      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated — see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
+      "Use when: enumerating notes in an account or folder; supports modifiedSince and limit for large collections.\nReturns: each note's title and id (ids are safe to use for follow-up reads/edits even when titles are duplicated — see search-notes for keyword-based lookup instead).\nDo not use when: you need content (get-note-content), or date order, incremental sync cursors, or word counts (list-recent-notes).\nNote: excludes notes in Recently Deleted unless includeRecentlyDeleted is true, which flags them inRecentlyDeleted. Warns if iCloud sync is active and results may be partial.",
     inputSchema: {
       account: z.string().max(MAX.ACCOUNT).optional().describe("Account to list notes from"),
       folder: z.string().max(MAX.FOLDER).optional().describe("Filter to specific folder"),
@@ -4000,6 +4153,153 @@ registerTool(
       structured
     );
   }, "Error listing notes")
+);
+
+// --- list-recent-notes ---
+
+registerTool(
+  "list-recent-notes",
+  {
+    description:
+      "Use when: syncing notes incrementally from the Notes database, or listing notes by modification date. Pass since (a modifiedCheckpoint cursor or ISO 8601) to page through changes oldest first; omit it for the newest notes first.\nReturns: metadata rows (id, identifier, title, folder path, account, created, modified, modifiedCheckpoint, pinned, locked, inRecentlyDeleted, markedForDeletion), plus optional wordCount/charCount (wordCounts) and bodyPreview/textDecoded (bodyPreview); order, saturated, and nextSince drive sync.\nDo not use when: you need full content (get-note-content) or keyword search (search-notes).\nNote: read-only NoteStore access; requires Full Disk Access. Sync rule: store nextSince and pass it as the next since; every since call advances, and saturated true means more changes may follow, so call again. For a first full sync start from since 1970-01-01. The cursor can miss edits iCloud delivers later with an older timestamp from another device, and deletions are invisible unless includeDeleted is true.",
+    inputSchema: {
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      folder: z
+        .string()
+        .min(1)
+        .max(MAX.FOLDER)
+        .optional()
+        .describe(
+          "Only notes directly in this folder: full path (list-folders syntax) or a unique name"
+        ),
+      since: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe(
+          "Return notes after this point, oldest first: a modifiedCheckpoint cursor from a row or nextSince, or an ISO 8601 date (local midnight) or date-time (local unless it has an offset), meaning modified strictly after it"
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(RECENT_LIMIT.MAX)
+        .optional()
+        .describe(`Maximum notes to return (default ${RECENT_LIMIT.DEFAULT})`),
+      includeDeleted: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also return notes in Recently Deleted, notes awaiting deletion, and folderless notes (default false)"
+        ),
+      wordCounts: z
+        .boolean()
+        .optional()
+        .describe(
+          "Decode each body for wordCount and charCount; null when the body is locked or not available (default false)"
+        ),
+      bodyPreview: z
+        .boolean()
+        .optional()
+        .describe(
+          "Add bodyPreview (180 characters: decoded body with wordCounts, else the stored snippet) and textDecoded"
+        ),
+    },
+    outputSchema: {
+      notes: z.array(z.object({}).passthrough()).optional(),
+      count: z.number().optional(),
+      limit: z.number().optional(),
+      order: z.string().optional(),
+      saturated: z.boolean().optional(),
+      nextSince: z.string().nullable().optional(),
+      account: z.string().optional(),
+      folder: z.string().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling((params) => {
+    const result = listRecentNotes(params);
+    const syncing = result.order === "oldest-first";
+    const scope = [
+      result.folder ? ` in folder "${result.folder}"` : "",
+      result.account ? ` (${result.account})` : "",
+      params.since ? ` modified after ${params.since}` : "",
+    ].join("");
+    const lines = result.notes.map(
+      (row) => `  - ${row.title ?? "(untitled)"} — ${row.modified ?? "no date"} [id: ${row.id}]`
+    );
+    let tail = "";
+    if (syncing && result.nextSince) {
+      tail = result.saturated
+        ? `\n\nMore changes may follow: call again with since ${result.nextSince}.`
+        : `\n\nCaught up. Next since: ${result.nextSince}`;
+    } else if (result.saturated) {
+      tail = `\n\nLimit reached: older notes were not listed. Page with since to reach them.`;
+    } else if (result.nextSince) {
+      tail = `\n\nNext since: ${result.nextSince}`;
+    }
+    return successResponse(
+      (result.count
+        ? `${result.count} notes${scope}, ${syncing ? "oldest" : "newest"} first:\n${lines.join("\n")}`
+        : `No notes${scope}.`) + tail,
+      result as unknown as Record<string, unknown>
+    );
+  }, "Error listing recent notes")
+);
+
+// --- list-folder-tree ---
+
+registerTool(
+  "list-folder-tree",
+  {
+    description:
+      "Use when: you need the folder hierarchy with note counts, per account, in one read.\nReturns: accounts, each with nested folders (id, identifier, name, path, kind folder/smart/trash, noteCount direct, totalNoteCount including subfolders, children) and the account's noteCount.\nDo not use when: you only need folder paths (list-folders) or notes (list-notes, list-recent-notes).\nNote: read-only NoteStore access; requires Full Disk Access. includeDeleted adds folders awaiting deletion (markedForDeletion) and folders whose account is gone.",
+    inputSchema: {
+      account: z
+        .string()
+        .min(1)
+        .max(MAX.ACCOUNT)
+        .optional()
+        .describe("Only this account (exact or unique-prefix name). Omit for every account."),
+      includeDeleted: z
+        .boolean()
+        .optional()
+        .describe("Include folders marked for deletion (default false)"),
+    },
+    outputSchema: {
+      accounts: z.array(z.object({}).passthrough()).optional(),
+      folderCount: z.number().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ account, includeDeleted }) => {
+    const result = folderTree({ account, includeDeleted });
+    const lines: string[] = [];
+    const walk = (nodes: FolderTreeNode[], depth: number) => {
+      for (const node of nodes) {
+        const counts =
+          node.totalNoteCount === node.noteCount
+            ? `${node.noteCount}`
+            : `${node.noteCount}, ${node.totalNoteCount} with subfolders`;
+        lines.push(`${"  ".repeat(depth + 1)}- ${node.name} (${counts})`);
+        walk(node.children, depth + 1);
+      }
+    };
+    for (const entry of result.accounts) {
+      lines.push(`${entry.account}: ${entry.noteCount} notes`);
+      walk(entry.folders, 0);
+    }
+    return successResponse(
+      `${result.folderCount} folders:\n${lines.join("\n")}`,
+      result as unknown as Record<string, unknown>
+    );
+  }, "Error listing folder tree")
 );
 
 // =============================================================================
