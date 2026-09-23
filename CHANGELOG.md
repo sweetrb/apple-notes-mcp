@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [2.8.47] - 2026-09-23
+
+### Fixed
+
+- The Full Disk Access advice in `doctor`, `health-check`, the database tools'
+  errors and the setup guide no longer says that granting Claude.app is enough
+  (#220). Claude Desktop starts MCP servers through a helper that disclaims
+  responsibility, so macOS checks the grant on the Node binary itself and
+  ignores the one on Claude.app. `doctor` now prints the path of the Node binary
+  running the server and says to add it in Full Disk Access, notes that a
+  version-manager path (nvm, fnm, Volta, asdf, mise) changes with each Node
+  version, and suggests a restart if quitting and relaunching is not enough.
+  Granting the terminal app is still enough when the server runs from a
+  terminal.
+
 ## [2.8.46] - 2026-09-23
 
 ### Fixed
