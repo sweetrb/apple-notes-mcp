@@ -74,7 +74,8 @@ Use this skill when the user:
 | `list-shared-notes` | List notes shared with collaborators |
 | `get-sync-status` | Check whether iCloud sync is active |
 | `health-check` | Quickly verify Notes.app access |
-| `doctor` | Run detailed setup diagnostics |
+| `doctor` | Run detailed setup diagnostics, including the feature matrix |
+| `get-capabilities` | Check native-write operations and the OS-aware feature matrix (`features.<name>.available` / `reason`) before calling a tool that depends on them |
 | `get-notes-stats` | Summarize note counts and recent activity |
 
 ## Usage Patterns

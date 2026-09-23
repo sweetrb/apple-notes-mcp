@@ -1090,6 +1090,10 @@ Run a full setup diagnostic: Notes.app reachability, the Automation permission, 
 
 **Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).
 
+The report ends with the same feature matrix as [`get-capabilities`](#get-capabilities)
+(`structuredContent.runtimeOS` and `structuredContent.features`). It is
+informational: an unavailable optional feature never changes `healthy`.
+
 ---
 
 #### `get-notes-stats`
@@ -1141,6 +1145,30 @@ resolve the same note. Creating a note from Markdown is
 
 Reports which background operations are implemented, live-verified, installed,
 and currently available, with a specific reason for each unavailable operation.
+
+It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
+`darwinRelease`) and a `features` matrix, one entry per feature group:
+`applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
+`backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
+placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
+`audioTranscription`, which need a native helper this server does not ship.
+Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
+`requirements`, `missing`, `unverified`, `tools`, and a machine-readable
+`reason` that is `null` when available and otherwise the first that applies:
+
+| `reason` | Meaning |
+|----------|---------|
+| `unsupported_platform` | Not running on macOS |
+| `not_implemented` | The server has no implementation for this feature yet |
+| `unknown_os_version` | The feature has a macOS floor and `sw_vers` could not be read |
+| `requires_macos_<major>` | macOS is older than `minimumMacOSVersion`, e.g. `requires_macos_26` |
+| `full_disk_access_missing` | The Notes database is not readable by this process |
+| `shortcuts_unavailable` | The `shortcuts` command could not be run |
+| `shortcut_not_installed` | A bridge Shortcut is missing or installed more than once |
+
+The probe never opens Notes.app or runs a Shortcut, so the Automation
+permission for Notes.app appears under `unverified` rather than being guessed;
+`doctor` and `health-check` confirm it by contacting Notes.
 
 #### `append-native`
 

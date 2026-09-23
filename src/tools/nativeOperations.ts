@@ -14,6 +14,7 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "../services/backgroundNotes.js";
 import { normalizeNativeTags } from "../services/nativeTags.js";
+import { getCapabilityMatrix } from "../services/capabilityMatrix.js";
 import { parseNoteTable } from "../utils/noteTables.js";
 import { readRichNote } from "../utils/noteRichText.js";
 
@@ -114,7 +115,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   }
   tool(
     "get-capabilities",
-    "Use when: checking native background-edit support before calling a write tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
+    "Use when: checking native background-edit support or which feature groups this Mac supports before calling a tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation; plus runtimeOS and an OS-version-aware features matrix (available, osSupported, minimumMacOSVersion, requirements, missing, unverified, machine reason code) per feature group.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
     {},
     () => {
       let bridge: { installed: boolean; shortcut: string; identifier?: string; error?: string };
@@ -180,6 +181,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
           ])
         ),
         unavailable: UNAVAILABLE,
+        ...getCapabilityMatrix(),
       };
     },
     true

@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.8.18] - 2026-09-23
+
+### Added
+
+- `get-capabilities` and `doctor` report an OS-version-aware feature matrix:
+  `runtimeOS` (`platform`, `macOSVersion`, `darwinRelease`) and a `features`
+  object with one entry per feature group (AppleScript core, Full Disk Access
+  reads, the Shortcuts bridges and each bridge, plus `not_implemented`
+  placeholders for features that need a native helper). Each entry reports
+  `available`, `osSupported`, `minimumMacOSVersion`, `requirements`,
+  `missing`, `unverified`, `tools`, and a machine-readable `reason`
+  (`unsupported_platform`, `not_implemented`, `unknown_os_version`,
+  `requires_macos_<major>`, `full_disk_access_missing`,
+  `shortcuts_unavailable`, `shortcut_not_installed`). The probe runs
+  `sw_vers`, one read-only database query, and one `shortcuts list`; it never
+  opens Notes.app, runs a Shortcut, or mutates anything. Existing output keys
+  are unchanged, and the matrix never changes `doctor`'s `healthy`. A new
+  feature registers with one entry in `src/services/capabilityMatrix.ts`.
+
 ## [2.8.17] - 2026-09-17
 
 ### Fixed

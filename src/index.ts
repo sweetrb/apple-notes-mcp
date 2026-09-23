@@ -1937,11 +1937,13 @@ registerTool(
   "doctor",
   {
     description:
-      "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
+      "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields, including runtimeOS and the same OS-version-aware features matrix as get-capabilities.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
     inputSchema: {},
     outputSchema: {
       healthy: z.boolean().optional(),
       checks: z.array(z.object({}).passthrough()).optional(),
+      runtimeOS: z.object({}).passthrough().optional(),
+      features: z.record(z.string(), z.object({}).passthrough()).optional(),
     },
   },
   withErrorHandling(() => {

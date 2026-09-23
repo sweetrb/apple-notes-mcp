@@ -180,6 +180,11 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
   - Plus note-not-found and password-protected errors raised before the database is touched.
 - Works independently of `get-note-content` — use both for full picture
 
+### get-capabilities / doctor feature matrix
+- Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.
+- `unverified: ["notes_automation"]` means the probe did not contact Notes.app, not that Automation is denied. Run `doctor` to confirm it.
+- Placeholder features (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`) always report `not_implemented`; do not attempt them through other tools.
+
 ### Batch operations
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.

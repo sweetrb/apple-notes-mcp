@@ -42808,13 +42808,19 @@ function addNativeTags(request, deps) {
     } : {}
   };
 }
-function nativeTagsStatus(shortcut = process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT) {
-  const lines = execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+function listInstalledShortcuts() {
+  return execFileSync6("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"]
   }).split(/\r?\n/u);
+}
+var nativeTagsShortcutName = () => process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
+function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
+  return resolveShortcut(listInstalledShortcuts(), shortcut);
+}
+function resolveShortcut(lines, shortcut) {
   const matches = lines.flatMap((line) => {
     const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
     return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
@@ -42919,10 +42925,12 @@ function comparableVisibleText(html) {
 
 // src/services/backgroundNotes.ts
 var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
-var backgroundStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT);
+var backgroundShortcutName = () => process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
+var backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 var nativeTagBridgeStatus = () => nativeTagsStatus();
 var MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
-var markdownNoteStatus = () => nativeTagsStatus(process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT);
+var markdownShortcutName = () => process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;
+var markdownNoteStatus = () => nativeTagsStatus(markdownShortcutName());
 function readBackgroundSnapshot(manager, id2) {
   if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
     throw new Error("Exact note ID required");
@@ -43343,8 +43351,258 @@ ${request.content}`
   }
 }
 
+// src/services/capabilityMatrix.ts
+import { execFileSync as execFileSync8 } from "node:child_process";
+import { release } from "node:os";
+var MACOS_SHORTCUTS_CLI = "12.0";
+var MACOS_MARKDOWN_IMPORT = "26.0";
+var FEATURES = [
+  {
+    name: "applescriptCore",
+    description: "Create, read, search, update, move, and delete notes and folders through Notes.app's AppleScript interface",
+    tools: [
+      "create-note",
+      "search-notes",
+      "get-note-content",
+      "update-note",
+      "append-to-note",
+      "delete-note",
+      "move-note",
+      "list-notes",
+      "list-folders",
+      "create-folder",
+      "list-accounts"
+    ],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "notes_automation" }]
+  },
+  {
+    name: "fullDiskAccessReads",
+    description: "Read-only reads of the Notes database: checklist state, note metadata, note links, native objects, native tags, and sync detail",
+    tools: [
+      "get-checklist-state",
+      "get-note-metadata",
+      "get-note-link",
+      "get-native-objects",
+      "list-native-tags",
+      "get-note-markdown (checklist annotations)",
+      "get-sync-status (pending uploads)"
+    ],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "full_disk_access" }]
+  },
+  {
+    name: "shortcutsBridges",
+    description: "Run the optional native-write Shortcut bridges in the background",
+    tools: [],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [{ kind: "shortcuts_cli" }]
+  },
+  {
+    name: "backgroundOperationsBridge",
+    description: "Native background edits through the Background Operations bridge, verified by exact-ID database readback",
+    tools: [
+      "append-native",
+      "create-checklist-item",
+      "create-table",
+      "insert-note-link",
+      "set-note-pinned",
+      "remove-native-tags"
+    ],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: backgroundShortcutName }
+    ]
+  },
+  {
+    name: "nativeTagsBridge",
+    description: "Add real Notes tags through the Native Tags bridge",
+    tools: ["add-native-tags", "replace-native-tag"],
+    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: nativeTagsShortcutName }
+    ]
+  },
+  {
+    name: "markdownNoteBridge",
+    description: "Create a note from Markdown with real Title, Heading, and Subheading styles through the Create Markdown Note bridge",
+    tools: ['create-note (format: "markdown")'],
+    minimumMacOSVersion: MACOS_MARKDOWN_IMPORT,
+    requirements: [
+      { kind: "notes_automation" },
+      { kind: "full_disk_access" },
+      { kind: "shortcuts_cli" },
+      { kind: "shortcut", name: markdownShortcutName }
+    ]
+  },
+  // Placeholders for features that need a native helper this server does not
+  // ship. They always report `not_implemented` so clients can detect them.
+  {
+    name: "checklistToggle",
+    description: "Check or uncheck an existing checklist item in place",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "smartFolders",
+    description: "Create or edit Smart Folders and their tag rules",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "paragraphLinks",
+    description: "Link to a specific paragraph or heading inside a note",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  },
+  {
+    name: "audioTranscription",
+    description: "Transcribe audio recordings attached to a note",
+    tools: [],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "native_helper" }]
+  }
+];
+function requirementLabel(requirement) {
+  return requirement.kind === "shortcut" ? `shortcut:${requirement.name()}` : requirement.kind;
+}
+function compareVersions(a, b) {
+  const pa = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const pb = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+function evaluateFeature(feature, env) {
+  const isMac = env.platform === "darwin";
+  const floor = feature.minimumMacOSVersion;
+  const versionKnown = env.macOSVersion !== null;
+  const osSupported = isMac && (floor === null || versionKnown && compareVersions(env.macOSVersion, floor) >= 0);
+  const missing = [];
+  const unverified = [];
+  const failures = /* @__PURE__ */ new Set();
+  for (const requirement of feature.requirements) {
+    const label = requirementLabel(requirement);
+    switch (requirement.kind) {
+      case "notes_automation":
+        unverified.push(label);
+        break;
+      case "full_disk_access":
+        if (!env.fullDiskAccess) {
+          missing.push(label);
+          failures.add("full_disk_access_missing");
+        }
+        break;
+      case "shortcuts_cli":
+        if (env.shortcutLines === null) {
+          missing.push(label);
+          failures.add("shortcuts_unavailable");
+        }
+        break;
+      case "shortcut":
+        if (env.shortcutLines === null) unverified.push(label);
+        else if (!resolveShortcut(env.shortcutLines, requirement.name()).installed) {
+          missing.push(label);
+          failures.add("shortcut_not_installed");
+        }
+        break;
+      case "native_helper":
+        missing.push(label);
+        failures.add("not_implemented");
+        break;
+    }
+  }
+  let reason = null;
+  if (!isMac) reason = "unsupported_platform";
+  else if (failures.has("not_implemented")) reason = "not_implemented";
+  else if (floor !== null && !versionKnown) reason = "unknown_os_version";
+  else if (!osSupported) reason = `requires_macos_${Number.parseInt(floor, 10)}`;
+  else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
+  else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
+  else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  return {
+    description: feature.description,
+    tools: feature.tools,
+    available: reason === null,
+    osSupported,
+    minimumMacOSVersion: floor,
+    requirements: feature.requirements.map(requirementLabel),
+    missing,
+    unverified,
+    reason
+  };
+}
+function evaluateFeatures(env, features = FEATURES) {
+  return {
+    runtimeOS: {
+      platform: env.platform,
+      macOSVersion: env.macOSVersion,
+      darwinRelease: env.darwinRelease
+    },
+    features: Object.fromEntries(features.map((f) => [f.name, evaluateFeature(f, env)]))
+  };
+}
+function readMacOSVersion() {
+  if (process.platform !== "darwin") return null;
+  try {
+    const out = execFileSync8("/usr/bin/sw_vers", ["-productVersion"], {
+      encoding: "utf8",
+      timeout: 3e3,
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return /^\d+(\.\d+)*$/.test(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+function probeCapabilityEnvironment() {
+  const platform = process.platform;
+  const isMac = platform === "darwin";
+  let shortcutLines = null;
+  if (isMac) {
+    try {
+      shortcutLines = listInstalledShortcuts();
+    } catch {
+      shortcutLines = null;
+    }
+  }
+  return {
+    platform,
+    macOSVersion: readMacOSVersion(),
+    darwinRelease: release(),
+    fullDiskAccess: isMac && hasFullDiskAccess(),
+    shortcutLines
+  };
+}
+function getCapabilityMatrix(probe = probeCapabilityEnvironment) {
+  return evaluateFeatures(probe());
+}
+function formatCapabilityMatrix(matrix) {
+  const os4 = matrix.runtimeOS;
+  const lines = [
+    `Feature matrix (macOS ${os4.macOSVersion ?? "unknown"}, Darwin ${os4.darwinRelease}):`
+  ];
+  for (const [name, status] of Object.entries(matrix.features)) {
+    lines.push(
+      status.available ? `  \u2713 ${name}: available${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}` : `  \u2717 ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}`
+    );
+  }
+  return lines.join("\n");
+}
+
 // src/tools/doctor.ts
-function runDoctor(manager) {
+function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
   const checks = [];
   const hc = manager.healthCheck();
   for (const c of hc.checks) {
@@ -43395,7 +43653,13 @@ function runDoctor(manager) {
   }
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
-  return { healthy, checks };
+  let matrix;
+  try {
+    matrix = capabilityMatrix();
+  } catch {
+    matrix = void 0;
+  }
+  return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features } : { healthy, checks };
 }
 function markdownBridgeDetail() {
   const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
@@ -43439,6 +43703,8 @@ function formatDoctorReport(r) {
   const icon = (s) => s === "ok" ? "\u2705" : s === "warn" ? "\u26A0\uFE0F " : "\u274C";
   const lines = [`\u{1FA7A} apple-notes-mcp doctor \u2014 ${r.healthy ? "healthy" : "ISSUES FOUND"}`, ""];
   for (const c of r.checks) lines.push(`${icon(c.status)} ${c.name}: ${c.detail}`);
+  if (r.runtimeOS && r.features)
+    lines.push("", formatCapabilityMatrix({ runtimeOS: r.runtimeOS, features: r.features }));
   return lines.join("\n");
 }
 
@@ -44096,7 +44362,7 @@ function registerNativeOperations(server2, manager) {
   }
   tool(
     "get-capabilities",
-    "Use when: checking native background-edit support before calling a write tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
+    "Use when: checking native background-edit support or which feature groups this Mac supports before calling a tool.\nReturns: bridge installation, implementation, verification, availability, and specific limitations per operation; plus runtimeOS and an OS-version-aware features matrix (available, osSupported, minimumMacOSVersion, requirements, missing, unverified, machine reason code) per feature group.\nDo not use when: checking only the Native Tags bridge (native-tags-status).\nSafety: read-only; does not open Notes or run a mutation.",
     {},
     () => {
       let bridge;
@@ -44146,7 +44412,8 @@ function registerNativeOperations(server2, manager) {
             }
           ])
         ),
-        unavailable: UNAVAILABLE
+        unavailable: UNAVAILABLE,
+        ...getCapabilityMatrix()
       };
     },
     true
@@ -44359,7 +44626,7 @@ function registerNativeOperations(server2, manager) {
 // src/setupShortcuts.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync7 } from "node:fs";
-import { release } from "node:os";
+import { release as release2 } from "node:os";
 import { dirname as dirname2, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
@@ -44384,7 +44651,7 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
   const baseDirectory = dependencies.baseDirectory || resolve2(dirname2(fileURLToPath(import.meta.url)), "../shortcuts");
-  const osRelease = (dependencies.osRelease || release)();
+  const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
     const path4 = resolve2(baseDirectory, file);
@@ -45776,11 +46043,13 @@ ${fdaLine}`, {
 registerTool(
   "doctor",
   {
-    description: "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
+    description: "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields, including runtimeOS and the same OS-version-aware features matrix as get-capabilities.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
     inputSchema: {},
     outputSchema: {
       healthy: external_exports.boolean().optional(),
-      checks: external_exports.array(external_exports.object({}).passthrough()).optional()
+      checks: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      runtimeOS: external_exports.object({}).passthrough().optional(),
+      features: external_exports.record(external_exports.string(), external_exports.object({}).passthrough()).optional()
     }
   },
   withErrorHandling(() => {
