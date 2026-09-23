@@ -788,3 +788,70 @@ export interface ExportNotesOptions {
   /** Response size budget in bytes (default exportMaxResponseBytes()) */
   maxResponseBytes?: number;
 }
+
+// =============================================================================
+// Link Insertion Types
+// =============================================================================
+
+/**
+ * How insert-link writes a URL: `raw` shows the URL itself, `hyperlink`
+ * shows a label that links to the URL.
+ */
+export type LinkInsertMode = "raw" | "hyperlink";
+
+/** Where insert-link places the link paragraph. */
+export type LinkInsertPosition = "end" | "after-title";
+
+/**
+ * Parameters for inserting one web or Notes link into an existing note.
+ */
+export interface InsertLinkParams {
+  /** Exact CoreData note id */
+  id: string;
+  /** Revision token from get-note-content */
+  expectedContentHash: string;
+  /** Link destination (http, https, mailto, notes, applenotes) */
+  url: string;
+  /** raw (default) or hyperlink */
+  mode: LinkInsertMode;
+  /** Visible text for hyperlink mode */
+  label?: string;
+  /** Raw mode only: false writes the URL as plain text with no stored link */
+  linked?: boolean;
+  /** end (default) or after-title */
+  position: LinkInsertPosition;
+  /** Leave a blank line between existing text and the link paragraph (default true) */
+  blankLine: boolean;
+  /** Unique existing phrase, required when the note holds native objects */
+  scopeText?: string;
+}
+
+/**
+ * What the guarded append step reports back to insert-link.
+ */
+export interface LinkAppendOutcome {
+  /** "applescript" for ordinary notes, "native" for notes with native objects */
+  route: "applescript" | "native";
+  /** Revision token after the write */
+  contentHash: string;
+}
+
+/**
+ * Result of a verified link insertion.
+ */
+export interface InsertLinkResult {
+  ok: true;
+  id: string;
+  mode: LinkInsertMode;
+  url: string;
+  /** Visible text written (the URL in raw mode, the label in hyperlink mode) */
+  text: string;
+  position: LinkInsertPosition;
+  route: "applescript" | "native";
+  /** Whether the note stores a link attribute on the inserted text */
+  linkStored: boolean;
+  /** Destination read back from the note's stored links */
+  storedUrl?: string;
+  previousContentHash: string;
+  contentHash: string;
+}

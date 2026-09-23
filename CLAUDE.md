@@ -17,15 +17,16 @@ This MCP server enables AI assistants to interact with Apple Notes on macOS via 
 
 The MCP protocol uses JSON for parameters. In JSON, `\` is an escape character. To include a literal backslash:
 
-| You want | Send in JSON parameter |
-|----------|------------------------|
-| `\` | `\\` |
-| `\\` | `\\\\` |
-| `Mobile\ Documents` | `Mobile\\ Documents` |
+| You want            | Send in JSON parameter |
+| ------------------- | ---------------------- |
+| `\`                 | `\\`                   |
+| `\\`                | `\\\\`                 |
+| `Mobile\ Documents` | `Mobile\\ Documents`   |
 
 ### Why This Matters
 
 If you send a single backslash without escaping:
+
 - The JSON parser interprets `\` as an escape sequence
 - Invalid sequences like `\ ` (backslash-space) cause silent failures
 - The note creation/update will fail with no clear error
@@ -33,28 +34,35 @@ If you send a single backslash without escaping:
 ### Examples
 
 **Correct - Shell command with escaped space:**
+
 ```
 content: "cp ~/Library/Mobile\\ Documents/file.txt ~/dest/"
 ```
+
 → arrives as: `cp ~/Library/Mobile\ Documents/file.txt ~/dest/`
 
 **Correct - Regex pattern:**
+
 ```
 content: "Version pattern: \\d+\\.\\d+"
 ```
+
 → arrives as: `Version pattern: \d+\.\d+`
 
 **Correct - Literal double backslash:**
+
 ```
 content: "In a JSON string, one backslash is written \\\\"
 ```
+
 → arrives as: `In a JSON string, one backslash is written \\`
 
 (One `\\` per literal backslash, exactly as in the shell example above. `\\\\`
-is the escaping for a literal *double* backslash — see the table's second row —
+is the escaping for a literal _double_ backslash — see the table's second row —
 so sending `\\\\` where you mean a single backslash stores two of them.)
 
 **Incorrect - Will fail:**
+
 ```
 content: "cp ~/Library/Mobile\ Documents/file.txt ~/dest/"
 ```
@@ -64,11 +72,13 @@ content: "cp ~/Library/Mobile\ Documents/file.txt ~/dest/"
 ### Using IDs for Reliability (Recommended)
 
 All note operations support an optional `id` parameter. **Using IDs is more reliable than titles** because:
+
 - IDs are unique across all accounts
 - Titles can be duplicated
 - No issues with special characters
 
 **Recommended workflow:**
+
 1. Use `search-notes` or `create-note` to get the note's ID
 2. Use the ID for subsequent operations (`get-note-content`, `update-note`, `delete-note`, `move-note`)
 
@@ -84,6 +94,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 ```
 
 ### create-note / update-note / append-to-note
+
 - Always escape backslashes in content (see above)
 - Newlines can be sent as `\n` (this is a valid JSON escape)
 - **Title handling:** The `title` parameter is automatically prepended as `<h1>` in the note body. Do NOT include the title in the `content` parameter, or it will appear twice.
@@ -94,19 +105,27 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
 - Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
 
+### insert-link
+
+- Adds one URL to an exact note as its own paragraph: `mode: "raw"` (default) shows the URL, `mode: "hyperlink"` shows `label`. `position` is `"end"` (default) or `"after-title"`; `blankLine` (default `true`) controls the blank line before it.
+- Needs the same `expectedContentHash` as `append-to-note`. Notes with native objects route to native end-append and need `scopeText`; only `position: "end"` with `blankLine: true` works there.
+- Verified from the note's stored link runs, not the HTML sent: the result carries `linkStored` and `storedUrl` (a bare origin comes back with a trailing `/`).
+- A bare URL written as plain text is not linked by Notes. `linked: false` writes it that way on purpose and reports `linkStored: false`.
+- Rich URL preview cards cannot be created, and a link cannot be placed inside an existing paragraph. For a link to another note by id, use `insert-note-link`.
+
 ### Checklist Creation Is Not Supported
 
 **You cannot create an Apple Notes checklist (the interactive ☐ / ☑ items) via this MCP server.** This is an Apple Notes limitation, not a server bug.
 
-The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–50, one bridge run each). If `create-checklist-items` returns `ok: false`, only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
+The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–20, one bridge run of a few seconds each; a client-side timeout does not stop the server, so read the note before any retry). If `create-checklist-items` returns `ok: false`, only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
 
 When you send checklist HTML or markdown to `create-note` or `update-note`:
 
-| You send | What Notes.app renders |
-|----------|------------------------|
-| `<input type="checkbox"> Buy milk` | `Buy milk` (the `<input>` is stripped) |
+| You send                                       | What Notes.app renders                       |
+| ---------------------------------------------- | -------------------------------------------- |
+| `<input type="checkbox"> Buy milk`             | `Buy milk` (the `<input>` is stripped)       |
 | `<ul class="checklist"><li>Buy milk</li></ul>` | A plain bulleted list (the class is dropped) |
-| `- [ ] Buy milk` in `plaintext` mode | Literal text `- [ ] Buy milk` |
+| `- [ ] Buy milk` in `plaintext` mode           | Literal text `- [ ] Buy milk`                |
 
 Apple Notes stores checklists as a paragraph style inside a gzipped protobuf blob. AppleScript's `body` interface does not expose paragraph styles, so there is no HTML or markdown input that produces a real checklist.
 
@@ -123,6 +142,7 @@ Do not try alternative HTML class names, data attributes, or Unicode characters 
 **Important:** When repeatedly updating a note (especially with HTML content), Apple Notes can accumulate whitespace artifacts - specifically `<div><br></div>` tags that persist between sections even after removing them from your content.
 
 **Symptoms:**
+
 - Large gaps appear between sections that weren't in your content
 - Reading the note back shows multiple blank `<div><br></div>` lines
 - The whitespace persists even when you update with clean content
@@ -130,6 +150,7 @@ Do not try alternative HTML class names, data attributes, or Unicode characters 
 **Cause:** Apple Notes' internal HTML processing preserves empty divs from previous edits. Each update can leave behind formatting artifacts.
 
 **Solution:** If a note has accumulated unwanted whitespace:
+
 1. Delete the note with `delete-note`
 2. Create a fresh note with `create-note`
 
@@ -138,6 +159,7 @@ This is more reliable than trying to fix the whitespace through updates, as the 
 ### Folder Paths (Nested Folder Support)
 
 All folder operations support hierarchical paths using `/` as a separator:
+
 - `"Work"` — simple folder name
 - `"Work/Clients"` — nested path (folder "Clients" inside "Work")
 - `"Work/Clients/Omnia"` — deeply nested path
@@ -145,11 +167,12 @@ All folder operations support hierarchical paths using `/` as a separator:
 
 This works in: `create-note` (folder param), `create-folder`, `search-notes`, `list-notes`, `move-note`, `batch-move-notes`, `delete-folder`.
 
-`create-folder` is the one that *creates* a hierarchy: pass it a whole path and every missing segment is created, existing ones skipped. It is idempotent — an already-existing folder is not an error — so call it before any `create-note` / `move-note` / `batch-move-notes` that targets a folder you have not confirmed exists.
+`create-folder` is the one that _creates_ a hierarchy: pass it a whole path and every missing segment is created, existing ones skipped. It is idempotent — an already-existing folder is not an error — so call it before any `create-note` / `move-note` / `batch-move-notes` that targets a folder you have not confirmed exists.
 
 `list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
 
 ### search-notes
+
 - Set `searchContent: true` to search note bodies **instead of** titles, not in addition to them. The two modes are exclusive, so no single call matches titles or bodies. A title-only search that finds nothing says so in the response; treat that as "no title matched", not "no such note exists", and retry with `searchContent: true`.
 - Searches are case-insensitive
 - Results include note IDs for reliable subsequent operations
@@ -158,6 +181,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 
 ### list-notes
+
 - Returns each note's `{title, id}` — not content. **Changed in 2.7.0:** `notes` was `string[]`
 - Prefer the returned `id` over the title for any follow-up read/update/move/delete — titles are not unique, and a by-title lookup collapses duplicates onto one note (the `search-notes`/`export-notes-json` identity trap)
 - Use `get-note-content` to retrieve full content
@@ -165,11 +189,13 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `limit` to cap the number of notes returned
 
 ### move-note
+
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
 - The destination folder must already exist (create it first with `create-folder`)
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### get-checklist-state
+
 - Requires note ID (not title) — use `search-notes` to find the ID first
 - Reads directly from the NoteStore SQLite database (not via AppleScript)
 - Requires Full Disk Access for the MCP host process
@@ -183,20 +209,24 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Works independently of `get-note-content` — use both for full picture
 
 ### Batch operations
+
 - `batch-delete-notes` and `batch-move-notes` accept at most **500 ids per request** (the limit is enforced at the schema boundary, so an over-long array is rejected before anything runs). Chunk larger sets.
 - `batch-move-notes`' destination folder must already exist — create it with `create-folder` first.
 
 ### get-note-link
+
 - Returns the shareable `notes://showNote?identifier=<uuid>` deep link — use this, not the `x-coredata://` id, whenever a link is meant to be handed to a person, stored in a Reminders task, or opened on iOS
 - Primary path reads `ZIDENTIFIER` from the NoteStore database, so it needs Full Disk Access; on macOS 12–15 it can fall back to the AppleScript `note link` property, which macOS 26+ no longer exposes
 - Password-protected notes cannot be linked
 
 ### get-note-markdown (checklist enrichment)
+
 - Automatically annotates checklist items with `[x]`/`[ ]` when database is accessible
 - Falls back to plain list items if Full Disk Access is not granted (no error)
 - No action needed — enrichment happens transparently
 
 ### Multi-account
+
 - Omitting `account` targets whatever Notes.app reports as its **`default account`** — which is often, but not necessarily, iCloud. Since 2.7.1 the server resolves that name at runtime instead of assuming the literal `"iCloud"`, so it is also correct for a localized account name, a non-iCloud default, or a name carrying a trailing U+F8FF ()
 - Use `list-accounts` to see available accounts
 - Pass `account` parameter to target specific account
@@ -205,24 +235,26 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ## Sync and Collaboration Awareness
 
 ### iCloud Sync
+
 - Use `get-sync-status` to check if sync is in progress
 - `search-notes`, `list-notes`, and `list-folders` will warn if sync is active
 - If you get incomplete results, wait a moment and retry
 
 ### Shared Notes
+
 - Use `list-shared-notes` to find notes shared with collaborators
 - `update-note` and `delete-note` will warn when modifying shared notes
 - Changes to shared notes are immediately visible to all collaborators
 
 ## Error Handling
 
-| Error | Likely Cause |
-|-------|--------------|
-| "Notes.app not responding" | Notes.app frozen or not running |
-| "Note not found" | Title doesn't match exactly (case-sensitive) |
-| Silent failure | Backslash not escaped in content |
-| "Permission denied" | macOS automation permission needed |
-| "iCloud sync in progress" | Wait and retry - results may be incomplete |
+| Error                      | Likely Cause                                            |
+| -------------------------- | ------------------------------------------------------- |
+| "Notes.app not responding" | Notes.app frozen or not running                         |
+| "Note not found"           | Title doesn't match exactly (case-sensitive)            |
+| Silent failure             | Backslash not escaped in content                        |
+| "Permission denied"        | macOS automation permission needed                      |
+| "iCloud sync in progress"  | Wait and retry - results may be incomplete              |
 | "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
 
 ## Recurring macOS permission prompts → offer the official-Node fix

@@ -1,10 +1,10 @@
 ## [Unreleased]
 
-## [2.9.0] - 2026-09-23
+## [2.8.22] - 2026-09-23
 
 ### Added
 
-- `create-checklist-items` appends 1 to 50 unchecked native checklist items to
+- `create-checklist-items` appends 1 to 20 unchecked native checklist items to
   one note in the order given. Each item is one run of the verified
   `create-checklist-item` bridge, chained on the previous run's verified
   revision. After every run the server checks that exactly one new unchecked
@@ -14,8 +14,25 @@
   call and returns `ok: false` with the verified `landed` items, the item it
   `stoppedAt` (with `outcome` `"not-written"` or `"uncertain"`), and the items
   `notAttempted`. It is gated with `create-checklist-item`.
+  The cap is 20 because each item is a synchronous bridge run of a few
+  seconds; a larger batch could outlast an MCP client's request timeout, and a
+  client that retried the whole call would append duplicates.
 
-## [2.8.18] - 2026-09-23
+## [2.8.21] - 2026-09-23
+
+### Added
+
+- `insert-link` adds one URL to an exact note as its own paragraph, at the end
+  or directly under the title. `mode: "raw"` shows the URL itself as a stored
+  link, or as plain text with `linked: false`; `mode: "hyperlink"` shows a
+  `label` that links to the URL. It uses `append-to-note`'s guards (fresh
+  `expectedContentHash`, attachment block, existing links must survive) and
+  routes notes with native objects to native end-append. The result is proven
+  from the note's stored link runs and reports `linkStored` and `storedUrl`.
+  Rich URL preview cards are not produced: no public automation route creates
+  one.
+
+## [2.8.20] - 2026-09-23
 
 ### Fixed
 
@@ -31,6 +48,28 @@
   terminator as its own run when that line's characters carry different
   attributes. `revision` and `styleRuns`, which the write guards compare, are
   unchanged.
+
+## [2.8.19] - 2026-09-23
+
+### Fixed
+
+- A write whose visible text contains `&` inside a link no longer reports a
+  readback mismatch after saving correctly. Notes' AppleScript HTML writes the
+  text `a=1&b=2` inside a link as `a=1&ampb=2`, without the semicolon, and the
+  visible-text comparison only decoded `&amp;`. It now decodes the HTML legacy
+  references (`amp`, `lt`, `gt`, `quot`, `nbsp`) with or without the
+  semicolon, in a single pass so `&amp;lt;` still reads as the literal `&lt;`.
+
+## [2.8.18] - 2026-09-23
+
+### Fixed
+
+- The server no longer truncates a response when the client closes stdin right
+  after a request. Shutdown on stdin `end`/`close` (and SIGINT/SIGTERM) now
+  waits for pending stdout writes to drain, capped at two seconds, before
+  exiting. Before, any response larger than the 64 KiB pipe buffer was cut off
+  mid-message, which `tools/list` was close to reaching and which one-shot
+  clients such as `docsTruth.test.ts` hit as an unparseable line.
 
 ## [2.8.17] - 2026-09-17
 

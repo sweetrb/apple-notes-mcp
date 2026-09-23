@@ -75,8 +75,14 @@ const common = {
 const htmlEscape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Most items create-checklist-items appends in one call; each is one bridge run. */
-export const MAX_CHECKLIST_BATCH = 50;
+/**
+ * Most items create-checklist-items appends in one call. Each item is one
+ * synchronous Shortcuts bridge run of a few seconds, so the cap keeps a full
+ * call well inside common MCP client request timeouts: a client that times out
+ * and retries the whole batch never sees the landed/stoppedAt report and would
+ * append duplicates.
+ */
+export const MAX_CHECKLIST_BATCH = 20;
 
 type ChecklistItem = NonNullable<RichNote["checklistItems"]>[number];
 const byPosition = (items: ChecklistItem[] = []) => [...items].sort((a, b) => a.start - b.start);
@@ -319,7 +325,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   );
   tool(
     "create-checklist-items",
-    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying.",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
     {
       ...common,
       items: z
