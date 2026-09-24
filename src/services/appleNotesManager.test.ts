@@ -2617,6 +2617,25 @@ describe("AppleNotesManager", () => {
       expect(folders[2].shared).toBe(true);
     });
 
+    it("marks smart folders, which AppleScript lists like ordinary ones (#247)", () => {
+      const smartId = "x-coredata://ABC/ICFolder/p9";
+      const plainId = "x-coredata://ABC/ICFolder/p2";
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          [plainId, "Notes", "", "false"].join(F),
+          [smartId, "Recents", "", "false"].join(F),
+        ].join(R),
+      });
+      const spy = vi.spyOn(manager, "smartFolderIds").mockReturnValue([smartId]);
+
+      const folders = manager.listFolders();
+
+      expect(folders.find((f) => f.id === smartId)?.smartFolder).toBe(true);
+      expect(folders.find((f) => f.id === plainId)).not.toHaveProperty("smartFolder");
+      spy.mockRestore();
+    });
+
     it("includes parent folder in path", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,

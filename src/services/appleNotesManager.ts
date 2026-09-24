@@ -742,7 +742,7 @@ export function readSmartFolderIds(
  */
 export function smartFolderDestinationError(folderPath: string): CodedError {
   return new CodedError(
-    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders marks smart folders smartFolder: true). Nothing was changed`,
     {
       code: "unsupported",
       committed: false,
@@ -2730,6 +2730,9 @@ export class AppleNotesManager {
   /**
    * Lists all folders in an account with full hierarchical paths.
    *
+   * Smart folders are included (AppleScript lists them like ordinary folders)
+   * and carry `smartFolder: true` when the NoteStore database is readable.
+   *
    * Each folder's `name` field contains the full path (e.g., "Work/Clients/Omnia")
    * so that duplicate folder names (e.g., multiple "Archive" folders) are
    * distinguishable and can be used directly in other operations.
@@ -2802,11 +2805,16 @@ export class AppleNotesManager {
       return safeName;
     };
 
+    // `every folder` lists smart folders like ordinary ones (macOS 27, #247) and
+    // the scripting dictionary has no folder-type property, so mark them from
+    // the NoteStore database. Unmarked when it cannot be read (no Full Disk Access).
+    const smart = new Set(entries.some((entry) => entry.id) ? this.smartFolderIds() : []);
     return entries.map((entry) => ({
       id: entry.id,
       name: buildPath(entry),
       account: entry.account || targetAccount || "",
       shared: entry.shared,
+      ...(smart.has(entry.id) ? { smartFolder: true } : {}),
     }));
   }
 

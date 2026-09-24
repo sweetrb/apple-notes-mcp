@@ -1,12 +1,14 @@
 /**
  * Read-only folder facts from the NoteStore database.
  *
- * AppleScript can resolve (and delete) folders it never lists: a smart folder's
- * `folder id "x-coredata://…/ICFolder/pN"` reference resolves even though
- * `folders of account` omits it, and Recently Deleted is listed like any other
- * folder. Folder type, the stable Notes identifier, the tombstone flag, and the
- * CloudKit share record are only visible in the store, so guarded folder
- * deletion reads them here before it asks Notes.app to delete anything.
+ * AppleScript cannot tell special folders from ordinary ones: `folders of
+ * account` lists smart folders like any other folder (at least on macOS 27,
+ * #247), their `folder id "x-coredata://…/ICFolder/pN"` references resolve and
+ * can be deleted, and Recently Deleted is listed the same way. Notes' scripting
+ * dictionary has no folder-type property, so folder type, the stable Notes
+ * identifier, the tombstone flag, and the CloudKit share record come from the
+ * store, and guarded folder deletion reads them here before it asks Notes.app
+ * to delete anything.
  *
  * Safety:
  * - The database is opened READ-ONLY (`sqlite3 -readonly`) through execFileSync

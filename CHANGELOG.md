@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [2.9.18] - 2026-09-24
+
+### Fixed
+
+- `add-attachment`, `create-note-with-attachment`, and
+  `add-attachment-from-pasteboard` no longer report a written file between
+  25 and 64 MiB as `verification_failed` / `indeterminate` (#243). The
+  post-write check read Notes' copy through the base64 fetch path, capped at
+  `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` (25 MiB by default), below the
+  64 MiB the tools accept, so an agent could attach the same file twice. The
+  check now saves Notes' copy and compares its size and a streamed SHA-256
+  with the source through one `O_NOFOLLOW` descriptor, with no cap of its
+  own. The NoteStore fallback (#236) streams its hash the same way.
+- `list-folders` marks smart folders with `smartFolder: true` (and
+  `(smart folder)` in the text list) when Full Disk Access lets it read the
+  Notes database (#247). Notes' AppleScript lists smart folders like ordinary
+  folders, at least on macOS 27, and has no folder-type property, so they were
+  indistinguishable there. The `folderStore.ts` module comment, which said
+  `folders of account` omits smart folders, now says the opposite, and the
+  `list-smart-folders` description and smart-folder refusal text no longer
+  imply `list-folders` shows only ordinary folders.
+
 ## [2.9.17] - 2026-09-24
 
 ### Added

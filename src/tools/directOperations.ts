@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  readSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -105,7 +106,7 @@ function localAttachment(path: string): Buffer {
   const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(descriptor);
-    if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_ADD_ATTACHMENT_BYTES)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync(descriptor);
     if (bytes.length !== stat.size)
@@ -113,6 +114,38 @@ function localAttachment(path: string): Buffer {
     return bytes;
   } finally {
     closeSync(descriptor);
+  }
+}
+
+/** Largest file add-attachment accepts; verification must never cap lower (#243). */
+const MAX_ADD_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Whether the regular file at `path` has exactly `size` bytes with SHA-256
+ * `expected`. Streams the file in chunks through one O_NOFOLLOW descriptor, so
+ * it has no read cap of its own and never holds the whole file twice (#243).
+ */
+function fileMatches(path: string, size: number, expected: string): boolean {
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile() || stat.size !== size) return false;
+    const hash = createHash("sha256");
+    const chunk = Buffer.allocUnsafe(1024 * 1024);
+    let total = 0;
+    for (;;) {
+      const read = readSync(descriptor, chunk, 0, chunk.length, null);
+      if (read === 0) break;
+      total += read;
+      if (total > size) return false;
+      hash.update(chunk.subarray(0, read));
+    }
+    return total === size && hash.digest("hex") === expected;
+  } catch {
+    return false;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
 }
 
@@ -398,21 +431,7 @@ function storedInsertion(
   if (returnedId && /\/ICAttachment\/p\d+$/.test(returnedId) && returnedId !== attachmentId)
     throw new Error(UNCERTAIN);
   const expected = sha256(bytes);
-  const matches = row.assetPaths.some((path) => {
-    // One descriptor for the size check and the read, so both see the same file.
-    let descriptor: number | undefined;
-    try {
-      descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-      const stat = fstatSync(descriptor);
-      return (
-        stat.isFile() && stat.size === bytes.length && sha256(readFileSync(descriptor)) === expected
-      );
-    } catch {
-      return false;
-    } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
-    }
-  });
+  const matches = row.assetPaths.some((path) => fileMatches(path, bytes.length, expected));
   if (!matches)
     throw new Error(
       `Notes' database shows new attachment ${attachmentId} on this note, but its file bytes could not be verified; read the exact note and do not attach the file again`
@@ -475,10 +494,15 @@ function attachFile(
     if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
       attachmentId = inserted[0].id;
       reportedName = inserted[0].name;
-      const fetched = manager.getAttachmentBase64ById(id, attachmentId);
-      const actual =
-        typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-      if (!actual || sha256(actual) !== sha256(bytes))
+      // Export Notes' copy and hash it in place. The base64 fetch path is
+      // capped at APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES (25 MiB by default),
+      // below the 64 MiB this tool accepts, so it cannot verify large files (#243).
+      const verifyPath = join(directory, "verify", "attachment.bin");
+      const saved = manager.saveAttachmentById(id, attachmentId, verifyPath);
+      if (
+        !saved.success ||
+        !fileMatches(saved.savedPath ?? verifyPath, bytes.length, sha256(bytes))
+      )
         throw new Error("Attachment bytes were not verified; read the exact note before retrying");
     } else {
       // AppleScript saw nothing usable. On macOS 27 it never lists a PDF

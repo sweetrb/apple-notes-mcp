@@ -1355,7 +1355,7 @@ Lists all folders in an account with full hierarchical paths.
 {}
 ```
 
-**Returns:** List of folders with IDs, paths, account names, and shared state, plus `identifier`, `parentIdentifier`, and `accountIdentifier` when Full Disk Access is granted. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
+**Returns:** List of folders with IDs, paths, account names, and shared state, plus `identifier`, `parentIdentifier`, and `accountIdentifier` when Full Disk Access is granted. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`). Smart folders are listed too, because Notes' AppleScript lists them like ordinary folders; with Full Disk Access they carry `smartFolder: true` (and `(smart folder)` in the text list). A smart folder cannot hold notes or folders.
 
 ---
 
@@ -2016,7 +2016,8 @@ Each take gets a deadline of 1.5 times its length plus a minute (at most 30 minu
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
 latest `expectedContentHash`, and an absolute `path`. The server never retries
 the insertion. It verifies that existing rich content survived and compares the
-fetched attachment bytes with the source before reporting success.
+size and streamed SHA-256 of Notes' saved copy with the source before reporting
+success, with no read cap below the 64 MiB write limit.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|

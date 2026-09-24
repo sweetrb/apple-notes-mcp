@@ -173,6 +173,13 @@ export interface Folder {
    * Whether the folder is shared with collaborators.
    */
   shared?: boolean;
+
+  /**
+   * True for a smart folder. AppleScript lists smart folders like ordinary
+   * ones, so this comes from the NoteStore database and is absent when that
+   * cannot be read (no Full Disk Access). A smart folder cannot hold notes.
+   */
+  smartFolder?: boolean;
 }
 
 /**

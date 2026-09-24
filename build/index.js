@@ -42435,7 +42435,7 @@ function readSmartFolderIds(read = readSmartFolders) {
 }
 function smartFolderDestinationError(folderPath) {
   return new CodedError(
-    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders marks smart folders smartFolder: true). Nothing was changed`,
     {
       code: "unsupported",
       committed: false,
@@ -43881,6 +43881,9 @@ var AppleNotesManager = class {
   /**
    * Lists all folders in an account with full hierarchical paths.
    *
+   * Smart folders are included (AppleScript lists them like ordinary folders)
+   * and carry `smartFolder: true` when the NoteStore database is readable.
+   *
    * Each folder's `name` field contains the full path (e.g., "Work/Clients/Omnia")
    * so that duplicate folder names (e.g., multiple "Archive" folders) are
    * distinguishable and can be used directly in other operations.
@@ -43939,11 +43942,13 @@ var AppleNotesManager = class {
       }
       return safeName;
     };
+    const smart = new Set(entries2.some((entry) => entry.id) ? this.smartFolderIds() : []);
     return entries2.map((entry) => ({
       id: entry.id,
       name: buildPath(entry),
       account: entry.account || targetAccount || "",
-      shared: entry.shared
+      shared: entry.shared,
+      ...smart.has(entry.id) ? { smartFolder: true } : {}
     }));
   }
   /**
@@ -53063,6 +53068,7 @@ import {
   mkdtempSync as mkdtempSync6,
   openSync as openSync7,
   readFileSync as readFileSync4,
+  readSync as readSync5,
   rmSync as rmSync6,
   writeFileSync as writeFileSync5
 } from "node:fs";
@@ -53344,7 +53350,7 @@ function localAttachment(path10) {
   const descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
   try {
     const stat = fstatSync7(descriptor);
-    if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_ADD_ATTACHMENT_BYTES)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync4(descriptor);
     if (bytes.length !== stat.size)
@@ -53352,6 +53358,30 @@ function localAttachment(path10) {
     return bytes;
   } finally {
     closeSync7(descriptor);
+  }
+}
+var MAX_ADD_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+function fileMatches(path10, size, expected) {
+  let descriptor;
+  try {
+    descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
+    const stat = fstatSync7(descriptor);
+    if (!stat.isFile() || stat.size !== size) return false;
+    const hash = createHash3("sha256");
+    const chunk = Buffer.allocUnsafe(1024 * 1024);
+    let total = 0;
+    for (; ; ) {
+      const read = readSync5(descriptor, chunk, 0, chunk.length, null);
+      if (read === 0) break;
+      total += read;
+      if (total > size) return false;
+      hash.update(chunk.subarray(0, read));
+    }
+    return total === size && hash.digest("hex") === expected;
+  } catch {
+    return false;
+  } finally {
+    if (descriptor !== void 0) closeSync7(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -53560,18 +53590,7 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
   if (returnedId && /\/ICAttachment\/p\d+$/.test(returnedId) && returnedId !== attachmentId)
     throw new Error(UNCERTAIN);
   const expected = sha256(bytes);
-  const matches = row.assetPaths.some((path10) => {
-    let descriptor;
-    try {
-      descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
-      const stat = fstatSync7(descriptor);
-      return stat.isFile() && stat.size === bytes.length && sha256(readFileSync4(descriptor)) === expected;
-    } catch {
-      return false;
-    } finally {
-      if (descriptor !== void 0) closeSync7(descriptor);
-    }
-  });
+  const matches = row.assetPaths.some((path10) => fileMatches(path10, bytes.length, expected));
   if (!matches)
     throw new Error(
       `Notes' database shows new attachment ${attachmentId} on this note, but its file bytes could not be verified; read the exact note and do not attach the file again`
@@ -53615,9 +53634,9 @@ function attachFile(manager, args, checked) {
     if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
       attachmentId = inserted[0].id;
       reportedName = inserted[0].name;
-      const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
-      const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-      if (!actual || sha256(actual) !== sha256(bytes))
+      const verifyPath = join24(directory, "verify", "attachment.bin");
+      const saved = manager.saveAttachmentById(id2, attachmentId, verifyPath);
+      if (!saved.success || !fileMatches(saved.savedPath ?? verifyPath, bytes.length, sha256(bytes)))
         throw new Error("Attachment bytes were not verified; read the exact note before retrying");
     } else {
       const stored = inserted.length === 0 && beforeStored ? storedInsertion(manager, id2, beforeStored, bytes, returnedId) : null;
@@ -53987,7 +54006,7 @@ import {
   mkdirSync as mkdirSync7,
   openSync as openSync8,
   readdirSync as readdirSync4,
-  readSync as readSync5,
+  readSync as readSync6,
   renameSync,
   unlinkSync as unlinkSync3,
   writeSync as writeSync5
@@ -54078,7 +54097,7 @@ var TemplateStore = class {
       const data = Buffer.alloc(stat.size);
       let read = 0;
       while (read < stat.size) {
-        const n = readSync5(fd, data, read, stat.size - read, read);
+        const n = readSync6(fd, data, read, stat.size - read, read);
         if (n <= 0) break;
         read += n;
       }
@@ -54395,7 +54414,7 @@ function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
 
 // src/utils/svgAnalyzer.ts
 import { createHash as createHash5 } from "node:crypto";
-import { closeSync as closeSync9, constants as constants9, fstatSync as fstatSync9, openSync as openSync9, readSync as readSync6 } from "node:fs";
+import { closeSync as closeSync9, constants as constants9, fstatSync as fstatSync9, openSync as openSync9, readSync as readSync7 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -56382,7 +56401,7 @@ function readSvgSource(path10) {
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {
-      const n = readSync6(fd, buffer, total, buffer.length - total, null);
+      const n = readSync7(fd, buffer, total, buffer.length - total, null);
       if (n === 0) break;
       total += n;
       if (total > SVG_LIMITS.maxSourceBytes)
@@ -60581,7 +60600,7 @@ ${noteList}`, {
 registerTool(
   "list-folders",
   {
-    description: "Use when: listing all folders, with full nested paths, for an account.\nReturns: folder names/paths.\nDo not use when: listing notes (list-notes).\nNote: warns if iCloud sync is active.",
+    description: "Use when: listing all folders, with full nested paths, for an account.\nReturns: folder names/paths.\nDo not use when: listing notes (list-notes).\nNote: smart folders are listed too (AppleScript lists them like ordinary folders) and are marked smartFolder: true when Full Disk Access lets the server read the Notes database; they cannot hold notes. Warns if iCloud sync is active.",
     inputSchema: {
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe("Account to list folders from")
     },
@@ -60611,7 +60630,7 @@ ${syncWarnings.join(" ")}` : "";
       return successResponse(`No folders found${acct}${syncNote}`, { folders: [], count: 0 });
     }
     const resolvedAcct = folders[0]?.account ? ` (${folders[0].account})` : acct;
-    const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
+    const folderList = folders.map((f) => `  - ${f.name}${f.smartFolder ? " (smart folder)" : ""}`).join("\n");
     return successResponse(
       `Found ${folders.length} folders${resolvedAcct}:
 ${folderList}${syncNote}`,
@@ -60627,7 +60646,7 @@ registerTool(
   {
     description: `Use when: listing Smart Folders and the rules that define them.
 Returns: each smart folder's name, ids, account, and parent, its rules decoded as match ("all"/"any"/"none") plus filters (each with a readable description), the stored query with the outer deleted wrapper removed, and the raw stored query JSON. With includeMatchingNotes, also the notes Notes.app currently shows in each folder.
-Do not use when: listing ordinary folders (list-folders) or searching notes (search-notes).
+Do not use when: listing all folders with paths (list-folders, which lists smart folders alongside ordinary ones) or searching notes (search-notes).
 Safety: read-only; reads the NoteStore database and requires Full Disk Access. includeMatchingNotes asks Notes.app (Automation permission) for each folder's current contents rather than re-evaluating the rules. Unrecognized rules are kept as "unknown" filters and set fullyDecoded false.`,
     inputSchema: {
       includeMatchingNotes: external_exports.boolean().optional().describe(

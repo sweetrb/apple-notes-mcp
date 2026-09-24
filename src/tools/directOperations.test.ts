@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
@@ -21,6 +21,13 @@ import { registerDirectOperations } from "./directOperations.js";
 import { PasteboardError } from "../utils/pasteboardFreeze.js";
 
 const directories: string[] = [];
+/** A saveAttachmentById mock that writes `content` where the caller asked. */
+const savesAs = (content: Buffer) =>
+  vi.fn((_note: string, _attachment: string, dest: string) => {
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, content);
+    return { success: true, savedPath: dest };
+  });
 afterEach(() => {
   vi.resetAllMocks();
   while (directories.length) rmSync(directories.pop()!, { recursive: true, force: true });
@@ -114,9 +121,7 @@ describe("direct Notes operations", () => {
         .mockReturnValueOnce([{ id: "existing" }])
         .mockReturnValue([{ id: "existing" }, { id: attachmentId }, { id: attachmentId }]),
       addAttachmentById: vi.fn(() => attachmentId),
-      getAttachmentBase64ById: vi.fn(() => ({
-        base64: Buffer.from(valid ? bytes : Buffer.from("wrong")).toString("base64"),
-      })),
+      saveAttachmentById: savesAs(valid ? bytes : Buffer.from("wrong")),
     };
     const registerTool = vi.fn();
     registerDirectOperations(
@@ -126,9 +131,102 @@ describe("direct Notes operations", () => {
     const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
     const result = await handler({ id, expectedContentHash: "revision", path });
     expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
-    expect(manager.getAttachmentBase64ById).toHaveBeenCalledWith(id, attachmentId);
+    expect(manager.saveAttachmentById).toHaveBeenCalledWith(id, attachmentId, expect.any(String));
     if (valid) expect(result.structuredContent).toMatchObject({ ok: true, attachmentId });
     else expect(result).toMatchObject({ isError: true });
+  });
+
+  it("verifies a file over the 25 MiB base64 fetch cap (#243)", async () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const attachmentId = "x-coredata://ABC/ICAttachment/p3";
+    const bytes = Buffer.alloc(25 * 1024 * 1024 + 1, 7);
+    const directory = mkdtempSync(join(tmpdir(), "direct-operation-large-test-"));
+    directories.push(directory);
+    const path = join(directory, "large.png");
+    writeFileSync(path, bytes);
+    rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
+    rich.read.mockReturnValue({
+      text: "existing",
+      links: [],
+      nativeTags: [],
+      nativeObjectIds: [],
+      hasNativeObjects: false,
+      hasChecklist: false,
+      revision: "rich",
+      objects: [],
+      checklistItems: [],
+      styleRuns: [],
+      objectData: [],
+    });
+    rich.hash.mockReturnValue("revision");
+    const manager = {
+      getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
+      getNoteContentById: vi.fn(() => "existing"),
+      listAttachmentsById: vi
+        .fn()
+        .mockReturnValueOnce([])
+        .mockReturnValue([{ id: attachmentId, name: "large.png" }]),
+      addAttachmentById: vi.fn(() => attachmentId),
+      saveAttachmentById: savesAs(bytes),
+      // The capped base64 path must not be used for verification.
+      getAttachmentBase64ById: vi.fn(() => ({ success: false, error: "too large" })),
+    };
+    const registerTool = vi.fn();
+    registerDirectOperations(
+      { registerTool } as unknown as McpServer,
+      manager as unknown as AppleNotesManager
+    );
+    const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
+    const result = await handler({ id, expectedContentHash: "revision", path });
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      attachmentId,
+      bytes: bytes.length,
+    });
+    expect(manager.getAttachmentBase64ById).not.toHaveBeenCalled();
+  });
+
+  it("rejects a saved copy one byte short of a large file (#243)", async () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const attachmentId = "x-coredata://ABC/ICAttachment/p3";
+    const bytes = Buffer.alloc(25 * 1024 * 1024 + 1, 7);
+    const directory = mkdtempSync(join(tmpdir(), "direct-operation-large-test-"));
+    directories.push(directory);
+    const path = join(directory, "large.png");
+    writeFileSync(path, bytes);
+    rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
+    rich.read.mockReturnValue({
+      text: "existing",
+      links: [],
+      nativeTags: [],
+      nativeObjectIds: [],
+      hasNativeObjects: false,
+      hasChecklist: false,
+      revision: "rich",
+      objects: [],
+      checklistItems: [],
+      styleRuns: [],
+      objectData: [],
+    });
+    rich.hash.mockReturnValue("revision");
+    const manager = {
+      getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
+      getNoteContentById: vi.fn(() => "existing"),
+      listAttachmentsById: vi
+        .fn()
+        .mockReturnValueOnce([])
+        .mockReturnValue([{ id: attachmentId, name: "large.png" }]),
+      addAttachmentById: vi.fn(() => attachmentId),
+      saveAttachmentById: savesAs(bytes.subarray(1)),
+    };
+    const registerTool = vi.fn();
+    registerDirectOperations(
+      { registerTool } as unknown as McpServer,
+      manager as unknown as AppleNotesManager
+    );
+    const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
+    const result = await handler({ id, expectedContentHash: "revision", path });
+    expect(result).toMatchObject({ isError: true });
   });
 });
 
@@ -169,7 +267,7 @@ describe("attachment filename override and create-then-attach", () => {
         .mockReturnValueOnce([])
         .mockReturnValue([{ id: attachmentId, name: reportedName }]),
       addAttachmentById: vi.fn(() => attachmentId),
-      getAttachmentBase64ById: vi.fn(() => ({ base64: bytes.toString("base64") })),
+      saveAttachmentById: savesAs(bytes),
     };
     const registerTool = vi.fn();
     registerDirectOperations(
@@ -485,7 +583,7 @@ describe("attachment filename override and create-then-attach", () => {
 
   it("names the created note when the attachment step fails", async () => {
     const { manager, handler } = setup("x");
-    manager.getAttachmentBase64ById.mockReturnValue({ base64: "d3Jvbmc=" });
+    manager.saveAttachmentById.mockImplementation(savesAs(Buffer.from("wrong")));
     const result = await handler("create-note-with-attachment")({ title: "New", path: source() });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(
@@ -541,7 +639,7 @@ describe("add-attachment verifies through NoteStore when AppleScript lists nothi
       // Notes' AppleScript on macOS 27 never lists the PDF.
       listAttachmentsById: vi.fn(() => []),
       addAttachmentById: vi.fn(() => returnedId),
-      getAttachmentBase64ById: vi.fn(),
+      saveAttachmentById: vi.fn(),
       getAttachmentAssetsById: vi.fn(stored),
     };
     const registerTool = vi.fn();
@@ -587,7 +685,7 @@ describe("add-attachment verifies through NoteStore when AppleScript lists nothi
       bytes: bytes.length,
     });
     expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
-    expect(manager.getAttachmentBase64ById).not.toHaveBeenCalled();
+    expect(manager.saveAttachmentById).not.toHaveBeenCalled();
   });
 
   it("refuses a new row whose file bytes differ, and says not to attach again", async () => {

@@ -2943,7 +2943,7 @@ registerTool(
   "list-folders",
   {
     description:
-      "Use when: listing all folders, with full nested paths, for an account.\nReturns: folder names/paths.\nDo not use when: listing notes (list-notes).\nNote: warns if iCloud sync is active.",
+      "Use when: listing all folders, with full nested paths, for an account.\nReturns: folder names/paths.\nDo not use when: listing notes (list-notes).\nNote: smart folders are listed too (AppleScript lists them like ordinary folders) and are marked smartFolder: true when Full Disk Access lets the server read the Notes database; they cannot hold notes. Warns if iCloud sync is active.",
     inputSchema: {
       account: z.string().max(MAX.ACCOUNT).optional().describe("Account to list folders from"),
     },
@@ -2979,7 +2979,9 @@ registerTool(
     // that was asked for — a unique prefix like "robert" resolves to the full
     // "robert.b.sweet@gmail.com", and echoing the request would hide that (#128).
     const resolvedAcct = folders[0]?.account ? ` (${folders[0].account})` : acct;
-    const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
+    const folderList = folders
+      .map((f) => `  - ${f.name}${f.smartFolder ? " (smart folder)" : ""}`)
+      .join("\n");
     return successResponse(
       `Found ${folders.length} folders${resolvedAcct}:\n${folderList}${syncNote}`,
       {
@@ -2996,7 +2998,7 @@ registerTool(
   "list-smart-folders",
   {
     description:
-      'Use when: listing Smart Folders and the rules that define them.\nReturns: each smart folder\'s name, ids, account, and parent, its rules decoded as match ("all"/"any"/"none") plus filters (each with a readable description), the stored query with the outer deleted wrapper removed, and the raw stored query JSON. With includeMatchingNotes, also the notes Notes.app currently shows in each folder.\nDo not use when: listing ordinary folders (list-folders) or searching notes (search-notes).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. includeMatchingNotes asks Notes.app (Automation permission) for each folder\'s current contents rather than re-evaluating the rules. Unrecognized rules are kept as "unknown" filters and set fullyDecoded false.',
+      'Use when: listing Smart Folders and the rules that define them.\nReturns: each smart folder\'s name, ids, account, and parent, its rules decoded as match ("all"/"any"/"none") plus filters (each with a readable description), the stored query with the outer deleted wrapper removed, and the raw stored query JSON. With includeMatchingNotes, also the notes Notes.app currently shows in each folder.\nDo not use when: listing all folders with paths (list-folders, which lists smart folders alongside ordinary ones) or searching notes (search-notes).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. includeMatchingNotes asks Notes.app (Automation permission) for each folder\'s current contents rather than re-evaluating the rules. Unrecognized rules are kept as "unknown" filters and set fullyDecoded false.',
     inputSchema: {
       includeMatchingNotes: z
         .boolean()
