@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants9) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants8);
+          this.rhs = optimizeExpr(this.rhs, names, constants9);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants9) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants8);
+        this.rhs = optimizeExpr(this.rhs, names, constants9);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants8) {
-        this.code = optimizeExpr(this.code, names, constants8);
+      optimizeNames(names, constants9) {
+        this.code = optimizeExpr(this.code, names, constants9);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants9) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants8))
+          if (n.optimizeNames(names, constants9))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants9) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        if (!(super.optimizeNames(names, constants8) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
+        if (!(super.optimizeNames(names, constants9) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants8);
+        this.condition = optimizeExpr(this.condition, names, constants9);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants9) {
+        if (!super.optimizeNames(names, constants9))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants8);
+        this.iteration = optimizeExpr(this.iteration, names, constants9);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants9) {
+        if (!super.optimizeNames(names, constants9))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants8);
+        this.iterable = optimizeExpr(this.iterable, names, constants9);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants9) {
         var _a, _b;
-        super.optimizeNames(names, constants8);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
+        super.optimizeNames(names, constants9);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants9);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants8) {
+    function optimizeExpr(expr, names, constants9) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants8[n.str];
+        const c = constants9[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants9[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve8.call(this, root, ref);
+      let _sch = resolve9.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve8(root, ref) {
+    function resolve9(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve8(baseURI, relativeURI, options) {
+    function resolve9(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve8,
+      resolve: resolve9,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants8 = {
+    var constants9 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants8) {
-      v = { value: constants8[c] };
+    for (c in constants9) {
+      v = { value: constants9[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join29(output, replacement);
+        return join30(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join29(output, rule.append(self.options));
+          output = join30(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join29(output, replacement) {
+    function join30(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
+        await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve8, reject) => {
+    return new Promise((resolve9, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve8(parseResult.data);
+            resolve9(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve8, reject) => {
+    return new Promise((resolve9, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve8, interval);
+      const timeoutId = setTimeout(resolve9, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
+      await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve8) => {
+    return new Promise((resolve9) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve8();
+        resolve9();
       } else {
-        this._stdout.once("drain", resolve8);
+        this._stdout.once("drain", resolve9);
       }
     });
   }
@@ -47633,13 +47633,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve8 = (pk, seen) => {
+  const resolve9 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve8(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve9(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47653,7 +47653,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve8(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve9(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -48860,6 +48860,19 @@ var FEATURES = [
     tools: [],
     minimumMacOSVersion: null,
     requirements: [{ kind: "native_write_helper" }]
+  },
+  {
+    name: "markdownTemplateLibrary",
+    description: "Validate, save, list, show and delete Markdown export templates (local JSON files; exporting with one still needs Full Disk Access)",
+    tools: [
+      "list-markdown-templates",
+      "show-markdown-template",
+      "validate-markdown-template",
+      "save-markdown-template",
+      "delete-markdown-template"
+    ],
+    minimumMacOSVersion: null,
+    requirements: []
   }
 ];
 function requirementLabel(requirement) {
@@ -51653,16 +51666,16 @@ var NOTE_PLACEHOLDERS = [
   "exportStem"
 ];
 var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join29) => ({
+var wrap2 = (before, after = "", join30) => ({
   mode: "wrap",
   before,
   after,
-  ...join29 ? { join: join29 } : {}
+  ...join30 ? { join: join30 } : {}
 });
-var pattern = (value, join29) => ({
+var pattern = (value, join30) => ({
   mode: "pattern",
   value,
-  ...join29 ? { join: join29 } : {}
+  ...join30 ? { join: join30 } : {}
 });
 var STANDARD = {
   schemaVersion: 1,
@@ -53686,9 +53699,426 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
   );
 }
 
+// src/services/templateStore.ts
+import { randomBytes } from "node:crypto";
+import {
+  closeSync as closeSync7,
+  constants as constants7,
+  fstatSync as fstatSync7,
+  linkSync,
+  lstatSync as lstatSync5,
+  mkdirSync as mkdirSync7,
+  openSync as openSync7,
+  readdirSync as readdirSync4,
+  readSync as readSync5,
+  renameSync,
+  unlinkSync as unlinkSync3,
+  writeSync as writeSync5
+} from "node:fs";
+import { homedir as homedir19 } from "node:os";
+import { isAbsolute as isAbsolute5, join as join25, resolve as resolve5 } from "node:path";
+var TEMPLATE_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+var TemplateStoreError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TemplateStoreError";
+  }
+  code;
+};
+function templateDir(env = process.env) {
+  const override = env.APPLE_NOTES_MCP_TEMPLATE_DIR?.trim();
+  if (override) {
+    if (!isAbsolute5(override))
+      throw new TemplateStoreError(
+        "unsafe-path",
+        "APPLE_NOTES_MCP_TEMPLATE_DIR must be an absolute path."
+      );
+    return resolve5(override);
+  }
+  return join25(homedir19(), "Library/Application Support/apple-notes-mcp/templates");
+}
+function checkName(name, action) {
+  if (isBuiltinTemplate(name) && action !== "read")
+    throw new TemplateStoreError(
+      "reserved-name",
+      `"${name}" is a built-in template and cannot be ${action === "save" ? "saved over" : "deleted"}.`
+    );
+  if (!TEMPLATE_SLUG.test(name))
+    throw new TemplateStoreError(
+      "invalid-name",
+      `Template names are 1-64 characters of a-z, 0-9, "-" and "_", starting with a letter or digit; got "${name}".`
+    );
+}
+var TemplateStore = class {
+  constructor(dir = templateDir()) {
+    this.dir = dir;
+  }
+  dir;
+  /** The library root, which must be a real directory (not a symlink) when it exists. */
+  root(create) {
+    let stat;
+    try {
+      stat = lstatSync5(this.dir);
+    } catch {
+      if (!create) return void 0;
+      mkdirSync7(this.dir, { recursive: true, mode: 448 });
+      stat = lstatSync5(this.dir);
+    }
+    if (!stat.isDirectory())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `The template library ${this.dir} is not a directory (symlinks are refused).`
+      );
+    return this.dir;
+  }
+  file(name) {
+    return join25(this.dir, `${name}.json`);
+  }
+  /** Read a saved template's text, refusing symlinks and non-regular files. */
+  readText(path10) {
+    let fd;
+    try {
+      fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
+    } catch (error2) {
+      if (error2.code === "ENOENT") return void 0;
+      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path10}: not a regular file.`);
+    }
+    try {
+      const stat = fstatSync7(fd);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to read ${path10}: not a regular file.`
+        );
+      if (stat.size > MAX_TEMPLATE_BYTES)
+        throw new TemplateValidationError([
+          {
+            path: "$",
+            message: `template is ${stat.size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`
+          }
+        ]);
+      const data = Buffer.alloc(stat.size);
+      let read = 0;
+      while (read < stat.size) {
+        const n = readSync5(fd, data, read, stat.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      return { text: data.subarray(0, read).toString("utf8"), bytes: read, mtime: stat.mtime };
+    } finally {
+      closeSync7(fd);
+    }
+  }
+  /** Saved templates in name order; `skipped` counts entries that are not usable. */
+  list() {
+    const templates = [];
+    let skipped = 0;
+    if (!this.root(false)) return { templates, skipped, dir: this.dir };
+    for (const entry of readdirSync4(this.dir).sort()) {
+      if (!entry.endsWith(".json") || entry.startsWith(".")) continue;
+      const name = entry.slice(0, -5);
+      if (!TEMPLATE_SLUG.test(name) || isBuiltinTemplate(name)) {
+        skipped++;
+        continue;
+      }
+      try {
+        const read = this.readText(this.file(name));
+        if (!read) continue;
+        const template = parseTemplate(read.text);
+        templates.push({
+          name,
+          ...template.name && template.name !== name ? { displayName: template.name } : {},
+          ...template.description ? { description: template.description } : {},
+          ...template.extends ? { extends: template.extends } : {},
+          bytes: read.bytes,
+          modified: read.mtime.toISOString()
+        });
+      } catch {
+        skipped++;
+      }
+    }
+    return { templates, skipped, dir: this.dir };
+  }
+  /**
+   * A saved template in its portable (as stored) form, or undefined when
+   * there is none. Throws {@link TemplateValidationError} for a corrupt file.
+   */
+  find(name) {
+    checkName(name, "read");
+    if (!this.root(false)) return void 0;
+    const read = this.readText(this.file(name));
+    return read ? parseTemplate(read.text) : void 0;
+  }
+  /** Like {@link find}, but a missing template is an error. */
+  get(name) {
+    const template = this.find(name);
+    if (!template)
+      throw new TemplateStoreError(
+        "template-not-found",
+        `No saved template named "${name}". Built-in templates: ${BUILTIN_TEMPLATE_NAMES.join(", ")}.`
+      );
+    return template;
+  }
+  /**
+   * Validate and save a template under `name`. Create-only unless `force`.
+   * Returns the file path and whether an existing template was replaced.
+   */
+  save(name, text2, { force = false } = {}) {
+    checkName(name, "save");
+    const template = parseTemplate(text2);
+    const body = JSON.stringify(template, null, 2) + "\n";
+    this.root(true);
+    const path10 = this.file(name);
+    let exists = false;
+    try {
+      const stat = lstatSync5(path10);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to replace ${path10}: it is not a regular file.`
+        );
+      exists = true;
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+    }
+    if (exists && !force)
+      throw new TemplateStoreError(
+        "template-exists",
+        `A template named "${name}" already exists. Pass force: true to replace it.`
+      );
+    const temp = join25(this.dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
+    const fd = openSync7(
+      temp,
+      constants7.O_WRONLY | constants7.O_CREAT | constants7.O_EXCL | constants7.O_NOFOLLOW,
+      384
+    );
+    try {
+      const data = Buffer.from(body, "utf8");
+      let written = 0;
+      while (written < data.length) written += writeSync5(fd, data, written);
+    } finally {
+      closeSync7(fd);
+    }
+    try {
+      if (force) renameSync(temp, path10);
+      else {
+        try {
+          linkSync(temp, path10);
+        } catch (error2) {
+          if (error2.code === "EEXIST")
+            throw new TemplateStoreError(
+              "template-exists",
+              `A template named "${name}" already exists. Pass force: true to replace it.`
+            );
+          throw error2;
+        }
+      }
+    } finally {
+      try {
+        unlinkSync3(temp);
+      } catch {
+      }
+    }
+    return { path: path10, replaced: exists, bytes: Buffer.byteLength(body), template };
+  }
+  /** Delete a saved template. Built-ins cannot be deleted. */
+  delete(name) {
+    checkName(name, "delete");
+    const path10 = this.file(name);
+    let stat;
+    try {
+      if (!this.root(false)) throw new Error("absent");
+      stat = lstatSync5(path10);
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+      throw new TemplateStoreError("template-not-found", `No saved template named "${name}".`);
+    }
+    if (!stat.isFile())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `Refusing to delete ${path10}: not a regular file.`
+      );
+    unlinkSync3(path10);
+    return { path: path10 };
+  }
+};
+
+// src/tools/markdownTemplates.ts
+var ok = (text2, structured) => ({
+  content: [{ type: "text", text: text2 }],
+  structuredContent: structured
+});
+function failure(action, error2) {
+  if (error2 instanceof TemplateValidationError)
+    return errorResult(
+      `Error ${action} [invalid-template]: the template is invalid:
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+      error2
+    );
+  if (error2 instanceof TemplateStoreError)
+    return errorResult(`Error ${action} [${error2.code}]: ${error2.message}`, error2);
+  const message = error2 instanceof Error ? error2.message : String(error2);
+  return errorResult(`Error ${action}: ${message}`, error2);
+}
+var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
+var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
+var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
+  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+);
+function sourceText(args) {
+  if (args.template === void 0 === (args.templateFile === void 0))
+    throw new Error("Provide exactly one of 'template' or 'templateFile'.");
+  if (args.templateFile !== void 0) return readTemplateFile(args.templateFile);
+  return typeof args.template === "string" ? args.template : JSON.stringify(args.template);
+}
+function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
+  const loose = external_exports.object({}).passthrough();
+  server2.registerTool(
+    "list-markdown-templates",
+    {
+      description: "Use when: choosing a Markdown export template, or checking which saved templates exist.\nReturns: the built-in templates, the saved templates (name, display name, description, size, modified date), the library directory, and how many unusable files were skipped.\nDo not use when: you need a template's rules (show-markdown-template).\nSafety: read-only; never opens Notes.",
+      inputSchema: {},
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async () => {
+      try {
+        const listing = store().list();
+        const builtins = BUILTIN_TEMPLATE_NAMES.map((name) => ({
+          name,
+          description: builtinTemplate(name).description ?? ""
+        }));
+        return ok(
+          `${builtins.length} built-in and ${listing.templates.length} saved template(s)` + (listing.skipped ? `; skipped ${listing.skipped} unusable file(s)` : "") + ".",
+          { builtins, ...listing }
+        );
+      } catch (error2) {
+        return failure("listing templates", error2);
+      }
+    })
+  );
+  const showInput = {
+    name: nameInput,
+    expanded: external_exports.boolean().optional().describe("Also return the fully expanded template (every rule filled from its base)")
+  };
+  server2.registerTool(
+    "show-markdown-template",
+    {
+      description: "Use when: reading a built-in or saved template, to copy it as the start of a new one or to see what an export will do.\nReturns: the template in its portable form (as saved, overrides only), its source, and with expanded: true every rule filled in.\nDo not use when: listing names (list-markdown-templates).\nSafety: read-only.",
+      inputSchema: showInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async ({ name, expanded }) => {
+      try {
+        const builtin = isBuiltinTemplate(name);
+        const template = builtin ? builtinTemplate(name) : store().get(name);
+        const structured = {
+          name,
+          source: builtin ? "builtin" : "saved",
+          template,
+          ...expanded ? { expanded: resolveTemplate(template, name) } : {}
+        };
+        return ok(JSON.stringify(template, null, 2), structured);
+      } catch (error2) {
+        return failure("showing template", error2);
+      }
+    })
+  );
+  const validateInput = {
+    name: nameInput.optional(),
+    template: templateInput,
+    templateFile: templateFileInput
+  };
+  server2.registerTool(
+    "validate-markdown-template",
+    {
+      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.',
+      inputSchema: validateInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async (args) => {
+      try {
+        const given = [args.name, args.template, args.templateFile].filter(
+          (value) => value !== void 0
+        ).length;
+        if (given !== 1)
+          throw new Error("Provide exactly one of 'name', 'template' or 'templateFile'.");
+        try {
+          if (args.name !== void 0) {
+            if (!isBuiltinTemplate(args.name)) store().get(args.name);
+          } else parseTemplate(sourceText(args));
+        } catch (error2) {
+          if (!(error2 instanceof TemplateValidationError)) throw error2;
+          return ok(
+            `Invalid template (${error2.errors.length} problem(s)):
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+            { valid: false, errors: error2.errors }
+          );
+        }
+        return ok("The template is valid.", { valid: true, errors: [] });
+      } catch (error2) {
+        return failure("validating template", error2);
+      }
+    })
+  );
+  const saveInput = {
+    name: external_exports.string().min(1).max(64).describe(
+      'Name to save under: lowercase a-z, 0-9, "-" and "_", starting with a letter or digit'
+    ),
+    template: templateInput,
+    templateFile: templateFileInput,
+    force: external_exports.boolean().optional().describe("Replace an existing saved template of this name (default false: create-only)")
+  };
+  server2.registerTool(
+    "save-markdown-template",
+    {
+      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
+      inputSchema: saveInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+    },
+    (async (args) => {
+      try {
+        const saved = store().save(args.name, sourceText(args), { force: args.force });
+        return ok(
+          `${saved.replaced ? "Replaced" : "Saved"} template "${args.name}" (${saved.bytes} bytes) at ${saved.path}.`,
+          { name: args.name, path: saved.path, bytes: saved.bytes, replaced: saved.replaced }
+        );
+      } catch (error2) {
+        return failure("saving template", error2);
+      }
+    })
+  );
+  const deleteInput = { name: external_exports.string().min(1).max(64).describe("Saved template to delete") };
+  server2.registerTool(
+    "delete-markdown-template",
+    {
+      description: "Use when: removing a saved Markdown template the user no longer wants.\nReturns: the name and the path of the removed file.\nDo not use when: the template is built in (standard-markdown, obsidian cannot be deleted).\nSafety: permanently removes one file from the template library; never touches Notes.",
+      inputSchema: deleteInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false }
+    },
+    (async ({ name }) => {
+      try {
+        const removed = store().delete(name);
+        return ok(`Deleted template "${name}" (${removed.path}).`, {
+          name,
+          path: removed.path,
+          deleted: true
+        });
+      } catch (error2) {
+        return failure("deleting template", error2);
+      }
+    })
+  );
+}
+
 // src/utils/svgAnalyzer.ts
 import { createHash as createHash5 } from "node:crypto";
-import { closeSync as closeSync7, constants as constants7, fstatSync as fstatSync7, openSync as openSync7, readSync as readSync5 } from "node:fs";
+import { closeSync as closeSync8, constants as constants8, fstatSync as fstatSync8, openSync as openSync8, readSync as readSync6 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -54629,7 +55059,7 @@ function parseXml(source, limits) {
       if (a.name === "xmlns") scope2.set("", a.value);
       else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
     }
-    const resolve8 = (qualified, isAttribute) => {
+    const resolve9 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
       const prefix = qualified.slice(0, colon);
@@ -54639,12 +55069,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve8(name, false);
+    const resolved = resolve9(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve8(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve9(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -55657,14 +56087,14 @@ function analyzeSvgBuffer(source) {
 function readSvgSource(path10) {
   let fd;
   try {
-    fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW | constants7.O_NONBLOCK);
+    fd = openSync8(path10, constants8.O_RDONLY | constants8.O_NOFOLLOW | constants8.O_NONBLOCK);
   } catch (error2) {
     if (error2.code === "ELOOP")
       throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
     throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const info = fstatSync7(fd);
+    const info = fstatSync8(fd);
     if (!info.isFile())
       throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
     if (info.size > SVG_LIMITS.maxSourceBytes)
@@ -55675,7 +56105,7 @@ function readSvgSource(path10) {
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {
-      const n = readSync5(fd, buffer, total, buffer.length - total, null);
+      const n = readSync6(fd, buffer, total, buffer.length - total, null);
       if (n === 0) break;
       total += n;
       if (total > SVG_LIMITS.maxSourceBytes)
@@ -55686,7 +56116,7 @@ function readSvgSource(path10) {
     }
     return buffer.subarray(0, total);
   } finally {
-    closeSync7(fd);
+    closeSync8(fd);
   }
 }
 function analyzeSvgFile(path10) {
@@ -56257,7 +56687,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname7, resolve as resolve5 } from "node:path";
+import { dirname as dirname7, resolve as resolve6 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -56280,11 +56710,11 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve5(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve6(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve5(baseDirectory, file);
+    const path10 = resolve6(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -56348,15 +56778,15 @@ import { createHash as createHash6 } from "node:crypto";
 import {
   chmodSync,
   existsSync as existsSync14,
-  mkdirSync as mkdirSync7,
+  mkdirSync as mkdirSync8,
   mkdtempSync as mkdtempSync6,
   readFileSync as readFileSync4,
-  renameSync,
+  renameSync as renameSync2,
   rmSync as rmSync6,
   writeFileSync as writeFileSync5
 } from "node:fs";
-import { homedir as homedir19, release as release3 } from "node:os";
-import { dirname as dirname8, join as join25, resolve as resolve6 } from "node:path";
+import { homedir as homedir20, release as release3 } from "node:os";
+import { dirname as dirname8, join as join26, resolve as resolve7 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PUBLIC_HELPER_PROTOCOL = 1;
 var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
@@ -56384,7 +56814,7 @@ var publicManifestSchema = external_exports.object({
 function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
+    const candidate = join26(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
         if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
@@ -56393,7 +56823,7 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
       }
     }
     const parent = dirname8(dir);
-    if (parent === dir) return resolve6(fromDir, "..");
+    if (parent === dir) return resolve7(fromDir, "..");
     dir = parent;
   }
 }
@@ -56401,7 +56831,7 @@ function defaultPublicHelperDeps(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
+    sourcePath: join26(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync14,
     readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
@@ -56412,14 +56842,14 @@ function defaultPublicHelperDeps(overrides = {}) {
 function publicHelperInstallDir(env = process.env) {
   const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
 }
 function sha256Hex(data) {
   return createHash6("sha256").update(data).digest("hex");
 }
 function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
+  const binaryPath = join26(installDir, PUBLIC_HELPER_BINARY);
   const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
   const fail = (reason, detail) => ({
     ...base,
@@ -56430,7 +56860,7 @@ function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
+  const manifestPath = join26(installDir, PUBLIC_HELPER_MANIFEST);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -56522,9 +56952,9 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     });
     const chunks = [];
     let size = 0;
-    let failure = null;
+    let failure2 = null;
     const stop = (error2) => {
-      failure ??= error2;
+      failure2 ??= error2;
       child2.kill("SIGKILL");
     };
     const timer = setTimeout(
@@ -56546,12 +56976,12 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     child2.on("error", (error2) => {
       settle();
       reject(
-        failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
       );
     });
     child2.on("close", (status, exitSignal) => {
       settle();
-      if (failure) return reject(failure);
+      if (failure2) return reject(failure2);
       if (status === null && exitSignal)
         return reject(
           new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
@@ -56669,8 +57099,8 @@ function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputP
 }
 function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const steps = [];
-  const done = (ok) => ({
-    ok,
+  const done = (ok2) => ({
+    ok: ok2,
     checkOnly,
     steps,
     installation: inspectPublicHelper(deps)
@@ -56706,12 +57136,12 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join25(installDir, ".staging-"));
+  mkdirSync8(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join26(installDir, ".staging-"));
   try {
-    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join25(staging, "source-digest.swift");
-    const plistPath = join25(staging, "Info.plist");
+    const stagedBinary = join26(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join26(staging, "source-digest.swift");
+    const plistPath = join26(staging, "Info.plist");
     writeFileSync5(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
     writeFileSync5(plistPath, publicHelperInfoPlist(), { mode: 384 });
     const compile = deps.spawn(
@@ -56774,9 +57204,9 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
       compiler
     };
     chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
+    renameSync2(stagedBinary, join26(installDir, PUBLIC_HELPER_BINARY));
     writeFileSync5(
-      join25(installDir, PUBLIC_HELPER_MANIFEST),
+      join26(installDir, PUBLIC_HELPER_MANIFEST),
       JSON.stringify(manifest, null, 2) + "\n",
       { mode: 384 }
     );
@@ -56999,11 +57429,11 @@ function getNoteDrawings(noteId3, options = {}) {
   if (!install.ready)
     throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
   const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
-  const ok = drawings.filter((d) => d.status === "ok").length;
+  const ok2 = drawings.filter((d) => d.status === "ok").length;
   return {
     id: noteId3,
     drawingCount: drawings.length,
-    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
+    status: ok2 === drawings.length ? "ok" : ok2 ? "partial" : "error",
     drawings
   };
 }
@@ -57020,8 +57450,8 @@ function formatNoteDrawings(result) {
 }
 
 // src/utils/noteAudio.ts
-import { readdirSync as readdirSync4, statSync as statSync4 } from "node:fs";
-import { join as join26 } from "node:path";
+import { readdirSync as readdirSync5, statSync as statSync4 } from "node:fs";
+import { join as join27 } from "node:path";
 var EXTRA_AUDIO_UTIS = [
   "public.mp3",
   "public.aiff-audio",
@@ -57046,7 +57476,7 @@ function accountDirsFor(containerDir, accountIdentifier) {
   if (own) return [own];
   let names;
   try {
-    names = readdirSync4(join26(containerDir, "Accounts")).sort();
+    names = readdirSync5(join27(containerDir, "Accounts")).sort();
   } catch {
     return [];
   }
@@ -57058,8 +57488,8 @@ function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_
   if (!id2 || !filename) return null;
   const generation = safeComponent(media?.generation);
   for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
-    const base = join26(dir, "Media", id2);
-    const candidates = generation ? [join26(base, generation, filename), join26(base, filename)] : [join26(base, filename)];
+    const base = join27(dir, "Media", id2);
+    const candidates = generation ? [join27(base, generation, filename), join27(base, filename)] : [join27(base, filename)];
     for (const candidate of candidates) {
       const real = realInside(candidate, dir);
       if (real && isFile2(real)) return real;
@@ -57331,21 +57761,21 @@ import { spawnSync as spawnSync5 } from "node:child_process";
 import {
   chmodSync as chmodSync2,
   existsSync as existsSync16,
-  mkdirSync as mkdirSync8,
+  mkdirSync as mkdirSync9,
   mkdtempSync as mkdtempSync7,
-  renameSync as renameSync2,
+  renameSync as renameSync3,
   rmSync as rmSync7,
   writeFileSync as writeFileSync6
 } from "node:fs";
 import { release as release4 } from "node:os";
-import { join as join28 } from "node:path";
+import { join as join29 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
 import { createHash as createHash7 } from "node:crypto";
 import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
-import { homedir as homedir20 } from "node:os";
-import { dirname as dirname9, join as join27, resolve as resolve7 } from "node:path";
+import { homedir as homedir21 } from "node:os";
+import { dirname as dirname9, join as join28, resolve as resolve8 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -57373,7 +57803,7 @@ var manifestSchema = external_exports.object({
 function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join27(dir, "package.json");
+    const candidate = join28(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
         const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
@@ -57382,7 +57812,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
       }
     }
     const parent = dirname9(dir);
-    if (parent === dir) return resolve7(fromDir, "..");
+    if (parent === dir) return resolve8(fromDir, "..");
     dir = parent;
   }
 }
@@ -57390,7 +57820,7 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join27(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join28(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
     readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync4,
@@ -57403,14 +57833,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join28(homedir21(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex2(data) {
   return createHash7("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join27(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join28(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -57428,7 +57858,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
-  const manifestPath = join27(installDir, MANIFEST_NAME);
+  const manifestPath = join28(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -57699,8 +58129,8 @@ function compileArguments(sourcePath, outputPath, sourceSha) {
 }
 function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const steps = [];
-  const done = (ok) => ({
-    ok,
+  const done = (ok2) => ({
+    ok: ok2,
     checkOnly,
     steps,
     installation: inspectInstallation(deps)
@@ -57742,10 +58172,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync8(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync7(join28(installDir, ".staging-"));
+  mkdirSync9(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync7(join29(installDir, ".staging-"));
   try {
-    const stagedBinary = join28(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join29(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -57822,8 +58252,8 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync2(stagedBinary, 448);
-    renameSync2(stagedBinary, join28(installDir, HELPER_BINARY_NAME));
-    writeFileSync6(join28(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync3(stagedBinary, join29(installDir, HELPER_BINARY_NAME));
+    writeFileSync6(join29(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
@@ -57991,6 +58421,7 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerMarkdownTemplates(server);
 registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
@@ -60808,7 +61239,7 @@ registerTool(
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
       wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
       template: external_exports.string().min(1).max(64).optional().describe(
-        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
+        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
       ),
       templateFile: exportPathInput(
         "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
@@ -60837,6 +61268,7 @@ registerTool(
     try {
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        findTemplate: (name) => TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : void 0,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024
       });

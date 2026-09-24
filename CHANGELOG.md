@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [2.9.16] - 2026-09-24
+
+### Added
+
+- Markdown template library tools: `list-markdown-templates`,
+  `show-markdown-template` (portable form, or `expanded` with every rule),
+  `validate-markdown-template` (by name, inline JSON or file; returns every
+  problem with a JSON path), `save-markdown-template` (lowercase slug names,
+  create-only unless `force`, validated first, 256 KiB cap, written to a
+  temporary file and moved into place with mode 0600 in a 0700 directory) and
+  `delete-markdown-template`. Built-in names are reserved. Listing skips
+  unreadable, invalid and symlinked entries and counts them.
+- `export-notes-markdown` `template` also accepts a saved template's name.
+- `APPLE_NOTES_MCP_TEMPLATE_DIR` sets the library directory (default
+  `~/Library/Application Support/apple-notes-mcp/templates`).
+- The capability matrix lists the library as `markdownTemplateLibrary`.
+- `validate-markdown-template` and `save-markdown-template` read
+  `templateFile` with the same rules as `export-notes-markdown` (`.json`
+  only) and return none of a file's contents when it is not a template.
+
 ## [2.9.15] - 2026-09-24
 
 ### Added
