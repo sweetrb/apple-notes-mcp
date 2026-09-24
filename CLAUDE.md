@@ -245,6 +245,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### add-attachment / create-note-with-attachment
+- `path` follows the same read scope as `create-note`'s `contentPath`: a regular file in home, temp, or `/Volumes`; hidden paths (`~/.ssh`, `~/.config`, a project `.env`) and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. Do not try to work around a refusal by copying the file; ask the user.
 - `filename` sets the name the attachment shows in Notes. It must keep the source file's extension and be a single path component.
 - macOS 27: Notes' AppleScript never lists PDF attachments. When AppleScript shows no new attachment, the tool verifies through the read-only NoteStore rows (needs Full Disk Access) and returns `verifiedBy: "database"`; without FDA a PDF attach reports "outcome uncertain", and the PDF was probably created, so read the note before retrying.
 - `create-note-with-attachment` creates the note, then attaches. If the attach step fails before the file is inserted, the error names the new note's id: call `add-attachment` on that id rather than repeating the tool, which would create a second note. If the error says the attachment outcome is uncertain (`indeterminate: true`), the file may already be attached: run `list-attachments` on that id before attaching again.

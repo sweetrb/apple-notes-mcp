@@ -5,7 +5,6 @@ import {
   fstatSync,
   mkdtempSync,
   openSync,
-  readFileSync,
   readSync,
   rmSync,
   writeFileSync,
@@ -22,6 +21,7 @@ import {
 } from "../utils/noteIdentifiers.js";
 import { classifyError, CodedError, errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
+import { readAllowedFile } from "../utils/attachmentFs.js";
 import { attachmentCoreDataId, type AttachmentAssetRecord } from "../utils/attachmentAssets.js";
 import {
   enrichNoteRead,
@@ -103,18 +103,11 @@ function assertExistingContentPreserved(before: Snapshot, after: Snapshot) {
 
 function localAttachment(path: string): Buffer {
   if (!isAbsolute(path)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  try {
-    const stat = fstatSync(descriptor);
-    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_ADD_ATTACHMENT_BYTES)
-      throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
-    const bytes = readFileSync(descriptor);
-    if (bytes.length !== stat.size)
-      throw new Error("Attachment changed while it was being read; try again");
-    return bytes;
-  } finally {
-    closeSync(descriptor);
-  }
+  // The same read scope as create-note's contentPath: home, temp or /Volumes,
+  // no hidden paths and no ~/Library outside iCloud Drive and CloudStorage, so
+  // a prompt cannot attach ~/.ssh/id_ed25519 to a synced note; O_NONBLOCK and
+  // the regular-file check keep a FIFO from blocking the server.
+  return readAllowedFile(path, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
 }
 
 /** Largest file add-attachment accepts; verification must never cap lower (#243). */
@@ -207,7 +200,13 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
   );
 
   const attachmentInput = {
-    path: z.string().min(1).max(4096).describe("Absolute path of the local file to attach"),
+    path: z
+      .string()
+      .min(1)
+      .max(4096)
+      .describe(
+        "Absolute path of the local regular file to attach, in home, temp or /Volumes; hidden paths and ~/Library (except iCloud Drive and CloudStorage) are refused"
+      ),
     filename: z
       .string()
       .min(1)
@@ -220,14 +219,14 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
 
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
 
   tool(
     "create-note-with-attachment",
-    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, with the same read scope as add-attachment (home, temp or /Volumes; no hidden paths or ~/Library outside iCloud Drive and CloudStorage), creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
     {
       title: z
         .string()

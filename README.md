@@ -2062,7 +2062,7 @@ success, with no read cap below the 64 MiB write limit.
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID |
 | `expectedContentHash` | string | Yes | `contentHash` from the note version being extended |
-| `path` | string | Yes | Absolute path of the local file; symbolic links are refused |
+| `path` | string | Yes | Absolute path of the local file. Read under the same rules as `create-note`'s [`contentPath`](#create-note): home, temp or `/Volumes` only; hidden paths (any component starting with `.`, such as `~/.ssh` or a project `.env`) and `~/Library` other than iCloud Drive (`~/Library/Mobile Documents`) and `~/Library/CloudStorage` are refused, checked again after resolving symbolic links and letter case, unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. Symbolic links and anything but a regular file (a FIFO, a device) are refused |
 | `filename` | string | No | Name the attachment gets in Notes instead of the source file's name. One path component that keeps the source file's extension, with no slash, colon, backslash, control character, leading dot or surrounding spaces. Notes names a file attachment after the file it receives, so the server gives its private temporary copy this name |
 
 **Returns:** `attachmentId`, `bytes`, the `name` Notes reports, and the new
@@ -2093,7 +2093,7 @@ same verification as [`add-attachment`](#add-attachment).
 | `content` | string | No | Plain-text body placed above the attachment |
 | `folder` | string | No | Existing folder or nested path; create it first with [`create-folder`](#create-folder) |
 | `account` | string | No | Account name; defaults to Notes.app's default account |
-| `path` | string | Yes | Absolute path of the local file (at most 64 MiB) |
+| `path` | string | Yes | Absolute path of the local file (at most 64 MiB), under the same read rules as `add-attachment`; a refused path creates no note |
 | `filename` | string | No | Attachment name override, as in `add-attachment` |
 
 ```json
@@ -2775,7 +2775,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_BACKGROUND_SHORTCUT` | `Apple Notes MCP - Background Operations v5` | Name or UUID of the installed Background Operations bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_MARKDOWN_SHORTCUT` | `Apple Notes MCP - Create Markdown Note` | Name or UUID of the installed Create Markdown Note bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_PASTEBOARD_NAME` | unset | Testing only: makes [`add-attachment-from-pasteboard`](#add-attachment-from-pasteboard) read a private named pasteboard instead of the general clipboard. |
-| `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note) inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
+| `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), and [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
 ### Configuration file (when the host strips `env`)

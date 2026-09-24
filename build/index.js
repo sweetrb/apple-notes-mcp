@@ -41474,8 +41474,11 @@ function privateContentReason(p, roots) {
   return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
 }
 var CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
-function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1") {
-  const abs = assertReadableInRoots(p, roots);
+function readAllowedFile(p, maxBytes, options = {}) {
+  const roots = options.roots ?? allowedSaveRoots();
+  const allowPrivate = options.allowPrivate ?? process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1";
+  const label = options.label ?? "Content file";
+  const abs = assertReadableInRoots(p, roots, label);
   const assertNotPrivate = (candidate, candidateRoots) => {
     if (allowPrivate) return;
     const reason = privateContentReason(candidate, candidateRoots);
@@ -41496,12 +41499,12 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPriva
   }
   try {
     const stat = fstatSync(descriptor);
-    if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
+    if (!stat.isFile()) throw new Error(`${label} is not a regular file: "${abs}"`);
     let after;
     try {
       after = canonicalize(abs);
     } catch {
-      throw new Error(`Content file changed while it was being opened; try again: "${abs}"`);
+      throw new Error(`${label} changed while it was being opened; try again: "${abs}"`);
     }
     if (!isWithinRoots(after, canonicalRoots(roots)))
       throw new Error(
@@ -41510,20 +41513,24 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPriva
     assertNotPrivate(after, canonicalRoots(roots));
     const named = statSync(after);
     if (named.dev !== stat.dev || named.ino !== stat.ino)
-      throw new Error(`Content file changed while it was being opened; try again: "${abs}"`);
-    if (stat.size === 0) throw new Error(`Content file is empty: "${abs}"`);
+      throw new Error(`${label} changed while it was being opened; try again: "${abs}"`);
+    if (stat.size === 0) throw new Error(`${label} is empty: "${abs}"`);
     if (stat.size > maxBytes)
-      throw new Error(`Content file is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
+      throw new Error(`${label} is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
     const bytes = readFileSync(descriptor);
     if (bytes.length !== stat.size)
-      throw new Error("Content file changed while it was being read; try again");
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
-    } catch {
-      throw new Error(`Content file is not valid UTF-8 text: "${abs}"`);
-    }
+      throw new Error(`${label} changed while it was being read; try again`);
+    return bytes;
   } finally {
     closeSync(descriptor);
+  }
+}
+function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1") {
+  const bytes = readAllowedFile(p, maxBytes, { roots, allowPrivate });
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+  } catch {
+    throw new Error(`Content file is not valid UTF-8 text: "${resolve(p)}"`);
   }
 }
 function cleanupTempDir(dir) {
@@ -53258,7 +53265,6 @@ import {
   fstatSync as fstatSync7,
   mkdtempSync as mkdtempSync6,
   openSync as openSync7,
-  readFileSync as readFileSync4,
   readSync as readSync5,
   rmSync as rmSync6,
   writeFileSync as writeFileSync5
@@ -53538,18 +53544,7 @@ function assertExistingContentPreserved(before, after) {
 }
 function localAttachment(path10) {
   if (!isAbsolute4(path10)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
-  try {
-    const stat = fstatSync7(descriptor);
-    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_ADD_ATTACHMENT_BYTES)
-      throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
-    const bytes = readFileSync4(descriptor);
-    if (bytes.length !== stat.size)
-      throw new Error("Attachment changed while it was being read; try again");
-    return bytes;
-  } finally {
-    closeSync7(descriptor);
-  }
+  return readAllowedFile(path10, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
 }
 var MAX_ADD_ATTACHMENT_BYTES = 64 * 1024 * 1024;
 function fileMatches(path10, size, expected) {
@@ -53623,20 +53618,22 @@ function registerDirectOperations(server2, manager) {
     })
   );
   const attachmentInput = {
-    path: external_exports.string().min(1).max(4096).describe("Absolute path of the local file to attach"),
+    path: external_exports.string().min(1).max(4096).describe(
+      "Absolute path of the local regular file to attach, in home, temp or /Volumes; hidden paths and ~/Library (except iCloud Drive and CloudStorage) are refused"
+    ),
     filename: external_exports.string().min(1).max(255).optional().describe(
       "Name the attachment gets in Notes instead of the source file's name. One path component with the source file's extension; no slash, colon, or control characters, and no leading dot."
     )
   };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
   tool(
     "create-note-with-attachment",
-    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, with the same read scope as add-attachment (home, temp or /Volumes; no hidden paths or ~/Library outside iCloud Drive and CloudStorage), creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
     {
       title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
       content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
@@ -57408,7 +57405,7 @@ import {
   existsSync as existsSync14,
   mkdirSync as mkdirSync8,
   mkdtempSync as mkdtempSync7,
-  readFileSync as readFileSync5,
+  readFileSync as readFileSync4,
   renameSync as renameSync2,
   rmSync as rmSync7,
   writeFileSync as writeFileSync6
@@ -57445,7 +57442,7 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
     const candidate = join27(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
-        if (JSON.parse(readFileSync5(candidate, "utf8")).name === "apple-notes-mcp")
+        if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
           return dir;
       } catch {
       }
@@ -57461,7 +57458,7 @@ function defaultPublicHelperDeps(overrides = {}) {
     platform: process.platform,
     sourcePath: join27(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync14,
-    readFile: (path10) => readFileSync5(path10),
+    readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
     spawnAsync: spawn,
     ...overrides
@@ -58401,7 +58398,7 @@ import { join as join30 } from "node:path";
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
 import { createHash as createHash7 } from "node:crypto";
-import { existsSync as existsSync15, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
 import { homedir as homedir21 } from "node:os";
 import { dirname as dirname9, join as join29, resolve as resolve8 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
@@ -58434,7 +58431,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
     const candidate = join29(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync6(candidate, "utf8"));
+        const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
         if (pkg.name === "apple-notes-mcp") return dir;
       } catch {
       }
@@ -58450,7 +58447,7 @@ function defaultDeps2(overrides = {}) {
     platform: process.platform,
     sourcePath: join29(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
-    readFile: (path10) => readFileSync6(path10),
+    readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync4,
     ...overrides
   };

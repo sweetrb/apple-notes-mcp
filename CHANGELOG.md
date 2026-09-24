@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.9.26] - 2026-09-24
+
+### Security
+
+- `add-attachment` and `create-note-with-attachment` now read their `path`
+  under the same scope `create-note`'s `contentPath` got in 2.9.24: a regular
+  file in home, temp or `/Volumes`, with hidden paths (`~/.ssh`, `~/.config`, a
+  project `.env`) and `~/Library` outside iCloud Drive and
+  `~/Library/CloudStorage` refused, checked on the literal path and again after
+  realpath, so a symlinked directory, a letter-case variant (`~/library`) or a
+  `/Volumes` alias cannot slip past. Before, both tools opened any absolute
+  path, so a prompt could attach `~/.ssh/id_ed25519` to a note that syncs to
+  iCloud (the same class as #195), and a FIFO blocked the server on open; the
+  file is now opened with `O_NONBLOCK` and must be a regular file.
+  `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` covers both tools as well as
+  `contentPath`. Both paths now share one helper, `readAllowedFile` in
+  `src/utils/attachmentFs.ts`. Found while reviewing @oliverames's #256.
+
 ## [2.9.25] - 2026-09-24
 
 ### Fixed
