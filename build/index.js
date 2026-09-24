@@ -48765,15 +48765,26 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   const segments = (path10) => JSON.stringify(splitFolderPath(path10).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
-    const accounts = manager.listAccounts().filter((account) => account.defaultFolder);
-    if (!accounts.some(
-      (account) => manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
-    ))
+    const accounts = manager.listAccounts().filter(
+      (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+    );
+    if (!accounts.length)
       throw new Error(
         `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
       );
-    for (const account of accounts)
-      manager.assertNotSmartFolderDestination(request.folder, account.name);
+    let smartRefusal;
+    const ordinary = accounts.filter((account) => {
+      try {
+        manager.assertNotSmartFolderDestination(request.folder, account.name);
+        return true;
+      } catch (error2) {
+        if (!(error2 instanceof CodedError && error2.envelope.reason === "smart_folder_destination"))
+          throw error2;
+        smartRefusal ??= error2;
+        return false;
+      }
+    });
+    if (!ordinary.length) throw smartRefusal;
   }
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(

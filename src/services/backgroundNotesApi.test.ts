@@ -395,6 +395,52 @@ describe("create-note Markdown bridge (#172)", () => {
     expect(manager.moveNoteById).not.toHaveBeenCalled();
   });
 
+  it("ignores a same-named smart folder in another account (#245)", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    manager.listAccounts.mockReturnValue([
+      { name: "iCloud", defaultFolder: "Notes" },
+      { name: "Exchange", defaultFolder: "Inbox" },
+    ]);
+    manager.assertNotSmartFolderDestination.mockImplementation(
+      (folder: string, account: string) => {
+        if (account === "Exchange") throw smartFolderDestinationError(folder);
+      }
+    );
+    // The Exchange default folder gains nothing; iCloud gains the new note.
+    let iCloudListings = 0;
+    manager.listNoteRefs.mockImplementation(((account: string) =>
+      (account === "Exchange" ? [] : iCloudListings++ === 0 ? [existing] : [existing, created]).map(
+        (id) => ({ id, title: "Plan" })
+      )) as never);
+    expect(
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals\n### Detail\n- one",
+        folder: "Work",
+      })
+    ).toMatchObject({ ok: true, id: created, account: "iCloud" });
+    expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
+  });
+
+  it("still refuses when the folder is a smart folder in every account that has it", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    manager.listAccounts.mockReturnValue([
+      { name: "iCloud", defaultFolder: "Notes" },
+      { name: "Exchange", defaultFolder: "Inbox" },
+    ]);
+    manager.assertNotSmartFolderDestination.mockImplementation((folder: string) => {
+      throw smartFolderDestinationError(folder);
+    });
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals",
+        folder: "Work",
+      })
+    ).toThrow(/^Refused: "Work" is a smart folder/);
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
+
   it("escapes Markdown punctuation so the title stays literal", () => {
     const title = "1. Q4 *plan* #work";
     const manager = markdownManager(
