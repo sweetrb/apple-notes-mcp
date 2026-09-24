@@ -2,6 +2,9 @@
 
 ## [2.9.27] - 2026-09-24
 
+Data-correctness fixes across reads, counts, guards and exports, contributed by
+@oliverames in #258.
+
 ### Fixed
 
 - `get-note-blocks` no longer reports the empty line before a checklist item

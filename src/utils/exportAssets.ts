@@ -478,16 +478,16 @@ export interface AssetWriter {
   readonly count: number;
 }
 
-/**
- * Copies assets into one directory, create-only. A name already taken gets a
- * `-2`, `-3`, ... suffix; the same source placed twice reuses its copy. URLs
- * are relative to `linkBase` when given, otherwise the absolute copy path.
- */
 /** Message for an assets directory that could not be created. */
 export function directoryFailure(dir: string, error: unknown): string {
   return `Could not create the assets directory ${dir}: ${error instanceof Error ? error.message : String(error)}`;
 }
 
+/**
+ * Copies assets into one directory, create-only. A name already taken gets a
+ * `-2`, `-3`, ... suffix; the same source placed twice reuses its copy. URLs
+ * are relative to `linkBase` when given, otherwise the absolute copy path.
+ */
 export class SidecarWriter implements AssetWriter {
   private readonly placed = new Map<string, { url: string; mime: string }>();
   private created = false;
