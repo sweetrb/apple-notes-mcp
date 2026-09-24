@@ -43,6 +43,7 @@ import {
   signedVarint,
   type WireField,
 } from "./protobuf.js";
+import { checklistRunLineStart } from "./checklistRuns.js";
 
 /** Paragraph style names. `unknown` carries the raw number in `styleType`. */
 export type BlockStyle =
@@ -229,7 +230,9 @@ export const isSafeLink = (url: string): boolean =>
   /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) &&
   !Array.from(url).some((char) => char.charCodeAt(0) < 32);
 
-const utf8 = new TextDecoder();
+// ignoreBOM keeps a leading U+FEFF in the text, so its length still matches
+// the attribute runs (Notes counts it as a character).
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 const first = (fields: WireField[], n: number) => fields.find((f) => f.fieldNumber === n);
 const varintOf = (fields: WireField[], n: number): number | undefined => {
   const f = first(fields, n);
@@ -418,8 +421,18 @@ export function decodeNoteBlocks(data: Uint8Array): NoteBlocksDocument {
       runIndex++;
     // Paragraph attributes come from the run covering the paragraph's first
     // character (the newline itself for an empty paragraph). In the verified
-    // library every run of a paragraph carried the same visual style.
-    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
+    // library every run of a paragraph carried the same visual style. A
+    // checklist run that starts on an empty paragraph's newline belongs to the
+    // next line (the macOS 27.2 "\nItem" layout, see checklistRunLineStart);
+    // Notes renders the empty paragraph as plain body text, so it must not
+    // become a second block with the same checklist item.
+    const covering = runs[runIndex];
+    const attrs = !covering
+      ? DEFAULT_PARAGRAPH
+      : covering.paragraph.styleType === 103 &&
+          checklistRunLineStart(text, covering.start, covering.length) > paragraphStart
+        ? DEFAULT_PARAGRAPH
+        : covering.paragraph;
     const style: BlockStyle =
       attrs.styleType === null ? "body" : (STYLE_NAMES[attrs.styleType] ?? "unknown");
     const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";

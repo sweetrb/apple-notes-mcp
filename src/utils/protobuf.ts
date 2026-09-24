@@ -162,7 +162,9 @@ export function bytesValue(field: ProtoField | undefined): Uint8Array | undefine
 export function stringValue(field: ProtoField | undefined): string | undefined {
   const bytes = bytesValue(field);
   if (!bytes) return undefined;
-  return new TextDecoder().decode(bytes);
+  // ignoreBOM: a leading U+FEFF is note text, not a byte-order mark to strip;
+  // stripping it would shift every attribute-run offset by one.
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
 }
 
 /**

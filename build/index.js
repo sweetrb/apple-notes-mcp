@@ -39353,7 +39353,7 @@ function bytesValue(field) {
 function stringValue(field) {
   const bytes = bytesValue(field);
   if (!bytes) return void 0;
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
 }
 function embeddedMessage(field) {
   const bytes = bytesValue(field);
@@ -45982,7 +45982,7 @@ var HIGHLIGHTS = {
 var KNOWN_RUN_FIELDS = /* @__PURE__ */ new Set([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 14]);
 var KNOWN_PARAGRAPH_FIELDS = /* @__PURE__ */ new Set([1, 2, 4, 5, 8, 9]);
 var isSafeLink = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
-var utf8 = new TextDecoder();
+var utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 var first = (fields, n) => fields.find((f) => f.fieldNumber === n);
 var varintOf = (fields, n) => {
   const f = first(fields, n);
@@ -46131,7 +46131,8 @@ function decodeNoteBlocks(data) {
     const end = newline === -1 ? text2.length : newline;
     while (runIndex < runs.length - 1 && runs[runIndex].start + runs[runIndex].length <= paragraphStart)
       runIndex++;
-    const attrs = runs[runIndex]?.paragraph ?? DEFAULT_PARAGRAPH;
+    const covering = runs[runIndex];
+    const attrs = !covering ? DEFAULT_PARAGRAPH : covering.paragraph.styleType === 103 && checklistRunLineStart(text2, covering.start, covering.length) > paragraphStart ? DEFAULT_PARAGRAPH : covering.paragraph;
     const style = attrs.styleType === null ? "body" : STYLE_NAMES[attrs.styleType] ?? "unknown";
     const alignment = ALIGNMENTS[attrs.alignmentValue] ?? "unknown";
     const block = {

@@ -201,6 +201,32 @@ describe("decodeNoteBlocks", () => {
     expect(decoded.blocks[2].runs).toEqual([{ start: 4, length: 2, text: "cd" }]);
   });
 
+  it("does not give a newline-led checklist run's item to the empty paragraph before it", () => {
+    // macOS 27.2 appends a checklist item as a run that starts on the previous
+    // line's newline ("\nItem"); here that newline ends an empty paragraph.
+    const item = para(n(1, 103), b(5, Buffer.concat([b(1, uuid(7)), n(2, 0)])));
+    const decoded = decodeNoteBlocks(doc("Title\n\nItem", [run(6), run(5, item)]));
+    expect(decoded.blocks.map((block) => [block.text, block.style])).toEqual([
+      ["Title", "body"],
+      ["", "body"],
+      ["Item", "checklist"],
+    ]);
+    expect(decoded.blocks[1].checklist).toBeUndefined();
+    expect(decoded.blocks[2].checklist).toEqual({ id: "07".repeat(16), done: false });
+    expect(decoded.summary.checklist).toEqual({ total: 1, done: 0 });
+  });
+
+  it("keeps a leading U+FEFF so run lengths still match the text", () => {
+    const decoded = decodeNoteBlocks(doc("\ufeffab", [run(1), run(2, n(5, 1))]));
+    expect(decoded.textLength).toBe(3);
+    expect(decoded.text).toBe("\ufeffab");
+    expect(decoded.blocks[0].runs.map((r) => [r.text, r.bold ?? false])).toEqual([
+      ["\ufeff", false],
+      ["ab", true],
+    ]);
+    expect(parseRichNote(doc("\ufeffab", [run(1), run(2, n(5, 1))])).text).toBe("\ufeffab");
+  });
+
   it("counts UTF-16 code units the way Notes does", () => {
     const text = "😀x\ny";
     const decoded = decodeNoteBlocks(doc(text, [run(2, n(5, 1)), run(3)]));
