@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   evaluateNoteQuery,
+  evaluateNoteQueryTruth,
   needsContent,
   needsTags,
   normalizeForMatch,
@@ -453,13 +454,25 @@ describe("evaluateNoteQuery", () => {
       expect(matches("pinned folder:finance locked", locked)).toBe(true);
     });
 
-    it("never match a body predicate, so its negation matches", () => {
+    it("never match a body predicate, negated or not", () => {
       expect(matches("body:budget", locked)).toBe(false);
       expect(matches("has:link", locked)).toBe(false);
       expect(matches("checklist:open", locked)).toBe(false);
       expect(matches("words:>=0", locked)).toBe(false);
       expect(matches("tag:x", locked)).toBe(false);
-      expect(matches("-body:budget", locked)).toBe(true);
+      // The body is unknown, so its negation is unknown too (#182).
+      expect(matches("-body:budget", locked)).toBe(false);
+      expect(matches("-has:attachment", locked)).toBe(false);
+      expect(matches("NOT tag:y", locked)).toBe(false);
+      expect(matches("-checklist:open", locked)).toBe(false);
+      expect(matches("-(body:x OR has:link)", locked)).toBe(false);
+    });
+
+    it("let a definite metadata branch decide an unknown body predicate", () => {
+      expect(matches("-body:x OR pinned", locked)).toBe(true);
+      expect(matches("-body:x AND -pinned", locked)).toBe(false);
+      expect(matches("-(body:x AND -pinned)", locked)).toBe(true);
+      expect(evaluateNoteQueryTruth(parseNoteQuery("-body:x"), makeNote(locked))).toBeNull();
     });
   });
 

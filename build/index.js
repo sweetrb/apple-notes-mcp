@@ -47329,20 +47329,36 @@ function cheapFirst(children) {
   }
   return ordered;
 }
-function evaluateNoteQuery(node, note) {
+function evaluateNoteQueryTruth(node, note) {
   switch (node.type) {
-    case "and":
-      return cheapFirst(node.children).every((child2) => evaluateNoteQuery(child2, note));
-    case "or":
-      return cheapFirst(node.children).some((child2) => evaluateNoteQuery(child2, note));
-    case "not":
-      return !evaluateNoteQuery(node.child, note);
+    case "and": {
+      let unknown2 = false;
+      for (const child2 of cheapFirst(node.children)) {
+        const value = evaluateNoteQueryTruth(child2, note);
+        if (value === false) return false;
+        if (value === null) unknown2 = true;
+      }
+      return unknown2 ? null : true;
+    }
+    case "or": {
+      let unknown2 = false;
+      for (const child2 of cheapFirst(node.children)) {
+        const value = evaluateNoteQueryTruth(child2, note);
+        if (value === true) return true;
+        if (value === null) unknown2 = true;
+      }
+      return unknown2 ? null : false;
+    }
+    case "not": {
+      const value = evaluateNoteQueryTruth(node.child, note);
+      return value === null ? null : !value;
+    }
     case "text": {
       const needle = normalizeForMatch(node.value);
       if (node.field === "title") return note.titleLower.includes(needle);
       if (node.field === "any" && note.titleLower.includes(needle)) return true;
       const content = note.content();
-      if (!content) return false;
+      if (!content) return null;
       return (node.field === "body" ? content.bodyLower : content.textLower).includes(needle);
     }
     case "folder":
@@ -47355,20 +47371,26 @@ function evaluateNoteQuery(node, note) {
       return compareDate(node.field === "created" ? note.created : note.modified, node);
     case "tag": {
       const content = note.content();
-      return Boolean(content?.tags.includes(normalizeForMatch(node.value)));
+      return content ? content.tags.includes(normalizeForMatch(node.value)) : null;
     }
-    case "has":
-      return Boolean(note.content()?.facets.has(node.facet));
+    case "has": {
+      const content = note.content();
+      return content ? content.facets.has(node.facet) : null;
+    }
     case "checklist": {
       const content = note.content();
-      if (!content || content.checklist.total === 0) return false;
+      if (!content) return null;
+      if (content.checklist.total === 0) return false;
       return node.state === "open" ? content.checklist.open > 0 : content.checklist.open === 0;
     }
     case "words": {
       const content = note.content();
-      return content ? compare(content.words, node.op, node.value) : false;
+      return content ? compare(content.words, node.op, node.value) : null;
     }
   }
+}
+function evaluateNoteQuery(node, note) {
+  return evaluateNoteQueryTruth(node, note) === true;
 }
 function positiveTextPredicates(node, negated = false) {
   switch (node.type) {
@@ -59252,7 +59274,7 @@ ${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
 registerTool(
   "query-notes",
   {
-    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates (including negated ones such as -body:x) never match them.',
     inputSchema: {
       query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
         'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
@@ -59305,7 +59327,7 @@ registerTool(
     }
     if (result.unreadable > 0) {
       notes.push(
-        `\u26A0\uFE0F ${result.unreadable} note bodies could not be decoded, so body predicates did not match them.`
+        `\u26A0\uFE0F ${result.unreadable} note bodies could not be decoded, so body predicates (including negated ones) did not match them.`
       );
     }
     const footer = notes.length ? `

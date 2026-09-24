@@ -525,8 +525,10 @@ and 64 levels of nesting. An unknown field such as `titel:x` is an error rather
 than a silent text search; quote it to search the literal text.
 
 Password-protected notes match on title and metadata only. Their bodies are
-encrypted, so body predicates never match them, and `-body:x` therefore does.
-Their snippets are always empty.
+encrypted, so a body predicate is unknown for them rather than false: neither
+`body:x` nor `-body:x` matches them, though `-body:x OR pinned` matches a
+pinned one. Notes whose body cannot be decoded are treated the same way. Their
+snippets are always empty.
 
 **Example - Open to-dos in a folder:**
 ```json

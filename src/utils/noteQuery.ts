@@ -536,21 +536,50 @@ function cheapFirst(children: QueryNode[]): QueryNode[] {
   return ordered;
 }
 
-/** Tests one note against a parsed query. */
-export function evaluateNoteQuery(node: QueryNode, note: QueryableNote): boolean {
+/**
+ * Result of testing one note against a query node: `null` means unknown, which
+ * is what a body predicate yields for a note whose body cannot be read (locked
+ * or undecodable).
+ */
+export type QueryTruth = boolean | null;
+
+/**
+ * Tests one note against a parsed query with three-valued (Kleene) logic, so a
+ * body predicate on an unreadable note stays unknown under NOT: `-body:x` does
+ * not match a note whose body could not be read, any more than `body:x` does.
+ * AND is false if any child is false, OR is true if any child is true, and
+ * otherwise an unknown child makes the result unknown.
+ */
+export function evaluateNoteQueryTruth(node: QueryNode, note: QueryableNote): QueryTruth {
   switch (node.type) {
-    case "and":
-      return cheapFirst(node.children).every((child) => evaluateNoteQuery(child, note));
-    case "or":
-      return cheapFirst(node.children).some((child) => evaluateNoteQuery(child, note));
-    case "not":
-      return !evaluateNoteQuery(node.child, note);
+    case "and": {
+      let unknown = false;
+      for (const child of cheapFirst(node.children)) {
+        const value = evaluateNoteQueryTruth(child, note);
+        if (value === false) return false;
+        if (value === null) unknown = true;
+      }
+      return unknown ? null : true;
+    }
+    case "or": {
+      let unknown = false;
+      for (const child of cheapFirst(node.children)) {
+        const value = evaluateNoteQueryTruth(child, note);
+        if (value === true) return true;
+        if (value === null) unknown = true;
+      }
+      return unknown ? null : false;
+    }
+    case "not": {
+      const value = evaluateNoteQueryTruth(node.child, note);
+      return value === null ? null : !value;
+    }
     case "text": {
       const needle = normalizeForMatch(node.value);
       if (node.field === "title") return note.titleLower.includes(needle);
       if (node.field === "any" && note.titleLower.includes(needle)) return true;
       const content = note.content();
-      if (!content) return false;
+      if (!content) return null;
       return (node.field === "body" ? content.bodyLower : content.textLower).includes(needle);
     }
     case "folder":
@@ -563,20 +592,32 @@ export function evaluateNoteQuery(node: QueryNode, note: QueryableNote): boolean
       return compareDate(node.field === "created" ? note.created : note.modified, node);
     case "tag": {
       const content = note.content();
-      return Boolean(content?.tags.includes(normalizeForMatch(node.value)));
+      return content ? content.tags.includes(normalizeForMatch(node.value)) : null;
     }
-    case "has":
-      return Boolean(note.content()?.facets.has(node.facet));
+    case "has": {
+      const content = note.content();
+      return content ? content.facets.has(node.facet) : null;
+    }
     case "checklist": {
       const content = note.content();
-      if (!content || content.checklist.total === 0) return false;
+      if (!content) return null;
+      if (content.checklist.total === 0) return false;
       return node.state === "open" ? content.checklist.open > 0 : content.checklist.open === 0;
     }
     case "words": {
       const content = note.content();
-      return content ? compare(content.words, node.op, node.value) : false;
+      return content ? compare(content.words, node.op, node.value) : null;
     }
   }
+}
+
+/**
+ * Tests one note against a parsed query. A note matches only when the query is
+ * definitely true for it; an unknown result (a body predicate on a locked or
+ * undecodable note, negated or not) does not match.
+ */
+export function evaluateNoteQuery(node: QueryNode, note: QueryableNote): boolean {
+  return evaluateNoteQueryTruth(node, note) === true;
 }
 
 /** One positive text predicate: the phrase and the part of the note it targets. */

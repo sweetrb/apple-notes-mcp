@@ -1073,7 +1073,7 @@ registerTool(
       'Syntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\n' +
       "Returns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\n" +
       "Do not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\n" +
-      "Safety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.",
+      "Safety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates (including negated ones such as -body:x) never match them.",
     inputSchema: {
       query: z
         .string()
@@ -1153,7 +1153,7 @@ registerTool(
     }
     if (result.unreadable > 0) {
       notes.push(
-        `⚠️ ${result.unreadable} note bodies could not be decoded, so body predicates did not match them.`
+        `⚠️ ${result.unreadable} note bodies could not be decoded, so body predicates (including negated ones) did not match them.`
       );
     }
     const footer = notes.length ? `\n\n${notes.join("\n")}` : "";

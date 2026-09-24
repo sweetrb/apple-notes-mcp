@@ -366,11 +366,14 @@ describe("queryNotes against a fixture NoteStore", () => {
     expect(locked).toMatchObject({ locked: true, snippet: "" });
   });
 
-  it("matches bare words in title or body, and locked notes by title only", () => {
+  it("matches bare words in title or body, and locked or undecodable notes by title only", () => {
     expect(pks("budget")).toEqual([103, 100]);
     expect(pks("body:budget")).toEqual([100]);
     expect(pks("title:budget")).toEqual([103]);
-    expect(pks("-body:budget folder:work")).toEqual([103, 107]);
+    // 103 is locked and 107 undecodable: their bodies are unknown, so a
+    // negated body predicate does not match them either (#182).
+    expect(pks("-body:budget folder:work")).toEqual([]);
+    expect(pks("-body:budget folder:work OR title:budget")).toEqual([103]);
   });
 
   it("includes deleted and folderless notes only on request", () => {

@@ -202,7 +202,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Syntax: bare words / `"phrases"`; `title:`, `body:`, `text:`, `folder:`, `account:`, `tag:`; `has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`; `checklist:open|done`; `pinned`, `locked`, `shared`; `words:>250`; `created:>=2026-07-01`, `modified:<2026-09-01`. AND is implicit; `OR`, `NOT`, leading `-`, and parentheses work. Quote an operator word to search it literally
 - Scans the 500 most recently modified notes by default (`scanLimit` up to 5000). When `scanTruncated` is true, older notes were not examined — raise `scanLimit` before concluding a note does not exist
 - Excludes Recently Deleted and folderless notes unless `includeDeleted: true`
-- Locked notes match on title and metadata only; body predicates never match them
+- Locked notes match on title and metadata only; body predicates never match them, negated or not (`-body:x` does not match a locked or undecodable note)
 - Each hit has `matchedIn` (where the positive text terms occur: `title`, `body`, or both) when the query has a text term and the body is readable; a `title:` term only counts toward the title and a `body:` term only toward the body. An empty list means the note matched through a non-text branch (`pinned OR x`)
 - `includeWordCount: true` adds `wordCount`, the same count `words:` filters on (null = locked or unreadable). A metadata-only query reads just the returned notes' bodies in one extra query
 - Result ids chain directly into `get-note-content` and every other id-based tool
