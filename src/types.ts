@@ -337,6 +337,13 @@ export interface AppleScriptOptions {
    * - Attempt 3: 2s delay
    */
   retryDelayMs?: number;
+
+  /**
+   * Largest osascript output, in bytes, this call accepts. Defaults to
+   * APPLE_NOTES_MCP_MAX_BUFFER or 64 MB. Note body reads raise it, because a
+   * body carries its inline images as base64 and grows with them (#237).
+   */
+  maxBufferBytes?: number;
 }
 
 /**

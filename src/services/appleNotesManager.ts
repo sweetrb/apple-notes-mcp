@@ -38,11 +38,13 @@ import type {
   NoteTablesResult,
   SmartFolder,
   DeleteGuardNote,
+  AppleScriptResult,
 } from "@/types.js";
 import {
   BULK_LIST_MUTATION_ERROR,
   executeAppleScript,
   isPermissionDenied,
+  noteBodyMaxBuffer,
 } from "@/utils/applescript.js";
 import { getChecklistItems, type ChecklistItem } from "@/utils/checklistParser.js";
 import { stripLargeInlineImages } from "@/utils/inlineImages.js";
@@ -81,8 +83,8 @@ import {
   scopeConflictMessage,
   type ScopeGuard,
 } from "@/utils/scopeGuard.js";
-import { existsSync } from "fs";
-import { homedir } from "os";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { homedir, tmpdir } from "os";
 import { join } from "path";
 import TurndownService from "turndown";
 
@@ -924,6 +926,52 @@ function buildAppLevelScript(command: string): string {
 }
 
 /**
+ * Longest expected body a guarded write embeds in its AppleScript as a string
+ * literal. A note's body carries its inline images as base64, so a note with
+ * one large image can hold a body of tens or hundreds of megabytes (#237).
+ */
+const INLINE_EXPECTED_BODY_LIMIT = MAX_CONTENT_LENGTH;
+
+/**
+ * Supplies the body a guarded write compares a note against. A body within
+ * INLINE_EXPECTED_BODY_LIMIT becomes a string literal; a longer one is written
+ * to a private temporary file (mode 0600 in a fresh mkdtemp directory) that
+ * the script reads, so the comparison still covers the whole body. Call
+ * `cleanup()` once the script has run.
+ */
+export class ExpectedBodies {
+  private directory: string | undefined;
+  private files = 0;
+
+  /**
+   * Returns AppleScript `setup` to run before the comparison (empty for a
+   * literal) and the `operand` to compare the note's body against.
+   * `variable` names the AppleScript variable a file-backed body is read into.
+   */
+  bind(body: string, variable: string): { setup: string; operand: string } {
+    if (body.length <= INLINE_EXPECTED_BODY_LIMIT) {
+      return { setup: "", operand: `"${escapeHtmlForAppleScript(body)}"` };
+    }
+    this.directory ??= mkdtempSync(join(tmpdir(), "apple-notes-expected-body-"));
+    const file = join(this.directory, `body-${this.files++}.html`);
+    writeFileSync(file, body, { encoding: "utf8", mode: 0o600 });
+    // `read` runs in osascript, not in sandboxed Notes.app, and «class utf8»
+    // decodes the file exactly as it was written.
+    return {
+      setup: `
+      tell current application to set ${variable} to read (POSIX file "${escapePlainStringForAppleScript(file)}") as «class utf8»`,
+      operand: variable,
+    };
+  }
+
+  /** Removes any temporary files. Safe to call more than once. */
+  cleanup(): void {
+    if (this.directory) rmSync(this.directory, { recursive: true, force: true });
+    this.directory = undefined;
+  }
+}
+
+/**
  * AppleScript (inside `tell application "Notes"`) that binds the facts guarded
  * folder deletion checks: `f`, `folderName`, `parentId` ("" at an account
  * root), `acctId`, `defaultId`, `sharedAny` (folder or any ancestor shared),
@@ -1466,7 +1514,7 @@ export class AppleNotesManager {
     // Retrieve the body property of the note
     const getCommand = `get body of note "${safeTitle}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
@@ -1508,7 +1556,9 @@ export class AppleNotesManager {
     // Note IDs work at the application level, not scoped to account
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
-    const result = executeAppleScript(script);
+    // A body carries its inline images as base64, so it can far exceed the
+    // general output cap (#237).
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
 
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id}":`, result.error);
@@ -1789,8 +1839,6 @@ export class AppleNotesManager {
     | { status: "guard-conflict"; index: number }
     | { status: "guard-inactive"; index: number; reason: string } {
     const safeId = sanitizeNoteId(id);
-    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
-    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     // Deleting a note that is already in Recently Deleted removes it for good,
     // so the script refuses one whose folder is Recently Deleted (#198). The
     // folder is read from Notes.app in the same script, not from the database,
@@ -1810,24 +1858,29 @@ export class AppleNotesManager {
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
     // was not moved to Recently Deleted and must not be reported as deleted.
+    //
+    // A body too long for a script literal (a note with large inline images) is
+    // compared against a private temporary file instead, still in full (#237).
     const trashIds = trashFolderIdList();
-    const guardChecks = guards
-      .map((guard, index) => {
-        const safeGuardId = sanitizeNoteId(guard.id);
-        const ref = `__guardRef${index}`;
-        const folderVar = `__guardFolder${index}`;
-        const inactive = (reason: string) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
-        let bodyCheck = "";
-        if (guard.expectedBody !== undefined) {
-          validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
-          const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
-          bodyCheck = `
+    const bodies = new ExpectedBodies();
+    let result: AppleScriptResult;
+    try {
+      const guardChecks = guards
+        .map((guard, index) => {
+          const safeGuardId = sanitizeNoteId(guard.id);
+          const ref = `__guardRef${index}`;
+          const folderVar = `__guardFolder${index}`;
+          const inactive = (reason: string) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+          let bodyCheck = "";
+          if (guard.expectedBody !== undefined) {
+            const expected = bodies.bind(guard.expectedBody, `__expectedGuardBody${index}`);
+            bodyCheck = `${expected.setup}
       set __guardBody to body of ${ref}
       considering case
-        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+        if __guardBody is not ${expected.operand} and __guardBody is not ${expected.operand} & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
       end considering`;
-        }
-        return `
+          }
+          return `
       if not (exists note id "${safeGuardId}") then ${inactive("missing")}
       set ${ref} to note id "${safeGuardId}"
       if password protected of ${ref} then ${inactive("locked")}
@@ -1837,19 +1890,20 @@ export class AppleNotesManager {
       end try
       if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
       if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
-      })
-      .join("");
-    const script = buildAppLevelScript(`
+        })
+        .join("");
+      const expected = bodies.bind(expectedBody, "__expectedBody");
+      const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
       if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}${expected.setup}
       set currentBody to body of noteRef
       considering case
-        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
       try
@@ -1857,7 +1911,10 @@ export class AppleNotesManager {
       end try
       return "SAFETY_DELETED"
     `);
-    const result = executeMutationAppleScript(script);
+      result = executeMutationAppleScript(script);
+    } finally {
+      bodies.cleanup();
+    }
 
     if (!result.success) {
       console.error(`Failed guarded delete for note ID "${id}":`, result.error);
