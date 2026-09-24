@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.23] - 2026-09-24
+## [2.9.26] - 2026-09-24
 
 ### Fixed
 
@@ -73,6 +73,13 @@
   `not_found` (#194).
 - `executeAppleScript` with `maxRetries: 0` threw "Cannot read properties of
   null". Zero now means one attempt.
+
+## [2.9.23] - 2026-09-24
+
+### Documentation
+
+- The README's Author section now has a Contributors list crediting
+  Oliver Ames (@oliverames) for his many merged pull requests and bug reports.
 
 ## [2.9.22] - 2026-09-24
 
