@@ -1,5 +1,84 @@
 ## [Unreleased]
 
+## [2.9.24] - 2026-09-24
+
+### Fixed
+
+- `get-note-blocks` no longer reports the empty line before a checklist item
+  appended on macOS 27.2 as a second checklist block with the same item id
+  (#192). That item's run starts on the preceding newline; the empty line now
+  follows the same first-non-newline rule the checklist readers use. Note text
+  that starts with U+FEFF is no longer cut by one character when decoded, which
+  made every run length overflow and failed the read with `invalid-runs`.
+- `query-notes`: a body predicate on a locked or undecodable note is now
+  unknown rather than false, so its negation (`-body:x`, `-has:attachment`,
+  `NOT tag:y`) no longer matches that note either (#182). A definite metadata
+  branch still decides, so `-body:x OR pinned` matches a pinned locked note.
+- `get-note-tables` reads the tables of a note that also holds a `tel:` or
+  `sms:` link (#193). It used the strict rich-text read that write guards need,
+  which refuses those schemes; tables never feed a rewrite, so that read now
+  leaves such links out instead.
+- `rename-folder` `expectedParentId` and `delete-folder-by-id`
+  `expectedAccountId` accept a Notes UUID or numeric key, like the other folder
+  and account inputs (#190), so `list-folders`' `parentIdentifier` works there.
+- `transcribe-note-audio` (#231): a speech-model download with
+  `downloadAssets: true` now counts against the take's deadline, so the helper
+  answers before the server stops waiting and a long download no longer turns
+  a take into `indeterminate`. The response is fitted to the size limit
+  measuring both copies of the transcript (text and structured content), and
+  `responseOversized: true` says when the transcripts had to be dropped. Before
+  macOS 26, Speech Recognition access that was never requested now returns
+  `permission_not_requested` instead of advice to allow an app that System
+  Settings does not list yet.
+- `get-note-drawings` (#230): ink removed with the pixel eraser no longer comes
+  back; a partly erased stroke is returned as its visible pieces
+  (`masked: true`) and `hiddenStrokeCount` counts fully erased strokes. A
+  drawing with no strokes no longer fails with `encode_failed` (its bounds are
+  zeros), and the helper exits non-zero whenever it writes that fallback error.
+  A stroke cut by the point limit now reports the points returned and
+  `pointsTruncated: true`. Past the response limit, points and then SVG are
+  dropped from the decoded result (`svgOmitted`) without running the helper
+  again, and a result that still does not fit is an error.
+- `list-note-links` no longer fails with a TypeError, or reports a negative
+  `notesWithoutBody`, when a note enters the scope between its note read and
+  its body reads (#217).
+- Folder scope guards: a `forbiddenAncestorFolderIds` entry that matches no
+  folder now fails the guard instead of passing every write, and scope ids are
+  compared in the spelling Notes returns, so a zero-padded key cannot slip
+  past (#215). `delete-note` compares a guard note with the target in
+  canonical form and the delete script refuses a guard whose live id is the
+  target's, so no spelling of the same note can guard its own delete (#214).
+- `export-notes-markdown` and `export-notes-html` (#209, #210): a folder export
+  cut at `limit` now says so with `truncated: true`. An assets directory that
+  cannot be created fails the export with `[invalid-path]` instead of marking
+  every attachment unavailable in a successful export. An unreferenced file or
+  PDF with no preview image no longer throws a TypeError in HTML export.
+- Verification no longer throws on a numeric reference past U+10FFFF
+  (`&#1114112;`, `&#x110000;`), which turned a committed write into an error;
+  such a reference decodes to U+FFFD as in HTML (#211).
+- Attachments (#202, #203): `list-paper-attachments` sets
+  `fallbackImageStale` and `export-paper-image` sets `stale` when Notes'
+  recorded rendering is missing and an older one was used. `export-attachments`
+  reports Notes' own renderings (a drawing's PNG, a scan's PDF) as
+  `exportedKind: "fallback"` with that format's extension instead of an
+  `"asset"` under the stored filename, marks attachments the body no longer
+  shows with `inBody: false`, and no longer exports the children of a container
+  Notes has deleted.
+- When stdin closes while a request is still being handled (for example
+  `transcribe-note-audio`), the server now answers it before exiting, waiting
+  up to 30 seconds, instead of exiting as soon as stdout drains (#186).
+- Word counts (`wordCount`, `words:`, `list-recent-notes` `wordCounts`, and
+  transcription word counts) split Chinese, Japanese, Thai, Lao, Khmer and
+  Myanmar text at word boundaries instead of counting each unspaced run as one
+  word (#244). `body:` and `matchedIn` now share one definition of the body.
+- `create-note` with Markdown no longer refuses a valid folder because another
+  account has a smart folder with the same path (#245). It refuses only when
+  the path is a smart folder in every account that has it; the move still
+  refuses a smart folder in the account the note landed in.
+- `add-attachment-from-pasteboard` refuses several copied images or PDFs
+  (`multiple_items`) instead of attaching only the first, and takes the PDF
+  when a copy offers both a PDF and a raster preview of it (#238).
+
 ## [2.9.23] - 2026-09-24
 
 ### Documentation
