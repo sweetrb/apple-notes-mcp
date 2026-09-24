@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.9.12] - 2026-09-24
+
 ### Fixed
 
 - Smart folders are refused as destinations. AppleScript resolves a smart
