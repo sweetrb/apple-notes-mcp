@@ -77,7 +77,7 @@ Use this skill when the user:
 | Tool                          | Purpose                                                                                                                                             |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list-attachments`            | List attachments in a note; `includePaths` adds on-disk `assetPaths`/`previewPath`, `firstImage` returns the lead visual in body order              |
-| `add-attachment`              | Attach one local file to an exact note (optional `filename` renames it in Notes)                                                                    |
+| `add-attachment`              | Attach one local file to an exact note (`filename` renames it); a macOS 27 PDF "outcome uncertain": read the note before retrying                   |
 | `create-note-with-attachment` | Create a note and attach one local file in one call; on a failed attach, reuse the named note id with `add-attachment`                              |
 | `save-attachment`             | Save an attachment to disk                                                                                                                          |
 | `list-paper-attachments`      | List Paper and classic drawings in a note, with Notes' rendered image size and any recognized handwriting text                                      |
@@ -91,6 +91,7 @@ Use this skill when the user:
 | `create-checklist-items`      | Append several unchecked native checklist items in order (needs the Background Operations bridge; on `ok: false`, only `landed` items are verified) |
 | `get-note-metadata`           | [BETA] Read pinned/trash/snippet metadata from the NoteStore DB                                                                                     |
 | `get-note-drawings`           | Decode classic PencilKit drawings to strokes or SVG (needs `apple-notes-mcp setup --public-helper` once)                                            |
+| `transcribe-note-audio`       | Transcribe a note's voice recordings on-device (same helper; pass `locale`, and `attachmentId` for long recordings)                                 |
 | `get-note-blocks`             | Read a note's paragraph styles, inline formatting, and attachment positions as typed blocks                                                         |
 | `list-note-paragraphs`        | List a note's paragraphs with style, stored paragraph ID, and a direct link when the ID is unique                                                   |
 | `get-paragraph-link`          | Get a link that opens Notes at one paragraph, refused when its ID is shared                                                                         |
@@ -383,6 +384,7 @@ Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
 - **Slow Notes.app**: `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` accept `timeoutSeconds` (1–120) for each automation step of that call. A timed-out write is uncertain; read the exact note before retrying
+- **Read times out on a note with a large image**: Notes.app returns images inside the body as base64, so a multi-megabyte image can outlast the read timeout, which also blocks `delete-note`. The error names the large attachments when Full Disk Access is granted. Retry `get-note-content` (and then `delete-note`) with a larger `timeoutSeconds`; if it still fails, have the user remove the image or delete the note in Notes.app
 - **"Notes.app accepted the delete, but the note is still in its original folder"**: nothing was deleted. Read the note again before retrying
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
 - **Attachment-risk update**: The mutation is rejected. Use Notes.app or create a separate note.

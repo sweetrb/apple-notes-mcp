@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join27(output, replacement);
+        return join28(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join27(output, rule.append(self.options));
+          output = join28(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join27(output, replacement) {
+    function join28(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -42933,15 +42933,27 @@ var AppleNotesManager = class {
    * @returns HTML content of the note, or empty string if not found
    */
   getNoteContentById(id2) {
+    return this.readNoteBodyById(id2).body;
+  }
+  /**
+   * Like {@link getNoteContentById}, but keeps the automation error so a
+   * caller can explain a failed read (for example a timeout on a note whose
+   * body carries a very large inline image, #237) instead of reporting a bare
+   * failure.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The HTML body, or an empty body plus the error that stopped the read
+   */
+  readNoteBodyById(id2) {
     const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id2}":`, result.error);
-      return "";
+      return { body: "", error: result.error };
     }
-    return result.output;
+    return { body: result.output };
   }
   /**
    * Retrieves the plain-text content of a note by its exact title.
@@ -49671,6 +49683,37 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
   };
 }
 
+// src/utils/bodyReadFailure.ts
+var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+function classifyBodyReadError(error2) {
+  if (!error2) return "other";
+  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
+  return "other";
+}
+function formatBytes2(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} bytes`;
+}
+function largeAttachments(attachments, threshold = LARGE_ATTACHMENT_BYTES) {
+  const flat = attachments.flatMap((a) => [a, ...a.children ?? []]);
+  return flat.filter((a) => typeof a.fileSize === "number" && a.fileSize >= threshold).map((a) => ({ name: a.filename || a.title || "attachment", bytes: a.fileSize })).sort((a, b) => b.bytes - a.bytes);
+}
+function describeBodyReadFailure(title, error2, attachments) {
+  const base = `Failed to read content of note "${title}"${error2 ? `: ${error2}` : ""}`;
+  const kind = classifyBodyReadError(error2);
+  if (kind === "other") return base;
+  const large = attachments ? largeAttachments(attachments) : [];
+  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
+    "; "
+  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  return `${base}
+
+${cause} ${remedy}`;
+}
+
 // src/utils/noteLinkInventory.ts
 import { dirname as dirname5 } from "node:path";
 var BODY_BATCH = 100;
@@ -51541,7 +51584,7 @@ function registerDirectOperations(server2, manager) {
   };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
@@ -51612,6 +51655,56 @@ function attachmentName(path10, filename) {
     );
   return filename;
 }
+var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
+var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+var sha256 = (data) => createHash2("sha256").update(data).digest("hex");
+function storedAttachmentIds(manager, id2) {
+  try {
+    return new Set(
+      manager.getAttachmentAssetsById(id2).attachments.filter((item) => item.parentIdentifier === null).map((item) => item.identifier.toLowerCase())
+    );
+  } catch {
+    return null;
+  }
+}
+function storedInsertion(manager, id2, before, bytes, returnedId) {
+  let added = [];
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) pause(250);
+    try {
+      added = manager.getAttachmentAssetsById(id2).attachments.filter(
+        (item) => item.parentIdentifier === null && !before.has(item.identifier.toLowerCase())
+      );
+    } catch {
+      added = [];
+    }
+    if (added.length === 1 && added[0].assetPaths.length > 0) break;
+  }
+  if (added.length === 0) return null;
+  if (added.length > 1) throw new Error(UNCERTAIN);
+  const row = added[0];
+  const attachmentId = attachmentCoreDataId(id2, row.pk);
+  if (returnedId && /\/ICAttachment\/p\d+$/.test(returnedId) && returnedId !== attachmentId)
+    throw new Error(UNCERTAIN);
+  const expected = sha256(bytes);
+  const matches = row.assetPaths.some((path10) => {
+    let descriptor;
+    try {
+      descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+      const stat = fstatSync5(descriptor);
+      return stat.isFile() && stat.size === bytes.length && sha256(readFileSync3(descriptor)) === expected;
+    } catch {
+      return false;
+    } finally {
+      if (descriptor !== void 0) closeSync5(descriptor);
+    }
+  });
+  if (!matches)
+    throw new Error(
+      `Notes' database shows new attachment ${attachmentId} on this note, but its file bytes could not be verified; read the exact note and do not attach the file again`
+    );
+  return { attachmentId, name: row.filename };
+}
 function attachFile(manager, args) {
   const { id: id2, expectedContentHash, path: path10 } = args;
   const name = attachmentName(path10, args.filename);
@@ -51619,6 +51712,7 @@ function attachFile(manager, args) {
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
+  const beforeStored = storedAttachmentIds(manager, id2);
   const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
   const temporaryFile = join22(directory, name);
   try {
@@ -51638,27 +51732,39 @@ function attachFile(manager, args) {
     );
     let inserted = readInserted();
     for (let attempt = 0; attempt < 4 && (inserted.length !== 1 || returnedId && returnedId !== inserted[0].id); attempt++) {
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      pause(250);
       inserted = readInserted();
     }
     const persistentReturnedId = returnedId && /\/ICAttachment\/p\d+$/.test(returnedId);
-    if (inserted.length !== 1 || persistentReturnedId && returnedId !== inserted[0].id)
-      throw new Error(
-        "Attachment insertion outcome uncertain; read the exact note before retrying"
-      );
-    const attachmentId = inserted[0].id;
-    const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
-    const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
-    if (!actual || createHash2("sha256").update(actual).digest("hex") !== createHash2("sha256").update(bytes).digest("hex"))
-      throw new Error("Attachment bytes were not verified; read the exact note before retrying");
-    const nameVerified = inserted[0].name === name;
+    let attachmentId;
+    let reportedName;
+    let verifiedBy = "applescript";
+    if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
+      attachmentId = inserted[0].id;
+      reportedName = inserted[0].name;
+      const fetched = manager.getAttachmentBase64ById(id2, attachmentId);
+      const actual = typeof fetched.base64 === "string" ? Buffer.from(fetched.base64, "base64") : null;
+      if (!actual || sha256(actual) !== sha256(bytes))
+        throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+    } else {
+      const stored = inserted.length === 0 && beforeStored ? storedInsertion(manager, id2, beforeStored, bytes, returnedId) : null;
+      if (!stored)
+        throw new Error(
+          inserted.length === 0 && !beforeStored ? `${UNCERTAIN}. Notes' AppleScript does not list some attachments (PDFs on macOS 27); grant Full Disk Access so the server can verify through the Notes database` : UNCERTAIN
+        );
+      attachmentId = stored.attachmentId;
+      reportedName = stored.name;
+      verifiedBy = "database";
+    }
+    const nameVerified = reportedName === name;
     return {
       ok: true,
       id: id2,
       attachmentId,
       contentHash: after.hash,
       bytes: bytes.length,
-      name: inserted[0].name,
+      name: reportedName,
+      ...verifiedBy === "database" ? { verifiedBy } : {},
       ...args.filename === void 0 ? {} : {
         filenameVerified: nameVerified,
         ...nameVerified ? {} : {
@@ -53080,7 +53186,7 @@ function canonicalJson(value) {
     return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(",")}}`;
   return JSON.stringify(value);
 }
-function sha256(text2) {
+function sha2562(text2) {
   return createHash4("sha256").update(text2).digest("hex");
 }
 var round = (v, digits) => {
@@ -53920,7 +54026,7 @@ function analysisFor(source, analyzer, viewport) {
   const classification = !importable || requiredLosses.includes("drop-content") ? "unsupported" : requiredLosses.length ? "lossy" : "safe";
   const analysis = {
     analyzer: SVG_ANALYZER_VERSION,
-    source: { sha256: sha256(source), bytes: source.length },
+    source: { sha256: sha2562(source), bytes: source.length },
     classification,
     importable,
     defaultWriteAllowed: importable && classification === "safe",
@@ -53941,7 +54047,7 @@ function analysisFor(source, analyzer, viewport) {
     issues: analyzer.issues,
     issuesTruncated: analyzer.issuesTruncated
   };
-  const analysisDigest = "sha256:" + sha256(canonicalJson({ analysis, drawing }));
+  const analysisDigest = "sha256:" + sha2562(canonicalJson({ analysis, drawing }));
   return { analysis: { ...analysis, analysisDigest }, drawing };
 }
 function analyzeSvgBuffer(source) {
@@ -54654,7 +54760,7 @@ function formatShortcutSetup(report) {
 }
 
 // src/services/publicHelper.ts
-import { spawnSync as spawnSync3 } from "node:child_process";
+import { spawn, spawnSync as spawnSync3 } from "node:child_process";
 import { createHash as createHash5 } from "node:crypto";
 import {
   chmodSync,
@@ -54676,7 +54782,11 @@ var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
 var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
 var PUBLIC_HELPER_MANIFEST = "manifest.json";
 var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
-var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set(["hello", "decode_drawing"]);
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "decode_drawing",
+  "transcribe"
+]);
 var DEFAULT_TIMEOUT_MS2 = 3e4;
 var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 var publicManifestSchema = external_exports.object({
@@ -54712,6 +54822,7 @@ function defaultPublicHelperDeps(overrides = {}) {
     exists: existsSync14,
     readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
+    spawnAsync: spawn,
     ...overrides
   };
 }
@@ -54776,10 +54887,14 @@ var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
   "helper_modified",
   "helper_manifest_invalid"
 ]);
+var ENVELOPE_CODES = {
+  invalid_request: "validation_error",
+  attachment_not_found: "not_found"
+};
 var PublicHelperError = class extends CodedError {
   constructor(code, message) {
     super(message, {
-      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES[code] ?? "operation_failed",
       helperCode: code
     });
     this.code = code;
@@ -54795,21 +54910,9 @@ var publicHelloSchema = external_exports.object({
   actions: external_exports.array(external_exports.string())
 }).passthrough();
 function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  if (!PUBLIC_HELPER_ACTIONS.has(action))
-    throw new PublicHelperError(
-      "unknown_action",
-      `"${action}" is not an action the server sends to the public helper.`
-    );
-  let binaryPath = options.binaryPath;
-  if (!binaryPath) {
-    const install = inspectPublicHelper(deps);
-    if (!install.ready)
-      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-    binaryPath = install.binaryPath;
-  }
-  const timeout = Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || options.timeoutMs || DEFAULT_TIMEOUT_MS2;
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
   const result = deps.spawn(binaryPath, [], {
-    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    input,
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
@@ -54823,24 +54926,100 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
       "helper_unreachable",
       `Could not run the helper: ${result.error.message}`
     );
+  return parseHelperOutput(result.status, String(result.stdout ?? ""));
+}
+async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const { signal } = options;
+  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
+  if (signal?.aborted) throw aborted2();
+  return new Promise((resolvePromise, reject) => {
+    const child = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+      stdio: ["pipe", "pipe", "ignore"]
+    });
+    const chunks = [];
+    let size = 0;
+    let failure = null;
+    const stop = (error2) => {
+      failure ??= error2;
+      child.kill("SIGKILL");
+    };
+    const timer = setTimeout(
+      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
+      timeout
+    );
+    const onAbort = () => stop(aborted2());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    child.stdout?.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES)
+        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
+      else chunks.push(chunk);
+    });
+    child.on("error", (error2) => {
+      settle();
+      reject(
+        failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+      );
+    });
+    child.on("close", (status, exitSignal) => {
+      settle();
+      if (failure) return reject(failure);
+      if (status === null && exitSignal)
+        return reject(
+          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
+        );
+      try {
+        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
+      } catch (error2) {
+        reject(error2);
+      }
+    });
+    child.stdin?.on("error", () => {
+    });
+    child.stdin?.end(input);
+  });
+}
+function prepareCall(action, fields, deps, options) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
+  return { binaryPath, timeout, input };
+}
+function parseHelperOutput(status, stdout) {
   let parsed;
   try {
-    parsed = JSON.parse(String(result.stdout ?? "").trim());
+    parsed = JSON.parse(stdout.trim());
   } catch {
     throw new PublicHelperError(
       "invalid_response",
-      `The helper exited with status ${result.status} and no JSON response.`
+      `The helper exited with status ${status} and no JSON response.`
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
     throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
   const object3 = parsed;
-  if (result.status !== 0 || object3.status !== "ok") {
+  if (status !== 0 || object3.status !== "ok") {
     const error2 = errorSchema.safeParse(object3);
     if (!error2.success)
       throw new PublicHelperError(
         "invalid_response",
-        `The helper failed with an unrecognized response (exit ${result.status}).`
+        `The helper failed with an unrecognized response (exit ${status}).`
       );
     throw new PublicHelperError(error2.data.code, error2.data.message);
   }
@@ -54887,6 +55066,10 @@ function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputP
     "AppKit",
     "-framework",
     "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
     "-Xlinker",
     "-sectcreate",
     "-Xlinker",
@@ -55253,6 +55436,313 @@ function formatNoteDrawings(result) {
   return lines.join("\n");
 }
 
+// src/utils/noteAudio.ts
+import { readdirSync as readdirSync4, statSync as statSync4 } from "node:fs";
+import { join as join25 } from "node:path";
+var EXTRA_AUDIO_UTIS = [
+  "public.mp3",
+  "public.aiff-audio",
+  "public.aifc-audio",
+  "com.microsoft.waveform-audio"
+];
+function audioRowsSql(columns, generationColumn) {
+  const generation = generationColumn ? `m.${generationColumn}` : "NULL";
+  const media = (alias) => `json((SELECT json_object('identifier', m.ZIDENTIFIER, 'generation', ${generation}, 'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
+  const live = (alias) => notTombstonedSql(columns, alias);
+  const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
+  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const account = accountCols.length ? `SELECT (SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = ${entity("ICAccount")} AND acc.Z_PK IN (${accountCols.map((c) => `n.${c}`).join(", ")}) LIMIT 1) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;` : "SELECT NULL;";
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'duration', a.ZDURATION, 'media', ${media("a")}, 'children', json((SELECT json_group_array(json_object('pk', c.Z_PK, 'identifier', c.ZIDENTIFIER, 'duration', c.ZDURATION, 'media', ${media("c")})) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT k WHERE k.ZPARENTATTACHMENT = a.Z_PK AND ${live("k")} ORDER BY k.Z_PK) c)))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT t WHERE t.ZNOTE = @pk AND t.ZPARENTATTACHMENT IS NULL AND ${live("t")} AND (t.ZTYPEUTI LIKE '%audio%' OR t.ZTYPEUTI IN (${utis})) ORDER BY t.Z_PK) a;`,
+    account
+  ].join("\n");
+}
+function accountDirsFor(containerDir, accountIdentifier) {
+  const own = resolveAccountDir(containerDir, accountIdentifier);
+  if (own) return [own];
+  let names;
+  try {
+    names = readdirSync4(join25(containerDir, "Accounts")).sort();
+  } catch {
+    return [];
+  }
+  return names.map((name) => safeComponent(name) ? resolveAccountDir(containerDir, name) : null).filter((dir) => dir !== null);
+}
+function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_CONTAINER_DIR) {
+  const id2 = safeComponent(media?.identifier);
+  const filename = safeComponent(media?.filename);
+  if (!id2 || !filename) return null;
+  const generation = safeComponent(media?.generation);
+  for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
+    const base = join25(dir, "Media", id2);
+    const candidates = generation ? [join25(base, generation, filename), join25(base, filename)] : [join25(base, filename)];
+    for (const candidate of candidates) {
+      const real = realInside(candidate, dir);
+      if (real && isFile2(real)) return real;
+    }
+  }
+  return null;
+}
+function isFile2(path10) {
+  try {
+    return statSync4(path10).isFile();
+  } catch {
+    return false;
+  }
+}
+var positive = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+function readAudioAssets(noteId3, options = {}) {
+  const { store, pk } = parseNoteId2(noteId3);
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const columns = readColumns(dbPath2);
+  const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
+  if (missing.length)
+    throw new NoteStoreError(
+      `This macOS version's Notes database lacks ${missing.join(", ")}; audio files cannot be located.`,
+      "schema"
+    );
+  const generation = columns.has("ZGENERATION1") ? "ZGENERATION1" : columns.has("ZGENERATION") ? "ZGENERATION" : null;
+  const [stateLine, rowsLine, accountLine] = queryNoteScoped(
+    audioRowsSql(columns, generation),
+    pk,
+    dbPath2
+  );
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  const account = accountLine?.trim() || null;
+  const attachmentId = (rowPk) => `x-coredata://${store}/ICAttachment/p${rowPk}`;
+  return rows.map((row) => {
+    const sources = row.children?.length ? row.children : [{ pk: row.pk, identifier: row.identifier, duration: row.duration, media: row.media }];
+    const takes = sources.map((take) => ({
+      attachmentId: attachmentId(take.pk),
+      identifier: take.identifier ?? "",
+      durationSeconds: positive(take.duration),
+      path: resolveMediaPath(take.media, account, options.containerDir)
+    }));
+    const total = takes.reduce((sum, t) => sum + (t.durationSeconds ?? 0), 0);
+    return {
+      pk: row.pk,
+      attachmentId: attachmentId(row.pk),
+      identifier: row.identifier ?? "",
+      typeUti: row.uti,
+      durationSeconds: positive(row.duration) ?? positive(total),
+      takes
+    };
+  });
+}
+function countWords2(text2) {
+  return text2.split(/\s+/u).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+// src/services/noteTranscription.ts
+var DEFAULT_TRANSCRIPTION_LOCALE = "en-US";
+var LOCALE_PATTERN = /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8}){0,3}$/;
+var TRANSCRIBE_MAX_SECONDS = { default: 900, min: 30, max: 3600 };
+function takeDeadlineSeconds(durationSeconds) {
+  const duration3 = durationSeconds ?? 600;
+  return Math.min(1800, Math.max(60, Math.ceil(duration3 * 1.5) + 60));
+}
+var KILL_GRACE_MS = 3e4;
+var BUDGET_MARGIN_MS = 1e4;
+var MIN_TAKE_SECONDS = 5;
+var CALL_WIDE_CODES = /* @__PURE__ */ new Set([
+  "permission_required",
+  "asset_unavailable",
+  "unsupported_locale",
+  "speech_unavailable"
+]);
+var helperTranscriptSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  transcript: external_exports.string(),
+  complete: external_exports.boolean(),
+  stopReason: external_exports.string().optional(),
+  engine: external_exports.string().optional(),
+  durationSeconds: external_exports.number().optional()
+});
+async function transcribeTake(take, ctx) {
+  const base = {
+    attachmentId: take.attachmentId,
+    identifier: take.identifier,
+    status: "error",
+    ...take.durationSeconds !== null ? { durationSeconds: Math.round(take.durationSeconds) } : {}
+  };
+  const failed = (code, message) => ({
+    take: { ...base, code, message },
+    text: ""
+  });
+  if (!take.path)
+    return failed(
+      "asset_unavailable",
+      "The audio file is not on this Mac (it may not have downloaded from iCloud yet)."
+    );
+  if (ctx.callWide) return failed(ctx.callWide.code, ctx.callWide.message);
+  const remainingMs = ctx.deadlineAt - ctx.now();
+  const deadline = Math.min(
+    takeDeadlineSeconds(take.durationSeconds),
+    Math.floor((remainingMs - BUDGET_MARGIN_MS) / 1e3)
+  );
+  if (deadline < MIN_TAKE_SECONDS)
+    return failed(
+      "time_limit",
+      `Not started: the call's ${ctx.maxSeconds}-second limit was reached. Transcribe this recording on its own with attachmentId, or raise maxSeconds.`
+    );
+  let raw;
+  try {
+    raw = await callPublicHelperAsync(
+      "transcribe",
+      {
+        path: take.path,
+        locale: ctx.locale,
+        timeoutSeconds: deadline,
+        downloadAssets: ctx.downloadAssets
+      },
+      ctx.deps,
+      { timeoutMs: Math.min(deadline * 1e3 + KILL_GRACE_MS, remainingMs), signal: ctx.signal }
+    );
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    if (code === "aborted") throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (CALL_WIDE_CODES.has(code)) ctx.callWide = { code, message };
+    return {
+      take: {
+        ...base,
+        // A timeout means the helper was killed mid-run: the outcome is unknown.
+        status: code === "timeout" ? "indeterminate" : "error",
+        code,
+        message
+      },
+      text: ""
+    };
+  }
+  const parsed = helperTranscriptSchema.safeParse(raw);
+  if (!parsed.success) return failed("invalid_response", "Unexpected helper response.");
+  const { transcript, complete, stopReason, engine, durationSeconds } = parsed.data;
+  const text2 = transcript.trim();
+  return {
+    take: {
+      ...base,
+      status: complete ? "ok" : text2 ? "partial" : "indeterminate",
+      ...complete ? {} : { code: "incomplete", message: stopReason ?? "stopped early" },
+      ...durationSeconds !== void 0 ? { durationSeconds } : {},
+      wordCount: countWords2(text2),
+      ...engine ? { engine } : {}
+    },
+    text: text2
+  };
+}
+function combineStatus(parts) {
+  if (parts.length && parts.every((p) => p.status === "ok")) return "ok";
+  if (parts.some((p) => p.hasText)) return "partial";
+  if (parts.some((p) => p.status === "indeterminate")) return "indeterminate";
+  return "error";
+}
+async function transcribeRecording(asset, includeText, ctx) {
+  const outcomes = [];
+  for (const take of asset.takes) outcomes.push(await transcribeTake(take, ctx));
+  const transcript = outcomes.map((o) => o.text).filter(Boolean).join("\n\n");
+  const status = combineStatus(
+    outcomes.map((o) => ({ status: o.take.status, hasText: o.text.length > 0 }))
+  );
+  const firstProblem = outcomes.find((o) => o.take.status !== "ok")?.take;
+  return {
+    attachmentId: asset.attachmentId,
+    identifier: asset.identifier,
+    typeUti: asset.typeUti,
+    status,
+    ...status !== "ok" && firstProblem?.code ? { code: firstProblem.code, message: firstProblem.message } : {},
+    ...asset.durationSeconds !== null ? { durationSeconds: Math.round(asset.durationSeconds) } : {},
+    wordCount: countWords2(transcript),
+    ...includeText ? { transcript } : {},
+    takes: outcomes.map((o) => o.take)
+  };
+}
+async function transcribeNoteAudio(noteId3, options = {}) {
+  const locale = options.locale ?? DEFAULT_TRANSCRIPTION_LOCALE;
+  if (!LOCALE_PATTERN.test(locale))
+    throw new PublicHelperError("invalid_request", `"${locale}" is not a BCP-47 locale.`);
+  const maxSeconds = options.maxSeconds ?? TRANSCRIBE_MAX_SECONDS.default;
+  if (!Number.isInteger(maxSeconds) || maxSeconds < TRANSCRIBE_MAX_SECONDS.min || maxSeconds > TRANSCRIBE_MAX_SECONDS.max)
+    throw new PublicHelperError(
+      "invalid_request",
+      `maxSeconds must be a whole number from ${TRANSCRIBE_MAX_SECONDS.min} to ${TRANSCRIBE_MAX_SECONDS.max}.`
+    );
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  let assets = (options.readAssets ?? ((id2) => readAudioAssets(id2)))(noteId3);
+  if (options.attachmentId) {
+    assets = assets.filter((a) => a.attachmentId === options.attachmentId);
+    if (assets.length === 0)
+      throw new PublicHelperError(
+        "attachment_not_found",
+        `No audio attachment ${options.attachmentId} in note ${noteId3}.`
+      );
+  }
+  const empty = { id: noteId3, locale, recordingCount: 0, recordings: [] };
+  if (assets.length === 0) return { ...empty, status: "none" };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const now = options.now ?? Date.now;
+  const ctx = {
+    locale,
+    downloadAssets: options.downloadAssets ?? false,
+    deps,
+    signal: options.signal,
+    now,
+    deadlineAt: now() + maxSeconds * 1e3,
+    maxSeconds,
+    callWide: null
+  };
+  const recordings = [];
+  for (const asset of assets)
+    recordings.push(await transcribeRecording(asset, options.includeText ?? true, ctx));
+  return {
+    ...empty,
+    status: combineStatus(
+      recordings.map((r) => ({ status: r.status, hasText: (r.wordCount ?? 0) > 0 }))
+    ),
+    recordingCount: recordings.length,
+    recordings
+  };
+}
+function fitTranscriptions(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
+  if (measure(result) <= maxBytes) return result;
+  let next = result;
+  for (let share = 0.5; measure(next) > maxBytes && share > 1e-4; share /= 2) {
+    next = {
+      ...result,
+      recordings: result.recordings.map(
+        (r) => r.transcript ? {
+          ...r,
+          transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
+          transcriptTruncated: true
+        } : r
+      )
+    };
+  }
+  return next;
+}
+function formatTranscription(result) {
+  if (result.recordingCount === 0) return `No audio attachments in note ${result.id}.`;
+  const lines = [
+    `${result.recordingCount} audio attachment${result.recordingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}, locale ${result.locale}):`
+  ];
+  result.recordings.forEach((r, i) => {
+    const facts = [
+      `status ${r.status}`,
+      ...r.durationSeconds !== void 0 ? [`${r.durationSeconds} s`] : [],
+      `${r.wordCount ?? 0} words`,
+      ...r.takes.length > 1 ? [`${r.takes.length} takes`] : [],
+      ...r.code ? [`${r.code}: ${r.message}`] : []
+    ];
+    lines.push("", `[${i + 1}] ${r.attachmentId} (${facts.join(", ")})`);
+    if (r.transcript)
+      lines.push(r.transcriptTruncated ? `${r.transcript} [truncated]` : r.transcript);
+  });
+  return lines.join("\n");
+}
+
 // src/services/privateHelperBuild.ts
 import { spawnSync as spawnSync5 } from "node:child_process";
 import {
@@ -55265,14 +55755,14 @@ import {
   writeFileSync as writeFileSync5
 } from "node:fs";
 import { release as release4 } from "node:os";
-import { join as join26 } from "node:path";
+import { join as join27 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
 import { createHash as createHash6 } from "node:crypto";
 import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
 import { homedir as homedir20 } from "node:os";
-import { dirname as dirname9, join as join25, resolve as resolve6 } from "node:path";
+import { dirname as dirname9, join as join26, resolve as resolve6 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -55300,7 +55790,7 @@ var manifestSchema = external_exports.object({
 function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
+    const candidate = join26(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
         const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
@@ -55317,7 +55807,7 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join26(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
     readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync4,
@@ -55330,14 +55820,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex2(data) {
   return createHash6("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join25(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join26(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -55355,7 +55845,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
-  const manifestPath = join25(installDir, MANIFEST_NAME);
+  const manifestPath = join26(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -55670,9 +56160,9 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
   mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join26(installDir, ".staging-"));
+  const staging = mkdtempSync6(join27(installDir, ".staging-"));
   try {
-    const stagedBinary = join26(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join27(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -55749,8 +56239,8 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync2(stagedBinary, 448);
-    renameSync2(stagedBinary, join26(installDir, HELPER_BINARY_NAME));
-    writeFileSync5(join26(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync2(stagedBinary, join27(installDir, HELPER_BINARY_NAME));
+    writeFileSync5(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
@@ -55944,6 +56434,16 @@ function withErrorHandling(handler, errorPrefix) {
     }
   };
 }
+function withAsyncErrorHandling(handler, errorPrefix) {
+  return async (params, extra) => {
+    try {
+      return await handler(params, extra?.signal);
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : "Unknown error";
+      return errorResponse(`${errorPrefix}: ${message}`, error2);
+    }
+  };
+}
 var MAX = {
   TITLE: 2e3,
   CONTENT: 5 * 1024 * 1024,
@@ -56027,10 +56527,24 @@ function readExactNoteSnapshot(id2) {
       error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`
     };
   }
-  const body = notesManager.getNoteContentById(id2);
-  if (!body) return { error: `Failed to read content of note "${note.title}"` };
+  const { body, error: error2 } = notesManager.readNoteBodyById(id2);
+  if (!body) {
+    const reason = bodyReadFailureMessage(id2, note.title, error2);
+    return { error: `${reason}${error2 ? "\n\nNothing was changed." : ""}` };
+  }
   const rich = enrichNoteRead(id2, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
+}
+function bodyReadFailureMessage(id2, title, error2) {
+  let attachments;
+  if (classifyBodyReadError(error2) !== "other") {
+    try {
+      attachments = readNoteStructure(id2, { includeText: false }).attachments;
+    } catch {
+      attachments = void 0;
+    }
+  }
+  return describeBodyReadFailure(title, error2, attachments);
 }
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 function containerUnknownMessage(title) {
@@ -56445,13 +56959,14 @@ ${lines}${footer}`,
 registerTool(
   "get-note-content",
   {
-    description: "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
+    description: "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app. Notes.app returns images inside the body as base64, so a note with a very large image can time out; the error then names the cause, and a larger timeoutSeconds gives the read more time.",
     inputSchema: {
       id: looseNoteId(external_exports.string()).optional().describe(`Note ID (preferred - more reliable than title): ${NOTE_ID_FORMS}`),
       title: external_exports.string().max(MAX.TITLE).optional().describe("Note title (use id instead when available)"),
       account: external_exports.string().max(MAX.ACCOUNT).optional().describe(
         "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
-      )
+      ),
+      timeoutSeconds: timeoutSecondsInput
     },
     outputSchema: {
       id: external_exports.string().optional(),
@@ -56484,9 +56999,9 @@ registerTool(
           `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const rawContent2 = notesManager.getNoteContentById(id2);
+      const { body: rawContent2, error: readError2 } = notesManager.readNoteBodyById(id2);
       if (!rawContent2) {
-        return errorResponse(`Failed to read content of note "${note2.title}"`);
+        return errorResponse(bodyReadFailureMessage(id2, note2.title, readError2));
       }
       const rich2 = enrichNoteRead(id2, rawContent2);
       const stripped2 = stripLargeInlineImages(rich2.content);
@@ -56526,9 +57041,9 @@ registerTool(
         `Note "${title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
       );
     }
-    const rawContent = notesManager.getNoteContent(title, account);
+    const { body: rawContent, error: readError } = notesManager.readNoteBodyById(note.id);
     if (!rawContent) {
-      return errorResponse(`Failed to read content of note "${title}"`);
+      return errorResponse(bodyReadFailureMessage(note.id, title, readError));
     }
     const rich = enrichNoteRead(note.id, rawContent);
     const stripped = stripLargeInlineImages(rich.content);
@@ -58964,6 +59479,49 @@ registerTool(
       ...pointsOmitted ? { pointsOmitted } : {}
     });
   }, "Error reading drawings")
+);
+registerTool(
+  "transcribe-note-audio",
+  {
+    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
+    inputSchema: {
+      id: noteIdInput,
+      locale: external_exports.string().max(35).optional().describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
+      attachmentId: external_exports.string().max(MAX.ATTACHMENT_ID).optional().describe("Only transcribe this audio attachment (x-coredata ICAttachment id)"),
+      includeText: external_exports.boolean().optional().describe("Include transcript text (default true); false returns statuses and counts only"),
+      downloadAssets: external_exports.boolean().optional().describe(
+        "Let macOS download the language's on-device speech model if it is missing (default false: returns asset_unavailable at once)"
+      ),
+      maxSeconds: external_exports.number().int().min(TRANSCRIBE_MAX_SECONDS.min).max(TRANSCRIBE_MAX_SECONDS.max).optional().describe(
+        `Total time budget for the call in seconds (default ${TRANSCRIBE_MAX_SECONDS.default}); recordings not started in time report code time_limit`
+      )
+    },
+    outputSchema: {
+      id: external_exports.string().optional(),
+      locale: external_exports.string().optional(),
+      status: external_exports.string().optional(),
+      recordingCount: external_exports.number().optional(),
+      recordings: external_exports.array(external_exports.object({}).passthrough()).optional()
+    }
+  },
+  withAsyncErrorHandling(async (params, signal) => {
+    const { id: id2, locale, attachmentId, includeText, downloadAssets, maxSeconds } = params;
+    const result = fitTranscriptions(
+      await transcribeNoteAudio(id2, {
+        locale,
+        attachmentId,
+        includeText,
+        downloadAssets,
+        maxSeconds,
+        signal
+      }),
+      exportMaxResponseBytes()
+    );
+    return successResponse(
+      formatTranscription(result),
+      result
+    );
+  }, "Error transcribing audio")
 );
 registerTool(
   "list-recent-notes",
