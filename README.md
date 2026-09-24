@@ -2132,8 +2132,10 @@ file then goes through [`add-attachment`](#add-attachment)'s checks.
 
 **Returns:** the `add-attachment` result plus `source` (`kind`: `file` or
 `data`, the pasteboard `type`, and the default `filename`). A copied file wins
-over image data; among data types PNG is preferred, then JPEG, HEIC, GIF, TIFF,
-and PDF.
+over image data; among data types PDF is preferred (a copied PDF usually comes
+with a raster preview of itself), then PNG, JPEG, HEIC, GIF, and TIFF. Several
+copied files or several image or PDF items are refused rather than attaching
+only the first.
 
 **Paste privacy (macOS 15.4 and later):** macOS can show an alert asking
 whether to allow a paste when a process reads the general pasteboard without a
@@ -2157,6 +2159,7 @@ before 15.4 the property does not exist and the pasteboard is read as before.
 | `pasteboard_empty` | `validation_error` | Nothing is on the pasteboard |
 | `unsupported_content` | `validation_error` | No PNG, JPEG, HEIC, GIF, TIFF, PDF, or copied file (text belongs in `append-to-note`); the message and `types` list the pasteboard types found |
 | `multiple_files` | `validation_error` | More than one copied file; `count` says how many. Copy one file, or use `add-attachment` per file |
+| `multiple_items` | `validation_error` | More than one image or PDF item (not files); `count` says how many. Copy one, or save each and use `add-attachment` |
 | `too_large` | `validation_error` | More than 64 MiB |
 | `file_unreadable` | `validation_error` | The copied file is a symlink, empty, over 64 MiB, or unreadable |
 | `pasteboard_changed` | `operation_failed` | The pasteboard changed while it was being read; try again |

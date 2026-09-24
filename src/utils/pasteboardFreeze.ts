@@ -9,7 +9,9 @@
  *   O_NOFOLLOW so a symlink is refused rather than followed. Several copied
  *   files are refused (`multiple_files`) rather than attaching only one;
  * - image or PDF data (screenshots, "Copy Image"): the bytes of the best
- *   available type are written as-is.
+ *   available type are written as-is. Several items that each carry image or
+ *   PDF data are refused (`multiple_items`) rather than attaching only the
+ *   first, since the pasteboard's data calls read the first item alone.
  *
  * The pasteboard change count is checked before and after the read, so a copy
  * that lands mid-read is refused instead of mixing two clipboards. Nothing is
@@ -54,16 +56,18 @@ export const PASTEBOARD_NAME_ENV = "APPLE_NOTES_MCP_PASTEBOARD_NAME";
 export const MAX_PASTEBOARD_BYTES = 64 * 1024 * 1024;
 
 /**
- * Pasteboard types taken as attachment data, in preference order. PNG before
- * TIFF because screenshots and most "Copy Image" commands offer both.
+ * Pasteboard types taken as attachment data, in preference order. PDF comes
+ * first: an app that copies a PDF (Preview, a PDF page) also offers a raster
+ * preview of it, and the PDF is the content. PNG before TIFF because
+ * screenshots and most "Copy Image" commands offer both.
  */
 export const PASTEBOARD_DATA_TYPES: ReadonlyArray<{ type: string; ext: string; label: string }> = [
+  { type: "com.adobe.pdf", ext: "pdf", label: "document" },
   { type: "public.png", ext: "png", label: "image" },
   { type: "public.jpeg", ext: "jpg", label: "image" },
   { type: "public.heic", ext: "heic", label: "image" },
   { type: "com.compuserve.gif", ext: "gif", label: "image" },
   { type: "public.tiff", ext: "tiff", label: "image" },
-  { type: "com.adobe.pdf", ext: "pdf", label: "document" },
 ];
 
 /**
@@ -85,8 +89,9 @@ export const PASTEBOARD_ACCESS_BEHAVIORS: Record<number, string> = {
  *   argv[4] = "1" when the caller accepts macOS's paste alert.
  *
  * The access check runs before any other pasteboard call. Every item is
- * inspected for a file URL, so several copied files are refused instead of
- * silently attaching the first one.
+ * inspected for a file URL and for supported data, so several copied files, or
+ * several image or PDF items, are refused instead of silently attaching the
+ * first one.
  */
 export const PASTEBOARD_FREEZE_JXA = `
 ObjC.import("AppKit");
@@ -107,15 +112,26 @@ function run(argv) {
   var items = pb.pasteboardItems;
   var itemCount = items && !items.isNil() ? Number(items.count) : 0;
   var fileUrls = [];
+  var dataItems = 0;
   for (var k = 0; k < itemCount; k++) {
     var item = items.objectAtIndex(k);
     var itemTypes = ObjC.deepUnwrap(item.types) || [];
-    if (itemTypes.indexOf("public.file-url") < 0) continue;
+    if (itemTypes.indexOf("public.file-url") < 0) {
+      for (var j = 0; j < prefs.length; j++) {
+        if (itemTypes.indexOf(prefs[j][0]) >= 0) {
+          dataItems++;
+          break;
+        }
+      }
+      continue;
+    }
     var value = ObjC.unwrap(item.stringForType("public.file-url"));
     if (value) fileUrls.push(value);
   }
   if (fileUrls.length > 1)
     return JSON.stringify({ status: "error", code: "multiple_files", count: fileUrls.length });
+  if (fileUrls.length === 0 && dataItems > 1)
+    return JSON.stringify({ status: "error", code: "multiple_items", count: dataItems });
   if (fileUrls.length === 1) {
     var url = $.NSURL.URLWithString(fileUrls[0]);
     if (url && !url.isNil() && url.isFileURL) {
@@ -148,6 +164,7 @@ export type PasteboardErrorCode =
   | "pasteboard_changed"
   | "unsupported_content"
   | "multiple_files"
+  | "multiple_items"
   | "too_large"
   | "write_failed"
   | "file_unreadable";
@@ -161,6 +178,7 @@ const ENVELOPE_CODES: Record<PasteboardErrorCode, ErrorCode> = {
   pasteboard_changed: "operation_failed",
   unsupported_content: "validation_error",
   multiple_files: "validation_error",
+  multiple_items: "validation_error",
   too_large: "validation_error",
   write_failed: "operation_failed",
   file_unreadable: "validation_error",
@@ -200,6 +218,8 @@ const MESSAGES: Record<PasteboardErrorCode, string> = {
   unsupported_content: `The pasteboard holds no supported content: copy ${SUPPORTED}. Text belongs in append-to-note, not in an attachment.`,
   multiple_files:
     "The pasteboard holds more than one copied file. Copy exactly one file, or attach each file with add-attachment.",
+  multiple_items:
+    "The pasteboard holds more than one image or PDF. Copy exactly one, or save each and attach it with add-attachment.",
   too_large: "The pasteboard contents exceed the 64 MiB attachment limit.",
   write_failed: "Could not write the pasteboard contents to a temporary file.",
   file_unreadable: "The copied file could not be read as a regular file of at most 64 MiB.",
@@ -219,15 +239,13 @@ function replyError(
         : MESSAGES.pasteboard_access_denied;
     return new PasteboardError(code, message, { accessBehavior });
   }
-  if (code === "multiple_files") {
+  if (code === "multiple_files" || code === "multiple_items") {
     const count = typeof reply.count === "number" ? reply.count : undefined;
-    return new PasteboardError(
-      code,
-      count
+    const counted =
+      code === "multiple_files"
         ? `The pasteboard holds ${count} copied files. Copy exactly one file, or attach each file with add-attachment.`
-        : MESSAGES[code],
-      count ? { count } : {}
-    );
+        : `The pasteboard holds ${count} images or PDFs. Copy exactly one, or save each and attach it with add-attachment.`;
+    return new PasteboardError(code, count ? counted : MESSAGES[code], count ? { count } : {});
   }
   if (code === "unsupported_content" && Array.isArray(reply.types)) {
     const types = reply.types.filter((t): t is string => typeof t === "string").slice(0, 20);

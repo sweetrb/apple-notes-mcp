@@ -53327,12 +53327,12 @@ import { basename as basename5, extname as extname6, join as join23 } from "node
 var PASTEBOARD_NAME_ENV = "APPLE_NOTES_MCP_PASTEBOARD_NAME";
 var MAX_PASTEBOARD_BYTES = 64 * 1024 * 1024;
 var PASTEBOARD_DATA_TYPES = [
+  { type: "com.adobe.pdf", ext: "pdf", label: "document" },
   { type: "public.png", ext: "png", label: "image" },
   { type: "public.jpeg", ext: "jpg", label: "image" },
   { type: "public.heic", ext: "heic", label: "image" },
   { type: "com.compuserve.gif", ext: "gif", label: "image" },
-  { type: "public.tiff", ext: "tiff", label: "image" },
-  { type: "com.adobe.pdf", ext: "pdf", label: "document" }
+  { type: "public.tiff", ext: "tiff", label: "image" }
 ];
 var PASTEBOARD_ACCESS_BEHAVIORS = {
   0: "default",
@@ -53359,15 +53359,26 @@ function run(argv) {
   var items = pb.pasteboardItems;
   var itemCount = items && !items.isNil() ? Number(items.count) : 0;
   var fileUrls = [];
+  var dataItems = 0;
   for (var k = 0; k < itemCount; k++) {
     var item = items.objectAtIndex(k);
     var itemTypes = ObjC.deepUnwrap(item.types) || [];
-    if (itemTypes.indexOf("public.file-url") < 0) continue;
+    if (itemTypes.indexOf("public.file-url") < 0) {
+      for (var j = 0; j < prefs.length; j++) {
+        if (itemTypes.indexOf(prefs[j][0]) >= 0) {
+          dataItems++;
+          break;
+        }
+      }
+      continue;
+    }
     var value = ObjC.unwrap(item.stringForType("public.file-url"));
     if (value) fileUrls.push(value);
   }
   if (fileUrls.length > 1)
     return JSON.stringify({ status: "error", code: "multiple_files", count: fileUrls.length });
+  if (fileUrls.length === 0 && dataItems > 1)
+    return JSON.stringify({ status: "error", code: "multiple_items", count: dataItems });
   if (fileUrls.length === 1) {
     var url = $.NSURL.URLWithString(fileUrls[0]);
     if (url && !url.isNil() && url.isFileURL) {
@@ -53398,6 +53409,7 @@ var ENVELOPE_CODES = {
   pasteboard_changed: "operation_failed",
   unsupported_content: "validation_error",
   multiple_files: "validation_error",
+  multiple_items: "validation_error",
   too_large: "validation_error",
   write_failed: "operation_failed",
   file_unreadable: "validation_error"
@@ -53424,6 +53436,7 @@ var MESSAGES = {
   pasteboard_changed: "The pasteboard changed while it was being read. Try again.",
   unsupported_content: `The pasteboard holds no supported content: copy ${SUPPORTED}. Text belongs in append-to-note, not in an attachment.`,
   multiple_files: "The pasteboard holds more than one copied file. Copy exactly one file, or attach each file with add-attachment.",
+  multiple_items: "The pasteboard holds more than one image or PDF. Copy exactly one, or save each and attach it with add-attachment.",
   too_large: "The pasteboard contents exceed the 64 MiB attachment limit.",
   write_failed: "Could not write the pasteboard contents to a temporary file.",
   file_unreadable: "The copied file could not be read as a regular file of at most 64 MiB."
@@ -53435,13 +53448,10 @@ function replyError(code, reply) {
     const message = accessBehavior === "alwaysDeny" ? "macOS is set to deny pasteboard access to the app that runs this server, so nothing was read. Change it to allow in System Settings, then try again." : MESSAGES.pasteboard_access_denied;
     return new PasteboardError(code, message, { accessBehavior });
   }
-  if (code === "multiple_files") {
+  if (code === "multiple_files" || code === "multiple_items") {
     const count = typeof reply.count === "number" ? reply.count : void 0;
-    return new PasteboardError(
-      code,
-      count ? `The pasteboard holds ${count} copied files. Copy exactly one file, or attach each file with add-attachment.` : MESSAGES[code],
-      count ? { count } : {}
-    );
+    const counted = code === "multiple_files" ? `The pasteboard holds ${count} copied files. Copy exactly one file, or attach each file with add-attachment.` : `The pasteboard holds ${count} images or PDFs. Copy exactly one, or save each and attach it with add-attachment.`;
+    return new PasteboardError(code, count ? counted : MESSAGES[code], count ? { count } : {});
   }
   if (code === "unsupported_content" && Array.isArray(reply.types)) {
     const types = reply.types.filter((t) => typeof t === "string").slice(0, 20);

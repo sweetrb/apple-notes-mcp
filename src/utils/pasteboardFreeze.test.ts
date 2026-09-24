@@ -147,6 +147,52 @@ describe("freezePasteboard (real JXA, private named pasteboards)", { timeout: 60
     }
   });
 
+  it("prefers the PDF over a raster preview of it (#238)", () => {
+    const name = fill([
+      ["public.png", PNG],
+      ["com.adobe.pdf", Buffer.from("%PDF-1.4 with preview").toString("hex")],
+    ]);
+    const frozen = freezePasteboard({ pasteboardName: name });
+    try {
+      expect(frozen).toMatchObject({ kind: "data", type: "com.adobe.pdf" });
+      expect(readFileSync(frozen.path, "utf8")).toBe("%PDF-1.4 with preview");
+    } finally {
+      frozen.cleanup();
+    }
+  });
+
+  it("refuses several image items instead of attaching the first (#238)", () => {
+    const name = `${PREFIX}-${names.length}`;
+    names.push(name);
+    execFileSync("osascript", [
+      "-l",
+      "JavaScript",
+      "-e",
+      `ObjC.import("AppKit");
+function run(argv) {
+  var pb = $.NSPasteboard.pasteboardWithName(argv[0]);
+  pb.clearContents;
+  var items = [];
+  for (var i = 0; i < 2; i++) {
+    var item = $.NSPasteboardItem.alloc.init;
+    item.setDataForType($.NSData.alloc.initWithBase64EncodedStringOptions(argv[1], 0), "public.png");
+    items.push(item);
+  }
+  pb.writeObjects($(items));
+  return String(pb.changeCount);
+}`,
+      name,
+      Buffer.from(PNG, "hex").toString("base64"),
+    ]);
+    try {
+      freezePasteboard({ pasteboardName: name });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as PasteboardError).code).toBe("multiple_items");
+      expect((e as PasteboardError).envelope).toMatchObject({ count: 2 });
+    }
+  });
+
   it("copies a copied file's bytes, keeping its name", () => {
     const source = join(scratch, "synthetic report.txt");
     writeFileSync(source, "synthetic file contents");
@@ -339,6 +385,29 @@ describe("PASTEBOARD_FREEZE_JXA logic (fake AppKit bridge)", () => {
     expect(calls.some((call) => call.startsWith("dataForType"))).toBe(false);
   });
 
+  it("refuses several image or PDF items before reading any of them (#238)", () => {
+    const { reply, calls } = run({
+      accessBehavior: 2,
+      items: [
+        { types: ["public.png", "public.tiff"] },
+        { types: ["public.jpeg"] },
+        { types: ["public.utf8-plain-text"] },
+      ],
+      data: { "public.png": "abc", "public.jpeg": "def" },
+    });
+    expect(reply).toEqual({ status: "error", code: "multiple_items", count: 2 });
+    expect(calls.some((call) => call.startsWith("dataForType"))).toBe(false);
+  });
+
+  it("takes the PDF when one item offers a PDF and a raster preview (#238)", () => {
+    const { reply } = run({
+      accessBehavior: 2,
+      items: [{ types: ["public.png", "com.adobe.pdf"] }],
+      data: { "public.png": "abc", "com.adobe.pdf": "%PDF" },
+    });
+    expect(reply).toMatchObject({ status: "ok", kind: "data", type: "com.adobe.pdf" });
+  });
+
   it("takes one copied file from whichever item carries it", () => {
     const { reply } = run({
       accessBehavior: 2,
@@ -441,6 +510,14 @@ describe("freezePasteboard error mapping (stubbed osascript)", () => {
       code: "validation_error",
       pasteboardCode: "multiple_files",
       count: 3,
+      committed: false,
+    });
+    const images = error('{"status":"error","code":"multiple_items","count":2}');
+    expect(images.message).toMatch(/holds 2 images or PDFs/);
+    expect(images.envelope).toMatchObject({
+      code: "validation_error",
+      pasteboardCode: "multiple_items",
+      count: 2,
       committed: false,
     });
     const text = error(
