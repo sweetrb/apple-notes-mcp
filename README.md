@@ -2228,7 +2228,7 @@ Lists the Paper drawings (`com.apple.paper`) and classic drawings (`com.apple.dr
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact CoreData note ID |
 
-**Returns:** Per drawing: `attachmentId`, `identifier`, `uti`, `kind` (`paper` or `drawing`), `handwritingSummary` (the handwriting text Notes recognized, or `null` when it stored none), `bundlePresent` (the Paper data bundle is on disk), `fallbackImagePath` (Notes' full rendering), `previewPath` (its largest thumbnail), and `raster` `{source, format, width, height}`: the validated image `export-paper-image` would copy, or `null`.
+**Returns:** Per drawing: `attachmentId`, `identifier`, `uti`, `kind` (`paper` or `drawing`), `handwritingSummary` (the handwriting text Notes recognized, or `null` when it stored none), `bundlePresent` (the Paper data bundle is on disk), `fallbackImagePath` (Notes' full rendering), `fallbackImageStale` (true when Notes recorded a newer rendering than the one on disk, so the image may not show the latest strokes; `export-paper-image` then reports `stale: true`), `previewPath` (its largest thumbnail), and `raster` `{source, format, width, height}`: the validated image `export-paper-image` would copy, or `null`.
 
 Strokes are not decoded. Notes' Paper bundle has no public reader, so the image is Notes' own rendering.
 
@@ -2289,7 +2289,7 @@ Copies a note's attachment files into a directory without opening Notes.app.
 | `exportDir` | string | Yes | Absolute destination directory, created if missing. Same allowlist as `save-attachment` (home, temp, or `/Volumes`), and never inside the Notes data folder |
 | `firstImageOnly` | boolean | No | Export only the lead visual that `list-attachments` `firstImage` reports |
 
-**Returns:** `exportDir`, counts (`exported`, `previews`, `skipped`, `failed`), and per attachment its `attachmentId`, `identifier`, `kind`, `exportedTo`, and `exportedKind`: `"asset"` for the real file, `"preview"` when the asset never downloaded and only Notes' thumbnail was on disk, or `null` when nothing was on disk. A preview is never chosen over an available asset, and it is named `<name>-preview.<ext>` so it is not mistaken for the original. A scan gallery with no file of its own exports its pages.
+**Returns:** `exportDir`, counts (`exported`, `previews`, `fallbacks`, `skipped`, `failed`), and per attachment its `attachmentId`, `identifier`, `kind`, `exportedTo`, and `exportedKind`: `"asset"` for the real file, `"fallback"` for Notes' own full rendering of it (a drawing's PNG or a scan's PDF, named with that format's extension), `"preview"` when the asset never downloaded and only Notes' thumbnail was on disk, or `null` when nothing was on disk. `inBody: false` marks an attachment the note body no longer shows; attachments inside a container Notes has deleted are not exported. A preview is never chosen over an available asset, and it is named `<name>-preview.<ext>` so it is not mistaken for the original. A scan gallery with no file of its own exports its pages.
 
 **⚠️ Safety:** Existing files are never replaced. A name that is taken gets `-2`, `-3`, and so on. Reads NoteStore and the Notes data folder read-only and needs Full Disk Access.
 

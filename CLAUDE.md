@@ -370,7 +370,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### Attachment paths, first image, and batch export
 - `list-attachments` with `includePaths: true` (needs the note `id` and Full Disk Access) adds `assetPaths` (the attachment's own files), `previewPath` (Notes' largest rendered thumbnail, always an image file), and `paths`. Use `assetPaths` when you need the original; a `previewPath` alone means the asset has not downloaded.
 - `list-attachments` with `firstImage: true` returns only the lead visual in body order: the first image even when `path` is `null`, else the first scan or drawing, else `null`.
-- `export-attachments` copies files into `exportDir` (same allowlist as `save-attachment`, never the Notes data folder). Check `exportedKind`: `"preview"` means you got a thumbnail, not the original. It never overwrites; collisions become `-2`, `-3`.
+- `export-attachments` copies files into `exportDir` (same allowlist as `save-attachment`, never the Notes data folder). Check `exportedKind`: `"preview"` means you got a thumbnail, not the original, and `"fallback"` means Notes' own rendering (a drawing's PNG, a scan's PDF). `inBody: false` marks an attachment the body no longer shows. It never overwrites; collisions become `-2`, `-3`.
 - Do not hand raw Notes paths to a browser or another tool. Export first.
 
 ### get-note-link

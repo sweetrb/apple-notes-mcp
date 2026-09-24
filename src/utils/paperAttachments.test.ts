@@ -29,6 +29,7 @@ import {
   exportDrawingRaster,
   findFallbackImage,
   findLargestPreview,
+  locateFallbackImage,
   parseDrawingRows,
   parseImageHeader,
   readDrawingRows,
@@ -321,6 +322,13 @@ describe("raster discovery (synthetic container)", () => {
     expect(findFallbackImage(accountDir, PAPER, "9_MISSING")).toBe(
       join(accountDir, "FallbackImages", PAPER, "3_NEW", "FallbackImage.png")
     );
+    // The recorded generation is missing: the older file is used, but flagged (#203).
+    expect(locateFallbackImage(accountDir, PAPER, "9_MISSING")).toEqual({
+      path: join(accountDir, "FallbackImages", PAPER, "3_NEW", "FallbackImage.png"),
+      stale: true,
+    });
+    expect(locateFallbackImage(accountDir, PAPER, "3_NEW").stale).toBe(false);
+    expect(locateFallbackImage(accountDir, PAPER, null).stale).toBe(false);
     expect(findFallbackImage(accountDir, "..", null)).toBeNull();
     expect(findFallbackImage(accountDir, "UNKNOWN", null)).toBeNull();
     expect(findLargestPreview(accountDir, "a/b")).toBeNull();

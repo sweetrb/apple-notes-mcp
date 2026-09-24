@@ -41341,6 +41341,7 @@ function buildAttachmentRowsSql(notePk, columns) {
     `'identifier', a.ZIDENTIFIER`,
     `'uti', ${col3("a", "ZTYPEUTI")}`,
     `'parentPk', ${parent}`,
+    `'parentDeleted', ${parent !== "NULL" && columns.has("ZMARKEDFORDELETION") ? `(SELECT COALESCE(p.ZMARKEDFORDELETION, 0) FROM ZICCLOUDSYNCINGOBJECT p WHERE p.Z_PK = ${parent})` : "0"}`,
     `'filename', ${col3("a", "ZFILENAME")}`,
     `'mediaIdentifier', m.ZIDENTIFIER`,
     `'mediaFilename', ${col3("m", "ZFILENAME")}`,
@@ -41399,6 +41400,7 @@ function parseAttachmentRows(json2) {
       identifier,
       uti: toStringOrNull(r.uti),
       parentPk: toIntOrNull(r.parentPk),
+      ...toIntOrNull(r.parentDeleted) ? { parentDeleted: true } : {},
       filename: toStringOrNull(r.filename),
       mediaIdentifier: toStringOrNull(r.mediaIdentifier),
       mediaFilename: toStringOrNull(r.mediaFilename),
@@ -41604,7 +41606,8 @@ function assetPathsFor(accountDir, row) {
     add(file);
   return found;
 }
-function assembleAttachmentAssets(rows, bodyOrder, containerDir = NOTES_CONTAINER_DIR) {
+function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTAINER_DIR) {
+  const rows = allRows.filter((r) => !r.parentDeleted);
   const byPk = new Map(rows.map((r) => [r.pk, r]));
   const roots = rows.filter((r) => r.parentPk === null || !byPk.has(r.parentPk));
   const bodyIndex = /* @__PURE__ */ new Map();
@@ -41727,6 +41730,11 @@ function copyFileExclusive(src, dest) {
 }
 function exportFileName(record2, source, kind) {
   const ext = extname(source);
+  if (kind === "fallback") {
+    const stored2 = safeComponent(record2.filename ? basename(record2.filename) : null);
+    const stem = stored2 && !GENERIC_FILE_NAMES.has(stored2.toLowerCase()) ? basename(stored2, extname(stored2)) : record2.identifier;
+    return `${safeComponent(stem) ?? record2.identifier}${ext}`;
+  }
   if (kind === "preview") {
     const stored2 = safeComponent(record2.filename ? basename(record2.filename) : null);
     const stem = stored2 ? basename(stored2, extname(stored2)) : record2.identifier;
@@ -41755,7 +41763,7 @@ function prepareExportDir(exportDir, containerDir = NOTES_CONTAINER_DIR) {
   }
   return abs;
 }
-function exportOneAttachment(record2, dir, source) {
+function exportOneAttachment(record2, dir, source, inBody) {
   const base = {
     pk: record2.pk,
     identifier: record2.identifier,
@@ -41763,7 +41771,8 @@ function exportOneAttachment(record2, dir, source) {
     kind: record2.kind,
     parentIdentifier: record2.parentIdentifier,
     exportedTo: null,
-    exportedKind: null
+    exportedKind: null,
+    ...inBody === false ? { inBody: false } : {}
   };
   if (!source) return base;
   const name = exportFileName(record2, source.path, source.kind);
@@ -41780,20 +41789,31 @@ function exportOneAttachment(record2, dir, source) {
   }
   return { ...base, error: "Too many name collisions in the export directory" };
 }
+function isFallbackRendering(path10) {
+  return /[\\/]Fallback(?:Images|PDFs)[\\/]/.test(path10);
+}
 function exportSource(record2) {
-  if (record2.assetPaths[0]) return { path: record2.assetPaths[0], kind: "asset" };
+  const asset = record2.assetPaths[0];
+  if (asset) return { path: asset, kind: isFallbackRendering(asset) ? "fallback" : "asset" };
   if (record2.previewPath) return { path: record2.previewPath, kind: "preview" };
   return null;
 }
 function exportAttachmentAssets(assets, exportDir, options = {}) {
   const dir = prepareExportDir(exportDir, options.containerDir);
+  const inBody = (record2) => {
+    if (assets.orderSource !== "body") return void 0;
+    const root = record2.parentIdentifier === null ? record2 : assets.attachments.find(
+      (a) => a.parentIdentifier === null && a.identifier === record2.parentIdentifier
+    );
+    return root ? root.bodyIndex !== null : void 0;
+  };
   if (options.firstImageOnly) {
     const first2 = selectFirstImage(assets);
     if (!first2) return { exportDir: dir, results: [], firstImage: null };
     const record2 = assets.attachments.find((a) => a.pk === first2.pk);
     return {
       exportDir: dir,
-      results: [exportOneAttachment(record2, dir, exportSource(record2))],
+      results: [exportOneAttachment(record2, dir, exportSource(record2), inBody(record2))],
       firstImage: first2
     };
   }
@@ -41807,7 +41827,7 @@ function exportAttachmentAssets(assets, exportDir, options = {}) {
     } else if (!exportSource(record2) && assets.attachments.some((c) => c.parentIdentifier === record2.identifier)) {
       continue;
     }
-    results.push(exportOneAttachment(record2, dir, exportSource(record2)));
+    results.push(exportOneAttachment(record2, dir, exportSource(record2), inBody(record2)));
   }
   return { exportDir: dir, results };
 }
@@ -41976,7 +41996,17 @@ function entries(dir, limit) {
   }
 }
 var byGenerationDesc = (a, b) => generationRank(basename2(b)) - generationRank(basename2(a));
-function findFallbackImage(accountDir, identifier, generation) {
+function locateFallbackImage(accountDir, identifier, generation) {
+  const gen = safeComponent(generation);
+  const path10 = searchFallbackImage(accountDir, identifier, generation);
+  if (!path10 || !gen) return { path: path10, stale: false };
+  const id2 = safeComponent(identifier);
+  const recorded = ["FallbackImage.png", "FallbackImage.jpg"].map(
+    (n) => id2 ? realInside(join8(accountDir, "FallbackImages", id2, gen, n), accountDir) : null
+  ).filter((p) => p !== null);
+  return { path: path10, stale: !recorded.includes(path10) };
+}
+function searchFallbackImage(accountDir, identifier, generation) {
   const id2 = safeComponent(identifier);
   if (!id2) return null;
   const base = join8(accountDir, "FallbackImages", id2);
@@ -42023,7 +42053,8 @@ function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
     const accountDir = resolveAccountDir(containerDir, row.accountIdentifier);
     const kind = row.uti === "com.apple.paper" ? "paper" : "drawing";
     const id2 = safeComponent(row.identifier);
-    const fallbackImagePath = accountDir ? findFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration) : null;
+    const fallback = accountDir ? locateFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration) : { path: null, stale: false };
+    const fallbackImagePath = fallback.path;
     const previewPath = accountDir ? findLargestPreview(accountDir, row.identifier) : null;
     const bundle = accountDir && id2 && kind === "paper" ? realInside(join8(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
     let raster = null;
@@ -42045,6 +42076,7 @@ function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
       handwritingSummary: row.handwritingSummary,
       bundlePresent: bundle !== null && kindOf(bundle) === "dir",
       fallbackImagePath,
+      fallbackImageStale: fallback.stale,
       previewPath,
       raster
     };
@@ -61424,6 +61456,7 @@ registerTool(
       height: external_exports.number().optional(),
       bytes: external_exports.number().optional(),
       source: external_exports.enum(["fallback", "preview"]).optional(),
+      stale: external_exports.boolean().optional(),
       attachmentId: external_exports.string().optional(),
       identifier: external_exports.string().optional(),
       kind: external_exports.enum(["paper", "drawing"]).optional(),
@@ -61432,8 +61465,9 @@ registerTool(
   },
   withErrorHandling(({ noteId: noteId3, savePath, attachmentId }) => {
     const r = notesManager.exportPaperImageById(noteId3, savePath, attachmentId);
+    const stale = r.source === "fallback" && r.drawing.fallbackImageStale;
     return successResponse(
-      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}`,
+      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}` + (stale ? ". This is an older rendering: the one Notes recorded is not on disk, so it may not show the latest strokes." : ""),
       {
         savedPath: r.savedPath,
         format: r.format,
@@ -61441,6 +61475,7 @@ registerTool(
         height: r.height,
         bytes: r.bytes,
         source: r.source,
+        ...stale ? { stale } : {},
         attachmentId: attachmentCoreDataId(noteId3, r.drawing.pk),
         identifier: r.drawing.identifier,
         kind: r.drawing.kind,
@@ -61453,7 +61488,7 @@ registerTool(
   "export-attachments",
   {
     description: `Use when: copying every file attachment of one note (or only its lead visual) into a directory on disk.
-Returns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "preview" when the asset never downloaded and only Notes' rendered thumbnail was available, or null when nothing was on disk.
+Returns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "fallback" for Notes' own full rendering of it (a drawing's PNG or a scan's PDF, named with that format's extension), "preview" when the asset never downloaded and only Notes' rendered thumbnail was available, or null when nothing was on disk; inBody: false marks an attachment no longer shown in the note body.
 Do not use when: exporting one attachment to an exact path (save-attachment) or reading bytes inline (fetch-attachment).
 Safety: writes files; exportDir must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Existing files are never replaced: name collisions get -2, -3, ... suffixes. Reads NoteStore and the Notes data folder read-only; requires Full Disk Access. Notes.app is not opened.`,
     inputSchema: {
@@ -61465,6 +61500,7 @@ Safety: writes files; exportDir must be absolute and under the home directory, a
       exportDir: external_exports.string().optional(),
       exported: external_exports.number().optional(),
       previews: external_exports.number().optional(),
+      fallbacks: external_exports.number().optional(),
       skipped: external_exports.number().optional(),
       failed: external_exports.number().optional(),
       results: external_exports.array(external_exports.object({}).passthrough()).optional(),
@@ -61479,12 +61515,14 @@ Safety: writes files; exportDir must be absolute and under the home directory, a
     }));
     const exported = results.filter((x) => x.exportedKind !== null).length;
     const previews = results.filter((x) => x.exportedKind === "preview").length;
+    const fallbacks = results.filter((x) => x.exportedKind === "fallback").length;
     const failed = results.filter((x) => x.error).length;
     const skipped = results.length - exported - failed;
     const structured = {
       exportDir: r.exportDir,
       exported,
       previews,
+      fallbacks,
       skipped,
       failed,
       results
@@ -61499,7 +61537,7 @@ Safety: writes files; exportDir must be absolute and under the home directory, a
       }
     }
     return successResponse(
-      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
+      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${fallbacks} Notes rendering(s), ${skipped} with nothing on disk, ${failed} failed).`,
       structured
     );
   }, "Error exporting attachments")

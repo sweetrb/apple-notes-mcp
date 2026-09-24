@@ -94,6 +94,11 @@ export interface DrawingAttachment {
   bundlePresent: boolean;
   /** Notes' full rendered raster (FallbackImage), newest generation first. */
   fallbackImagePath: string | null;
+  /**
+   * True when Notes recorded a newer rendering generation than the file found:
+   * the recorded one is missing on disk, so the image may lag the drawing.
+   */
+  fallbackImageStale: boolean;
   /** The largest rendered thumbnail, always an image file. */
   previewPath: string | null;
   /** The raster an export would copy: the fallback image, else the preview; null when neither validates. */
@@ -316,6 +321,36 @@ export function findFallbackImage(
   identifier: string,
   generation: string | null
 ): string | null {
+  return locateFallbackImage(accountDir, identifier, generation).path;
+}
+
+/**
+ * {@link findFallbackImage} plus whether the file is stale: Notes recorded a
+ * rendering generation, that generation's file is not on disk, and an older
+ * rendering was found instead (it may not show the latest strokes).
+ */
+export function locateFallbackImage(
+  accountDir: string,
+  identifier: string,
+  generation: string | null
+): { path: string | null; stale: boolean } {
+  const gen = safeComponent(generation);
+  const path = searchFallbackImage(accountDir, identifier, generation);
+  if (!path || !gen) return { path, stale: false };
+  const id = safeComponent(identifier);
+  const recorded = ["FallbackImage.png", "FallbackImage.jpg"]
+    .map((n) =>
+      id ? realInside(join(accountDir, "FallbackImages", id, gen, n), accountDir) : null
+    )
+    .filter((p): p is string => p !== null);
+  return { path, stale: !recorded.includes(path) };
+}
+
+function searchFallbackImage(
+  accountDir: string,
+  identifier: string,
+  generation: string | null
+): string | null {
   const id = safeComponent(identifier);
   if (!id) return null;
   const base = join(accountDir, "FallbackImages", id);
@@ -377,9 +412,10 @@ export function describeDrawings(
     const accountDir = resolveAccountDir(containerDir, row.accountIdentifier);
     const kind: DrawingAttachment["kind"] = row.uti === "com.apple.paper" ? "paper" : "drawing";
     const id = safeComponent(row.identifier);
-    const fallbackImagePath = accountDir
-      ? findFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration)
-      : null;
+    const fallback = accountDir
+      ? locateFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration)
+      : { path: null, stale: false };
+    const fallbackImagePath = fallback.path;
     const previewPath = accountDir ? findLargestPreview(accountDir, row.identifier) : null;
     const bundle =
       accountDir && id && kind === "paper"
@@ -404,6 +440,7 @@ export function describeDrawings(
       handwritingSummary: row.handwritingSummary,
       bundlePresent: bundle !== null && kindOf(bundle) === "dir",
       fallbackImagePath,
+      fallbackImageStale: fallback.stale,
       previewPath,
       raster,
     };

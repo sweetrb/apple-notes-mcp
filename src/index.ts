@@ -3827,6 +3827,7 @@ registerTool(
       height: z.number().optional(),
       bytes: z.number().optional(),
       source: z.enum(["fallback", "preview"]).optional(),
+      stale: z.boolean().optional(),
       attachmentId: z.string().optional(),
       identifier: z.string().optional(),
       kind: z.enum(["paper", "drawing"]).optional(),
@@ -3835,8 +3836,12 @@ registerTool(
   },
   withErrorHandling(({ noteId, savePath, attachmentId }) => {
     const r = notesManager.exportPaperImageById(noteId, savePath, attachmentId);
+    const stale = r.source === "fallback" && r.drawing.fallbackImageStale;
     return successResponse(
-      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}`,
+      `Saved ${r.format.toUpperCase()} ${r.width}x${r.height} (${r.bytes} bytes, ${r.source === "fallback" ? "Notes' full rendering" : "largest preview"}) to ${r.savedPath}` +
+        (stale
+          ? ". This is an older rendering: the one Notes recorded is not on disk, so it may not show the latest strokes."
+          : ""),
       {
         savedPath: r.savedPath,
         format: r.format,
@@ -3844,6 +3849,7 @@ registerTool(
         height: r.height,
         bytes: r.bytes,
         source: r.source,
+        ...(stale ? { stale } : {}),
         attachmentId: attachmentCoreDataId(noteId, r.drawing.pk),
         identifier: r.drawing.identifier,
         kind: r.drawing.kind,
@@ -3859,7 +3865,7 @@ registerTool(
   "export-attachments",
   {
     description:
-      'Use when: copying every file attachment of one note (or only its lead visual) into a directory on disk.\nReturns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "preview" when the asset never downloaded and only Notes\' rendered thumbnail was available, or null when nothing was on disk.\nDo not use when: exporting one attachment to an exact path (save-attachment) or reading bytes inline (fetch-attachment).\nSafety: writes files; exportDir must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Existing files are never replaced: name collisions get -2, -3, ... suffixes. Reads NoteStore and the Notes data folder read-only; requires Full Disk Access. Notes.app is not opened.',
+      'Use when: copying every file attachment of one note (or only its lead visual) into a directory on disk.\nReturns: per attachment its id, kind, exportedTo, and exportedKind: "asset" for the real file, "fallback" for Notes\' own full rendering of it (a drawing\'s PNG or a scan\'s PDF, named with that format\'s extension), "preview" when the asset never downloaded and only Notes\' rendered thumbnail was available, or null when nothing was on disk; inBody: false marks an attachment no longer shown in the note body.\nDo not use when: exporting one attachment to an exact path (save-attachment) or reading bytes inline (fetch-attachment).\nSafety: writes files; exportDir must be absolute and under the home directory, a temp dir, or /Volumes, and not inside the Notes data folder. Existing files are never replaced: name collisions get -2, -3, ... suffixes. Reads NoteStore and the Notes data folder read-only; requires Full Disk Access. Notes.app is not opened.',
     inputSchema: {
       noteId: noteIdInput,
       exportDir: z
@@ -3876,6 +3882,7 @@ registerTool(
       exportDir: z.string().optional(),
       exported: z.number().optional(),
       previews: z.number().optional(),
+      fallbacks: z.number().optional(),
       skipped: z.number().optional(),
       failed: z.number().optional(),
       results: z.array(z.object({}).passthrough()).optional(),
@@ -3890,12 +3897,14 @@ registerTool(
     }));
     const exported = results.filter((x) => x.exportedKind !== null).length;
     const previews = results.filter((x) => x.exportedKind === "preview").length;
+    const fallbacks = results.filter((x) => x.exportedKind === "fallback").length;
     const failed = results.filter((x) => x.error).length;
     const skipped = results.length - exported - failed;
     const structured: Record<string, unknown> = {
       exportDir: r.exportDir,
       exported,
       previews,
+      fallbacks,
       skipped,
       failed,
       results,
@@ -3910,7 +3919,7 @@ registerTool(
       }
     }
     return successResponse(
-      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
+      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${fallbacks} Notes rendering(s), ${skipped} with nothing on disk, ${failed} failed).`,
       structured
     );
   }, "Error exporting attachments")
