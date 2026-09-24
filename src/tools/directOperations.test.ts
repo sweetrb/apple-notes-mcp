@@ -299,3 +299,146 @@ describe("attachment filename override and create-then-attach", () => {
     );
   });
 });
+
+describe("add-attachment verifies through NoteStore when AppleScript lists nothing (#236)", () => {
+  const id = "x-coredata://ABC/ICNote/p1";
+  const bytes = Buffer.from("%PDF-1.7 synthetic");
+  const richBase = {
+    text: "existing",
+    links: [],
+    nativeTags: [],
+    nativeObjectIds: [],
+    hasNativeObjects: false,
+    hasChecklist: false,
+    revision: "rich",
+    objects: [],
+    checklistItems: [],
+    styleRuns: [],
+    objectData: [],
+  };
+  const row = (
+    pk: number,
+    identifier: string,
+    assetPaths: string[],
+    parent: string | null = null
+  ) => ({
+    pk,
+    identifier,
+    uti: "com.adobe.pdf",
+    kind: "pdf",
+    parentIdentifier: parent,
+    filename: "report.pdf",
+    bodyIndex: null,
+    assetPaths,
+    previewPath: null,
+    paths: assetPaths,
+  });
+  const setup = (stored: () => unknown, returnedId = "") => {
+    rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
+    rich.read.mockReturnValue(richBase);
+    rich.hash.mockReturnValue("revision");
+    const directory = mkdtempSync(join(tmpdir(), "direct-operation-pdf-test-"));
+    directories.push(directory);
+    const path = join(directory, "report.pdf");
+    writeFileSync(path, bytes);
+    const manager = {
+      getNoteById: vi.fn(() => ({ id, title: "Note", passwordProtected: false })),
+      getNoteContentById: vi.fn(() => "existing"),
+      // Notes' AppleScript on macOS 27 never lists the PDF.
+      listAttachmentsById: vi.fn(() => []),
+      addAttachmentById: vi.fn(() => returnedId),
+      getAttachmentBase64ById: vi.fn(),
+      getAttachmentAssetsById: vi.fn(stored),
+    };
+    const registerTool = vi.fn();
+    registerDirectOperations(
+      { registerTool } as unknown as McpServer,
+      manager as unknown as AppleNotesManager
+    );
+    const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
+    return {
+      manager,
+      directory,
+      run: () =>
+        handler({ id, expectedContentHash: "revision", path }) as Promise<{
+          structuredContent?: Record<string, unknown>;
+          isError?: boolean;
+          content: Array<{ text: string }>;
+        }>,
+    };
+  };
+  const mediaFile = (directory: string, data: Buffer) => {
+    const media = join(directory, "media.pdf");
+    writeFileSync(media, data);
+    return media;
+  };
+
+  it("reports success when exactly one new row appears with the same bytes", async () => {
+    let media = "";
+    let calls = 0;
+    const { manager, directory, run } = setup(() => ({
+      orderSource: "creation",
+      attachments:
+        calls++ === 0
+          ? [row(4, "OLD", [])]
+          : [row(4, "OLD", []), row(9, "NEW", [media]), row(10, "CHILD", [], "NEW")],
+    }));
+    media = mediaFile(directory, bytes);
+    const result = await run();
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      attachmentId: "x-coredata://ABC/ICAttachment/p9",
+      name: "report.pdf",
+      verifiedBy: "database",
+      bytes: bytes.length,
+    });
+    expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+    expect(manager.getAttachmentBase64ById).not.toHaveBeenCalled();
+  });
+
+  it("refuses a new row whose file bytes differ, and says not to attach again", async () => {
+    let media = "";
+    let calls = 0;
+    const { directory, run } = setup(() => ({
+      orderSource: "creation",
+      attachments: calls++ === 0 ? [] : [row(9, "NEW", [media])],
+    }));
+    media = mediaFile(directory, Buffer.from("different"));
+    const result = await run();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/ICAttachment\/p9.*do not attach the file again/);
+  });
+
+  it("refuses a row that disagrees with the id Notes returned", async () => {
+    let media = "";
+    let calls = 0;
+    const { directory, run } = setup(
+      () => ({
+        orderSource: "creation",
+        attachments: calls++ === 0 ? [] : [row(9, "NEW", [media])],
+      }),
+      "x-coredata://ABC/ICAttachment/p8"
+    );
+    media = mediaFile(directory, bytes);
+    const result = await run();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/outcome uncertain/);
+  });
+
+  it("stays uncertain when no new row appears", async () => {
+    const { run } = setup(() => ({ orderSource: "creation", attachments: [row(4, "OLD", [])] }));
+    const result = await run();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/outcome uncertain/);
+    expect(result.content[0].text).not.toMatch(/Full Disk Access/);
+  });
+
+  it("stays uncertain and names Full Disk Access when the database cannot be read", async () => {
+    const { run } = setup(() => {
+      throw new Error("Full Disk Access is required");
+    });
+    const result = await run();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/outcome uncertain.*Full Disk Access/);
+  });
+});

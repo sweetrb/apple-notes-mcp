@@ -2,9 +2,9 @@
  * The public native helper: build, verify, and call.
  *
  * Some Notes content can only be read through Apple frameworks that have no
- * command-line or AppleScript surface (PencilKit for classic drawings). The
- * helper is a small Swift program that links PUBLIC frameworks only. No
- * prebuilt binary ships with the package:
+ * command-line or AppleScript surface (PencilKit for classic drawings, Speech
+ * for on-device transcription). The helper is a small Swift program that links
+ * PUBLIC frameworks only. No prebuilt binary ships with the package:
  *
  * - `apple-notes-mcp setup --public-helper` compiles the packaged source with
  *   `xcrun swiftc`, ad-hoc signs it, runs its `hello` handshake, and installs
@@ -16,7 +16,8 @@
  *   every response is schema-checked by the caller before use.
  *
  * The helper never opens the Notes database or writes to the Notes group
- * container: the server reads what it needs read-only and passes bytes in.
+ * container: the server reads what it needs read-only and passes bytes in, or
+ * names one audio file for the helper to open read-only.
  *
  * Shared-code note: the manifest, install inspection, spawn/timeout handling
  * and build steps mirror the opt-in private helper's; both could later move to
@@ -25,7 +26,7 @@
  *
  * @module services/publicHelper
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -41,7 +42,7 @@ import { homedir, release } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { CodedError } from "@/utils/errorCodes.js";
+import { CodedError, type ErrorCode } from "@/utils/errorCodes.js";
 
 /** The only protocol version this client speaks. Bump with the Swift `protocolVersion`. */
 export const PUBLIC_HELPER_PROTOCOL = 1;
@@ -58,7 +59,11 @@ export const PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helpe
  * stays reachable from scripts/test-public-helper.mjs, which runs the binary
  * directly, but is refused here before anything is spawned.
  */
-export const PUBLIC_HELPER_ACTIONS: ReadonlySet<string> = new Set(["hello", "decode_drawing"]);
+export const PUBLIC_HELPER_ACTIONS: ReadonlySet<string> = new Set([
+  "hello",
+  "decode_drawing",
+  "transcribe",
+]);
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
@@ -98,6 +103,11 @@ export interface PublicHelperDeps {
   exists: (path: string) => boolean;
   readFile: (path: string) => Buffer;
   spawn: typeof spawnSync;
+  /**
+   * Async spawn for actions that can run for minutes (transcription), so the
+   * server keeps serving other requests. Defaults to node's `spawn`.
+   */
+  spawnAsync?: typeof spawn;
 }
 
 /** Locate the package root: the nearest directory whose package.json names this package. */
@@ -132,6 +142,7 @@ export function defaultPublicHelperDeps(
     exists: existsSync,
     readFile: (path) => readFileSync(path),
     spawn: spawnSync,
+    spawnAsync: spawn,
     ...overrides,
   };
 }
@@ -211,11 +222,18 @@ const UNAVAILABLE_CODES: ReadonlySet<string> = new Set<PublicHelperUnavailable>(
   "helper_manifest_invalid",
 ]);
 
+/** Helper codes with a more specific envelope code than `operation_failed`. */
+const ENVELOPE_CODES: Readonly<Record<string, ErrorCode>> = {
+  invalid_request: "validation_error",
+  attachment_not_found: "not_found",
+};
+
 /**
  * A helper failure with a stable machine code. It carries the coded error
  * envelope: `unsupported` while the helper is unavailable (not built, stale,
- * modified, or not macOS), `operation_failed` otherwise, with the helper's
- * own code as `helperCode`.
+ * modified, or not macOS), `validation_error` for a rejected request,
+ * `not_found` for a missing attachment, `operation_failed` otherwise, with the
+ * helper's own code as `helperCode`.
  */
 export class PublicHelperError extends CodedError {
   constructor(
@@ -223,7 +241,9 @@ export class PublicHelperError extends CodedError {
     message: string
   ) {
     super(message, {
-      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : "operation_failed",
+      code: UNAVAILABLE_CODES.has(code)
+        ? "unsupported"
+        : (ENVELOPE_CODES[code] ?? "operation_failed"),
       helperCode: code,
     });
     this.name = "PublicHelperError";
@@ -244,7 +264,10 @@ export const publicHelloSchema = z
 export interface PublicCallOptions {
   /** Run this binary without the installation check (setup's handshake only). */
   binaryPath?: string;
-  /** Per-call timeout; the env override still wins when set. */
+  /**
+   * Per-call timeout for actions whose run time depends on the input (for
+   * example transcription length). Takes precedence over the env default.
+   */
   timeoutMs?: number;
 }
 
@@ -260,24 +283,9 @@ export function callPublicHelper(
   deps: PublicHelperDeps = defaultPublicHelperDeps(),
   options: PublicCallOptions = {}
 ): Record<string, unknown> {
-  if (!PUBLIC_HELPER_ACTIONS.has(action))
-    throw new PublicHelperError(
-      "unknown_action",
-      `"${action}" is not an action the server sends to the public helper.`
-    );
-  let binaryPath = options.binaryPath;
-  if (!binaryPath) {
-    const install = inspectPublicHelper(deps);
-    if (!install.ready)
-      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-    binaryPath = install.binaryPath;
-  }
-  const timeout =
-    Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) ||
-    options.timeoutMs ||
-    DEFAULT_TIMEOUT_MS;
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
   const result = deps.spawn(binaryPath, [], {
-    input: JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields }),
+    input,
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
@@ -291,24 +299,133 @@ export function callPublicHelper(
       "helper_unreachable",
       `Could not run the helper: ${result.error.message}`
     );
+  return parseHelperOutput(result.status, String(result.stdout ?? ""));
+}
+
+export interface PublicAsyncCallOptions extends PublicCallOptions {
+  /** Aborting kills the helper at once and rejects with code `aborted`. */
+  signal?: AbortSignal;
+}
+
+/**
+ * The asynchronous form of {@link callPublicHelper}, for actions that can run
+ * for minutes. The helper runs as a child process without blocking the event
+ * loop, so the server keeps answering other requests. On timeout or abort the
+ * helper is killed with SIGKILL; a timeout rejects with code `timeout`, an
+ * abort with code `aborted`.
+ */
+export async function callPublicHelperAsync(
+  action: string,
+  fields: Record<string, unknown> = {},
+  deps: PublicHelperDeps = defaultPublicHelperDeps(),
+  options: PublicAsyncCallOptions = {}
+): Promise<Record<string, unknown>> {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const { signal } = options;
+  const aborted = () =>
+    new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
+  if (signal?.aborted) throw aborted();
+  return new Promise((resolvePromise, reject) => {
+    const child = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let failure: PublicHelperError | null = null;
+    const stop = (error: PublicHelperError) => {
+      failure ??= error;
+      child.kill("SIGKILL");
+    };
+    const timer = setTimeout(
+      () =>
+        stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
+      timeout
+    );
+    const onAbort = () => stop(aborted());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    child.stdout?.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES)
+        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
+      else chunks.push(chunk);
+    });
+    child.on("error", (error) => {
+      settle();
+      reject(
+        failure ??
+          new PublicHelperError("helper_unreachable", `Could not run the helper: ${error.message}`)
+      );
+    });
+    child.on("close", (status, exitSignal) => {
+      settle();
+      if (failure) return reject(failure);
+      if (status === null && exitSignal)
+        return reject(
+          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
+        );
+      try {
+        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    // A helper that exits before reading stdin closes the pipe; its exit status tells the story.
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(input);
+  });
+}
+
+/** Allowlist, installation check, timeout and request body shared by both call forms. */
+function prepareCall(
+  action: string,
+  fields: Record<string, unknown>,
+  deps: PublicHelperDeps,
+  options: PublicCallOptions
+): { binaryPath: string; timeout: number; input: string } {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout =
+    options.timeoutMs ||
+    Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) ||
+    DEFAULT_TIMEOUT_MS;
+  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
+  return { binaryPath, timeout, input };
+}
+
+/** Parse and schema-check one helper answer; every failure is a PublicHelperError. */
+function parseHelperOutput(status: number | null, stdout: string): Record<string, unknown> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(result.stdout ?? "").trim());
+    parsed = JSON.parse(stdout.trim());
   } catch {
     throw new PublicHelperError(
       "invalid_response",
-      `The helper exited with status ${result.status} and no JSON response.`
+      `The helper exited with status ${status} and no JSON response.`
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
     throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
   const object = parsed as Record<string, unknown>;
-  if (result.status !== 0 || object.status !== "ok") {
+  if (status !== 0 || object.status !== "ok") {
     const error = errorSchema.safeParse(object);
     if (!error.success)
       throw new PublicHelperError(
         "invalid_response",
-        `The helper failed with an unrecognized response (exit ${result.status}).`
+        `The helper failed with an unrecognized response (exit ${status}).`
       );
     throw new PublicHelperError(error.data.code, error.data.message);
   }
@@ -360,6 +477,11 @@ export const PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
  * Info.plist linked into the binary's `__TEXT,__info_plist` section. Some
  * frameworks (PencilKit's replica bookkeeping, privacy prompts) need a bundle
  * identifier and trap in a bare command-line tool without one.
+ *
+ * It deliberately carries no NSSpeechRecognitionUsageDescription: the helper
+ * never asks for Speech Recognition access, and without a usage string macOS
+ * stops a process that requests it instead of showing a prompt, so a request
+ * can never leave the helper waiting on a dialog nobody sees.
  */
 export function publicHelperInfoPlist(): string {
   return [
@@ -394,6 +516,10 @@ export function publicHelperCompileArguments(
     "AppKit",
     "-framework",
     "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
     "-Xlinker",
     "-sectcreate",
     "-Xlinker",
