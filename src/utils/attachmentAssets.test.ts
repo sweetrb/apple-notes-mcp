@@ -547,6 +547,15 @@ describe("small helpers", () => {
         "asset"
       )
     ).toBe("ID1.pdf");
+    // A stored identifier that could traverse never becomes part of the name.
+    for (const identifier of ["../../escape", "..", "a/b", ""]) {
+      expect(exportFileName({ identifier, filename: null }, "/x/FallbackImage.png", "asset")).toBe(
+        "attachment.png"
+      );
+      expect(exportFileName({ identifier, filename: null }, "/x/Preview.png", "preview")).toBe(
+        "attachment-preview.png"
+      );
+    }
     expect(collisionName("a.png", 1)).toBe("a.png");
     expect(collisionName("a.png", 2)).toBe("a-2.png");
     expect(collisionName("README", 3)).toBe("README-3");
@@ -754,6 +763,21 @@ describe("export", () => {
       exportedKind: null,
       exportedTo: null,
     });
+  });
+
+  it("keeps a traversing stored identifier inside the export directory", () => {
+    const sourceDir = join(root, "generic-source");
+    mkdirSync(sourceDir, { recursive: true });
+    const source = join(sourceDir, "FallbackImage.png");
+    writeFileSync(source, "png");
+    const dir = join(exportRoot, "traversal");
+    mkdirSync(dir, { recursive: true });
+    const r = exportOneAttachment(rec("../../escape", "image", { filename: null }), dir, {
+      path: source,
+      kind: "asset",
+    });
+    expect(r.exportedTo).toBe(join(dir, "attachment.png"));
+    expect(existsSync(join(exportRoot, "..", "escape.png"))).toBe(false);
   });
 
   it("chooses the asset over the preview", () => {

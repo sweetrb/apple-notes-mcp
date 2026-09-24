@@ -109,6 +109,13 @@ describe("safety refusals", () => {
     [svg('<rect fill="url(https://example.com/p)" width="1" height="1"/>'), "svg_unsafe"],
     [svg('<a href="javascript:alert(1)"><rect width="1" height="1"/></a>'), "svg_unsafe"],
     [svg('<rect style="fill:red;@import url(#x)" width="1" height="1"/>'), "svg_unsafe"],
+    // CSS escapes spell url( and @import; a tab or newline splits a scheme name.
+    [svg('<rect style="fill:u\\72 l(https://example.com/p)" width="1" height="1"/>'), "svg_unsafe"],
+    [svg('<rect fill="\\75rl(https://example.com/p)" width="1" height="1"/>'), "svg_unsafe"],
+    [svg('<rect style="fill:red;\\@import \'x\'" width="1" height="1"/>'), "svg_unsafe"],
+    [svg('<a href="java&#9;script:alert(1)"><rect width="1" height="1"/></a>'), "svg_unsafe"],
+    [svg('<a href="&#10;java&#13;script:alert(1)"><rect width="1" height="1"/></a>'), "svg_unsafe"],
+    [svg('<rect fill="url(&#9;https://example.com/p)" width="1" height="1"/>'), "svg_unsafe"],
     ['<!DOCTYPE svg><svg xmlns="http://www.w3.org/2000/svg"/>', "svg_unsafe"],
     [svg("&ent;"), "svg_unsafe"],
     ['<svg xmlns="http://www.w3.org/2000/svg"><g></svg>', "svg_invalid"],
@@ -138,6 +145,19 @@ describe("safety refusals", () => {
 });
 
 describe("references", () => {
+  it("prefers a plain href over xlink:href, as SVG 2 does", () => {
+    const XL = 'xmlns:xlink="http://www.w3.org/1999/xlink"';
+    const r = run(
+      svg(
+        `<defs><path id="a" d="M0 0 L5 5" stroke="red" ${ROUND}/><path id="b" d="M0 0 L5 6" stroke="red" ${ROUND}/></defs>` +
+          `<use xlink:href="#a" href="#b"/>`,
+        `width="100" height="100" ${XL}`
+      )
+    );
+    expect(r.drawing.strokes).toHaveLength(1);
+    expect(r.drawing.strokes[0].points[1]).toEqual([5, 6]);
+  });
+
   it("expands use of symbols with viewBox and of plain elements", () => {
     const r = run(
       svg(
@@ -285,6 +305,32 @@ describe("styles", () => {
     );
     expect(r.drawing.strokes).toHaveLength(1);
     expect(r.drawing.strokes[0].points[1]).toEqual([5, 6]);
+  });
+
+  it("lets a later display declaration re-show content hidden by an earlier one", () => {
+    const r = run(
+      svg(
+        `<g display="none" style="display:inline"><path d="M0 0 L5 5" stroke="red" ${ROUND}/></g>` +
+          `<g display="inline" style="display:none"><path d="M0 0 L5 6" stroke="red" ${ROUND}/></g>`
+      )
+    );
+    expect(r.drawing.strokes).toHaveLength(1);
+    expect(r.drawing.strokes[0].points[1]).toEqual([5, 5]);
+  });
+
+  it("matches CSS keywords case-insensitively", () => {
+    const r = run(
+      svg(
+        `<g display="NONE"><path d="M0 0 L5 5" stroke="red"/></g>` +
+          `<g visibility="Hidden"><path d="M0 0 L5 5" stroke="red"/></g>` +
+          `<path d="M0 0 L5 6" stroke="red" stroke-linecap="Round" stroke-linejoin="ROUND" fill="none" stroke-dasharray="None"/>`
+      )
+    );
+    expect(r.drawing.strokes).toHaveLength(1);
+    expect(codes(r)).not.toContain("cap_approximated");
+    expect(codes(r)).not.toContain("invalid_value");
+    const rule = run(svg('<path d="M0 0 L10 0 L10 10 Z" fill="red" fill-rule="EvenOdd"/>'));
+    expect(codes(rule)).not.toContain("invalid_value");
   });
 
   it("reports ignored, invalid and unsupported properties", () => {
@@ -498,6 +544,23 @@ describe("limits and elements", () => {
     );
     // Each case builds input just past a budget; slow under coverage instrumentation.
   }, 30_000);
+
+  it("stops flattening a hostile path at the geometry budget, not after it", () => {
+    // Each cubic flattens to hundreds of points at this scale; charging only
+    // after a whole subpath was flattened let a 1 MiB file exhaust the heap.
+    const d = "M0 0" + " c1 1 -1 1 0 0".repeat(20_000);
+    const started = Date.now();
+    const error = refused(svg(`<path d="${d}" transform="scale(100000)" stroke="red"/>`));
+    expect(error.code).toBe("svg_complexity_limit");
+    expect(error.message).toMatch(/geometryWork/);
+    expect(Date.now() - started).toBeLessThan(20_000);
+  }, 30_000);
+
+  it("refuses out-of-range control points before flattening them", () => {
+    const d = "M0 0" + " c1 1 -1 1 0 0".repeat(20_000);
+    const error = refused(svg(`<path d="${d}" transform="scale(1e9)" stroke="red"/>`));
+    expect(error.code).toBe("svg_geometry_invalid");
+  });
 
   it("limits traversal depth through nested references", () => {
     let chain = "";

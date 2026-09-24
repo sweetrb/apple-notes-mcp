@@ -704,7 +704,7 @@ registerTool(
         .max(MAX.SAVE_PATH)
         .optional()
         .describe(
-          `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
+          `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes), except hidden paths (such as ~/.ssh or ~/.config) and ~/Library; symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
         ),
       format: z
         .enum(["plaintext", "html", "markdown"])

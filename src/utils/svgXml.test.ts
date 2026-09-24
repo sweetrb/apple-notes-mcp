@@ -101,6 +101,45 @@ describe("parseXml", () => {
     );
   });
 
+  it("caps attributes per element and namespace declarations", () => {
+    const attrs = Array.from({ length: 5 }, (_, i) => `a${i}="1"`).join(" ");
+    expect(code(() => parseXml(`<svg ${attrs}/>`, { ...LIMITS, maxAttributes: 4 }))).toBe(
+      "svg_complexity_limit"
+    );
+    expect(parseXml(`<svg ${attrs}/>`, { ...LIMITS, maxAttributes: 5 }).attributes).toHaveLength(5);
+    const ns = Array.from({ length: 3 }, (_, i) => `xmlns:p${i}="urn:${i}"`).join(" ");
+    expect(
+      code(() =>
+        parseXml(`<svg ${ns}><g xmlns:q="urn:q"/></svg>`, {
+          ...LIMITS,
+          maxNamespaceDeclarations: 3,
+        })
+      )
+    ).toBe("svg_complexity_limit");
+  });
+
+  it("checks duplicate attributes in linear time", () => {
+    const attrs = Array.from({ length: 100_000 }, (_, i) => `a${i}=""`).join(" ");
+    const started = Date.now();
+    const root = parseXml(`<svg ${attrs}/>`, { ...LIMITS, maxAttributes: 100_000 });
+    expect(root.attributes).toHaveLength(100_000);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("resolves prefixes through enclosing scopes and lets inner declarations shadow them", () => {
+    const root = parseXml(
+      '<svg xmlns="urn:a" xmlns:p="urn:p"><g><p:x/><h xmlns="urn:b"><p:y xmlns:p="urn:q"/><k/></h><m/></g></svg>',
+      LIMITS
+    );
+    const g = root.children[0];
+    expect(g.ns).toBe("urn:a");
+    expect(g.children[0].ns).toBe("urn:p");
+    const h = g.children[1];
+    expect(h.ns).toBe("urn:b");
+    expect(h.children.map((c) => c.ns)).toEqual(["urn:q", "urn:b"]);
+    expect(g.children[2].ns).toBe("urn:a");
+  });
+
   it("gives SvgError a location", () => {
     const e = new SvgError("svg_unsafe", "m", "svg/g[1]");
     expect(e.location).toBe("svg/g[1]");

@@ -297,11 +297,15 @@ export function pasteboardFilename(
   return ext && !extname(requested) ? requested + ext : requested;
 }
 
-/** Reads a copied file without following a final symlink. */
+/**
+ * Reads a copied file without following a final symlink. O_NONBLOCK keeps a
+ * copied FIFO from blocking the event loop (it is then refused as not a
+ * regular file); it does not affect reading a regular file.
+ */
 function readRegularFile(path: string): Buffer {
   let descriptor: number;
   try {
-    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   } catch {
     throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
   }
