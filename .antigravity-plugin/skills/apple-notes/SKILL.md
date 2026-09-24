@@ -96,7 +96,7 @@ Use this skill when the user:
 | Tool                             | Purpose                                                                                                                                                                            |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list-attachments`               | List attachments in a note; `includePaths` adds on-disk `assetPaths`/`previewPath`, `firstImage` returns the lead visual in body order                                             |
-| `add-attachment`                 | Attach one local file to an exact note (`filename` renames it); a macOS 27 PDF "outcome uncertain": read the note before retrying                                                  |
+| `add-attachment`                 | Attach one local file (home, temp or /Volumes; no hidden paths or ~/Library) to an exact note (`filename` renames it); a macOS 27 PDF "outcome uncertain": read the note first     |
 | `create-note-with-attachment`    | Create a note and attach one local file in one call; on a failed attach, reuse the named note id with `add-attachment`                                                             |
 | `add-attachment-from-pasteboard` | Attach the copied image, PDF, or one file to an exact note (note checked first, pasteboard frozen, never modified); `pasteboard_access_denied`: ask before `allowPasteAlert: true` |
 | `save-attachment`                | Save an attachment to disk                                                                                                                                                         |

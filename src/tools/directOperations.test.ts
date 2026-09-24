@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
@@ -593,6 +594,127 @@ describe("attachment filename override and create-then-attach", () => {
       new RegExp(`Note ${id} was created; attach to it with add-attachment`)
     );
     expect(result.structuredContent).toMatchObject({ committed: true, indeterminate: false });
+  });
+
+  // The attachment path gets the same read scope as create-note's contentPath
+  // (#256): a prompt must not attach ~/.ssh/id_ed25519 to a synced note.
+  describe("attachment read scope", () => {
+    const privateTree = () => {
+      const directory = mkdtempSync(join(tmpdir(), "direct-operation-scope-test-"));
+      directories.push(directory);
+      mkdirSync(join(directory, ".ssh"));
+      writeFileSync(join(directory, ".ssh", "key.txt"), bytes);
+      symlinkSync(join(directory, ".ssh"), join(directory, "keys"), "dir");
+      return directory;
+    };
+
+    it("refuses a file in a hidden directory", async () => {
+      const { manager, handler } = setup("key.txt");
+      const result = await handler("add-attachment")({
+        id,
+        expectedContentHash: "revision",
+        path: join(privateTree(), ".ssh", "key.txt"),
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/hidden file or directory/);
+      expect(result.content[0].text).toMatch(/APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS/);
+      expect(result.structuredContent).toEqual({
+        code: "validation_error",
+        committed: false,
+        indeterminate: false,
+      });
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    });
+
+    it("refuses a hidden directory reached through a visible symlinked directory", async () => {
+      const { manager, handler } = setup("key.txt");
+      const result = await handler("add-attachment")({
+        id,
+        expectedContentHash: "revision",
+        path: join(privateTree(), "keys", "key.txt"),
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/hidden file or directory/);
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    });
+
+    it("refuses a private path before create-note-with-attachment creates the note", async () => {
+      const { manager, handler } = setup("key.txt");
+      const result = await handler("create-note-with-attachment")({
+        title: "New",
+        path: join(privateTree(), ".ssh", "key.txt"),
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/hidden file or directory/);
+      expect(manager.createNote).not.toHaveBeenCalled();
+    });
+
+    // On a case-insensitive volume "~/library" names ~/Library; only the
+    // re-check after realpath sees the real spelling.
+    it.runIf(process.platform === "darwin")(
+      "refuses a case variant of ~/Library after realpath",
+      async () => {
+        const caches = join(homedir(), "Library", "Caches");
+        mkdirSync(caches, { recursive: true });
+        const directory = mkdtempSync(join(caches, "direct-operation-case-test-"));
+        directories.push(directory);
+        writeFileSync(join(directory, "key.txt"), bytes);
+        const variant = join(homedir(), "library", "Caches", basename(directory), "key.txt");
+        if (!existsSync(variant)) return; // case-sensitive volume: nothing to alias
+        const { manager, handler } = setup("key.txt");
+        const result = await handler("add-attachment")({
+          id,
+          expectedContentHash: "revision",
+          path: variant,
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toMatch(/~\/Library/);
+        expect(manager.addAttachmentById).not.toHaveBeenCalled();
+      }
+    );
+
+    it("refuses a path outside home, temp and /Volumes", async () => {
+      const { manager, handler } = setup("hosts");
+      const result = await handler("add-attachment")({
+        id,
+        expectedContentHash: "revision",
+        path: "/etc/hosts",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/outside allowed locations/);
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    });
+
+    it("refuses a FIFO without blocking on open", async () => {
+      const directory = mkdtempSync(join(tmpdir(), "direct-operation-fifo-test-"));
+      directories.push(directory);
+      const fifo = join(directory, "pipe.txt");
+      execFileSync("mkfifo", [fifo]);
+      const { manager, handler } = setup("pipe.txt");
+      const result = await handler("add-attachment")({
+        id,
+        expectedContentHash: "revision",
+        path: fifo,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/not a regular file/);
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    });
+
+    it("attaches a hidden path only when the server opts in", async () => {
+      const { handler } = setup("key.txt");
+      vi.stubEnv("APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS", "1");
+      try {
+        const result = await handler("add-attachment")({
+          id,
+          expectedContentHash: "revision",
+          path: join(privateTree(), ".ssh", "key.txt"),
+        });
+        expect(result.structuredContent).toMatchObject({ ok: true, attachmentId });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 
   // The note was created, so a pre-insertion revision conflict must not read
