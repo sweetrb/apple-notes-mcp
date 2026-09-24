@@ -53483,7 +53483,10 @@ function registerDirectOperations(server2, manager) {
     {
       id: folderId,
       expectedName: external_exports.string().max(1e3),
-      expectedParentId: external_exports.string().max(2e3),
+      // Same forms as id, so list-folders' parentIdentifier (a folder UUID)
+      // works; a top-level folder's parent is its account, passed as the
+      // account's x-coredata id.
+      expectedParentId: folderId,
       newName: external_exports.string().min(1).max(1e3)
     },
     (args) => ({
@@ -53864,7 +53867,9 @@ function readFolderStoreFacts(pk, dbPath2 = NOTE_STORE_PATH) {
 
 // src/tools/folderDelete.ts
 var folderIdSchema = external_exports.string().max(2e3).transform(looseIdTransform("ICFolder"));
-var accountIdSchema = external_exports.string().max(2e3).regex(/^x-coredata:\/\/[0-9a-f-]+\/ICAccount\/p\d+$/i, "An exact account ID is required");
+var accountIdSchema = external_exports.string().max(2e3).transform(looseIdTransform("ICAccount")).pipe(
+  external_exports.string().regex(/^x-coredata:\/\/[0-9a-f-]+\/ICAccount\/p\d+$/i, "An exact account ID is required")
+);
 var revisionSchema = external_exports.string().regex(/^sha256:[a-f0-9]{64}$/);
 var defaultDeps = {
   readStore: (pk) => readFolderStoreFacts(pk),

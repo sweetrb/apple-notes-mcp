@@ -45,7 +45,8 @@ vi.mock(import("child_process"), async (importOriginal) => {
       sqlite.calls.push(sql);
       if (sqlite.mode === "no_fda") throw new Error("Error: unable to open database file");
       const entity = /Z_NAME = '(\w+)'/.exec(sql)?.[1];
-      const identifier = entity === "ICFolder" ? FOLDER_UUID : NOTE_UUID;
+      const identifier =
+        entity === "ICFolder" ? FOLDER_UUID : entity === "ICAccount" ? ACCOUNT_UUID : NOTE_UUID;
       return JSON.stringify({
         store: STORE,
         rows: [
@@ -173,6 +174,7 @@ const FOLDER_ID_FIELDS: Array<[string, string]> = [
   ["show-folder", "id"],
   ["get-folder-by-id", "id"],
   ["rename-folder", "id"],
+  ["rename-folder", "expectedParentId"],
   ["delete-folder-by-id", "id"],
   ["delete-folder-by-id", "expectedParentId"],
 ];
@@ -209,6 +211,19 @@ describe("id inputs accept Notes UUIDs and numeric keys", () => {
     expect(field(tool, name).parse(FOLDER_UUID)).toBe(FOLDER_ID);
     expect(field(tool, name).parse("42")).toBe(FOLDER_ID);
     expect(sqlite.calls.every((sql) => sql.includes("Z_NAME = 'ICFolder'"))).toBe(true);
+  });
+
+  it("delete-folder-by-id.expectedAccountId resolves account UUIDs and keys (#190)", () => {
+    const schema = field("delete-folder-by-id", "expectedAccountId");
+    const ACCOUNT_ID = `x-coredata://${STORE}/ICAccount/p42`;
+    expect(schema.parse(ACCOUNT_UUID)).toBe(ACCOUNT_ID);
+    expect(schema.parse("42")).toBe(ACCOUNT_ID);
+    expect(sqlite.calls.every((sql) => sql.includes("Z_NAME = 'ICAccount'"))).toBe(true);
+    sqlite.calls = [];
+    expect(schema.parse(ACCOUNT_ID)).toBe(ACCOUNT_ID);
+    expect(sqlite.calls).toEqual([]);
+    expect(schema.safeParse("Work account").success).toBe(false);
+    expect(schema.safeParse(FOLDER_ID).success).toBe(false);
   });
 
   it("resolves note lookups against the ICNote entity only", () => {

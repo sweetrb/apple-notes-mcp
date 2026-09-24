@@ -27,10 +27,17 @@ import { CodedError, errorResult } from "../utils/errorCodes.js";
 // Notes UUID or numeric Core Data key, resolved to the x-coredata id before the
 // handler runs. The manager methods then require the exact x-coredata form.
 const folderIdSchema = z.string().max(2000).transform(looseIdTransform("ICFolder"));
+// The account's Notes UUID or numeric key is resolved the same way, then the
+// result must be an exact account id.
 const accountIdSchema = z
   .string()
   .max(2000)
-  .regex(/^x-coredata:\/\/[0-9a-f-]+\/ICAccount\/p\d+$/i, "An exact account ID is required");
+  .transform(looseIdTransform("ICAccount"))
+  .pipe(
+    z
+      .string()
+      .regex(/^x-coredata:\/\/[0-9a-f-]+\/ICAccount\/p\d+$/i, "An exact account ID is required")
+  );
 const revisionSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 
 /** Arguments accepted by `delete-folder-by-id`. */

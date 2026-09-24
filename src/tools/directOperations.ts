@@ -197,7 +197,10 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
     {
       id: folderId,
       expectedName: z.string().max(1000),
-      expectedParentId: z.string().max(2000),
+      // Same forms as id, so list-folders' parentIdentifier (a folder UUID)
+      // works; a top-level folder's parent is its account, passed as the
+      // account's x-coredata id.
+      expectedParentId: folderId,
       newName: z.string().min(1).max(1000),
     },
     (args) => ({
