@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.15] - 2026-09-24
+## [2.9.17] - 2026-09-24
 
 ### Added
 
@@ -36,6 +36,66 @@
 - Known limitation (#236): a pasted PDF, like one sent to `add-attachment`,
   is inserted but reported as uncertain on macOS 27, because AppleScript does
   not list PDF attachments.
+
+## [2.9.16] - 2026-09-24
+
+### Added
+
+- Markdown template library tools: `list-markdown-templates`,
+  `show-markdown-template` (portable form, or `expanded` with every rule),
+  `validate-markdown-template` (by name, inline JSON or file; returns every
+  problem with a JSON path), `save-markdown-template` (lowercase slug names,
+  create-only unless `force`, validated first, 256 KiB cap, written to a
+  temporary file and moved into place with mode 0600 in a 0700 directory) and
+  `delete-markdown-template`. Built-in names are reserved. Listing skips
+  unreadable, invalid and symlinked entries and counts them.
+- `export-notes-markdown` `template` also accepts a saved template's name.
+- `APPLE_NOTES_MCP_TEMPLATE_DIR` sets the library directory (default
+  `~/Library/Application Support/apple-notes-mcp/templates`).
+- The capability matrix lists the library as `markdownTemplateLibrary`.
+- `validate-markdown-template` and `save-markdown-template` read
+  `templateFile` with the same rules as `export-notes-markdown` (`.json`
+  only) and return none of a file's contents when it is not a template.
+
+## [2.9.15] - 2026-09-24
+
+### Added
+
+- `export-notes-markdown` accepts `template` (built-in `standard-markdown` or
+  `obsidian`) or `templateFile` (a JSON template in an allowed location). A
+  template is portable, data-only JSON (schema version 1) with 43 rules for
+  every block style, inline format, highlight color, attachment kind,
+  per-note header and footer, and note separator; five rule modes (`wrap`,
+  `linePrefix`, `pattern`, `plain`, `omit`); line or paragraph joins; an
+  inline nesting order; `{{placeholder}}` tokens with `:raw` and `:yaml`
+  modifiers for YAML front matter (title, dates, folder, account, tags, ids);
+  rich-link images with italic captions; and asset modes `copy`,
+  `reference` and `omit` with relative or absolute links. Validation reports
+  every problem with a JSON path before any note is read
+  (`[invalid-template]`). Templated copies get stable content-hashed names,
+  are reused on repeat exports, and never replace a different file.
+  Templated receipts add `template`, `warnings` (seven codes, such as
+  `missing_asset`) and `assetFiles`. docs/markdown-templates.md documents the
+  schema.
+- Template errors never quote the template file's contents: a JSON syntax
+  error reports only its line and column, a wrong value is reported by its
+  allowed values or type, long keys and placeholders are shortened, and a
+  file without `"schemaVersion": 1` gets that one error and nothing else.
+  `templateFile` must end in `.json`.
+- Templated exports read each note's metadata (UUID, dates, folder, account)
+  only when a rule or asset setting uses one of those placeholders, so a
+  `standard-markdown` export runs no extra database reads.
+- `src/utils/markdownTemplate.ts` (schema, validation, built-ins),
+  `templateRender.ts` (renderer; `standard-markdown` output is tested equal
+  to the default renderer), `templateAssets.ts` (hashed and reference
+  writers, template file reads), and `readExportNoteMeta` in
+  `noteExportData.ts` (UUID, dates, folder and account, read-only, with
+  feature-detected columns and a bound note key).
+
+### Unchanged
+
+- `export-notes-markdown` without a template produces the same output as
+  2.9.14.
 
 ## [2.9.14] - 2026-09-24
 

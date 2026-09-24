@@ -1,0 +1,264 @@
+/**
+ * Files for templated Markdown exports: asset writers with stable
+ * content-hashed names, a writer that links to the original files, the
+ * per-note assets directory a template asks for, and reading a template file
+ * from an allowed location.
+ *
+ * Nothing here replaces or deletes an existing file. A hashed asset whose
+ * name is already taken is reused only when the existing regular file has the
+ * same content; anything else is reported as an error for that asset.
+ *
+ * @module utils/templateAssets
+ */
+import { createHash } from "node:crypto";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  writeSync,
+} from "node:fs";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  assertExportPath,
+  encodePathUrl,
+  safeAssetName,
+  sniffMime,
+  type AssetWriter,
+  type PlacedAsset,
+  type ResolvedAsset,
+} from "./exportAssets.js";
+import {
+  fillPlaceholders,
+  MAX_TEMPLATE_BYTES,
+  type PlaceholderValues,
+} from "./markdownTemplate.js";
+
+const CHUNK = 1024 * 1024;
+
+/** Open a regular file without following a final symlink. */
+function openRegular(path: string): number {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  if (!fstatSync(fd).isFile()) {
+    closeSync(fd);
+    throw new Error("not a regular file");
+  }
+  return fd;
+}
+
+/** SHA-256 of a file's content and its first bytes. */
+function digest(fd: number): { hash: string; head: Buffer } {
+  const hash = createHash("sha256");
+  const chunk = Buffer.alloc(CHUNK);
+  let head = Buffer.alloc(0);
+  for (let position = 0; ;) {
+    const n = readSync(fd, chunk, 0, chunk.length, position);
+    if (n <= 0) break;
+    if (position === 0) head = Buffer.from(chunk.subarray(0, Math.min(n, 16)));
+    hash.update(chunk.subarray(0, n));
+    position += n;
+  }
+  return { hash: hash.digest("hex"), head };
+}
+
+/** Markdown URL for a file: relative to `linkBase` when given, else absolute. */
+function urlFor(target: string, linkBase: string | undefined): string {
+  return encodePathUrl(linkBase ? relative(linkBase, target).split(sep).join("/") : target);
+}
+
+/**
+ * Copies assets into one directory under stable names: a sanitized stem plus
+ * the first eight hex digits of the content's SHA-256 (`photo-1a2b3c4d.jpg`).
+ * Re-exporting the same file reuses the existing copy; a different file under
+ * that name is refused, never replaced. The directory must not be a symlink.
+ */
+export class HashedSidecarWriter implements AssetWriter {
+  private readonly placed = new Map<string, { url: string; mime: string }>();
+  private ready = false;
+  /** Absolute paths of files written or reused. */
+  readonly files: string[] = [];
+  count = 0;
+
+  constructor(
+    readonly dir: string,
+    private readonly linkBase?: string
+  ) {}
+
+  private prepare() {
+    if (this.ready) return;
+    assertExportPath(this.dir);
+    mkdirSync(this.dir, { recursive: true });
+    if (!lstatSync(this.dir).isDirectory()) throw new Error("assets directory is not a directory");
+    this.ready = true;
+  }
+
+  place(asset: ResolvedAsset): PlacedAsset {
+    const done = this.placed.get(asset.path);
+    if (done) return done;
+    let source: number;
+    try {
+      source = openRegular(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      const { hash, head } = digest(source);
+      const mime = sniffMime(head, asset.name);
+      this.prepare();
+      const name = safeAssetName(asset.name, mime);
+      const ext = extname(name);
+      const target = join(
+        this.dir,
+        `${name.slice(0, name.length - ext.length)}-${hash.slice(0, 8)}${ext}`
+      );
+      let existing: number | undefined;
+      try {
+        existing = openRegular(target);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT") return { error: "destination-not-regular" };
+      }
+      if (existing !== undefined) {
+        try {
+          if (digest(existing).hash !== hash) return { error: "name-taken" };
+        } finally {
+          closeSync(existing);
+        }
+      } else this.copy(source, target);
+      this.count++;
+      this.files.push(target);
+      const result = { url: urlFor(target, this.linkBase), mime };
+      this.placed.set(asset.path, result);
+      return result;
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      closeSync(source);
+    }
+  }
+
+  private copy(source: number, target: string) {
+    const out = openSync(
+      target,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o644
+    );
+    try {
+      const chunk = Buffer.alloc(CHUNK);
+      for (let position = 0; ;) {
+        const n = readSync(source, chunk, 0, chunk.length, position);
+        if (n <= 0) break;
+        let written = 0;
+        while (written < n) written += writeSync(out, chunk, written, n - written);
+        position += n;
+      }
+    } finally {
+      closeSync(out);
+    }
+  }
+}
+
+/** Links to the original files in place. Copies nothing. */
+export class ReferenceWriter implements AssetWriter {
+  count = 0;
+
+  constructor(private readonly linkBase?: string) {}
+
+  place(asset: ResolvedAsset): PlacedAsset {
+    let fd: number;
+    try {
+      fd = openRegular(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      const head = Buffer.alloc(16);
+      const n = readSync(fd, head, 0, 16, 0);
+      this.count++;
+      return {
+        url: urlFor(asset.path, this.linkBase),
+        mime: sniffMime(head.subarray(0, n), asset.name),
+      };
+    } finally {
+      closeSync(fd);
+    }
+  }
+}
+
+/** A placeholder value safe to use as one path component. */
+function pathComponent(value: string): string {
+  const clean = Array.from(value.normalize("NFC"), (char) =>
+    char.charCodeAt(0) < 32 || char === "\x7f" ? "_" : char
+  )
+    .join("")
+    .replace(/[/\\:]+/g, "_")
+    .replace(/^[.\s]+/, "")
+    .trim()
+    .slice(0, 120);
+  return clean || "untitled";
+}
+
+/**
+ * The absolute assets directory for one note: the template's `directory`
+ * with placeholders filled (each value made path-safe) beneath `outputDir`.
+ * Throws when the result is absolute or escapes `outputDir`.
+ */
+export function templateAssetsDir(
+  directory: string,
+  outputDir: string,
+  values: PlaceholderValues
+): string {
+  const safe: PlaceholderValues = {};
+  for (const [key, value] of Object.entries(values)) {
+    const raw = typeof value === "string" ? value : value?.raw;
+    if (raw !== undefined) safe[key as keyof PlaceholderValues] = pathComponent(raw);
+  }
+  const filled = fillPlaceholders(directory, safe);
+  const base = resolve(outputDir);
+  const dir = resolve(base, filled);
+  if (isAbsolute(filled) || filled.split("/").includes("..") || !dir.startsWith(base + sep))
+    throw new Error(`assets.directory "${directory}" resolves outside the output directory`);
+  return dir;
+}
+
+/**
+ * Read a template file from an allowed location (home, a temp directory, or
+ * /Volumes; never inside the Notes library). Refuses a name without a .json
+ * extension, symlinks, non-regular files, and files over the template size limit.
+ */
+export function readTemplateFile(path: string): string {
+  const abs = assertExportPath(path);
+  if (extname(abs).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${abs}`);
+  let fd: number;
+  try {
+    fd = openRegular(abs);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    throw new Error(
+      code === "ENOENT"
+        ? `Template file not found: ${abs}`
+        : code === "ELOOP"
+          ? `Refusing to read the symbolic link ${abs}`
+          : `Template file is not a readable regular file: ${abs}`
+    );
+  }
+  try {
+    const size = fstatSync(fd).size;
+    if (size > MAX_TEMPLATE_BYTES)
+      throw new Error(`Template file is ${size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`);
+    const data = Buffer.alloc(size);
+    let read = 0;
+    while (read < size) {
+      const n = readSync(fd, data, read, size - read, read);
+      if (n <= 0) break;
+      read += n;
+    }
+    return data.subarray(0, read).toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
+}

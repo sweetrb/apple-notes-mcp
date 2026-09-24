@@ -1710,6 +1710,8 @@ single note.
 | `outputPath` | string | No | Absolute file to create. Create-only: an existing file (or symlink) is refused with `[output_exists]` |
 | `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
 | `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
+| `template` | string | No | Render through a template: `standard-markdown`, `obsidian`, or a saved template's name. Exclusive with `templateFile` |
+| `templateFile` | string | No | Render through the JSON template in this `.json` file (same path rules; at most 256 KiB) |
 
 Both paths follow the `save-attachment` rules (absolute, under the home
 directory, a temp directory, or `/Volumes`, no symlink escapes) and may not
@@ -1723,6 +1725,19 @@ receipt: `format`, `count`, `bytes`, `output`, and `assets` (`dir`, `files`).
 Both carry `stats` (attachments, placed, placeholders, unavailable, tables,
 unreadableTables, unreferenced) and `skipped`. Nothing already written is
 deleted if a later step fails.
+
+**Templates:** `template` or `templateFile` renders through a portable JSON
+template that sets how every block style, inline format, attachment,
+per-note header and footer (for YAML front matter with title, dates,
+folder, tags and id), and the note separator are written. The built-in
+`standard-markdown` reproduces the default output; `obsidian` adds front
+matter and copies attachments into `<file>.assets` beside `outputPath`.
+Templated asset copies get stable content-hashed names and are reused on a
+repeat export. An invalid template is refused with `[invalid-template]` and
+one JSON path per problem, before any note is read. A templated receipt adds
+`template`, `warnings` (such as `missing_asset`) and `assetFiles`. See
+[docs/markdown-templates.md](docs/markdown-templates.md) for the schema,
+every rule and placeholder, and examples.
 
 ---
 
@@ -1767,6 +1782,88 @@ HTML file, so the file and its `.assets` directory can be moved together.
 **Returns:** `format`, `count`, `bytes`, `output`, either `embedded` (assets
 embedded) or `assets` (`dir`, `files`), `stats`, and `skipped`. Nothing
 already written is deleted if a later step fails.
+
+---
+
+#### `list-markdown-templates`
+
+Lists the Markdown export templates: the built-ins (`standard-markdown`,
+`obsidian`) and every saved template in the library, with its display name,
+description, size and modification date. Unreadable, invalid or unsafe files
+in the library are skipped and counted in `skipped`. Takes no parameters.
+
+**Returns:** `builtins`, `templates`, `skipped`, and `dir` (the library
+directory).
+
+---
+
+#### `show-markdown-template`
+
+Returns one template in its portable form: a built-in, or a saved template
+exactly as stored (overrides only). Use it as the starting point for a new
+template.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | A built-in or saved template name |
+| `expanded` | boolean | No | Also return `expanded`, with every rule filled in from its base |
+
+**Returns:** `name`, `source` (`builtin` or `saved`), `template`, and
+optionally `expanded`.
+
+---
+
+#### `validate-markdown-template`
+
+Checks a template without saving it. Pass exactly one of `name`, `template`
+or `templateFile`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | One of three | A saved or built-in template |
+| `template` | object or string | One of three | The template as a JSON object or JSON text |
+| `templateFile` | string | One of three | Absolute path of a JSON template file (home, a temp directory, or `/Volumes`; at most 256 KiB) |
+
+**Returns:** `valid`, and `errors` as `{path, message}` pairs such as
+`$.rules["inline.bold"].after: is required when mode is "wrap"`. An invalid
+template is a normal result, not a tool error.
+
+---
+
+#### `save-markdown-template`
+
+Validates a template and stores it in the library so `export-notes-markdown`
+can use it by `template` name.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Lowercase `a-z`, `0-9`, `-` and `_`, 1-64 characters, starting with a letter or digit. Built-in names are reserved |
+| `template` | object or string | One of `template`/`templateFile` | The template |
+| `templateFile` | string | One of `template`/`templateFile` | A JSON template file |
+| `force` | boolean | No | Replace an existing template of this name (default `false`) |
+
+Saving is create-only: an existing name is refused with `[template-exists]`
+unless `force` is true. An invalid template is refused with
+`[invalid-template]` and one JSON path per problem. The file is written to a
+temporary name and then moved into place, with mode `0600` in a `0700`
+directory. The library is `~/Library/Application Support/apple-notes-mcp/templates`,
+or `APPLE_NOTES_MCP_TEMPLATE_DIR`. A symlinked library or template file is
+refused.
+
+**Returns:** `name`, `path`, `bytes`, and `replaced`.
+
+---
+
+#### `delete-markdown-template`
+
+Removes one saved template file from the library. Built-in templates cannot
+be deleted.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | The saved template to delete |
+
+**Returns:** `name`, `path`, and `deleted: true`.
 
 ---
 
@@ -2559,6 +2656,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
+| `APPLE_NOTES_MCP_TEMPLATE_DIR` | `~/Library/Application Support/apple-notes-mcp/templates` | Absolute directory of the saved Markdown template library (`save-markdown-template` and friends). |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
 | `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. A [`list-note-paragraphs`](#list-note-paragraphs) or [`list-note-links`](#list-note-links) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |

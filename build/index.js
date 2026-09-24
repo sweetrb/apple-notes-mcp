@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants10) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants8);
+          this.rhs = optimizeExpr(this.rhs, names, constants10);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants10) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants8);
+        this.rhs = optimizeExpr(this.rhs, names, constants10);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants8) {
-        this.code = optimizeExpr(this.code, names, constants8);
+      optimizeNames(names, constants10) {
+        this.code = optimizeExpr(this.code, names, constants10);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants10) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants8))
+          if (n.optimizeNames(names, constants10))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants10) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        if (!(super.optimizeNames(names, constants8) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
+        if (!(super.optimizeNames(names, constants10) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants8);
+        this.condition = optimizeExpr(this.condition, names, constants10);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants10) {
+        if (!super.optimizeNames(names, constants10))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants8);
+        this.iteration = optimizeExpr(this.iteration, names, constants10);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants10) {
+        if (!super.optimizeNames(names, constants10))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants8);
+        this.iterable = optimizeExpr(this.iterable, names, constants10);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants10) {
         var _a, _b;
-        super.optimizeNames(names, constants8);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
+        super.optimizeNames(names, constants10);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants10);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants8) {
+    function optimizeExpr(expr, names, constants10) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants8[n.str];
+        const c = constants10[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants10[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -1785,14 +1785,14 @@ var require_code2 = __commonJS({
     }
     exports.callValidateCode = callValidateCode;
     var newRegExp = (0, codegen_1._)`new RegExp`;
-    function usePattern({ gen, it: { opts } }, pattern) {
+    function usePattern({ gen, it: { opts } }, pattern2) {
       const u = opts.unicodeRegExp ? "u" : "";
       const { regExp } = opts.code;
-      const rx = regExp(pattern, u);
+      const rx = regExp(pattern2, u);
       return gen.scopeValue("pattern", {
         key: rx.toString(),
         ref: rx,
-        code: (0, codegen_1._)`${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern}, ${u})`
+        code: (0, codegen_1._)`${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern2}, ${u})`
       });
     }
     exports.usePattern = usePattern;
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve7.call(this, root, ref);
+      let _sch = resolve9.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve7(root, ref) {
+    function resolve9(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve7(baseURI, relativeURI, options) {
+    function resolve9(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -3876,49 +3876,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative4, options, skipNormalization) {
+    function resolveComponent(base, relative5, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse3(serialize(base, options), options);
-        relative4 = parse3(serialize(relative4, options), options);
+        relative5 = parse3(serialize(relative5, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative4.scheme) {
-        target.scheme = relative4.scheme;
-        target.userinfo = relative4.userinfo;
-        target.host = relative4.host;
-        target.port = relative4.port;
-        target.path = removeDotSegments(relative4.path || "");
-        target.query = relative4.query;
+      if (!options.tolerant && relative5.scheme) {
+        target.scheme = relative5.scheme;
+        target.userinfo = relative5.userinfo;
+        target.host = relative5.host;
+        target.port = relative5.port;
+        target.path = removeDotSegments(relative5.path || "");
+        target.query = relative5.query;
       } else {
-        if (relative4.userinfo !== void 0 || relative4.host !== void 0 || relative4.port !== void 0) {
-          target.userinfo = relative4.userinfo;
-          target.host = relative4.host;
-          target.port = relative4.port;
-          target.path = removeDotSegments(relative4.path || "");
-          target.query = relative4.query;
+        if (relative5.userinfo !== void 0 || relative5.host !== void 0 || relative5.port !== void 0) {
+          target.userinfo = relative5.userinfo;
+          target.host = relative5.host;
+          target.port = relative5.port;
+          target.path = removeDotSegments(relative5.path || "");
+          target.query = relative5.query;
         } else {
-          if (!relative4.path) {
+          if (!relative5.path) {
             target.path = base.path;
-            if (relative4.query !== void 0) {
-              target.query = relative4.query;
+            if (relative5.query !== void 0) {
+              target.query = relative5.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative4.path[0] === "/") {
-              target.path = removeDotSegments(relative4.path);
+            if (relative5.path[0] === "/") {
+              target.path = removeDotSegments(relative5.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative4.path;
+                target.path = "/" + relative5.path;
               } else if (!base.path) {
-                target.path = relative4.path;
+                target.path = relative5.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative4.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative5.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative4.query;
+            target.query = relative5.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -3926,7 +3926,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative4.fragment;
+      target.fragment = relative5.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve7,
+      resolve: resolve9,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants8 = {
+    var constants10 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants8) {
-      v = { value: constants8[c] };
+    for (c in constants10) {
+      v = { value: constants10[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -8184,7 +8184,7 @@ var require_Node = __commonJS({
         }
         return sum;
       } },
-      _ensureInsertValid: { value: function _ensureInsertValid(node, child, isPreinsert) {
+      _ensureInsertValid: { value: function _ensureInsertValid(node, child2, isPreinsert) {
         var parent = this, i, kid;
         if (!node.nodeType) throw new TypeError("not a node");
         switch (parent.nodeType) {
@@ -8196,8 +8196,8 @@ var require_Node = __commonJS({
             utils.HierarchyRequestError();
         }
         if (node.isAncestor(parent)) utils.HierarchyRequestError();
-        if (child !== null || !isPreinsert) {
-          if (child.parentNode !== parent) utils.NotFoundError();
+        if (child2 !== null || !isPreinsert) {
+          if (child2.parentNode !== parent) utils.NotFoundError();
         }
         switch (node.nodeType) {
           case DOCUMENT_FRAGMENT_NODE:
@@ -8222,10 +8222,10 @@ var require_Node = __commonJS({
                 case 0:
                   break;
                 case 1:
-                  if (child !== null) {
-                    if (isPreinsert && child.nodeType === DOCUMENT_TYPE_NODE)
+                  if (child2 !== null) {
+                    if (isPreinsert && child2.nodeType === DOCUMENT_TYPE_NODE)
                       utils.HierarchyRequestError();
-                    for (kid = child.nextSibling; kid !== null; kid = kid.nextSibling) {
+                    for (kid = child2.nextSibling; kid !== null; kid = kid.nextSibling) {
                       if (kid.nodeType === DOCUMENT_TYPE_NODE)
                         utils.HierarchyRequestError();
                     }
@@ -8235,7 +8235,7 @@ var require_Node = __commonJS({
                     if (i > 0)
                       utils.HierarchyRequestError();
                   } else {
-                    if (i > 1 || i === 1 && child.nodeType !== ELEMENT_NODE)
+                    if (i > 1 || i === 1 && child2.nodeType !== ELEMENT_NODE)
                       utils.HierarchyRequestError();
                   }
                   break;
@@ -8244,10 +8244,10 @@ var require_Node = __commonJS({
               }
               break;
             case ELEMENT_NODE:
-              if (child !== null) {
-                if (isPreinsert && child.nodeType === DOCUMENT_TYPE_NODE)
+              if (child2 !== null) {
+                if (isPreinsert && child2.nodeType === DOCUMENT_TYPE_NODE)
                   utils.HierarchyRequestError();
-                for (kid = child.nextSibling; kid !== null; kid = kid.nextSibling) {
+                for (kid = child2.nextSibling; kid !== null; kid = kid.nextSibling) {
                   if (kid.nodeType === DOCUMENT_TYPE_NODE)
                     utils.HierarchyRequestError();
                 }
@@ -8257,17 +8257,17 @@ var require_Node = __commonJS({
                 if (i > 0)
                   utils.HierarchyRequestError();
               } else {
-                if (i > 1 || i === 1 && child.nodeType !== ELEMENT_NODE)
+                if (i > 1 || i === 1 && child2.nodeType !== ELEMENT_NODE)
                   utils.HierarchyRequestError();
               }
               break;
             case DOCUMENT_TYPE_NODE:
-              if (child === null) {
+              if (child2 === null) {
                 if (parent._countChildrenOfType(ELEMENT_NODE))
                   utils.HierarchyRequestError();
               } else {
                 for (kid = parent.firstChild; kid !== null; kid = kid.nextSibling) {
-                  if (kid === child) break;
+                  if (kid === child2) break;
                   if (kid.nodeType === ELEMENT_NODE)
                     utils.HierarchyRequestError();
                 }
@@ -8277,7 +8277,7 @@ var require_Node = __commonJS({
                 if (i > 0)
                   utils.HierarchyRequestError();
               } else {
-                if (i > 1 || i === 1 && child.nodeType !== DOCUMENT_TYPE_NODE)
+                if (i > 1 || i === 1 && child2.nodeType !== DOCUMENT_TYPE_NODE)
                   utils.HierarchyRequestError();
               }
               break;
@@ -8286,10 +8286,10 @@ var require_Node = __commonJS({
           if (node.nodeType === DOCUMENT_TYPE_NODE) utils.HierarchyRequestError();
         }
       } },
-      insertBefore: { value: function insertBefore(node, child) {
+      insertBefore: { value: function insertBefore(node, child2) {
         var parent = this;
-        parent._ensureInsertValid(node, child, true);
-        var refChild = child;
+        parent._ensureInsertValid(node, child2, true);
+        var refChild = child2;
         if (refChild === node) {
           refChild = node.nextSibling;
         }
@@ -8297,28 +8297,28 @@ var require_Node = __commonJS({
         node._insertOrReplace(parent, refChild, false);
         return node;
       } },
-      appendChild: { value: function(child) {
-        return this.insertBefore(child, null);
+      appendChild: { value: function(child2) {
+        return this.insertBefore(child2, null);
       } },
-      _appendChild: { value: function(child) {
-        child._insertOrReplace(this, null, false);
+      _appendChild: { value: function(child2) {
+        child2._insertOrReplace(this, null, false);
       } },
-      removeChild: { value: function removeChild(child) {
+      removeChild: { value: function removeChild(child2) {
         var parent = this;
-        if (!child.nodeType) throw new TypeError("not a node");
-        if (child.parentNode !== parent) utils.NotFoundError();
-        child.remove();
-        return child;
+        if (!child2.nodeType) throw new TypeError("not a node");
+        if (child2.parentNode !== parent) utils.NotFoundError();
+        child2.remove();
+        return child2;
       } },
       // To replace a `child` with `node` within a `parent` (this)
-      replaceChild: { value: function replaceChild(node, child) {
+      replaceChild: { value: function replaceChild(node, child2) {
         var parent = this;
-        parent._ensureInsertValid(node, child, false);
+        parent._ensureInsertValid(node, child2, false);
         if (node.doc !== parent.doc) {
           parent.doc.adoptNode(node);
         }
-        node._insertOrReplace(parent, child, true);
-        return child;
+        node._insertOrReplace(parent, child2, true);
+        return child2;
       } },
       // See: http://ejohn.org/blog/comparing-document-position/
       contains: { value: function contains(node) {
@@ -8474,14 +8474,14 @@ var require_Node = __commonJS({
       // or replace the specified child with this node, firing mutation events as
       // necessary
       _insertOrReplace: { value: function _insertOrReplace(parent, before, isReplace) {
-        var child = this, before_index, i;
-        if (child.nodeType === DOCUMENT_FRAGMENT_NODE && child.rooted) {
+        var child2 = this, before_index, i;
+        if (child2.nodeType === DOCUMENT_FRAGMENT_NODE && child2.rooted) {
           utils.HierarchyRequestError();
         }
         if (parent._childNodes) {
           before_index = before === null ? parent._childNodes.length : before.index;
-          if (child.parentNode === parent) {
-            var child_index = child.index;
+          if (child2.parentNode === parent) {
+            var child_index = child2.index;
             if (child_index < before_index) {
               before_index--;
             }
@@ -8495,10 +8495,10 @@ var require_Node = __commonJS({
         if (n === null) {
           n = parent.firstChild;
         }
-        var bothRooted = child.rooted && parent.rooted;
-        if (child.nodeType === DOCUMENT_FRAGMENT_NODE) {
+        var bothRooted = child2.rooted && parent.rooted;
+        if (child2.nodeType === DOCUMENT_FRAGMENT_NODE) {
           var spliceArgs = [0, isReplace ? 1 : 0], next;
-          for (var kid = child.firstChild; kid !== null; kid = next) {
+          for (var kid = child2.firstChild; kid !== null; kid = next) {
             next = kid.nextSibling;
             spliceArgs.push(kid);
             kid.parentNode = parent;
@@ -8522,10 +8522,10 @@ var require_Node = __commonJS({
               parent._firstChild = null;
             }
           }
-          if (child._childNodes) {
-            child._childNodes.length = 0;
+          if (child2._childNodes) {
+            child2._childNodes.length = 0;
           } else {
-            child._firstChild = null;
+            child2._firstChild = null;
           }
           if (parent.rooted) {
             parent.modify();
@@ -8534,40 +8534,40 @@ var require_Node = __commonJS({
             }
           }
         } else {
-          if (before === child) {
+          if (before === child2) {
             return;
           }
           if (bothRooted) {
-            child._remove();
-          } else if (child.parentNode) {
-            child.remove();
+            child2._remove();
+          } else if (child2.parentNode) {
+            child2.remove();
           }
-          child.parentNode = parent;
+          child2.parentNode = parent;
           if (isReplace) {
-            LinkedList.replace(n, child);
+            LinkedList.replace(n, child2);
             if (parent._childNodes) {
-              child._index = before_index;
-              parent._childNodes[before_index] = child;
+              child2._index = before_index;
+              parent._childNodes[before_index] = child2;
             } else if (parent._firstChild === before) {
-              parent._firstChild = child;
+              parent._firstChild = child2;
             }
           } else {
             if (n !== null) {
-              LinkedList.insertBefore(child, n);
+              LinkedList.insertBefore(child2, n);
             }
             if (parent._childNodes) {
-              child._index = before_index;
-              parent._childNodes.splice(before_index, 0, child);
+              child2._index = before_index;
+              parent._childNodes.splice(before_index, 0, child2);
             } else if (parent._firstChild === before) {
-              parent._firstChild = child;
+              parent._firstChild = child2;
             }
           }
           if (bothRooted) {
             parent.modify();
-            parent.doc.mutateMove(child);
+            parent.doc.mutateMove(child2);
           } else if (parent.rooted) {
             parent.modify();
-            parent.doc.mutateInsert(child);
+            parent.doc.mutateInsert(child2);
           }
         }
       } },
@@ -8615,24 +8615,24 @@ var require_Node = __commonJS({
       } },
       normalize: { value: function() {
         var next;
-        for (var child = this.firstChild; child !== null; child = next) {
-          next = child.nextSibling;
-          if (child.normalize) {
-            child.normalize();
+        for (var child2 = this.firstChild; child2 !== null; child2 = next) {
+          next = child2.nextSibling;
+          if (child2.normalize) {
+            child2.normalize();
           }
-          if (child.nodeType !== Node.TEXT_NODE) {
+          if (child2.nodeType !== Node.TEXT_NODE) {
             continue;
           }
-          if (child.nodeValue === "") {
-            this.removeChild(child);
+          if (child2.nodeValue === "") {
+            this.removeChild(child2);
             continue;
           }
-          var prevChild = child.previousSibling;
+          var prevChild = child2.previousSibling;
           if (prevChild === null) {
             continue;
           } else if (prevChild.nodeType === Node.TEXT_NODE) {
-            prevChild.appendData(child.nodeValue);
-            this.removeChild(child);
+            prevChild.appendData(child2.nodeValue);
+            this.removeChild(child2);
           }
         }
       } },
@@ -9247,7 +9247,7 @@ var require_select = __commonJS({
       while ((el = el.previousSibling) && el.nodeType !== 1) ;
       return el;
     };
-    var child = function(el) {
+    var child2 = function(el) {
       if (el = el.firstChild) {
         while (el.nodeType !== 1 && (el = el.nextSibling)) ;
       }
@@ -9348,7 +9348,7 @@ var require_select = __commonJS({
       };
     };
     var nth = function(param_, test, last) {
-      var param = parseNth(param_), group = param.group, offset = param.offset, find2 = !last ? child : lastChild, advance = !last ? next : prev;
+      var param = parseNth(param_), group = param.group, offset = param.offset, find2 = !last ? child2 : lastChild, advance = !last ? next : prev;
       return function(el) {
         if (!parentIsElement(el)) return;
         var rel = find2(el.parentNode), pos = 0;
@@ -11181,11 +11181,11 @@ var require_Leaf = __commonJS({
       } },
       firstChild: { value: null },
       lastChild: { value: null },
-      insertBefore: { value: function(node, child) {
+      insertBefore: { value: function(node, child2) {
         if (!node.nodeType) throw new TypeError("not a node");
         HierarchyRequestError();
       } },
-      replaceChild: { value: function(node, child) {
+      replaceChild: { value: function(node, child2) {
         if (!node.nodeType) throw new TypeError("not a node");
         HierarchyRequestError();
       } },
@@ -11676,7 +11676,7 @@ var require_TreeWalker = __commonJS({
       previous: "previousSibling"
     };
     function traverseChildren(tw, type) {
-      var child, node, parent, result, sibling;
+      var child2, node, parent, result, sibling;
       node = tw._currentNode[mapChild[type]];
       while (node !== null) {
         result = tw._internalFilter(node);
@@ -11685,9 +11685,9 @@ var require_TreeWalker = __commonJS({
           return node;
         }
         if (result === NodeFilter.FILTER_SKIP) {
-          child = node[mapChild[type]];
-          if (child !== null) {
-            node = child;
+          child2 = node[mapChild[type]];
+          if (child2 !== null) {
+            node = child2;
             continue;
           }
         }
@@ -12184,9 +12184,9 @@ var require_URL = __commonJS({
       },
       // See: http://tools.ietf.org/html/rfc3986#section-5.2
       // and https://url.spec.whatwg.org/#constructors
-      resolve: function(relative4) {
+      resolve: function(relative5) {
         var base = this;
-        var r = new URL2(relative4);
+        var r = new URL2(relative5);
         var t = new URL2();
         if (r.scheme !== void 0) {
           t.scheme = r.scheme;
@@ -12220,7 +12220,7 @@ var require_URL = __commonJS({
               if (r.path.charAt(0) === "/") {
                 t.path = remove_dot_segments(r.path);
               } else {
-                t.path = merge2(base.path, r.path);
+                t.path = merge3(base.path, r.path);
                 t.path = remove_dot_segments(t.path);
               }
               t.query = r.query;
@@ -12229,7 +12229,7 @@ var require_URL = __commonJS({
         }
         t.fragment = r.fragment;
         return t.toString();
-        function merge2(basepath, refpath) {
+        function merge3(basepath, refpath) {
           if (base.host !== void 0 && !base.path)
             return "/" + refpath;
           var lastslash = basepath.lastIndexOf("/");
@@ -13867,9 +13867,9 @@ var require_htmlelts = __commonJS({
           get: function() {
             var s = "";
             for (var i = 0, n = this.childNodes.length; i < n; i++) {
-              var child = this.childNodes[i];
-              if (child.nodeType === Node.TEXT_NODE)
-                s += child._data;
+              var child2 = this.childNodes[i];
+              if (child2.nodeType === Node.TEXT_NODE)
+                s += child2._data;
             }
             return s;
           },
@@ -14830,20 +14830,20 @@ var require_Document = __commonJS({
             this.documentElement = kid;
         }
       } },
-      insertBefore: { value: function insertBefore(child, refChild) {
-        Node.prototype.insertBefore.call(this, child, refChild);
+      insertBefore: { value: function insertBefore(child2, refChild) {
+        Node.prototype.insertBefore.call(this, child2, refChild);
         this._updateDocTypeElement();
-        return child;
+        return child2;
       } },
-      replaceChild: { value: function replaceChild(node, child) {
-        Node.prototype.replaceChild.call(this, node, child);
+      replaceChild: { value: function replaceChild(node, child2) {
+        Node.prototype.replaceChild.call(this, node, child2);
         this._updateDocTypeElement();
-        return child;
+        return child2;
       } },
-      removeChild: { value: function removeChild(child) {
-        Node.prototype.removeChild.call(this, child);
+      removeChild: { value: function removeChild(child2) {
+        Node.prototype.removeChild.call(this, child2);
         this._updateDocTypeElement();
-        return child;
+        return child2;
       } },
       getElementById: { value: function(id2) {
         var n = this.byId[id2];
@@ -18469,7 +18469,7 @@ var require_HTMLParser = __commonJS({
         }
       }
       function scanChars(shouldPauseFunc) {
-        var codepoint, s, pattern, eof;
+        var codepoint, s, pattern2, eof;
         while (nextchar < numchars) {
           if (paused > 0 || shouldPauseFunc && shouldPauseFunc()) {
             return true;
@@ -18530,10 +18530,10 @@ var require_HTMLParser = __commonJS({
               break;
             case "string":
               codepoint = chars.charCodeAt(nextchar);
-              pattern = tokenizer.lookahead;
-              var pos = chars.indexOf(pattern, nextchar);
+              pattern2 = tokenizer.lookahead;
+              var pos = chars.indexOf(pattern2, nextchar);
               if (pos !== -1) {
-                s = chars.substring(nextchar, pos + pattern.length);
+                s = chars.substring(nextchar, pos + pattern2.length);
                 eof = false;
               } else {
                 if (!input_complete) return true;
@@ -18641,9 +18641,9 @@ var require_HTMLParser = __commonJS({
         }
         ignore_linefeed = false;
       }
-      function getMatchingChars(pattern) {
-        pattern.lastIndex = nextchar - 1;
-        var match = pattern.exec(chars);
+      function getMatchingChars(pattern2) {
+        pattern2.lastIndex = nextchar - 1;
+        var match = pattern2.exec(chars);
         if (match && match.index === nextchar - 1) {
           match = match[0];
           nextchar += match.length - 1;
@@ -18656,9 +18656,9 @@ var require_HTMLParser = __commonJS({
           throw new Error("should never happen");
         }
       }
-      function emitCharsWhile(pattern) {
-        pattern.lastIndex = nextchar - 1;
-        var match = pattern.exec(chars)[0];
+      function emitCharsWhile(pattern2) {
+        pattern2.lastIndex = nextchar - 1;
+        var match = pattern2.exec(chars)[0];
         if (!match) return false;
         emitCharString(match);
         nextchar += match.length - 1;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join29(output, replacement);
+        return join31(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join29(output, rule.append(self.options));
+          output = join31(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join29(output, replacement) {
+    function join31(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -29618,12 +29618,12 @@ var $ZodCheckUpperCase = /* @__PURE__ */ $constructor("$ZodCheckUpperCase", (ins
 var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst, def) => {
   $ZodCheck.init(inst, def);
   const escapedRegex = escapeRegex(def.includes);
-  const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
-  def.pattern = pattern;
+  const pattern2 = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
+  def.pattern = pattern2;
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.includes(def.includes, def.position))
@@ -29641,12 +29641,12 @@ var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst,
 });
 var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern = new RegExp(`^${escapeRegex(def.prefix)}.*`);
-  def.pattern ?? (def.pattern = pattern);
+  const pattern2 = new RegExp(`^${escapeRegex(def.prefix)}.*`);
+  def.pattern ?? (def.pattern = pattern2);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.startsWith(def.prefix))
@@ -29664,12 +29664,12 @@ var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (i
 });
 var $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern = new RegExp(`.*${escapeRegex(def.suffix)}$`);
-  def.pattern ?? (def.pattern = pattern);
+  const pattern2 = new RegExp(`.*${escapeRegex(def.suffix)}$`);
+  def.pattern ?? (def.pattern = pattern2);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.endsWith(def.suffix))
@@ -30351,7 +30351,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -30360,7 +30360,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject2(input)) {
+    if (!isObject3(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -30777,8 +30777,8 @@ var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, void 0]) : void 0;
   });
   defineLazy(inst._zod, "pattern", () => {
-    const pattern = def.innerType._zod.pattern;
-    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : void 0;
+    const pattern2 = def.innerType._zod.pattern;
+    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)})?$`) : void 0;
   });
   inst._zod.parse = (payload, ctx) => {
     if (def.innerType._zod.optin === "optional") {
@@ -30795,8 +30795,8 @@ var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
   defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
   defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
   defineLazy(inst._zod, "pattern", () => {
-    const pattern = def.innerType._zod.pattern;
-    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)}|null)$`) : void 0;
+    const pattern2 = def.innerType._zod.pattern;
+    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)}|null)$`) : void 0;
   });
   defineLazy(inst._zod, "values", () => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, null]) : void 0;
@@ -31483,12 +31483,12 @@ function _length(length, params) {
     length
   });
 }
-function _regex(pattern, params) {
+function _regex(pattern2, params) {
   return new $ZodCheckRegex({
     check: "string_format",
     format: "regex",
     ...normalizeParams(params),
-    pattern
+    pattern: pattern2
   });
 }
 function _lowercase(params) {
@@ -31997,11 +31997,11 @@ var JSONSchemaGenerator = class {
           }
           case "template_literal": {
             const json2 = _json;
-            const pattern = schema._zod.pattern;
-            if (!pattern)
+            const pattern2 = schema._zod.pattern;
+            if (!pattern2)
               throw new Error("Pattern not found in template literal");
             json2.type = "string";
-            json2.pattern = pattern.source;
+            json2.pattern = pattern2.source;
             break;
           }
           case "pipe": {
@@ -35368,13 +35368,13 @@ function stringifyRegExpWithFlags(regex, refs) {
     // `.` matches newlines
   };
   const source = flags.i ? regex.source.toLowerCase() : regex.source;
-  let pattern = "";
+  let pattern2 = "";
   let isEscaped = false;
   let inCharGroup = false;
   let inCharRange = false;
   for (let i = 0; i < source.length; i++) {
     if (isEscaped) {
-      pattern += source[i];
+      pattern2 += source[i];
       isEscaped = false;
       continue;
     }
@@ -35382,40 +35382,40 @@ function stringifyRegExpWithFlags(regex, refs) {
       if (inCharGroup) {
         if (source[i].match(/[a-z]/)) {
           if (inCharRange) {
-            pattern += source[i];
-            pattern += `${source[i - 2]}-${source[i]}`.toUpperCase();
+            pattern2 += source[i];
+            pattern2 += `${source[i - 2]}-${source[i]}`.toUpperCase();
             inCharRange = false;
           } else if (source[i + 1] === "-" && source[i + 2]?.match(/[a-z]/)) {
-            pattern += source[i];
+            pattern2 += source[i];
             inCharRange = true;
           } else {
-            pattern += `${source[i]}${source[i].toUpperCase()}`;
+            pattern2 += `${source[i]}${source[i].toUpperCase()}`;
           }
           continue;
         }
       } else if (source[i].match(/[a-z]/)) {
-        pattern += `[${source[i]}${source[i].toUpperCase()}]`;
+        pattern2 += `[${source[i]}${source[i].toUpperCase()}]`;
         continue;
       }
     }
     if (flags.m) {
       if (source[i] === "^") {
-        pattern += `(^|(?<=[\r
+        pattern2 += `(^|(?<=[\r
 ]))`;
         continue;
       } else if (source[i] === "$") {
-        pattern += `($|(?=[\r
+        pattern2 += `($|(?=[\r
 ]))`;
         continue;
       }
     }
     if (flags.s && source[i] === ".") {
-      pattern += inCharGroup ? `${source[i]}\r
+      pattern2 += inCharGroup ? `${source[i]}\r
 ` : `[${source[i]}\r
 ]`;
       continue;
     }
-    pattern += source[i];
+    pattern2 += source[i];
     if (source[i] === "\\") {
       isEscaped = true;
     } else if (inCharGroup && source[i] === "]") {
@@ -35425,12 +35425,12 @@ function stringifyRegExpWithFlags(regex, refs) {
     }
   }
   try {
-    new RegExp(pattern);
+    new RegExp(pattern2);
   } catch {
     console.warn(`Could not convert regex pattern at ${refs.currentPath.join("/")} to a flag-independent form! Falling back to the flag-ignorant source`);
     return regex.source;
   }
-  return pattern;
+  return pattern2;
 }
 
 // node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
+        await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve7, reject) => {
+    return new Promise((resolve9, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve7(parseResult.data);
+            resolve9(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve7, reject) => {
+    return new Promise((resolve9, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve7, interval);
+      const timeoutId = setTimeout(resolve9, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -37927,46 +37927,46 @@ var UriTemplate = class _UriTemplate {
       }
       return patterns;
     }
-    let pattern;
+    let pattern2;
     const name = part.name;
     switch (part.operator) {
       case "":
-        pattern = part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)";
+        pattern2 = part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)";
         break;
       case "+":
       case "#":
-        pattern = "(.+)";
+        pattern2 = "(.+)";
         break;
       case ".":
-        pattern = "\\.([^/,]+)";
+        pattern2 = "\\.([^/,]+)";
         break;
       case "/":
-        pattern = "/" + (part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)");
+        pattern2 = "/" + (part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)");
         break;
       default:
-        pattern = "([^/]+)";
+        pattern2 = "([^/]+)";
     }
-    patterns.push({ pattern, name });
+    patterns.push({ pattern: pattern2, name });
     return patterns;
   }
   match(uri) {
     _UriTemplate.validateLength(uri, MAX_TEMPLATE_LENGTH, "URI");
-    let pattern = "^";
+    let pattern2 = "^";
     const names = [];
     for (const part of this.parts) {
       if (typeof part === "string") {
-        pattern += this.escapeRegExp(part);
+        pattern2 += this.escapeRegExp(part);
       } else {
         const patterns = this.partToRegExp(part);
         for (const { pattern: partPattern, name } of patterns) {
-          pattern += partPattern;
+          pattern2 += partPattern;
           names.push({ name, exploded: part.exploded });
         }
       }
     }
-    pattern += "$";
-    _UriTemplate.validateLength(pattern, MAX_REGEX_LENGTH, "Generated regex pattern");
-    const regex = new RegExp(pattern);
+    pattern2 += "$";
+    _UriTemplate.validateLength(pattern2, MAX_REGEX_LENGTH, "Generated regex pattern");
+    const regex = new RegExp(pattern2);
     const match = uri.match(regex);
     if (!match)
       return null;
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
+      await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve7) => {
+    return new Promise((resolve9) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve7();
+        resolve9();
       } else {
-        this._stdout.once("drain", resolve7);
+        this._stdout.once("drain", resolve9);
       }
     });
   }
@@ -39077,7 +39077,7 @@ var RETRYABLE_ERROR_PATTERNS = [
   /changed during listing/i
 ];
 function isRetryableError(errorMessage) {
-  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
+  return RETRYABLE_ERROR_PATTERNS.some((pattern2) => pattern2.test(errorMessage));
 }
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -39161,8 +39161,8 @@ function parseErrorMessage(errorOutput) {
   if (isPermissionDenied(errorOutput)) {
     return PERMISSION_DENIED_MESSAGE;
   }
-  for (const { pattern, message } of ERROR_MAPPINGS) {
-    const match = coreError.match(pattern);
+  for (const { pattern: pattern2, message } of ERROR_MAPPINGS) {
+    const match = coreError.match(pattern2);
     if (match) {
       let result = message;
       for (let i = 1; i < match.length; i++) {
@@ -41540,10 +41540,10 @@ function previewFileInBundle(bundle, accountDir) {
   const direct = [];
   const nested = [];
   for (const entry of boundedEntries(bundle, MAX_BUNDLE_ENTRIES) ?? []) {
-    const child = realInside(join7(bundle, entry), accountDir);
-    if (!child) continue;
-    if (isRegularFile(child)) direct.push(child);
-    else if (isDirectory(child)) nested.push(child);
+    const child2 = realInside(join7(bundle, entry), accountDir);
+    if (!child2) continue;
+    if (isRegularFile(child2)) direct.push(child2);
+    else if (isDirectory(child2)) nested.push(child2);
   }
   nested.sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
   const pick2 = (files) => files.find((f) => basename(f) === "Preview.png") ?? files.find((f) => PREVIEW_IMAGE_SUFFIXES.has(extname(f).toLowerCase())) ?? null;
@@ -41648,8 +41648,8 @@ function assembleAttachmentAssets(rows, bodyOrder, containerDir = NOTES_CONTAINE
   const attachments = [];
   for (const root of orderedRoots) {
     attachments.push(record2(root, null));
-    for (const child of rows.filter((r) => r.parentPk === root.pk && r !== root)) {
-      attachments.push(record2(child, root));
+    for (const child2 of rows.filter((r) => r.parentPk === root.pk && r !== root)) {
+      attachments.push(record2(child2, root));
     }
   }
   return { orderSource, attachments };
@@ -42644,8 +42644,8 @@ function getNoteLinkFromDB(coreDataId3) {
   }
 }
 function extractCoreDataId(output, prefix) {
-  const pattern = new RegExp(`${prefix} id ([^\\s]+)`);
-  const match = output.match(pattern);
+  const pattern2 = new RegExp(`${prefix} id ([^\\s]+)`);
+  const match = output.match(pattern2);
   return match ? match[1] : "";
 }
 var AppleNotesManager = class {
@@ -46643,9 +46643,9 @@ var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes data
 function canonicalKey(value) {
   return BigInt(value).toString();
 }
-function assertAll(values, pattern, label) {
+function assertAll(values, pattern2, label) {
   for (const value of values) {
-    if (!pattern.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
+    if (!pattern2.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
   }
 }
 function entityClause(entity3) {
@@ -46802,10 +46802,10 @@ function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH9) {
 }
 var defaultResolver = (values, entity3) => resolveIdentifiers(values, entity3);
 var DEFAULT_MAX_ID_LENGTH = 2e3;
-function acceptAlternateForms(pattern) {
+function acceptAlternateForms(pattern2) {
   return new RegExp(
-    `${pattern.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
-    pattern.flags
+    `${pattern2.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
+    pattern2.flags
   );
 }
 function resolveInSchema(values, entity3, ctx, resolver) {
@@ -46820,16 +46820,16 @@ function resolveInSchema(values, entity3, ctx, resolver) {
     return null;
   }
 }
-function exactIdInput(entity3, pattern, message, options = {}) {
+function exactIdInput(entity3, pattern2, message, options = {}) {
   const resolver = options.resolver ?? defaultResolver;
-  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message).transform((value, ctx) => {
+  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message).transform((value, ctx) => {
     const map = resolveInSchema([value], entity3, ctx, resolver);
     return map ? map.get(value) ?? value : external_exports.NEVER;
   });
 }
-function exactIdArrayInput(entity3, pattern, message, options = {}) {
+function exactIdArrayInput(entity3, pattern2, message, options = {}) {
   const resolver = options.resolver ?? defaultResolver;
-  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message);
+  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message);
   const array2 = options.maxItems === void 0 ? external_exports.array(item) : external_exports.array(item).max(options.maxItems);
   return array2.transform((values, ctx) => {
     const map = resolveInSchema(values, entity3, ctx, resolver);
@@ -47036,12 +47036,12 @@ function tokenize(input) {
       const field = prefix.toLowerCase();
       let value = word.slice(colon + 1);
       if (FIELDS.has(field)) {
-        let quoted = false;
+        let quoted2 = false;
         if (value === "" && input[j] === '"') {
           [value, j] = readQuoted(input, j);
-          quoted = true;
+          quoted2 = true;
         }
-        push({ kind: "term", pos: i, field, value, quoted });
+        push({ kind: "term", pos: i, field, value, quoted: quoted2 });
         i = j;
         continue;
       }
@@ -47080,11 +47080,11 @@ function parseLocalDate(text2, pos) {
   return { start: start.getTime(), end: new Date(year, month - 1, day + 1).getTime() };
 }
 function termNode(token) {
-  const { field, value, quoted, pos } = token;
+  const { field, value, quoted: quoted2, pos } = token;
   if (field === void 0) {
     if (value === "") throw new NoteQueryError("Empty quoted phrase", pos);
     const lower2 = value.toLowerCase();
-    if (!quoted && FLAGS.includes(lower2)) {
+    if (!quoted2 && FLAGS.includes(lower2)) {
       return { type: "flag", flag: lower2 };
     }
     return { type: "text", field: "any", value };
@@ -47203,9 +47203,9 @@ var Parser = class {
     if (token?.kind === "not") {
       this.index++;
       this.enter(token.pos);
-      const child = this.parseUnary();
+      const child2 = this.parseUnary();
       this.depth--;
-      return { type: "not", child };
+      return { type: "not", child: child2 };
     }
     return this.parsePrimary();
   }
@@ -47326,9 +47326,9 @@ function cheapFirst(children) {
 function evaluateNoteQuery(node, note) {
   switch (node.type) {
     case "and":
-      return cheapFirst(node.children).every((child) => evaluateNoteQuery(child, note));
+      return cheapFirst(node.children).every((child2) => evaluateNoteQuery(child2, note));
     case "or":
-      return cheapFirst(node.children).some((child) => evaluateNoteQuery(child, note));
+      return cheapFirst(node.children).some((child2) => evaluateNoteQuery(child2, note));
     case "not":
       return !evaluateNoteQuery(node.child, note);
     case "text": {
@@ -47368,7 +47368,7 @@ function positiveTextPredicates(node, negated = false) {
   switch (node.type) {
     case "and":
     case "or":
-      return node.children.flatMap((child) => positiveTextPredicates(child, negated));
+      return node.children.flatMap((child2) => positiveTextPredicates(child2, negated));
     case "not":
       return positiveTextPredicates(node.child, !negated);
     case "text":
@@ -47633,13 +47633,13 @@ var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve7 = (pk, seen) => {
+  const resolve9 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve9(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47653,7 +47653,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve9(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -48368,8 +48368,8 @@ function validateAppendContent(content, format, options = {}) {
     if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(checked))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
     const withoutLinkDestinations = checked.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
-    for (const [pattern, name] of UNMODELED_MARKDOWN)
-      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
+    for (const [pattern2, name] of UNMODELED_MARKDOWN)
+      if (pattern2.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
@@ -48860,6 +48860,19 @@ var FEATURES = [
     tools: [],
     minimumMacOSVersion: null,
     requirements: [{ kind: "native_write_helper" }]
+  },
+  {
+    name: "markdownTemplateLibrary",
+    description: "Validate, save, list, show and delete Markdown export templates (local JSON files; exporting with one still needs Full Disk Access)",
+    tools: [
+      "list-markdown-templates",
+      "show-markdown-template",
+      "validate-markdown-template",
+      "save-markdown-template",
+      "delete-markdown-template"
+    ],
+    minimumMacOSVersion: null,
+    requirements: []
   }
 ];
 function requirementLabel(requirement) {
@@ -49895,8 +49908,8 @@ function describeBodyReadFailure(title, error2, attachments) {
   const kind = classifyBodyReadError(error2);
   if (kind === "other") return base;
   const large = attachments ? largeAttachments(attachments) : [];
-  const listed = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
-  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed}). ` : "";
+  const listed2 = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
+  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed2}). ` : "";
   if (kind === "buffer") {
     const cause2 = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
     const remedy2 = "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
@@ -50233,8 +50246,8 @@ function insertLink(request, deps) {
 }
 
 // src/services/notesExport.ts
-import { mkdirSync as mkdirSync5 } from "node:fs";
-import { basename as basename4, dirname as dirname6, extname as extname4, join as join21 } from "node:path";
+import { mkdirSync as mkdirSync6 } from "node:fs";
+import { basename as basename4, dirname as dirname6, extname as extname5, join as join22 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -50424,8 +50437,8 @@ var AssetLocator = class {
   /** Preview.png (or another image) at most two levels inside a bundle. */
   bundleImage(bundle, account) {
     const found = [];
-    for (const child of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
-      const path10 = confine(join19(bundle, child), account);
+    for (const child2 of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
+      const path10 = confine(join19(bundle, child2), account);
       if (!path10) continue;
       if (isFile(path10)) found.push(path10);
       else
@@ -50760,7 +50773,7 @@ function planAttachment(attachment, ctx) {
       ctx.stats.attachments--;
       return {
         type: "gallery",
-        items: attachment.children.map((child) => planAttachment(child, ctx))
+        items: attachment.children.map((child2) => planAttachment(child2, ctx))
       };
     }
     case "link": {
@@ -51332,9 +51345,9 @@ function wrapMarkdown(markdown, width) {
   }
   return out.join("\n");
 }
-function renderNotesMarkdown(notes, ctx, { wrap: wrap2 = 0 } = {}) {
+function renderNotesMarkdown(notes, ctx, { wrap: wrap3 = 0 } = {}) {
   const body = notes.map((note) => renderNoteMarkdown(note, ctx)).join(NOTE_SEPARATOR);
-  return (wrap2 ? wrapMarkdown(body, wrap2) : body) + (notes.length ? "\n" : "");
+  return (wrap3 ? wrapMarkdown(body, wrap3) : body) + (notes.length ? "\n" : "");
 }
 
 // src/utils/noteExportData.ts
@@ -51508,18 +51521,1290 @@ function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
     ordered
   };
 }
+var CORE_DATA_EPOCH = 978307200;
+function coreDataDate(value) {
+  const seconds = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(seconds) || Math.abs(seconds) > 1e10) return void 0;
+  return new Date((seconds + CORE_DATA_EPOCH) * 1e3).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+function noteMetaQuery(columns) {
+  const first2 = (names) => {
+    const present = names.filter((name) => columns.has(name)).map((name) => `n.${name}`);
+    if (!present.length) return "NULL";
+    return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
+  };
+  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort((a, b) => Number(b.slice(8) || 0) - Number(a.slice(8) || 0));
+  const folder = columns.has("ZFOLDER") && columns.has("ZTITLE2") ? "(SELECT f.ZTITLE2 FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_PK = n.ZFOLDER)" : "NULL";
+  const account = columns.has("ZNAME") && accountColumns.length ? `(SELECT a.ZNAME FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_PK = ${first2(accountColumns)})` : "NULL";
+  return `SELECT json_object('uuid', ${first2(["ZIDENTIFIER"])}, 'created', ${first2(["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"])}, 'modified', ${first2(["ZMODIFICATIONDATE1", "ZMODIFICATIONDATE"])}, 'folder', ${folder}, 'account', ${account}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
+}
+function readExportNoteMeta(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
+  const match = /\/ICNote\/p([0-9]{1,18})$/.exec(id2);
+  if (!match) throw new NoteBlocksError("invalid-id", "Not a note id");
+  const output = sqlite(dbPath2, [
+    "-cmd",
+    ".parameter init",
+    "-cmd",
+    `.parameter set @pk ${match[1]}`,
+    noteMetaQuery(objectColumns(dbPath2))
+  ]);
+  if (!output) return {};
+  let row;
+  try {
+    row = JSON.parse(output);
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  const meta = {};
+  const set = (key, value) => {
+    if (value !== void 0) meta[key] = value;
+  };
+  set("uuid", text(row.uuid));
+  set("created", coreDataDate(row.created));
+  set("modified", coreDataDate(row.modified));
+  set("folder", text(row.folder));
+  set("account", text(row.account));
+  return meta;
+}
+
+// src/utils/markdownTemplate.ts
+var TEMPLATE_SCHEMA_VERSION = 1;
+var MAX_TEMPLATE_BYTES = 256 * 1024;
+var MAX_META_LENGTH = 512;
+var MAX_RULE_TEXT = 4096;
+var MAX_DIRECTORY_LENGTH = 1024;
+var RULE_IDS = [
+  "document.header",
+  "document.footer",
+  "document.separator",
+  "block.title",
+  "block.heading",
+  "block.subheading",
+  "block.body",
+  "block.bulleted",
+  "block.dashed",
+  "block.numbered",
+  "block.checklist.checked",
+  "block.checklist.unchecked",
+  "block.code",
+  "paragraph.quote",
+  "inline.bold",
+  "inline.italic",
+  "inline.underline",
+  "inline.strikethrough",
+  "inline.superscript",
+  "inline.subscript",
+  "inline.highlight.purple",
+  "inline.highlight.pink",
+  "inline.highlight.orange",
+  "inline.highlight.mint",
+  "inline.highlight.blue",
+  "inline.highlight.other",
+  "inline.color",
+  "inline.link",
+  "attachment.image",
+  "attachment.drawing.classic",
+  "attachment.drawing.paper",
+  "attachment.scan",
+  "attachment.pdf",
+  "attachment.audio",
+  "attachment.video",
+  "attachment.other",
+  "attachment.table",
+  "attachment.divider",
+  "attachment.gallery",
+  "attachment.url",
+  "attachment.url.image",
+  "attachment.map",
+  "attachment.placeholder"
+];
+var RULE_MODES = ["wrap", "linePrefix", "pattern", "plain", "omit"];
+var INLINE_FORMATS = [
+  "subscript",
+  "superscript",
+  "highlight",
+  "underline",
+  "strikethrough",
+  "bold",
+  "italic",
+  "color",
+  "link"
+];
+var PLACEHOLDERS = [
+  "content",
+  "title",
+  "id",
+  "uuid",
+  "folder",
+  "account",
+  "created",
+  "modified",
+  "tags",
+  "exportStem",
+  "index",
+  "checked",
+  "url",
+  "path",
+  "alt",
+  "caption",
+  "linkText",
+  "filename",
+  "kind",
+  "uti",
+  "color",
+  "highlight",
+  "fence"
+];
+var NOTE_PLACEHOLDERS = [
+  "title",
+  "id",
+  "uuid",
+  "folder",
+  "account",
+  "created",
+  "modified",
+  "exportStem"
+];
+var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
+var wrap2 = (before, after = "", join31) => ({
+  mode: "wrap",
+  before,
+  after,
+  ...join31 ? { join: join31 } : {}
+});
+var pattern = (value, join31) => ({
+  mode: "pattern",
+  value,
+  ...join31 ? { join: join31 } : {}
+});
+var STANDARD = {
+  schemaVersion: 1,
+  name: "standard-markdown",
+  description: "The default export-notes-markdown output",
+  assets: { mode: "copy", pathStyle: "relative", directory: null },
+  inlineOrder: [...INLINE_FORMATS],
+  options: {
+    titleFallback: true,
+    richLinkImages: false,
+    richLinkImageCaption: "none",
+    listIndent: "    "
+  },
+  rules: {
+    "document.header": pattern(""),
+    "document.footer": pattern(""),
+    "document.separator": pattern("\n\n---\n\n"),
+    "block.title": wrap2("# ", "", "paragraph"),
+    "block.heading": wrap2("## ", "", "paragraph"),
+    "block.subheading": wrap2("### ", "", "paragraph"),
+    "block.body": { mode: "plain", join: "paragraph" },
+    "block.bulleted": wrap2("- ", "", "line"),
+    "block.dashed": wrap2("- ", "", "line"),
+    "block.numbered": pattern("{{index}}. {{content}}", "line"),
+    "block.checklist.checked": wrap2("- [x] ", "", "line"),
+    "block.checklist.unchecked": wrap2("- [ ] ", "", "line"),
+    "block.code": wrap2("{{fence}}\n", "\n{{fence}}", "paragraph"),
+    "paragraph.quote": { mode: "linePrefix", value: "> " },
+    "inline.bold": wrap2("**", "**"),
+    "inline.italic": wrap2("*", "*"),
+    "inline.underline": wrap2("<u>", "</u>"),
+    "inline.strikethrough": wrap2("~~", "~~"),
+    "inline.superscript": wrap2("<sup>", "</sup>"),
+    "inline.subscript": wrap2("<sub>", "</sub>"),
+    "inline.highlight.purple": wrap2("==", "=="),
+    "inline.highlight.pink": wrap2("==", "=="),
+    "inline.highlight.orange": wrap2("==", "=="),
+    "inline.highlight.mint": wrap2("==", "=="),
+    "inline.highlight.blue": wrap2("==", "=="),
+    "inline.highlight.other": wrap2("==", "=="),
+    "inline.color": { mode: "plain" },
+    "inline.link": pattern("[{{content}}]({{url}})"),
+    "attachment.image": pattern("![{{alt}}]({{path}})"),
+    "attachment.drawing.classic": pattern("![{{alt}}]({{path}})"),
+    "attachment.drawing.paper": pattern("![{{alt}}]({{path}})"),
+    "attachment.scan": pattern("[{{linkText}}]({{path}})"),
+    "attachment.pdf": pattern("[{{linkText}}]({{path}})"),
+    "attachment.audio": pattern("[{{linkText}}]({{path}})"),
+    "attachment.video": pattern("[{{linkText}}]({{path}})"),
+    "attachment.other": pattern("[{{linkText}}]({{path}})"),
+    "attachment.table": { mode: "plain" },
+    "attachment.divider": pattern("---"),
+    "attachment.gallery": { mode: "plain", join: "paragraph" },
+    "attachment.url": pattern("[{{alt}}]({{url}})"),
+    "attachment.url.image": pattern("![{{alt}}]({{url}})"),
+    "attachment.map": pattern("[{{alt}}]({{url}})"),
+    "attachment.placeholder": pattern("\\[{{content}}\\]")
+  }
+};
+var OBSIDIAN = {
+  schemaVersion: 1,
+  name: "obsidian",
+  description: "Obsidian-style Markdown: YAML front matter (title, dates, folder, tags, id), image-URL link cards as images, attachments copied to <file>.assets",
+  extends: "standard-markdown",
+  assets: { directory: "{{exportStem}}.assets" },
+  options: { richLinkImages: true, richLinkImageCaption: "followingItalicParagraph" },
+  rules: {
+    "document.header": pattern(
+      "---\ntitle: {{title:yaml}}\ncreated: {{created:yaml}}\nmodified: {{modified:yaml}}\nfolder: {{folder:yaml}}\ntags: {{tags:yaml}}\nnote-id: {{uuid:yaml}}\n---\n\n"
+    )
+  }
+};
+var BUILTINS = { "standard-markdown": STANDARD, obsidian: OBSIDIAN };
+var BUILTIN_TEMPLATE_NAMES = Object.keys(BUILTINS);
+var isBuiltinTemplate = (name) => Object.prototype.hasOwnProperty.call(BUILTINS, name);
+function builtinTemplate(name) {
+  return JSON.parse(JSON.stringify(BUILTINS[name]));
+}
+var TemplateValidationError = class extends Error {
+  constructor(errors) {
+    super(
+      `Invalid template (${errors.length} problem${errors.length === 1 ? "" : "s"}): ` + errors.map((e) => `${e.path}: ${e.message}`).join("; ")
+    );
+    this.errors = errors;
+    this.name = "TemplateValidationError";
+  }
+  errors;
+  code = "invalid-template";
+};
+var MAX_QUOTED_TOKEN = 32;
+function child(path10, key) {
+  if (typeof key === "number") return `${path10}[${key}]`;
+  if (key.length > MAX_QUOTED_TOKEN) key = `${key.slice(0, MAX_QUOTED_TOKEN - 3)}...`;
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${path10}.${key}` : `${path10}[${JSON.stringify(key)}]`;
+}
+var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var describe = (value) => value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
+var describeVersion = (value) => typeof value === "number" && Number.isFinite(value) ? String(value) : describe(value);
+var listed = (values) => values.map((v) => JSON.stringify(v)).join(", ");
+var quoted = (token) => token.length <= MAX_QUOTED_TOKEN ? token : `${token.slice(0, MAX_QUOTED_TOKEN - 3)}...}}`;
+var TOKEN = /\{\{([^{}]*)\}\}/g;
+var TOKEN_BODY = /^\s*([A-Za-z]+)(?::([A-Za-z]+))?\s*$/;
+var META_PLACEHOLDERS = ["uuid", "folder", "account", "created", "modified"];
+function usesNoteMeta(template) {
+  const uses = (value) => typeof value === "string" ? placeholderTokens(value).some(({ name }) => META_PLACEHOLDERS.includes(name)) : typeof value === "object" && value !== null && Object.values(value).some(uses);
+  return uses(template.rules) || uses(template.assets) || uses(template.options);
+}
+function placeholderTokens(text2) {
+  return [...text2.matchAll(TOKEN)].map((match) => {
+    const body = TOKEN_BODY.exec(match[1]);
+    return {
+      token: match[0],
+      name: body?.[1] ?? match[1],
+      ...body?.[2] ? { modifier: body[2] } : {}
+    };
+  });
+}
+var Collector = class {
+  errors = [];
+  add(path10, message) {
+    this.errors.push({ path: path10, message });
+  }
+  /** Report unknown keys; returns the known keys present, sorted. */
+  keys(value, path10, allowed) {
+    const present = Object.keys(value).sort();
+    for (const key of present)
+      if (!allowed.includes(key))
+        this.add(child(path10, key), `unknown key; allowed keys are ${listed(allowed)}`);
+    return present.filter((key) => allowed.includes(key));
+  }
+  text(value, path10, { max, allowed = PLACEHOLDERS }) {
+    if (typeof value !== "string") {
+      this.add(path10, `must be a string, not ${describe(value)}`);
+      return false;
+    }
+    if (value.length > max)
+      this.add(path10, `must be at most ${max} characters (is ${value.length})`);
+    for (const { token: raw, name, modifier } of placeholderTokens(value)) {
+      const token = quoted(raw);
+      if (!PLACEHOLDERS.includes(name))
+        this.add(path10, `unknown placeholder ${token}; allowed: ${PLACEHOLDERS.join(", ")}`);
+      else if (!allowed.includes(name))
+        this.add(
+          path10,
+          `placeholder ${token} is not available here; allowed: ${allowed.join(", ")}`
+        );
+      else if (modifier && !PLACEHOLDER_MODIFIERS.includes(modifier))
+        this.add(
+          path10,
+          `unknown modifier in ${token}; allowed modifiers are ${PLACEHOLDER_MODIFIERS.join(", ")}`
+        );
+    }
+    return true;
+  }
+  oneOf(value, path10, allowed) {
+    if (typeof value === "string" && allowed.includes(value)) return true;
+    this.add(
+      path10,
+      typeof value === "string" ? `must be one of ${listed(allowed)}` : `must be one of ${listed(allowed)}, not ${describe(value)}`
+    );
+    return false;
+  }
+  boolean(value, path10) {
+    if (typeof value === "boolean") return true;
+    this.add(path10, `must be true or false, not ${describe(value)}`);
+    return false;
+  }
+};
+var RULE_FIELDS = {
+  wrap: ["before", "after"],
+  linePrefix: ["value"],
+  pattern: ["value"],
+  plain: [],
+  omit: []
+};
+function validateRule(c, rule, path10) {
+  if (!isObject2(rule)) {
+    c.add(path10, `must be an object, not ${describe(rule)}`);
+    return;
+  }
+  const keys = c.keys(rule, path10, ["mode", "before", "after", "value", "join"]);
+  if (!("mode" in rule)) {
+    c.add(child(path10, "mode"), `is required; one of ${listed(RULE_MODES)}`);
+    return;
+  }
+  if (!c.oneOf(rule.mode, child(path10, "mode"), RULE_MODES)) return;
+  const needed = RULE_FIELDS[rule.mode];
+  for (const field of ["before", "after", "value"]) {
+    const fieldPath = child(path10, field);
+    if (needed.includes(field)) {
+      if (!(field in rule)) c.add(fieldPath, `is required when mode is "${rule.mode}"`);
+      else c.text(rule[field], fieldPath, { max: MAX_RULE_TEXT });
+    } else if (keys.includes(field)) c.add(fieldPath, `is not used when mode is "${rule.mode}"`);
+  }
+  if ("join" in rule) c.oneOf(rule.join, child(path10, "join"), ["line", "paragraph"]);
+}
+function validateDirectory(c, value, path10) {
+  if (value === null) return;
+  if (!c.text(value, path10, { max: MAX_DIRECTORY_LENGTH, allowed: NOTE_PLACEHOLDERS })) return;
+  if (!value.trim()) c.add(path10, "must not be empty; use null to copy only with assetsDir");
+  else if (/^[/~]/.test(value)) c.add(path10, "must be relative to the output file's directory");
+  else if (/[\\\0]/.test(value)) c.add(path10, "must not contain a backslash or NUL");
+  else if (value.split("/").some((part) => part.trim() === ".."))
+    c.add(path10, 'must not contain a ".." component');
+}
+function validateInlineOrder(c, value, path10) {
+  if (!Array.isArray(value)) {
+    c.add(
+      path10,
+      `must be an array of ${INLINE_FORMATS.length} inline formats, not ${describe(value)}`
+    );
+    return;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  value.forEach((item, i) => {
+    if (!c.oneOf(item, child(path10, i), INLINE_FORMATS)) return;
+    if (seen.has(item)) c.add(child(path10, i), `duplicate format "${item}"`);
+    seen.add(item);
+  });
+  const missing = INLINE_FORMATS.filter((format) => !seen.has(format));
+  if (missing.length) c.add(path10, `must list every inline format; missing ${listed(missing)}`);
+}
+function validateOptions(c, value, path10) {
+  if (!isObject2(value)) {
+    c.add(path10, `must be an object, not ${describe(value)}`);
+    return;
+  }
+  for (const key of c.keys(value, path10, [
+    "titleFallback",
+    "richLinkImages",
+    "richLinkImageCaption",
+    "listIndent"
+  ])) {
+    const at = child(path10, key);
+    if (key === "richLinkImageCaption")
+      c.oneOf(value[key], at, ["none", "followingItalicParagraph"]);
+    else if (key === "listIndent") {
+      if (typeof value[key] !== "string" || !/^[ \t]{0,16}$/.test(value[key]))
+        c.add(at, "must be a string of at most 16 spaces or tabs");
+    } else c.boolean(value[key], at);
+  }
+}
+function templateErrors(input) {
+  const c = new Collector();
+  if (!isObject2(input)) {
+    c.add("$", `a template must be a JSON object, not ${describe(input)}`);
+    return c.errors;
+  }
+  if (input.schemaVersion !== TEMPLATE_SCHEMA_VERSION) {
+    c.add(
+      "$.schemaVersion",
+      "schemaVersion" in input ? `must be ${TEMPLATE_SCHEMA_VERSION}, not ${describeVersion(input.schemaVersion)}` : `is required and must be ${TEMPLATE_SCHEMA_VERSION}`
+    );
+    return c.errors;
+  }
+  const keys = c.keys(input, "$", [
+    "schemaVersion",
+    "name",
+    "description",
+    "extends",
+    "assets",
+    "inlineOrder",
+    "rules",
+    "options"
+  ]);
+  for (const key of keys) {
+    const path10 = child("$", key);
+    const value = input[key];
+    switch (key) {
+      case "schemaVersion":
+        break;
+      case "name":
+      case "description":
+        c.text(value, path10, { max: MAX_META_LENGTH, allowed: [] });
+        break;
+      case "extends":
+        c.oneOf(value, path10, BUILTIN_TEMPLATE_NAMES);
+        break;
+      case "assets":
+        if (!isObject2(value)) {
+          c.add(path10, `must be an object, not ${describe(value)}`);
+          break;
+        }
+        for (const field of c.keys(value, path10, ["mode", "pathStyle", "directory"])) {
+          const at = child(path10, field);
+          if (field === "mode") c.oneOf(value.mode, at, ["copy", "reference", "omit"]);
+          else if (field === "pathStyle")
+            c.oneOf(value.pathStyle, at, ["relative", "absolute"]);
+          else validateDirectory(c, value.directory, at);
+        }
+        break;
+      case "inlineOrder":
+        validateInlineOrder(c, value, path10);
+        break;
+      case "rules":
+        if (!isObject2(value)) {
+          c.add(path10, `must be an object keyed by rule id, not ${describe(value)}`);
+          break;
+        }
+        for (const id2 of Object.keys(value).sort()) {
+          if (!RULE_IDS.includes(id2))
+            c.add(child(path10, id2), "unknown rule id; see the template reference for the list");
+          else validateRule(c, value[id2], child(path10, id2));
+        }
+        break;
+      default:
+        validateOptions(c, value, path10);
+    }
+  }
+  return c.errors;
+}
+function validateTemplate(input) {
+  const errors = templateErrors(input);
+  if (errors.length) throw new TemplateValidationError(errors);
+  return input;
+}
+function jsonErrorLocation(text2, message) {
+  const lineColumn = /\(line (\d+) column (\d+)\)/.exec(message);
+  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
+  const position = /at position (\d+)/.exec(message);
+  if (!position) return void 0;
+  const offset = Math.min(Number(position[1]), text2.length);
+  const before = text2.slice(0, offset).split("\n");
+  return { line: before.length, column: before[before.length - 1].length + 1 };
+}
+function parseTemplate(text2) {
+  const bytes = Buffer.byteLength(text2, "utf8");
+  if (bytes > MAX_TEMPLATE_BYTES)
+    throw new TemplateValidationError([
+      { path: "$", message: `template is ${bytes} bytes; the limit is ${MAX_TEMPLATE_BYTES}` }
+    ]);
+  let parsed;
+  try {
+    parsed = JSON.parse(text2);
+  } catch (error2) {
+    const at = jsonErrorLocation(text2, error2.message);
+    throw new TemplateValidationError([
+      {
+        path: "$",
+        message: at ? `not valid JSON at line ${at.line}, column ${at.column}` : "not valid JSON"
+      }
+    ]);
+  }
+  return validateTemplate(parsed);
+}
+function resolveTemplate(template, name) {
+  if (template === STANDARD) return merge2(void 0, STANDARD, name);
+  return merge2(resolveTemplate(BUILTINS[template.extends ?? "standard-markdown"]), template, name);
+}
+function merge2(base, template, name) {
+  return {
+    name: name ?? template.name ?? base?.name ?? "template",
+    ...template.description !== void 0 ? { description: template.description } : base?.description !== void 0 ? { description: base.description } : {},
+    assets: { ...base?.assets, ...template.assets },
+    inlineOrder: [...template.inlineOrder ?? base.inlineOrder],
+    rules: { ...base?.rules, ...template.rules },
+    options: { ...base?.options, ...template.options }
+  };
+}
+var plainValue = (text2) => ({ md: text2, raw: text2 });
+function fillPlaceholders(text2, values) {
+  return text2.replace(TOKEN, (token, body) => {
+    const parsed = TOKEN_BODY.exec(body);
+    const raw = parsed ? values[parsed[1]] : void 0;
+    const value = typeof raw === "string" ? plainValue(raw) : raw;
+    if (parsed?.[2] === "yaml") {
+      if (!value) return "null";
+      return JSON.stringify(value.list ?? value.raw);
+    }
+    if (!value) return "";
+    return parsed?.[2] === "raw" ? value.raw : value.md;
+  });
+}
+function ruleUses(rule, name) {
+  return [rule.before, rule.after, rule.value].some(
+    (text2) => text2 !== void 0 && placeholderTokens(text2).some((token) => token.name === name)
+  );
+}
+
+// src/utils/templateRender.ts
+var FILE_BACKED = /* @__PURE__ */ new Set([
+  "image",
+  "drawing",
+  "paper",
+  "scan",
+  "pdf",
+  "audio",
+  "video",
+  "file",
+  "gallery"
+]);
+var KIND_RULES = {
+  image: "attachment.image",
+  drawing: "attachment.drawing.classic",
+  paper: "attachment.drawing.paper",
+  scan: "attachment.scan",
+  pdf: "attachment.pdf",
+  audio: "attachment.audio",
+  video: "attachment.video",
+  file: "attachment.other",
+  table: "attachment.table",
+  divider: "attachment.divider",
+  gallery: "attachment.gallery",
+  link: "attachment.url"
+};
+var IMAGE_URL_EXTENSIONS = /\.(?:apng|avif|bmp|gif|heic|heif|ico|jfif|jpe?g|jxl|png|svgz?|tiff?|webp)$/i;
+function isImageUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    let path10 = parsed.pathname;
+    try {
+      path10 = decodeURIComponent(path10);
+    } catch {
+    }
+    return IMAGE_URL_EXTENSIONS.test(path10);
+  } catch {
+    return false;
+  }
+}
+function isMapUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "maps.apple.com" || host.endsWith(".maps.apple.com");
+  } catch {
+    return false;
+  }
+}
+function attachmentRuleId(attachment, template) {
+  if (attachment.kind === "inline") return void 0;
+  if (attachment.kind === "link") {
+    const url = attachment.url ?? "";
+    if (template.options.richLinkImages && isImageUrl(url)) return "attachment.url.image";
+    if (isMapUrl(url)) return "attachment.map";
+  }
+  return KIND_RULES[attachment.kind] ?? "attachment.other";
+}
+function applyRule(rule, content, values) {
+  const fill = (text2 = "") => fillPlaceholders(text2, { ...values, content: plainValue(content) });
+  switch (rule.mode) {
+    case "omit":
+      return void 0;
+    case "plain":
+      return content;
+    case "wrap":
+      return fill(rule.before) + content + fill(rule.after);
+    case "pattern":
+      return fill(rule.value);
+    case "linePrefix": {
+      const prefix = fill(rule.value);
+      return content.split("\n").map((line) => line ? prefix + line : prefix.trimEnd()).join("\n");
+    }
+  }
+}
+function applyInline(rule, text2, values) {
+  const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(text2);
+  if (!match[2]) return text2;
+  const out = applyRule(rule, match[2], values);
+  return out === void 0 ? "" : `${match[1]}${out}${match[3]}`;
+}
+var HIGHLIGHT_RULES = /* @__PURE__ */ new Set(["purple", "pink", "orange", "mint", "blue"]);
+function highlightRule(name) {
+  return HIGHLIGHT_RULES.has(name) ? `inline.highlight.${name}` : "inline.highlight.other";
+}
+function buildLayers(template) {
+  const { rules } = template;
+  const active = (rule) => rule.mode !== "plain";
+  const flag3 = (format) => {
+    const rule = rules[`inline.${format}`];
+    return {
+      key: (fmt) => fmt[format] && active(rule) ? "on" : void 0,
+      rule: () => rule,
+      values: () => ({})
+    };
+  };
+  const layers = {
+    bold: flag3("bold"),
+    italic: flag3("italic"),
+    underline: flag3("underline"),
+    strikethrough: flag3("strikethrough"),
+    superscript: flag3("superscript"),
+    subscript: flag3("subscript"),
+    highlight: {
+      key: (fmt) => {
+        if (!fmt.highlight) return void 0;
+        const rule = rules[highlightRule(fmt.highlight)];
+        if (!active(rule)) return void 0;
+        return JSON.stringify(rule) + (ruleUses(rule, "highlight") ? fmt.highlight : "");
+      },
+      rule: (fmt) => rules[highlightRule(fmt.highlight)],
+      values: (fmt) => ({ highlight: fmt.highlight })
+    },
+    color: {
+      key: (fmt) => {
+        const rule = rules["inline.color"];
+        if (!fmt.color || !active(rule)) return void 0;
+        return ruleUses(rule, "color") ? fmt.color : "on";
+      },
+      rule: () => rules["inline.color"],
+      values: (fmt) => ({ color: fmt.color })
+    },
+    link: {
+      key: (fmt) => fmt.link,
+      rule: () => rules["inline.link"],
+      values: (fmt) => ({ url: { md: linkDestination(fmt.link), raw: fmt.link } })
+    }
+  };
+  return [...template.inlineOrder].reverse().map((format) => layers[format]);
+}
+var LIST_STYLES2 = /* @__PURE__ */ new Set(["bulleted", "dashed", "numbered", "checklist"]);
+var TemplateRenderer = class {
+  constructor(ctx, options) {
+    this.ctx = ctx;
+    this.options = options;
+    this.layers = buildLayers(options.template);
+    this.rules = options.template.rules;
+  }
+  ctx;
+  options;
+  warnings = [];
+  layers;
+  rules;
+  /** The attachment each plan was made from, for rule and placeholder lookup. */
+  origins = /* @__PURE__ */ new WeakMap();
+  get template() {
+    return this.options.template;
+  }
+  /** Placeholder values describing the note. */
+  noteValues(note) {
+    const meta = this.options.metaFor?.(note) ?? {};
+    const text2 = (value) => value === void 0 ? void 0 : { md: escapeMarkdown(value), raw: value };
+    const tags = noteTags(note);
+    const values = {
+      title: text2(note.title.trim()),
+      id: note.id,
+      uuid: meta.uuid,
+      folder: text2(meta.folder),
+      account: text2(meta.account),
+      created: meta.created,
+      modified: meta.modified,
+      tags: {
+        md: tags.map((tag) => escapeMarkdown(tag)).join(", "),
+        raw: tags.join(", "),
+        list: tags
+      },
+      exportStem: this.options.exportStem ?? "export"
+    };
+    return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== void 0));
+  }
+  warn(code, note, attachmentId) {
+    this.warnings.push({ code, noteId: note.id, ...attachmentId ? { attachmentId } : {} });
+  }
+  /** Plan one attachment, honoring omit rules before any file is placed. */
+  plan(note, id2, attachment, binding) {
+    const omitted = { type: "inline", text: "" };
+    if (!attachment) {
+      this.warn("attachment_not_found", note, id2);
+      return planAttachment(void 0, this.ctx);
+    }
+    const ruleId = attachmentRuleId(attachment, this.template);
+    if (ruleId && this.rules[ruleId].mode === "omit") return omitted;
+    const fileBacked = FILE_BACKED.has(attachment.kind);
+    if (fileBacked && this.template.assets.mode === "omit") return omitted;
+    if (fileBacked && !binding.writer && binding.required)
+      this.warn("assets_dir_required", note, attachment.id);
+    const plan = planAttachment(attachment, {
+      ...this.ctx,
+      ...binding.writer ? { writer: binding.writer } : { writer: void 0 }
+    });
+    this.inspect(note, plan, attachment);
+    return plan;
+  }
+  /** Record origins and warnings for a plan and any gallery items. */
+  inspect(note, plan, attachment) {
+    this.origins.set(plan, attachment);
+    switch (plan.type) {
+      case "inline":
+        if (!plan.text) this.warn("inline_token_metadata_missing", note, attachment.id);
+        break;
+      case "unavailable":
+        this.warn(
+          plan.reason === "undecodable" ? "table_decode_failed" : plan.reason === "missing" ? "missing_asset" : "asset_copy_failed",
+          note,
+          attachment.id
+        );
+        break;
+      case "gallery":
+        if (!plan.items.length) this.warn("gallery_children_missing", note, attachment.id);
+        plan.items.forEach((item, i) => this.inspect(note, item, attachment.children[i]));
+        break;
+    }
+  }
+  /** Placeholder values for an attachment. */
+  attachmentValues(attachment, base) {
+    if (!attachment) return base;
+    const filename = attachment.mediaFilename ?? attachment.title;
+    return {
+      ...base,
+      kind: attachment.kind,
+      uti: attachment.uti,
+      ...filename ? { filename: { md: escapeMarkdown(filename), raw: filename } } : {}
+    };
+  }
+  /** Render a plan through its template rule; "" when omitted. */
+  renderPlan(plan, values, caption) {
+    const origin = this.origins.get(plan);
+    const vars = this.attachmentValues(origin, values);
+    const apply2 = (id2, content, extra = {}) => applyRule(this.rules[id2], content, { ...vars, ...extra }) ?? "";
+    switch (plan.type) {
+      case "inline":
+        return plan.link ? applyInline(this.rules["inline.link"], escapeMarkdown(plan.text), {
+          ...vars,
+          url: { md: linkDestination(plan.link), raw: plan.link }
+        }) : escapeMarkdown(plan.text);
+      case "divider":
+        return apply2("attachment.divider", "");
+      case "table":
+        return apply2("attachment.table", tableMarkdown(plan.rows));
+      case "placeholder":
+      case "unavailable": {
+        const label = plan.type === "unavailable" ? `${plan.label} unavailable` : plan.label;
+        return apply2(
+          "attachment.placeholder",
+          escapeMarkdown(plan.name ? `${label}: ${plan.name}` : label)
+        );
+      }
+      case "asset": {
+        const alt = escapeMarkdown(plan.name ?? plan.label);
+        const id2 = origin && attachmentRuleId(origin, this.template) || "attachment.other";
+        return apply2(id2, "", {
+          alt: { md: alt, raw: plan.name ?? plan.label },
+          path: { md: linkDestination(plan.url), raw: plan.url },
+          linkText: plan.previewUrl ? `![${alt}](${linkDestination(plan.previewUrl)})` : alt
+        });
+      }
+      case "card": {
+        if (!plan.url) return `${escapeMarkdown(plan.title)} (${escapeMarkdown(plan.displayUrl)})`;
+        const id2 = origin && attachmentRuleId(origin, this.template) || "attachment.url";
+        const alt = caption ?? plan.title;
+        return apply2(id2, "", {
+          alt: { md: escapeMarkdown(alt), raw: alt },
+          url: { md: linkDestination(plan.url), raw: plan.url },
+          ...caption !== void 0 ? { caption: { md: escapeMarkdown(caption), raw: caption } } : {}
+        });
+      }
+      case "gallery": {
+        const rule = this.rules["attachment.gallery"];
+        const items = plan.items.map((item) => this.renderPlan(item, values)).filter(Boolean);
+        if (!items.length) return "";
+        return apply2("attachment.gallery", items.join(rule.join === "line" ? "\n" : "\n\n"));
+      }
+    }
+  }
+  /** Format text runs through the inline layers. */
+  layered(pieces, values, depth = 0) {
+    if (depth === this.layers.length)
+      return pieces.map((piece) => escapeMarkdown(piece.text.replace(/\n/g, " "))).join("");
+    const layer = this.layers[depth];
+    let out = "";
+    for (let i = 0; i < pieces.length; ) {
+      const key = layer.key(pieces[i].fmt);
+      let j = i;
+      while (j < pieces.length && layer.key(pieces[j].fmt) === key) j++;
+      const inner = this.layered(pieces.slice(i, j), values, depth + 1);
+      const fmt = pieces[i].fmt;
+      out = joinSafe(
+        out,
+        key === void 0 ? inner : applyInline(layer.rule(fmt), inner, { ...values, ...layer.values(fmt) })
+      );
+      i = j;
+    }
+    return out;
+  }
+  inline(pieces, values, caption) {
+    let out = "";
+    for (let i = 0; i < pieces.length; ) {
+      const piece = pieces[i];
+      if (piece.type === "attachment") {
+        out = joinSafe(out, this.renderPlan(piece.plan, values, caption));
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < pieces.length && pieces[j].type === "text") j++;
+      out = joinSafe(out, this.layered(pieces.slice(i, j), values));
+      i = j;
+    }
+    return out;
+  }
+  /** The caption paragraph after a lone image-URL link card, if the template wants one. */
+  captionFor(note, index) {
+    const { options } = this.template;
+    if (!options.richLinkImages || options.richLinkImageCaption !== "followingItalicParagraph")
+      return void 0;
+    const blocks = note.doc.blocks;
+    const current = blocks[index];
+    if (current.text.trim() !== "\uFFFC" || current.attachments.length !== 1) return void 0;
+    const attachment = note.attachments.get(current.attachments[0].id);
+    if (!attachment || attachmentRuleId(attachment, this.template) !== "attachment.url.image")
+      return void 0;
+    if (this.rules["attachment.url.image"].mode === "omit" || !isSafe(attachment.url))
+      return void 0;
+    const next = blocks[index + 1];
+    if (!next || next.style !== "body" || next.blockQuote || next.indent !== 0 || next.attachments.length || next.text.includes("\uFFFC") || !next.text.trim() || !next.runs.every((run) => !run.text.trim() || run.italic))
+      return void 0;
+    return next.text.trim();
+  }
+  /** Render one note's body. */
+  renderBody(note, values) {
+    const binding = this.options.assetsFor?.(note) ?? {};
+    const plan = (id2) => this.plan(note, id2, note.attachments.get(id2), binding);
+    const titleIndex = titleBlockIndex(note);
+    const lines = [];
+    const counters = [];
+    const skip = /* @__PURE__ */ new Set();
+    let code;
+    const push = (text2, quote, group) => {
+      if (!text2) return;
+      if (quote) {
+        const quoted2 = applyRule(this.rules["paragraph.quote"], text2, values);
+        if (!quoted2) return;
+        text2 = quoted2;
+      }
+      lines.push({ text: text2, quote, ...group ? { group } : {} });
+    };
+    const ruled = (id2, content, extra = {}) => applyRule(this.rules[id2], content, { ...values, ...extra });
+    const groupOf = (id2, list) => this.rules[id2].join === "line" ? list ? "list" : id2 : void 0;
+    const flushCode = () => {
+      if (!code) return;
+      const longest = Math.max(
+        2,
+        ...code.lines.map((l) => Math.max(0, ...(l.match(/`+/g) ?? []).map((m) => m.length)))
+      );
+      push(
+        ruled("block.code", code.lines.join("\n"), { fence: "`".repeat(longest + 1) }),
+        code.quote,
+        groupOf("block.code", false)
+      );
+      code = void 0;
+    };
+    if (this.template.options.titleFallback && titleIndex === -1 && note.title.trim())
+      push(
+        ruled("block.title", escapeMarkdown(note.title.trim())),
+        false,
+        groupOf("block.title", false)
+      );
+    for (const block of note.doc.blocks) {
+      if (skip.has(block.index)) continue;
+      if (block.style === "monospaced") {
+        if (code && code.quote !== block.blockQuote) flushCode();
+        code ??= { lines: [], quote: block.blockQuote };
+        code.lines.push(block.text.replace(/￼/g, ""));
+        continue;
+      }
+      flushCode();
+      if (!LIST_STYLES2.has(block.style)) counters.length = 0;
+      if (!block.text.trim()) continue;
+      const caption = this.captionFor(note, block.index);
+      if (caption !== void 0) skip.add(block.index + 1);
+      const pieces = blockPieces(block, plan);
+      let segment = [];
+      const segments = [];
+      for (const piece of pieces) {
+        if (piece.type === "attachment" && isBlockPlan(piece.plan)) {
+          segments.push(segment, piece.plan);
+          segment = [];
+        } else segment.push(piece);
+      }
+      segments.push(segment);
+      let first2 = true;
+      for (const segment2 of segments) {
+        if (!Array.isArray(segment2)) {
+          push(this.renderPlan(segment2, values), block.blockQuote);
+          continue;
+        }
+        const body = this.inline(segment2, values, caption).trim();
+        if (!body) continue;
+        const [text2, group] = this.blockLine(
+          block,
+          body,
+          first2,
+          block.index === titleIndex,
+          counters,
+          values
+        );
+        push(text2, block.blockQuote, group);
+        first2 = false;
+      }
+    }
+    flushCode();
+    for (const attachment of unreferencedAttachments(note)) {
+      this.ctx.stats.unreferenced++;
+      push(this.renderPlan(this.plan(note, attachment.id, attachment, binding), values), false);
+    }
+    return this.join(lines, values);
+  }
+  /** One paragraph through its block rule, with list indent and numbering. */
+  blockLine(block, body, first2, isTitle, counters, values) {
+    const rule = (id2, content, extra = {}, list = false) => [
+      applyRule(this.rules[id2], content, { ...values, ...extra }),
+      this.rules[id2].join === "line" ? list ? "list" : id2 : void 0
+    ];
+    if (isTitle || block.style === "title") return rule("block.title", body);
+    if (block.style === "heading") return rule("block.heading", body);
+    if (block.style === "subheading") return rule("block.subheading", body);
+    if (!LIST_STYLES2.has(block.style) || !first2) return rule("block.body", escapeLineStart(body));
+    const item = escapeLineStart(body);
+    const level = Math.min(block.indent, 20);
+    counters.length = Math.min(counters.length, level + 1);
+    while (counters.length <= level) counters.push(0);
+    let result;
+    if (block.style === "numbered")
+      result = rule("block.numbered", item, { index: String(++counters[level]) }, true);
+    else {
+      counters[level] = 0;
+      if (block.style === "checklist") {
+        const done = !!block.checklist?.done;
+        result = rule(
+          done ? "block.checklist.checked" : "block.checklist.unchecked",
+          item,
+          { checked: String(done) },
+          true
+        );
+      } else
+        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", item, {}, true);
+    }
+    const indent = this.template.options.listIndent.repeat(level);
+    if (result[0] && indent)
+      result[0] = result[0].split("\n").map((line) => line ? indent + line : line).join("\n");
+    return result;
+  }
+  /** Join lines: one newline within a `line`-join group, a blank line elsewhere. */
+  join(lines, values) {
+    const quote = this.rules["paragraph.quote"];
+    const quoteGap = quote.mode === "linePrefix" ? `
+${fillPlaceholders(quote.value ?? "", values).trimEnd()}
+` : "\n\n";
+    let out = "";
+    let previous;
+    for (const line of lines) {
+      if (previous) {
+        const tight = previous.group !== void 0 && previous.group === line.group && previous.quote === line.quote;
+        out += tight ? "\n" : previous.quote && line.quote ? quoteGap : "\n\n";
+      }
+      out += line.text;
+      previous = line;
+    }
+    return out;
+  }
+};
+var isSafe = (url) => !!url && /^https?:\/\//i.test(url) && !Array.from(url).some((c) => c.charCodeAt(0) < 32);
+function noteTags(note) {
+  const tags = [];
+  for (const attachment of note.attachments.values()) {
+    if (!attachment.uti.endsWith(".hashtag") || !attachment.altText) continue;
+    const tag = attachment.altText.replace(/^#/, "").trim();
+    if (tag && !tags.includes(tag)) tags.push(tag);
+  }
+  return tags;
+}
+function renderNotesWithTemplate(notes, ctx, options) {
+  const renderer = new TemplateRenderer(ctx, options);
+  const rules = options.template.rules;
+  let markdown = "";
+  notes.forEach((note, i) => {
+    const values = renderer.noteValues(note);
+    if (i > 0) markdown += applyRule(rules["document.separator"], "", values) ?? "";
+    const body = renderer.renderBody(note, values);
+    markdown += (applyRule(rules["document.header"], "", values) ?? "") + (options.wrap ? wrapMarkdown(body, options.wrap) : body) + (applyRule(rules["document.footer"], "", values) ?? "");
+  });
+  return { markdown: markdown + (notes.length ? "\n" : ""), warnings: renderer.warnings };
+}
+
+// src/utils/templateAssets.ts
+import { createHash as createHash2 } from "node:crypto";
+import {
+  closeSync as closeSync5,
+  constants as constants5,
+  fstatSync as fstatSync5,
+  lstatSync as lstatSync4,
+  mkdirSync as mkdirSync5,
+  openSync as openSync5,
+  readSync as readSync4,
+  writeSync as writeSync4
+} from "node:fs";
+import { extname as extname4, isAbsolute as isAbsolute3, join as join21, relative as relative4, resolve as resolve4, sep as sep4 } from "node:path";
+var CHUNK = 1024 * 1024;
+function openRegular(path10) {
+  const fd = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+  if (!fstatSync5(fd).isFile()) {
+    closeSync5(fd);
+    throw new Error("not a regular file");
+  }
+  return fd;
+}
+function digest(fd) {
+  const hash = createHash2("sha256");
+  const chunk = Buffer.alloc(CHUNK);
+  let head = Buffer.alloc(0);
+  for (let position = 0; ; ) {
+    const n = readSync4(fd, chunk, 0, chunk.length, position);
+    if (n <= 0) break;
+    if (position === 0) head = Buffer.from(chunk.subarray(0, Math.min(n, 16)));
+    hash.update(chunk.subarray(0, n));
+    position += n;
+  }
+  return { hash: hash.digest("hex"), head };
+}
+function urlFor(target, linkBase) {
+  return encodePathUrl(linkBase ? relative4(linkBase, target).split(sep4).join("/") : target);
+}
+var HashedSidecarWriter = class {
+  constructor(dir, linkBase) {
+    this.dir = dir;
+    this.linkBase = linkBase;
+  }
+  dir;
+  linkBase;
+  placed = /* @__PURE__ */ new Map();
+  ready = false;
+  /** Absolute paths of files written or reused. */
+  files = [];
+  count = 0;
+  prepare() {
+    if (this.ready) return;
+    assertExportPath(this.dir);
+    mkdirSync5(this.dir, { recursive: true });
+    if (!lstatSync4(this.dir).isDirectory()) throw new Error("assets directory is not a directory");
+    this.ready = true;
+  }
+  place(asset) {
+    const done = this.placed.get(asset.path);
+    if (done) return done;
+    let source;
+    try {
+      source = openRegular(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      const { hash, head } = digest(source);
+      const mime = sniffMime(head, asset.name);
+      this.prepare();
+      const name = safeAssetName(asset.name, mime);
+      const ext = extname4(name);
+      const target = join21(
+        this.dir,
+        `${name.slice(0, name.length - ext.length)}-${hash.slice(0, 8)}${ext}`
+      );
+      let existing;
+      try {
+        existing = openRegular(target);
+      } catch (error2) {
+        const code = error2.code;
+        if (code !== "ENOENT") return { error: "destination-not-regular" };
+      }
+      if (existing !== void 0) {
+        try {
+          if (digest(existing).hash !== hash) return { error: "name-taken" };
+        } finally {
+          closeSync5(existing);
+        }
+      } else this.copy(source, target);
+      this.count++;
+      this.files.push(target);
+      const result = { url: urlFor(target, this.linkBase), mime };
+      this.placed.set(asset.path, result);
+      return result;
+    } catch (error2) {
+      return { error: error2 instanceof Error ? error2.message : String(error2) };
+    } finally {
+      closeSync5(source);
+    }
+  }
+  copy(source, target) {
+    const out = openSync5(
+      target,
+      constants5.O_WRONLY | constants5.O_CREAT | constants5.O_EXCL | constants5.O_NOFOLLOW,
+      420
+    );
+    try {
+      const chunk = Buffer.alloc(CHUNK);
+      for (let position = 0; ; ) {
+        const n = readSync4(source, chunk, 0, chunk.length, position);
+        if (n <= 0) break;
+        let written = 0;
+        while (written < n) written += writeSync4(out, chunk, written, n - written);
+        position += n;
+      }
+    } finally {
+      closeSync5(out);
+    }
+  }
+};
+var ReferenceWriter = class {
+  constructor(linkBase) {
+    this.linkBase = linkBase;
+  }
+  linkBase;
+  count = 0;
+  place(asset) {
+    let fd;
+    try {
+      fd = openRegular(asset.path);
+    } catch {
+      return { error: "unreadable" };
+    }
+    try {
+      const head = Buffer.alloc(16);
+      const n = readSync4(fd, head, 0, 16, 0);
+      this.count++;
+      return {
+        url: urlFor(asset.path, this.linkBase),
+        mime: sniffMime(head.subarray(0, n), asset.name)
+      };
+    } finally {
+      closeSync5(fd);
+    }
+  }
+};
+function pathComponent(value) {
+  const clean = Array.from(
+    value.normalize("NFC"),
+    (char) => char.charCodeAt(0) < 32 || char === "\x7F" ? "_" : char
+  ).join("").replace(/[/\\:]+/g, "_").replace(/^[.\s]+/, "").trim().slice(0, 120);
+  return clean || "untitled";
+}
+function templateAssetsDir(directory, outputDir, values) {
+  const safe = {};
+  for (const [key, value] of Object.entries(values)) {
+    const raw = typeof value === "string" ? value : value?.raw;
+    if (raw !== void 0) safe[key] = pathComponent(raw);
+  }
+  const filled = fillPlaceholders(directory, safe);
+  const base = resolve4(outputDir);
+  const dir = resolve4(base, filled);
+  if (isAbsolute3(filled) || filled.split("/").includes("..") || !dir.startsWith(base + sep4))
+    throw new Error(`assets.directory "${directory}" resolves outside the output directory`);
+  return dir;
+}
+function readTemplateFile(path10) {
+  const abs = assertExportPath(path10);
+  if (extname4(abs).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${abs}`);
+  let fd;
+  try {
+    fd = openRegular(abs);
+  } catch (error2) {
+    const code = error2.code;
+    throw new Error(
+      code === "ENOENT" ? `Template file not found: ${abs}` : code === "ELOOP" ? `Refusing to read the symbolic link ${abs}` : `Template file is not a readable regular file: ${abs}`
+    );
+  }
+  try {
+    const size = fstatSync5(fd).size;
+    if (size > MAX_TEMPLATE_BYTES)
+      throw new Error(`Template file is ${size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`);
+    const data = Buffer.alloc(size);
+    let read = 0;
+    while (read < size) {
+      const n = readSync4(fd, data, read, size - read, read);
+      if (n <= 0) break;
+      read += n;
+    }
+    return data.subarray(0, read).toString("utf8");
+  } finally {
+    closeSync5(fd);
+  }
+}
 
 // src/services/notesExport.ts
 var DEFAULT_FOLDER_EXPORT_LIMIT = 100;
 var MAX_FOLDER_EXPORT_LIMIT = 1e3;
 var NotesExportError = class extends Error {
-  constructor(code, message) {
+  constructor(code, message, details) {
     super(message);
     this.code = code;
+    this.details = details;
     this.name = "NotesExportError";
   }
   code;
+  details;
 };
+var MAX_EXPORT_WARNINGS = 200;
+var MAX_LISTED_ASSETS = 1e3;
+function chooseTemplate(request, deps) {
+  if (request.template !== void 0 && request.templateFile !== void 0)
+    throw new NotesExportError(
+      "invalid-request",
+      "Provide at most one of 'template' or 'templateFile'."
+    );
+  const invalid2 = (error2, where) => new NotesExportError("invalid-template", `${where}: ${error2.message}`, error2.errors);
+  if (request.template !== void 0) {
+    const name2 = request.template;
+    if (isBuiltinTemplate(name2))
+      return {
+        info: { name: name2, source: "builtin" },
+        template: resolveTemplate(builtinTemplate(name2), name2)
+      };
+    let portable2;
+    try {
+      portable2 = deps.findTemplate?.(name2);
+    } catch (error2) {
+      if (error2 instanceof TemplateValidationError)
+        throw invalid2(error2, `Saved template "${name2}"`);
+      throw error2;
+    }
+    if (!portable2) throw new NotesExportError("template-not-found", `No template named "${name2}".`);
+    return { info: { name: name2, source: "saved" }, template: resolveTemplate(portable2, name2) };
+  }
+  if (request.templateFile === void 0) return void 0;
+  let text2;
+  try {
+    text2 = readTemplateFile(request.templateFile);
+  } catch (error2) {
+    throw new NotesExportError(
+      "invalid-path",
+      `templateFile: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+  let portable;
+  try {
+    portable = parseTemplate(text2);
+  } catch (error2) {
+    throw invalid2(error2, "templateFile");
+  }
+  const name = portable.name ?? basename4(request.templateFile, extname5(request.templateFile));
+  return { info: { name, source: "file" }, template: resolveTemplate(portable, name) };
+}
 function validPath(path10, what) {
   try {
     return assertExportPath(path10);
@@ -51559,7 +52844,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync5(dirname6(output), { recursive: true });
+  mkdirSync6(dirname6(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -51581,8 +52866,16 @@ function exportNotesMarkdown(request, deps) {
   const assetsDir = request.assetsDir ? validPath(request.assetsDir, "assetsDir") : void 0;
   if (output && assetsDir && output === assetsDir)
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
+  const chosen = chooseTemplate(request, deps);
+  if (chosen && assetsDir && chosen.template.assets.mode !== "copy")
+    throw new NotesExportError(
+      "invalid-request",
+      `assetsDir has no effect: template "${chosen.info.name}" sets assets.mode to "${chosen.template.assets.mode}".`
+    );
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  if (chosen)
+    return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
   const fd = output ? openOutput(output) : void 0;
   const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
@@ -51614,7 +52907,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join21(dirname6(output), `${basename4(output, extname4(output))}.assets`);
+  return join22(dirname6(output), `${basename4(output, extname5(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -51654,37 +52947,143 @@ function exportNotesHtml(request, deps) {
     ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count }
   };
 }
+function readMetaSafely(read, id2) {
+  try {
+    return read(id2);
+  } catch {
+    return {};
+  }
+}
+function pathValues(note, meta, exportStem) {
+  const values = { title: note.title.trim(), id: note.id, exportStem };
+  for (const [key, value] of Object.entries(meta)) if (value) values[key] = value;
+  return values;
+}
+function assetBindings(template, notes, meta, { output, assetsDir, exportStem }) {
+  const linkBase = template.assets.pathStyle === "relative" && output ? dirname6(output) : void 0;
+  const writers = /* @__PURE__ */ new Map();
+  const writerFor = (dir) => {
+    let writer = writers.get(dir);
+    if (!writer) writers.set(dir, writer = new HashedSidecarWriter(dir, linkBase));
+    return writer;
+  };
+  const reference = template.assets.mode === "reference" ? new ReferenceWriter(linkBase) : void 0;
+  const bindings = /* @__PURE__ */ new Map();
+  for (const note of notes) {
+    let binding = {};
+    if (reference) binding = { writer: reference };
+    else if (template.assets.mode === "copy") {
+      if (assetsDir) binding = { writer: writerFor(assetsDir) };
+      else if (template.assets.directory !== null && output) {
+        let dir;
+        try {
+          dir = templateAssetsDir(
+            template.assets.directory,
+            dirname6(output),
+            pathValues(note, meta.get(note) ?? {}, exportStem)
+          );
+        } catch (error2) {
+          throw new NotesExportError("invalid-path", error2.message);
+        }
+        dir = validPath(dir, "assets.directory");
+        if (dir === output)
+          throw new NotesExportError("invalid-path", "assets.directory resolves to outputPath.");
+        binding = { writer: writerFor(dir) };
+      } else if (template.assets.directory !== null) binding = { required: true };
+    }
+    bindings.set(note, binding);
+  }
+  return { bindings, writers };
+}
+function exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir }) {
+  const { template } = chosen;
+  const readMeta = deps.readMeta ?? ((id2) => readExportNoteMeta(id2));
+  const needsMeta = usesNoteMeta(template);
+  const meta = new Map(
+    notes.map((note) => [note, needsMeta ? readMetaSafely(readMeta, note.id) : {}])
+  );
+  const exportStem = output ? basename4(output, extname5(output)) : "export";
+  const { bindings, writers } = assetBindings(template, notes, meta, {
+    output,
+    assetsDir,
+    exportStem
+  });
+  const fd = output ? openOutput(output) : void 0;
+  const ctx = { stats: emptyStats(), locator: deps.locator ?? new AssetLocator() };
+  let warnings = [];
+  const markdown = renderInto(fd, () => {
+    const result = renderNotesWithTemplate(notes, ctx, {
+      template,
+      exportStem,
+      wrap: request.wrap ?? 0,
+      assetsFor: (note) => bindings.get(note) ?? {},
+      metaFor: (note) => meta.get(note) ?? {}
+    });
+    warnings = result.warnings;
+    return result.markdown;
+  });
+  const bytes = Buffer.byteLength(markdown);
+  const used = [...writers.values()].filter((writer) => writer.count > 0);
+  const files = used.flatMap((writer) => writer.files);
+  const receipt = {
+    format: "markdown",
+    count: notes.length,
+    bytes,
+    stats: ctx.stats,
+    skipped,
+    template: chosen.info,
+    warnings: warnings.slice(0, MAX_EXPORT_WARNINGS),
+    ...warnings.length > MAX_EXPORT_WARNINGS ? { warningsOmitted: warnings.length - MAX_EXPORT_WARNINGS } : {},
+    ...used.length ? {
+      assets: {
+        dir: used.length === 1 ? used[0].dir : dirname6(output),
+        files: files.length
+      },
+      assetFiles: files.slice(0, MAX_LISTED_ASSETS)
+    } : {}
+  };
+  if (fd !== void 0) {
+    writeAllAndClose(fd, markdown);
+    return { ...receipt, output };
+  }
+  if (bytes > deps.maxInlineBytes)
+    throw new NotesExportError(
+      "too-large",
+      `The Markdown is ${bytes} bytes, over the ${deps.maxInlineBytes}-byte inline limit. Pass outputPath to write it to a file, or export fewer notes.`
+    );
+  return { ...receipt, markdown };
+}
 
 // src/tools/directOperations.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import {
-  closeSync as closeSync6,
-  constants as constants6,
-  fstatSync as fstatSync6,
+  closeSync as closeSync7,
+  constants as constants7,
+  fstatSync as fstatSync7,
   mkdtempSync as mkdtempSync6,
-  openSync as openSync6,
+  openSync as openSync7,
   readFileSync as readFileSync4,
   rmSync as rmSync6,
   writeFileSync as writeFileSync5
 } from "node:fs";
 import { tmpdir as tmpdir6 } from "node:os";
-import { basename as basename6, extname as extname6, isAbsolute as isAbsolute3, join as join23 } from "node:path";
+import { basename as basename6, extname as extname7, isAbsolute as isAbsolute4, join as join24 } from "node:path";
 
 // src/utils/pasteboardFreeze.ts
 import { execFileSync as execFileSync19 } from "node:child_process";
 import {
-  closeSync as closeSync5,
-  constants as constants5,
-  fstatSync as fstatSync5,
+  closeSync as closeSync6,
+  constants as constants6,
+  fstatSync as fstatSync6,
   mkdtempSync as mkdtempSync5,
-  openSync as openSync5,
+  openSync as openSync6,
   readFileSync as readFileSync3,
   rmSync as rmSync5,
   statSync as statSync4,
   writeFileSync as writeFileSync4
 } from "node:fs";
 import { tmpdir as tmpdir5 } from "node:os";
-import { basename as basename5, extname as extname5, join as join22 } from "node:path";
+import { basename as basename5, extname as extname6, join as join23 } from "node:path";
 var PASTEBOARD_NAME_ENV = "APPLE_NOTES_MCP_PASTEBOARD_NAME";
 var MAX_PASTEBOARD_BYTES = 64 * 1024 * 1024;
 var PASTEBOARD_DATA_TYPES = [
@@ -51830,27 +53229,27 @@ function defaultRunJxa(args) {
 }
 function pasteboardFilename(requested, frozenFilename) {
   if (requested === void 0) return void 0;
-  const ext = extname5(frozenFilename);
-  return ext && !extname5(requested) ? requested + ext : requested;
+  const ext = extname6(frozenFilename);
+  return ext && !extname6(requested) ? requested + ext : requested;
 }
 function readRegularFile(path10) {
   let descriptor;
   try {
-    descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+    descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
   } catch {
     throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
   }
   try {
-    const stat = fstatSync5(descriptor);
+    const stat = fstatSync6(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > MAX_PASTEBOARD_BYTES)
       throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
     return readFileSync3(descriptor);
   } finally {
-    closeSync5(descriptor);
+    closeSync6(descriptor);
   }
 }
 function freezePasteboard(options = {}) {
-  const directory = mkdtempSync5(join22(tmpdir5(), "notes-pasteboard-"));
+  const directory = mkdtempSync5(join23(tmpdir5(), "notes-pasteboard-"));
   const cleanup = () => rmSync5(directory, { recursive: true, force: true });
   try {
     const prefs = JSON.stringify(PASTEBOARD_DATA_TYPES.map((t) => [t.type, t.ext]));
@@ -51879,15 +53278,15 @@ function freezePasteboard(options = {}) {
     if (reply.kind === "file") {
       const bytes = readRegularFile(reply.path);
       const filename2 = basename5(reply.path);
-      const path11 = join22(directory, filename2);
+      const path11 = join23(directory, filename2);
       writeFileSync4(path11, bytes, { mode: 384 });
       return { kind: "file", type: reply.type, path: path11, filename: filename2, bytes: bytes.length, cleanup };
     }
-    if (join22(directory, basename5(reply.path)) !== reply.path)
+    if (join23(directory, basename5(reply.path)) !== reply.path)
       throw new PasteboardError("write_failed", MESSAGES.write_failed);
     const label = PASTEBOARD_DATA_TYPES.find((t) => t.type === reply.type)?.label ?? "item";
-    const filename = `Pasted ${label}${extname5(reply.path)}`;
-    const path10 = join22(directory, filename);
+    const filename = `Pasted ${label}${extname6(reply.path)}`;
+    const path10 = join23(directory, filename);
     writeFileSync4(path10, readFileSync3(reply.path), { mode: 384 });
     rmSync5(reply.path, { force: true });
     return { kind: "data", type: reply.type, path: path10, filename, bytes: statSync4(path10).size, cleanup };
@@ -51941,10 +53340,10 @@ function assertExistingContentPreserved(before, after) {
   }
 }
 function localAttachment(path10) {
-  if (!isAbsolute3(path10)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
+  if (!isAbsolute4(path10)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
   try {
-    const stat = fstatSync6(descriptor);
+    const stat = fstatSync7(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync4(descriptor);
@@ -51952,7 +53351,7 @@ function localAttachment(path10) {
       throw new Error("Attachment changed while it was being read; try again");
     return bytes;
   } finally {
-    closeSync6(descriptor);
+    closeSync7(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -52123,15 +53522,15 @@ function attachmentName(path10, filename) {
   const source = basename6(path10);
   if (filename === void 0) return source;
   checkAttachmentFilename(filename);
-  if (extname6(filename).toLowerCase() !== extname6(source).toLowerCase())
+  if (extname7(filename).toLowerCase() !== extname7(source).toLowerCase())
     throw new Error(
-      `filename must keep the source file's extension (${extname6(source) || "none"})`
+      `filename must keep the source file's extension (${extname7(source) || "none"})`
     );
   return filename;
 }
 var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
 var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-var sha256 = (data) => createHash2("sha256").update(data).digest("hex");
+var sha256 = (data) => createHash3("sha256").update(data).digest("hex");
 function storedAttachmentIds(manager, id2) {
   try {
     return new Set(
@@ -52164,13 +53563,13 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
   const matches = row.assetPaths.some((path10) => {
     let descriptor;
     try {
-      descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
-      const stat = fstatSync6(descriptor);
+      descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
+      const stat = fstatSync7(descriptor);
       return stat.isFile() && stat.size === bytes.length && sha256(readFileSync4(descriptor)) === expected;
     } catch {
       return false;
     } finally {
-      if (descriptor !== void 0) closeSync6(descriptor);
+      if (descriptor !== void 0) closeSync7(descriptor);
     }
   });
   if (!matches)
@@ -52187,8 +53586,8 @@ function attachFile(manager, args, checked) {
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
   const beforeStored = storedAttachmentIds(manager, id2);
-  const directory = mkdtempSync6(join23(tmpdir6(), "notes-attachment-add-"));
-  const temporaryFile = join23(directory, name);
+  const directory = mkdtempSync6(join24(tmpdir6(), "notes-attachment-add-"));
+  const temporaryFile = join24(directory, name);
   try {
     writeFileSync5(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
@@ -52255,7 +53654,7 @@ function attachFile(manager, args, checked) {
 }
 
 // src/tools/folderDelete.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 
 // src/utils/folderStore.ts
 import { execFileSync as execFileSync20 } from "child_process";
@@ -52442,7 +53841,7 @@ function folderDeleteRevision(app, store) {
     store.childFolderCount,
     store.noteCount
   ];
-  return `sha256:${createHash3("sha256").update(JSON.stringify(state)).digest("hex")}`;
+  return `sha256:${createHash4("sha256").update(JSON.stringify(state)).digest("hex")}`;
 }
 function checkFolder(manager, args, deps) {
   const app = manager.readFolderForDelete(args.id);
@@ -52577,9 +53976,426 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
   );
 }
 
+// src/services/templateStore.ts
+import { randomBytes } from "node:crypto";
+import {
+  closeSync as closeSync8,
+  constants as constants8,
+  fstatSync as fstatSync8,
+  linkSync,
+  lstatSync as lstatSync5,
+  mkdirSync as mkdirSync7,
+  openSync as openSync8,
+  readdirSync as readdirSync4,
+  readSync as readSync5,
+  renameSync,
+  unlinkSync as unlinkSync3,
+  writeSync as writeSync5
+} from "node:fs";
+import { homedir as homedir19 } from "node:os";
+import { isAbsolute as isAbsolute5, join as join26, resolve as resolve5 } from "node:path";
+var TEMPLATE_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+var TemplateStoreError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TemplateStoreError";
+  }
+  code;
+};
+function templateDir(env = process.env) {
+  const override = env.APPLE_NOTES_MCP_TEMPLATE_DIR?.trim();
+  if (override) {
+    if (!isAbsolute5(override))
+      throw new TemplateStoreError(
+        "unsafe-path",
+        "APPLE_NOTES_MCP_TEMPLATE_DIR must be an absolute path."
+      );
+    return resolve5(override);
+  }
+  return join26(homedir19(), "Library/Application Support/apple-notes-mcp/templates");
+}
+function checkName(name, action) {
+  if (isBuiltinTemplate(name) && action !== "read")
+    throw new TemplateStoreError(
+      "reserved-name",
+      `"${name}" is a built-in template and cannot be ${action === "save" ? "saved over" : "deleted"}.`
+    );
+  if (!TEMPLATE_SLUG.test(name))
+    throw new TemplateStoreError(
+      "invalid-name",
+      `Template names are 1-64 characters of a-z, 0-9, "-" and "_", starting with a letter or digit; got "${name}".`
+    );
+}
+var TemplateStore = class {
+  constructor(dir = templateDir()) {
+    this.dir = dir;
+  }
+  dir;
+  /** The library root, which must be a real directory (not a symlink) when it exists. */
+  root(create) {
+    let stat;
+    try {
+      stat = lstatSync5(this.dir);
+    } catch {
+      if (!create) return void 0;
+      mkdirSync7(this.dir, { recursive: true, mode: 448 });
+      stat = lstatSync5(this.dir);
+    }
+    if (!stat.isDirectory())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `The template library ${this.dir} is not a directory (symlinks are refused).`
+      );
+    return this.dir;
+  }
+  file(name) {
+    return join26(this.dir, `${name}.json`);
+  }
+  /** Read a saved template's text, refusing symlinks and non-regular files. */
+  readText(path10) {
+    let fd;
+    try {
+      fd = openSync8(path10, constants8.O_RDONLY | constants8.O_NOFOLLOW);
+    } catch (error2) {
+      if (error2.code === "ENOENT") return void 0;
+      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path10}: not a regular file.`);
+    }
+    try {
+      const stat = fstatSync8(fd);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to read ${path10}: not a regular file.`
+        );
+      if (stat.size > MAX_TEMPLATE_BYTES)
+        throw new TemplateValidationError([
+          {
+            path: "$",
+            message: `template is ${stat.size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`
+          }
+        ]);
+      const data = Buffer.alloc(stat.size);
+      let read = 0;
+      while (read < stat.size) {
+        const n = readSync5(fd, data, read, stat.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      return { text: data.subarray(0, read).toString("utf8"), bytes: read, mtime: stat.mtime };
+    } finally {
+      closeSync8(fd);
+    }
+  }
+  /** Saved templates in name order; `skipped` counts entries that are not usable. */
+  list() {
+    const templates = [];
+    let skipped = 0;
+    if (!this.root(false)) return { templates, skipped, dir: this.dir };
+    for (const entry of readdirSync4(this.dir).sort()) {
+      if (!entry.endsWith(".json") || entry.startsWith(".")) continue;
+      const name = entry.slice(0, -5);
+      if (!TEMPLATE_SLUG.test(name) || isBuiltinTemplate(name)) {
+        skipped++;
+        continue;
+      }
+      try {
+        const read = this.readText(this.file(name));
+        if (!read) continue;
+        const template = parseTemplate(read.text);
+        templates.push({
+          name,
+          ...template.name && template.name !== name ? { displayName: template.name } : {},
+          ...template.description ? { description: template.description } : {},
+          ...template.extends ? { extends: template.extends } : {},
+          bytes: read.bytes,
+          modified: read.mtime.toISOString()
+        });
+      } catch {
+        skipped++;
+      }
+    }
+    return { templates, skipped, dir: this.dir };
+  }
+  /**
+   * A saved template in its portable (as stored) form, or undefined when
+   * there is none. Throws {@link TemplateValidationError} for a corrupt file.
+   */
+  find(name) {
+    checkName(name, "read");
+    if (!this.root(false)) return void 0;
+    const read = this.readText(this.file(name));
+    return read ? parseTemplate(read.text) : void 0;
+  }
+  /** Like {@link find}, but a missing template is an error. */
+  get(name) {
+    const template = this.find(name);
+    if (!template)
+      throw new TemplateStoreError(
+        "template-not-found",
+        `No saved template named "${name}". Built-in templates: ${BUILTIN_TEMPLATE_NAMES.join(", ")}.`
+      );
+    return template;
+  }
+  /**
+   * Validate and save a template under `name`. Create-only unless `force`.
+   * Returns the file path and whether an existing template was replaced.
+   */
+  save(name, text2, { force = false } = {}) {
+    checkName(name, "save");
+    const template = parseTemplate(text2);
+    const body = JSON.stringify(template, null, 2) + "\n";
+    this.root(true);
+    const path10 = this.file(name);
+    let exists = false;
+    try {
+      const stat = lstatSync5(path10);
+      if (!stat.isFile())
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to replace ${path10}: it is not a regular file.`
+        );
+      exists = true;
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+    }
+    if (exists && !force)
+      throw new TemplateStoreError(
+        "template-exists",
+        `A template named "${name}" already exists. Pass force: true to replace it.`
+      );
+    const temp = join26(this.dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
+    const fd = openSync8(
+      temp,
+      constants8.O_WRONLY | constants8.O_CREAT | constants8.O_EXCL | constants8.O_NOFOLLOW,
+      384
+    );
+    try {
+      const data = Buffer.from(body, "utf8");
+      let written = 0;
+      while (written < data.length) written += writeSync5(fd, data, written);
+    } finally {
+      closeSync8(fd);
+    }
+    try {
+      if (force) renameSync(temp, path10);
+      else {
+        try {
+          linkSync(temp, path10);
+        } catch (error2) {
+          if (error2.code === "EEXIST")
+            throw new TemplateStoreError(
+              "template-exists",
+              `A template named "${name}" already exists. Pass force: true to replace it.`
+            );
+          throw error2;
+        }
+      }
+    } finally {
+      try {
+        unlinkSync3(temp);
+      } catch {
+      }
+    }
+    return { path: path10, replaced: exists, bytes: Buffer.byteLength(body), template };
+  }
+  /** Delete a saved template. Built-ins cannot be deleted. */
+  delete(name) {
+    checkName(name, "delete");
+    const path10 = this.file(name);
+    let stat;
+    try {
+      if (!this.root(false)) throw new Error("absent");
+      stat = lstatSync5(path10);
+    } catch (error2) {
+      if (error2 instanceof TemplateStoreError) throw error2;
+      throw new TemplateStoreError("template-not-found", `No saved template named "${name}".`);
+    }
+    if (!stat.isFile())
+      throw new TemplateStoreError(
+        "unsafe-path",
+        `Refusing to delete ${path10}: not a regular file.`
+      );
+    unlinkSync3(path10);
+    return { path: path10 };
+  }
+};
+
+// src/tools/markdownTemplates.ts
+var ok = (text2, structured) => ({
+  content: [{ type: "text", text: text2 }],
+  structuredContent: structured
+});
+function failure(action, error2) {
+  if (error2 instanceof TemplateValidationError)
+    return errorResult(
+      `Error ${action} [invalid-template]: the template is invalid:
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+      error2
+    );
+  if (error2 instanceof TemplateStoreError)
+    return errorResult(`Error ${action} [${error2.code}]: ${error2.message}`, error2);
+  const message = error2 instanceof Error ? error2.message : String(error2);
+  return errorResult(`Error ${action}: ${message}`, error2);
+}
+var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
+var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
+var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
+  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+);
+function sourceText(args) {
+  if (args.template === void 0 === (args.templateFile === void 0))
+    throw new Error("Provide exactly one of 'template' or 'templateFile'.");
+  if (args.templateFile !== void 0) return readTemplateFile(args.templateFile);
+  return typeof args.template === "string" ? args.template : JSON.stringify(args.template);
+}
+function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
+  const loose = external_exports.object({}).passthrough();
+  server2.registerTool(
+    "list-markdown-templates",
+    {
+      description: "Use when: choosing a Markdown export template, or checking which saved templates exist.\nReturns: the built-in templates, the saved templates (name, display name, description, size, modified date), the library directory, and how many unusable files were skipped.\nDo not use when: you need a template's rules (show-markdown-template).\nSafety: read-only; never opens Notes.",
+      inputSchema: {},
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async () => {
+      try {
+        const listing = store().list();
+        const builtins = BUILTIN_TEMPLATE_NAMES.map((name) => ({
+          name,
+          description: builtinTemplate(name).description ?? ""
+        }));
+        return ok(
+          `${builtins.length} built-in and ${listing.templates.length} saved template(s)` + (listing.skipped ? `; skipped ${listing.skipped} unusable file(s)` : "") + ".",
+          { builtins, ...listing }
+        );
+      } catch (error2) {
+        return failure("listing templates", error2);
+      }
+    })
+  );
+  const showInput = {
+    name: nameInput,
+    expanded: external_exports.boolean().optional().describe("Also return the fully expanded template (every rule filled from its base)")
+  };
+  server2.registerTool(
+    "show-markdown-template",
+    {
+      description: "Use when: reading a built-in or saved template, to copy it as the start of a new one or to see what an export will do.\nReturns: the template in its portable form (as saved, overrides only), its source, and with expanded: true every rule filled in.\nDo not use when: listing names (list-markdown-templates).\nSafety: read-only.",
+      inputSchema: showInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async ({ name, expanded }) => {
+      try {
+        const builtin = isBuiltinTemplate(name);
+        const template = builtin ? builtinTemplate(name) : store().get(name);
+        const structured = {
+          name,
+          source: builtin ? "builtin" : "saved",
+          template,
+          ...expanded ? { expanded: resolveTemplate(template, name) } : {}
+        };
+        return ok(JSON.stringify(template, null, 2), structured);
+      } catch (error2) {
+        return failure("showing template", error2);
+      }
+    })
+  );
+  const validateInput = {
+    name: nameInput.optional(),
+    template: templateInput,
+    templateFile: templateFileInput
+  };
+  server2.registerTool(
+    "validate-markdown-template",
+    {
+      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.',
+      inputSchema: validateInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: true }
+    },
+    (async (args) => {
+      try {
+        const given = [args.name, args.template, args.templateFile].filter(
+          (value) => value !== void 0
+        ).length;
+        if (given !== 1)
+          throw new Error("Provide exactly one of 'name', 'template' or 'templateFile'.");
+        try {
+          if (args.name !== void 0) {
+            if (!isBuiltinTemplate(args.name)) store().get(args.name);
+          } else parseTemplate(sourceText(args));
+        } catch (error2) {
+          if (!(error2 instanceof TemplateValidationError)) throw error2;
+          return ok(
+            `Invalid template (${error2.errors.length} problem(s)):
+` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
+            { valid: false, errors: error2.errors }
+          );
+        }
+        return ok("The template is valid.", { valid: true, errors: [] });
+      } catch (error2) {
+        return failure("validating template", error2);
+      }
+    })
+  );
+  const saveInput = {
+    name: external_exports.string().min(1).max(64).describe(
+      'Name to save under: lowercase a-z, 0-9, "-" and "_", starting with a letter or digit'
+    ),
+    template: templateInput,
+    templateFile: templateFileInput,
+    force: external_exports.boolean().optional().describe("Replace an existing saved template of this name (default false: create-only)")
+  };
+  server2.registerTool(
+    "save-markdown-template",
+    {
+      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
+      inputSchema: saveInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+    },
+    (async (args) => {
+      try {
+        const saved = store().save(args.name, sourceText(args), { force: args.force });
+        return ok(
+          `${saved.replaced ? "Replaced" : "Saved"} template "${args.name}" (${saved.bytes} bytes) at ${saved.path}.`,
+          { name: args.name, path: saved.path, bytes: saved.bytes, replaced: saved.replaced }
+        );
+      } catch (error2) {
+        return failure("saving template", error2);
+      }
+    })
+  );
+  const deleteInput = { name: external_exports.string().min(1).max(64).describe("Saved template to delete") };
+  server2.registerTool(
+    "delete-markdown-template",
+    {
+      description: "Use when: removing a saved Markdown template the user no longer wants.\nReturns: the name and the path of the removed file.\nDo not use when: the template is built in (standard-markdown, obsidian cannot be deleted).\nSafety: permanently removes one file from the template library; never touches Notes.",
+      inputSchema: deleteInput,
+      outputSchema: loose,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false }
+    },
+    (async ({ name }) => {
+      try {
+        const removed = store().delete(name);
+        return ok(`Deleted template "${name}" (${removed.path}).`, {
+          name,
+          path: removed.path,
+          deleted: true
+        });
+      } catch (error2) {
+        return failure("deleting template", error2);
+      }
+    })
+  );
+}
+
 // src/utils/svgAnalyzer.ts
-import { createHash as createHash4 } from "node:crypto";
-import { closeSync as closeSync7, constants as constants7, fstatSync as fstatSync7, openSync as openSync7, readSync as readSync4 } from "node:fs";
+import { createHash as createHash5 } from "node:crypto";
+import { closeSync as closeSync9, constants as constants9, fstatSync as fstatSync9, openSync as openSync9, readSync as readSync6 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -53253,10 +55069,10 @@ function clipPolyline(points, r) {
   if (run.length) parts.push(run);
   return { parts, clipped: true };
 }
-function dashPolyline(points, pattern, offset, charge) {
-  const total = pattern.reduce((s, v) => s + v, 0);
+function dashPolyline(points, pattern2, offset, charge) {
+  const total = pattern2.reduce((s, v) => s + v, 0);
   let index = 0;
-  let remaining = pattern[0];
+  let remaining = pattern2[0];
   let on = true;
   let shift = (offset % total + total) % total;
   while (shift > 0) {
@@ -53264,8 +55080,8 @@ function dashPolyline(points, pattern, offset, charge) {
     remaining -= step;
     shift -= step;
     if (remaining <= 0) {
-      index = (index + 1) % pattern.length;
-      remaining = pattern[index];
+      index = (index + 1) % pattern2.length;
+      remaining = pattern2[index];
       on = !on;
     }
   }
@@ -53287,8 +55103,8 @@ function dashPolyline(points, pattern, offset, charge) {
       on = !on;
       segLen -= remaining;
       a = cut;
-      index = (index + 1) % pattern.length;
-      remaining = pattern[index];
+      index = (index + 1) % pattern2.length;
+      remaining = pattern2[index];
     }
     remaining -= segLen;
     if (on && currentDash) currentDash.push(b);
@@ -53520,7 +55336,7 @@ function parseXml(source, limits) {
       if (a.name === "xmlns") scope2.set("", a.value);
       else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
     }
-    const resolve7 = (qualified, isAttribute) => {
+    const resolve9 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
       const prefix = qualified.slice(0, colon);
@@ -53530,12 +55346,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve7(name, false);
+    const resolved = resolve9(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve7(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve9(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -53661,7 +55477,7 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 function sha2562(text2) {
-  return createHash4("sha256").update(text2).digest("hex");
+  return createHash5("sha256").update(text2).digest("hex");
 }
 var round = (v, digits) => {
   const r = Number(v.toFixed(digits));
@@ -53778,10 +55594,10 @@ function assertInert(el, location) {
       throw new SvgError("svg_unsafe", "Active content in a style attribute", location);
   }
   const counts = /* @__PURE__ */ new Map();
-  for (const child of el.children) {
-    const n = (counts.get(child.local) ?? 0) + 1;
-    counts.set(child.local, n);
-    assertInert(child, `${location}/${child.local}[${n}]`);
+  for (const child2 of el.children) {
+    const n = (counts.get(child2.local) ?? 0) + 1;
+    counts.set(child2.local, n);
+    assertInert(child2, `${location}/${child2.local}[${n}]`);
   }
 }
 var INITIAL_STYLE = {
@@ -54033,14 +55849,14 @@ var Analyzer = class {
   /** Walk an element's children with its own style and transform applied. */
   container(el, ctx) {
     const counts = /* @__PURE__ */ new Map();
-    for (const child of el.children) {
-      const n = (counts.get(child.local) ?? 0) + 1;
-      counts.set(child.local, n);
-      const id2 = attr(child, "id");
-      this.element(child, {
+    for (const child2 of el.children) {
+      const n = (counts.get(child2.local) ?? 0) + 1;
+      counts.set(child2.local, n);
+      const id2 = attr(child2, "id");
+      this.element(child2, {
         ...ctx,
         depth: ctx.depth + 1,
-        location: `${ctx.location}/${child.local}[${n}]${id2 ? `#${id2}` : ""}`
+        location: `${ctx.location}/${child2.local}[${n}]${id2 ? `#${id2}` : ""}`
       });
     }
   }
@@ -54463,9 +56279,9 @@ var Analyzer = class {
           let pieces = polylines;
           if (style.dasharray) {
             const k = nonScaling ? 1 : mean;
-            const pattern = style.dasharray.map((v) => v * k);
+            const pattern2 = style.dasharray.map((v) => v * k);
             pieces = polylines.flatMap(
-              (p) => dashPolyline(p, pattern, style.dashoffset * k, (n) => this.charge("dashWork", n))
+              (p) => dashPolyline(p, pattern2, style.dashoffset * k, (n) => this.charge("dashWork", n))
             );
           }
           this.layers++;
@@ -54548,14 +56364,14 @@ function analyzeSvgBuffer(source) {
 function readSvgSource(path10) {
   let fd;
   try {
-    fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW | constants7.O_NONBLOCK);
+    fd = openSync9(path10, constants9.O_RDONLY | constants9.O_NOFOLLOW | constants9.O_NONBLOCK);
   } catch (error2) {
     if (error2.code === "ELOOP")
       throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
     throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const info = fstatSync7(fd);
+    const info = fstatSync9(fd);
     if (!info.isFile())
       throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
     if (info.size > SVG_LIMITS.maxSourceBytes)
@@ -54566,7 +56382,7 @@ function readSvgSource(path10) {
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {
-      const n = readSync4(fd, buffer, total, buffer.length - total, null);
+      const n = readSync6(fd, buffer, total, buffer.length - total, null);
       if (n === 0) break;
       total += n;
       if (total > SVG_LIMITS.maxSourceBytes)
@@ -54577,7 +56393,7 @@ function readSvgSource(path10) {
     }
     return buffer.subarray(0, total);
   } finally {
-    closeSync7(fd);
+    closeSync9(fd);
   }
 }
 function analyzeSvgFile(path10) {
@@ -55148,7 +56964,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname7, resolve as resolve4 } from "node:path";
+import { dirname as dirname7, resolve as resolve6 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -55171,11 +56987,11 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve4(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve6(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve4(baseDirectory, file);
+    const path10 = resolve6(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -55235,19 +57051,19 @@ function formatShortcutSetup(report) {
 
 // src/services/publicHelper.ts
 import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash5 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 import {
   chmodSync,
   existsSync as existsSync14,
-  mkdirSync as mkdirSync6,
+  mkdirSync as mkdirSync8,
   mkdtempSync as mkdtempSync7,
   readFileSync as readFileSync5,
-  renameSync,
+  renameSync as renameSync2,
   rmSync as rmSync7,
   writeFileSync as writeFileSync6
 } from "node:fs";
-import { homedir as homedir19, release as release3 } from "node:os";
-import { dirname as dirname8, join as join25, resolve as resolve5 } from "node:path";
+import { homedir as homedir20, release as release3 } from "node:os";
+import { dirname as dirname8, join as join27, resolve as resolve7 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PUBLIC_HELPER_PROTOCOL = 1;
 var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
@@ -55275,7 +57091,7 @@ var publicManifestSchema = external_exports.object({
 function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
+    const candidate = join27(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
         if (JSON.parse(readFileSync5(candidate, "utf8")).name === "apple-notes-mcp")
@@ -55284,7 +57100,7 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
       }
     }
     const parent = dirname8(dir);
-    if (parent === dir) return resolve5(fromDir, "..");
+    if (parent === dir) return resolve7(fromDir, "..");
     dir = parent;
   }
 }
@@ -55292,7 +57108,7 @@ function defaultPublicHelperDeps(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
+    sourcePath: join27(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync14,
     readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync3,
@@ -55303,14 +57119,14 @@ function defaultPublicHelperDeps(overrides = {}) {
 function publicHelperInstallDir(env = process.env) {
   const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
 }
 function sha256Hex(data) {
-  return createHash5("sha256").update(data).digest("hex");
+  return createHash6("sha256").update(data).digest("hex");
 }
 function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
+  const binaryPath = join27(installDir, PUBLIC_HELPER_BINARY);
   const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
   const fail = (reason, detail) => ({
     ...base,
@@ -55321,7 +57137,7 @@ function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
+  const manifestPath = join27(installDir, PUBLIC_HELPER_MANIFEST);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -55408,15 +57224,15 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
   const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
   if (signal?.aborted) throw aborted2();
   return new Promise((resolvePromise, reject) => {
-    const child = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
       stdio: ["pipe", "pipe", "ignore"]
     });
     const chunks = [];
     let size = 0;
-    let failure = null;
+    let failure2 = null;
     const stop = (error2) => {
-      failure ??= error2;
-      child.kill("SIGKILL");
+      failure2 ??= error2;
+      child2.kill("SIGKILL");
     };
     const timer = setTimeout(
       () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
@@ -55428,21 +57244,21 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
       clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
     };
-    child.stdout?.on("data", (chunk) => {
+    child2.stdout?.on("data", (chunk) => {
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
-    child.on("error", (error2) => {
+    child2.on("error", (error2) => {
       settle();
       reject(
-        failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
       );
     });
-    child.on("close", (status, exitSignal) => {
+    child2.on("close", (status, exitSignal) => {
       settle();
-      if (failure) return reject(failure);
+      if (failure2) return reject(failure2);
       if (status === null && exitSignal)
         return reject(
           new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
@@ -55453,9 +57269,9 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
         reject(error2);
       }
     });
-    child.stdin?.on("error", () => {
+    child2.stdin?.on("error", () => {
     });
-    child.stdin?.end(input);
+    child2.stdin?.end(input);
   });
 }
 function prepareCall(action, fields, deps, options) {
@@ -55560,8 +57376,8 @@ function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputP
 }
 function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const steps = [];
-  const done = (ok) => ({
-    ok,
+  const done = (ok2) => ({
+    ok: ok2,
     checkOnly,
     steps,
     installation: inspectPublicHelper(deps)
@@ -55597,12 +57413,12 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync6(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync7(join25(installDir, ".staging-"));
+  mkdirSync8(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync7(join27(installDir, ".staging-"));
   try {
-    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join25(staging, "source-digest.swift");
-    const plistPath = join25(staging, "Info.plist");
+    const stagedBinary = join27(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join27(staging, "source-digest.swift");
+    const plistPath = join27(staging, "Info.plist");
     writeFileSync6(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
     writeFileSync6(plistPath, publicHelperInfoPlist(), { mode: 384 });
     const compile = deps.spawn(
@@ -55665,9 +57481,9 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
       compiler
     };
     chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
+    renameSync2(stagedBinary, join27(installDir, PUBLIC_HELPER_BINARY));
     writeFileSync6(
-      join25(installDir, PUBLIC_HELPER_MANIFEST),
+      join27(installDir, PUBLIC_HELPER_MANIFEST),
       JSON.stringify(manifest, null, 2) + "\n",
       { mode: 384 }
     );
@@ -55890,11 +57706,11 @@ function getNoteDrawings(noteId3, options = {}) {
   if (!install.ready)
     throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
   const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
-  const ok = drawings.filter((d) => d.status === "ok").length;
+  const ok2 = drawings.filter((d) => d.status === "ok").length;
   return {
     id: noteId3,
     drawingCount: drawings.length,
-    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
+    status: ok2 === drawings.length ? "ok" : ok2 ? "partial" : "error",
     drawings
   };
 }
@@ -55911,8 +57727,8 @@ function formatNoteDrawings(result) {
 }
 
 // src/utils/noteAudio.ts
-import { readdirSync as readdirSync4, statSync as statSync5 } from "node:fs";
-import { join as join26 } from "node:path";
+import { readdirSync as readdirSync5, statSync as statSync5 } from "node:fs";
+import { join as join28 } from "node:path";
 var EXTRA_AUDIO_UTIS = [
   "public.mp3",
   "public.aiff-audio",
@@ -55937,7 +57753,7 @@ function accountDirsFor(containerDir, accountIdentifier) {
   if (own) return [own];
   let names;
   try {
-    names = readdirSync4(join26(containerDir, "Accounts")).sort();
+    names = readdirSync5(join28(containerDir, "Accounts")).sort();
   } catch {
     return [];
   }
@@ -55949,8 +57765,8 @@ function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_
   if (!id2 || !filename) return null;
   const generation = safeComponent(media?.generation);
   for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
-    const base = join26(dir, "Media", id2);
-    const candidates = generation ? [join26(base, generation, filename), join26(base, filename)] : [join26(base, filename)];
+    const base = join28(dir, "Media", id2);
+    const candidates = generation ? [join28(base, generation, filename), join28(base, filename)] : [join28(base, filename)];
     for (const candidate of candidates) {
       const real = realInside(candidate, dir);
       if (real && isFile2(real)) return real;
@@ -56222,21 +58038,21 @@ import { spawnSync as spawnSync5 } from "node:child_process";
 import {
   chmodSync as chmodSync2,
   existsSync as existsSync16,
-  mkdirSync as mkdirSync7,
+  mkdirSync as mkdirSync9,
   mkdtempSync as mkdtempSync8,
-  renameSync as renameSync2,
+  renameSync as renameSync3,
   rmSync as rmSync8,
   writeFileSync as writeFileSync7
 } from "node:fs";
 import { release as release4 } from "node:os";
-import { join as join28 } from "node:path";
+import { join as join30 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 import { existsSync as existsSync15, readFileSync as readFileSync6 } from "node:fs";
-import { homedir as homedir20 } from "node:os";
-import { dirname as dirname9, join as join27, resolve as resolve6 } from "node:path";
+import { homedir as homedir21 } from "node:os";
+import { dirname as dirname9, join as join29, resolve as resolve8 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -56264,7 +58080,7 @@ var manifestSchema = external_exports.object({
 function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join27(dir, "package.json");
+    const candidate = join29(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
         const pkg = JSON.parse(readFileSync6(candidate, "utf8"));
@@ -56273,7 +58089,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
       }
     }
     const parent = dirname9(dir);
-    if (parent === dir) return resolve6(fromDir, "..");
+    if (parent === dir) return resolve8(fromDir, "..");
     dir = parent;
   }
 }
@@ -56281,7 +58097,7 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join27(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join29(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
     readFile: (path10) => readFileSync6(path10),
     spawn: spawnSync4,
@@ -56294,14 +58110,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join29(homedir21(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex2(data) {
-  return createHash6("sha256").update(data).digest("hex");
+  return createHash7("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join27(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join29(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -56319,7 +58135,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
-  const manifestPath = join27(installDir, MANIFEST_NAME);
+  const manifestPath = join29(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -56590,8 +58406,8 @@ function compileArguments(sourcePath, outputPath, sourceSha) {
 }
 function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const steps = [];
-  const done = (ok) => ({
-    ok,
+  const done = (ok2) => ({
+    ok: ok2,
     checkOnly,
     steps,
     installation: inspectInstallation(deps)
@@ -56633,10 +58449,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync8(join28(installDir, ".staging-"));
+  mkdirSync9(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync8(join30(installDir, ".staging-"));
   try {
-    const stagedBinary = join28(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join30(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -56713,8 +58529,8 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync2(stagedBinary, 448);
-    renameSync2(stagedBinary, join28(installDir, HELPER_BINARY_NAME));
-    writeFileSync7(join28(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync3(stagedBinary, join30(installDir, HELPER_BINARY_NAME));
+    writeFileSync7(join30(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
@@ -56882,6 +58698,7 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerMarkdownTemplates(server);
 registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
@@ -58311,10 +60128,10 @@ function guardedAppend({
       return `<div>${escaped || "<br>"}</div>`;
     }).join("");
   };
-  const separatorToHtml = (sep4) => {
-    if (format === "html") return sep4;
-    if (sep4 === "\n\n") return "<div><br></div>";
-    const escaped = sep4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const separatorToHtml = (sep5) => {
+    if (format === "html") return sep5;
+    if (sep5 === "\n\n") return "<div><br></div>";
+    const escaped = sep5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return `<div>${escaped}</div>`;
   };
   const snapshot = readExactNoteSnapshot(id2);
@@ -59687,7 +61504,7 @@ var exportStatsSchema = external_exports.object({
 registerTool(
   "export-notes-markdown",
   {
-    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.",
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.\nTemplates: pass template ('standard-markdown' reproduces the default output; 'obsidian' adds YAML front matter and copies attachments beside outputPath) or templateFile (a JSON template) to control how every block, inline style, attachment, per-note header/footer and separator renders. Templated receipts add template, warnings (e.g. missing_asset) and assetFiles; an invalid template is refused with [invalid-template] and every problem's JSON path.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
@@ -59697,7 +61514,13 @@ registerTool(
       ),
       outputPath: exportPathInput("File to create for the Markdown"),
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
-      wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)")
+      wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
+      template: external_exports.string().min(1).max(64).optional().describe(
+        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
+      ),
+      templateFile: exportPathInput(
+        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
+      )
     },
     outputSchema: {
       format: external_exports.string().optional(),
@@ -59707,7 +61530,13 @@ registerTool(
       output: external_exports.string().optional(),
       assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
       stats: exportStatsSchema.optional(),
-      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
+      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional(),
+      template: external_exports.object({ name: external_exports.string(), source: external_exports.string() }).optional(),
+      warnings: external_exports.array(
+        external_exports.object({ code: external_exports.string(), noteId: external_exports.string(), attachmentId: external_exports.string().optional() })
+      ).optional(),
+      warningsOmitted: external_exports.number().optional(),
+      assetFiles: external_exports.array(external_exports.string()).optional()
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
   },
@@ -59716,15 +61545,22 @@ registerTool(
     try {
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
+        findTemplate: (name) => TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : void 0,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024
       });
     } catch (error2) {
       if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
       const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
+      if (error2 instanceof NotesExportError && error2.details)
+        return errorResponse(
+          `Error exporting Markdown [${error2.code}]: the template is invalid:
+` + error2.details.map((detail) => `${detail.path}: ${detail.message}`).join("\n")
+        );
       return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
     }
-    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    const warned = receipt.warnings?.length ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)` : "";
+    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
     if (receipt.output)
       return successResponse(
         `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` + (receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : "") + `${skipped}.`,

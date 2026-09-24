@@ -15,7 +15,12 @@
  */
 import { mkdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
-import type { NotesExportReceipt, NotesExportRequest, NotesExportSkip } from "../types.js";
+import type {
+  NotesExportReceipt,
+  NotesExportRequest,
+  NotesExportSkip,
+  NotesExportTemplateInfo,
+} from "../types.js";
 import {
   AssetLocator,
   assertExportPath,
@@ -30,7 +35,34 @@ import { emptyStats, type ExportContext } from "../utils/exportRender.js";
 import { renderNotesHtml } from "../utils/htmlExport.js";
 import { renderNotesMarkdown } from "../utils/markdownExport.js";
 import { NoteBlocksError } from "../utils/noteBlocks.js";
-import { readExportNote, type ExportNote } from "../utils/noteExportData.js";
+import {
+  readExportNote,
+  readExportNoteMeta,
+  type ExportNote,
+  type ExportNoteMeta,
+} from "../utils/noteExportData.js";
+import {
+  builtinTemplate,
+  isBuiltinTemplate,
+  parseTemplate,
+  resolveTemplate,
+  TemplateValidationError,
+  usesNoteMeta,
+  type PortableTemplate,
+  type ResolvedTemplate,
+  type TemplateError,
+} from "../utils/markdownTemplate.js";
+import {
+  renderNotesWithTemplate,
+  type TemplateAssetBinding,
+  type TemplateWarning,
+} from "../utils/templateRender.js";
+import {
+  HashedSidecarWriter,
+  readTemplateFile,
+  ReferenceWriter,
+  templateAssetsDir,
+} from "../utils/templateAssets.js";
 
 /** Default and maximum notes read from one folder. */
 export const DEFAULT_FOLDER_EXPORT_LIMIT = 100;
@@ -43,17 +75,26 @@ export type NotesExportErrorCode =
   | "output_exists"
   | "folder-unavailable"
   | "too-large"
+  | "invalid-template"
+  | "template-not-found"
   | NoteBlocksError["code"];
 
 export class NotesExportError extends Error {
   constructor(
     readonly code: NotesExportErrorCode,
-    message: string
+    message: string,
+    /** Every problem found, for `invalid-template`. */
+    readonly details?: TemplateError[]
   ) {
     super(message);
     this.name = "NotesExportError";
   }
 }
+
+/** Most warnings listed in a receipt; the rest are counted. */
+export const MAX_EXPORT_WARNINGS = 200;
+/** Most asset paths listed in a receipt. */
+const MAX_LISTED_ASSETS = 1000;
 
 /** Collaborators, injectable for tests. */
 export interface NotesExportDeps {
@@ -69,6 +110,69 @@ export interface NotesExportDeps {
   locator?: AssetLocator;
   /** Largest inline document, in bytes. */
   maxInlineBytes: number;
+  /** Defaults to reading the NoteStore database; failures leave fields empty. */
+  readMeta?: (id: string) => ExportNoteMeta;
+  /** Looks up a saved (non-built-in) template by name. */
+  findTemplate?: (name: string) => PortableTemplate | undefined;
+}
+
+/** A template chosen for an export, with where it came from. */
+export interface ChosenTemplate {
+  info: NotesExportTemplateInfo;
+  template: ResolvedTemplate;
+}
+
+/**
+ * Resolve `template` (a built-in or saved name) or `templateFile` (a JSON
+ * file in an allowed location). Validates before any note is read.
+ */
+export function chooseTemplate(
+  request: Pick<NotesExportRequest, "template" | "templateFile">,
+  deps: Pick<NotesExportDeps, "findTemplate">
+): ChosenTemplate | undefined {
+  if (request.template !== undefined && request.templateFile !== undefined)
+    throw new NotesExportError(
+      "invalid-request",
+      "Provide at most one of 'template' or 'templateFile'."
+    );
+  const invalid = (error: TemplateValidationError, where: string) =>
+    new NotesExportError("invalid-template", `${where}: ${error.message}`, error.errors);
+  if (request.template !== undefined) {
+    const name = request.template;
+    if (isBuiltinTemplate(name))
+      return {
+        info: { name, source: "builtin" },
+        template: resolveTemplate(builtinTemplate(name), name),
+      };
+    let portable: PortableTemplate | undefined;
+    try {
+      portable = deps.findTemplate?.(name);
+    } catch (error) {
+      if (error instanceof TemplateValidationError)
+        throw invalid(error, `Saved template "${name}"`);
+      throw error;
+    }
+    if (!portable) throw new NotesExportError("template-not-found", `No template named "${name}".`);
+    return { info: { name, source: "saved" }, template: resolveTemplate(portable, name) };
+  }
+  if (request.templateFile === undefined) return undefined;
+  let text: string;
+  try {
+    text = readTemplateFile(request.templateFile);
+  } catch (error) {
+    throw new NotesExportError(
+      "invalid-path",
+      `templateFile: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  let portable: PortableTemplate;
+  try {
+    portable = parseTemplate(text);
+  } catch (error) {
+    throw invalid(error as TemplateValidationError, "templateFile");
+  }
+  const name = portable.name ?? basename(request.templateFile, extname(request.templateFile));
+  return { info: { name, source: "file" }, template: resolveTemplate(portable, name) };
 }
 
 function validPath(path: string, what: string): string {
@@ -152,8 +256,17 @@ export function exportNotesMarkdown(
   if (output && assetsDir && output === assetsDir)
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
 
+  const chosen = chooseTemplate(request, deps);
+  if (chosen && assetsDir && chosen.template.assets.mode !== "copy")
+    throw new NotesExportError(
+      "invalid-request",
+      `assetsDir has no effect: template "${chosen.info.name}" sets assets.mode to "${chosen.template.assets.mode}".`
+    );
+
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
+  if (chosen)
+    return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
   const fd = output ? openOutput(output) : undefined;
 
   const writer: AssetWriter | undefined = assetsDir
@@ -246,4 +359,136 @@ export function exportNotesHtml(
       ? { assets: { dir: assetsDir, files: writer.count } }
       : { embedded: writer.count }),
   };
+}
+
+function readMetaSafely(read: (id: string) => ExportNoteMeta, id: string): ExportNoteMeta {
+  try {
+    return read(id);
+  } catch {
+    return {};
+  }
+}
+
+/** Raw note values used to build an assets directory path. */
+function pathValues(note: ExportNote, meta: ExportNoteMeta, exportStem: string) {
+  const values: Record<string, string> = { title: note.title.trim(), id: note.id, exportStem };
+  for (const [key, value] of Object.entries(meta)) if (value) values[key] = value;
+  return values;
+}
+
+/** Where each note's file-backed attachments go. Throws before anything is written. */
+function assetBindings(
+  template: ResolvedTemplate,
+  notes: ExportNote[],
+  meta: Map<ExportNote, ExportNoteMeta>,
+  { output, assetsDir, exportStem }: { output?: string; assetsDir?: string; exportStem: string }
+): { bindings: Map<ExportNote, TemplateAssetBinding>; writers: Map<string, HashedSidecarWriter> } {
+  const linkBase = template.assets.pathStyle === "relative" && output ? dirname(output) : undefined;
+  const writers = new Map<string, HashedSidecarWriter>();
+  const writerFor = (dir: string) => {
+    let writer = writers.get(dir);
+    if (!writer) writers.set(dir, (writer = new HashedSidecarWriter(dir, linkBase)));
+    return writer;
+  };
+  const reference =
+    template.assets.mode === "reference" ? new ReferenceWriter(linkBase) : undefined;
+  const bindings = new Map<ExportNote, TemplateAssetBinding>();
+  for (const note of notes) {
+    let binding: TemplateAssetBinding = {};
+    if (reference) binding = { writer: reference };
+    else if (template.assets.mode === "copy") {
+      if (assetsDir) binding = { writer: writerFor(assetsDir) };
+      else if (template.assets.directory !== null && output) {
+        let dir: string;
+        try {
+          dir = templateAssetsDir(
+            template.assets.directory,
+            dirname(output),
+            pathValues(note, meta.get(note) ?? {}, exportStem)
+          );
+        } catch (error) {
+          throw new NotesExportError("invalid-path", (error as Error).message);
+        }
+        dir = validPath(dir, "assets.directory");
+        if (dir === output)
+          throw new NotesExportError("invalid-path", "assets.directory resolves to outputPath.");
+        binding = { writer: writerFor(dir) };
+      } else if (template.assets.directory !== null) binding = { required: true };
+    }
+    bindings.set(note, binding);
+  }
+  return { bindings, writers };
+}
+
+/** Export through a template: per-note metadata, template asset rules, warnings. */
+function exportWithTemplate(
+  request: NotesExportRequest,
+  deps: NotesExportDeps,
+  chosen: ChosenTemplate,
+  notes: ExportNote[],
+  skipped: NotesExportSkip[],
+  { output, assetsDir }: { output?: string; assetsDir?: string }
+): NotesExportReceipt {
+  const { template } = chosen;
+  const readMeta = deps.readMeta ?? ((id: string) => readExportNoteMeta(id));
+  // One sqlite3 read per note, so only when a placeholder needs it.
+  const needsMeta = usesNoteMeta(template);
+  const meta = new Map(
+    notes.map((note) => [note, needsMeta ? readMetaSafely(readMeta, note.id) : {}])
+  );
+  const exportStem = output ? basename(output, extname(output)) : "export";
+  const { bindings, writers } = assetBindings(template, notes, meta, {
+    output,
+    assetsDir,
+    exportStem,
+  });
+
+  const fd = output ? openOutput(output) : undefined;
+  const ctx: ExportContext = { stats: emptyStats(), locator: deps.locator ?? new AssetLocator() };
+  let warnings: TemplateWarning[] = [];
+  const markdown = renderInto(fd, () => {
+    const result = renderNotesWithTemplate(notes, ctx, {
+      template,
+      exportStem,
+      wrap: request.wrap ?? 0,
+      assetsFor: (note) => bindings.get(note) ?? {},
+      metaFor: (note) => meta.get(note) ?? {},
+    });
+    warnings = result.warnings;
+    return result.markdown;
+  });
+  const bytes = Buffer.byteLength(markdown);
+  const used = [...writers.values()].filter((writer) => writer.count > 0);
+  const files = used.flatMap((writer) => writer.files);
+  const receipt: NotesExportReceipt = {
+    format: "markdown",
+    count: notes.length,
+    bytes,
+    stats: ctx.stats,
+    skipped,
+    template: chosen.info,
+    warnings: warnings.slice(0, MAX_EXPORT_WARNINGS),
+    ...(warnings.length > MAX_EXPORT_WARNINGS
+      ? { warningsOmitted: warnings.length - MAX_EXPORT_WARNINGS }
+      : {}),
+    ...(used.length
+      ? {
+          assets: {
+            dir: used.length === 1 ? used[0].dir : dirname(output!),
+            files: files.length,
+          },
+          assetFiles: files.slice(0, MAX_LISTED_ASSETS),
+        }
+      : {}),
+  };
+  if (fd !== undefined) {
+    writeAllAndClose(fd, markdown);
+    return { ...receipt, output };
+  }
+  if (bytes > deps.maxInlineBytes)
+    throw new NotesExportError(
+      "too-large",
+      `The Markdown is ${bytes} bytes, over the ${deps.maxInlineBytes}-byte inline limit. Pass outputPath to write it to a file, or export fewer notes.`
+    );
+  return { ...receipt, markdown };
 }

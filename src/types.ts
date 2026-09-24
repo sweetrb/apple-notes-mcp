@@ -1431,6 +1431,25 @@ export interface NotesExportRequest {
    * set). False copies them to a sidecar directory.
    */
   embedAssets?: boolean;
+  /** Render through this template: a built-in name or a saved template's name. */
+  template?: string;
+  /** Render through the template in this JSON file (exclusive with `template`). */
+  templateFile?: string;
+}
+
+/** The template an export used. */
+export interface NotesExportTemplateInfo {
+  name: string;
+  /** `builtin`, a `saved` library template, or a one-off template `file`. */
+  source: "builtin" | "saved" | "file";
+}
+
+/** A problem that did not stop a templated export. */
+export interface NotesExportWarning {
+  /** Stable code, such as `missing_asset` or `table_decode_failed`. */
+  code: string;
+  noteId: string;
+  attachmentId?: string;
 }
 
 /** Counts of how attachments were rendered in an export. */
@@ -1468,6 +1487,14 @@ export interface NotesExportReceipt {
   embedded?: number;
   stats: NotesExportAttachmentStats;
   skipped: NotesExportSkip[];
+  /** Templated exports only: the template used. */
+  template?: NotesExportTemplateInfo;
+  /** Templated exports only: problems that did not stop the export. */
+  warnings?: NotesExportWarning[];
+  /** Warnings beyond the listed ones. */
+  warningsOmitted?: number;
+  /** Templated exports only: absolute paths of asset files written or reused. */
+  assetFiles?: string[];
 }
 
 /**

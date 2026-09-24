@@ -255,6 +255,20 @@ export const FEATURES: FeatureDefinition[] = [
     minimumMacOSVersion: null,
     requirements: [{ kind: "native_write_helper" }],
   },
+  {
+    name: "markdownTemplateLibrary",
+    description:
+      "Validate, save, list, show and delete Markdown export templates (local JSON files; exporting with one still needs Full Disk Access)",
+    tools: [
+      "list-markdown-templates",
+      "show-markdown-template",
+      "validate-markdown-template",
+      "save-markdown-template",
+      "delete-markdown-template",
+    ],
+    minimumMacOSVersion: null,
+    requirements: [],
+  },
 ];
 
 /** Stable string label for a requirement, as reported in `requirements`/`missing`. */

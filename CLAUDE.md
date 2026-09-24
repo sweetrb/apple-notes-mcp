@@ -334,6 +334,15 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `outputPath` is create-only; `[output_exists]` means choose a new path, never delete the old file on the user's behalf
 - Pass `assetsDir` to copy attachment files; without it attachments are placeholders like `\[Image: name\]`
 - Password-protected notes are listed in `skipped`; Full Disk Access is required
+- `template` (`standard-markdown`, `obsidian`) or `templateFile` (JSON, exclusive) renders through a Markdown template; the schema is in docs/markdown-templates.md. `standard-markdown` output equals the default export
+- `[invalid-template]` lists one `$.json.path: problem` per line: fix those fields, do not guess a new template
+- Templated `warnings` (for example `missing_asset`, `assets_dir_required`) do not fail the export; report them
+
+### Markdown template library
+- `list-markdown-templates`, `show-markdown-template`, `validate-markdown-template`, `save-markdown-template`, `delete-markdown-template` manage JSON templates for `export-notes-markdown` (`template: "<name>"`)
+- Library: `~/Library/Application Support/apple-notes-mcp/templates` or `APPLE_NOTES_MCP_TEMPLATE_DIR`; names are lowercase slugs; `standard-markdown` and `obsidian` are built in and reserved
+- Save is create-only: `[template-exists]` means ask before passing `force: true`
+- Start a new template from `show-markdown-template` output and validate before saving
 
 ### export-notes-html
 - Same selection as `export-notes-markdown`; `outputPath` is required (the HTML is never returned inline) and create-only
