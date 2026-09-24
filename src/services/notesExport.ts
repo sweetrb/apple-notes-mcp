@@ -47,6 +47,7 @@ import {
   parseTemplate,
   resolveTemplate,
   TemplateValidationError,
+  usesNoteMeta,
   type PortableTemplate,
   type ResolvedTemplate,
   type TemplateError,
@@ -430,7 +431,11 @@ function exportWithTemplate(
 ): NotesExportReceipt {
   const { template } = chosen;
   const readMeta = deps.readMeta ?? ((id: string) => readExportNoteMeta(id));
-  const meta = new Map(notes.map((note) => [note, readMetaSafely(readMeta, note.id)]));
+  // One sqlite3 read per note, so only when a placeholder needs it.
+  const needsMeta = usesNoteMeta(template);
+  const meta = new Map(
+    notes.map((note) => [note, needsMeta ? readMetaSafely(readMeta, note.id) : {}])
+  );
   const exportStem = output ? basename(output, extname(output)) : "export";
   const { bindings, writers } = assetBindings(template, notes, meta, {
     output,

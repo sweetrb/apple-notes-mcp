@@ -309,9 +309,14 @@ export class TemplateValidationError extends Error {
   }
 }
 
+/** The longest key or placeholder quoted back whole in an error message. */
+const MAX_QUOTED_TOKEN = 32;
+
 /** `$.a`, `$.a[2]`, `$.rules["inline.bold"]`. */
 function child(path: string, key: string | number): string {
   if (typeof key === "number") return `${path}[${key}]`;
+  // No valid key is this long; an unknown one is shortened, not echoed whole.
+  if (key.length > MAX_QUOTED_TOKEN) key = `${key.slice(0, MAX_QUOTED_TOKEN - 3)}...`;
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
     ? `${path}.${key}`
     : `${path}[${JSON.stringify(key)}]`;
@@ -323,10 +328,30 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const describe = (value: unknown): string =>
   value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
 
+/** A wrong schemaVersion: a number is shown as is, anything else only by type. */
+const describeVersion = (value: unknown): string =>
+  typeof value === "number" && Number.isFinite(value) ? String(value) : describe(value);
+
 const listed = (values: readonly string[]) => values.map((v) => JSON.stringify(v)).join(", ");
+
+/** A placeholder token as quoted back in an error, capped so a long one is not echoed. */
+const quoted = (token: string) =>
+  token.length <= MAX_QUOTED_TOKEN ? token : `${token.slice(0, MAX_QUOTED_TOKEN - 3)}...}}`;
 
 const TOKEN = /\{\{([^{}]*)\}\}/g;
 const TOKEN_BODY = /^\s*([A-Za-z]+)(?::([A-Za-z]+))?\s*$/;
+
+/** Placeholders whose values come from each note's metadata read. */
+const META_PLACEHOLDERS: readonly string[] = ["uuid", "folder", "account", "created", "modified"];
+
+/** Whether any rule, asset setting or option uses a metadata placeholder. */
+export function usesNoteMeta(template: ResolvedTemplate): boolean {
+  const uses = (value: unknown): boolean =>
+    typeof value === "string"
+      ? placeholderTokens(value).some(({ name }) => META_PLACEHOLDERS.includes(name))
+      : typeof value === "object" && value !== null && Object.values(value).some(uses);
+  return uses(template.rules) || uses(template.assets) || uses(template.options);
+}
 
 /** The placeholder names used in a string, for validation and rendering. */
 export function placeholderTokens(
@@ -368,7 +393,8 @@ class Collector {
     }
     if (value.length > max)
       this.add(path, `must be at most ${max} characters (is ${value.length})`);
-    for (const { token, name, modifier } of placeholderTokens(value)) {
+    for (const { token: raw, name, modifier } of placeholderTokens(value)) {
+      const token = quoted(raw);
       if (!(PLACEHOLDERS as readonly string[]).includes(name))
         this.add(path, `unknown placeholder ${token}; allowed: ${PLACEHOLDERS.join(", ")}`);
       else if (!allowed.includes(name))
@@ -389,7 +415,9 @@ class Collector {
     if (typeof value === "string" && (allowed as readonly string[]).includes(value)) return true;
     this.add(
       path,
-      `must be one of ${listed(allowed)}, not ${JSON.stringify(value) ?? "undefined"}`
+      typeof value === "string"
+        ? `must be one of ${listed(allowed)}`
+        : `must be one of ${listed(allowed)}, not ${describe(value)}`
     );
     return false;
   }
@@ -490,6 +518,18 @@ export function templateErrors(input: unknown): TemplateError[] {
     c.add("$", `a template must be a JSON object, not ${describe(input)}`);
     return c.errors;
   }
+  // Anything without schemaVersion 1 is not treated as a template, so
+  // nothing else about it (key names, placeholders) is reported back:
+  // templateFile can name any readable JSON file.
+  if (input.schemaVersion !== TEMPLATE_SCHEMA_VERSION) {
+    c.add(
+      "$.schemaVersion",
+      "schemaVersion" in input
+        ? `must be ${TEMPLATE_SCHEMA_VERSION}, not ${describeVersion(input.schemaVersion)}`
+        : `is required and must be ${TEMPLATE_SCHEMA_VERSION}`
+    );
+    return c.errors;
+  }
   const keys = c.keys(input, "$", [
     "schemaVersion",
     "name",
@@ -500,14 +540,11 @@ export function templateErrors(input: unknown): TemplateError[] {
     "rules",
     "options",
   ]);
-  if (!("schemaVersion" in input)) c.add("$.schemaVersion", "is required and must be 1");
   for (const key of keys) {
     const path = child("$", key);
     const value = input[key];
     switch (key) {
       case "schemaVersion":
-        if (value !== TEMPLATE_SCHEMA_VERSION)
-          c.add(path, `must be ${TEMPLATE_SCHEMA_VERSION}, not ${JSON.stringify(value)}`);
         break;
       case "name":
       case "description":
@@ -557,6 +594,23 @@ export function validateTemplate(input: unknown): PortableTemplate {
   return input as PortableTemplate;
 }
 
+/**
+ * The line and column of a JSON.parse failure, from the "(line L column C)"
+ * or "at position N" in V8's message. Only the numbers are used.
+ */
+export function jsonErrorLocation(
+  text: string,
+  message: string
+): { line: number; column: number } | undefined {
+  const lineColumn = /\(line (\d+) column (\d+)\)/.exec(message);
+  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
+  const position = /at position (\d+)/.exec(message);
+  if (!position) return undefined;
+  const offset = Math.min(Number(position[1]), text.length);
+  const before = text.slice(0, offset).split("\n");
+  return { line: before.length, column: before[before.length - 1].length + 1 };
+}
+
 /** Parse template JSON text under the size cap, then validate it. */
 export function parseTemplate(text: string): PortableTemplate {
   const bytes = Buffer.byteLength(text, "utf8");
@@ -568,8 +622,13 @@ export function parseTemplate(text: string): PortableTemplate {
   try {
     parsed = JSON.parse(text);
   } catch (error) {
+    // V8's message quotes the source text; report only where the error is.
+    const at = jsonErrorLocation(text, (error as Error).message);
     throw new TemplateValidationError([
-      { path: "$", message: `not valid JSON: ${(error as Error).message}` },
+      {
+        path: "$",
+        message: at ? `not valid JSON at line ${at.line}, column ${at.column}` : "not valid JSON",
+      },
     ]);
   }
   return validateTemplate(parsed);

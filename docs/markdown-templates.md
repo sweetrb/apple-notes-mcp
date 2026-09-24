@@ -25,7 +25,7 @@ Pass exactly one of these to `export-notes-markdown`:
 | Parameter | Meaning |
 | --- | --- |
 | `template` | A built-in name (`standard-markdown` or `obsidian`) or a saved template's name |
-| `templateFile` | An absolute path to a JSON template file (home, a temp directory, or `/Volumes`; at most 256 KiB; symlinks refused) |
+| `templateFile` | An absolute path to a JSON template file ending in `.json` (home, a temp directory, or `/Volumes`; at most 256 KiB; symlinks refused) |
 
 The template is read and validated before any note is opened. An invalid
 template is refused with `[invalid-template]` and one line per problem, each
@@ -36,6 +36,11 @@ Error exporting Markdown [invalid-template]: the template is invalid:
 $.rules["inline.bold"].after: is required when mode is "wrap"
 $.inlineOrder: must list every inline format; missing "link"
 ```
+
+Errors never quote the file's contents. A JSON syntax error reports only its
+line and column, a wrong value reports the allowed values but not the one
+given, and a file without `"schemaVersion": 1` is reported only as missing
+it, with nothing else about the file.
 
 ### Built-in templates
 

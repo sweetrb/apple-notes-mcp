@@ -1491,6 +1491,19 @@ export class AppleNotesManager {
    * @returns HTML content of the note, or empty string if not found
    */
   getNoteContentById(id: string): string {
+    return this.readNoteBodyById(id).body;
+  }
+
+  /**
+   * Like {@link getNoteContentById}, but keeps the automation error so a
+   * caller can explain a failed read (for example a timeout on a note whose
+   * body carries a very large inline image, #237) instead of reporting a bare
+   * failure.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The HTML body, or an empty body plus the error that stopped the read
+   */
+  readNoteBodyById(id: string): { body: string; error?: string } {
     const safeId = sanitizeId(id);
     // Note IDs work at the application level, not scoped to account
     const getCommand = `get body of note id "${safeId}"`;
@@ -1499,10 +1512,10 @@ export class AppleNotesManager {
 
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id}":`, result.error);
-      return "";
+      return { body: "", error: result.error };
     }
 
-    return result.output;
+    return { body: result.output };
   }
 
   /**
