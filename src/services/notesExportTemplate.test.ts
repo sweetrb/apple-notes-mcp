@@ -28,7 +28,12 @@ import { NoteBlocksError } from "../utils/noteBlocks.js";
 import type { AssetLocator } from "../utils/exportAssets.js";
 import { attachment, attachmentRun, block, exportNote } from "../utils/fixtures/exportNote.js";
 import type { ExportNote } from "../utils/noteExportData.js";
-import { TemplateValidationError } from "../utils/markdownTemplate.js";
+import {
+  builtinTemplate,
+  resolveTemplate,
+  TemplateValidationError,
+  usesNoteMeta,
+} from "../utils/markdownTemplate.js";
 
 const ID = (n: number) => `x-coredata://FIXTURE/ICNote/p${n}`;
 let dir: string;
@@ -170,6 +175,25 @@ describe("exportNotesMarkdown with a template", () => {
       count: 1,
     });
     expect(templated.assetFiles).toBeUndefined();
+  });
+
+  it("reads note metadata only when a placeholder uses it", () => {
+    const reads: string[] = [];
+    const counting = (id: string) => {
+      reads.push(id);
+      return {};
+    };
+    exportNotesMarkdown({ id: ID(3), template: "standard-markdown" }, deps({ readMeta: counting }));
+    expect(reads).toEqual([]);
+    exportNotesMarkdown({ id: ID(3), template: "obsidian" }, deps({ readMeta: counting }));
+    expect(reads).toEqual([ID(3)]);
+    expect(usesNoteMeta(resolveTemplate(builtinTemplate("standard-markdown")))).toBe(false);
+    expect(usesNoteMeta(resolveTemplate(builtinTemplate("obsidian")))).toBe(true);
+    const assetsOnly = resolveTemplate({
+      schemaVersion: 1,
+      assets: { mode: "copy", directory: "{{folder}}" },
+    });
+    expect(usesNoteMeta(assetsOnly)).toBe(true);
   });
 
   it("copies assets under hashed names into the obsidian directory beside outputPath", () => {

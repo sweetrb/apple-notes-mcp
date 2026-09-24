@@ -11,6 +11,7 @@ import {
   INLINE_FORMATS,
   isBuiltinTemplate,
   MAX_TEMPLATE_BYTES,
+  jsonErrorLocation,
   parseTemplate,
   placeholderTokens,
   resolveTemplate,
@@ -87,8 +88,34 @@ describe("validation", () => {
       { path: "$.schemaVersion", message: "is required and must be 1" },
     ]);
     expect(templateErrors({ schemaVersion: "1" })).toEqual([
-      { path: "$.schemaVersion", message: 'must be 1, not "1"' },
+      { path: "$.schemaVersion", message: "must be 1, not a string" },
     ]);
+    expect(templateErrors({ schemaVersion: 2 })).toEqual([
+      { path: "$.schemaVersion", message: "must be 1, not 2" },
+    ]);
+  });
+
+  it("reports nothing else about a file that is not a template", () => {
+    // templateFile can name any JSON file; only the missing version comes back.
+    const secret = { apiKey: "sk-live-SECRET", nested: { password: "hunter2" } };
+    for (const input of [secret, { ...secret, schemaVersion: "SECRET" }]) {
+      const errors = templateErrors(input);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].path).toBe("$.schemaVersion");
+      expect(JSON.stringify(errors)).not.toMatch(/SECRET|hunter2|apiKey|password|nested/);
+    }
+  });
+
+  it("does not echo values, and caps long keys and placeholders", () => {
+    const errors = templateErrors({
+      schemaVersion: 1,
+      extends: "SECRET-VALUE",
+      ["k".repeat(40) + "SECRET"]: 1,
+      name: `{{${"p".repeat(40)}SECRET}}`,
+      assets: { mode: "SECRET-MODE" },
+    });
+    expect(JSON.stringify(errors)).not.toContain("SECRET");
+    expect(errors.map((e) => e.path)).toContain(`$["${"k".repeat(29)}..."]`);
   });
 
   it("reports unknown keys at every level with a JSON path", () => {
@@ -126,16 +153,19 @@ describe("validation", () => {
       })
     ).toEqual([
       { path: "$.assets.directory", message: 'must not contain a ".." component' },
-      { path: "$.assets.mode", message: 'must be one of "copy", "reference", "omit", not "link"' },
-      { path: "$.assets.pathStyle", message: 'must be one of "relative", "absolute", not "rel"' },
+      { path: "$.assets.mode", message: 'must be one of "copy", "reference", "omit"' },
+      { path: "$.assets.pathStyle", message: 'must be one of "relative", "absolute"' },
       { path: "$.description", message: "must be at most 512 characters (is 513)" },
       {
         path: "$.extends",
-        message: 'must be one of "standard-markdown", "obsidian", not "fancy"',
+        message: 'must be one of "standard-markdown", "obsidian"',
       },
       { path: "$.name", message: "must be a string, not a number" },
       { path: "$.options.listIndent", message: "must be a string of at most 16 spaces or tabs" },
-      { path: "$.options.richLinkImageCaption", message: expect.stringContaining('not "above"') },
+      {
+        path: "$.options.richLinkImageCaption",
+        message: expect.stringMatching(/^must be one of /),
+      },
       { path: "$.options.richLinkImages", message: "must be true or false, not a number" },
       { path: "$.options.titleFallback", message: "must be true or false, not a string" },
     ]);
@@ -171,7 +201,7 @@ describe("validation", () => {
       { path: "$.inlineOrder[7]", message: 'duplicate format "bold"' },
       {
         path: "$.inlineOrder[8]",
-        message: expect.stringContaining('not "blink"'),
+        message: expect.stringMatching(/^must be one of .*"link"$/),
       },
       { path: "$.inlineOrder", message: 'must list every inline format; missing "color", "link"' },
     ]);
@@ -198,7 +228,10 @@ describe("validation", () => {
         path: '$.rules["attachment.image"].value',
         message: "must be at most 4096 characters (is 4097)",
       },
-      { path: '$.rules["block.body"].mode', message: expect.stringContaining('not "shout"') },
+      {
+        path: '$.rules["block.body"].mode',
+        message: 'must be one of "wrap", "linePrefix", "pattern", "plain", "omit"',
+      },
       { path: '$.rules["block.code"]', message: "must be an object, not a string" },
       {
         path: '$.rules["block.title"].mode',
@@ -216,7 +249,7 @@ describe("validation", () => {
       { path: '$.rules["inline.italic"].before', message: 'is not used when mode is "pattern"' },
       {
         path: '$.rules["inline.italic"].join',
-        message: 'must be one of "line", "paragraph", not "tight"',
+        message: 'must be one of "line", "paragraph"',
       },
       { path: '$.rules["inline.link"].value', message: 'is not used when mode is "plain"' },
     ]);
@@ -224,7 +257,7 @@ describe("validation", () => {
 
   it("throws every error at once", () => {
     try {
-      validateTemplate({ schemaVersion: 2, bad: true });
+      validateTemplate({ schemaVersion: 1, bad: true, extends: 3 });
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(TemplateValidationError);
@@ -232,7 +265,7 @@ describe("validation", () => {
       expect(e.code).toBe("invalid-template");
       expect(e.errors).toHaveLength(2);
       expect(e.message).toBe(
-        'Invalid template (2 problems): $.bad: unknown key; allowed keys are "schemaVersion", "name", "description", "extends", "assets", "inlineOrder", "rules", "options"; $.schemaVersion: must be 1, not 2'
+        'Invalid template (2 problems): $.bad: unknown key; allowed keys are "schemaVersion", "name", "description", "extends", "assets", "inlineOrder", "rules", "options"; $.extends: must be one of "standard-markdown", "obsidian", not a number'
       );
     }
     expect(() => validateTemplate({})).toThrow("Invalid template (1 problem)");
@@ -243,7 +276,28 @@ describe("validation", () => {
       schemaVersion: 1,
       name: "x",
     });
-    expect(() => parseTemplate("{")).toThrow(/\$: not valid JSON/);
+    expect(() => parseTemplate("{")).toThrow("$: not valid JSON at line 1, column 2");
+    expect(() => parseTemplate('{\n  "a": 1,\n}')).toThrow("not valid JSON at line 3, column 1");
+  });
+
+  it("reports only where JSON is invalid, never the text", () => {
+    for (const text of ["SECRET=hunter2", '{"token": SECRET}', '{"a": "SECRET"', ""]) {
+      const error = (() => {
+        try {
+          parseTemplate(text);
+        } catch (e) {
+          return e as TemplateValidationError;
+        }
+      })();
+      expect(error).toBeInstanceOf(TemplateValidationError);
+      expect(error?.message).toMatch(/^Invalid template \(1 problem\): \$: not valid JSON/);
+      expect(error?.message).not.toMatch(/SECRET|hunter2|token/);
+    }
+    expect(jsonErrorLocation("ab\ncd", "Unexpected token in JSON at position 4")).toEqual({
+      line: 2,
+      column: 2,
+    });
+    expect(jsonErrorLocation("x", "Unexpected token 'x', \"x\" is not valid JSON")).toBeUndefined();
     expect(() => parseTemplate(" ".repeat(MAX_TEMPLATE_BYTES + 1))).toThrow(
       `the limit is ${MAX_TEMPLATE_BYTES}`
     );

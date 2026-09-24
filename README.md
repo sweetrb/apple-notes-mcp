@@ -1685,7 +1685,7 @@ single note.
 | `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
 | `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
 | `template` | string | No | Render through a template: `standard-markdown` or `obsidian`. Exclusive with `templateFile` |
-| `templateFile` | string | No | Render through the JSON template in this file (same path rules; at most 256 KiB) |
+| `templateFile` | string | No | Render through the JSON template in this `.json` file (same path rules; at most 256 KiB) |
 
 Both paths follow the `save-attachment` rules (absolute, under the home
 directory, a temp directory, or `/Volumes`, no symlink escapes) and may not

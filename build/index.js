@@ -46846,12 +46846,12 @@ function tokenize(input) {
       const field = prefix.toLowerCase();
       let value = word.slice(colon + 1);
       if (FIELDS.has(field)) {
-        let quoted = false;
+        let quoted2 = false;
         if (value === "" && input[j] === '"') {
           [value, j] = readQuoted(input, j);
-          quoted = true;
+          quoted2 = true;
         }
-        push({ kind: "term", pos: i, field, value, quoted });
+        push({ kind: "term", pos: i, field, value, quoted: quoted2 });
         i = j;
         continue;
       }
@@ -46890,11 +46890,11 @@ function parseLocalDate(text2, pos) {
   return { start: start.getTime(), end: new Date(year, month - 1, day + 1).getTime() };
 }
 function termNode(token) {
-  const { field, value, quoted, pos } = token;
+  const { field, value, quoted: quoted2, pos } = token;
   if (field === void 0) {
     if (value === "") throw new NoteQueryError("Empty quoted phrase", pos);
     const lower2 = value.toLowerCase();
-    if (!quoted && FLAGS.includes(lower2)) {
+    if (!quoted2 && FLAGS.includes(lower2)) {
       return { type: "flag", flag: lower2 };
     }
     return { type: "text", field: "any", value };
@@ -51477,15 +51477,24 @@ var TemplateValidationError = class extends Error {
   errors;
   code = "invalid-template";
 };
+var MAX_QUOTED_TOKEN = 32;
 function child(path10, key) {
   if (typeof key === "number") return `${path10}[${key}]`;
+  if (key.length > MAX_QUOTED_TOKEN) key = `${key.slice(0, MAX_QUOTED_TOKEN - 3)}...`;
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${path10}.${key}` : `${path10}[${JSON.stringify(key)}]`;
 }
 var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var describe = (value) => value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
+var describeVersion = (value) => typeof value === "number" && Number.isFinite(value) ? String(value) : describe(value);
 var listed = (values) => values.map((v) => JSON.stringify(v)).join(", ");
+var quoted = (token) => token.length <= MAX_QUOTED_TOKEN ? token : `${token.slice(0, MAX_QUOTED_TOKEN - 3)}...}}`;
 var TOKEN = /\{\{([^{}]*)\}\}/g;
 var TOKEN_BODY = /^\s*([A-Za-z]+)(?::([A-Za-z]+))?\s*$/;
+var META_PLACEHOLDERS = ["uuid", "folder", "account", "created", "modified"];
+function usesNoteMeta(template) {
+  const uses = (value) => typeof value === "string" ? placeholderTokens(value).some(({ name }) => META_PLACEHOLDERS.includes(name)) : typeof value === "object" && value !== null && Object.values(value).some(uses);
+  return uses(template.rules) || uses(template.assets) || uses(template.options);
+}
 function placeholderTokens(text2) {
   return [...text2.matchAll(TOKEN)].map((match) => {
     const body = TOKEN_BODY.exec(match[1]);
@@ -51516,7 +51525,8 @@ var Collector = class {
     }
     if (value.length > max)
       this.add(path10, `must be at most ${max} characters (is ${value.length})`);
-    for (const { token, name, modifier } of placeholderTokens(value)) {
+    for (const { token: raw, name, modifier } of placeholderTokens(value)) {
+      const token = quoted(raw);
       if (!PLACEHOLDERS.includes(name))
         this.add(path10, `unknown placeholder ${token}; allowed: ${PLACEHOLDERS.join(", ")}`);
       else if (!allowed.includes(name))
@@ -51536,7 +51546,7 @@ var Collector = class {
     if (typeof value === "string" && allowed.includes(value)) return true;
     this.add(
       path10,
-      `must be one of ${listed(allowed)}, not ${JSON.stringify(value) ?? "undefined"}`
+      typeof value === "string" ? `must be one of ${listed(allowed)}` : `must be one of ${listed(allowed)}, not ${describe(value)}`
     );
     return false;
   }
@@ -51626,6 +51636,13 @@ function templateErrors(input) {
     c.add("$", `a template must be a JSON object, not ${describe(input)}`);
     return c.errors;
   }
+  if (input.schemaVersion !== TEMPLATE_SCHEMA_VERSION) {
+    c.add(
+      "$.schemaVersion",
+      "schemaVersion" in input ? `must be ${TEMPLATE_SCHEMA_VERSION}, not ${describeVersion(input.schemaVersion)}` : `is required and must be ${TEMPLATE_SCHEMA_VERSION}`
+    );
+    return c.errors;
+  }
   const keys = c.keys(input, "$", [
     "schemaVersion",
     "name",
@@ -51636,14 +51653,11 @@ function templateErrors(input) {
     "rules",
     "options"
   ]);
-  if (!("schemaVersion" in input)) c.add("$.schemaVersion", "is required and must be 1");
   for (const key of keys) {
     const path10 = child("$", key);
     const value = input[key];
     switch (key) {
       case "schemaVersion":
-        if (value !== TEMPLATE_SCHEMA_VERSION)
-          c.add(path10, `must be ${TEMPLATE_SCHEMA_VERSION}, not ${JSON.stringify(value)}`);
         break;
       case "name":
       case "description":
@@ -51690,6 +51704,15 @@ function validateTemplate(input) {
   if (errors.length) throw new TemplateValidationError(errors);
   return input;
 }
+function jsonErrorLocation(text2, message) {
+  const lineColumn = /\(line (\d+) column (\d+)\)/.exec(message);
+  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
+  const position = /at position (\d+)/.exec(message);
+  if (!position) return void 0;
+  const offset = Math.min(Number(position[1]), text2.length);
+  const before = text2.slice(0, offset).split("\n");
+  return { line: before.length, column: before[before.length - 1].length + 1 };
+}
 function parseTemplate(text2) {
   const bytes = Buffer.byteLength(text2, "utf8");
   if (bytes > MAX_TEMPLATE_BYTES)
@@ -51700,8 +51723,12 @@ function parseTemplate(text2) {
   try {
     parsed = JSON.parse(text2);
   } catch (error2) {
+    const at = jsonErrorLocation(text2, error2.message);
     throw new TemplateValidationError([
-      { path: "$", message: `not valid JSON: ${error2.message}` }
+      {
+        path: "$",
+        message: at ? `not valid JSON at line ${at.line}, column ${at.column}` : "not valid JSON"
+      }
     ]);
   }
   return validateTemplate(parsed);
@@ -52080,9 +52107,9 @@ var TemplateRenderer = class {
     const push = (text2, quote, group) => {
       if (!text2) return;
       if (quote) {
-        const quoted = applyRule(this.rules["paragraph.quote"], text2, values);
-        if (!quoted) return;
-        text2 = quoted;
+        const quoted2 = applyRule(this.rules["paragraph.quote"], text2, values);
+        if (!quoted2) return;
+        text2 = quoted2;
       }
       lines.push({ text: text2, quote, ...group ? { group } : {} });
     };
@@ -52403,6 +52430,8 @@ function templateAssetsDir(directory, outputDir, values) {
 }
 function readTemplateFile(path10) {
   const abs = assertExportPath(path10);
+  if (extname4(abs).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${abs}`);
   let fd;
   try {
     fd = openRegular(abs);
@@ -52681,7 +52710,10 @@ function assetBindings(template, notes, meta, { output, assetsDir, exportStem })
 function exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir }) {
   const { template } = chosen;
   const readMeta = deps.readMeta ?? ((id2) => readExportNoteMeta(id2));
-  const meta = new Map(notes.map((note) => [note, readMetaSafely(readMeta, note.id)]));
+  const needsMeta = usesNoteMeta(template);
+  const meta = new Map(
+    notes.map((note) => [note, needsMeta ? readMetaSafely(readMeta, note.id) : {}])
+  );
   const exportStem = output ? basename4(output, extname5(output)) : "export";
   const { bindings, writers } = assetBindings(template, notes, meta, {
     output,
@@ -60479,7 +60511,7 @@ registerTool(
         `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
       ),
       templateFile: exportPathInput(
-        "JSON template file to render through (exclusive with template; at most 256 KiB)"
+        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
       )
     },
     outputSchema: {

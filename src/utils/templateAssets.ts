@@ -226,11 +226,13 @@ export function templateAssetsDir(
 
 /**
  * Read a template file from an allowed location (home, a temp directory, or
- * /Volumes; never inside the Notes library). Refuses symlinks, non-regular
- * files, and files over the template size limit.
+ * /Volumes; never inside the Notes library). Refuses a name without a .json
+ * extension, symlinks, non-regular files, and files over the template size limit.
  */
 export function readTemplateFile(path: string): string {
   const abs = assertExportPath(path);
+  if (extname(abs).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${abs}`);
   let fd: number;
   try {
     fd = openRegular(abs);

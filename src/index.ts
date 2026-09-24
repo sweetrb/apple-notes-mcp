@@ -4162,7 +4162,7 @@ registerTool(
           `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
         ),
       templateFile: exportPathInput(
-        "JSON template file to render through (exclusive with template; at most 256 KiB)"
+        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
       ),
     },
     outputSchema: {

@@ -155,11 +155,15 @@ describe("readTemplateFile", () => {
     expect(readTemplateFile(file)).toBe('{"schemaVersion":1}');
   });
 
-  it("refuses missing files, symlinks, directories, oversize files and other locations", () => {
+  it("refuses other extensions, missing files, symlinks, directories, oversize files and other locations", () => {
     expect(() => readTemplateFile(join(dir, "missing.json"))).toThrow("Template file not found");
     symlinkSync(join(dir, "t.json"), join(dir, "link.json"));
     expect(() => readTemplateFile(join(dir, "link.json"))).toThrow("symbolic link");
-    expect(() => readTemplateFile(join(dir, "lib"))).toThrow("not a readable regular file");
+    mkdirSync(join(dir, "folder.json"));
+    expect(() => readTemplateFile(join(dir, "folder.json"))).toThrow("not a readable regular file");
+    writeFileSync(join(dir, "notes.txt"), '{"schemaVersion":1}');
+    expect(() => readTemplateFile(join(dir, "notes.txt"))).toThrow("must have a .json extension");
+    expect(() => readTemplateFile(join(dir, "lib"))).toThrow("must have a .json extension");
     writeFileSync(join(dir, "big.json"), Buffer.alloc(MAX_TEMPLATE_BYTES + 1, 32));
     expect(() => readTemplateFile(join(dir, "big.json"))).toThrow("the limit is");
     expect(() => readTemplateFile("/etc/hosts")).toThrow("outside allowed locations");

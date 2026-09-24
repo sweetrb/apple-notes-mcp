@@ -20,6 +20,14 @@
   Templated receipts add `template`, `warnings` (seven codes, such as
   `missing_asset`) and `assetFiles`. docs/markdown-templates.md documents the
   schema.
+- Template errors never quote the template file's contents: a JSON syntax
+  error reports only its line and column, a wrong value is reported by its
+  allowed values or type, long keys and placeholders are shortened, and a
+  file without `"schemaVersion": 1` gets that one error and nothing else.
+  `templateFile` must end in `.json`.
+- Templated exports read each note's metadata (UUID, dates, folder, account)
+  only when a rule or asset setting uses one of those placeholders, so a
+  `standard-markdown` export runs no extra database reads.
 - `src/utils/markdownTemplate.ts` (schema, validation, built-ins),
   `templateRender.ts` (renderer; `standard-markdown` output is tested equal
   to the default renderer), `templateAssets.ts` (hashed and reference
@@ -30,7 +38,8 @@
 ### Unchanged
 
 - `export-notes-markdown` without a template produces the same output as
-  2.8.49.
+  2.9.11.
+
 ## [2.9.11] - 2026-09-23
 
 ### Added
