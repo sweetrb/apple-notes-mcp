@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.23] - 2026-09-24
+## [2.9.25] - 2026-09-24
 
 ### Fixed
 
@@ -43,6 +43,13 @@
 - `export-attachments` passes a stored attachment identifier through the same
   one-component check as file names, with a constant fallback, and refuses any
   destination whose directory is not the export directory.
+
+## [2.9.23] - 2026-09-24
+
+### Documentation
+
+- The README's Author section now has a Contributors list crediting
+  Oliver Ames (@oliverames) for his many merged pull requests and bug reports.
 
 ## [2.9.22] - 2026-09-24
 
