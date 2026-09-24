@@ -3008,6 +3008,12 @@ A software consulting, contracting, and development company.
 - Email: rob@superiortech.io
 - GitHub: [@sweetrb](https://github.com/sweetrb)
 
+### Contributors
+
+- **Oliver Ames** ([@oliverames](https://github.com/oliverames)) — the project's most prolific
+  contributor, with dozens of merged pull requests spanning features, fixes, documentation, and
+  sharp, well-reproduced bug reports.
+
 ## License
 
 MIT License - see [LICENSE](https://github.com/sweetrb/apple-notes-mcp/blob/main/LICENSE) for details.
