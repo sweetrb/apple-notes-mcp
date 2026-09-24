@@ -107,7 +107,7 @@ const RULES: Array<{ code: ErrorCode; pattern: RegExp }> = [
   {
     code: "validation_error",
     pattern:
-      /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i,
+      /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to (?:read|write)|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i,
   },
 ];
 

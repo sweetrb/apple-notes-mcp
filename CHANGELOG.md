@@ -1,5 +1,37 @@
 ## [Unreleased]
 
+## [2.9.28] - 2026-09-24
+
+### Security
+
+- `analyze-svg`'s `path` and the Markdown template tools' `templateFile`
+  (`export-notes-markdown`, `validate-markdown-template`,
+  `save-markdown-template`) are now read under the same policy as
+  `create-note`'s `contentPath` and the attachment tools, through the shared
+  `readAllowedFile` helper. That means a regular file in home, temp or
+  `/Volumes`. Hidden paths and `~/Library` outside iCloud Drive and
+  `~/Library/CloudStorage` are refused, and so are hidden entries inside those
+  two. The check runs on the literal path, again after realpath and again
+  after open. The file is opened with `O_NONBLOCK` and must be a regular,
+  non-empty file. `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` covers both.
+  Before, both paths were bounded only by those roots, so a prompt could point
+  `templateFile` at `~/.docker/config.json` or another credential JSON.
+- Refusals and parse errors from both tools no longer quote the file.
+  `analyze-svg` refuses a file whose first element is not `<svg>` before any
+  error can name one of its tags or attributes, and a disallowed named entity
+  is no longer echoed. Template JSON errors already reported only line and
+  column.
+
+### Fixed
+
+- A scope-guard refusal (`Scope guard failed: …`) is now `revision_conflict`
+  with `committed: false`. Before, its "read the note's current folder … before
+  retrying" advice matched the unverified-write rule, so it came back as
+  `verification_failed` with `indeterminate: true`, although the guard runs
+  before anything is written.
+- A read refused by that policy ("Refusing to read …") is `validation_error`
+  rather than `operation_failed`, as a refused write already was.
+
 ## [2.9.27] - 2026-09-24
 
 Data-correctness fixes across reads, counts, guards and exports, contributed by

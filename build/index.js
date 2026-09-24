@@ -39889,7 +39889,7 @@ var RULES = [
   },
   {
     code: "validation_error",
-    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to (?:read|write)|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
   }
 ];
 var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;

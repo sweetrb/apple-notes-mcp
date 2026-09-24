@@ -109,6 +109,11 @@ const CASES: Array<[string, ErrorEnvelope]> = [
     'Stopped after tags ["a"]; read exact note before retry: Error: boom',
     { code: "verification_failed", indeterminate: true },
   ],
+  // A read refused by the content-file policy (templateFile, analyze-svg path).
+  [
+    'Error validating template: Refusing to read "/Users/x/.docker/config.json": it is in a hidden file or directory, which can hold credentials or app data.',
+    { code: "validation_error" },
+  ],
   // revision_conflict
   // A scope guard refusal: nothing ran, so not an unverified write, despite
   // its "read the note ... before retrying" advice.
