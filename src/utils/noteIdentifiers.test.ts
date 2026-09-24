@@ -18,6 +18,7 @@ import { join } from "path";
 import {
   buildLookupSql,
   buildResolveSql,
+  canonicalCoreDataId,
   exactIdArrayInput,
   exactIdInput,
   identifierForm,
@@ -347,5 +348,15 @@ describe("id input schemas", () => {
     expect(schema.parse("whatever-it-was")).toBe("whatever-it-was");
     expect(schema.parse(note(7))).toBe(note(7));
     expect(schema.safeParse("30").success).toBe(false);
+  });
+});
+
+describe("canonicalCoreDataId", () => {
+  it("upper-cases the store UUID and drops leading zeros from the key", () => {
+    expect(canonicalCoreDataId("x-coredata://8fa9-ab/ICFolder/p0012")).toBe(
+      "x-coredata://8FA9-AB/ICFolder/p12"
+    );
+    expect(canonicalCoreDataId("x-coredata://AB/ICNote/p0")).toBe("x-coredata://AB/ICNote/p0");
+    expect(canonicalCoreDataId("Meeting notes")).toBe("Meeting notes");
   });
 });

@@ -52,6 +52,7 @@ import type {
 } from "@/types.js";
 import { folderTree, listRecentNotes, RECENT_LIMIT } from "@/utils/noteRecentList.js";
 import {
+  canonicalCoreDataId,
   exactIdArrayInput,
   exactIdInput,
   lookupStableIdentifiers,
@@ -586,10 +587,15 @@ function prepareDeleteGuards(args: DeleteGuardArgs): PreparedDeleteGuards | { er
   if ((guardNoteId === undefined) !== (expectedGuardContentHash === undefined)) {
     return { error: "Pass guardNoteId and expectedGuardContentHash together." };
   }
-  if (guardNoteId === id || requireActiveNoteId === id) {
+  // Compare canonical spellings: Notes resolves a lower-case store UUID to the
+  // same note, so a raw string comparison could let the target guard itself.
+  // The delete script also refuses a guard whose live id is the target's.
+  const same = (a?: string, b?: string) =>
+    a !== undefined && b !== undefined && canonicalCoreDataId(a) === canonicalCoreDataId(b);
+  if (same(guardNoteId, id) || same(requireActiveNoteId, id)) {
     return { error: "A guard note must be a different note from the one being deleted." };
   }
-  if (guardNoteId !== undefined && guardNoteId === requireActiveNoteId) {
+  if (same(guardNoteId, requireActiveNoteId)) {
     return { error: "requireActiveNoteId repeats guardNoteId; pass only guardNoteId." };
   }
 

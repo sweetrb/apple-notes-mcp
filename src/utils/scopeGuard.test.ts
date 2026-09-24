@@ -74,6 +74,30 @@ describe("scope guard", () => {
     compiles(script);
   });
 
+  it("refuses a forbidden id that names no folder instead of passing (#215)", () => {
+    const script = buildScopeGuardScript("noteRef", { forbiddenAncestorFolderIds: [F2, F3] });
+    const exists = script.indexOf(
+      'if not (exists folder id (contents of forbiddenId)) then return "SAFETY_SCOPE:a forbidden folder id does not match any folder"'
+    );
+    expect(exists).toBeGreaterThan(-1);
+    expect(exists).toBeLessThan(script.indexOf("the note is inside a forbidden folder"));
+    expect(buildScopeGuardScript("noteRef", { ifFolderId: F1 })).not.toContain("exists folder id");
+    compiles(script);
+  });
+
+  it("compares folder ids in the spelling Notes returns (#215)", () => {
+    // Notes does not resolve a zero-padded key, and returns the store UUID in upper case.
+    const script = buildScopeGuardScript("noteRef", {
+      ifFolderId: "x-coredata://abc/ICFolder/p001",
+      ifAncestorFolderId: "x-coredata://abc/ICFolder/p02",
+      forbiddenAncestorFolderIds: ["x-coredata://abc/ICFolder/p03", F3],
+    });
+    expect(script).toContain(`if (id of scopeFolder) is not "${F1}"`);
+    expect(script).toContain(`scopeChain does not contain "${F2}"`);
+    expect(script).toContain(`repeat with forbiddenId in {"${F3}"}`);
+    expect(script).not.toMatch(/p0\d/);
+  });
+
   it("skips the destination chain without forbidden folders or a destination", () => {
     expect(
       buildScopeGuardScript("noteRef", { ifAncestorFolderId: F1 }, "destFolder")

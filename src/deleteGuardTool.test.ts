@@ -188,6 +188,10 @@ describe("delete-note copy-then-retire guard", () => {
         /different note/,
       ],
       [{ requireActiveNoteId: COPY }, /repeats guardNoteId/],
+      // Other spellings of the same note (#214).
+      [{ guardNoteId: "x-coredata://abcdef/ICNote/p10" }, /different note/],
+      [{ guardNoteId: "x-coredata://ABCDEF/ICNote/p010" }, /different note/],
+      [{ requireActiveNoteId: "x-coredata://abcdef/ICNote/p11" }, /repeats guardNoteId/],
     ];
     for (const [extra, message] of cases) {
       const response = await guarded(extra);

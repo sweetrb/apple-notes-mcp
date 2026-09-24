@@ -2154,6 +2154,8 @@ describe("AppleNotesManager", () => {
         '(name of __guardFolder0) is "Recently Deleted"',
         'return "SAFETY_GUARD_INACTIVE:0:in Recently Deleted"',
         'return "SAFETY_GUARD_CONFLICT:0"',
+        // The target cannot guard its own delete, however its id was spelled (#214).
+        'if (id of __guardRef0) is (id of noteRef) then return "SAFETY_GUARD_INACTIVE:0:the note being deleted"',
         `exists note id "${other}"`,
         'return "SAFETY_GUARD_INACTIVE:1:in Recently Deleted"',
       ]) {

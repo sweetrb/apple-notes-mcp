@@ -178,6 +178,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `update-note`, `append-to-note`, `delete-note`, and `move-note` accept optional `ifFolderId`, `ifAncestorFolderId`, and `forbiddenAncestorFolderIds` (exact folder ids from `list-folders`).
 - Use them when a write should only happen while the note is still where you reviewed it, or must never touch a protected subtree (for `move-note`, the destination is checked against the forbidden list too).
 - They are re-checked inside the write's own AppleScript. A failure reads `Scope guard failed: …` and nothing is changed; re-read the note before retrying.
+- A forbidden id that matches no folder fails the guard (`a forbidden folder id does not match any folder`) rather than being ignored; take ids from `list-folders`.
 
 ### list-smart-folders
 - Read-only; reads the NoteStore database, so it needs Full Disk Access

@@ -1966,6 +1966,7 @@ export class AppleNotesManager {
           return `
       if not (exists note id "${safeGuardId}") then ${inactive("missing")}
       set ${ref} to note id "${safeGuardId}"
+      if (id of ${ref}) is (id of noteRef) then ${inactive("the note being deleted")}
       if password protected of ${ref} then ${inactive("locked")}
       set ${folderVar} to missing value
       try

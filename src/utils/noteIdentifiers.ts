@@ -102,6 +102,20 @@ function canonicalKey(value: string): string {
   return BigInt(value).toString();
 }
 
+/**
+ * The one spelling Notes.app itself uses for an x-coredata id: upper-case
+ * store UUID and a numeric key without leading zeros. Notes compares ids
+ * without regard to case but does not resolve a zero-padded key, so two
+ * spellings of one object only compare equal after this. Any other value is
+ * returned unchanged.
+ */
+export function canonicalCoreDataId(id: string): string {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(IC[A-Za-z]+)\/p(\d+)$/.exec(id);
+  return match
+    ? `x-coredata://${match[1].toUpperCase()}/${match[2]}/p${canonicalKey(match[3])}`
+    : id;
+}
+
 /** Asserts that every value matches a pattern before it enters SQL text. */
 function assertAll(values: string[], pattern: RegExp, label: string): void {
   for (const value of values) {

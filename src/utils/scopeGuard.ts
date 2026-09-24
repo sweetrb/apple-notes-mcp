@@ -18,6 +18,7 @@
  *
  * @module utils/scopeGuard
  */
+import { canonicalCoreDataId } from "./noteIdentifiers.js";
 
 /** Optional folder preconditions on a note write. */
 export interface ScopeGuard {
@@ -90,18 +91,30 @@ export function buildScopeGuardScript(
 ): string {
   if (!hasScopeGuard(guard)) return "";
   validateScopeGuard(guard);
-  const forbidden = guard.forbiddenAncestorFolderIds ?? [];
+  // Compare in the spelling Notes returns: it does not resolve a zero-padded
+  // key, so "p012" would otherwise never equal the folder's "p12".
+  const ifFolderId = guard.ifFolderId && canonicalCoreDataId(guard.ifFolderId);
+  const ifAncestorFolderId =
+    guard.ifAncestorFolderId && canonicalCoreDataId(guard.ifAncestorFolderId);
+  const forbidden = [...new Set((guard.forbiddenAncestorFolderIds ?? []).map(canonicalCoreDataId))];
   let script = `
       set scopeFolder to container of ${noteVar}
       if class of scopeFolder is not folder then return "${SCOPE_MARKER}:the note is not in a folder"`;
-  if (guard.ifFolderId)
+  // A forbidden id that names no folder can never match, so the guard would
+  // pass every write; refuse it instead of failing open.
+  if (forbidden.length > 0)
     script += `
-      if (id of scopeFolder) is not "${guard.ifFolderId}" then return "${SCOPE_MARKER}:the note is not in the expected folder"`;
-  if (guard.ifAncestorFolderId || forbidden.length > 0)
+      repeat with forbiddenId in ${idList(forbidden)}
+        if not (exists folder id (contents of forbiddenId)) then return "${SCOPE_MARKER}:a forbidden folder id does not match any folder"
+      end repeat`;
+  if (ifFolderId)
+    script += `
+      if (id of scopeFolder) is not "${ifFolderId}" then return "${SCOPE_MARKER}:the note is not in the expected folder"`;
+  if (ifAncestorFolderId || forbidden.length > 0)
     script += chainScript("scopeChain", "scopeFolder");
-  if (guard.ifAncestorFolderId)
+  if (ifAncestorFolderId)
     script += `
-      if scopeChain does not contain "${guard.ifAncestorFolderId}" then return "${SCOPE_MARKER}:the note is not inside the expected ancestor folder"`;
+      if scopeChain does not contain "${ifAncestorFolderId}" then return "${SCOPE_MARKER}:the note is not inside the expected ancestor folder"`;
   if (forbidden.length > 0) {
     script += `
       repeat with forbiddenId in ${idList(forbidden)}
