@@ -385,7 +385,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Decodes `com.apple.drawing.2` / `com.apple.drawing` attachments into strokes (`inkType`, sRGB `color`, `width`, `points`) and/or SVG (`format: "json" | "svg" | "both"`). Modern Paper sketches (`com.apple.paper`) are not decoded.
 - Needs Full Disk Access and the public native helper, built once by the user with `apple-notes-mcp setup --public-helper`. An error mentioning `setup --public-helper` means it is not built or is stale after an upgrade; tell the user to run that command rather than retrying.
 - Overall `status` is `none` when the note has no classic drawing. A per-drawing `status: "error"` carries a `code` (`no_data`, `undecodable`, `timeout`, ...) and does not fail the call.
-- For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points itself (`pointsOmitted`) past the response size limit.
+- For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points (`pointsOmitted`) and then SVG (`svgOmitted`) itself past the response size limit, and fails if even that is too large.
+- Pixel-erased ink is not returned: `masked: true` marks a visible piece of a partly erased stroke (one stroke can give several), and `hiddenStrokeCount` counts fully erased strokes.
 
 ### transcribe-note-audio (on-device transcription)
 - Transcribes a note's voice recordings and audio attachments on this Mac with the Speech framework (never a server). Same prerequisites as `get-note-drawings`: Full Disk Access and `apple-notes-mcp setup --public-helper`.

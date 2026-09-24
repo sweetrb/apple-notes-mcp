@@ -57735,14 +57735,17 @@ var strokeSchema = external_exports.object({
       force: external_exports.number()
     })
   ).optional(),
-  transformApplied: external_exports.boolean().optional()
+  transformApplied: external_exports.boolean().optional(),
+  masked: external_exports.boolean().optional(),
+  pointsTruncated: external_exports.boolean().optional()
 }).strip();
 var decodedDrawingSchema = external_exports.object({
   status: external_exports.literal("ok"),
   strokeCount: external_exports.number().int(),
   strokes: external_exports.array(strokeSchema),
   truncated: external_exports.boolean(),
-  bounds
+  bounds,
+  hiddenStrokeCount: external_exports.number().int().optional()
 });
 function decodeRow(row, format, includePoints, deps) {
   const base = {
@@ -57775,7 +57778,8 @@ function decodeRow(row, format, includePoints, deps) {
     status: "ok",
     strokeCount: decoded.strokeCount,
     bounds: decoded.bounds,
-    truncated: decoded.truncated
+    truncated: decoded.truncated,
+    ...decoded.hiddenStrokeCount ? { hiddenStrokeCount: decoded.hiddenStrokeCount } : {}
   };
   if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
   if (format !== "svg")
@@ -57800,6 +57804,28 @@ function getNoteDrawings(noteId3, options = {}) {
     drawings
   };
 }
+function fitNoteDrawings(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
+  let next = result;
+  let pointsOmitted = false;
+  let svgOmitted = false;
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.strokes?.some((s) => s.points))) {
+    next = {
+      ...next,
+      drawings: next.drawings.map(
+        (d) => d.strokes ? { ...d, strokes: d.strokes.map(({ points: _points, ...rest }) => rest) } : d
+      )
+    };
+    pointsOmitted = true;
+  }
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.svg !== void 0)) {
+    next = {
+      ...next,
+      drawings: next.drawings.map(({ svg: _svg, ...rest }) => rest)
+    };
+    svgOmitted = true;
+  }
+  return { result: next, pointsOmitted, svgOmitted, oversized: measure(next) > maxBytes };
+}
 function formatNoteDrawings(result) {
   if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
   const lines = [
@@ -57807,7 +57833,7 @@ function formatNoteDrawings(result) {
   ];
   for (const d of result.drawings)
     lines.push(
-      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
+      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.hiddenStrokeCount ? ` (${d.hiddenStrokeCount} fully erased)` : ""}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
     );
   return lines.join("\n");
 }
@@ -61888,20 +61914,25 @@ registerTool(
       drawingCount: external_exports.number().optional(),
       status: external_exports.string().optional(),
       drawings: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      pointsOmitted: external_exports.boolean().optional()
+      pointsOmitted: external_exports.boolean().optional(),
+      svgOmitted: external_exports.boolean().optional()
     }
   },
   withErrorHandling(({ id: id2, format, includePoints }) => {
-    let result = getNoteDrawings(id2, { format, includePoints });
-    let pointsOmitted = false;
-    if (Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() && includePoints !== false && format !== "svg") {
-      result = getNoteDrawings(id2, { format, includePoints: false });
-      pointsOmitted = true;
-    }
-    const text2 = formatNoteDrawings(result) + (pointsOmitted ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "");
+    const limit = exportMaxResponseBytes();
+    const { result, pointsOmitted, svgOmitted, oversized } = fitNoteDrawings(
+      getNoteDrawings(id2, { format, includePoints }),
+      limit
+    );
+    if (oversized)
+      return errorResponse(
+        `The drawings in note "${id2}" are too large to return even without stroke points and SVG (limit ${limit} bytes, APPLE_NOTES_MCP_EXPORT_MAX_BYTES).`
+      );
+    const text2 = formatNoteDrawings(result) + (pointsOmitted ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "") + (svgOmitted ? "\nSVG documents were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)." : "");
     return successResponse(text2, {
       ...result,
-      ...pointsOmitted ? { pointsOmitted } : {}
+      ...pointsOmitted ? { pointsOmitted } : {},
+      ...svgOmitted ? { svgOmitted } : {}
     });
   }, "Error reading drawings")
 );

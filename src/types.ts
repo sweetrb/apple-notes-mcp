@@ -939,6 +939,13 @@ export interface DrawingStroke {
   points?: DrawingPoint[];
   /** True when the stroke carried a non-identity transform, already applied to its points. */
   transformApplied?: boolean;
+  /**
+   * True when part of the stroke was erased (a pixel eraser or ruler mask):
+   * this entry is one visible piece, and one stroke can yield several entries.
+   */
+  masked?: boolean;
+  /** True when the helper's point limit cut this stroke short; pointCount counts the points returned. */
+  pointsTruncated?: boolean;
 }
 
 /** Decode outcome for one classic drawing attachment. */
@@ -958,6 +965,8 @@ export interface NoteDrawing {
   strokes?: DrawingStroke[];
   /** True when the helper stopped at its stroke or point limit. */
   truncated?: boolean;
+  /** Strokes erased completely (nothing visible), left out of strokes and SVG. */
+  hiddenStrokeCount?: number;
   /** Standalone SVG document, when format is "svg" or "both". */
   svg?: string;
 }

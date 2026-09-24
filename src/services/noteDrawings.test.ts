@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { DrawingRow } from "@/utils/noteDrawings.js";
-import { formatNoteDrawings, getNoteDrawings } from "./noteDrawings.js";
+import { fitNoteDrawings, formatNoteDrawings, getNoteDrawings } from "./noteDrawings.js";
 import { PublicHelperError, type PublicHelperDeps } from "./publicHelper.js";
 
 const pencil = JSON.parse(
@@ -154,5 +154,90 @@ describe("getNoteDrawings", () => {
     expect(text).toBe(
       `1 classic drawing in note ${NOTE} (ok):\n- x-coredata://S/ICAttachment/p20: 3 strokes`
     );
+  });
+});
+
+describe("erased strokes (#230)", () => {
+  const pieces = {
+    status: "ok",
+    strokeCount: 2,
+    truncated: false,
+    hiddenStrokeCount: 1,
+    bounds: { x: 0, y: 0, width: 100, height: 2 },
+    strokes: [
+      {
+        inkType: "com.apple.ink.pen",
+        color: { red: 0, green: 0, blue: 0, alpha: 1 },
+        width: 2,
+        pointCount: 2,
+        bounds: { x: 0, y: -1, width: 35, height: 2 },
+        masked: true,
+        pointsTruncated: true,
+        points: [
+          { x: 0, y: 0, width: 2, opacity: 1, force: 1 },
+          { x: 35, y: 0, width: 2, opacity: 1, force: 1 },
+        ],
+      },
+    ],
+  };
+
+  it("passes the visible pieces, the erased count and per-stroke truncation through", () => {
+    const erased = Buffer.from("erased");
+    const [drawing] = getNoteDrawings(NOTE, {
+      format: "both",
+      deps: helperDeps({ [erased.toString("base64")]: pieces }),
+      readRows: () => [row(5, erased)],
+    }).drawings;
+    expect(drawing).toMatchObject({ status: "ok", strokeCount: 2, hiddenStrokeCount: 1 });
+    expect(drawing.strokes?.[0]).toMatchObject({ masked: true, pointsTruncated: true });
+    expect(
+      formatNoteDrawings({ id: NOTE, drawingCount: 1, status: "ok", drawings: [drawing] })
+    ).toContain("2 strokes (1 fully erased)");
+  });
+});
+
+describe("fitNoteDrawings", () => {
+  const decode = (format: "json" | "svg" | "both") =>
+    getNoteDrawings(NOTE, {
+      format,
+      deps: helperDeps(answers),
+      readRows: () => [row(20, good), row(21, good)],
+    });
+
+  it("leaves a result under the limit alone", () => {
+    const result = decode("both");
+    expect(fitNoteDrawings(result, 10_000_000)).toEqual({
+      result,
+      pointsOmitted: false,
+      svgOmitted: false,
+      oversized: false,
+    });
+  });
+
+  it("drops points first, then SVG, and reports a result that still cannot fit", () => {
+    const result = decode("both");
+    const withoutPoints = fitNoteDrawings(result, 10_000_000).result;
+    const noPointsSize = Buffer.byteLength(
+      JSON.stringify({
+        ...withoutPoints,
+        drawings: withoutPoints.drawings.map((d) => ({
+          ...d,
+          strokes: d.strokes?.map(({ points: _p, ...rest }) => rest),
+        })),
+      })
+    );
+    const pointsOnly = fitNoteDrawings(result, noPointsSize);
+    expect(pointsOnly).toMatchObject({ pointsOmitted: true, svgOmitted: false, oversized: false });
+    expect(pointsOnly.result.drawings[0].svg).toContain("<path ");
+    expect(pointsOnly.result.drawings[0].strokes?.[0]).not.toHaveProperty("points");
+
+    const svgToo = fitNoteDrawings(result, noPointsSize - 1);
+    expect(svgToo).toMatchObject({ pointsOmitted: true, svgOmitted: true });
+    expect(svgToo.result.drawings[0].svg).toBeUndefined();
+    expect(svgToo.result.drawings[0].strokeCount).toBe(3);
+
+    // svg-only output has no points to drop: the SVG goes, and a tiny limit is oversized.
+    const svgOnly = fitNoteDrawings(decode("svg"), 10);
+    expect(svgOnly).toMatchObject({ pointsOmitted: false, svgOmitted: true, oversized: true });
   });
 });

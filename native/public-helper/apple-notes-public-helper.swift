@@ -43,30 +43,51 @@ struct HelperFailure: Error {
     let message: String
 }
 
-func writeJSON(_ object: [String: Any]) {
+/// Writes one JSON line. Returns false when `object` could not be encoded and
+/// the `encode_failed` error was written in its place.
+@discardableResult
+func writeJSON(_ object: [String: Any]) -> Bool {
     let data: Data
+    var encodedObject = false
     if JSONSerialization.isValidJSONObject(object),
        let encoded = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) {
         data = encoded
+        encodedObject = true
     } else {
         data = Data(#"{"code":"encode_failed","message":"response was not JSON-encodable","status":"error"}"#.utf8)
     }
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data([0x0A]))
+    return encodedObject
 }
 
 func finish(_ object: [String: Any]) -> Never {
-    writeJSON(object)
-    exit(object["status"] as? String == "ok" ? 0 : 1)
+    // The exit status must agree with what was written: an ok response that
+    // could not be encoded went out as an error.
+    let written = writeJSON(object)
+    exit(written && object["status"] as? String == "ok" ? 0 : 1)
 }
 
 func fail(_ failure: HelperFailure) -> Never {
     finish(["status": "error", "code": failure.code, "message": failure.message])
 }
 
-/// Round to two decimals so large drawings stay compact on the wire.
+/// Round to two decimals so large drawings stay compact on the wire. A
+/// non-finite value (JSON cannot carry one) becomes 0.
 func rounded(_ value: CGFloat) -> Double {
-    (Double(value) * 100).rounded() / 100
+    value.isFinite ? (Double(value) * 100).rounded() / 100 : 0
+}
+
+/// A rectangle as JSON. PencilKit reports an empty drawing's bounds as
+/// CGRect.null (an infinite origin); that and any non-finite rectangle become zeros.
+func boundsObject(_ rect: CGRect) -> [String: Any] {
+    let finite = !rect.isNull && !rect.isInfinite
+        && [rect.origin.x, rect.origin.y, rect.size.width, rect.size.height].allSatisfy(\.isFinite)
+    let r = finite ? rect : .zero
+    return [
+        "x": rounded(r.origin.x), "y": rounded(r.origin.y),
+        "width": rounded(r.size.width), "height": rounded(r.size.height),
+    ]
 }
 
 // MARK: - Drawings
@@ -102,61 +123,92 @@ func decodeDrawing(_ request: [String: Any]) throws -> [String: Any] {
     var strokes: [[String: Any]] = []
     var pointBudget = maxPoints
     var truncated = false
-    for stroke in drawing.strokes {
-        if strokes.count >= maxStrokes || pointBudget <= 0 {
-            truncated = true
-            break
-        }
+    var hiddenStrokes = 0
+    strokeLoop: for stroke in drawing.strokes {
         let path = stroke.path
         let transform = stroke.transform
-        var points: [[String: Any]] = []
-        var widthSum: CGFloat = 0
-        var count = 0
-        for point in path {
-            count += 1
-            widthSum += point.size.width
-            if includePoints {
-                if pointBudget <= 0 {
-                    truncated = true
-                    break
-                }
-                pointBudget -= 1
-                let location = point.location.applying(transform)
-                points.append([
-                    "x": rounded(location.x),
-                    "y": rounded(location.y),
-                    "width": rounded(point.size.width),
-                    "opacity": rounded(point.opacity),
-                    "force": rounded(point.force),
-                ])
-            }
+        // PencilKit clips a stroke to its mask (the pixel eraser and the ruler
+        // set one) and reports the parametric ranges of the path inside it,
+        // which are the parts that render. Emit only those, one entry per
+        // range, so erased ink does not come back.
+        let masked = stroke.mask != nil
+        let ranges: [ClosedRange<CGFloat>] =
+            masked ? stroke.maskedPathRanges : [0...CGFloat(max(path.count - 1, 0))]
+        if masked && (ranges.isEmpty || path.count == 0) {
+            hiddenStrokes += 1
+            continue
         }
-        let bounds = stroke.renderBounds
-        var entry: [String: Any] = [
-            "inkType": stroke.ink.inkType.rawValue,
-            "color": rgba(stroke.ink.color),
-            "width": count > 0 ? rounded(widthSum / CGFloat(count)) : 0,
-            "pointCount": count,
-            "bounds": [
-                "x": rounded(bounds.origin.x), "y": rounded(bounds.origin.y),
-                "width": rounded(bounds.size.width), "height": rounded(bounds.size.height),
-            ],
-        ]
-        if includePoints { entry["points"] = points }
-        if !transform.isIdentity { entry["transformApplied"] = true }
-        strokes.append(entry)
+        for range in ranges {
+            if strokes.count >= maxStrokes || (includePoints && pointBudget <= 0) {
+                truncated = true
+                break strokeLoop
+            }
+            var samples: [PKStrokePoint] = []
+            if masked {
+                // The range's ends, interpolated, plus the control points inside it.
+                samples.append(path.interpolatedPoint(at: range.lowerBound))
+                let first = Int(range.lowerBound.rounded(.down)) + 1
+                let last = Int(range.upperBound.rounded(.up)) - 1
+                if first <= last { for index in first...last { samples.append(path[index]) } }
+                samples.append(path.interpolatedPoint(at: range.upperBound))
+            } else {
+                samples = Array(path)
+            }
+            var points: [[String: Any]] = []
+            var widthSum: CGFloat = 0
+            var count = 0
+            var pointsTruncated = false
+            var visible = CGRect.null
+            for point in samples {
+                if includePoints {
+                    if pointBudget <= 0 {
+                        truncated = true
+                        pointsTruncated = true
+                        break
+                    }
+                    pointBudget -= 1
+                }
+                // Counted only once the point is kept, so pointCount and width
+                // describe exactly the points returned.
+                count += 1
+                widthSum += point.size.width
+                let location = point.location.applying(transform)
+                let half = max(point.size.width, point.size.height) / 2
+                visible = visible.union(CGRect(x: location.x - half, y: location.y - half, width: half * 2, height: half * 2))
+                if includePoints {
+                    points.append([
+                        "x": rounded(location.x),
+                        "y": rounded(location.y),
+                        "width": rounded(point.size.width),
+                        "opacity": rounded(point.opacity),
+                        "force": rounded(point.force),
+                    ])
+                }
+            }
+            var entry: [String: Any] = [
+                "inkType": stroke.ink.inkType.rawValue,
+                "color": rgba(stroke.ink.color),
+                "width": count > 0 ? rounded(widthSum / CGFloat(count)) : 0,
+                "pointCount": count,
+                "bounds": boundsObject(masked ? visible : stroke.renderBounds),
+            ]
+            if includePoints { entry["points"] = points }
+            if !transform.isIdentity { entry["transformApplied"] = true }
+            if masked { entry["masked"] = true }
+            if pointsTruncated { entry["pointsTruncated"] = true }
+            strokes.append(entry)
+            if pointsTruncated { break strokeLoop }
+        }
     }
-    let bounds = drawing.bounds
-    return [
+    var response: [String: Any] = [
         "status": "ok",
         "strokeCount": drawing.strokes.count,
         "strokes": strokes,
         "truncated": truncated,
-        "bounds": [
-            "x": rounded(bounds.origin.x), "y": rounded(bounds.origin.y),
-            "width": rounded(bounds.size.width), "height": rounded(bounds.size.height),
-        ],
+        "bounds": boundsObject(drawing.bounds),
     ]
+    if hiddenStrokes > 0 { response["hiddenStrokeCount"] = hiddenStrokes }
+    return response
 }
 
 func inkType(named name: String) -> PKInk.InkType {

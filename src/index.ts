@@ -165,7 +165,7 @@ import {
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
-import { formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
+import { fitNoteDrawings, formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
 import {
   fitTranscriptions,
   formatTranscription,
@@ -4596,29 +4596,34 @@ registerTool(
       status: z.string().optional(),
       drawings: z.array(z.object({}).passthrough()).optional(),
       pointsOmitted: z.boolean().optional(),
+      svgOmitted: z.boolean().optional(),
     },
   },
   withErrorHandling(({ id, format, includePoints }) => {
-    let result = getNoteDrawings(id, { format, includePoints });
-    let pointsOmitted = false;
-    // Stroke points dominate the payload. Past the response budget, drop them
-    // (SVG and stroke summaries stay) rather than fail the whole read.
-    if (
-      Buffer.byteLength(JSON.stringify(result)) > exportMaxResponseBytes() &&
-      includePoints !== false &&
-      format !== "svg"
-    ) {
-      result = getNoteDrawings(id, { format, includePoints: false });
-      pointsOmitted = true;
-    }
+    // Past the response budget, drop stroke points and then SVG documents from
+    // the decoded result (no second helper run), and fail rather than send a
+    // response that is still too large.
+    const limit = exportMaxResponseBytes();
+    const { result, pointsOmitted, svgOmitted, oversized } = fitNoteDrawings(
+      getNoteDrawings(id, { format, includePoints }),
+      limit
+    );
+    if (oversized)
+      return errorResponse(
+        `The drawings in note "${id}" are too large to return even without stroke points and SVG (limit ${limit} bytes, APPLE_NOTES_MCP_EXPORT_MAX_BYTES).`
+      );
     const text =
       formatNoteDrawings(result) +
       (pointsOmitted
         ? "\nStroke points were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
+        : "") +
+      (svgOmitted
+        ? "\nSVG documents were omitted to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES)."
         : "");
     return successResponse(text, {
       ...result,
       ...(pointsOmitted ? { pointsOmitted } : {}),
+      ...(svgOmitted ? { svgOmitted } : {}),
     } as unknown as Record<string, unknown>);
   }, "Error reading drawings")
 );

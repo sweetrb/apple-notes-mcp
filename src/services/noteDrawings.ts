@@ -40,6 +40,8 @@ const strokeSchema = z
       )
       .optional(),
     transformApplied: z.boolean().optional(),
+    masked: z.boolean().optional(),
+    pointsTruncated: z.boolean().optional(),
   })
   .strip();
 
@@ -49,6 +51,7 @@ export const decodedDrawingSchema = z.object({
   strokes: z.array(strokeSchema),
   truncated: z.boolean(),
   bounds,
+  hiddenStrokeCount: z.number().int().optional(),
 });
 
 export type DrawingFormat = "json" | "svg" | "both";
@@ -100,6 +103,7 @@ function decodeRow(
     strokeCount: decoded.strokeCount,
     bounds: decoded.bounds,
     truncated: decoded.truncated,
+    ...(decoded.hiddenStrokeCount ? { hiddenStrokeCount: decoded.hiddenStrokeCount } : {}),
   };
   if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
   if (format !== "svg")
@@ -138,6 +142,47 @@ export function getNoteDrawings(
   };
 }
 
+/** What {@link fitNoteDrawings} had to drop to stay under the byte limit. */
+export interface FittedNoteDrawings {
+  result: NoteDrawingsResult;
+  pointsOmitted: boolean;
+  svgOmitted: boolean;
+  /** Still over the limit with points and SVG dropped. */
+  oversized: boolean;
+}
+
+/**
+ * Shrinks a decoded result to `maxBytes` without calling the helper again:
+ * first drop stroke points (the strokes' counts, colors and bounds stay), then
+ * the SVG documents. `oversized` means even that did not fit.
+ */
+export function fitNoteDrawings(
+  result: NoteDrawingsResult,
+  maxBytes: number,
+  measure: (r: NoteDrawingsResult) => number = (r) => Buffer.byteLength(JSON.stringify(r))
+): FittedNoteDrawings {
+  let next = result;
+  let pointsOmitted = false;
+  let svgOmitted = false;
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.strokes?.some((s) => s.points))) {
+    next = {
+      ...next,
+      drawings: next.drawings.map((d) =>
+        d.strokes ? { ...d, strokes: d.strokes.map(({ points: _points, ...rest }) => rest) } : d
+      ),
+    };
+    pointsOmitted = true;
+  }
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.svg !== undefined)) {
+    next = {
+      ...next,
+      drawings: next.drawings.map(({ svg: _svg, ...rest }) => rest),
+    };
+    svgOmitted = true;
+  }
+  return { result: next, pointsOmitted, svgOmitted, oversized: measure(next) > maxBytes };
+}
+
 /** Short human summary for the text content block (counts only, no SVG bodies). */
 export function formatNoteDrawings(result: NoteDrawingsResult): string {
   if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
@@ -147,7 +192,7 @@ export function formatNoteDrawings(result: NoteDrawingsResult): string {
   for (const d of result.drawings)
     lines.push(
       d.status === "ok"
-        ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.truncated ? " (truncated)" : ""}`
+        ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.hiddenStrokeCount ? ` (${d.hiddenStrokeCount} fully erased)` : ""}${d.truncated ? " (truncated)" : ""}`
         : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
     );
   return lines.join("\n");
