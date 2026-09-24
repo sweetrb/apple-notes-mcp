@@ -1,5 +1,34 @@
 ## [Unreleased]
 
+## [2.9.19] - 2026-09-24
+
+### Documentation
+
+- The bundled skill (`skills/apple-notes/SKILL.md` and its generated copies)
+  now matches the current tool set. Its tool tables list `append-native`,
+  `insert-note-link`, `set-note-pinned`, `get-folder-by-id`, `rename-folder`,
+  `create-table`, `create-checklist-item`, `get-native-objects`, and a Native
+  Tags group (`native-tags-status`, `add-native-tags`, `remove-native-tags`,
+  `replace-native-tag`), and `list-folders` mentions the `smartFolder` flag.
+- The skill no longer says `append-to-note` refuses notes with attachments. It
+  routes them, like other notes with native objects, to native end-append with
+  `scopeText`; only `update-note` refuses them. The skill now also names the
+  other reasons `update-note` refuses a note (`writable: false`: checklists,
+  native tags, and superscript, subscript, alignment, or highlight), explains
+  link preservation and `allowLinkChanges`, and says to start an HTML
+  `newContent` with the title line.
+- Formatting guidance adds rules for list items (one line of inline text, no
+  block elements, no empty items, no `<br>` to fake sub-items), plain-text
+  titles, text color, formatting that makes a note unwritable, `<blockquote>`,
+  and native tables. Formatting Limits now point to the Markdown route for
+  block quotes, highlights, and real headings, and say dashed lists have no
+  route. Verification notes that plain text shows neither list markers nor
+  table text and points to `get-note-blocks` and `get-note-tables`.
+- Error handling covers `create-note`'s "may have been created" result and
+  `update-note`'s readback mismatch: read the note instead of retrying.
+  The smart-folder refusal list now includes `create-note-with-attachment`
+  and `create-folder` paths.
+
 ## [2.9.18] - 2026-09-24
 
 ### Fixed
