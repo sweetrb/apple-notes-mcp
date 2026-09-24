@@ -26,6 +26,15 @@ const LEGACY_ENTITIES: Record<string, string> = {
 };
 
 /**
+ * A numeric character reference as text. Past U+10FFFF there is no character,
+ * and String.fromCodePoint would throw, turning a committed write into an
+ * error at verification; HTML decodes such a reference as U+FFFD, so do that.
+ */
+function codePointText(value: number): string {
+  return Number.isSafeInteger(value) && value <= 0x10ffff ? String.fromCodePoint(value) : "\ufffd";
+}
+
+/**
  * Reduce Notes HTML to the visible text that a person sees.
  *
  * Notes.app may rewrite equivalent HTML during a save. Comparing raw markup
@@ -67,8 +76,8 @@ export function comparableVisibleText(html: string): string {
         /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
         (_match, legacy: string | undefined, dec: string | undefined, hex: string | undefined) => {
           if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
-          if (dec) return String.fromCodePoint(Number(dec));
-          if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+          if (dec) return codePointText(Number(dec));
+          if (hex) return codePointText(Number.parseInt(hex, 16));
           return "'";
         }
       )

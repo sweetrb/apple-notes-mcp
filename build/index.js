@@ -48294,13 +48294,16 @@ var LEGACY_ENTITIES = {
   gt: ">",
   amp: "&"
 };
+function codePointText(value) {
+  return Number.isSafeInteger(value) && value <= 1114111 ? String.fromCodePoint(value) : "\uFFFD";
+}
 function comparableVisibleText(html) {
   return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(
     /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
     (_match, legacy, dec, hex3) => {
       if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
-      if (dec) return String.fromCodePoint(Number(dec));
-      if (hex3) return String.fromCodePoint(Number.parseInt(hex3, 16));
+      if (dec) return codePointText(Number(dec));
+      if (hex3) return codePointText(Number.parseInt(hex3, 16));
       return "'";
     }
   ).replace(/\s+/g, " ").trim();

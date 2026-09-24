@@ -16,6 +16,13 @@ describe("hashNoteContent", () => {
 });
 
 describe("comparableVisibleText", () => {
+  it("decodes out-of-range numeric references to U+FFFD instead of throwing (#211)", () => {
+    expect(
+      comparableVisibleText("<div>a&#1114112;b&#x110000;c&#99999999999999999999;d</div>")
+    ).toBe("a\ufffdb\ufffdc\ufffdd");
+    expect(comparableVisibleText("&#1114111;&#x41;")).toBe("\u{10ffff}A");
+  });
+
   it("treats Notes HTML rewrites with the same visible text as equivalent", () => {
     const submitted = "<div>Hello <b>safe</b> world</div>";
     const normalized = '<div><span style="font-weight: bold">Hello safe world</span><br></div>';
