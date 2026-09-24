@@ -175,6 +175,39 @@ describe("appendChecklistItems", () => {
       notAttempted: ["b"],
     });
   });
+
+  // #248 — a bridge refusal, or a Shortcut that exits with its own error, with
+  // the note unchanged is definitively not written, not uncertain.
+  it.each([
+    [
+      "refused",
+      Object.assign(new Error("refused the request without running it"), { refused: true }),
+    ],
+    [
+      "exited with an error",
+      Object.assign(new Error("Find Notes could not run"), { status: 1, signal: null }),
+    ],
+  ])("reports not-written when the bridge %s and the note is unchanged", (_label, failure) => {
+    const note = simulatedNote();
+    note.deps.run = vi.fn(() => {
+      throw failure;
+    });
+    const result = appendChecklistItems(
+      { id, expectedContentHash: note.snapshot().hash, scopeText, items: ["a", "b"] },
+      note.deps,
+      note.readRich
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      landed: [],
+      stoppedAt: {
+        index: 0,
+        outcome: "not-written",
+        error: expect.stringMatching(/nothing was written/),
+      },
+      notAttempted: ["b"],
+    });
+  });
 });
 
 describe("create-checklist-items schema", () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderMarkdown } from "../utils/appendMarkdown.js";
 import type { RichNote } from "../utils/noteRichText.js";
+import type { CodedError } from "../utils/errorCodes.js";
 import {
   assertPreserved,
   assertAppendedHtmlLinks,
@@ -8,6 +9,7 @@ import {
   assertMarkdownBlocks,
   DIVIDER_UTI,
   headingLevels,
+  BRIDGE_REFUSED,
   mutateBackground,
   validateAppendContent,
   type BackgroundSnapshot,
@@ -259,6 +261,105 @@ describe("background note mutation boundaries", () => {
     }
   });
 });
+describe("bridge refusal and failure reporting (#248)", () => {
+  const unchanged = () => {
+    const f = fixture();
+    f.after.hash = f.before.hash;
+    f.after.pinned = f.before.pinned;
+    return f;
+  };
+  const envelope = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (error) {
+      return { message: (error as Error).message, envelope: (error as CodedError).envelope };
+    }
+    throw new Error("expected a throw");
+  };
+  it("reports a bridge refusal with an unchanged note as not written, naming the reason", () => {
+    const f = unchanged();
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error(BRIDGE_REFUSED), {
+        refused: true,
+        shortcut: "Apple Notes MCP - Background Operations v5",
+      });
+    });
+    const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
+    expect(r.message).toMatch(
+      /^The "Apple Notes MCP - Background Operations v5" Shortcut refused the request without running it: its Find Notes step/
+    );
+    expect(r.message).toMatch(/nothing was written/);
+    expect(r.message).not.toMatch(/uncertain/);
+    expect(r.envelope).toEqual({
+      code: "operation_failed",
+      committed: false,
+      indeterminate: false,
+    });
+    expect(f.deps.run).toHaveBeenCalledTimes(1);
+  });
+  it("passes a Shortcut's own action error through as not written when the note is unchanged", () => {
+    const f = unchanged();
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("Command failed"), {
+        status: 1,
+        signal: null,
+        stderr: 'Error: The action "Find Notes" could not run because an unknown error occurred.',
+        shortcut: "Apple Notes MCP - Background Operations v5",
+      });
+    });
+    const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
+    expect(r.message).toMatch(/Shortcut failed: Error: The action "Find Notes" could not run/);
+    expect(r.envelope).toMatchObject({ committed: false, indeterminate: false });
+  });
+  it("reports a bridge that is not installed as never run, not uncertain", () => {
+    const f = unchanged();
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(
+        new Error(
+          'Install the supplied "Apple Notes MCP - Background Operations v5" Shortcut once; Shortcuts must list it exactly once'
+        ),
+        { notInstalled: true, shortcut: "Apple Notes MCP - Background Operations v5" }
+      );
+    });
+    const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
+    expect(r.message).toMatch(/^Install the supplied .*never ran, so nothing was written/);
+    expect(r.envelope).toEqual({
+      code: "shortcut_not_installed",
+      committed: false,
+      indeterminate: false,
+    });
+  });
+  it("keeps a timeout indeterminate even when the note is unchanged", () => {
+    const f = unchanged();
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error("spawnSync /usr/bin/shortcuts ETIMEDOUT"), {
+        code: "ETIMEDOUT",
+        signal: "SIGTERM",
+        status: null,
+      });
+    });
+    const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
+    expect(r.message).toMatch(/uncertain/);
+    expect(r.envelope).toBeUndefined();
+  });
+  it("keeps a failure indeterminate when the note did change", () => {
+    const f = fixture();
+    f.after.pinned = false;
+    f.deps.run.mockImplementation(() => {
+      throw Object.assign(new Error(BRIDGE_REFUSED), { refused: true });
+    });
+    expect(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps)).toThrow(
+      /uncertain/
+    );
+  });
+  it("keeps a clean exit with an unchanged note indeterminate", () => {
+    const f = unchanged();
+    expect(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps)).toThrow(
+      /uncertain/
+    );
+  });
+});
+
 describe("heading readback", () => {
   it("lists non-empty heading levels in order, skipping the empty heading Notes appends", () => {
     expect(

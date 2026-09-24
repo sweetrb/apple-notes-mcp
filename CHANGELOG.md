@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [2.9.19] - 2026-09-24
+
+### Fixed
+
+- `create-table`, `append-native`, `create-checklist-item(s)`,
+  `set-note-pinned` and the native-tag tools no longer report a Background
+  Operations Shortcut that ran nothing as an uncertain write (#248). The
+  Shortcut ends in `…_REFUSED` when its Find Notes step does not return
+  exactly one note with the exact title and scope text, and exits 0, so the
+  server ignored it and `create-table` said only "Native table cells not
+  verified" with `indeterminate: true`. The refusal is now read from the
+  Shortcut's output and named in the error, and a Shortcut that stops with its
+  own action error (for example "The action “Find Notes” could not run") is
+  passed through the same way. When either happens and the note reads back
+  unchanged, the result is `code: "operation_failed"`, `committed: false`,
+  `indeterminate: false`, so a caller knows a retry is safe;
+  `create-checklist-items` reports that item as `not-written`. A timeout, or a
+  failed readback on a note that did change, is still indeterminate.
+- The same tools no longer call a write "uncertain" when the Background
+  Operations Shortcut is not installed at all: the Shortcut never ran, so the
+  error is now `code: "shortcut_not_installed"`, `committed: false`,
+  `indeterminate: false`, instead of `verification_failed` with a
+  "Native table cells not verified" prefix (found while live-testing #248).
+
 ## [2.9.18] - 2026-09-24
 
 ### Fixed
@@ -43,7 +67,7 @@
   `alwaysAllow`, or `default`/`ask` with the `allowPasteAlert: true`
   argument (which lets macOS show its paste alert). Otherwise it reads nothing
   and returns `permission_denied` with `pasteboardCode:
-  "pasteboard_access_denied"` and the `accessBehavior`. `alwaysDeny` is never
+"pasteboard_access_denied"` and the `accessBehavior`. `alwaysDeny` is never
   overridden. macOS before 15.4 has no such property and reads as before.
 - The note is resolved and `expectedContentHash` checked (and a malformed
   `filename` refused) before the pasteboard is read, so an invalid request
@@ -156,7 +180,7 @@
   `create-folder` (any path segment) now refuse a destination that names only
   a smart folder with `Refused: "<path>" is a smart folder…` and
   `structuredContent` `{ code: "unsupported", committed: false, reason:
-  "smart_folder_destination" }`, before anything is written. An ordinary
+"smart_folder_destination" }`, before anything is written. An ordinary
   folder with the same name as a smart folder is still found. Smart folders
   are identified read-only from the NoteStore database with the
   `list-smart-folders` reader, so the guard needs Full Disk Access; without

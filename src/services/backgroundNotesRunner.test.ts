@@ -41,6 +41,22 @@ describe("background transport", () => {
     expect(path).not.toBe("");
     expect(existsSync(path)).toBe(false);
   });
+  // #248 — a bridge that ran nothing ends in "…_REFUSED" and exits 0.
+  it("turns a REFUSED bridge output into a refusal error, and accepts DONE", () => {
+    let output = "APPLE_NOTES_BACKGROUND_V5_REFUSED\n";
+    vi.mocked(execFileSync).mockImplementation((_file, args) =>
+      args?.[0] === "list" ? `${BACKGROUND_SHORTCUT} (${shortcutId})\n` : output
+    );
+    expect(() => runBackgroundShortcut({ operation: "append-html", text: "x" })).toThrow(
+      expect.objectContaining({
+        refused: true,
+        shortcut: BACKGROUND_SHORTCUT,
+        message: expect.stringMatching(/Find Notes step did not find exactly one note/),
+      })
+    );
+    output = "APPLE_NOTES_BACKGROUND_V5_DONE\n";
+    expect(() => runBackgroundShortcut({ operation: "append-html", text: "x" })).not.toThrow();
+  });
   it("refuses to run without an exact installed bridge, naming the Shortcut to install", () => {
     vi.mocked(execFileSync).mockReturnValue(`${BACKGROUND_SHORTCUT} copy (${shortcutId})\n`);
     expect(() => runBackgroundShortcut({ text: "hello" })).toThrow(
