@@ -57924,6 +57924,7 @@ var BUDGET_MARGIN_MS = 1e4;
 var MIN_TAKE_SECONDS = 5;
 var CALL_WIDE_CODES = /* @__PURE__ */ new Set([
   "permission_required",
+  "permission_not_requested",
   "asset_unavailable",
   "unsupported_locale",
   "speech_unavailable"
@@ -58084,24 +58085,29 @@ async function transcribeNoteAudio(noteId3, options = {}) {
 }
 function fitTranscriptions(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
   if (measure(result) <= maxBytes) return result;
+  const shorten = (share) => ({
+    ...result,
+    recordings: result.recordings.map(
+      (r) => r.transcript ? {
+        ...r,
+        transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
+        transcriptTruncated: true
+      } : r
+    )
+  });
   let next = result;
   for (let share = 0.5; measure(next) > maxBytes && share > 1e-4; share /= 2) {
-    next = {
-      ...result,
-      recordings: result.recordings.map(
-        (r) => r.transcript ? {
-          ...r,
-          transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
-          transcriptTruncated: true
-        } : r
-      )
-    };
+    next = shorten(share);
   }
+  if (measure(next) > maxBytes) next = { ...shorten(0), responseOversized: true };
   return next;
 }
 function formatTranscription(result) {
   if (result.recordingCount === 0) return `No audio attachments in note ${result.id}.`;
   const lines = [
+    ...result.responseOversized ? [
+      "The transcripts were dropped: even without them the response exceeds APPLE_NOTES_MCP_EXPORT_MAX_BYTES. Transcribe one recording at a time with attachmentId."
+    ] : [],
     `${result.recordingCount} audio attachment${result.recordingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}, locale ${result.locale}):`
   ];
   result.recordings.forEach((r, i) => {
@@ -61902,7 +61908,7 @@ registerTool(
 registerTool(
   "transcribe-note-audio",
   {
-    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
+    description: "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition; permission_not_requested (before macOS 26) means the host app has never asked for that access, so it is not listed there yet. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
     inputSchema: {
       id: noteIdInput,
       locale: external_exports.string().max(35).optional().describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
@@ -61920,11 +61926,13 @@ registerTool(
       locale: external_exports.string().optional(),
       status: external_exports.string().optional(),
       recordingCount: external_exports.number().optional(),
-      recordings: external_exports.array(external_exports.object({}).passthrough()).optional()
+      recordings: external_exports.array(external_exports.object({}).passthrough()).optional(),
+      responseOversized: external_exports.boolean().optional()
     }
   },
   withAsyncErrorHandling(async (params, signal) => {
     const { id: id2, locale, attachmentId, includeText, downloadAssets, maxSeconds } = params;
+    const toResponse = (r) => successResponse(formatTranscription(r), r);
     const result = fitTranscriptions(
       await transcribeNoteAudio(id2, {
         locale,
@@ -61934,12 +61942,10 @@ registerTool(
         maxSeconds,
         signal
       }),
-      exportMaxResponseBytes()
+      exportMaxResponseBytes(),
+      (r) => Buffer.byteLength(JSON.stringify(toResponse(r)))
     );
-    return successResponse(
-      formatTranscription(result),
-      result
-    );
+    return toResponse(result);
   }, "Error transcribing audio")
 );
 registerTool(

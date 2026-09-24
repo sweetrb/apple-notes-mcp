@@ -315,6 +315,13 @@ func permissionRequired(_ status: SFSpeechRecognizerAuthorizationStatus) -> Help
     let settings = "System Settings > Privacy & Security > Speech Recognition"
     let detail: String
     switch status {
+    case .notDetermined:
+        // Never requested: macOS lists an app under Speech Recognition only after
+        // it has asked, so "allow it in Settings" cannot be followed yet.
+        return HelperFailure(
+            code: "permission_not_requested",
+            message: "Speech Recognition access has never been requested by the app running this server, so it is not listed in \(settings) yet, and the server never shows the permission prompt. On-device transcription without a grant needs macOS 26 or later; on this macOS, run the server from an app that has already been granted Speech Recognition access."
+        )
     case .denied:
         detail = "Speech Recognition access was denied for the app running this server. Turn it on in \(settings), then try again."
     case .restricted:
@@ -352,7 +359,9 @@ func speechFailure(_ error: Error, requireGrant: Bool) -> HelperFailure {
 /// Makes sure the locale's on-device model is installed. A download starts only
 /// when the caller opted in: otherwise a missing model is `asset_unavailable` at once.
 @available(macOS 26, *)
-func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String, allowDownload: Bool) async throws {
+func ensureSpeechAssets(
+    _ transcriber: SpeechTranscriber, localeID: String, allowDownload: Bool, downloadSeconds: Double
+) async throws {
     switch await AssetInventory.status(forModules: [transcriber]) {
     case .installed:
         return
@@ -374,7 +383,11 @@ func ensureSpeechAssets(_ transcriber: SpeechTranscriber, localeID: String, allo
     guard let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
         return
     }
-    let outcome = await race(seconds: 90, work: { try await installation.downloadAndInstall() }, stop: {})
+    // The download counts against the take's deadline (the server kills the
+    // helper shortly after it), so it never gets more than what is left.
+    let outcome = await race(
+        seconds: min(90, downloadSeconds), work: { try await installation.downloadAndInstall() }, stop: {}
+    )
     switch outcome {
     case .completed:
         return
@@ -402,8 +415,21 @@ func transcribeWithAnalyzer(
     guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: localeID)) else {
         throw HelperFailure(code: "unsupported_locale", message: "No on-device transcription for \(localeID)")
     }
+    let started = Date()
     let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-    try await ensureSpeechAssets(transcriber, localeID: localeID, allowDownload: allowDownload)
+    try await ensureSpeechAssets(
+        transcriber, localeID: localeID, allowDownload: allowDownload, downloadSeconds: max(1, deadline - 5)
+    )
+    // Whatever the checks and a model download used comes off the analysis, so
+    // the helper still answers by its deadline with what it has.
+    let remaining = deadline - Date().timeIntervalSince(started)
+    if remaining < 1 {
+        return [
+            "status": "ok", "engine": "SpeechAnalyzer", "locale": locale.identifier(.bcp47),
+            "transcript": "", "complete": false,
+            "stopReason": "The speech model download used the time limit; it is installed now, so retry",
+        ]
+    }
     let analyzer = SpeechAnalyzer(modules: [transcriber])
     let collector = TranscriptCollector()
     let reader = Task {
@@ -413,7 +439,7 @@ func transcribeWithAnalyzer(
         }
     }
     let outcome = await race(
-        seconds: deadline,
+        seconds: remaining,
         work: {
             _ = try await analyzer.analyzeSequence(from: file)
             try await analyzer.finalizeAndFinishThroughEndOfInput()

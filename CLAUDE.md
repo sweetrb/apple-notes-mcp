@@ -392,7 +392,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Pass `locale` (BCP-47, default `en-US`) when the speech is not US English. Transcribe long recordings one at a time with `attachmentId`; clients may stop waiting after a fixed time.
 - Per-recording `status`: `ok`, `partial` (some text; `code: "incomplete"` or a failed take), `error` (with `code`), or `indeterminate` (the helper timed out; the outcome is unknown, so a retry may work). Overall `none` means the note has no audio.
 - `asset_unavailable` can mean the audio file has not downloaded from iCloud, or that the language's on-device speech model is not installed. The server never downloads a model on its own: ask the user before retrying with `downloadAssets: true`.
-- The server never shows a permission prompt. `permission_required` means the app hosting this server lacks Speech Recognition access; tell the user to allow it under System Settings > Privacy & Security > Speech Recognition rather than retrying.
+- The server never shows a permission prompt. `permission_required` means the app hosting this server lacks Speech Recognition access; tell the user to allow it under System Settings > Privacy & Security > Speech Recognition rather than retrying. `permission_not_requested` (before macOS 26 only) means the host app has never asked for that access, so it is not in that list yet; the user needs macOS 26 or a host app that already has the access.
+- `responseOversized: true` means the transcripts were dropped to fit the response size limit; transcribe one recording at a time with `attachmentId`.
 - `maxSeconds` (30 to 3600, default 900) caps the whole call; takes not started in time report `time_limit`, so transcribe the rest by `attachmentId`. Cancelling the request stops the helper.
 - Use `includeText: false` when only statuses and word counts are needed.
 

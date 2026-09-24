@@ -62,6 +62,7 @@ const MIN_TAKE_SECONDS = 5;
  */
 const CALL_WIDE_CODES: ReadonlySet<string> = new Set([
   "permission_required",
+  "permission_not_requested",
   "asset_unavailable",
   "unsupported_locale",
   "speech_unavailable",
@@ -296,7 +297,10 @@ export async function transcribeNoteAudio(
 
 /**
  * Shortens transcripts evenly until `measure` fits `maxBytes`, marking each
- * shortened recording. Counts and statuses are never changed.
+ * shortened recording. Counts and statuses are never changed. Pass a `measure`
+ * of the whole tool response: the transcripts travel in both the text and the
+ * structured content. When even empty transcripts do not fit, the transcripts
+ * are dropped and `responseOversized` is set, so the caller can tell.
  */
 export function fitTranscriptions(
   result: NoteTranscriptionResult,
@@ -304,21 +308,23 @@ export function fitTranscriptions(
   measure: (r: NoteTranscriptionResult) => number = (r) => Buffer.byteLength(JSON.stringify(r))
 ): NoteTranscriptionResult {
   if (measure(result) <= maxBytes) return result;
+  const shorten = (share: number): NoteTranscriptionResult => ({
+    ...result,
+    recordings: result.recordings.map((r) =>
+      r.transcript
+        ? {
+            ...r,
+            transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
+            transcriptTruncated: true,
+          }
+        : r
+    ),
+  });
   let next = result;
   for (let share = 0.5; measure(next) > maxBytes && share > 0.0001; share /= 2) {
-    next = {
-      ...result,
-      recordings: result.recordings.map((r) =>
-        r.transcript
-          ? {
-              ...r,
-              transcript: r.transcript.slice(0, Math.floor(r.transcript.length * share)),
-              transcriptTruncated: true,
-            }
-          : r
-      ),
-    };
+    next = shorten(share);
   }
+  if (measure(next) > maxBytes) next = { ...shorten(0), responseOversized: true };
   return next;
 }
 
@@ -326,6 +332,11 @@ export function fitTranscriptions(
 export function formatTranscription(result: NoteTranscriptionResult): string {
   if (result.recordingCount === 0) return `No audio attachments in note ${result.id}.`;
   const lines = [
+    ...(result.responseOversized
+      ? [
+          "The transcripts were dropped: even without them the response exceeds APPLE_NOTES_MCP_EXPORT_MAX_BYTES. Transcribe one recording at a time with attachmentId.",
+        ]
+      : []),
     `${result.recordingCount} audio attachment${result.recordingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}, locale ${result.locale}):`,
   ];
   result.recordings.forEach((r, i) => {

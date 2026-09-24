@@ -1013,6 +1013,8 @@ export interface NoteTranscriptionResult {
   status: TranscriptionStatus | "none";
   recordingCount: number;
   recordings: TranscribedRecording[];
+  /** Set when the response did not fit the size limit even with every transcript emptied. */
+  responseOversized?: boolean;
 }
 
 /** Result of get-note-drawings. */

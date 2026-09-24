@@ -404,6 +404,44 @@ describe("helpers", () => {
     expect(formatTranscription(fitted)).toContain("[truncated]");
   });
 
+  it("fits a measure that counts the transcript twice, and flags a response that cannot fit (#231)", async () => {
+    const result = await transcribeNoteAudio(NOTE, {
+      deps: helperDeps({ "/a": ok("word ".repeat(2000)) }),
+      readAssets: () => [asset(1, [{ path: "/a" }])],
+    });
+    // The tool sends the transcript in the text summary and in structuredContent.
+    const twice = (r: typeof result) =>
+      Buffer.byteLength(formatTranscription(r)) + Buffer.byteLength(JSON.stringify(r));
+    const fitted = fitTranscriptions(result, 6_000, twice);
+    expect(twice(fitted)).toBeLessThanOrEqual(6_000);
+    expect(fitted.responseOversized).toBeUndefined();
+    const hopeless = fitTranscriptions(result, 100, twice);
+    expect(hopeless.responseOversized).toBe(true);
+    expect(hopeless.recordings[0]).toMatchObject({ transcript: "", transcriptTruncated: true });
+    expect(hopeless.recordings[0].wordCount).toBe(2000);
+    expect(formatTranscription(hopeless)).toMatch(/transcripts were dropped/);
+  });
+
+  it("reuses permission_not_requested for every later take like permission_required", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const result = await transcribeNoteAudio(NOTE, {
+      deps: helperDeps(
+        {
+          "/a": { status: "error", code: "permission_not_requested", message: "never asked" },
+          "/b": ok("unused"),
+        },
+        true,
+        seen
+      ),
+      readAssets: () => [asset(1, [{ path: "/a" }]), asset(2, [{ path: "/b" }])],
+    });
+    expect(seen).toHaveLength(1);
+    expect(result.recordings.map((r) => r.code)).toEqual([
+      "permission_not_requested",
+      "permission_not_requested",
+    ]);
+  });
+
   it("formats an empty note", () => {
     expect(
       formatTranscription({

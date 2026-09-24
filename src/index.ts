@@ -44,7 +44,12 @@ import {
   SPECIAL_LIMIT,
 } from "@/utils/noteListings.js";
 import { NoteStoreError } from "@/utils/noteStoreSql.js";
-import type { DeleteGuardNote, FolderTreeNode, SpecialNoteKind } from "@/types.js";
+import type {
+  DeleteGuardNote,
+  FolderTreeNode,
+  NoteTranscriptionResult,
+  SpecialNoteKind,
+} from "@/types.js";
 import { folderTree, listRecentNotes, RECENT_LIMIT } from "@/utils/noteRecentList.js";
 import {
   exactIdArrayInput,
@@ -4624,7 +4629,7 @@ registerTool(
   "transcribe-note-audio",
   {
     description:
-      "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
+      "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition; permission_not_requested (before macOS 26) means the host app has never asked for that access, so it is not listed there yet. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
     inputSchema: {
       id: noteIdInput,
       locale: z
@@ -4663,10 +4668,15 @@ registerTool(
       status: z.string().optional(),
       recordingCount: z.number().optional(),
       recordings: z.array(z.object({}).passthrough()).optional(),
+      responseOversized: z.boolean().optional(),
     },
   },
   withAsyncErrorHandling(async (params, signal) => {
     const { id, locale, attachmentId, includeText, downloadAssets, maxSeconds } = params;
+    const toResponse = (r: NoteTranscriptionResult): ToolResponse =>
+      successResponse(formatTranscription(r), r as unknown as Record<string, unknown>);
+    // Measure the whole response: the transcripts appear in the text summary
+    // and again in structuredContent.
     const result = fitTranscriptions(
       await transcribeNoteAudio(id, {
         locale,
@@ -4676,12 +4686,10 @@ registerTool(
         maxSeconds,
         signal,
       }),
-      exportMaxResponseBytes()
+      exportMaxResponseBytes(),
+      (r) => Buffer.byteLength(JSON.stringify(toResponse(r)))
     );
-    return successResponse(
-      formatTranscription(result),
-      result as unknown as Record<string, unknown>
-    );
+    return toResponse(result);
   }, "Error transcribing audio")
 );
 
