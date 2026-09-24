@@ -62,11 +62,14 @@ import { resolveUpdateResponseTitle } from "@/utils/updateResponseTitle.js";
 import { resolveSearchLimit, describeSearchLimit } from "@/utils/searchLimit.js";
 import { describeSearchScope } from "@/utils/searchScope.js";
 import {
+  addWordCountsFromDatabase,
   contentSearchFailureHint,
   describeContentScan,
+  describeMatchDetails,
   searchContentViaDatabase,
   type ContentSearchSource,
   type SearchContentDbResult,
+  type SearchHit,
 } from "@/utils/searchContentDb.js";
 import { NoteQueryError } from "@/utils/noteQuery.js";
 import {
@@ -681,7 +684,7 @@ registerTool(
   "create-note",
   {
     description:
-      "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id — reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist — create-folder first (it is idempotent), since this tool does not create it.",
+      "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id — reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist — create-folder first (it is idempotent), since this tool does not create it. A smart folder is refused (code unsupported); it cannot hold notes.",
     inputSchema: {
       title: z.string().min(1, "Title is required").max(MAX.TITLE),
       content: z
@@ -874,7 +877,7 @@ registerTool(
   "search-notes",
   {
     description:
-      "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
+      "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript. When the note text came from the database, each result has matchedIn (title, body, or both); includeWordCount adds wordCount.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: z.string().min(1, "Search query is required").max(MAX.QUERY),
       searchContent: z
@@ -900,130 +903,161 @@ registerTool(
         .describe(
           "Maximum number of results to return. Defaults to 50 — a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
         ),
+      includeWordCount: z
+        .boolean()
+        .optional()
+        .describe(
+          "Add wordCount to each result (null when locked or unreadable). A database body search already has the text; otherwise the bodies are read in one batched read-only database query (needs Full Disk Access), which also adds matchedIn"
+        ),
     },
     outputSchema: {
       notes: z.array(z.object({}).passthrough()).optional(),
       count: z.number().optional(),
       source: z.enum(["database", "applescript"]).optional(),
       scanTruncated: z.boolean().optional(),
+      wordCountUnavailable: z.string().optional(),
     },
   },
-  withErrorHandling(({ query, searchContent = false, account, folder, modifiedSince, limit }) => {
-    // Default the result cap so a broad query returns useful results instead of a
-    // timeout error: search-notes reads several properties per match via AppleScript
-    // (~200ms/note), so an unbounded search over hundreds of matches exceeds the 30s
-    // budget (#100). The applied cap is disclosed below so truncation is visible.
-    const effectiveLimit = resolveSearchLimit(limit);
-    const limitWasDefault = limit === undefined;
+  withErrorHandling(
+    ({ query, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
+      // Default the result cap so a broad query returns useful results instead of a
+      // timeout error: search-notes reads several properties per match via AppleScript
+      // (~200ms/note), so an unbounded search over hundreds of matches exceeds the 30s
+      // budget (#100). The applied cap is disclosed below so truncation is visible.
+      const effectiveLimit = resolveSearchLimit(limit);
+      const limitWasDefault = limit === undefined;
 
-    // Body search: prefer the NoteStore database. AppleScript's `body contains`
-    // makes Notes.app scan every body before the limit applies, so a broad term
-    // times out even with the default cap (#100). Any database failure (no Full
-    // Disk Access, unknown schema) falls back to the AppleScript path.
-    let source: ContentSearchSource | undefined;
-    let dbScan: SearchContentDbResult["scan"] | undefined;
-    let dbUnavailable: NoteQueryStoreError["kind"] | undefined;
-    const runSearch = () => {
-      if (searchContent) {
+      // Body search: prefer the NoteStore database. AppleScript's `body contains`
+      // makes Notes.app scan every body before the limit applies, so a broad term
+      // times out even with the default cap (#100). Any database failure (no Full
+      // Disk Access, unknown schema) falls back to the AppleScript path.
+      let source: ContentSearchSource | undefined;
+      let dbScan: SearchContentDbResult["scan"] | undefined;
+      let dbUnavailable: NoteQueryStoreError["kind"] | undefined;
+      const runSearch = (): SearchHit[] => {
+        if (searchContent) {
+          try {
+            const db = searchContentViaDatabase({
+              query,
+              account: notesManager.searchAccountScope(account),
+              folder,
+              modifiedSince,
+              limit: effectiveLimit,
+              includeWordCount,
+            });
+            source = "database";
+            dbScan = db.scan;
+            return db.notes;
+          } catch (error) {
+            if (!(error instanceof NoteQueryStoreError)) throw error;
+            dbUnavailable = error.kind;
+          }
+          source = "applescript";
+        }
         try {
-          const db = searchContentViaDatabase({
+          return notesManager.searchNotes(
             query,
-            account: notesManager.searchAccountScope(account),
+            searchContent,
+            account,
             folder,
             modifiedSince,
-            limit: effectiveLimit,
-          });
-          source = "database";
-          dbScan = db.scan;
-          return db.notes;
+            effectiveLimit
+          );
         } catch (error) {
-          if (!(error instanceof NoteQueryStoreError)) throw error;
-          dbUnavailable = error.kind;
+          if (!searchContent || !(error instanceof Error)) throw error;
+          throw new Error(contentSearchFailureHint(error.message, dbUnavailable));
         }
-        source = "applescript";
+      };
+
+      // Use sync-aware wrapper for this read operation
+      const {
+        result: found,
+        syncBefore,
+        syncInterference,
+      } = withSyncAwarenessSync("search-notes", runSearch);
+
+      // A database body search already decoded the text (matchedIn and wordCount
+      // came with it). An AppleScript search did not, so word counts come from one
+      // batched read-only database query, never a per-note AppleScript call.
+      let notes = found;
+      let wordCountUnavailable: NoteQueryStoreError["kind"] | undefined;
+      if (includeWordCount && source !== "database" && found.length > 0) {
+        const enriched = addWordCountsFromDatabase(found, query);
+        notes = enriched.notes;
+        wordCountUnavailable = enriched.unavailable;
       }
-      try {
-        return notesManager.searchNotes(
-          query,
-          searchContent,
-          account,
-          folder,
-          modifiedSince,
-          effectiveLimit
-        );
-      } catch (error) {
-        if (!searchContent || !(error instanceof Error)) throw error;
-        throw new Error(contentSearchFailureHint(error.message, dbUnavailable));
-      }
-    };
+      const wordCountFields = wordCountUnavailable ? { wordCountUnavailable } : {};
+      const wordCountNote = wordCountUnavailable
+        ? `\n\nℹ️ Word counts were not added: ${
+            wordCountUnavailable === "no_fda"
+              ? "they are read from the Notes database, which needs Full Disk Access (run the doctor tool)"
+              : "the Notes database could not be read"
+          }.`
+        : "";
 
-    // Use sync-aware wrapper for this read operation
-    const {
-      result: notes,
-      syncBefore,
-      syncInterference,
-    } = withSyncAwarenessSync("search-notes", runSearch);
-
-    const searchType = searchContent
-      ? source === "database"
-        ? "content via the Notes database"
-        : "content"
-      : "titles";
-    const sourceFields = source ? { source } : {};
-    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
-    const scanNote = describeContentScan(dbScan);
-    const folderInfo = folder ? ` in folder "${folder}"` : "";
-    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const { info: limitInfo, truncationNote } = describeSearchLimit(
-      effectiveLimit,
-      limitWasDefault,
-      notes.length
-    );
-
-    // Build sync warning if needed
-    const syncWarnings: string[] = [];
-    if (syncBefore.syncDetected) {
-      syncWarnings.push(`⚠️ iCloud sync was active during search.`);
-    }
-    if (syncInterference) {
-      syncWarnings.push(`⚠️ Sync activity detected - results may be incomplete.`);
-    }
-    const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
-
-    if (notes.length === 0) {
-      // Disclose a title-only search on the empty result: bodies were never read, so a
-      // bare `{"notes":[],"count":0}` reads as "no such note exists" for a term that may
-      // appear in dozens of note bodies.
-      const scopeHint = describeSearchScope(searchContent, notes.length);
-      return successResponse(
-        `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
-        { notes: [], count: 0, ...sourceFields, ...scanFields }
+      const searchType = searchContent
+        ? source === "database"
+          ? "content via the Notes database"
+          : "content"
+        : "titles";
+      const sourceFields = source ? { source } : {};
+      const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+      const scanNote = describeContentScan(dbScan);
+      const folderInfo = folder ? ` in folder "${folder}"` : "";
+      const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+      const { info: limitInfo, truncationNote } = describeSearchLimit(
+        effectiveLimit,
+        limitWasDefault,
+        notes.length
       );
-    }
 
-    // Format each note with ID and folder info, highlighting Recently Deleted
-    const noteList = notes
-      .map((n) => {
-        const idSuffix = n.id ? ` [id: ${n.id}]` : "";
-        if (n.folder === "Recently Deleted") {
-          return `  - ${n.title} [DELETED]${idSuffix}`;
-        } else if (n.folder) {
-          return `  - ${n.title} (${n.folder})${idSuffix}`;
-        }
-        return `  - ${n.title}${idSuffix}`;
-      })
-      .join("\n");
-
-    return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${scanNote}${syncNote}`,
-      {
-        notes: withStableIdentifiers(notes, "ICNote"),
-        count: notes.length,
-        ...sourceFields,
-        ...scanFields,
+      // Build sync warning if needed
+      const syncWarnings: string[] = [];
+      if (syncBefore.syncDetected) {
+        syncWarnings.push(`⚠️ iCloud sync was active during search.`);
       }
-    );
-  }, "Error searching notes")
+      if (syncInterference) {
+        syncWarnings.push(`⚠️ Sync activity detected - results may be incomplete.`);
+      }
+      const syncNote = syncWarnings.length > 0 ? `\n\n${syncWarnings.join(" ")}` : "";
+
+      if (notes.length === 0) {
+        // Disclose a title-only search on the empty result: bodies were never read, so a
+        // bare `{"notes":[],"count":0}` reads as "no such note exists" for a term that may
+        // appear in dozens of note bodies.
+        const scopeHint = describeSearchScope(searchContent, notes.length);
+        return successResponse(
+          `No notes found matching "${query}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+          { notes: [], count: 0, ...sourceFields, ...scanFields }
+        );
+      }
+
+      // Format each note with ID and folder info, highlighting Recently Deleted
+      const noteList = notes
+        .map((n) => {
+          const idSuffix = `${n.id ? ` [id: ${n.id}]` : ""}${describeMatchDetails(n)}`;
+          if (n.folder === "Recently Deleted") {
+            return `  - ${n.title} [DELETED]${idSuffix}`;
+          } else if (n.folder) {
+            return `  - ${n.title} (${n.folder})${idSuffix}`;
+          }
+          return `  - ${n.title}${idSuffix}`;
+        })
+        .join("\n");
+
+      return successResponse(
+        `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):\n${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
+        {
+          notes: withStableIdentifiers(notes, "ICNote"),
+          count: notes.length,
+          ...sourceFields,
+          ...scanFields,
+          ...wordCountFields,
+        }
+      );
+    },
+    "Error searching notes"
+  )
 );
 
 // --- query-notes ---
@@ -1034,7 +1068,7 @@ registerTool(
     description:
       "Use when: finding notes with a boolean expression over text and metadata — e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\n" +
       'Syntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\n' +
-      "Returns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\n" +
+      "Returns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\n" +
       "Do not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\n" +
       "Safety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.",
     inputSchema: {
@@ -1069,6 +1103,12 @@ registerTool(
         .describe(
           "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
         ),
+      includeWordCount: z
+        .boolean()
+        .optional()
+        .describe(
+          "Add wordCount to each returned note (the count words: filters on; null when locked or unreadable). Free when the query reads bodies; a metadata-only query reads just the returned notes' bodies in one extra query (default false)"
+        ),
     },
     outputSchema: {
       notes: z.array(z.object({}).passthrough()).optional(),
@@ -1084,10 +1124,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true },
   },
-  withErrorHandling(({ query, limit, scanLimit, includeDeleted }) => {
+  withErrorHandling(({ query, limit, scanLimit, includeDeleted, includeWordCount }) => {
     let result: QueryNotesResult;
     try {
-      result = queryNotes(query, { limit, scanLimit, includeDeleted });
+      result = queryNotes(query, { limit, scanLimit, includeDeleted, includeWordCount });
     } catch (error) {
       if (error instanceof NoteQueryError || error instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -1122,7 +1162,7 @@ registerTool(
       .map((n) => {
         const where = [n.account, n.folder].filter(Boolean).join(" / ");
         const snippet = n.snippet ? `\n      ${n.snippet}` : "";
-        return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+        return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${describeMatchDetails(n)}${snippet}`;
       })
       .join("\n");
     return successResponse(
@@ -2716,7 +2756,7 @@ registerTool(
   "move-note",
   {
     description:
-      "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
+      "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist and cannot be a smart folder (refused with code unsupported before the move). Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
     inputSchema: {
       id: noteIdInput,
       folder: z.string().min(1, "Destination folder is required").max(MAX.FOLDER),
@@ -3018,7 +3058,7 @@ registerTool(
   "create-folder",
   {
     description:
-      "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nDo not use when: creating a note (create-note).",
+      "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nNote: a path segment that names a smart folder is refused (code unsupported) before anything is created; smart folders cannot hold folders.\nDo not use when: creating a note (create-note).",
     inputSchema: {
       name: z
         .string()
@@ -3597,7 +3637,7 @@ registerTool(
   "batch-move-notes",
   {
     description:
-      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
+      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
     inputSchema: {
       ids: noteIdArrayInput.describe(
         `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`

@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.12] - 2026-09-24
+## [2.9.15] - 2026-09-24
 
 ### Added
 
@@ -38,7 +38,76 @@
 ### Unchanged
 
 - `export-notes-markdown` without a template produces the same output as
-  2.9.11.
+  2.9.14.
+
+## [2.9.14] - 2026-09-24
+
+### Added
+
+- `search-notes` and `query-notes` results report `matchedIn`: `["title"]`,
+  `["body"]`, or `["title", "body"]`, saying where the search text occurs
+  (the body is the text after the first line). It is computed from note text
+  the search already decoded, with no extra AppleScript call. `query-notes`
+  looks for a `title:` term only in the title and a `body:` term only in the
+  body, and returns an empty list when a note matched only through a non-text
+  branch such as `pinned OR x`. The field is omitted when the text is not
+  available: locked or undecodable notes, queries without a text term, and
+  AppleScript searches without `includeWordCount`.
+- `includeWordCount` on `search-notes` and `query-notes` adds `wordCount` per
+  result (`null` for locked or unreadable notes), the same count the
+  `words:` filter uses. When a search did not already read bodies (an
+  AppleScript title or content search, or a metadata-only query), the
+  returned notes' bodies are read in one batched read-only database query.
+  For `search-notes` that read also adds `matchedIn`; without Full Disk
+  Access the results are unchanged and `wordCountUnavailable` says why.
+- The text output appends these details to each result line, for example
+  `· matched in title, body · 245 words`.
+
+## [2.9.13] - 2026-09-24
+
+### Fixed
+
+- Smart folders are refused as destinations. AppleScript resolves a smart
+  folder by name like any other folder and Notes.app accepts `move` and
+  `make` against it: `move-note` and `batch-move-notes` sent the note to
+  Recently Deleted while reporting that the folder may not exist, and
+  `create-note` stored the new note inside the smart folder, where no folder
+  shows it, while reporting failure. `create-note` (every route),
+  `create-note-with-attachment`, `move-note`, `batch-move-notes`, and
+  `create-folder` (any path segment) now refuse a destination that names only
+  a smart folder with `Refused: "<path>" is a smart folder…` and
+  `structuredContent` `{ code: "unsupported", committed: false, reason:
+  "smart_folder_destination" }`, before anything is written. An ordinary
+  folder with the same name as a smart folder is still found. Smart folders
+  are identified read-only from the NoteStore database with the
+  `list-smart-folders` reader, so the guard needs Full Disk Access; without
+  it, destinations resolve as before.
+
+## [2.9.12] - 2026-09-24
+
+### Fixed
+
+- A note holding a large image can be read and deleted again (#237). This
+  follows up #242, which explained the failure but left it in place. Notes.app
+  returns a body with each inline image embedded as base64, so a 40 MB TIFF
+  makes a body of about 110 MB. That exceeded the 64 MB AppleScript output cap,
+  and because Node stops osascript with the same signal it uses for a timeout,
+  `get-note-content` reported a 30-second timeout and retried. Body reads now
+  accept up to 512 MB (the longest string Node.js can hold).
+- `delete-note` and `batch-delete-notes` no longer refuse a note whose body is
+  over 5 MB. They embedded the reviewed body in their AppleScript, and a single
+  5 MB image already exceeds that limit. A longer body is now written to a
+  private temporary file (mode 0600 in a fresh directory, removed afterwards)
+  that the delete script reads, so the comparison before the delete still
+  covers the whole body, including a `guardNoteId` body. The `contentHash` of
+  every note is unchanged.
+- Output past the AppleScript output cap now fails at once with an error that
+  names the cap, instead of being reported as a timeout and retried. A body
+  read that still overflows is explained by #242's message as a size limit:
+  it names the note's large attachments and says that retrying or a longer
+  `timeoutSeconds` will not help, rather than suggesting a longer timeout.
+  `APPLE_NOTES_MCP_MAX_BUFFER` values past the longest string Node.js can hold
+  are clamped to it.
 
 ## [2.9.11] - 2026-09-23
 

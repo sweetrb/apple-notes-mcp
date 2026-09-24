@@ -649,18 +649,19 @@ export function createMarkdownNote(
     // moveNoteById needs an existing folder, so check before the bridge creates
     // anything.
     const wanted = segments(request.folder);
+    const accounts = manager.listAccounts().filter((account) => account.defaultFolder);
     if (
-      !manager
-        .listAccounts()
-        .some(
-          (account) =>
-            account.defaultFolder &&
-            manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
-        )
+      !accounts.some((account) =>
+        manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+      )
     )
       throw new Error(
         `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
       );
+    // The bridge creates before it moves, so refuse a smart folder now, while
+    // nothing exists yet, rather than at the move.
+    for (const account of accounts)
+      manager.assertNotSmartFolderDestination(request.folder, account.name);
   }
   const defaultFolderNotes = () =>
     new Map(

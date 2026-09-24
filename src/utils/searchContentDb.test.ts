@@ -13,9 +13,11 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { gzipSync } from "zlib";
 import {
+  addWordCountsFromDatabase,
   buildSearchContentQuery,
   contentSearchFailureHint,
   describeContentScan,
+  describeMatchDetails,
   searchContentViaDatabase,
 } from "./searchContentDb.js";
 import { NoteQueryStoreError } from "./noteQueryStore.js";
@@ -294,5 +296,106 @@ describe("contentSearchFailureHint", () => {
 
   it("omits the Full Disk Access remedy when the database failed for another reason", () => {
     expect(contentSearchFailureHint(timeout, "schema")).not.toContain("Full Disk Access");
+  });
+});
+
+describe("search match details from the database body search", () => {
+  const byPk = (options: Partial<Parameters<typeof searchContentViaDatabase>[0]> = {}) =>
+    new Map(search(options).notes.map((n) => [Number(n.id.split("/p")[1]), n]));
+
+  it("reports where the phrase occurs, from the text the search already decoded", () => {
+    const hits = byPk();
+    expect(hits.get(100)?.matchedIn).toEqual(["body"]);
+    expect(hits.get(101)?.matchedIn).toEqual(["title"]);
+    expect(hits.get(102)?.matchedIn).toEqual(["body"]);
+    expect(byPk({ query: "groceries" }).get(100)?.matchedIn).toEqual(["title"]);
+  });
+
+  it("adds wordCount only when asked", () => {
+    const plain = byPk().get(100);
+    expect(plain).toBeDefined();
+    expect(plain).not.toHaveProperty("wordCount");
+    const hits = byPk({ includeWordCount: true });
+    expect(hits.get(100)?.wordCount).toBe(6);
+    expect(hits.get(101)?.wordCount).toBe(4);
+  });
+});
+
+describe("addWordCountsFromDatabase", () => {
+  const note = (pk: number | string, title: string, store = UUID) => ({
+    id: typeof pk === "number" ? `x-coredata://${store}/ICNote/p${pk}` : pk,
+    title,
+    content: "",
+    tags: [],
+    created: new Date(0),
+    modified: new Date(0),
+  });
+
+  it("reads bodies in one batch and adds wordCount and matchedIn for the query", () => {
+    const { notes, unavailable } = addWordCountsFromDatabase(
+      [note(100, "Groceries"), note(101, "The Plan"), note(106, "Locked")],
+      "the",
+      { dbPath: db }
+    );
+    expect(unavailable).toBeUndefined();
+    expect(notes.map((n) => [n.wordCount, n.matchedIn])).toEqual([
+      [6, ["body"]],
+      [4, ["title"]],
+      [null, undefined],
+    ]);
+  });
+
+  it("gives null word counts to ids the store does not hold", () => {
+    const { notes } = addWordCountsFromDatabase(
+      [
+        note(999, "Gone"),
+        note(100, "Other store", "FFFFFFFF-0000-0000-0000-000000000000"),
+        note("not-a-coredata-id", "Odd"),
+      ],
+      "x",
+      { dbPath: db }
+    );
+    expect(notes.map((n) => n.wordCount)).toEqual([null, null, null]);
+    expect(notes.every((n) => n.matchedIn === undefined)).toBe(true);
+  });
+
+  it("leaves matchedIn out when the text does not contain the query as matched here", () => {
+    // AppleScript matched the note (for example ignoring diacritics), so the
+    // location is unknown rather than a metadata-only match.
+    const { notes } = addWordCountsFromDatabase([note(100, "Groceries")], "zzz-absent", {
+      dbPath: db,
+    });
+    expect(notes[0].wordCount).toBe(6);
+    expect(notes[0]).not.toHaveProperty("matchedIn");
+  });
+
+  it("reads more ids than one query allows in several batches", () => {
+    const many = Array.from({ length: 600 }, (_, i) => note(i + 1, `n${i}`));
+    const { notes } = addWordCountsFromDatabase(many, "the", { dbPath: db });
+    expect(notes).toHaveLength(600);
+    expect(notes[99].wordCount).toBe(6);
+    expect(notes[0].wordCount).toBeNull();
+  });
+
+  it("returns the notes unchanged with a reason when the database cannot be read", () => {
+    const input = [note(100, "Groceries")];
+    const result = addWordCountsFromDatabase(input, "the", {
+      dbPath: join(dir, "missing.sqlite"),
+    });
+    expect(result.unavailable).toBe("no_fda");
+    expect(result.notes).toBe(input);
+  });
+});
+
+describe("describeMatchDetails", () => {
+  it("renders locations and counts, and nothing when neither is present", () => {
+    expect(describeMatchDetails({})).toBe("");
+    expect(describeMatchDetails({ matchedIn: ["title", "body"], wordCount: 245 })).toBe(
+      " · matched in title, body · 245 words"
+    );
+    expect(describeMatchDetails({ matchedIn: [], wordCount: 1 })).toBe(
+      " · no text match (metadata) · 1 word"
+    );
+    expect(describeMatchDetails({ wordCount: null })).toBe(" · word count unavailable");
   });
 });

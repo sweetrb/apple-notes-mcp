@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants7) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants8);
+          this.rhs = optimizeExpr(this.rhs, names, constants7);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants7) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants8);
+        this.rhs = optimizeExpr(this.rhs, names, constants7);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants8) {
-        this.code = optimizeExpr(this.code, names, constants8);
+      optimizeNames(names, constants7) {
+        this.code = optimizeExpr(this.code, names, constants7);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants7) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants8))
+          if (n.optimizeNames(names, constants7))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants7) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        if (!(super.optimizeNames(names, constants8) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
+        if (!(super.optimizeNames(names, constants7) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants8);
+        this.condition = optimizeExpr(this.condition, names, constants7);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants7) {
+        if (!super.optimizeNames(names, constants7))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants8);
+        this.iteration = optimizeExpr(this.iteration, names, constants7);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants8) {
-        if (!super.optimizeNames(names, constants8))
+      optimizeNames(names, constants7) {
+        if (!super.optimizeNames(names, constants7))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants8);
+        this.iterable = optimizeExpr(this.iterable, names, constants7);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants8) {
+      optimizeNames(names, constants7) {
         var _a, _b;
-        super.optimizeNames(names, constants8);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
+        super.optimizeNames(names, constants7);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants7);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants7);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants8) {
+    function optimizeExpr(expr, names, constants7) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants8[n.str];
+        const c = constants7[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants7[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -1785,14 +1785,14 @@ var require_code2 = __commonJS({
     }
     exports.callValidateCode = callValidateCode;
     var newRegExp = (0, codegen_1._)`new RegExp`;
-    function usePattern({ gen, it: { opts } }, pattern2) {
+    function usePattern({ gen, it: { opts } }, pattern) {
       const u = opts.unicodeRegExp ? "u" : "";
       const { regExp } = opts.code;
-      const rx = regExp(pattern2, u);
+      const rx = regExp(pattern, u);
       return gen.scopeValue("pattern", {
         key: rx.toString(),
         ref: rx,
-        code: (0, codegen_1._)`${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern2}, ${u})`
+        code: (0, codegen_1._)`${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern}, ${u})`
       });
     }
     exports.usePattern = usePattern;
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve8.call(this, root, ref);
+      let _sch = resolve7.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve8(root, ref) {
+    function resolve7(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve8(baseURI, relativeURI, options) {
+    function resolve7(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -3876,49 +3876,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative5, options, skipNormalization) {
+    function resolveComponent(base, relative4, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse3(serialize(base, options), options);
-        relative5 = parse3(serialize(relative5, options), options);
+        relative4 = parse3(serialize(relative4, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative5.scheme) {
-        target.scheme = relative5.scheme;
-        target.userinfo = relative5.userinfo;
-        target.host = relative5.host;
-        target.port = relative5.port;
-        target.path = removeDotSegments(relative5.path || "");
-        target.query = relative5.query;
+      if (!options.tolerant && relative4.scheme) {
+        target.scheme = relative4.scheme;
+        target.userinfo = relative4.userinfo;
+        target.host = relative4.host;
+        target.port = relative4.port;
+        target.path = removeDotSegments(relative4.path || "");
+        target.query = relative4.query;
       } else {
-        if (relative5.userinfo !== void 0 || relative5.host !== void 0 || relative5.port !== void 0) {
-          target.userinfo = relative5.userinfo;
-          target.host = relative5.host;
-          target.port = relative5.port;
-          target.path = removeDotSegments(relative5.path || "");
-          target.query = relative5.query;
+        if (relative4.userinfo !== void 0 || relative4.host !== void 0 || relative4.port !== void 0) {
+          target.userinfo = relative4.userinfo;
+          target.host = relative4.host;
+          target.port = relative4.port;
+          target.path = removeDotSegments(relative4.path || "");
+          target.query = relative4.query;
         } else {
-          if (!relative5.path) {
+          if (!relative4.path) {
             target.path = base.path;
-            if (relative5.query !== void 0) {
-              target.query = relative5.query;
+            if (relative4.query !== void 0) {
+              target.query = relative4.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative5.path[0] === "/") {
-              target.path = removeDotSegments(relative5.path);
+            if (relative4.path[0] === "/") {
+              target.path = removeDotSegments(relative4.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative5.path;
+                target.path = "/" + relative4.path;
               } else if (!base.path) {
-                target.path = relative5.path;
+                target.path = relative4.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative5.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative4.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative5.query;
+            target.query = relative4.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -3926,7 +3926,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative5.fragment;
+      target.fragment = relative4.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve8,
+      resolve: resolve7,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants8 = {
+    var constants7 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants8) {
-      v = { value: constants8[c] };
+    for (c in constants7) {
+      v = { value: constants7[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -8184,7 +8184,7 @@ var require_Node = __commonJS({
         }
         return sum;
       } },
-      _ensureInsertValid: { value: function _ensureInsertValid(node, child2, isPreinsert) {
+      _ensureInsertValid: { value: function _ensureInsertValid(node, child, isPreinsert) {
         var parent = this, i, kid;
         if (!node.nodeType) throw new TypeError("not a node");
         switch (parent.nodeType) {
@@ -8196,8 +8196,8 @@ var require_Node = __commonJS({
             utils.HierarchyRequestError();
         }
         if (node.isAncestor(parent)) utils.HierarchyRequestError();
-        if (child2 !== null || !isPreinsert) {
-          if (child2.parentNode !== parent) utils.NotFoundError();
+        if (child !== null || !isPreinsert) {
+          if (child.parentNode !== parent) utils.NotFoundError();
         }
         switch (node.nodeType) {
           case DOCUMENT_FRAGMENT_NODE:
@@ -8222,10 +8222,10 @@ var require_Node = __commonJS({
                 case 0:
                   break;
                 case 1:
-                  if (child2 !== null) {
-                    if (isPreinsert && child2.nodeType === DOCUMENT_TYPE_NODE)
+                  if (child !== null) {
+                    if (isPreinsert && child.nodeType === DOCUMENT_TYPE_NODE)
                       utils.HierarchyRequestError();
-                    for (kid = child2.nextSibling; kid !== null; kid = kid.nextSibling) {
+                    for (kid = child.nextSibling; kid !== null; kid = kid.nextSibling) {
                       if (kid.nodeType === DOCUMENT_TYPE_NODE)
                         utils.HierarchyRequestError();
                     }
@@ -8235,7 +8235,7 @@ var require_Node = __commonJS({
                     if (i > 0)
                       utils.HierarchyRequestError();
                   } else {
-                    if (i > 1 || i === 1 && child2.nodeType !== ELEMENT_NODE)
+                    if (i > 1 || i === 1 && child.nodeType !== ELEMENT_NODE)
                       utils.HierarchyRequestError();
                   }
                   break;
@@ -8244,10 +8244,10 @@ var require_Node = __commonJS({
               }
               break;
             case ELEMENT_NODE:
-              if (child2 !== null) {
-                if (isPreinsert && child2.nodeType === DOCUMENT_TYPE_NODE)
+              if (child !== null) {
+                if (isPreinsert && child.nodeType === DOCUMENT_TYPE_NODE)
                   utils.HierarchyRequestError();
-                for (kid = child2.nextSibling; kid !== null; kid = kid.nextSibling) {
+                for (kid = child.nextSibling; kid !== null; kid = kid.nextSibling) {
                   if (kid.nodeType === DOCUMENT_TYPE_NODE)
                     utils.HierarchyRequestError();
                 }
@@ -8257,17 +8257,17 @@ var require_Node = __commonJS({
                 if (i > 0)
                   utils.HierarchyRequestError();
               } else {
-                if (i > 1 || i === 1 && child2.nodeType !== ELEMENT_NODE)
+                if (i > 1 || i === 1 && child.nodeType !== ELEMENT_NODE)
                   utils.HierarchyRequestError();
               }
               break;
             case DOCUMENT_TYPE_NODE:
-              if (child2 === null) {
+              if (child === null) {
                 if (parent._countChildrenOfType(ELEMENT_NODE))
                   utils.HierarchyRequestError();
               } else {
                 for (kid = parent.firstChild; kid !== null; kid = kid.nextSibling) {
-                  if (kid === child2) break;
+                  if (kid === child) break;
                   if (kid.nodeType === ELEMENT_NODE)
                     utils.HierarchyRequestError();
                 }
@@ -8277,7 +8277,7 @@ var require_Node = __commonJS({
                 if (i > 0)
                   utils.HierarchyRequestError();
               } else {
-                if (i > 1 || i === 1 && child2.nodeType !== DOCUMENT_TYPE_NODE)
+                if (i > 1 || i === 1 && child.nodeType !== DOCUMENT_TYPE_NODE)
                   utils.HierarchyRequestError();
               }
               break;
@@ -8286,10 +8286,10 @@ var require_Node = __commonJS({
           if (node.nodeType === DOCUMENT_TYPE_NODE) utils.HierarchyRequestError();
         }
       } },
-      insertBefore: { value: function insertBefore(node, child2) {
+      insertBefore: { value: function insertBefore(node, child) {
         var parent = this;
-        parent._ensureInsertValid(node, child2, true);
-        var refChild = child2;
+        parent._ensureInsertValid(node, child, true);
+        var refChild = child;
         if (refChild === node) {
           refChild = node.nextSibling;
         }
@@ -8297,28 +8297,28 @@ var require_Node = __commonJS({
         node._insertOrReplace(parent, refChild, false);
         return node;
       } },
-      appendChild: { value: function(child2) {
-        return this.insertBefore(child2, null);
+      appendChild: { value: function(child) {
+        return this.insertBefore(child, null);
       } },
-      _appendChild: { value: function(child2) {
-        child2._insertOrReplace(this, null, false);
+      _appendChild: { value: function(child) {
+        child._insertOrReplace(this, null, false);
       } },
-      removeChild: { value: function removeChild(child2) {
+      removeChild: { value: function removeChild(child) {
         var parent = this;
-        if (!child2.nodeType) throw new TypeError("not a node");
-        if (child2.parentNode !== parent) utils.NotFoundError();
-        child2.remove();
-        return child2;
+        if (!child.nodeType) throw new TypeError("not a node");
+        if (child.parentNode !== parent) utils.NotFoundError();
+        child.remove();
+        return child;
       } },
       // To replace a `child` with `node` within a `parent` (this)
-      replaceChild: { value: function replaceChild(node, child2) {
+      replaceChild: { value: function replaceChild(node, child) {
         var parent = this;
-        parent._ensureInsertValid(node, child2, false);
+        parent._ensureInsertValid(node, child, false);
         if (node.doc !== parent.doc) {
           parent.doc.adoptNode(node);
         }
-        node._insertOrReplace(parent, child2, true);
-        return child2;
+        node._insertOrReplace(parent, child, true);
+        return child;
       } },
       // See: http://ejohn.org/blog/comparing-document-position/
       contains: { value: function contains(node) {
@@ -8474,14 +8474,14 @@ var require_Node = __commonJS({
       // or replace the specified child with this node, firing mutation events as
       // necessary
       _insertOrReplace: { value: function _insertOrReplace(parent, before, isReplace) {
-        var child2 = this, before_index, i;
-        if (child2.nodeType === DOCUMENT_FRAGMENT_NODE && child2.rooted) {
+        var child = this, before_index, i;
+        if (child.nodeType === DOCUMENT_FRAGMENT_NODE && child.rooted) {
           utils.HierarchyRequestError();
         }
         if (parent._childNodes) {
           before_index = before === null ? parent._childNodes.length : before.index;
-          if (child2.parentNode === parent) {
-            var child_index = child2.index;
+          if (child.parentNode === parent) {
+            var child_index = child.index;
             if (child_index < before_index) {
               before_index--;
             }
@@ -8495,10 +8495,10 @@ var require_Node = __commonJS({
         if (n === null) {
           n = parent.firstChild;
         }
-        var bothRooted = child2.rooted && parent.rooted;
-        if (child2.nodeType === DOCUMENT_FRAGMENT_NODE) {
+        var bothRooted = child.rooted && parent.rooted;
+        if (child.nodeType === DOCUMENT_FRAGMENT_NODE) {
           var spliceArgs = [0, isReplace ? 1 : 0], next;
-          for (var kid = child2.firstChild; kid !== null; kid = next) {
+          for (var kid = child.firstChild; kid !== null; kid = next) {
             next = kid.nextSibling;
             spliceArgs.push(kid);
             kid.parentNode = parent;
@@ -8522,10 +8522,10 @@ var require_Node = __commonJS({
               parent._firstChild = null;
             }
           }
-          if (child2._childNodes) {
-            child2._childNodes.length = 0;
+          if (child._childNodes) {
+            child._childNodes.length = 0;
           } else {
-            child2._firstChild = null;
+            child._firstChild = null;
           }
           if (parent.rooted) {
             parent.modify();
@@ -8534,40 +8534,40 @@ var require_Node = __commonJS({
             }
           }
         } else {
-          if (before === child2) {
+          if (before === child) {
             return;
           }
           if (bothRooted) {
-            child2._remove();
-          } else if (child2.parentNode) {
-            child2.remove();
+            child._remove();
+          } else if (child.parentNode) {
+            child.remove();
           }
-          child2.parentNode = parent;
+          child.parentNode = parent;
           if (isReplace) {
-            LinkedList.replace(n, child2);
+            LinkedList.replace(n, child);
             if (parent._childNodes) {
-              child2._index = before_index;
-              parent._childNodes[before_index] = child2;
+              child._index = before_index;
+              parent._childNodes[before_index] = child;
             } else if (parent._firstChild === before) {
-              parent._firstChild = child2;
+              parent._firstChild = child;
             }
           } else {
             if (n !== null) {
-              LinkedList.insertBefore(child2, n);
+              LinkedList.insertBefore(child, n);
             }
             if (parent._childNodes) {
-              child2._index = before_index;
-              parent._childNodes.splice(before_index, 0, child2);
+              child._index = before_index;
+              parent._childNodes.splice(before_index, 0, child);
             } else if (parent._firstChild === before) {
-              parent._firstChild = child2;
+              parent._firstChild = child;
             }
           }
           if (bothRooted) {
             parent.modify();
-            parent.doc.mutateMove(child2);
+            parent.doc.mutateMove(child);
           } else if (parent.rooted) {
             parent.modify();
-            parent.doc.mutateInsert(child2);
+            parent.doc.mutateInsert(child);
           }
         }
       } },
@@ -8615,24 +8615,24 @@ var require_Node = __commonJS({
       } },
       normalize: { value: function() {
         var next;
-        for (var child2 = this.firstChild; child2 !== null; child2 = next) {
-          next = child2.nextSibling;
-          if (child2.normalize) {
-            child2.normalize();
+        for (var child = this.firstChild; child !== null; child = next) {
+          next = child.nextSibling;
+          if (child.normalize) {
+            child.normalize();
           }
-          if (child2.nodeType !== Node.TEXT_NODE) {
+          if (child.nodeType !== Node.TEXT_NODE) {
             continue;
           }
-          if (child2.nodeValue === "") {
-            this.removeChild(child2);
+          if (child.nodeValue === "") {
+            this.removeChild(child);
             continue;
           }
-          var prevChild = child2.previousSibling;
+          var prevChild = child.previousSibling;
           if (prevChild === null) {
             continue;
           } else if (prevChild.nodeType === Node.TEXT_NODE) {
-            prevChild.appendData(child2.nodeValue);
-            this.removeChild(child2);
+            prevChild.appendData(child.nodeValue);
+            this.removeChild(child);
           }
         }
       } },
@@ -9247,7 +9247,7 @@ var require_select = __commonJS({
       while ((el = el.previousSibling) && el.nodeType !== 1) ;
       return el;
     };
-    var child2 = function(el) {
+    var child = function(el) {
       if (el = el.firstChild) {
         while (el.nodeType !== 1 && (el = el.nextSibling)) ;
       }
@@ -9348,7 +9348,7 @@ var require_select = __commonJS({
       };
     };
     var nth = function(param_, test, last) {
-      var param = parseNth(param_), group = param.group, offset = param.offset, find2 = !last ? child2 : lastChild, advance = !last ? next : prev;
+      var param = parseNth(param_), group = param.group, offset = param.offset, find2 = !last ? child : lastChild, advance = !last ? next : prev;
       return function(el) {
         if (!parentIsElement(el)) return;
         var rel = find2(el.parentNode), pos = 0;
@@ -11181,11 +11181,11 @@ var require_Leaf = __commonJS({
       } },
       firstChild: { value: null },
       lastChild: { value: null },
-      insertBefore: { value: function(node, child2) {
+      insertBefore: { value: function(node, child) {
         if (!node.nodeType) throw new TypeError("not a node");
         HierarchyRequestError();
       } },
-      replaceChild: { value: function(node, child2) {
+      replaceChild: { value: function(node, child) {
         if (!node.nodeType) throw new TypeError("not a node");
         HierarchyRequestError();
       } },
@@ -11676,7 +11676,7 @@ var require_TreeWalker = __commonJS({
       previous: "previousSibling"
     };
     function traverseChildren(tw, type) {
-      var child2, node, parent, result, sibling;
+      var child, node, parent, result, sibling;
       node = tw._currentNode[mapChild[type]];
       while (node !== null) {
         result = tw._internalFilter(node);
@@ -11685,9 +11685,9 @@ var require_TreeWalker = __commonJS({
           return node;
         }
         if (result === NodeFilter.FILTER_SKIP) {
-          child2 = node[mapChild[type]];
-          if (child2 !== null) {
-            node = child2;
+          child = node[mapChild[type]];
+          if (child !== null) {
+            node = child;
             continue;
           }
         }
@@ -12184,9 +12184,9 @@ var require_URL = __commonJS({
       },
       // See: http://tools.ietf.org/html/rfc3986#section-5.2
       // and https://url.spec.whatwg.org/#constructors
-      resolve: function(relative5) {
+      resolve: function(relative4) {
         var base = this;
-        var r = new URL2(relative5);
+        var r = new URL2(relative4);
         var t = new URL2();
         if (r.scheme !== void 0) {
           t.scheme = r.scheme;
@@ -12220,7 +12220,7 @@ var require_URL = __commonJS({
               if (r.path.charAt(0) === "/") {
                 t.path = remove_dot_segments(r.path);
               } else {
-                t.path = merge3(base.path, r.path);
+                t.path = merge2(base.path, r.path);
                 t.path = remove_dot_segments(t.path);
               }
               t.query = r.query;
@@ -12229,7 +12229,7 @@ var require_URL = __commonJS({
         }
         t.fragment = r.fragment;
         return t.toString();
-        function merge3(basepath, refpath) {
+        function merge2(basepath, refpath) {
           if (base.host !== void 0 && !base.path)
             return "/" + refpath;
           var lastslash = basepath.lastIndexOf("/");
@@ -13867,9 +13867,9 @@ var require_htmlelts = __commonJS({
           get: function() {
             var s = "";
             for (var i = 0, n = this.childNodes.length; i < n; i++) {
-              var child2 = this.childNodes[i];
-              if (child2.nodeType === Node.TEXT_NODE)
-                s += child2._data;
+              var child = this.childNodes[i];
+              if (child.nodeType === Node.TEXT_NODE)
+                s += child._data;
             }
             return s;
           },
@@ -14830,20 +14830,20 @@ var require_Document = __commonJS({
             this.documentElement = kid;
         }
       } },
-      insertBefore: { value: function insertBefore(child2, refChild) {
-        Node.prototype.insertBefore.call(this, child2, refChild);
+      insertBefore: { value: function insertBefore(child, refChild) {
+        Node.prototype.insertBefore.call(this, child, refChild);
         this._updateDocTypeElement();
-        return child2;
+        return child;
       } },
-      replaceChild: { value: function replaceChild(node, child2) {
-        Node.prototype.replaceChild.call(this, node, child2);
+      replaceChild: { value: function replaceChild(node, child) {
+        Node.prototype.replaceChild.call(this, node, child);
         this._updateDocTypeElement();
-        return child2;
+        return child;
       } },
-      removeChild: { value: function removeChild(child2) {
-        Node.prototype.removeChild.call(this, child2);
+      removeChild: { value: function removeChild(child) {
+        Node.prototype.removeChild.call(this, child);
         this._updateDocTypeElement();
-        return child2;
+        return child;
       } },
       getElementById: { value: function(id2) {
         var n = this.byId[id2];
@@ -18469,7 +18469,7 @@ var require_HTMLParser = __commonJS({
         }
       }
       function scanChars(shouldPauseFunc) {
-        var codepoint, s, pattern2, eof;
+        var codepoint, s, pattern, eof;
         while (nextchar < numchars) {
           if (paused > 0 || shouldPauseFunc && shouldPauseFunc()) {
             return true;
@@ -18530,10 +18530,10 @@ var require_HTMLParser = __commonJS({
               break;
             case "string":
               codepoint = chars.charCodeAt(nextchar);
-              pattern2 = tokenizer.lookahead;
-              var pos = chars.indexOf(pattern2, nextchar);
+              pattern = tokenizer.lookahead;
+              var pos = chars.indexOf(pattern, nextchar);
               if (pos !== -1) {
-                s = chars.substring(nextchar, pos + pattern2.length);
+                s = chars.substring(nextchar, pos + pattern.length);
                 eof = false;
               } else {
                 if (!input_complete) return true;
@@ -18641,9 +18641,9 @@ var require_HTMLParser = __commonJS({
         }
         ignore_linefeed = false;
       }
-      function getMatchingChars(pattern2) {
-        pattern2.lastIndex = nextchar - 1;
-        var match = pattern2.exec(chars);
+      function getMatchingChars(pattern) {
+        pattern.lastIndex = nextchar - 1;
+        var match = pattern.exec(chars);
         if (match && match.index === nextchar - 1) {
           match = match[0];
           nextchar += match.length - 1;
@@ -18656,9 +18656,9 @@ var require_HTMLParser = __commonJS({
           throw new Error("should never happen");
         }
       }
-      function emitCharsWhile(pattern2) {
-        pattern2.lastIndex = nextchar - 1;
-        var match = pattern2.exec(chars)[0];
+      function emitCharsWhile(pattern) {
+        pattern.lastIndex = nextchar - 1;
+        var match = pattern.exec(chars)[0];
         if (!match) return false;
         emitCharString(match);
         nextchar += match.length - 1;
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join29(output, replacement);
+        return join28(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join29(output, rule.append(self.options));
+          output = join28(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join29(output, replacement) {
+    function join28(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -29618,12 +29618,12 @@ var $ZodCheckUpperCase = /* @__PURE__ */ $constructor("$ZodCheckUpperCase", (ins
 var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst, def) => {
   $ZodCheck.init(inst, def);
   const escapedRegex = escapeRegex(def.includes);
-  const pattern2 = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
-  def.pattern = pattern2;
+  const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
+  def.pattern = pattern;
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern2);
+    bag.patterns.add(pattern);
   });
   inst._zod.check = (payload) => {
     if (payload.value.includes(def.includes, def.position))
@@ -29641,12 +29641,12 @@ var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst,
 });
 var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern2 = new RegExp(`^${escapeRegex(def.prefix)}.*`);
-  def.pattern ?? (def.pattern = pattern2);
+  const pattern = new RegExp(`^${escapeRegex(def.prefix)}.*`);
+  def.pattern ?? (def.pattern = pattern);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern2);
+    bag.patterns.add(pattern);
   });
   inst._zod.check = (payload) => {
     if (payload.value.startsWith(def.prefix))
@@ -29664,12 +29664,12 @@ var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (i
 });
 var $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern2 = new RegExp(`.*${escapeRegex(def.suffix)}$`);
-  def.pattern ?? (def.pattern = pattern2);
+  const pattern = new RegExp(`.*${escapeRegex(def.suffix)}$`);
+  def.pattern ?? (def.pattern = pattern);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern2);
+    bag.patterns.add(pattern);
   });
   inst._zod.check = (payload) => {
     if (payload.value.endsWith(def.suffix))
@@ -30351,7 +30351,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject3 = isObject;
+  const isObject2 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -30360,7 +30360,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject3(input)) {
+    if (!isObject2(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -30777,8 +30777,8 @@ var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, void 0]) : void 0;
   });
   defineLazy(inst._zod, "pattern", () => {
-    const pattern2 = def.innerType._zod.pattern;
-    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)})?$`) : void 0;
+    const pattern = def.innerType._zod.pattern;
+    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : void 0;
   });
   inst._zod.parse = (payload, ctx) => {
     if (def.innerType._zod.optin === "optional") {
@@ -30795,8 +30795,8 @@ var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
   defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
   defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
   defineLazy(inst._zod, "pattern", () => {
-    const pattern2 = def.innerType._zod.pattern;
-    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)}|null)$`) : void 0;
+    const pattern = def.innerType._zod.pattern;
+    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)}|null)$`) : void 0;
   });
   defineLazy(inst._zod, "values", () => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, null]) : void 0;
@@ -31483,12 +31483,12 @@ function _length(length, params) {
     length
   });
 }
-function _regex(pattern2, params) {
+function _regex(pattern, params) {
   return new $ZodCheckRegex({
     check: "string_format",
     format: "regex",
     ...normalizeParams(params),
-    pattern: pattern2
+    pattern
   });
 }
 function _lowercase(params) {
@@ -31997,11 +31997,11 @@ var JSONSchemaGenerator = class {
           }
           case "template_literal": {
             const json2 = _json;
-            const pattern2 = schema._zod.pattern;
-            if (!pattern2)
+            const pattern = schema._zod.pattern;
+            if (!pattern)
               throw new Error("Pattern not found in template literal");
             json2.type = "string";
-            json2.pattern = pattern2.source;
+            json2.pattern = pattern.source;
             break;
           }
           case "pipe": {
@@ -35368,13 +35368,13 @@ function stringifyRegExpWithFlags(regex, refs) {
     // `.` matches newlines
   };
   const source = flags.i ? regex.source.toLowerCase() : regex.source;
-  let pattern2 = "";
+  let pattern = "";
   let isEscaped = false;
   let inCharGroup = false;
   let inCharRange = false;
   for (let i = 0; i < source.length; i++) {
     if (isEscaped) {
-      pattern2 += source[i];
+      pattern += source[i];
       isEscaped = false;
       continue;
     }
@@ -35382,40 +35382,40 @@ function stringifyRegExpWithFlags(regex, refs) {
       if (inCharGroup) {
         if (source[i].match(/[a-z]/)) {
           if (inCharRange) {
-            pattern2 += source[i];
-            pattern2 += `${source[i - 2]}-${source[i]}`.toUpperCase();
+            pattern += source[i];
+            pattern += `${source[i - 2]}-${source[i]}`.toUpperCase();
             inCharRange = false;
           } else if (source[i + 1] === "-" && source[i + 2]?.match(/[a-z]/)) {
-            pattern2 += source[i];
+            pattern += source[i];
             inCharRange = true;
           } else {
-            pattern2 += `${source[i]}${source[i].toUpperCase()}`;
+            pattern += `${source[i]}${source[i].toUpperCase()}`;
           }
           continue;
         }
       } else if (source[i].match(/[a-z]/)) {
-        pattern2 += `[${source[i]}${source[i].toUpperCase()}]`;
+        pattern += `[${source[i]}${source[i].toUpperCase()}]`;
         continue;
       }
     }
     if (flags.m) {
       if (source[i] === "^") {
-        pattern2 += `(^|(?<=[\r
+        pattern += `(^|(?<=[\r
 ]))`;
         continue;
       } else if (source[i] === "$") {
-        pattern2 += `($|(?=[\r
+        pattern += `($|(?=[\r
 ]))`;
         continue;
       }
     }
     if (flags.s && source[i] === ".") {
-      pattern2 += inCharGroup ? `${source[i]}\r
+      pattern += inCharGroup ? `${source[i]}\r
 ` : `[${source[i]}\r
 ]`;
       continue;
     }
-    pattern2 += source[i];
+    pattern += source[i];
     if (source[i] === "\\") {
       isEscaped = true;
     } else if (inCharGroup && source[i] === "]") {
@@ -35425,12 +35425,12 @@ function stringifyRegExpWithFlags(regex, refs) {
     }
   }
   try {
-    new RegExp(pattern2);
+    new RegExp(pattern);
   } catch {
     console.warn(`Could not convert regex pattern at ${refs.currentPath.join("/")} to a flag-independent form! Falling back to the flag-ignorant source`);
     return regex.source;
   }
-  return pattern2;
+  return pattern;
 }
 
 // node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@3.25.76/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
+        await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve8, reject) => {
+    return new Promise((resolve7, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve8(parseResult.data);
+            resolve7(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve8, reject) => {
+    return new Promise((resolve7, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve8, interval);
+      const timeoutId = setTimeout(resolve7, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -37927,46 +37927,46 @@ var UriTemplate = class _UriTemplate {
       }
       return patterns;
     }
-    let pattern2;
+    let pattern;
     const name = part.name;
     switch (part.operator) {
       case "":
-        pattern2 = part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)";
+        pattern = part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)";
         break;
       case "+":
       case "#":
-        pattern2 = "(.+)";
+        pattern = "(.+)";
         break;
       case ".":
-        pattern2 = "\\.([^/,]+)";
+        pattern = "\\.([^/,]+)";
         break;
       case "/":
-        pattern2 = "/" + (part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)");
+        pattern = "/" + (part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)");
         break;
       default:
-        pattern2 = "([^/]+)";
+        pattern = "([^/]+)";
     }
-    patterns.push({ pattern: pattern2, name });
+    patterns.push({ pattern, name });
     return patterns;
   }
   match(uri) {
     _UriTemplate.validateLength(uri, MAX_TEMPLATE_LENGTH, "URI");
-    let pattern2 = "^";
+    let pattern = "^";
     const names = [];
     for (const part of this.parts) {
       if (typeof part === "string") {
-        pattern2 += this.escapeRegExp(part);
+        pattern += this.escapeRegExp(part);
       } else {
         const patterns = this.partToRegExp(part);
         for (const { pattern: partPattern, name } of patterns) {
-          pattern2 += partPattern;
+          pattern += partPattern;
           names.push({ name, exploded: part.exploded });
         }
       }
     }
-    pattern2 += "$";
-    _UriTemplate.validateLength(pattern2, MAX_REGEX_LENGTH, "Generated regex pattern");
-    const regex = new RegExp(pattern2);
+    pattern += "$";
+    _UriTemplate.validateLength(pattern, MAX_REGEX_LENGTH, "Generated regex pattern");
+    const regex = new RegExp(pattern);
     const match = uri.match(regex);
     if (!match)
       return null;
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
+      await new Promise((resolve7) => setTimeout(resolve7, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve8) => {
+    return new Promise((resolve7) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve8();
+        resolve7();
       } else {
-        this._stdout.once("drain", resolve8);
+        this._stdout.once("drain", resolve7);
       }
     });
   }
@@ -38983,6 +38983,7 @@ var StdioServerTransport = class {
 
 // src/utils/applescript.ts
 import { execFileSync } from "child_process";
+import { constants as bufferConstants } from "node:buffer";
 
 // src/utils/docsUrls.ts
 var FULL_DISK_ACCESS_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md";
@@ -39019,6 +39020,21 @@ function envPositiveNumber(name) {
 }
 function getMaxBuffer() {
   return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
+}
+var MAX_OUTPUT_BYTES = bufferConstants.MAX_STRING_LENGTH;
+var NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, MAX_OUTPUT_BYTES);
+function noteBodyMaxBuffer() {
+  return Math.min(Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES), MAX_OUTPUT_BYTES);
+}
+function isOutputOverflowError(error2) {
+  const code = error2 instanceof Error ? error2.code : void 0;
+  return code === "ENOBUFS" || code === "ERR_STRING_TOO_LONG";
+}
+function outputOverflowMessage(maxBufferBytes) {
+  const mib = 1024 * 1024;
+  const limit = maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
+  const remedy = maxBufferBytes >= MAX_OUTPUT_BYTES ? "That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app." : "Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.";
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. ${remedy}`;
 }
 var SCRIPT_TIMEOUT_HEADROOM_MS = 5e3;
 var MIN_ATTEMPT_BUDGET_MS = 1e3;
@@ -39061,7 +39077,7 @@ var RETRYABLE_ERROR_PATTERNS = [
   /changed during listing/i
 ];
 function isRetryableError(errorMessage) {
-  return RETRYABLE_ERROR_PATTERNS.some((pattern2) => pattern2.test(errorMessage));
+  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
 }
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -39145,8 +39161,8 @@ function parseErrorMessage(errorOutput) {
   if (isPermissionDenied(errorOutput)) {
     return PERMISSION_DENIED_MESSAGE;
   }
-  for (const { pattern: pattern2, message } of ERROR_MAPPINGS) {
-    const match = coreError.match(pattern2);
+  for (const { pattern, message } of ERROR_MAPPINGS) {
+    const match = coreError.match(pattern);
     if (match) {
       let result = message;
       for (let i = 1; i < match.length; i++) {
@@ -39165,6 +39181,7 @@ function executeAppleScript(script, options = {}) {
   const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
+  const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
   if (!script || !script.trim()) {
     return {
       success: false,
@@ -39195,7 +39212,7 @@ function executeAppleScript(script, options = {}) {
         killSignal: "SIGKILL",
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
-        maxBuffer: getMaxBuffer()
+        maxBuffer: maxBufferBytes
       });
       const duration3 = Date.now() - attemptStart;
       debugLog("AppleScript succeeded", {
@@ -39213,7 +39230,9 @@ function executeAppleScript(script, options = {}) {
       let errorMessage;
       let isTimeout = false;
       let rawError;
-      if (isTimeoutError(error2)) {
+      if (isOutputOverflowError(error2)) {
+        errorMessage = outputOverflowMessage(maxBufferBytes);
+      } else if (isTimeoutError(error2)) {
         isTimeout = true;
         const timeoutSecs = Math.round(timeoutMs / 1e3);
         errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;
@@ -39567,6 +39586,77 @@ function getChecklistItems(noteId3) {
     };
   }
   return { items };
+}
+
+// src/utils/errorCodes.ts
+var CodedError = class extends Error {
+  envelope;
+  constructor(message, envelope) {
+    super(message);
+    this.name = "CodedError";
+    this.envelope = envelope;
+  }
+};
+var RULES = [
+  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  {
+    code: "verification_failed",
+    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
+  },
+  {
+    code: "revision_conflict",
+    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
+  },
+  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
+  {
+    code: "shortcut_not_installed",
+    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
+  },
+  {
+    code: "not_found",
+    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
+  },
+  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
+  {
+    code: "notes_unavailable",
+    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
+  },
+  {
+    code: "unsupported",
+    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
+  },
+  {
+    code: "validation_error",
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+  }
+];
+var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
+var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
+function classifyError(message, cause) {
+  if (cause instanceof CodedError) return { ...cause.envelope };
+  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message;
+  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
+  let code = "operation_failed";
+  if (timeoutCause) code = "timeout_indeterminate";
+  else if (isPermissionDenied(text2)) code = "permission_denied";
+  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
+  const envelope = { code };
+  if (code === "timeout_indeterminate" || code === "verification_failed") {
+    envelope.indeterminate = true;
+    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
+  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
+    envelope.committed = false;
+    envelope.indeterminate = false;
+  }
+  return envelope;
+}
+function errorResult(message, cause) {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: classifyError(message, cause),
+    isError: true
+  };
 }
 
 // src/utils/inlineImages.ts
@@ -41450,10 +41540,10 @@ function previewFileInBundle(bundle, accountDir) {
   const direct = [];
   const nested = [];
   for (const entry of boundedEntries(bundle, MAX_BUNDLE_ENTRIES) ?? []) {
-    const child2 = realInside(join7(bundle, entry), accountDir);
-    if (!child2) continue;
-    if (isRegularFile(child2)) direct.push(child2);
-    else if (isDirectory(child2)) nested.push(child2);
+    const child = realInside(join7(bundle, entry), accountDir);
+    if (!child) continue;
+    if (isRegularFile(child)) direct.push(child);
+    else if (isDirectory(child)) nested.push(child);
   }
   nested.sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
   const pick2 = (files) => files.find((f) => basename(f) === "Preview.png") ?? files.find((f) => PREVIEW_IMAGE_SUFFIXES.has(extname(f).toLowerCase())) ?? null;
@@ -41558,8 +41648,8 @@ function assembleAttachmentAssets(rows, bodyOrder, containerDir = NOTES_CONTAINE
   const attachments = [];
   for (const root of orderedRoots) {
     attachments.push(record2(root, null));
-    for (const child2 of rows.filter((r) => r.parentPk === root.pk && r !== root)) {
-      attachments.push(record2(child2, root));
+    for (const child of rows.filter((r) => r.parentPk === root.pk && r !== root)) {
+      attachments.push(record2(child, root));
     }
   }
   return { orderSource, attachments };
@@ -42130,8 +42220,8 @@ function scopeConflictMessage(reason) {
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync5 } from "fs";
-import { homedir as homedir8 } from "os";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync } from "fs";
+import { homedir as homedir8, tmpdir as tmpdir2 } from "os";
 import { join as join9 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
@@ -42339,6 +42429,24 @@ function buildFolderReference(folderPath) {
 }
 var AS_ACCOUNT_REF = "__acctRef";
 var LIVE_FOLDER_NOT_FOUND = "Folder not found";
+var SMART_FOLDER_DESTINATION = "SMART_FOLDER_DESTINATION";
+function readSmartFolderIds(read = readSmartFolders) {
+  return (read().folders ?? []).map((folder) => folder.id).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+}
+function smartFolderDestinationError(folderPath) {
+  return new CodedError(
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false,
+      reason: "smart_folder_destination"
+    }
+  );
+}
+function throwIfSmartFolderDestination(error2, folderPath) {
+  if (error2?.includes(SMART_FOLDER_DESTINATION)) throw smartFolderDestinationError(folderPath);
+}
 function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) throw new Error("Invalid AppleScript variable");
   buildFolderReference(folderPath);
@@ -42347,10 +42455,26 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   const cid = `${varName}_cid`;
   const any = `${varName}_any`;
   const parent = `${varName}_p`;
-  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${escapePlainStringForAppleScript(folderPath)}" number -1728`;
-  const lines = [];
+  const quotedPath = escapePlainStringForAppleScript(folderPath);
+  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${quotedPath}" number -1728`;
+  const excluded = (opts.excludeFolderIds ?? []).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+  const skipIds = `${varName}_sx`;
+  const skipped = `${varName}_sh`;
+  const candidateTest = excluded.length ? [
+    `    if ${skipIds} contains ${cid} then`,
+    `      set ${skipped} to true`,
+    `    else if exists folder id ${cid} then`
+  ] : [`    if exists folder id ${cid} then`];
+  const unresolved = excluded.length ? [
+    `if ${varName} is missing value then`,
+    `  if ${skipped} then error "${SMART_FOLDER_DESTINATION}: ${quotedPath}" number -1728`,
+    `  ${notFound}`,
+    `end if`
+  ] : [`if ${varName} is missing value then ${notFound}`];
+  const lines = excluded.length ? [`set ${skipIds} to {${excluded.map((id2) => `"${id2}"`).join(", ")}}`] : [];
   parts.forEach((part, i) => {
     const name = escapePlainStringForAppleScript(part);
+    if (excluded.length) lines.push(`set ${skipped} to false`);
     if (i === 0) {
       lines.push(
         `set ${varName} to missing value`,
@@ -42358,7 +42482,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${AS_ACCOUNT_REF} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      if class of (container of ${c}) is not folder then`,
         `        set ${varName} to folder id ${cid}`,
         `        exit repeat`,
@@ -42378,7 +42502,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${parent} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      set ${varName} to folder id ${cid}`,
         `      exit repeat`,
         `    end if`,
@@ -42386,7 +42510,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `end repeat`
       );
     }
-    lines.push(`if ${varName} is missing value then ${notFound}`);
+    lines.push(...unresolved);
   });
   return lines.join("\n");
 }
@@ -42442,6 +42566,34 @@ function buildAppLevelScript(command) {
     end tell
   `;
 }
+var INLINE_EXPECTED_BODY_LIMIT = MAX_CONTENT_LENGTH;
+var ExpectedBodies = class {
+  directory;
+  files = 0;
+  /**
+   * Returns AppleScript `setup` to run before the comparison (empty for a
+   * literal) and the `operand` to compare the note's body against.
+   * `variable` names the AppleScript variable a file-backed body is read into.
+   */
+  bind(body, variable) {
+    if (body.length <= INLINE_EXPECTED_BODY_LIMIT) {
+      return { setup: "", operand: `"${escapeHtmlForAppleScript(body)}"` };
+    }
+    this.directory ??= mkdtempSync2(join9(tmpdir2(), "apple-notes-expected-body-"));
+    const file = join9(this.directory, `body-${this.files++}.html`);
+    writeFileSync(file, body, { encoding: "utf8", mode: 384 });
+    return {
+      setup: `
+      tell current application to set ${variable} to read (POSIX file "${escapePlainStringForAppleScript(file)}") as \xABclass utf8\xBB`,
+      operand: variable
+    };
+  }
+  /** Removes any temporary files. Safe to call more than once. */
+  cleanup() {
+    if (this.directory) rmSync2(this.directory, { recursive: true, force: true });
+    this.directory = void 0;
+  }
+};
 function folderDeleteFactsScript(id2) {
   if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
   return `
@@ -42492,8 +42644,8 @@ function getNoteLinkFromDB(coreDataId3) {
   }
 }
 function extractCoreDataId(output, prefix) {
-  const pattern2 = new RegExp(`${prefix} id ([^\\s]+)`);
-  const match = output.match(pattern2);
+  const pattern = new RegExp(`${prefix} id ([^\\s]+)`);
+  const match = output.match(pattern);
   return match ? match[1] : "";
 }
 var AppleNotesManager = class {
@@ -42619,7 +42771,9 @@ var AppleNotesManager = class {
     const safeBody = escapeHtmlForAppleScript(`<h1>${htmlTitle}</h1>${bodyContent}`);
     let createCommand;
     if (folder) {
-      createCommand = `${buildLiveFolderResolution(folder, "__folder")}
+      createCommand = `${buildLiveFolderResolution(folder, "__folder", {
+        excludeFolderIds: this.smartFolderIds()
+      })}
       make new note at __folder with properties {body:"${safeBody}"}`;
     } else {
       createCommand = `
@@ -42631,6 +42785,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      if (folder) throwIfSmartFolderDestination(result.error, folder);
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
     }
@@ -42803,7 +42958,7 @@ var AppleNotesManager = class {
     const safeTitle = escapePlainStringForAppleScript(title);
     const getCommand = `get body of note "${safeTitle}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get content of note "${title}":`, result.error);
@@ -42840,7 +42995,7 @@ var AppleNotesManager = class {
     const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id2}":`, result.error);
       return { body: "", error: result.error };
@@ -43063,25 +43218,25 @@ var AppleNotesManager = class {
    */
   deleteNoteByIdIfUnchanged(id2, expectedBody, scope2, guards = []) {
     const safeId = sanitizeNoteId(id2);
-    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
-    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const trashIds = trashFolderIdList();
-    const guardChecks = guards.map((guard, index) => {
-      const safeGuardId = sanitizeNoteId(guard.id);
-      const ref = `__guardRef${index}`;
-      const folderVar = `__guardFolder${index}`;
-      const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
-      let bodyCheck = "";
-      if (guard.expectedBody !== void 0) {
-        validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
-        const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
-        bodyCheck = `
+    const bodies = new ExpectedBodies();
+    let result;
+    try {
+      const guardChecks = guards.map((guard, index) => {
+        const safeGuardId = sanitizeNoteId(guard.id);
+        const ref = `__guardRef${index}`;
+        const folderVar = `__guardFolder${index}`;
+        const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+        let bodyCheck = "";
+        if (guard.expectedBody !== void 0) {
+          const expected2 = bodies.bind(guard.expectedBody, `__expectedGuardBody${index}`);
+          bodyCheck = `${expected2.setup}
       set __guardBody to body of ${ref}
       considering case
-        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+        if __guardBody is not ${expected2.operand} and __guardBody is not ${expected2.operand} & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
       end considering`;
-      }
-      return `
+        }
+        return `
       if not (exists note id "${safeGuardId}") then ${inactive("missing")}
       set ${ref} to note id "${safeGuardId}"
       if password protected of ${ref} then ${inactive("locked")}
@@ -43091,18 +43246,19 @@ var AppleNotesManager = class {
       end try
       if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
       if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
-    }).join("");
-    const script = buildAppLevelScript(`
+      }).join("");
+      const expected = bodies.bind(expectedBody, "__expectedBody");
+      const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
       if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}${expected.setup}
       set currentBody to body of noteRef
       considering case
-        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
       try
@@ -43110,7 +43266,10 @@ var AppleNotesManager = class {
       end try
       return "SAFETY_DELETED"
     `);
-    const result = executeMutationAppleScript(script);
+      result = executeMutationAppleScript(script);
+    } finally {
+      bodies.cleanup();
+    }
     if (!result.success) {
       console.error(`Failed guarded delete for note ID "${id2}":`, result.error);
       return { status: "failed" };
@@ -43230,6 +43389,35 @@ var AppleNotesManager = class {
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return (resultList as text)${trashSuffix}
       `;
+  }
+  /**
+   * Smart folder ids that a destination folder must never resolve to. Read
+   * fresh on every write (a smart folder can be added at any time); empty
+   * without Full Disk Access. See {@link readSmartFolderIds}.
+   */
+  smartFolderIds() {
+    return readSmartFolderIds();
+  }
+  /**
+   * Read-only preflight: throws the smart-folder refusal when `folderPath`
+   * resolves in `account` only to a smart folder. For write paths that create
+   * something before they reach their own destination check (the Markdown
+   * bridge creates first and moves second). Other failures are left to the
+   * write itself, which reports them as before.
+   *
+   * @param folderPath - Destination folder path (list-folders syntax)
+   * @param account - Account to resolve in (defaults to Notes' default)
+   */
+  assertNotSmartFolderDestination(folderPath, account) {
+    const excludeFolderIds = this.smartFolderIds();
+    if (excludeFolderIds.length === 0) return;
+    const script = buildAccountScopedScript(
+      { account: this.resolveAccount(account) },
+      `${buildLiveFolderResolution(folderPath, "__folder", { excludeFolderIds })}
+      return id of __folder`
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) throwIfSmartFolderDestination(result.error, folderPath);
   }
   /**
    * Lists every smart folder with its decoded query, read-only.
@@ -43772,37 +43960,40 @@ var AppleNotesManager = class {
       console.error(`Invalid folder name: "${name}"`);
       return null;
     }
+    const smart = { rootOnly: true, excludeFolderIds: this.smartFolderIds() };
     for (let i = 0; i < parts.length; i++) {
       const currentPath = parts.slice(0, i + 1).map((p) => escapeFolderName(p)).join("/");
       const checkScript = buildAccountScopedScript(
         { account: targetAccount },
-        `${buildLiveFolderResolution(currentPath, "__folder", { rootOnly: true })}
+        `${buildLiveFolderResolution(currentPath, "__folder", smart)}
         return id of __folder`
       );
       const checkResult = executeAppleScript(checkScript);
       if (checkResult.success) {
         continue;
       }
+      throwIfSmartFolderDestination(checkResult.error, currentPath);
       const segmentName = escapePlainStringForAppleScript(parts[i]);
       let createCommand;
       if (i === 0) {
         createCommand = `make new folder with properties {name:"${segmentName}"}`;
       } else {
         const parentPath = parts.slice(0, i).map((p) => escapeFolderName(p)).join("/");
-        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", { rootOnly: true })}
+        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", smart)}
         make new folder at __parent with properties {name:"${segmentName}"}`;
       }
       const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
       const result = executeMutationAppleScript(script);
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
+        throwIfSmartFolderDestination(result.error, name);
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
       }
     }
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `${buildLiveFolderResolution(name, "__folder", { rootOnly: true })}
+      `${buildLiveFolderResolution(name, "__folder", smart)}
       return (id of __folder) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
@@ -43861,7 +44052,9 @@ var AppleNotesManager = class {
   moveNoteById(id2, destinationFolder, account, scope2) {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeNoteId(id2);
-    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
       ${destFolderSetup}
@@ -43876,6 +44069,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      throwIfSmartFolderDestination(result.error, destinationFolder);
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
@@ -44770,7 +44964,9 @@ var AppleNotesManager = class {
   batchMoveNotes(ids, folder, account) {
     if (ids.length === 0) return [];
     const targetAccount = this.resolveAccount(account);
-    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const results = new Array(ids.length);
     const runnable = [];
     ids.forEach((id2, i) => {
@@ -44826,6 +45022,7 @@ var AppleNotesManager = class {
       const res = executeMutationAppleScript(script);
       if (!res.success) {
         throwIfAccountResolutionFailed(res.error);
+        throwIfSmartFolderDestination(res.error, folder);
         for (const r of runnable) {
           results[r.index] = this.createBatchResult(
             ids[r.index],
@@ -46446,9 +46643,9 @@ var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes data
 function canonicalKey(value) {
   return BigInt(value).toString();
 }
-function assertAll(values, pattern2, label) {
+function assertAll(values, pattern, label) {
   for (const value of values) {
-    if (!pattern2.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
+    if (!pattern.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
   }
 }
 function entityClause(entity3) {
@@ -46605,10 +46802,10 @@ function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH9) {
 }
 var defaultResolver = (values, entity3) => resolveIdentifiers(values, entity3);
 var DEFAULT_MAX_ID_LENGTH = 2e3;
-function acceptAlternateForms(pattern2) {
+function acceptAlternateForms(pattern) {
   return new RegExp(
-    `${pattern2.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
-    pattern2.flags
+    `${pattern.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
+    pattern.flags
   );
 }
 function resolveInSchema(values, entity3, ctx, resolver) {
@@ -46623,16 +46820,16 @@ function resolveInSchema(values, entity3, ctx, resolver) {
     return null;
   }
 }
-function exactIdInput(entity3, pattern2, message, options = {}) {
+function exactIdInput(entity3, pattern, message, options = {}) {
   const resolver = options.resolver ?? defaultResolver;
-  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message).transform((value, ctx) => {
+  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message).transform((value, ctx) => {
     const map = resolveInSchema([value], entity3, ctx, resolver);
     return map ? map.get(value) ?? value : external_exports.NEVER;
   });
 }
-function exactIdArrayInput(entity3, pattern2, message, options = {}) {
+function exactIdArrayInput(entity3, pattern, message, options = {}) {
   const resolver = options.resolver ?? defaultResolver;
-  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message);
+  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern), message);
   const array2 = options.maxItems === void 0 ? external_exports.array(item) : external_exports.array(item).max(options.maxItems);
   return array2.transform((values, ctx) => {
     const map = resolveInSchema(values, entity3, ctx, resolver);
@@ -46735,13 +46932,6 @@ function describeSearchScope(searchContent, resultCount) {
   }
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
-
-// src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync14 } from "child_process";
-import * as fs8 from "fs";
-import * as os8 from "os";
-import * as path8 from "path";
-import { gunzipSync as gunzipSync8 } from "zlib";
 
 // src/utils/noteQuery.ts
 var QUERY_LIMITS = {
@@ -46846,12 +47036,12 @@ function tokenize(input) {
       const field = prefix.toLowerCase();
       let value = word.slice(colon + 1);
       if (FIELDS.has(field)) {
-        let quoted2 = false;
+        let quoted = false;
         if (value === "" && input[j] === '"') {
           [value, j] = readQuoted(input, j);
-          quoted2 = true;
+          quoted = true;
         }
-        push({ kind: "term", pos: i, field, value, quoted: quoted2 });
+        push({ kind: "term", pos: i, field, value, quoted });
         i = j;
         continue;
       }
@@ -46890,11 +47080,11 @@ function parseLocalDate(text2, pos) {
   return { start: start.getTime(), end: new Date(year, month - 1, day + 1).getTime() };
 }
 function termNode(token) {
-  const { field, value, quoted: quoted2, pos } = token;
+  const { field, value, quoted, pos } = token;
   if (field === void 0) {
     if (value === "") throw new NoteQueryError("Empty quoted phrase", pos);
     const lower2 = value.toLowerCase();
-    if (!quoted2 && FLAGS.includes(lower2)) {
+    if (!quoted && FLAGS.includes(lower2)) {
       return { type: "flag", flag: lower2 };
     }
     return { type: "text", field: "any", value };
@@ -47013,9 +47203,9 @@ var Parser = class {
     if (token?.kind === "not") {
       this.index++;
       this.enter(token.pos);
-      const child2 = this.parseUnary();
+      const child = this.parseUnary();
       this.depth--;
-      return { type: "not", child: child2 };
+      return { type: "not", child };
     }
     return this.parsePrimary();
   }
@@ -47136,9 +47326,9 @@ function cheapFirst(children) {
 function evaluateNoteQuery(node, note) {
   switch (node.type) {
     case "and":
-      return cheapFirst(node.children).every((child2) => evaluateNoteQuery(child2, note));
+      return cheapFirst(node.children).every((child) => evaluateNoteQuery(child, note));
     case "or":
-      return cheapFirst(node.children).some((child2) => evaluateNoteQuery(child2, note));
+      return cheapFirst(node.children).some((child) => evaluateNoteQuery(child, note));
     case "not":
       return !evaluateNoteQuery(node.child, note);
     case "text": {
@@ -47174,21 +47364,50 @@ function evaluateNoteQuery(node, note) {
     }
   }
 }
-function positiveTextTerms(node, negated = false) {
+function positiveTextPredicates(node, negated = false) {
   switch (node.type) {
     case "and":
     case "or":
-      return node.children.flatMap((child2) => positiveTextTerms(child2, negated));
+      return node.children.flatMap((child) => positiveTextPredicates(child, negated));
     case "not":
-      return positiveTextTerms(node.child, !negated);
+      return positiveTextPredicates(node.child, !negated);
     case "text":
-      return negated ? [] : [node.value];
+      return negated ? [] : [{ field: node.field, value: node.value }];
     default:
       return [];
   }
 }
+function positiveTextTerms(node, negated = false) {
+  return positiveTextPredicates(node, negated).map((predicate) => predicate.value);
+}
+function matchLocations(predicates, title, text2) {
+  if (predicates.length === 0) return void 0;
+  if (text2 === null && predicates.some((p) => p.field !== "title")) return void 0;
+  const firstBreak = text2 === null ? -1 : text2.indexOf("\n");
+  const titleLower = normalizeForMatch(title);
+  const firstLineLower = text2 === null ? "" : normalizeForMatch(firstBreak === -1 ? text2 : text2.slice(0, firstBreak));
+  const bodyLower = text2 === null || firstBreak === -1 ? "" : normalizeForMatch(text2.slice(firstBreak + 1));
+  let inTitle = false;
+  let inBody = false;
+  for (const predicate of predicates) {
+    const needle = normalizeForMatch(predicate.value);
+    if (predicate.field !== "body" && !inTitle) {
+      inTitle = titleLower.includes(needle) || firstLineLower.includes(needle);
+    }
+    if (predicate.field !== "title" && !inBody) inBody = bodyLower.includes(needle);
+  }
+  const locations = [];
+  if (inTitle) locations.push("title");
+  if (inBody) locations.push("body");
+  return locations;
+}
 
 // src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync14 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
+import { gunzipSync as gunzipSync8 } from "zlib";
 var NOTES_DB_PATH10 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
@@ -47270,6 +47489,15 @@ function decodeNoteBody(data) {
     objectIds
   };
 }
+function decodeBodyHex(hex3) {
+  try {
+    return decodeNoteBody(
+      new Uint8Array(gunzipSync8(Buffer.from(hex3, "hex"), { maxOutputLength: 32 * 1024 * 1024 }))
+    );
+  } catch {
+    return null;
+  }
+}
 function countWords(text2) {
   let count = 0;
   for (const word of text2.replace(/\ufffc/gu, " ").split(/\s+/u)) {
@@ -47340,17 +47568,78 @@ function presentColumns2(dbPath2) {
   }
   return cols;
 }
+function readStore(dbPath2, build) {
+  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  try {
+    return runSqlite6(dbPath2, build(presentColumns2(dbPath2)));
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+}
+var NOTE_TEXT_BATCH_MAX = QUERY_RESULTS.MAX;
+function buildNoteTextsSql(available, pks) {
+  const missing = ["Z_PK", "Z_ENT"].filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns search enrichment needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const keys = [...new Set(pks)];
+  if (keys.length > NOTE_TEXT_BATCH_MAX) {
+    throw new NoteQueryStoreError(
+      `At most ${NOTE_TEXT_BATCH_MAX} notes can be read at once.`,
+      "query_error"
+    );
+  }
+  for (const pk of keys) {
+    if (!Number.isSafeInteger(pk) || pk < 1) {
+      throw new NoteQueryStoreError(`Invalid note key ${String(pk)}`, "query_error");
+    }
+  }
+  const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'locked', ${locked}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity2("ICNote")} AND n.Z_PK IN (${keys.length ? keys.join(", ") : "NULL"});`,
+    "COMMIT;"
+  ].join(" ");
+}
+function readNoteTexts(pks, options = {}) {
+  const output = readStore(
+    options.dbPath ?? NOTES_DB_PATH10,
+    (available) => buildNoteTextsSql(available, pks)
+  );
+  let uuid2;
+  const texts = /* @__PURE__ */ new Map();
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line);
+    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    else if (row.k === "note" && typeof row.pk === "number") {
+      const body = row.locked || !row.data ? null : decodeBodyHex(row.data);
+      texts.set(row.pk, body ? body.text : null);
+    }
+  }
+  return { uuid: uuid2, texts };
+}
 var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve8 = (pk, seen) => {
+  const resolve7 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve8(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve7(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47364,7 +47653,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve8(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve7(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -47396,23 +47685,10 @@ function runNoteQuery(ast, options = {}) {
   const withBodies = needsContent(ast);
   const withTags = needsTags(ast);
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH10;
-  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-  let output;
-  try {
-    const available = presentColumns2(dbPath2);
-    output = runSqlite6(
-      dbPath2,
-      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
-    );
-  } catch (error2) {
-    if (error2 instanceof NoteQueryStoreError) throw error2;
-    const message = error2 instanceof Error ? error2.message : String(error2);
-    if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-    }
-    console.error(`query-notes: database read failed: ${message}`);
-    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
-  }
+  const output = readStore(
+    dbPath2,
+    (available) => buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+  );
   let uuid2;
   let eligible = 0;
   const folderRows = [];
@@ -47436,6 +47712,8 @@ function runNoteQuery(ast, options = {}) {
   }
   const folders = resolveFolders(folderRows);
   const textTerms = positiveTextTerms(ast);
+  const textPredicates = positiveTextPredicates(ast);
+  const pendingWordCounts = [];
   const hits = [];
   let matched = 0;
   let unreadable = 0;
@@ -47453,15 +47731,7 @@ function runNoteQuery(ast, options = {}) {
         if (withBodies) unreadable++;
         return decoded;
       }
-      try {
-        decoded = decodeNoteBody(
-          new Uint8Array(
-            gunzipSync8(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
-          )
-        );
-      } catch {
-        decoded = null;
-      }
+      decoded = decodeBodyHex(row.data);
       if (!decoded) unreadable++;
       return decoded;
     };
@@ -47502,6 +47772,8 @@ function runNoteQuery(ast, options = {}) {
     matched++;
     if (hits.length >= limit) continue;
     const body = locked ? null : decode2();
+    const matchedIn = matchLocations(textPredicates, row.title ?? "", body ? body.text : null);
+    if (options.includeWordCount && !withBodies) pendingWordCounts.push(row.pk);
     hits.push({
       id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
       title: row.title ?? "",
@@ -47510,7 +47782,16 @@ function runNoteQuery(ast, options = {}) {
       ...note.modified !== void 0 ? { modified: new Date(note.modified).toISOString() } : {},
       ...note.created !== void 0 ? { created: new Date(note.created).toISOString() } : {},
       snippet: locked ? "" : body ? buildSnippet(body.text, textTerms) : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
-      ...locked ? { locked: true } : {}
+      ...locked ? { locked: true } : {},
+      ...matchedIn ? { matchedIn } : {},
+      ...options.includeWordCount && withBodies ? { wordCount: body ? countWords(body.text) : null } : {}
+    });
+  }
+  if (pendingWordCounts.length) {
+    const { texts } = readNoteTexts(pendingWordCounts, { dbPath: dbPath2 });
+    pendingWordCounts.forEach((pk, index) => {
+      const text2 = texts.get(pk);
+      hits[index].wordCount = typeof text2 === "string" ? countWords(text2) : null;
     });
   }
   return {
@@ -47553,6 +47834,7 @@ function searchContentViaDatabase(options) {
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
     scanLimit: QUERY_SCAN.MAX,
+    includeWordCount: options.includeWordCount,
     dbPath: options.dbPath
   });
   const notes = result.notes.map((hit) => ({
@@ -47563,7 +47845,9 @@ function searchContentViaDatabase(options) {
     created: hit.created ? new Date(hit.created) : /* @__PURE__ */ new Date(0),
     modified: hit.modified ? new Date(hit.modified) : /* @__PURE__ */ new Date(0),
     ...hit.folder !== void 0 ? { folder: hit.folder } : {},
-    ...hit.account !== void 0 ? { account: hit.account } : {}
+    ...hit.account !== void 0 ? { account: hit.account } : {},
+    ...hit.matchedIn ? { matchedIn: hit.matchedIn } : {},
+    ...hit.wordCount !== void 0 ? { wordCount: hit.wordCount } : {}
   }));
   return {
     notes,
@@ -47586,14 +47870,63 @@ function contentSearchFailureHint(message, dbUnavailable) {
   const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
   return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
 }
+var NOTE_ID = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/;
+function addWordCountsFromDatabase(notes, query2, options = {}) {
+  const keys = /* @__PURE__ */ new Map();
+  for (const note of notes) {
+    const match = NOTE_ID.exec(note.id ?? "");
+    if (match) keys.set(note, { store: match[1].toUpperCase(), pk: Number(match[2]) });
+  }
+  const pks = [...new Set([...keys.values()].map((key) => key.pk))];
+  let store;
+  const texts = /* @__PURE__ */ new Map();
+  try {
+    for (let start = 0; start < pks.length; start += NOTE_TEXT_BATCH_MAX) {
+      const read = readNoteTexts(pks.slice(start, start + NOTE_TEXT_BATCH_MAX), options);
+      store = read.uuid?.toUpperCase();
+      for (const [pk, text2] of read.texts) texts.set(pk, text2);
+    }
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) return { notes, unavailable: error2.kind };
+    throw error2;
+  }
+  const predicates = [{ field: "any", value: query2 }];
+  return {
+    notes: notes.map((note) => {
+      const key = keys.get(note);
+      const text2 = key && key.store === store ? texts.get(key.pk) : void 0;
+      if (typeof text2 !== "string") return { ...note, wordCount: null };
+      const matchedIn = matchLocations(predicates, note.title, text2);
+      return {
+        ...note,
+        ...matchedIn?.length ? { matchedIn } : {},
+        wordCount: countWords(text2)
+      };
+    })
+  };
+}
+function describeMatchDetails(hit) {
+  const parts = [];
+  if (hit.matchedIn) {
+    parts.push(
+      hit.matchedIn.length ? `matched in ${hit.matchedIn.join(", ")}` : "no text match (metadata)"
+    );
+  }
+  if (hit.wordCount !== void 0) {
+    parts.push(
+      hit.wordCount === null ? "word count unavailable" : `${hit.wordCount} word${hit.wordCount === 1 ? "" : "s"}`
+    );
+  }
+  return parts.map((part) => ` \xB7 ${part}`).join("");
+}
 
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
 import { execFileSync as execFileSync15 } from "node:child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
+import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
 import { join as join16 } from "node:path";
 
 // src/services/shortcutConsent.ts
@@ -47696,10 +48029,10 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join16(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-native-tags-"));
   try {
     const path10 = join16(directory, "request.json");
-    writeFileSync(path10, JSON.stringify(input), { mode: 384 });
+    writeFileSync2(path10, JSON.stringify(input), { mode: 384 });
     execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path10], {
       encoding: "utf8",
       timeout: 6e4,
@@ -47714,14 +48047,14 @@ function runNativeTagsShortcut(input) {
       { shortcut: status.shortcut, code: error2?.code }
     );
   } finally {
-    rmSync2(directory, { recursive: true, force: true });
+    rmSync3(directory, { recursive: true, force: true });
   }
 }
 
 // src/services/backgroundNotes.ts
 import { execFileSync as execFileSync16 } from "node:child_process";
-import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
-import { tmpdir as tmpdir3 } from "node:os";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync3, rmSync as rmSync4 } from "node:fs";
+import { tmpdir as tmpdir4 } from "node:os";
 import { join as join17 } from "node:path";
 
 // src/utils/appendMarkdown.ts
@@ -48035,8 +48368,8 @@ function validateAppendContent(content, format, options = {}) {
     if (/!\[|<\/?[a-z]|\]\(\s*(?:javascript|data|file):/i.test(checked))
       throw new Error("Markdown images, raw HTML and local/executable links are unsupported");
     const withoutLinkDestinations = checked.replace(/(\[[^\]\n]+\])\([^()\s]+\)/g, "$1()");
-    for (const [pattern2, name] of UNMODELED_MARKDOWN)
-      if (pattern2.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
+    for (const [pattern, name] of UNMODELED_MARKDOWN)
+      if (pattern.test(name === UNDERSCORES_OUTSIDE_A_WORD ? withoutLinkDestinations : checked))
         throw new Error(
           `Markdown cannot use ${name}; Notes would change that text, so the result could not be verified`
         );
@@ -48047,10 +48380,10 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join17(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync4(join17(tmpdir4(), "apple-notes-background-"));
   try {
     const file = join17(directory, "request.json");
-    writeFileSync2(
+    writeFileSync3(
       file,
       JSON.stringify({
         operation: "",
@@ -48079,7 +48412,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       throw Object.assign(error2, { shortcut: status.shortcut });
     }
   } finally {
-    rmSync3(directory, { recursive: true, force: true });
+    rmSync4(directory, { recursive: true, force: true });
   }
 }
 function backgroundDependencies(manager) {
@@ -48307,12 +48640,15 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   const segments = (path10) => JSON.stringify(splitFolderPath(path10).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
-    if (!manager.listAccounts().some(
-      (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+    const accounts = manager.listAccounts().filter((account) => account.defaultFolder);
+    if (!accounts.some(
+      (account) => manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
     ))
       throw new Error(
         `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
       );
+    for (const account of accounts)
+      manager.assertNotSmartFolderDestination(request.folder, account.name);
   }
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(
@@ -48980,77 +49316,6 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
-// src/utils/errorCodes.ts
-var CodedError = class extends Error {
-  envelope;
-  constructor(message, envelope) {
-    super(message);
-    this.name = "CodedError";
-    this.envelope = envelope;
-  }
-};
-var RULES = [
-  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
-  {
-    code: "verification_failed",
-    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
-  },
-  {
-    code: "revision_conflict",
-    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
-  },
-  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
-  {
-    code: "shortcut_not_installed",
-    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
-  },
-  {
-    code: "not_found",
-    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
-  },
-  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
-  {
-    code: "notes_unavailable",
-    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
-  },
-  {
-    code: "unsupported",
-    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
-  },
-  {
-    code: "validation_error",
-    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
-  }
-];
-var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
-var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
-function classifyError(message, cause) {
-  if (cause instanceof CodedError) return { ...cause.envelope };
-  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
-${cause.message}` : message;
-  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
-  let code = "operation_failed";
-  if (timeoutCause) code = "timeout_indeterminate";
-  else if (isPermissionDenied(text2)) code = "permission_denied";
-  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
-  const envelope = { code };
-  if (code === "timeout_indeterminate" || code === "verification_failed") {
-    envelope.indeterminate = true;
-    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
-  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
-    envelope.committed = false;
-    envelope.indeterminate = false;
-  }
-  return envelope;
-}
-function errorResult(message, cause) {
-  return {
-    content: [{ type: "text", text: message }],
-    structuredContent: classifyError(message, cause),
-    isError: true
-  };
-}
-
 // src/utils/shutdown.ts
 var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
 function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
@@ -49204,7 +49469,7 @@ function selectParagraph(paragraphs, selector) {
     );
   return matches[occurrence - 1];
 }
-var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+var NOTE_ID2 = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
 function titleMatchSql(columns) {
   return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
 }
@@ -49215,7 +49480,7 @@ function checkNoteSelector(selector) {
   if (selector.folder !== void 0 && selector.title === void 0)
     throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
   if (selector.id === void 0) return void 0;
-  const pk = NOTE_ID.exec(selector.id)?.[1];
+  const pk = NOTE_ID2.exec(selector.id)?.[1];
   if (!pk)
     throw new ParagraphLinkError(
       "invalid-argument",
@@ -49607,9 +49872,12 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
 
 // src/utils/bodyReadFailure.ts
 var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+var OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
 function classifyBodyReadError(error2) {
   if (!error2) return "other";
-  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (OUTPUT_OVERFLOW.test(error2) || /ENOBUFS|maxBuffer|ERR_STRING_TOO_LONG/i.test(error2)) {
+    return "buffer";
+  }
   if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
   return "other";
 }
@@ -49627,10 +49895,17 @@ function describeBodyReadFailure(title, error2, attachments) {
   const kind = classifyBodyReadError(error2);
   if (kind === "other") return base;
   const large = attachments ? largeAttachments(attachments) : [];
-  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
-    "; "
-  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
-  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  const listed = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
+  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed}). ` : "";
+  if (kind === "buffer") {
+    const cause2 = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
+    const remedy2 = "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
+    return `${base}
+
+${cause2} ${remedy2}`;
+  }
+  const cause = large.length > 0 ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
   return `${base}
 
 ${cause} ${remedy}`;
@@ -49958,8 +50233,8 @@ function insertLink(request, deps) {
 }
 
 // src/services/notesExport.ts
-import { mkdirSync as mkdirSync6 } from "node:fs";
-import { basename as basename4, dirname as dirname6, extname as extname5, join as join22 } from "node:path";
+import { mkdirSync as mkdirSync5 } from "node:fs";
+import { basename as basename4, dirname as dirname6, extname as extname4, join as join21 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -50149,8 +50424,8 @@ var AssetLocator = class {
   /** Preview.png (or another image) at most two levels inside a bundle. */
   bundleImage(bundle, account) {
     const found = [];
-    for (const child2 of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
-      const path10 = confine(join19(bundle, child2), account);
+    for (const child of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
+      const path10 = confine(join19(bundle, child), account);
       if (!path10) continue;
       if (isFile(path10)) found.push(path10);
       else
@@ -50485,7 +50760,7 @@ function planAttachment(attachment, ctx) {
       ctx.stats.attachments--;
       return {
         type: "gallery",
-        items: attachment.children.map((child2) => planAttachment(child2, ctx))
+        items: attachment.children.map((child) => planAttachment(child, ctx))
       };
     }
     case "link": {
@@ -51057,9 +51332,9 @@ function wrapMarkdown(markdown, width) {
   }
   return out.join("\n");
 }
-function renderNotesMarkdown(notes, ctx, { wrap: wrap3 = 0 } = {}) {
+function renderNotesMarkdown(notes, ctx, { wrap: wrap2 = 0 } = {}) {
   const body = notes.map((note) => renderNoteMarkdown(note, ctx)).join(NOTE_SEPARATOR);
-  return (wrap3 ? wrapMarkdown(body, wrap3) : body) + (notes.length ? "\n" : "");
+  return (wrap2 ? wrapMarkdown(body, wrap2) : body) + (notes.length ? "\n" : "");
 }
 
 // src/utils/noteExportData.ts
@@ -51233,1290 +51508,18 @@ function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
     ordered
   };
 }
-var CORE_DATA_EPOCH = 978307200;
-function coreDataDate(value) {
-  const seconds = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(seconds) || Math.abs(seconds) > 1e10) return void 0;
-  return new Date((seconds + CORE_DATA_EPOCH) * 1e3).toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-function noteMetaQuery(columns) {
-  const first2 = (names) => {
-    const present = names.filter((name) => columns.has(name)).map((name) => `n.${name}`);
-    if (!present.length) return "NULL";
-    return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
-  };
-  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort((a, b) => Number(b.slice(8) || 0) - Number(a.slice(8) || 0));
-  const folder = columns.has("ZFOLDER") && columns.has("ZTITLE2") ? "(SELECT f.ZTITLE2 FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_PK = n.ZFOLDER)" : "NULL";
-  const account = columns.has("ZNAME") && accountColumns.length ? `(SELECT a.ZNAME FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_PK = ${first2(accountColumns)})` : "NULL";
-  return `SELECT json_object('uuid', ${first2(["ZIDENTIFIER"])}, 'created', ${first2(["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"])}, 'modified', ${first2(["ZMODIFICATIONDATE1", "ZMODIFICATIONDATE"])}, 'folder', ${folder}, 'account', ${account}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
-}
-function readExportNoteMeta(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
-  const match = /\/ICNote\/p([0-9]{1,18})$/.exec(id2);
-  if (!match) throw new NoteBlocksError("invalid-id", "Not a note id");
-  const output = sqlite(dbPath2, [
-    "-cmd",
-    ".parameter init",
-    "-cmd",
-    `.parameter set @pk ${match[1]}`,
-    noteMetaQuery(objectColumns(dbPath2))
-  ]);
-  if (!output) return {};
-  let row;
-  try {
-    row = JSON.parse(output);
-  } catch {
-    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
-  }
-  const meta = {};
-  const set = (key, value) => {
-    if (value !== void 0) meta[key] = value;
-  };
-  set("uuid", text(row.uuid));
-  set("created", coreDataDate(row.created));
-  set("modified", coreDataDate(row.modified));
-  set("folder", text(row.folder));
-  set("account", text(row.account));
-  return meta;
-}
-
-// src/utils/markdownTemplate.ts
-var TEMPLATE_SCHEMA_VERSION = 1;
-var MAX_TEMPLATE_BYTES = 256 * 1024;
-var MAX_META_LENGTH = 512;
-var MAX_RULE_TEXT = 4096;
-var MAX_DIRECTORY_LENGTH = 1024;
-var RULE_IDS = [
-  "document.header",
-  "document.footer",
-  "document.separator",
-  "block.title",
-  "block.heading",
-  "block.subheading",
-  "block.body",
-  "block.bulleted",
-  "block.dashed",
-  "block.numbered",
-  "block.checklist.checked",
-  "block.checklist.unchecked",
-  "block.code",
-  "paragraph.quote",
-  "inline.bold",
-  "inline.italic",
-  "inline.underline",
-  "inline.strikethrough",
-  "inline.superscript",
-  "inline.subscript",
-  "inline.highlight.purple",
-  "inline.highlight.pink",
-  "inline.highlight.orange",
-  "inline.highlight.mint",
-  "inline.highlight.blue",
-  "inline.highlight.other",
-  "inline.color",
-  "inline.link",
-  "attachment.image",
-  "attachment.drawing.classic",
-  "attachment.drawing.paper",
-  "attachment.scan",
-  "attachment.pdf",
-  "attachment.audio",
-  "attachment.video",
-  "attachment.other",
-  "attachment.table",
-  "attachment.divider",
-  "attachment.gallery",
-  "attachment.url",
-  "attachment.url.image",
-  "attachment.map",
-  "attachment.placeholder"
-];
-var RULE_MODES = ["wrap", "linePrefix", "pattern", "plain", "omit"];
-var INLINE_FORMATS = [
-  "subscript",
-  "superscript",
-  "highlight",
-  "underline",
-  "strikethrough",
-  "bold",
-  "italic",
-  "color",
-  "link"
-];
-var PLACEHOLDERS = [
-  "content",
-  "title",
-  "id",
-  "uuid",
-  "folder",
-  "account",
-  "created",
-  "modified",
-  "tags",
-  "exportStem",
-  "index",
-  "checked",
-  "url",
-  "path",
-  "alt",
-  "caption",
-  "linkText",
-  "filename",
-  "kind",
-  "uti",
-  "color",
-  "highlight",
-  "fence"
-];
-var NOTE_PLACEHOLDERS = [
-  "title",
-  "id",
-  "uuid",
-  "folder",
-  "account",
-  "created",
-  "modified",
-  "exportStem"
-];
-var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join29) => ({
-  mode: "wrap",
-  before,
-  after,
-  ...join29 ? { join: join29 } : {}
-});
-var pattern = (value, join29) => ({
-  mode: "pattern",
-  value,
-  ...join29 ? { join: join29 } : {}
-});
-var STANDARD = {
-  schemaVersion: 1,
-  name: "standard-markdown",
-  description: "The default export-notes-markdown output",
-  assets: { mode: "copy", pathStyle: "relative", directory: null },
-  inlineOrder: [...INLINE_FORMATS],
-  options: {
-    titleFallback: true,
-    richLinkImages: false,
-    richLinkImageCaption: "none",
-    listIndent: "    "
-  },
-  rules: {
-    "document.header": pattern(""),
-    "document.footer": pattern(""),
-    "document.separator": pattern("\n\n---\n\n"),
-    "block.title": wrap2("# ", "", "paragraph"),
-    "block.heading": wrap2("## ", "", "paragraph"),
-    "block.subheading": wrap2("### ", "", "paragraph"),
-    "block.body": { mode: "plain", join: "paragraph" },
-    "block.bulleted": wrap2("- ", "", "line"),
-    "block.dashed": wrap2("- ", "", "line"),
-    "block.numbered": pattern("{{index}}. {{content}}", "line"),
-    "block.checklist.checked": wrap2("- [x] ", "", "line"),
-    "block.checklist.unchecked": wrap2("- [ ] ", "", "line"),
-    "block.code": wrap2("{{fence}}\n", "\n{{fence}}", "paragraph"),
-    "paragraph.quote": { mode: "linePrefix", value: "> " },
-    "inline.bold": wrap2("**", "**"),
-    "inline.italic": wrap2("*", "*"),
-    "inline.underline": wrap2("<u>", "</u>"),
-    "inline.strikethrough": wrap2("~~", "~~"),
-    "inline.superscript": wrap2("<sup>", "</sup>"),
-    "inline.subscript": wrap2("<sub>", "</sub>"),
-    "inline.highlight.purple": wrap2("==", "=="),
-    "inline.highlight.pink": wrap2("==", "=="),
-    "inline.highlight.orange": wrap2("==", "=="),
-    "inline.highlight.mint": wrap2("==", "=="),
-    "inline.highlight.blue": wrap2("==", "=="),
-    "inline.highlight.other": wrap2("==", "=="),
-    "inline.color": { mode: "plain" },
-    "inline.link": pattern("[{{content}}]({{url}})"),
-    "attachment.image": pattern("![{{alt}}]({{path}})"),
-    "attachment.drawing.classic": pattern("![{{alt}}]({{path}})"),
-    "attachment.drawing.paper": pattern("![{{alt}}]({{path}})"),
-    "attachment.scan": pattern("[{{linkText}}]({{path}})"),
-    "attachment.pdf": pattern("[{{linkText}}]({{path}})"),
-    "attachment.audio": pattern("[{{linkText}}]({{path}})"),
-    "attachment.video": pattern("[{{linkText}}]({{path}})"),
-    "attachment.other": pattern("[{{linkText}}]({{path}})"),
-    "attachment.table": { mode: "plain" },
-    "attachment.divider": pattern("---"),
-    "attachment.gallery": { mode: "plain", join: "paragraph" },
-    "attachment.url": pattern("[{{alt}}]({{url}})"),
-    "attachment.url.image": pattern("![{{alt}}]({{url}})"),
-    "attachment.map": pattern("[{{alt}}]({{url}})"),
-    "attachment.placeholder": pattern("\\[{{content}}\\]")
-  }
-};
-var OBSIDIAN = {
-  schemaVersion: 1,
-  name: "obsidian",
-  description: "Obsidian-style Markdown: YAML front matter (title, dates, folder, tags, id), image-URL link cards as images, attachments copied to <file>.assets",
-  extends: "standard-markdown",
-  assets: { directory: "{{exportStem}}.assets" },
-  options: { richLinkImages: true, richLinkImageCaption: "followingItalicParagraph" },
-  rules: {
-    "document.header": pattern(
-      "---\ntitle: {{title:yaml}}\ncreated: {{created:yaml}}\nmodified: {{modified:yaml}}\nfolder: {{folder:yaml}}\ntags: {{tags:yaml}}\nnote-id: {{uuid:yaml}}\n---\n\n"
-    )
-  }
-};
-var BUILTINS = { "standard-markdown": STANDARD, obsidian: OBSIDIAN };
-var BUILTIN_TEMPLATE_NAMES = Object.keys(BUILTINS);
-var isBuiltinTemplate = (name) => Object.prototype.hasOwnProperty.call(BUILTINS, name);
-function builtinTemplate(name) {
-  return JSON.parse(JSON.stringify(BUILTINS[name]));
-}
-var TemplateValidationError = class extends Error {
-  constructor(errors) {
-    super(
-      `Invalid template (${errors.length} problem${errors.length === 1 ? "" : "s"}): ` + errors.map((e) => `${e.path}: ${e.message}`).join("; ")
-    );
-    this.errors = errors;
-    this.name = "TemplateValidationError";
-  }
-  errors;
-  code = "invalid-template";
-};
-var MAX_QUOTED_TOKEN = 32;
-function child(path10, key) {
-  if (typeof key === "number") return `${path10}[${key}]`;
-  if (key.length > MAX_QUOTED_TOKEN) key = `${key.slice(0, MAX_QUOTED_TOKEN - 3)}...`;
-  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${path10}.${key}` : `${path10}[${JSON.stringify(key)}]`;
-}
-var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var describe = (value) => value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
-var describeVersion = (value) => typeof value === "number" && Number.isFinite(value) ? String(value) : describe(value);
-var listed = (values) => values.map((v) => JSON.stringify(v)).join(", ");
-var quoted = (token) => token.length <= MAX_QUOTED_TOKEN ? token : `${token.slice(0, MAX_QUOTED_TOKEN - 3)}...}}`;
-var TOKEN = /\{\{([^{}]*)\}\}/g;
-var TOKEN_BODY = /^\s*([A-Za-z]+)(?::([A-Za-z]+))?\s*$/;
-var META_PLACEHOLDERS = ["uuid", "folder", "account", "created", "modified"];
-function usesNoteMeta(template) {
-  const uses = (value) => typeof value === "string" ? placeholderTokens(value).some(({ name }) => META_PLACEHOLDERS.includes(name)) : typeof value === "object" && value !== null && Object.values(value).some(uses);
-  return uses(template.rules) || uses(template.assets) || uses(template.options);
-}
-function placeholderTokens(text2) {
-  return [...text2.matchAll(TOKEN)].map((match) => {
-    const body = TOKEN_BODY.exec(match[1]);
-    return {
-      token: match[0],
-      name: body?.[1] ?? match[1],
-      ...body?.[2] ? { modifier: body[2] } : {}
-    };
-  });
-}
-var Collector = class {
-  errors = [];
-  add(path10, message) {
-    this.errors.push({ path: path10, message });
-  }
-  /** Report unknown keys; returns the known keys present, sorted. */
-  keys(value, path10, allowed) {
-    const present = Object.keys(value).sort();
-    for (const key of present)
-      if (!allowed.includes(key))
-        this.add(child(path10, key), `unknown key; allowed keys are ${listed(allowed)}`);
-    return present.filter((key) => allowed.includes(key));
-  }
-  text(value, path10, { max, allowed = PLACEHOLDERS }) {
-    if (typeof value !== "string") {
-      this.add(path10, `must be a string, not ${describe(value)}`);
-      return false;
-    }
-    if (value.length > max)
-      this.add(path10, `must be at most ${max} characters (is ${value.length})`);
-    for (const { token: raw, name, modifier } of placeholderTokens(value)) {
-      const token = quoted(raw);
-      if (!PLACEHOLDERS.includes(name))
-        this.add(path10, `unknown placeholder ${token}; allowed: ${PLACEHOLDERS.join(", ")}`);
-      else if (!allowed.includes(name))
-        this.add(
-          path10,
-          `placeholder ${token} is not available here; allowed: ${allowed.join(", ")}`
-        );
-      else if (modifier && !PLACEHOLDER_MODIFIERS.includes(modifier))
-        this.add(
-          path10,
-          `unknown modifier in ${token}; allowed modifiers are ${PLACEHOLDER_MODIFIERS.join(", ")}`
-        );
-    }
-    return true;
-  }
-  oneOf(value, path10, allowed) {
-    if (typeof value === "string" && allowed.includes(value)) return true;
-    this.add(
-      path10,
-      typeof value === "string" ? `must be one of ${listed(allowed)}` : `must be one of ${listed(allowed)}, not ${describe(value)}`
-    );
-    return false;
-  }
-  boolean(value, path10) {
-    if (typeof value === "boolean") return true;
-    this.add(path10, `must be true or false, not ${describe(value)}`);
-    return false;
-  }
-};
-var RULE_FIELDS = {
-  wrap: ["before", "after"],
-  linePrefix: ["value"],
-  pattern: ["value"],
-  plain: [],
-  omit: []
-};
-function validateRule(c, rule, path10) {
-  if (!isObject2(rule)) {
-    c.add(path10, `must be an object, not ${describe(rule)}`);
-    return;
-  }
-  const keys = c.keys(rule, path10, ["mode", "before", "after", "value", "join"]);
-  if (!("mode" in rule)) {
-    c.add(child(path10, "mode"), `is required; one of ${listed(RULE_MODES)}`);
-    return;
-  }
-  if (!c.oneOf(rule.mode, child(path10, "mode"), RULE_MODES)) return;
-  const needed = RULE_FIELDS[rule.mode];
-  for (const field of ["before", "after", "value"]) {
-    const fieldPath = child(path10, field);
-    if (needed.includes(field)) {
-      if (!(field in rule)) c.add(fieldPath, `is required when mode is "${rule.mode}"`);
-      else c.text(rule[field], fieldPath, { max: MAX_RULE_TEXT });
-    } else if (keys.includes(field)) c.add(fieldPath, `is not used when mode is "${rule.mode}"`);
-  }
-  if ("join" in rule) c.oneOf(rule.join, child(path10, "join"), ["line", "paragraph"]);
-}
-function validateDirectory(c, value, path10) {
-  if (value === null) return;
-  if (!c.text(value, path10, { max: MAX_DIRECTORY_LENGTH, allowed: NOTE_PLACEHOLDERS })) return;
-  if (!value.trim()) c.add(path10, "must not be empty; use null to copy only with assetsDir");
-  else if (/^[/~]/.test(value)) c.add(path10, "must be relative to the output file's directory");
-  else if (/[\\\0]/.test(value)) c.add(path10, "must not contain a backslash or NUL");
-  else if (value.split("/").some((part) => part.trim() === ".."))
-    c.add(path10, 'must not contain a ".." component');
-}
-function validateInlineOrder(c, value, path10) {
-  if (!Array.isArray(value)) {
-    c.add(
-      path10,
-      `must be an array of ${INLINE_FORMATS.length} inline formats, not ${describe(value)}`
-    );
-    return;
-  }
-  const seen = /* @__PURE__ */ new Set();
-  value.forEach((item, i) => {
-    if (!c.oneOf(item, child(path10, i), INLINE_FORMATS)) return;
-    if (seen.has(item)) c.add(child(path10, i), `duplicate format "${item}"`);
-    seen.add(item);
-  });
-  const missing = INLINE_FORMATS.filter((format) => !seen.has(format));
-  if (missing.length) c.add(path10, `must list every inline format; missing ${listed(missing)}`);
-}
-function validateOptions(c, value, path10) {
-  if (!isObject2(value)) {
-    c.add(path10, `must be an object, not ${describe(value)}`);
-    return;
-  }
-  for (const key of c.keys(value, path10, [
-    "titleFallback",
-    "richLinkImages",
-    "richLinkImageCaption",
-    "listIndent"
-  ])) {
-    const at = child(path10, key);
-    if (key === "richLinkImageCaption")
-      c.oneOf(value[key], at, ["none", "followingItalicParagraph"]);
-    else if (key === "listIndent") {
-      if (typeof value[key] !== "string" || !/^[ \t]{0,16}$/.test(value[key]))
-        c.add(at, "must be a string of at most 16 spaces or tabs");
-    } else c.boolean(value[key], at);
-  }
-}
-function templateErrors(input) {
-  const c = new Collector();
-  if (!isObject2(input)) {
-    c.add("$", `a template must be a JSON object, not ${describe(input)}`);
-    return c.errors;
-  }
-  if (input.schemaVersion !== TEMPLATE_SCHEMA_VERSION) {
-    c.add(
-      "$.schemaVersion",
-      "schemaVersion" in input ? `must be ${TEMPLATE_SCHEMA_VERSION}, not ${describeVersion(input.schemaVersion)}` : `is required and must be ${TEMPLATE_SCHEMA_VERSION}`
-    );
-    return c.errors;
-  }
-  const keys = c.keys(input, "$", [
-    "schemaVersion",
-    "name",
-    "description",
-    "extends",
-    "assets",
-    "inlineOrder",
-    "rules",
-    "options"
-  ]);
-  for (const key of keys) {
-    const path10 = child("$", key);
-    const value = input[key];
-    switch (key) {
-      case "schemaVersion":
-        break;
-      case "name":
-      case "description":
-        c.text(value, path10, { max: MAX_META_LENGTH, allowed: [] });
-        break;
-      case "extends":
-        c.oneOf(value, path10, BUILTIN_TEMPLATE_NAMES);
-        break;
-      case "assets":
-        if (!isObject2(value)) {
-          c.add(path10, `must be an object, not ${describe(value)}`);
-          break;
-        }
-        for (const field of c.keys(value, path10, ["mode", "pathStyle", "directory"])) {
-          const at = child(path10, field);
-          if (field === "mode") c.oneOf(value.mode, at, ["copy", "reference", "omit"]);
-          else if (field === "pathStyle")
-            c.oneOf(value.pathStyle, at, ["relative", "absolute"]);
-          else validateDirectory(c, value.directory, at);
-        }
-        break;
-      case "inlineOrder":
-        validateInlineOrder(c, value, path10);
-        break;
-      case "rules":
-        if (!isObject2(value)) {
-          c.add(path10, `must be an object keyed by rule id, not ${describe(value)}`);
-          break;
-        }
-        for (const id2 of Object.keys(value).sort()) {
-          if (!RULE_IDS.includes(id2))
-            c.add(child(path10, id2), "unknown rule id; see the template reference for the list");
-          else validateRule(c, value[id2], child(path10, id2));
-        }
-        break;
-      default:
-        validateOptions(c, value, path10);
-    }
-  }
-  return c.errors;
-}
-function validateTemplate(input) {
-  const errors = templateErrors(input);
-  if (errors.length) throw new TemplateValidationError(errors);
-  return input;
-}
-function jsonErrorLocation(text2, message) {
-  const lineColumn = /\(line (\d+) column (\d+)\)/.exec(message);
-  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
-  const position = /at position (\d+)/.exec(message);
-  if (!position) return void 0;
-  const offset = Math.min(Number(position[1]), text2.length);
-  const before = text2.slice(0, offset).split("\n");
-  return { line: before.length, column: before[before.length - 1].length + 1 };
-}
-function parseTemplate(text2) {
-  const bytes = Buffer.byteLength(text2, "utf8");
-  if (bytes > MAX_TEMPLATE_BYTES)
-    throw new TemplateValidationError([
-      { path: "$", message: `template is ${bytes} bytes; the limit is ${MAX_TEMPLATE_BYTES}` }
-    ]);
-  let parsed;
-  try {
-    parsed = JSON.parse(text2);
-  } catch (error2) {
-    const at = jsonErrorLocation(text2, error2.message);
-    throw new TemplateValidationError([
-      {
-        path: "$",
-        message: at ? `not valid JSON at line ${at.line}, column ${at.column}` : "not valid JSON"
-      }
-    ]);
-  }
-  return validateTemplate(parsed);
-}
-function resolveTemplate(template, name) {
-  if (template === STANDARD) return merge2(void 0, STANDARD, name);
-  return merge2(resolveTemplate(BUILTINS[template.extends ?? "standard-markdown"]), template, name);
-}
-function merge2(base, template, name) {
-  return {
-    name: name ?? template.name ?? base?.name ?? "template",
-    ...template.description !== void 0 ? { description: template.description } : base?.description !== void 0 ? { description: base.description } : {},
-    assets: { ...base?.assets, ...template.assets },
-    inlineOrder: [...template.inlineOrder ?? base.inlineOrder],
-    rules: { ...base?.rules, ...template.rules },
-    options: { ...base?.options, ...template.options }
-  };
-}
-var plainValue = (text2) => ({ md: text2, raw: text2 });
-function fillPlaceholders(text2, values) {
-  return text2.replace(TOKEN, (token, body) => {
-    const parsed = TOKEN_BODY.exec(body);
-    const raw = parsed ? values[parsed[1]] : void 0;
-    const value = typeof raw === "string" ? plainValue(raw) : raw;
-    if (parsed?.[2] === "yaml") {
-      if (!value) return "null";
-      return JSON.stringify(value.list ?? value.raw);
-    }
-    if (!value) return "";
-    return parsed?.[2] === "raw" ? value.raw : value.md;
-  });
-}
-function ruleUses(rule, name) {
-  return [rule.before, rule.after, rule.value].some(
-    (text2) => text2 !== void 0 && placeholderTokens(text2).some((token) => token.name === name)
-  );
-}
-
-// src/utils/templateRender.ts
-var FILE_BACKED = /* @__PURE__ */ new Set([
-  "image",
-  "drawing",
-  "paper",
-  "scan",
-  "pdf",
-  "audio",
-  "video",
-  "file",
-  "gallery"
-]);
-var KIND_RULES = {
-  image: "attachment.image",
-  drawing: "attachment.drawing.classic",
-  paper: "attachment.drawing.paper",
-  scan: "attachment.scan",
-  pdf: "attachment.pdf",
-  audio: "attachment.audio",
-  video: "attachment.video",
-  file: "attachment.other",
-  table: "attachment.table",
-  divider: "attachment.divider",
-  gallery: "attachment.gallery",
-  link: "attachment.url"
-};
-var IMAGE_URL_EXTENSIONS = /\.(?:apng|avif|bmp|gif|heic|heif|ico|jfif|jpe?g|jxl|png|svgz?|tiff?|webp)$/i;
-function isImageUrl(url) {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    let path10 = parsed.pathname;
-    try {
-      path10 = decodeURIComponent(path10);
-    } catch {
-    }
-    return IMAGE_URL_EXTENSIONS.test(path10);
-  } catch {
-    return false;
-  }
-}
-function isMapUrl(url) {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host === "maps.apple.com" || host.endsWith(".maps.apple.com");
-  } catch {
-    return false;
-  }
-}
-function attachmentRuleId(attachment, template) {
-  if (attachment.kind === "inline") return void 0;
-  if (attachment.kind === "link") {
-    const url = attachment.url ?? "";
-    if (template.options.richLinkImages && isImageUrl(url)) return "attachment.url.image";
-    if (isMapUrl(url)) return "attachment.map";
-  }
-  return KIND_RULES[attachment.kind] ?? "attachment.other";
-}
-function applyRule(rule, content, values) {
-  const fill = (text2 = "") => fillPlaceholders(text2, { ...values, content: plainValue(content) });
-  switch (rule.mode) {
-    case "omit":
-      return void 0;
-    case "plain":
-      return content;
-    case "wrap":
-      return fill(rule.before) + content + fill(rule.after);
-    case "pattern":
-      return fill(rule.value);
-    case "linePrefix": {
-      const prefix = fill(rule.value);
-      return content.split("\n").map((line) => line ? prefix + line : prefix.trimEnd()).join("\n");
-    }
-  }
-}
-function applyInline(rule, text2, values) {
-  const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(text2);
-  if (!match[2]) return text2;
-  const out = applyRule(rule, match[2], values);
-  return out === void 0 ? "" : `${match[1]}${out}${match[3]}`;
-}
-var HIGHLIGHT_RULES = /* @__PURE__ */ new Set(["purple", "pink", "orange", "mint", "blue"]);
-function highlightRule(name) {
-  return HIGHLIGHT_RULES.has(name) ? `inline.highlight.${name}` : "inline.highlight.other";
-}
-function buildLayers(template) {
-  const { rules } = template;
-  const active = (rule) => rule.mode !== "plain";
-  const flag3 = (format) => {
-    const rule = rules[`inline.${format}`];
-    return {
-      key: (fmt) => fmt[format] && active(rule) ? "on" : void 0,
-      rule: () => rule,
-      values: () => ({})
-    };
-  };
-  const layers = {
-    bold: flag3("bold"),
-    italic: flag3("italic"),
-    underline: flag3("underline"),
-    strikethrough: flag3("strikethrough"),
-    superscript: flag3("superscript"),
-    subscript: flag3("subscript"),
-    highlight: {
-      key: (fmt) => {
-        if (!fmt.highlight) return void 0;
-        const rule = rules[highlightRule(fmt.highlight)];
-        if (!active(rule)) return void 0;
-        return JSON.stringify(rule) + (ruleUses(rule, "highlight") ? fmt.highlight : "");
-      },
-      rule: (fmt) => rules[highlightRule(fmt.highlight)],
-      values: (fmt) => ({ highlight: fmt.highlight })
-    },
-    color: {
-      key: (fmt) => {
-        const rule = rules["inline.color"];
-        if (!fmt.color || !active(rule)) return void 0;
-        return ruleUses(rule, "color") ? fmt.color : "on";
-      },
-      rule: () => rules["inline.color"],
-      values: (fmt) => ({ color: fmt.color })
-    },
-    link: {
-      key: (fmt) => fmt.link,
-      rule: () => rules["inline.link"],
-      values: (fmt) => ({ url: { md: linkDestination(fmt.link), raw: fmt.link } })
-    }
-  };
-  return [...template.inlineOrder].reverse().map((format) => layers[format]);
-}
-var LIST_STYLES2 = /* @__PURE__ */ new Set(["bulleted", "dashed", "numbered", "checklist"]);
-var TemplateRenderer = class {
-  constructor(ctx, options) {
-    this.ctx = ctx;
-    this.options = options;
-    this.layers = buildLayers(options.template);
-    this.rules = options.template.rules;
-  }
-  ctx;
-  options;
-  warnings = [];
-  layers;
-  rules;
-  /** The attachment each plan was made from, for rule and placeholder lookup. */
-  origins = /* @__PURE__ */ new WeakMap();
-  get template() {
-    return this.options.template;
-  }
-  /** Placeholder values describing the note. */
-  noteValues(note) {
-    const meta = this.options.metaFor?.(note) ?? {};
-    const text2 = (value) => value === void 0 ? void 0 : { md: escapeMarkdown(value), raw: value };
-    const tags = noteTags(note);
-    const values = {
-      title: text2(note.title.trim()),
-      id: note.id,
-      uuid: meta.uuid,
-      folder: text2(meta.folder),
-      account: text2(meta.account),
-      created: meta.created,
-      modified: meta.modified,
-      tags: {
-        md: tags.map((tag) => escapeMarkdown(tag)).join(", "),
-        raw: tags.join(", "),
-        list: tags
-      },
-      exportStem: this.options.exportStem ?? "export"
-    };
-    return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== void 0));
-  }
-  warn(code, note, attachmentId) {
-    this.warnings.push({ code, noteId: note.id, ...attachmentId ? { attachmentId } : {} });
-  }
-  /** Plan one attachment, honoring omit rules before any file is placed. */
-  plan(note, id2, attachment, binding) {
-    const omitted = { type: "inline", text: "" };
-    if (!attachment) {
-      this.warn("attachment_not_found", note, id2);
-      return planAttachment(void 0, this.ctx);
-    }
-    const ruleId = attachmentRuleId(attachment, this.template);
-    if (ruleId && this.rules[ruleId].mode === "omit") return omitted;
-    const fileBacked = FILE_BACKED.has(attachment.kind);
-    if (fileBacked && this.template.assets.mode === "omit") return omitted;
-    if (fileBacked && !binding.writer && binding.required)
-      this.warn("assets_dir_required", note, attachment.id);
-    const plan = planAttachment(attachment, {
-      ...this.ctx,
-      ...binding.writer ? { writer: binding.writer } : { writer: void 0 }
-    });
-    this.inspect(note, plan, attachment);
-    return plan;
-  }
-  /** Record origins and warnings for a plan and any gallery items. */
-  inspect(note, plan, attachment) {
-    this.origins.set(plan, attachment);
-    switch (plan.type) {
-      case "inline":
-        if (!plan.text) this.warn("inline_token_metadata_missing", note, attachment.id);
-        break;
-      case "unavailable":
-        this.warn(
-          plan.reason === "undecodable" ? "table_decode_failed" : plan.reason === "missing" ? "missing_asset" : "asset_copy_failed",
-          note,
-          attachment.id
-        );
-        break;
-      case "gallery":
-        if (!plan.items.length) this.warn("gallery_children_missing", note, attachment.id);
-        plan.items.forEach((item, i) => this.inspect(note, item, attachment.children[i]));
-        break;
-    }
-  }
-  /** Placeholder values for an attachment. */
-  attachmentValues(attachment, base) {
-    if (!attachment) return base;
-    const filename = attachment.mediaFilename ?? attachment.title;
-    return {
-      ...base,
-      kind: attachment.kind,
-      uti: attachment.uti,
-      ...filename ? { filename: { md: escapeMarkdown(filename), raw: filename } } : {}
-    };
-  }
-  /** Render a plan through its template rule; "" when omitted. */
-  renderPlan(plan, values, caption) {
-    const origin = this.origins.get(plan);
-    const vars = this.attachmentValues(origin, values);
-    const apply2 = (id2, content, extra = {}) => applyRule(this.rules[id2], content, { ...vars, ...extra }) ?? "";
-    switch (plan.type) {
-      case "inline":
-        return plan.link ? applyInline(this.rules["inline.link"], escapeMarkdown(plan.text), {
-          ...vars,
-          url: { md: linkDestination(plan.link), raw: plan.link }
-        }) : escapeMarkdown(plan.text);
-      case "divider":
-        return apply2("attachment.divider", "");
-      case "table":
-        return apply2("attachment.table", tableMarkdown(plan.rows));
-      case "placeholder":
-      case "unavailable": {
-        const label = plan.type === "unavailable" ? `${plan.label} unavailable` : plan.label;
-        return apply2(
-          "attachment.placeholder",
-          escapeMarkdown(plan.name ? `${label}: ${plan.name}` : label)
-        );
-      }
-      case "asset": {
-        const alt = escapeMarkdown(plan.name ?? plan.label);
-        const id2 = origin && attachmentRuleId(origin, this.template) || "attachment.other";
-        return apply2(id2, "", {
-          alt: { md: alt, raw: plan.name ?? plan.label },
-          path: { md: linkDestination(plan.url), raw: plan.url },
-          linkText: plan.previewUrl ? `![${alt}](${linkDestination(plan.previewUrl)})` : alt
-        });
-      }
-      case "card": {
-        if (!plan.url) return `${escapeMarkdown(plan.title)} (${escapeMarkdown(plan.displayUrl)})`;
-        const id2 = origin && attachmentRuleId(origin, this.template) || "attachment.url";
-        const alt = caption ?? plan.title;
-        return apply2(id2, "", {
-          alt: { md: escapeMarkdown(alt), raw: alt },
-          url: { md: linkDestination(plan.url), raw: plan.url },
-          ...caption !== void 0 ? { caption: { md: escapeMarkdown(caption), raw: caption } } : {}
-        });
-      }
-      case "gallery": {
-        const rule = this.rules["attachment.gallery"];
-        const items = plan.items.map((item) => this.renderPlan(item, values)).filter(Boolean);
-        if (!items.length) return "";
-        return apply2("attachment.gallery", items.join(rule.join === "line" ? "\n" : "\n\n"));
-      }
-    }
-  }
-  /** Format text runs through the inline layers. */
-  layered(pieces, values, depth = 0) {
-    if (depth === this.layers.length)
-      return pieces.map((piece) => escapeMarkdown(piece.text.replace(/\n/g, " "))).join("");
-    const layer = this.layers[depth];
-    let out = "";
-    for (let i = 0; i < pieces.length; ) {
-      const key = layer.key(pieces[i].fmt);
-      let j = i;
-      while (j < pieces.length && layer.key(pieces[j].fmt) === key) j++;
-      const inner = this.layered(pieces.slice(i, j), values, depth + 1);
-      const fmt = pieces[i].fmt;
-      out = joinSafe(
-        out,
-        key === void 0 ? inner : applyInline(layer.rule(fmt), inner, { ...values, ...layer.values(fmt) })
-      );
-      i = j;
-    }
-    return out;
-  }
-  inline(pieces, values, caption) {
-    let out = "";
-    for (let i = 0; i < pieces.length; ) {
-      const piece = pieces[i];
-      if (piece.type === "attachment") {
-        out = joinSafe(out, this.renderPlan(piece.plan, values, caption));
-        i++;
-        continue;
-      }
-      let j = i;
-      while (j < pieces.length && pieces[j].type === "text") j++;
-      out = joinSafe(out, this.layered(pieces.slice(i, j), values));
-      i = j;
-    }
-    return out;
-  }
-  /** The caption paragraph after a lone image-URL link card, if the template wants one. */
-  captionFor(note, index) {
-    const { options } = this.template;
-    if (!options.richLinkImages || options.richLinkImageCaption !== "followingItalicParagraph")
-      return void 0;
-    const blocks = note.doc.blocks;
-    const current = blocks[index];
-    if (current.text.trim() !== "\uFFFC" || current.attachments.length !== 1) return void 0;
-    const attachment = note.attachments.get(current.attachments[0].id);
-    if (!attachment || attachmentRuleId(attachment, this.template) !== "attachment.url.image")
-      return void 0;
-    if (this.rules["attachment.url.image"].mode === "omit" || !isSafe(attachment.url))
-      return void 0;
-    const next = blocks[index + 1];
-    if (!next || next.style !== "body" || next.blockQuote || next.indent !== 0 || next.attachments.length || next.text.includes("\uFFFC") || !next.text.trim() || !next.runs.every((run) => !run.text.trim() || run.italic))
-      return void 0;
-    return next.text.trim();
-  }
-  /** Render one note's body. */
-  renderBody(note, values) {
-    const binding = this.options.assetsFor?.(note) ?? {};
-    const plan = (id2) => this.plan(note, id2, note.attachments.get(id2), binding);
-    const titleIndex = titleBlockIndex(note);
-    const lines = [];
-    const counters = [];
-    const skip = /* @__PURE__ */ new Set();
-    let code;
-    const push = (text2, quote, group) => {
-      if (!text2) return;
-      if (quote) {
-        const quoted2 = applyRule(this.rules["paragraph.quote"], text2, values);
-        if (!quoted2) return;
-        text2 = quoted2;
-      }
-      lines.push({ text: text2, quote, ...group ? { group } : {} });
-    };
-    const ruled = (id2, content, extra = {}) => applyRule(this.rules[id2], content, { ...values, ...extra });
-    const groupOf = (id2, list) => this.rules[id2].join === "line" ? list ? "list" : id2 : void 0;
-    const flushCode = () => {
-      if (!code) return;
-      const longest = Math.max(
-        2,
-        ...code.lines.map((l) => Math.max(0, ...(l.match(/`+/g) ?? []).map((m) => m.length)))
-      );
-      push(
-        ruled("block.code", code.lines.join("\n"), { fence: "`".repeat(longest + 1) }),
-        code.quote,
-        groupOf("block.code", false)
-      );
-      code = void 0;
-    };
-    if (this.template.options.titleFallback && titleIndex === -1 && note.title.trim())
-      push(
-        ruled("block.title", escapeMarkdown(note.title.trim())),
-        false,
-        groupOf("block.title", false)
-      );
-    for (const block of note.doc.blocks) {
-      if (skip.has(block.index)) continue;
-      if (block.style === "monospaced") {
-        if (code && code.quote !== block.blockQuote) flushCode();
-        code ??= { lines: [], quote: block.blockQuote };
-        code.lines.push(block.text.replace(/￼/g, ""));
-        continue;
-      }
-      flushCode();
-      if (!LIST_STYLES2.has(block.style)) counters.length = 0;
-      if (!block.text.trim()) continue;
-      const caption = this.captionFor(note, block.index);
-      if (caption !== void 0) skip.add(block.index + 1);
-      const pieces = blockPieces(block, plan);
-      let segment = [];
-      const segments = [];
-      for (const piece of pieces) {
-        if (piece.type === "attachment" && isBlockPlan(piece.plan)) {
-          segments.push(segment, piece.plan);
-          segment = [];
-        } else segment.push(piece);
-      }
-      segments.push(segment);
-      let first2 = true;
-      for (const segment2 of segments) {
-        if (!Array.isArray(segment2)) {
-          push(this.renderPlan(segment2, values), block.blockQuote);
-          continue;
-        }
-        const body = this.inline(segment2, values, caption).trim();
-        if (!body) continue;
-        const [text2, group] = this.blockLine(
-          block,
-          body,
-          first2,
-          block.index === titleIndex,
-          counters,
-          values
-        );
-        push(text2, block.blockQuote, group);
-        first2 = false;
-      }
-    }
-    flushCode();
-    for (const attachment of unreferencedAttachments(note)) {
-      this.ctx.stats.unreferenced++;
-      push(this.renderPlan(this.plan(note, attachment.id, attachment, binding), values), false);
-    }
-    return this.join(lines, values);
-  }
-  /** One paragraph through its block rule, with list indent and numbering. */
-  blockLine(block, body, first2, isTitle, counters, values) {
-    const rule = (id2, content, extra = {}, list = false) => [
-      applyRule(this.rules[id2], content, { ...values, ...extra }),
-      this.rules[id2].join === "line" ? list ? "list" : id2 : void 0
-    ];
-    if (isTitle || block.style === "title") return rule("block.title", body);
-    if (block.style === "heading") return rule("block.heading", body);
-    if (block.style === "subheading") return rule("block.subheading", body);
-    if (!LIST_STYLES2.has(block.style) || !first2) return rule("block.body", escapeLineStart(body));
-    const item = escapeLineStart(body);
-    const level = Math.min(block.indent, 20);
-    counters.length = Math.min(counters.length, level + 1);
-    while (counters.length <= level) counters.push(0);
-    let result;
-    if (block.style === "numbered")
-      result = rule("block.numbered", item, { index: String(++counters[level]) }, true);
-    else {
-      counters[level] = 0;
-      if (block.style === "checklist") {
-        const done = !!block.checklist?.done;
-        result = rule(
-          done ? "block.checklist.checked" : "block.checklist.unchecked",
-          item,
-          { checked: String(done) },
-          true
-        );
-      } else
-        result = rule(block.style === "dashed" ? "block.dashed" : "block.bulleted", item, {}, true);
-    }
-    const indent = this.template.options.listIndent.repeat(level);
-    if (result[0] && indent)
-      result[0] = result[0].split("\n").map((line) => line ? indent + line : line).join("\n");
-    return result;
-  }
-  /** Join lines: one newline within a `line`-join group, a blank line elsewhere. */
-  join(lines, values) {
-    const quote = this.rules["paragraph.quote"];
-    const quoteGap = quote.mode === "linePrefix" ? `
-${fillPlaceholders(quote.value ?? "", values).trimEnd()}
-` : "\n\n";
-    let out = "";
-    let previous;
-    for (const line of lines) {
-      if (previous) {
-        const tight = previous.group !== void 0 && previous.group === line.group && previous.quote === line.quote;
-        out += tight ? "\n" : previous.quote && line.quote ? quoteGap : "\n\n";
-      }
-      out += line.text;
-      previous = line;
-    }
-    return out;
-  }
-};
-var isSafe = (url) => !!url && /^https?:\/\//i.test(url) && !Array.from(url).some((c) => c.charCodeAt(0) < 32);
-function noteTags(note) {
-  const tags = [];
-  for (const attachment of note.attachments.values()) {
-    if (!attachment.uti.endsWith(".hashtag") || !attachment.altText) continue;
-    const tag = attachment.altText.replace(/^#/, "").trim();
-    if (tag && !tags.includes(tag)) tags.push(tag);
-  }
-  return tags;
-}
-function renderNotesWithTemplate(notes, ctx, options) {
-  const renderer = new TemplateRenderer(ctx, options);
-  const rules = options.template.rules;
-  let markdown = "";
-  notes.forEach((note, i) => {
-    const values = renderer.noteValues(note);
-    if (i > 0) markdown += applyRule(rules["document.separator"], "", values) ?? "";
-    const body = renderer.renderBody(note, values);
-    markdown += (applyRule(rules["document.header"], "", values) ?? "") + (options.wrap ? wrapMarkdown(body, options.wrap) : body) + (applyRule(rules["document.footer"], "", values) ?? "");
-  });
-  return { markdown: markdown + (notes.length ? "\n" : ""), warnings: renderer.warnings };
-}
-
-// src/utils/templateAssets.ts
-import { createHash as createHash2 } from "node:crypto";
-import {
-  closeSync as closeSync5,
-  constants as constants5,
-  fstatSync as fstatSync5,
-  lstatSync as lstatSync4,
-  mkdirSync as mkdirSync5,
-  openSync as openSync5,
-  readSync as readSync4,
-  writeSync as writeSync4
-} from "node:fs";
-import { extname as extname4, isAbsolute as isAbsolute3, join as join21, relative as relative4, resolve as resolve4, sep as sep4 } from "node:path";
-var CHUNK = 1024 * 1024;
-function openRegular(path10) {
-  const fd = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
-  if (!fstatSync5(fd).isFile()) {
-    closeSync5(fd);
-    throw new Error("not a regular file");
-  }
-  return fd;
-}
-function digest(fd) {
-  const hash = createHash2("sha256");
-  const chunk = Buffer.alloc(CHUNK);
-  let head = Buffer.alloc(0);
-  for (let position = 0; ; ) {
-    const n = readSync4(fd, chunk, 0, chunk.length, position);
-    if (n <= 0) break;
-    if (position === 0) head = Buffer.from(chunk.subarray(0, Math.min(n, 16)));
-    hash.update(chunk.subarray(0, n));
-    position += n;
-  }
-  return { hash: hash.digest("hex"), head };
-}
-function urlFor(target, linkBase) {
-  return encodePathUrl(linkBase ? relative4(linkBase, target).split(sep4).join("/") : target);
-}
-var HashedSidecarWriter = class {
-  constructor(dir, linkBase) {
-    this.dir = dir;
-    this.linkBase = linkBase;
-  }
-  dir;
-  linkBase;
-  placed = /* @__PURE__ */ new Map();
-  ready = false;
-  /** Absolute paths of files written or reused. */
-  files = [];
-  count = 0;
-  prepare() {
-    if (this.ready) return;
-    assertExportPath(this.dir);
-    mkdirSync5(this.dir, { recursive: true });
-    if (!lstatSync4(this.dir).isDirectory()) throw new Error("assets directory is not a directory");
-    this.ready = true;
-  }
-  place(asset) {
-    const done = this.placed.get(asset.path);
-    if (done) return done;
-    let source;
-    try {
-      source = openRegular(asset.path);
-    } catch {
-      return { error: "unreadable" };
-    }
-    try {
-      const { hash, head } = digest(source);
-      const mime = sniffMime(head, asset.name);
-      this.prepare();
-      const name = safeAssetName(asset.name, mime);
-      const ext = extname4(name);
-      const target = join21(
-        this.dir,
-        `${name.slice(0, name.length - ext.length)}-${hash.slice(0, 8)}${ext}`
-      );
-      let existing;
-      try {
-        existing = openRegular(target);
-      } catch (error2) {
-        const code = error2.code;
-        if (code !== "ENOENT") return { error: "destination-not-regular" };
-      }
-      if (existing !== void 0) {
-        try {
-          if (digest(existing).hash !== hash) return { error: "name-taken" };
-        } finally {
-          closeSync5(existing);
-        }
-      } else this.copy(source, target);
-      this.count++;
-      this.files.push(target);
-      const result = { url: urlFor(target, this.linkBase), mime };
-      this.placed.set(asset.path, result);
-      return result;
-    } catch (error2) {
-      return { error: error2 instanceof Error ? error2.message : String(error2) };
-    } finally {
-      closeSync5(source);
-    }
-  }
-  copy(source, target) {
-    const out = openSync5(
-      target,
-      constants5.O_WRONLY | constants5.O_CREAT | constants5.O_EXCL | constants5.O_NOFOLLOW,
-      420
-    );
-    try {
-      const chunk = Buffer.alloc(CHUNK);
-      for (let position = 0; ; ) {
-        const n = readSync4(source, chunk, 0, chunk.length, position);
-        if (n <= 0) break;
-        let written = 0;
-        while (written < n) written += writeSync4(out, chunk, written, n - written);
-        position += n;
-      }
-    } finally {
-      closeSync5(out);
-    }
-  }
-};
-var ReferenceWriter = class {
-  constructor(linkBase) {
-    this.linkBase = linkBase;
-  }
-  linkBase;
-  count = 0;
-  place(asset) {
-    let fd;
-    try {
-      fd = openRegular(asset.path);
-    } catch {
-      return { error: "unreadable" };
-    }
-    try {
-      const head = Buffer.alloc(16);
-      const n = readSync4(fd, head, 0, 16, 0);
-      this.count++;
-      return {
-        url: urlFor(asset.path, this.linkBase),
-        mime: sniffMime(head.subarray(0, n), asset.name)
-      };
-    } finally {
-      closeSync5(fd);
-    }
-  }
-};
-function pathComponent(value) {
-  const clean = Array.from(
-    value.normalize("NFC"),
-    (char) => char.charCodeAt(0) < 32 || char === "\x7F" ? "_" : char
-  ).join("").replace(/[/\\:]+/g, "_").replace(/^[.\s]+/, "").trim().slice(0, 120);
-  return clean || "untitled";
-}
-function templateAssetsDir(directory, outputDir, values) {
-  const safe = {};
-  for (const [key, value] of Object.entries(values)) {
-    const raw = typeof value === "string" ? value : value?.raw;
-    if (raw !== void 0) safe[key] = pathComponent(raw);
-  }
-  const filled = fillPlaceholders(directory, safe);
-  const base = resolve4(outputDir);
-  const dir = resolve4(base, filled);
-  if (isAbsolute3(filled) || filled.split("/").includes("..") || !dir.startsWith(base + sep4))
-    throw new Error(`assets.directory "${directory}" resolves outside the output directory`);
-  return dir;
-}
-function readTemplateFile(path10) {
-  const abs = assertExportPath(path10);
-  if (extname4(abs).toLowerCase() !== ".json")
-    throw new Error(`Template file must have a .json extension: ${abs}`);
-  let fd;
-  try {
-    fd = openRegular(abs);
-  } catch (error2) {
-    const code = error2.code;
-    throw new Error(
-      code === "ENOENT" ? `Template file not found: ${abs}` : code === "ELOOP" ? `Refusing to read the symbolic link ${abs}` : `Template file is not a readable regular file: ${abs}`
-    );
-  }
-  try {
-    const size = fstatSync5(fd).size;
-    if (size > MAX_TEMPLATE_BYTES)
-      throw new Error(`Template file is ${size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`);
-    const data = Buffer.alloc(size);
-    let read = 0;
-    while (read < size) {
-      const n = readSync4(fd, data, read, size - read, read);
-      if (n <= 0) break;
-      read += n;
-    }
-    return data.subarray(0, read).toString("utf8");
-  } finally {
-    closeSync5(fd);
-  }
-}
 
 // src/services/notesExport.ts
 var DEFAULT_FOLDER_EXPORT_LIMIT = 100;
 var MAX_FOLDER_EXPORT_LIMIT = 1e3;
 var NotesExportError = class extends Error {
-  constructor(code, message, details) {
+  constructor(code, message) {
     super(message);
     this.code = code;
-    this.details = details;
     this.name = "NotesExportError";
   }
   code;
-  details;
 };
-var MAX_EXPORT_WARNINGS = 200;
-var MAX_LISTED_ASSETS = 1e3;
-function chooseTemplate(request, deps) {
-  if (request.template !== void 0 && request.templateFile !== void 0)
-    throw new NotesExportError(
-      "invalid-request",
-      "Provide at most one of 'template' or 'templateFile'."
-    );
-  const invalid2 = (error2, where) => new NotesExportError("invalid-template", `${where}: ${error2.message}`, error2.errors);
-  if (request.template !== void 0) {
-    const name2 = request.template;
-    if (isBuiltinTemplate(name2))
-      return {
-        info: { name: name2, source: "builtin" },
-        template: resolveTemplate(builtinTemplate(name2), name2)
-      };
-    let portable2;
-    try {
-      portable2 = deps.findTemplate?.(name2);
-    } catch (error2) {
-      if (error2 instanceof TemplateValidationError)
-        throw invalid2(error2, `Saved template "${name2}"`);
-      throw error2;
-    }
-    if (!portable2) throw new NotesExportError("template-not-found", `No template named "${name2}".`);
-    return { info: { name: name2, source: "saved" }, template: resolveTemplate(portable2, name2) };
-  }
-  if (request.templateFile === void 0) return void 0;
-  let text2;
-  try {
-    text2 = readTemplateFile(request.templateFile);
-  } catch (error2) {
-    throw new NotesExportError(
-      "invalid-path",
-      `templateFile: ${error2 instanceof Error ? error2.message : String(error2)}`
-    );
-  }
-  let portable;
-  try {
-    portable = parseTemplate(text2);
-  } catch (error2) {
-    throw invalid2(error2, "templateFile");
-  }
-  const name = portable.name ?? basename4(request.templateFile, extname5(request.templateFile));
-  return { info: { name, source: "file" }, template: resolveTemplate(portable, name) };
-}
 function validPath(path10, what) {
   try {
     return assertExportPath(path10);
@@ -52556,7 +51559,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync6(dirname6(output), { recursive: true });
+  mkdirSync5(dirname6(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -52578,16 +51581,8 @@ function exportNotesMarkdown(request, deps) {
   const assetsDir = request.assetsDir ? validPath(request.assetsDir, "assetsDir") : void 0;
   if (output && assetsDir && output === assetsDir)
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
-  const chosen = chooseTemplate(request, deps);
-  if (chosen && assetsDir && chosen.template.assets.mode !== "copy")
-    throw new NotesExportError(
-      "invalid-request",
-      `assetsDir has no effect: template "${chosen.info.name}" sets assets.mode to "${chosen.template.assets.mode}".`
-    );
   const ids = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
-  if (chosen)
-    return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
   const fd = output ? openOutput(output) : void 0;
   const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
@@ -52619,7 +51614,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join22(dirname6(output), `${basename4(output, extname5(output))}.assets`);
+  return join21(dirname6(output), `${basename4(output, extname4(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -52659,127 +51654,21 @@ function exportNotesHtml(request, deps) {
     ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count }
   };
 }
-function readMetaSafely(read, id2) {
-  try {
-    return read(id2);
-  } catch {
-    return {};
-  }
-}
-function pathValues(note, meta, exportStem) {
-  const values = { title: note.title.trim(), id: note.id, exportStem };
-  for (const [key, value] of Object.entries(meta)) if (value) values[key] = value;
-  return values;
-}
-function assetBindings(template, notes, meta, { output, assetsDir, exportStem }) {
-  const linkBase = template.assets.pathStyle === "relative" && output ? dirname6(output) : void 0;
-  const writers = /* @__PURE__ */ new Map();
-  const writerFor = (dir) => {
-    let writer = writers.get(dir);
-    if (!writer) writers.set(dir, writer = new HashedSidecarWriter(dir, linkBase));
-    return writer;
-  };
-  const reference = template.assets.mode === "reference" ? new ReferenceWriter(linkBase) : void 0;
-  const bindings = /* @__PURE__ */ new Map();
-  for (const note of notes) {
-    let binding = {};
-    if (reference) binding = { writer: reference };
-    else if (template.assets.mode === "copy") {
-      if (assetsDir) binding = { writer: writerFor(assetsDir) };
-      else if (template.assets.directory !== null && output) {
-        let dir;
-        try {
-          dir = templateAssetsDir(
-            template.assets.directory,
-            dirname6(output),
-            pathValues(note, meta.get(note) ?? {}, exportStem)
-          );
-        } catch (error2) {
-          throw new NotesExportError("invalid-path", error2.message);
-        }
-        dir = validPath(dir, "assets.directory");
-        if (dir === output)
-          throw new NotesExportError("invalid-path", "assets.directory resolves to outputPath.");
-        binding = { writer: writerFor(dir) };
-      } else if (template.assets.directory !== null) binding = { required: true };
-    }
-    bindings.set(note, binding);
-  }
-  return { bindings, writers };
-}
-function exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir }) {
-  const { template } = chosen;
-  const readMeta = deps.readMeta ?? ((id2) => readExportNoteMeta(id2));
-  const needsMeta = usesNoteMeta(template);
-  const meta = new Map(
-    notes.map((note) => [note, needsMeta ? readMetaSafely(readMeta, note.id) : {}])
-  );
-  const exportStem = output ? basename4(output, extname5(output)) : "export";
-  const { bindings, writers } = assetBindings(template, notes, meta, {
-    output,
-    assetsDir,
-    exportStem
-  });
-  const fd = output ? openOutput(output) : void 0;
-  const ctx = { stats: emptyStats(), locator: deps.locator ?? new AssetLocator() };
-  let warnings = [];
-  const markdown = renderInto(fd, () => {
-    const result = renderNotesWithTemplate(notes, ctx, {
-      template,
-      exportStem,
-      wrap: request.wrap ?? 0,
-      assetsFor: (note) => bindings.get(note) ?? {},
-      metaFor: (note) => meta.get(note) ?? {}
-    });
-    warnings = result.warnings;
-    return result.markdown;
-  });
-  const bytes = Buffer.byteLength(markdown);
-  const used = [...writers.values()].filter((writer) => writer.count > 0);
-  const files = used.flatMap((writer) => writer.files);
-  const receipt = {
-    format: "markdown",
-    count: notes.length,
-    bytes,
-    stats: ctx.stats,
-    skipped,
-    template: chosen.info,
-    warnings: warnings.slice(0, MAX_EXPORT_WARNINGS),
-    ...warnings.length > MAX_EXPORT_WARNINGS ? { warningsOmitted: warnings.length - MAX_EXPORT_WARNINGS } : {},
-    ...used.length ? {
-      assets: {
-        dir: used.length === 1 ? used[0].dir : dirname6(output),
-        files: files.length
-      },
-      assetFiles: files.slice(0, MAX_LISTED_ASSETS)
-    } : {}
-  };
-  if (fd !== void 0) {
-    writeAllAndClose(fd, markdown);
-    return { ...receipt, output };
-  }
-  if (bytes > deps.maxInlineBytes)
-    throw new NotesExportError(
-      "too-large",
-      `The Markdown is ${bytes} bytes, over the ${deps.maxInlineBytes}-byte inline limit. Pass outputPath to write it to a file, or export fewer notes.`
-    );
-  return { ...receipt, markdown };
-}
 
 // src/tools/directOperations.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash2 } from "node:crypto";
 import {
-  closeSync as closeSync6,
-  constants as constants6,
-  fstatSync as fstatSync6,
-  mkdtempSync as mkdtempSync4,
-  openSync as openSync6,
+  closeSync as closeSync5,
+  constants as constants5,
+  fstatSync as fstatSync5,
+  mkdtempSync as mkdtempSync5,
+  openSync as openSync5,
   readFileSync as readFileSync3,
-  rmSync as rmSync4,
-  writeFileSync as writeFileSync3
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
 } from "node:fs";
-import { tmpdir as tmpdir4 } from "node:os";
-import { basename as basename5, extname as extname6, isAbsolute as isAbsolute4, join as join23 } from "node:path";
+import { tmpdir as tmpdir5 } from "node:os";
+import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join22 } from "node:path";
 var noteId = exactIdInput(
   "ICNote",
   /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
@@ -52823,10 +51712,10 @@ function assertExistingContentPreserved(before, after) {
   }
 }
 function localAttachment(path10) {
-  if (!isAbsolute4(path10)) throw new Error("An absolute local file path is required");
-  const descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
+  if (!isAbsolute3(path10)) throw new Error("An absolute local file path is required");
+  const descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
   try {
-    const stat = fstatSync6(descriptor);
+    const stat = fstatSync5(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024)
       throw new Error("Attachment must be a nonempty regular file of at most 64 MiB");
     const bytes = readFileSync3(descriptor);
@@ -52834,7 +51723,7 @@ function localAttachment(path10) {
       throw new Error("Attachment changed while it was being read; try again");
     return bytes;
   } finally {
-    closeSync6(descriptor);
+    closeSync5(descriptor);
   }
 }
 function registerDirectOperations(server2, manager) {
@@ -52902,7 +51791,9 @@ function registerDirectOperations(server2, manager) {
     {
       title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
       content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
-      folder: external_exports.string().max(1e3).optional().describe("Existing folder or nested path; create it first with create-folder"),
+      folder: external_exports.string().max(1e3).optional().describe(
+        "Existing folder or nested path; create it first with create-folder. A smart folder is refused before the note is created"
+      ),
       account: external_exports.string().max(200).optional().describe("Account name; defaults to Notes' default"),
       ...attachmentInput
     },
@@ -52955,15 +51846,15 @@ function attachmentName(path10, filename) {
     throw new Error(
       "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
     );
-  if (extname6(filename).toLowerCase() !== extname6(source).toLowerCase())
+  if (extname5(filename).toLowerCase() !== extname5(source).toLowerCase())
     throw new Error(
-      `filename must keep the source file's extension (${extname6(source) || "none"})`
+      `filename must keep the source file's extension (${extname5(source) || "none"})`
     );
   return filename;
 }
 var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
 var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-var sha256 = (data) => createHash3("sha256").update(data).digest("hex");
+var sha256 = (data) => createHash2("sha256").update(data).digest("hex");
 function storedAttachmentIds(manager, id2) {
   try {
     return new Set(
@@ -52996,13 +51887,13 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
   const matches = row.assetPaths.some((path10) => {
     let descriptor;
     try {
-      descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
-      const stat = fstatSync6(descriptor);
+      descriptor = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+      const stat = fstatSync5(descriptor);
       return stat.isFile() && stat.size === bytes.length && sha256(readFileSync3(descriptor)) === expected;
     } catch {
       return false;
     } finally {
-      if (descriptor !== void 0) closeSync6(descriptor);
+      if (descriptor !== void 0) closeSync5(descriptor);
     }
   });
   if (!matches)
@@ -53019,10 +51910,10 @@ function attachFile(manager, args) {
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
   const beforeStored = storedAttachmentIds(manager, id2);
-  const directory = mkdtempSync4(join23(tmpdir4(), "notes-attachment-add-"));
-  const temporaryFile = join23(directory, name);
+  const directory = mkdtempSync5(join22(tmpdir5(), "notes-attachment-add-"));
+  const temporaryFile = join22(directory, name);
   try {
-    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    writeFileSync4(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
@@ -53082,12 +51973,12 @@ function attachFile(manager, args) {
       } : {}
     };
   } finally {
-    rmSync4(directory, { recursive: true, force: true });
+    rmSync5(directory, { recursive: true, force: true });
   }
 }
 
 // src/tools/folderDelete.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 
 // src/utils/folderStore.ts
 import { execFileSync as execFileSync19 } from "child_process";
@@ -53274,7 +52165,7 @@ function folderDeleteRevision(app, store) {
     store.childFolderCount,
     store.noteCount
   ];
-  return `sha256:${createHash4("sha256").update(JSON.stringify(state)).digest("hex")}`;
+  return `sha256:${createHash3("sha256").update(JSON.stringify(state)).digest("hex")}`;
 }
 function checkFolder(manager, args, deps) {
   const app = manager.readFolderForDelete(args.id);
@@ -53410,8 +52301,8 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
 }
 
 // src/utils/svgAnalyzer.ts
-import { createHash as createHash5 } from "node:crypto";
-import { closeSync as closeSync7, constants as constants7, fstatSync as fstatSync7, openSync as openSync7, readSync as readSync5 } from "node:fs";
+import { createHash as createHash4 } from "node:crypto";
+import { closeSync as closeSync6, constants as constants6, fstatSync as fstatSync6, openSync as openSync6, readSync as readSync4 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -54085,10 +52976,10 @@ function clipPolyline(points, r) {
   if (run.length) parts.push(run);
   return { parts, clipped: true };
 }
-function dashPolyline(points, pattern2, offset, charge) {
-  const total = pattern2.reduce((s, v) => s + v, 0);
+function dashPolyline(points, pattern, offset, charge) {
+  const total = pattern.reduce((s, v) => s + v, 0);
   let index = 0;
-  let remaining = pattern2[0];
+  let remaining = pattern[0];
   let on = true;
   let shift = (offset % total + total) % total;
   while (shift > 0) {
@@ -54096,8 +52987,8 @@ function dashPolyline(points, pattern2, offset, charge) {
     remaining -= step;
     shift -= step;
     if (remaining <= 0) {
-      index = (index + 1) % pattern2.length;
-      remaining = pattern2[index];
+      index = (index + 1) % pattern.length;
+      remaining = pattern[index];
       on = !on;
     }
   }
@@ -54119,8 +53010,8 @@ function dashPolyline(points, pattern2, offset, charge) {
       on = !on;
       segLen -= remaining;
       a = cut;
-      index = (index + 1) % pattern2.length;
-      remaining = pattern2[index];
+      index = (index + 1) % pattern.length;
+      remaining = pattern[index];
     }
     remaining -= segLen;
     if (on && currentDash) currentDash.push(b);
@@ -54352,7 +53243,7 @@ function parseXml(source, limits) {
       if (a.name === "xmlns") scope2.set("", a.value);
       else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
     }
-    const resolve8 = (qualified, isAttribute) => {
+    const resolve7 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
       const prefix = qualified.slice(0, colon);
@@ -54362,12 +53253,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve8(name, false);
+    const resolved = resolve7(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve8(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve7(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -54493,7 +53384,7 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 function sha2562(text2) {
-  return createHash5("sha256").update(text2).digest("hex");
+  return createHash4("sha256").update(text2).digest("hex");
 }
 var round = (v, digits) => {
   const r = Number(v.toFixed(digits));
@@ -54610,10 +53501,10 @@ function assertInert(el, location) {
       throw new SvgError("svg_unsafe", "Active content in a style attribute", location);
   }
   const counts = /* @__PURE__ */ new Map();
-  for (const child2 of el.children) {
-    const n = (counts.get(child2.local) ?? 0) + 1;
-    counts.set(child2.local, n);
-    assertInert(child2, `${location}/${child2.local}[${n}]`);
+  for (const child of el.children) {
+    const n = (counts.get(child.local) ?? 0) + 1;
+    counts.set(child.local, n);
+    assertInert(child, `${location}/${child.local}[${n}]`);
   }
 }
 var INITIAL_STYLE = {
@@ -54865,14 +53756,14 @@ var Analyzer = class {
   /** Walk an element's children with its own style and transform applied. */
   container(el, ctx) {
     const counts = /* @__PURE__ */ new Map();
-    for (const child2 of el.children) {
-      const n = (counts.get(child2.local) ?? 0) + 1;
-      counts.set(child2.local, n);
-      const id2 = attr(child2, "id");
-      this.element(child2, {
+    for (const child of el.children) {
+      const n = (counts.get(child.local) ?? 0) + 1;
+      counts.set(child.local, n);
+      const id2 = attr(child, "id");
+      this.element(child, {
         ...ctx,
         depth: ctx.depth + 1,
-        location: `${ctx.location}/${child2.local}[${n}]${id2 ? `#${id2}` : ""}`
+        location: `${ctx.location}/${child.local}[${n}]${id2 ? `#${id2}` : ""}`
       });
     }
   }
@@ -55295,9 +54186,9 @@ var Analyzer = class {
           let pieces = polylines;
           if (style.dasharray) {
             const k = nonScaling ? 1 : mean;
-            const pattern2 = style.dasharray.map((v) => v * k);
+            const pattern = style.dasharray.map((v) => v * k);
             pieces = polylines.flatMap(
-              (p) => dashPolyline(p, pattern2, style.dashoffset * k, (n) => this.charge("dashWork", n))
+              (p) => dashPolyline(p, pattern, style.dashoffset * k, (n) => this.charge("dashWork", n))
             );
           }
           this.layers++;
@@ -55380,14 +54271,14 @@ function analyzeSvgBuffer(source) {
 function readSvgSource(path10) {
   let fd;
   try {
-    fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW | constants7.O_NONBLOCK);
+    fd = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW | constants6.O_NONBLOCK);
   } catch (error2) {
     if (error2.code === "ELOOP")
       throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
     throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const info = fstatSync7(fd);
+    const info = fstatSync6(fd);
     if (!info.isFile())
       throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
     if (info.size > SVG_LIMITS.maxSourceBytes)
@@ -55398,7 +54289,7 @@ function readSvgSource(path10) {
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {
-      const n = readSync5(fd, buffer, total, buffer.length - total, null);
+      const n = readSync4(fd, buffer, total, buffer.length - total, null);
       if (n === 0) break;
       total += n;
       if (total > SVG_LIMITS.maxSourceBytes)
@@ -55409,7 +54300,7 @@ function readSvgSource(path10) {
     }
     return buffer.subarray(0, total);
   } finally {
-    closeSync7(fd);
+    closeSync6(fd);
   }
 }
 function analyzeSvgFile(path10) {
@@ -55980,7 +54871,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname7, resolve as resolve5 } from "node:path";
+import { dirname as dirname7, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -56003,11 +54894,11 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve5(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve4(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve5(baseDirectory, file);
+    const path10 = resolve4(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -56067,19 +54958,19 @@ function formatShortcutSetup(report) {
 
 // src/services/publicHelper.ts
 import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 import {
   chmodSync,
   existsSync as existsSync14,
-  mkdirSync as mkdirSync7,
-  mkdtempSync as mkdtempSync5,
+  mkdirSync as mkdirSync6,
+  mkdtempSync as mkdtempSync6,
   readFileSync as readFileSync4,
   renameSync,
-  rmSync as rmSync5,
-  writeFileSync as writeFileSync4
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
 } from "node:fs";
 import { homedir as homedir19, release as release3 } from "node:os";
-import { dirname as dirname8, join as join25, resolve as resolve6 } from "node:path";
+import { dirname as dirname8, join as join24, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PUBLIC_HELPER_PROTOCOL = 1;
 var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
@@ -56094,7 +54985,7 @@ var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
   "transcribe"
 ]);
 var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
 var publicManifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -56107,7 +54998,7 @@ var publicManifestSchema = external_exports.object({
 function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join25(dir, "package.json");
+    const candidate = join24(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
         if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
@@ -56116,7 +55007,7 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
       }
     }
     const parent = dirname8(dir);
-    if (parent === dir) return resolve6(fromDir, "..");
+    if (parent === dir) return resolve5(fromDir, "..");
     dir = parent;
   }
 }
@@ -56124,7 +55015,7 @@ function defaultPublicHelperDeps(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
+    sourcePath: join24(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync14,
     readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
@@ -56135,14 +55026,14 @@ function defaultPublicHelperDeps(overrides = {}) {
 function publicHelperInstallDir(env = process.env) {
   const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+  return join24(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
 }
 function sha256Hex(data) {
-  return createHash6("sha256").update(data).digest("hex");
+  return createHash5("sha256").update(data).digest("hex");
 }
 function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
+  const binaryPath = join24(installDir, PUBLIC_HELPER_BINARY);
   const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
   const fail = (reason, detail) => ({
     ...base,
@@ -56153,7 +55044,7 @@ function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
+  const manifestPath = join24(installDir, PUBLIC_HELPER_MANIFEST);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -56222,7 +55113,7 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES
+    maxBuffer: MAX_OUTPUT_BYTES2
   });
   const errno = result.error?.code;
   if (errno === "ETIMEDOUT" || result.signal && result.status === null)
@@ -56240,7 +55131,7 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
   const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
   if (signal?.aborted) throw aborted2();
   return new Promise((resolvePromise, reject) => {
-    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+    const child = (deps.spawnAsync ?? spawn)(binaryPath, [], {
       stdio: ["pipe", "pipe", "ignore"]
     });
     const chunks = [];
@@ -56248,7 +55139,7 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     let failure = null;
     const stop = (error2) => {
       failure ??= error2;
-      child2.kill("SIGKILL");
+      child.kill("SIGKILL");
     };
     const timer = setTimeout(
       () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
@@ -56260,19 +55151,19 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
       clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
     };
-    child2.stdout?.on("data", (chunk) => {
+    child.stdout?.on("data", (chunk) => {
       size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES)
+      if (size > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
-    child2.on("error", (error2) => {
+    child.on("error", (error2) => {
       settle();
       reject(
         failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
       );
     });
-    child2.on("close", (status, exitSignal) => {
+    child.on("close", (status, exitSignal) => {
       settle();
       if (failure) return reject(failure);
       if (status === null && exitSignal)
@@ -56285,9 +55176,9 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
         reject(error2);
       }
     });
-    child2.stdin?.on("error", () => {
+    child.stdin?.on("error", () => {
     });
-    child2.stdin?.end(input);
+    child.stdin?.end(input);
   });
 }
 function prepareCall(action, fields, deps, options) {
@@ -56429,14 +55320,14 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join25(installDir, ".staging-"));
+  mkdirSync6(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join24(installDir, ".staging-"));
   try {
-    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join25(staging, "source-digest.swift");
-    const plistPath = join25(staging, "Info.plist");
-    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
-    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const stagedBinary = join24(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join24(staging, "source-digest.swift");
+    const plistPath = join24(staging, "Info.plist");
+    writeFileSync5(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync5(plistPath, publicHelperInfoPlist(), { mode: 384 });
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
@@ -56497,15 +55388,15 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
       compiler
     };
     chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
-    writeFileSync4(
-      join25(installDir, PUBLIC_HELPER_MANIFEST),
+    renameSync(stagedBinary, join24(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync5(
+      join24(installDir, PUBLIC_HELPER_MANIFEST),
       JSON.stringify(manifest, null, 2) + "\n",
       { mode: 384 }
     );
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    rmSync5(staging, { recursive: true, force: true });
+    rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectPublicHelper(deps);
   steps.push({
@@ -56744,7 +55635,7 @@ function formatNoteDrawings(result) {
 
 // src/utils/noteAudio.ts
 import { readdirSync as readdirSync4, statSync as statSync4 } from "node:fs";
-import { join as join26 } from "node:path";
+import { join as join25 } from "node:path";
 var EXTRA_AUDIO_UTIS = [
   "public.mp3",
   "public.aiff-audio",
@@ -56769,7 +55660,7 @@ function accountDirsFor(containerDir, accountIdentifier) {
   if (own) return [own];
   let names;
   try {
-    names = readdirSync4(join26(containerDir, "Accounts")).sort();
+    names = readdirSync4(join25(containerDir, "Accounts")).sort();
   } catch {
     return [];
   }
@@ -56781,8 +55672,8 @@ function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_
   if (!id2 || !filename) return null;
   const generation = safeComponent(media?.generation);
   for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
-    const base = join26(dir, "Media", id2);
-    const candidates = generation ? [join26(base, generation, filename), join26(base, filename)] : [join26(base, filename)];
+    const base = join25(dir, "Media", id2);
+    const candidates = generation ? [join25(base, generation, filename), join25(base, filename)] : [join25(base, filename)];
     for (const candidate of candidates) {
       const real = realInside(candidate, dir);
       if (real && isFile2(real)) return real;
@@ -57054,21 +55945,21 @@ import { spawnSync as spawnSync5 } from "node:child_process";
 import {
   chmodSync as chmodSync2,
   existsSync as existsSync16,
-  mkdirSync as mkdirSync8,
-  mkdtempSync as mkdtempSync6,
+  mkdirSync as mkdirSync7,
+  mkdtempSync as mkdtempSync7,
   renameSync as renameSync2,
-  rmSync as rmSync6,
-  writeFileSync as writeFileSync5
+  rmSync as rmSync7,
+  writeFileSync as writeFileSync6
 } from "node:fs";
 import { release as release4 } from "node:os";
-import { join as join28 } from "node:path";
+import { join as join27 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
 import { homedir as homedir20 } from "node:os";
-import { dirname as dirname9, join as join27, resolve as resolve7 } from "node:path";
+import { dirname as dirname9, join as join26, resolve as resolve6 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -57083,7 +55974,7 @@ var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
 var DEFAULT_TIMEOUT_MS3 = 2e4;
-var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var MAX_OUTPUT_BYTES3 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -57096,7 +55987,7 @@ var manifestSchema = external_exports.object({
 function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join27(dir, "package.json");
+    const candidate = join26(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
         const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
@@ -57105,7 +55996,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
       }
     }
     const parent = dirname9(dir);
-    if (parent === dir) return resolve7(fromDir, "..");
+    if (parent === dir) return resolve6(fromDir, "..");
     dir = parent;
   }
 }
@@ -57113,7 +56004,7 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join27(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join26(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
     readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync4,
@@ -57126,14 +56017,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex2(data) {
-  return createHash7("sha256").update(data).digest("hex");
+  return createHash6("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join27(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join26(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -57151,7 +56042,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
-  const manifestPath = join27(installDir, MANIFEST_NAME);
+  const manifestPath = join26(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -57267,7 +56158,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2,
+    maxBuffer: MAX_OUTPUT_BYTES3,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -57465,10 +56356,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync8(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join28(installDir, ".staging-"));
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync7(join27(installDir, ".staging-"));
   try {
-    const stagedBinary = join28(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join27(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -57545,13 +56436,13 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync2(stagedBinary, 448);
-    renameSync2(stagedBinary, join28(installDir, HELPER_BINARY_NAME));
-    writeFileSync5(join28(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync2(stagedBinary, join27(installDir, HELPER_BINARY_NAME));
+    writeFileSync6(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync7(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
@@ -57932,7 +56823,7 @@ function registerTool(name, config2, cb) {
 registerTool(
   "create-note",
   {
-    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it.",
+    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it. A smart folder is refused (code unsupported); it cannot hold notes.",
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
       content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).optional().describe(
@@ -58072,7 +56963,7 @@ registerTool(
 registerTool(
   "search-notes",
   {
-    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
+    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript. When the note text came from the database, each result has matchedIn (title, body, or both); includeWordCount adds wordCount.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: external_exports.string().min(1, "Search query is required").max(MAX.QUERY),
       searchContent: external_exports.boolean().optional().describe(
@@ -58085,112 +56976,132 @@ registerTool(
       ),
       limit: external_exports.number().int().positive().optional().describe(
         "Maximum number of results to return. Defaults to 50 \u2014 a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each result (null when locked or unreadable). A database body search already has the text; otherwise the bodies are read in one batched read-only database query (needs Full Disk Access), which also adds matchedIn"
       )
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
       count: external_exports.number().optional(),
       source: external_exports.enum(["database", "applescript"]).optional(),
-      scanTruncated: external_exports.boolean().optional()
+      scanTruncated: external_exports.boolean().optional(),
+      wordCountUnavailable: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
-    const effectiveLimit = resolveSearchLimit(limit);
-    const limitWasDefault = limit === void 0;
-    let source;
-    let dbScan;
-    let dbUnavailable;
-    const runSearch = () => {
-      if (searchContent) {
+  withErrorHandling(
+    ({ query: query2, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
+      const effectiveLimit = resolveSearchLimit(limit);
+      const limitWasDefault = limit === void 0;
+      let source;
+      let dbScan;
+      let dbUnavailable;
+      const runSearch = () => {
+        if (searchContent) {
+          try {
+            const db = searchContentViaDatabase({
+              query: query2,
+              account: notesManager.searchAccountScope(account),
+              folder,
+              modifiedSince,
+              limit: effectiveLimit,
+              includeWordCount
+            });
+            source = "database";
+            dbScan = db.scan;
+            return db.notes;
+          } catch (error2) {
+            if (!(error2 instanceof NoteQueryStoreError)) throw error2;
+            dbUnavailable = error2.kind;
+          }
+          source = "applescript";
+        }
         try {
-          const db = searchContentViaDatabase({
-            query: query2,
-            account: notesManager.searchAccountScope(account),
+          return notesManager.searchNotes(
+            query2,
+            searchContent,
+            account,
             folder,
             modifiedSince,
-            limit: effectiveLimit
-          });
-          source = "database";
-          dbScan = db.scan;
-          return db.notes;
+            effectiveLimit
+          );
         } catch (error2) {
-          if (!(error2 instanceof NoteQueryStoreError)) throw error2;
-          dbUnavailable = error2.kind;
+          if (!searchContent || !(error2 instanceof Error)) throw error2;
+          throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
         }
-        source = "applescript";
+      };
+      const {
+        result: found,
+        syncBefore,
+        syncInterference
+      } = withSyncAwarenessSync("search-notes", runSearch);
+      let notes = found;
+      let wordCountUnavailable;
+      if (includeWordCount && source !== "database" && found.length > 0) {
+        const enriched = addWordCountsFromDatabase(found, query2);
+        notes = enriched.notes;
+        wordCountUnavailable = enriched.unavailable;
       }
-      try {
-        return notesManager.searchNotes(
-          query2,
-          searchContent,
-          account,
-          folder,
-          modifiedSince,
-          effectiveLimit
-        );
-      } catch (error2) {
-        if (!searchContent || !(error2 instanceof Error)) throw error2;
-        throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
+      const wordCountFields = wordCountUnavailable ? { wordCountUnavailable } : {};
+      const wordCountNote = wordCountUnavailable ? `
+
+\u2139\uFE0F Word counts were not added: ${wordCountUnavailable === "no_fda" ? "they are read from the Notes database, which needs Full Disk Access (run the doctor tool)" : "the Notes database could not be read"}.` : "";
+      const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
+      const sourceFields = source ? { source } : {};
+      const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+      const scanNote = describeContentScan(dbScan);
+      const folderInfo = folder ? ` in folder "${folder}"` : "";
+      const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+      const { info: limitInfo, truncationNote } = describeSearchLimit(
+        effectiveLimit,
+        limitWasDefault,
+        notes.length
+      );
+      const syncWarnings = [];
+      if (syncBefore.syncDetected) {
+        syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
       }
-    };
-    const {
-      result: notes,
-      syncBefore,
-      syncInterference
-    } = withSyncAwarenessSync("search-notes", runSearch);
-    const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
-    const sourceFields = source ? { source } : {};
-    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
-    const scanNote = describeContentScan(dbScan);
-    const folderInfo = folder ? ` in folder "${folder}"` : "";
-    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const { info: limitInfo, truncationNote } = describeSearchLimit(
-      effectiveLimit,
-      limitWasDefault,
-      notes.length
-    );
-    const syncWarnings = [];
-    if (syncBefore.syncDetected) {
-      syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
-    }
-    if (syncInterference) {
-      syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
-    }
-    const syncNote = syncWarnings.length > 0 ? `
+      if (syncInterference) {
+        syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
+      }
+      const syncNote = syncWarnings.length > 0 ? `
 
 ${syncWarnings.join(" ")}` : "";
-    if (notes.length === 0) {
-      const scopeHint = describeSearchScope(searchContent, notes.length);
+      if (notes.length === 0) {
+        const scopeHint = describeSearchScope(searchContent, notes.length);
+        return successResponse(
+          `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+          { notes: [], count: 0, ...sourceFields, ...scanFields }
+        );
+      }
+      const noteList = notes.map((n) => {
+        const idSuffix = `${n.id ? ` [id: ${n.id}]` : ""}${describeMatchDetails(n)}`;
+        if (n.folder === "Recently Deleted") {
+          return `  - ${n.title} [DELETED]${idSuffix}`;
+        } else if (n.folder) {
+          return `  - ${n.title} (${n.folder})${idSuffix}`;
+        }
+        return `  - ${n.title}${idSuffix}`;
+      }).join("\n");
       return successResponse(
-        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
-        { notes: [], count: 0, ...sourceFields, ...scanFields }
+        `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
+${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
+        {
+          notes: withStableIdentifiers(notes, "ICNote"),
+          count: notes.length,
+          ...sourceFields,
+          ...scanFields,
+          ...wordCountFields
+        }
       );
-    }
-    const noteList = notes.map((n) => {
-      const idSuffix = n.id ? ` [id: ${n.id}]` : "";
-      if (n.folder === "Recently Deleted") {
-        return `  - ${n.title} [DELETED]${idSuffix}`;
-      } else if (n.folder) {
-        return `  - ${n.title} (${n.folder})${idSuffix}`;
-      }
-      return `  - ${n.title}${idSuffix}`;
-    }).join("\n");
-    return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${truncationNote}${scanNote}${syncNote}`,
-      {
-        notes: withStableIdentifiers(notes, "ICNote"),
-        count: notes.length,
-        ...sourceFields,
-        ...scanFields
-      }
-    );
-  }, "Error searching notes")
+    },
+    "Error searching notes"
+  )
 );
 registerTool(
   "query-notes",
   {
-    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
     inputSchema: {
       query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
         'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
@@ -58203,6 +57114,9 @@ registerTool(
       ),
       includeDeleted: external_exports.boolean().optional().describe(
         "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each returned note (the count words: filters on; null when locked or unreadable). Free when the query reads bodies; a metadata-only query reads just the returned notes' bodies in one extra query (default false)"
       )
     },
     outputSchema: {
@@ -58219,10 +57133,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted }) => {
+  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted, includeWordCount }) => {
     let result;
     try {
-      result = queryNotes(query2, { limit, scanLimit, includeDeleted });
+      result = queryNotes(query2, { limit, scanLimit, includeDeleted, includeWordCount });
     } catch (error2) {
       if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -58253,7 +57167,7 @@ ${notes.join("\n")}` : "";
       const where = [n.account, n.folder].filter(Boolean).join(" / ");
       const snippet = n.snippet ? `
       ${n.snippet}` : "";
-      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${describeMatchDetails(n)}${snippet}`;
     }).join("\n");
     return successResponse(
       `Found ${result.matched} matching notes (${scope2}):
@@ -59120,10 +58034,10 @@ function guardedAppend({
       return `<div>${escaped || "<br>"}</div>`;
     }).join("");
   };
-  const separatorToHtml = (sep5) => {
-    if (format === "html") return sep5;
-    if (sep5 === "\n\n") return "<div><br></div>";
-    const escaped = sep5.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const separatorToHtml = (sep4) => {
+    if (format === "html") return sep4;
+    if (sep4 === "\n\n") return "<div><br></div>";
+    const escaped = sep4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return `<div>${escaped}</div>`;
   };
   const snapshot = readExactNoteSnapshot(id2);
@@ -59424,7 +58338,7 @@ registerTool(
 registerTool(
   "move-note",
   {
-    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
+    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist and cannot be a smart folder (refused with code unsupported before the move). Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
     inputSchema: {
       id: noteIdInput,
       folder: external_exports.string().min(1, "Destination folder is required").max(MAX.FOLDER),
@@ -59666,7 +58580,7 @@ ${lines.join("\n")}${fullyDecoded ? "" : '\n\nSome rules were not recognized; se
 registerTool(
   "create-folder",
   {
-    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nDo not use when: creating a note (create-note).",
+    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nNote: a path segment that names a smart folder is refused (code unsupported) before anything is created; smart folders cannot hold folders.\nDo not use when: creating a note (create-note).",
     inputSchema: {
       name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER).describe(
         'Folder name or nested path separated by "/". E.g., "Retro Tech/PC/CPUs" creates all intermediate folders. Existing segments are skipped.'
@@ -60107,7 +59021,7 @@ registerTool(
 registerTool(
   "batch-move-notes",
   {
-    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
+    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
     inputSchema: {
       ids: noteIdArrayInput.describe(
         `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`
@@ -60496,7 +59410,7 @@ var exportStatsSchema = external_exports.object({
 registerTool(
   "export-notes-markdown",
   {
-    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.\nTemplates: pass template ('standard-markdown' reproduces the default output; 'obsidian' adds YAML front matter and copies attachments beside outputPath) or templateFile (a JSON template) to control how every block, inline style, attachment, per-note header/footer and separator renders. Templated receipts add template, warnings (e.g. missing_asset) and assetFiles; an invalid template is refused with [invalid-template] and every problem's JSON path.",
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
@@ -60506,13 +59420,7 @@ registerTool(
       ),
       outputPath: exportPathInput("File to create for the Markdown"),
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
-      wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
-      template: external_exports.string().min(1).max(64).optional().describe(
-        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
-      ),
-      templateFile: exportPathInput(
-        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
-      )
+      wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)")
     },
     outputSchema: {
       format: external_exports.string().optional(),
@@ -60522,13 +59430,7 @@ registerTool(
       output: external_exports.string().optional(),
       assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
       stats: exportStatsSchema.optional(),
-      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional(),
-      template: external_exports.object({ name: external_exports.string(), source: external_exports.string() }).optional(),
-      warnings: external_exports.array(
-        external_exports.object({ code: external_exports.string(), noteId: external_exports.string(), attachmentId: external_exports.string().optional() })
-      ).optional(),
-      warningsOmitted: external_exports.number().optional(),
-      assetFiles: external_exports.array(external_exports.string()).optional()
+      skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
   },
@@ -60543,15 +59445,9 @@ registerTool(
     } catch (error2) {
       if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
       const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
-      if (error2 instanceof NotesExportError && error2.details)
-        return errorResponse(
-          `Error exporting Markdown [${error2.code}]: the template is invalid:
-` + error2.details.map((detail) => `${detail.path}: ${detail.message}`).join("\n")
-        );
       return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
     }
-    const warned = receipt.warnings?.length ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)` : "";
-    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
+    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
     if (receipt.output)
       return successResponse(
         `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` + (receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : "") + `${skipped}.`,
