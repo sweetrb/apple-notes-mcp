@@ -20,12 +20,19 @@ import {
   statSync,
   symlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { TemplateStore, TemplateStoreError, templateDir } from "./templateStore.js";
 import { MAX_TEMPLATE_BYTES, TemplateValidationError } from "../utils/markdownTemplate.js";
 import { registerMarkdownTemplates } from "../tools/markdownTemplates.js";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeSync: vi.fn(actual.writeSync) };
+});
 
 let root: string;
 const editorial = JSON.stringify({
@@ -162,6 +169,33 @@ describe("TemplateStore", () => {
     } finally {
       chmodSync(dir, 0o700);
     }
+  });
+});
+
+describe("TemplateStore file safety", () => {
+  it("removes its temporary file when writing it fails", () => {
+    const store = new TemplateStore(join(root, "lib7"));
+    vi.mocked(writeSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+    });
+    expect(code(() => store.save("a", editorial))).toMatch(/ENOSPC/);
+    expect(readdirSync(store.dir)).toEqual([]);
+  });
+
+  it("refuses a FIFO without blocking and reports only symlinks as unsafe paths", () => {
+    const store = new TemplateStore(join(root, "lib8"));
+    store.save("ok", editorial);
+    execFileSync("mkfifo", [join(store.dir, "pipe.json")]);
+    expect(code(() => store.find("pipe"))).toBe("unsafe-path");
+    symlinkSync(join(store.dir, "ok.json"), join(store.dir, "link.json"));
+    expect(code(() => store.find("link"))).toBe("unsafe-path");
+    chmodSync(join(store.dir, "ok.json"), 0o000);
+    try {
+      expect(code(() => store.find("ok"))).toMatch(/EACCES/);
+    } finally {
+      chmodSync(join(store.dir, "ok.json"), 0o600);
+    }
+    expect(store.list()).toMatchObject({ templates: [{ name: "ok" }], skipped: 2 });
   });
 });
 

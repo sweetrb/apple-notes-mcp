@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.24] - 2026-09-24
+## [2.9.26] - 2026-09-24
 
 ### Fixed
 
@@ -78,6 +78,54 @@
 - `add-attachment-from-pasteboard` refuses several copied images or PDFs
   (`multiple_items`) instead of attaching only the first, and takes the PDF
   when a copy offers both a PDF and a raster preview of it (#238).
+
+## [2.9.24] - 2026-09-24
+
+### Fixed
+
+- `analyze-svg` no longer builds a whole flattened subpath before charging it
+  to the geometry budget. A single cubic can flatten to 65,536 points, so a
+  1 MiB path of short cubics under a large `transform` could exhaust the Node
+  heap before `svg_complexity_limit` was raised. Points are now charged as they
+  are emitted, and the coordinate limit is checked on each subpath's control
+  points before flattening (a flattened curve stays inside them), so such a
+  file is refused with `svg_geometry_invalid` without subdividing anything.
+- `analyze-svg` resolves CSS escapes before looking for `url(` and `@import`,
+  so `u\72 l(https://…)` is refused like `url(https://…)`, and removes ASCII
+  tab, newline and carriage return from an `href` before the scheme check, as
+  a browser's URL parser does, so `java&#9;script:` is refused.
+- `analyze-svg` now follows the cascade and CSS keyword rules browsers use:
+  a later `display` declaration can show content an earlier `display="none"`
+  hid, keywords such as `NONE` (including `fill` and `stroke`), `EvenOdd` and
+  `Round` match case-insensitively,
+  and a plain `href` wins over `xlink:href`, as in SVG 2.
+- The SVG reader checks duplicate attributes with a set instead of a scan per
+  attribute (a 1 MiB element took tens of seconds), links each element's
+  namespace scope to its parent instead of copying it, and caps an element at
+  1,024 attributes and a document at 1,024 namespace declarations.
+- Reading a template (`templateFile`, the saved template library), a hashed
+  export asset, or a copied file for `add-attachment-from-pasteboard` opens the
+  file with `O_NONBLOCK`, so a FIFO at that path is refused as not a regular
+  file instead of blocking the server's event loop.
+- `save-markdown-template` removes its temporary file when writing it fails,
+  and reports a template it cannot open for a reason other than a symbolic link
+  (for example `EACCES`) as that error instead of `unsafe-path`.
+- A templated Markdown export copies an asset to a temporary name and links it
+  into place, so an interrupted copy no longer leaves a truncated file under
+  the content-hashed name that every later export reported as `name-taken`.
+- `create-note`'s `contentPath` refuses hidden paths (any component starting
+  with `.`, such as `~/.ssh`, `~/.aws` or `~/.config/gh/hosts.yml`) and
+  `~/Library`, which hold keys, tokens and app data, unless the server sets
+  `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` (#195). iCloud Drive
+  (`~/Library/Mobile Documents`) and cloud storage folders
+  (`~/Library/CloudStorage`: Dropbox, Google Drive, OneDrive) stay readable,
+  since they hold documents. It also opens the
+  file with `O_NONBLOCK` and, after opening, resolves the path again and
+  requires it to name the same file as the open descriptor, since
+  `O_NOFOLLOW` only guards the last path component.
+- `export-attachments` passes a stored attachment identifier through the same
+  one-component check as file names, with a constant fallback, and refuses any
+  destination whose directory is not the export directory.
 
 ## [2.9.23] - 2026-09-24
 

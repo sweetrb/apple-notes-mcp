@@ -2,8 +2,9 @@
  * Template asset writers, per-note asset directories and template file reads,
  * against real files in a temporary directory.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -13,6 +14,7 @@ import {
   rmSync,
   symlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,6 +25,11 @@ import {
   ReferenceWriter,
   templateAssetsDir,
 } from "./templateAssets.js";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeSync: vi.fn(actual.writeSync) };
+});
 
 let dir: string;
 let photo: string;
@@ -97,6 +104,45 @@ describe("HashedSidecarWriter", () => {
       })
     ).toEqual({ error: expect.stringContaining("Refusing to write to the symbolic link") });
     expect(readdirSync(real)).toEqual([]);
+  });
+
+  it("leaves nothing under the hashed name when a copy is interrupted", () => {
+    const out = join(dir, "out5");
+    const name = `My Photo-${hash8(png)}.png`;
+    vi.mocked(writeSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+    });
+    const writer = new HashedSidecarWriter(out);
+    expect(writer.place({ path: photo, name: "My Photo.png", role: "original" })).toEqual({
+      error: expect.stringContaining("ENOSPC"),
+    });
+    expect(readdirSync(out)).toEqual([]);
+    // A later export copies the file instead of reporting the name as taken.
+    expect(
+      new HashedSidecarWriter(out).place({ path: photo, name: "My Photo.png", role: "original" })
+    ).toMatchObject({ mime: "image/png" });
+    expect(readdirSync(out)).toEqual([name]);
+    expect(readFileSync(join(out, name))).toEqual(png);
+  });
+
+  it("refuses a FIFO source or destination without blocking", () => {
+    const fifo = join(dir, "lib", "pipe.png");
+    execFileSync("mkfifo", [fifo]);
+    const out = join(dir, "out6");
+    expect(
+      new HashedSidecarWriter(out).place({ path: fifo, name: "pipe.png", role: "original" })
+    ).toEqual({ error: "unreadable" });
+    mkdirSync(out, { recursive: true });
+    execFileSync("mkfifo", [join(out, `My Photo-${hash8(png)}.png`)]);
+    expect(
+      new HashedSidecarWriter(out).place({ path: photo, name: "My Photo.png", role: "original" })
+    ).toEqual({ error: "destination-not-regular" });
+    expect(new ReferenceWriter().place({ path: fifo, name: "pipe.png", role: "original" })).toEqual(
+      { error: "unreadable" }
+    );
+    const template = join(dir, "pipe.json");
+    execFileSync("mkfifo", [template]);
+    expect(() => readTemplateFile(template)).toThrow(/not a readable regular file/);
   });
 
   it("reports unreadable sources", () => {

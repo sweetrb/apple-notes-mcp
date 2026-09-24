@@ -130,14 +130,26 @@ export class TemplateStore {
     return join(this.dir, `${name}.json`);
   }
 
-  /** Read a saved template's text, refusing symlinks and non-regular files. */
+  /**
+   * Read a saved template's text, refusing symlinks and non-regular files.
+   * O_NONBLOCK keeps a FIFO from blocking the event loop (it is then refused as
+   * not a regular file); it does not affect reading a regular file. Only a
+   * symlink (ELOOP) is reported as unsafe-path; other open failures, such as
+   * EACCES, are rethrown as they are.
+   */
   private readText(path: string): { text: string; bytes: number; mtime: Date } | undefined {
     let fd: number;
     try {
-      fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path}: not a regular file.`);
+      const errno = (error as NodeJS.ErrnoException).code;
+      if (errno === "ENOENT") return undefined;
+      if (errno === "ELOOP")
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to read ${path}: it is a symbolic link.`
+        );
+      throw error;
     }
     try {
       const stat = fstatSync(fd);
@@ -260,9 +272,16 @@ export class TemplateStore {
       const data = Buffer.from(body, "utf8");
       let written = 0;
       while (written < data.length) written += writeSync(fd, data, written);
-    } finally {
+    } catch (error) {
       closeSync(fd);
+      try {
+        unlinkSync(temp);
+      } catch {
+        /* already gone */
+      }
+      throw error;
     }
+    closeSync(fd);
     try {
       if (force) renameSync(temp, path);
       else {
