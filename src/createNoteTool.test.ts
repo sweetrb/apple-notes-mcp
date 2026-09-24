@@ -14,6 +14,8 @@ const manager = vi.hoisted(() => {
     getNoteContentById: vi.fn(),
     deleteNoteByIdIfUnchanged: vi.fn(),
     listNoteRefsDetailed: vi.fn(),
+    exportAttachmentsById: vi.fn(),
+    getNoteDetails: vi.fn(),
     // readNoteBodyById is the error-keeping form of getNoteContentById (#237).
     readNoteBodyById: vi.fn((id: string) => ({ body: m.getNoteContentById(id) ?? "" })),
   };
@@ -384,6 +386,100 @@ describe("delete-note placement check", () => {
     })) as Response;
     expect(response.isError).toBe(true);
     expect(response.content[0].text).toMatch(/still in its original folder.*Nothing was deleted/);
+  });
+
+  it("reports a delete whose placement could not be re-read as uncertain (#195)", async () => {
+    const id = "x-coredata://ABCDEF/ICNote/p7";
+    manager.getNoteById.mockReturnValueOnce({ id, title: "Plan" });
+    manager.getNoteContentById.mockReturnValueOnce("<div>Plan</div>");
+    manager.deleteNoteByIdIfUnchanged.mockReturnValueOnce({ status: "unverified" });
+    const response = (await registered.get("delete-note")!({
+      id,
+      expectedContentHash: "sha256:plain",
+    })) as Response & { structuredContent?: Record<string, unknown> };
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toMatch(/could not be re-read.*uncertain/);
+    expect(response.structuredContent).toEqual({
+      code: "verification_failed",
+      indeterminate: true,
+    });
+  });
+});
+
+describe("export-attachments outcome (#202)", () => {
+  const noteId = "x-coredata://ABCDEF/ICNote/p9";
+  const run = () =>
+    registered.get("export-attachments")!({ noteId, exportDir: "/tmp/out" }) as Promise<Response>;
+
+  it("is an error when every attempted copy failed", async () => {
+    manager.exportAttachmentsById.mockReturnValueOnce({
+      exportDir: "/tmp/out",
+      results: [
+        { pk: 1, kind: "image", exportedTo: null, exportedKind: null, error: "EACCES" },
+        { pk: 2, kind: "pdf", exportedTo: null, exportedKind: null, error: "EACCES" },
+      ],
+    });
+    const response = await run();
+    expect(response.isError).toBe(true);
+    expect(response.structuredContent).toMatchObject({
+      code: "operation_failed",
+      exported: 0,
+      failed: 2,
+    });
+    expect(response.structuredContent?.results).toHaveLength(2);
+  });
+
+  it("stays a success when at least one copy landed", async () => {
+    manager.exportAttachmentsById.mockReturnValueOnce({
+      exportDir: "/tmp/out",
+      results: [
+        { pk: 1, kind: "image", exportedTo: "/tmp/out/a.png", exportedKind: "asset" },
+        { pk: 2, kind: "pdf", exportedTo: null, exportedKind: null, error: "EACCES" },
+      ],
+    });
+    const response = await run();
+    expect(response.isError).toBeUndefined();
+    expect(response.structuredContent).toMatchObject({ exported: 1, failed: 1 });
+  });
+});
+
+describe("not-found codes ignore the note title (#185)", () => {
+  it.each(["Meeting timed out", 'Plan" timed out "B', "Result uncertain"])(
+    "reports a missing note titled %j as not_found",
+    async (title) => {
+      manager.getNoteDetails.mockReturnValueOnce(null);
+      const response = (await registered.get("get-note-content")!({ title })) as Response;
+      expect(response.isError).toBe(true);
+      expect(response.content[0].text).toBe(`Note "${title}" not found`);
+      expect(response.structuredContent).toEqual({ code: "not_found" });
+    }
+  );
+});
+
+describe("Notes.app unavailable during a write (#185)", () => {
+  const lost = "Lost connection to Notes.app. The app may have crashed or been restarted.";
+
+  it("marks a write tool's notes_unavailable error indeterminate", async () => {
+    manager.getNoteById.mockImplementationOnce(() => {
+      throw new Error(lost);
+    });
+    const response = (await registered.get("delete-note")!({
+      id: "x-coredata://ABCDEF/ICNote/p7",
+      expectedContentHash: "sha256:plain",
+    })) as Response;
+    expect(response.isError).toBe(true);
+    expect(response.structuredContent).toEqual({
+      code: "notes_unavailable",
+      indeterminate: true,
+    });
+  });
+
+  it("leaves a read tool's notes_unavailable error as it was", async () => {
+    manager.getNoteDetails.mockImplementationOnce(() => {
+      throw new Error(lost);
+    });
+    const response = (await registered.get("get-note-content")!({ title: "Plan" })) as Response;
+    expect(response.structuredContent).toEqual({ code: "notes_unavailable" });
   });
 });
 

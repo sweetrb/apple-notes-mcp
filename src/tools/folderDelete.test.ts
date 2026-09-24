@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import type { FolderAppFacts } from "../types.js";
 import type { FolderStoreFacts } from "../utils/folderStore.js";
+import { CodedError } from "../utils/errorCodes.js";
 import {
   coreDataPk,
   folderDeleteRefusal,
@@ -266,6 +267,33 @@ describe("folder delete apply", () => {
   it("reports an uncertain outcome when Notes.app still resolves the folder", () => {
     manager.folderExistsById.mockReturnValue(true);
     expect(() => apply()).toThrow(/still resolves/);
+  });
+
+  // #219: after Notes.app accepted the delete, a failed check must not escape
+  // as a plain error with no outcome.
+  it("reports a throwing existence readback as uncertain", () => {
+    manager.folderExistsById.mockImplementation(() => {
+      throw new Error("Notes.app is not responding");
+    });
+    let thrown: unknown;
+    try {
+      apply();
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CodedError);
+    expect((thrown as CodedError).envelope).toEqual({
+      code: "verification_failed",
+      indeterminate: true,
+    });
+    expect((thrown as Error).message).toMatch(/accepted the delete, but the readback failed/);
+  });
+
+  it("reports storeTombstoned false when the tombstone read throws", () => {
+    deps.readStore.mockReturnValueOnce(storeFacts()).mockImplementation(() => {
+      throw new Error("database is locked");
+    });
+    expect(apply()).toMatchObject({ status: "deleted", committed: true, storeTombstoned: false });
   });
 });
 

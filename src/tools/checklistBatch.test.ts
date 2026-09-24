@@ -6,6 +6,7 @@ import type { RichNote } from "../utils/noteRichText.js";
 import {
   appendChecklistItems,
   MAX_CHECKLIST_BATCH,
+  nativeToolResult,
   registerNativeOperations,
 } from "./nativeOperations.js";
 
@@ -207,6 +208,88 @@ describe("appendChecklistItems", () => {
       },
       notAttempted: ["b"],
     });
+  });
+});
+
+describe("appendChecklistItems outcome reporting (#201)", () => {
+  it("reports a readback that throws after the bridge ran as uncertain", () => {
+    const note = simulatedNote();
+    const read = note.deps.read;
+    note.deps.read = (noteId) => {
+      if (note.runs() > 0) throw new Error("database is locked");
+      return read(noteId);
+    };
+    const result = appendChecklistItems(
+      { id, expectedContentHash: note.snapshot().hash, scopeText, items: ["a", "b"] },
+      note.deps,
+      note.readRich
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      code: "verification_failed",
+      indeterminate: true,
+      landed: [],
+      stoppedAt: { index: 0, outcome: "uncertain", error: expect.stringMatching(/locked/) },
+      notAttempted: ["b"],
+    });
+    // The pre-run revision is stale once the bridge may have written.
+    expect(result).not.toHaveProperty("contentHash");
+    expect(nativeToolResult(result).isError).toBe(true);
+  });
+
+  it("keeps contentHash and committed: false when nothing was attempted", () => {
+    const note = simulatedNote();
+    const result = appendChecklistItems(
+      { id, expectedContentHash: `sha256:${"f".repeat(64)}`, scopeText, items: ["a"] },
+      note.deps,
+      note.readRich
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      code: "revision_conflict",
+      committed: false,
+      indeterminate: false,
+      contentHash: `sha256:${"f".repeat(64)}`,
+    });
+  });
+
+  it("includes landed and an error code when the final order check fails", () => {
+    const note = simulatedNote({ initial: ["kept"] });
+    let calls = 0;
+    // The last read (the order check) sees the new items moved before the old one.
+    const readRich = () => {
+      const rich = note.readRich();
+      if (++calls === 4)
+        rich.checklistItems = rich.checklistItems!.map((item) => ({
+          ...item,
+          start: item.id.startsWith("old") ? 1000 : item.start,
+        }));
+      return rich;
+    };
+    const result = appendChecklistItems(
+      { id, expectedContentHash: note.snapshot().hash, scopeText, items: ["a", "b"] },
+      note.deps,
+      readRich
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      orderVerified: false,
+      code: "verification_failed",
+      committed: true,
+    });
+    expect((result.landed as Array<{ text: string }>).map((i) => i.text)).toEqual(["a", "b"]);
+    expect(nativeToolResult(result).isError).toBe(true);
+  });
+
+  it("does not mark a successful batch as an error", () => {
+    const note = simulatedNote();
+    const result = appendChecklistItems(
+      { id, expectedContentHash: note.snapshot().hash, scopeText, items: ["a"] },
+      note.deps,
+      note.readRich
+    );
+    expect(result.ok).toBe(true);
+    expect(nativeToolResult(result)).not.toHaveProperty("isError");
   });
 });
 

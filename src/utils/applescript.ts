@@ -276,6 +276,21 @@ export function isPermissionDenied(error?: string | null): boolean {
 }
 
 /**
+ * Double-quoted segments on one line, straight or curly. Error text
+ * interpolates caller data (note titles, folder names, tags) inside double
+ * quotes, so a note titled "Meeting timed out" must not read as a timeout.
+ */
+const QUOTED = /"[^"\n]*"|“[^”\n]*”/g;
+
+/**
+ * Replace quoted caller data with `""`, so error classification sees only the
+ * wording that AppleScript or the server itself produced.
+ */
+export function stripQuoted(text: string): string {
+  return text.replace(QUOTED, '""');
+}
+
+/**
  * User-friendly error messages mapped from common AppleScript errors.
  * Each entry maps a pattern (regex or string) to a user-friendly message.
  */
@@ -371,14 +386,19 @@ function parseErrorMessage(errorOutput: string): string {
   // trailing OSStatus code, and on a fully localised Mac `(-1743)` is the only
   // part of the refusal any pattern can match — matching coreError alone would
   // throw the sole locale-independent signal away.
-  if (isPermissionDenied(errorOutput)) {
+  // Quoted note, folder and account names are caller data: a note titled
+  // "Access denied" must not read as a permission refusal.
+  if (isPermissionDenied(stripQuoted(errorOutput))) {
     return PERMISSION_DENIED_MESSAGE;
   }
 
-  // Try to match against known error patterns for user-friendly messages
+  // Try to match against known error patterns for user-friendly messages.
+  // A rule without a capture group must match outside quoted names; a rule
+  // with one captures the quoted name itself, so it matches the raw text.
+  const unquoted = stripQuoted(coreError);
   for (const { pattern, message } of ERROR_MAPPINGS) {
     const match = coreError.match(pattern);
-    if (match) {
+    if (match && (match.length > 1 || pattern.test(unquoted))) {
       // Replace $1, $2, etc. with captured groups
       let result = message;
       for (let i = 1; i < match.length; i++) {
@@ -443,8 +463,12 @@ export function executeAppleScript(
     callTimeoutMs() ??
     envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ??
     DEFAULT_TIMEOUT_MS;
-  const maxRetries =
-    options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
+  // maxRetries counts attempts, so anything below 1 (a caller passing 0 to
+  // mean "no retries") still runs the script once.
+  const maxRetries = Math.max(
+    1,
+    options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES
+  );
   const retryDelayMs =
     options.retryDelayMs ??
     envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ??

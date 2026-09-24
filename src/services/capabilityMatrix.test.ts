@@ -111,13 +111,32 @@ describe("evaluateFeature", () => {
   });
 
   it("reports placeholders as not_implemented", () => {
-    for (const name of ["checklistToggle", "smartFolders", "paragraphLinks", "audioTranscription"])
+    for (const name of ["checklistToggle", "smartFolders"])
       expect(evaluateFeature(feature(name), env())).toMatchObject({
         available: false,
         osSupported: true,
         reason: "not_implemented",
         missing: ["native_write_helper"],
       });
+  });
+
+  it("reports paragraph links and audio transcription as shipped database reads", () => {
+    expect(feature("paragraphLinks").tools).toEqual(["list-note-paragraphs", "get-paragraph-link"]);
+    expect(feature("audioTranscription").tools).toEqual([
+      "get-audio-transcripts",
+      "transcribe-note-audio",
+    ]);
+    for (const name of ["paragraphLinks", "audioTranscription"]) {
+      expect(evaluateFeature(feature(name), env())).toMatchObject({
+        available: true,
+        reason: null,
+        requirements: ["full_disk_access"],
+      });
+      expect(evaluateFeature(feature(name), env({ fullDiskAccess: false }))).toMatchObject({
+        available: false,
+        reason: "full_disk_access_missing",
+      });
+    }
   });
 
   it("keeps write-dependent features not_implemented even with the read-only helper enabled", () => {

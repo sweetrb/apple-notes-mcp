@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { insertLink, type LinkInsertDependencies } from "./linkInsert.js";
 import type { InsertLinkParams } from "../types.js";
+import { CodedError } from "../utils/errorCodes.js";
 import type { NoteLink } from "../utils/noteRichText.js";
 
 const ID = "x-coredata://00000000-0000-0000-0000-000000000000/ICNote/p1";
@@ -107,6 +108,22 @@ describe("insertLink", () => {
     expect(() => insertLink(base, d)).toThrow(
       /The text was written, but link verification failed: .*not found.*Do not retry automatically/
     );
+  });
+
+  // #212: the envelope must say the text committed, not leave it unknown.
+  it("marks a failed link verification as committed", () => {
+    let thrown: unknown;
+    try {
+      insertLink(base, deps([]));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CodedError);
+    expect((thrown as CodedError).envelope).toEqual({
+      code: "verification_failed",
+      committed: true,
+      indeterminate: true,
+    });
   });
 
   it("wraps a non-Error verification failure too", async () => {

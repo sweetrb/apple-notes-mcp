@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
-import { CodedError, errorResult } from "../utils/errorCodes.js";
+import { classifyError, CodedError, errorResult } from "../utils/errorCodes.js";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import {
@@ -118,20 +118,28 @@ export function appendChecklistItems(
   const landed: Array<{ index: number; id: string; text: string }> = [];
   let contentHash = args.expectedContentHash;
   for (const [index, text] of args.items.entries()) {
-    let wrote = false;
+    // Set once the bridge run starts: from then on any failure, including a
+    // readback that throws, leaves the item's outcome unknown.
+    let attempted = false;
+    const tracked: BackgroundDependencies = {
+      ...deps,
+      run: (input) => {
+        attempted = true;
+        deps.run(input);
+      },
+    };
     try {
       const result = mutateBackground(
         { ...args, expectedContentHash: contentHash },
         "create-checklist-item",
         { text },
         (before, after) => {
-          wrote = true;
           assertPreserved(before, after, { append: true });
           const added = after.checklist.slice(before.checklist.length);
           if (added.length !== 1 || added[0].text !== text || added[0].done)
             throw new Error("Native checklist item not verified");
         },
-        deps
+        tracked
       );
       const items = byPosition(readRich(args.id).checklistItems);
       const fresh = items.filter(
@@ -147,23 +155,41 @@ export function appendChecklistItems(
       landed.push({ index, id: fresh[0].id, text });
       contentHash = result.contentHash;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // A bridge refusal or failure with an unchanged readback is reported as
+      // not written even though the run started (#248).
+      const uncertain =
+        attempted && !(error instanceof CodedError && error.envelope.committed === false);
+      const classified = classifyError(message, error).code;
+      const envelope = uncertain
+        ? {
+            code:
+              classified === "timeout_indeterminate"
+                ? classified
+                : ("verification_failed" as const),
+            indeterminate: true,
+          }
+        : {
+            code: classified,
+            indeterminate: false,
+            // Earlier items did land, so only an empty batch wrote nothing.
+            ...(landed.length === 0 ? { committed: false } : {}),
+          };
       return {
         ok: false,
+        ...envelope,
         id: args.id,
         landed,
         stoppedAt: {
           index,
           text,
-          // A bridge refusal or failure with an unchanged readback is
-          // reported as not written even though verification ran (#248).
-          outcome:
-            wrote && !(error instanceof CodedError && error.envelope.committed === false)
-              ? "uncertain"
-              : "not-written",
-          error: error instanceof Error ? error.message : String(error),
+          outcome: uncertain ? "uncertain" : "not-written",
+          error: message,
         },
         notAttempted: args.items.slice(index + 1),
-        contentHash,
+        // After an uncertain run the note may have changed, so the last
+        // verified revision would be stale; read the note for a fresh one.
+        ...(uncertain ? {} : { contentHash }),
         message: `Stopped at item ${index + 1} of ${args.items.length}; ${landed.length} item(s) landed and were verified. Read the exact note before retrying, and retry only items that are not present.`,
       };
     }
@@ -175,9 +201,11 @@ export function appendChecklistItems(
     tail.every((item, i) => item.id === landed[i].id && item.text === landed[i].text);
   return {
     ok: orderVerified,
+    ...(orderVerified ? {} : { code: "verification_failed", committed: true }),
     id: args.id,
     contentHash,
     items: landed,
+    landed,
     orderVerified,
     ...(orderVerified
       ? {}
@@ -185,6 +213,19 @@ export function appendChecklistItems(
           message:
             "Every item landed and was verified, but they are not the note's last checklist items in the requested order. Read the note before editing it further.",
         }),
+  };
+}
+
+/**
+ * Wrap a native tool's result. A partial result that carries an error `code`
+ * (create-checklist-items stopping early) is a failed call, so it is marked
+ * `isError` and clients do not read it as success.
+ */
+export function nativeToolResult(result: Record<string, unknown>) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(result) }],
+    structuredContent: result,
+    ...(result.ok === false && typeof result.code === "string" ? { isError: true } : {}),
   };
 }
 
@@ -207,11 +248,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
       },
       (async (args: z.infer<z.ZodObject<S>>) => {
         try {
-          const result = handler(args as z.infer<z.ZodObject<S>>);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result) }],
-            structuredContent: result,
-          };
+          return nativeToolResult(handler(args as z.infer<z.ZodObject<S>>));
         } catch (error) {
           return errorResult(error instanceof Error ? error.message : "Operation failed", error);
         }

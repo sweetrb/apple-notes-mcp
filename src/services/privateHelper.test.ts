@@ -17,6 +17,7 @@ import {
   callPrivateHelper,
   defaultDeps,
   helperInstallDir,
+  helperTimeoutMs,
   inspectInstallation,
   packageRoot,
   privateHelperCapabilities,
@@ -309,6 +310,59 @@ describe("callPrivateHelper", SPAWN_TIMEOUT, () => {
       callPrivateHelper("probe", {}, deps, { binaryPath: join(fx.root, "absent") })
     );
     expect(e.code).toBe("helper_unreachable");
+  });
+
+  // #204: only our own timeout is a timeout.
+  const spawned = (result: Partial<ReturnType<PrivateHelperDeps["spawn"]>>) => {
+    const deps = fx.deps(ON);
+    deps.spawn = (() => ({
+      pid: 1,
+      output: [],
+      stdout: "",
+      stderr: "",
+      status: null,
+      signal: null,
+      ...result,
+    })) as unknown as PrivateHelperDeps["spawn"];
+    return caught(() =>
+      callPrivateHelper("probe", {}, deps, { binaryPath: join(fx.root, "absent") })
+    );
+  };
+
+  it("reports a helper crash by its signal, not as a timeout", () => {
+    const e = spawned({ signal: "SIGSEGV" });
+    expect(e.code).toBe("helper_crashed");
+    expect(e.message).toMatch(/SIGSEGV/);
+  });
+
+  it("reports output past maxBuffer as an invalid response, not a timeout", () => {
+    const error = Object.assign(new Error("spawnSync ENOBUFS"), { code: "ENOBUFS" });
+    const e = spawned({ signal: "SIGKILL", error });
+    expect(e.code).toBe("invalid_response");
+    expect(e.message).toMatch(/exceeded/);
+  });
+
+  it("still reports ETIMEDOUT as a timeout", () => {
+    const error = Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" });
+    expect(spawned({ signal: "SIGKILL", error }).code).toBe("timeout");
+  });
+
+  it.each(["-5", "0", "soon"])("uses the default timeout for the override %j", (value) => {
+    expect(helperTimeoutMs({ APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS: value })).toBe(20_000);
+  });
+
+  it("honours a positive timeout override", () => {
+    expect(helperTimeoutMs({ APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS: "300" })).toBe(300);
+  });
+
+  it("runs the helper with a negative timeout override instead of throwing", () => {
+    fx.install();
+    const r = callPrivateHelper(
+      "probe",
+      {},
+      fx.deps({ ...ON, APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS: "-5" })
+    );
+    expect(r.status).toBe("ok");
   });
 
   it("falls back to the default timeout for a non-numeric override", () => {

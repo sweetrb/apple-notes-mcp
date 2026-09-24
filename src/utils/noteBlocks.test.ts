@@ -8,11 +8,35 @@ import { gzipSync } from "node:zlib";
 import {
   decodeCompressedNoteBlocks,
   decodeNoteBlocks,
+  NOTE_BLOCKS_ERROR_CODES,
   NoteBlocksError,
   pageNoteBlocks,
   blocksMaxResponseBytes,
 } from "./noteBlocks.js";
 import { parseRichNote } from "./noteRichText.js";
+import { ERROR_CODES, classifyError } from "./errorCodes.js";
+
+// #192: reader failures carry their code explicitly, not by matching words.
+describe("NoteBlocksError codes", () => {
+  it("maps every reader code into the shared vocabulary", () => {
+    for (const code of Object.values(NOTE_BLOCKS_ERROR_CODES))
+      expect(Object.keys(ERROR_CODES)).toContain(code);
+  });
+
+  it.each([
+    ["invalid-runs", "Invalid Notes attribute run", "unsupported"],
+    ["malformed-protobuf", "invalid wire type 7", "unsupported"],
+    ["decompress-failed", "Failed to decompress note data: incorrect header check", "unsupported"],
+    ["no-body", "No body data is stored for this note", "operation_failed"],
+    ["query-failed", "Failed to query the Notes database", "operation_failed"],
+    ["not-found", 'No note found for ID "x"', "not_found"],
+  ] as const)("classifies [%s] as its own code", (code, message, expected) => {
+    const error = new NoteBlocksError(code, message);
+    expect(classifyError(`Error reading note blocks [${code}]: ${message}`, error).code).toBe(
+      expected
+    );
+  });
+});
 
 const varint = (value: number | bigint): number[] => {
   let v = BigInt.asUintN(64, BigInt(value));

@@ -156,7 +156,9 @@ describe("private helper tools", () => {
       "full_disk_access_missing"
     );
     expect(envelopeCode("store_unavailable", "open failed")).toBe("operation_failed");
-    expect(envelopeCode("timeout", "")).toBe("timeout_indeterminate");
+    // A read-only helper timeout wrote nothing, so it is not indeterminate (#204).
+    expect(envelopeCode("timeout", "")).toBe("operation_failed");
+    expect(envelopeCode("helper_crashed", "")).toBe("operation_failed");
   });
 
   it("uses the real dependencies when none are injected", async () => {

@@ -440,6 +440,12 @@ describe("readAudioTranscripts (sqlite3 fixture store)", () => {
       INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZIDENTIFIER, ZISPASSWORDPROTECTED) VALUES (50, 'NOTE-50', 0);
       INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (51, 'AUD-51', 'com.apple.m4a-audio', 50, NULL, ${hexLiteral(first)}, NULL, NULL, NULL);
       INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (52, 'AUD-52', 'public.mp3', 50, NULL, NULL, NULL, NULL, NULL);
+      INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZIDENTIFIER) VALUES (60, 'FOLDER-60');
+      CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER, Z_NAME VARCHAR);
+      INSERT INTO Z_PRIMARYKEY VALUES (5, 'ICAttachment'), (9, 'ICNote'), (15, 'ICFolder');
+      ALTER TABLE ZICCLOUDSYNCINGOBJECT ADD COLUMN Z_ENT INTEGER;
+      UPDATE ZICCLOUDSYNCINGOBJECT SET Z_ENT = CASE
+        WHEN Z_PK IN (10, 30, 40, 50) THEN 9 WHEN Z_PK = 60 THEN 15 ELSE 5 END;
     `;
     const sqlFile = join(dir, "setup.sql");
     writeFileSync(sqlFile, sql);
@@ -522,6 +528,17 @@ describe("readAudioTranscripts (sqlite3 fixture store)", () => {
   it("reports a missing note", () => {
     try {
       readAudioTranscripts(noteId(999), { dbPath });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(AudioTranscriptError);
+      expect((error as AudioTranscriptError).kind).toBe("not_found");
+    }
+  });
+
+  // #194: a folder or attachment key is not a note without audio.
+  it.each([60, 11])("reports the non-note key p%i as a missing note", (pk) => {
+    try {
+      readAudioTranscripts(noteId(pk), { dbPath });
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(AudioTranscriptError);

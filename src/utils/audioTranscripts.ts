@@ -275,11 +275,14 @@ export function buildTranscriptSql(pk: string, available: ReadonlySet<string>): 
   const locked = available.has("ZISPASSWORDPROTECTED")
     ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)"
     : "0";
+  // Only a note row counts: every entity shares this table, so a folder or
+  // attachment key would otherwise read as a note without audio.
+  const isNote = `n.Z_PK = ${pk} AND n.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')`;
   return [
     "BEGIN;",
     // Every statement yields exactly one row, so output lines stay positional.
-    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}), ` +
-      `'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}));`,
+    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${isNote}), ` +
+      `'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE ${isNote}));`,
     `SELECT COALESCE((SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = ${pk} LIMIT 1), '');`,
     "SELECT json_group_array(json_object(" +
       "'pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, " +

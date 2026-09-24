@@ -581,14 +581,53 @@ describe("attachment filename override and create-then-attach", () => {
     expect(manager.createNote).not.toHaveBeenCalled();
   });
 
-  it("names the created note when the attachment step fails", async () => {
+  it("hands off to add-attachment when the attach step fails before insertion", async () => {
+    const { manager, handler } = setup("x");
+    manager.listAttachmentsById.mockReset().mockImplementation(() => {
+      throw new Error("Notes.app is busy");
+    });
+    const result = await handler("create-note-with-attachment")({ title: "New", path: source() });
+    expect(result.isError).toBe(true);
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    expect(result.content[0].text).toMatch(
+      new RegExp(`Note ${id} was created; attach to it with add-attachment`)
+    );
+    expect(result.structuredContent).toMatchObject({ committed: true, indeterminate: false });
+  });
+
+  // The note was created, so a pre-insertion revision conflict must not read
+  // as committed: false, which would invite a retry that creates a second note.
+  it("never reports committed: false once the note exists", async () => {
+    const { manager, handler } = setup("x");
+    manager.listAttachmentsById.mockReset().mockImplementation(() => {
+      throw new Error("Note revision changed");
+    });
+    const result = await handler("create-note-with-attachment")({ title: "New", path: source() });
+    expect(result.isError).toBe(true);
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    expect(result.structuredContent).toEqual({
+      code: "revision_conflict",
+      committed: true,
+      indeterminate: false,
+    });
+  });
+
+  // #196: after insertion the file may already be in the note, so sending the
+  // caller to add-attachment would duplicate it.
+  it("reports an uncertain attachment after insertion without the add-attachment hand-off", async () => {
     const { manager, handler } = setup("x");
     manager.saveAttachmentById.mockImplementation(savesAs(Buffer.from("wrong")));
     const result = await handler("create-note-with-attachment")({ title: "New", path: source() });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(
-      new RegExp(`Note ${id} was created; attach to it with add-attachment`)
+      new RegExp(`Note ${id} was created, but the attachment outcome is uncertain`)
     );
+    expect(result.content[0].text).not.toMatch(/attach to it with add-attachment/);
+    expect(result.structuredContent).toEqual({
+      code: "verification_failed",
+      committed: true,
+      indeterminate: true,
+    });
   });
 });
 
