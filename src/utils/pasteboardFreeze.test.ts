@@ -23,9 +23,6 @@ import {
   pasteboardTimeoutMs,
 } from "./pasteboardFreeze.js";
 
-/** The real-JXA suite needs macOS (osascript and AppKit). */
-const onMac = process.platform === "darwin";
-
 /**
  * These tests run the REAL JXA program against private, uniquely named
  * pasteboards, so the user's general pasteboard is never read or changed.
@@ -95,15 +92,14 @@ function run(argv) {
 }
 
 afterAll(() => {
-  if (onMac)
-    for (const name of names)
-      execFileSync("osascript", [
-        "-l",
-        "JavaScript",
-        "-e",
-        'ObjC.import("AppKit"); function run(argv) { $.NSPasteboard.pasteboardWithName(argv[0]).releaseGlobally; }',
-        name,
-      ]);
+  for (const name of names)
+    execFileSync("osascript", [
+      "-l",
+      "JavaScript",
+      "-e",
+      'ObjC.import("AppKit"); function run(argv) { $.NSPasteboard.pasteboardWithName(argv[0]).releaseGlobally; }',
+      name,
+    ]);
   rmSync(scratch, { recursive: true, force: true });
 }, 60_000);
 
@@ -114,105 +110,101 @@ const PNG =
   "5b7e5d830000000049454e44ae426082";
 
 // Each case spawns osascript several times; allow for a loaded machine.
-describe.skipIf(!onMac)(
-  "freezePasteboard (real JXA, private named pasteboards)",
-  { timeout: 60_000 },
-  () => {
-    it("freezes image bytes, preferring PNG over TIFF, into a private file", () => {
-      const name = fill([
-        ["public.tiff", "4d4d002a"],
-        ["public.png", PNG],
-      ]);
-      const frozen = freezePasteboard({ pasteboardName: name });
-      try {
-        expect(frozen).toMatchObject({
-          kind: "data",
-          type: "public.png",
-          filename: "Pasted image.png",
-        });
-        expect(readFileSync(frozen.path).toString("hex")).toBe(PNG);
-        expect(frozen.bytes).toBe(PNG.length / 2);
-        expect(statSync(frozen.path).mode & 0o077).toBe(0);
-      } finally {
-        frozen.cleanup();
-      }
-      expect(existsSync(frozen.path)).toBe(false);
-    });
+describe("freezePasteboard (real JXA, private named pasteboards)", { timeout: 60_000 }, () => {
+  it("freezes image bytes, preferring PNG over TIFF, into a private file", () => {
+    const name = fill([
+      ["public.tiff", "4d4d002a"],
+      ["public.png", PNG],
+    ]);
+    const frozen = freezePasteboard({ pasteboardName: name });
+    try {
+      expect(frozen).toMatchObject({
+        kind: "data",
+        type: "public.png",
+        filename: "Pasted image.png",
+      });
+      expect(readFileSync(frozen.path).toString("hex")).toBe(PNG);
+      expect(frozen.bytes).toBe(PNG.length / 2);
+      expect(statSync(frozen.path).mode & 0o077).toBe(0);
+    } finally {
+      frozen.cleanup();
+    }
+    expect(existsSync(frozen.path)).toBe(false);
+  });
 
-    it("takes a PDF under a default document name", () => {
-      const name = fill([["com.adobe.pdf", Buffer.from("%PDF-1.4 synthetic").toString("hex")]]);
-      const frozen = freezePasteboard({ pasteboardName: name });
-      try {
-        expect(frozen).toMatchObject({
-          kind: "data",
-          type: "com.adobe.pdf",
-          filename: "Pasted document.pdf",
-        });
-        expect(readFileSync(frozen.path, "utf8")).toBe("%PDF-1.4 synthetic");
-      } finally {
-        frozen.cleanup();
-      }
-    });
+  it("takes a PDF under a default document name", () => {
+    const name = fill([["com.adobe.pdf", Buffer.from("%PDF-1.4 synthetic").toString("hex")]]);
+    const frozen = freezePasteboard({ pasteboardName: name });
+    try {
+      expect(frozen).toMatchObject({
+        kind: "data",
+        type: "com.adobe.pdf",
+        filename: "Pasted document.pdf",
+      });
+      expect(readFileSync(frozen.path, "utf8")).toBe("%PDF-1.4 synthetic");
+    } finally {
+      frozen.cleanup();
+    }
+  });
 
-    it("copies a copied file's bytes, keeping its name", () => {
-      const source = join(scratch, "synthetic report.txt");
-      writeFileSync(source, "synthetic file contents");
-      const name = fill([["file-url", source]]);
-      const frozen = freezePasteboard({ pasteboardName: name });
-      try {
-        expect(frozen).toMatchObject({
-          kind: "file",
-          type: "public.file-url",
-          filename: "synthetic report.txt",
-        });
-        expect(frozen.path).not.toBe(source);
-        expect(readFileSync(frozen.path, "utf8")).toBe("synthetic file contents");
-      } finally {
-        frozen.cleanup();
-      }
-    });
+  it("copies a copied file's bytes, keeping its name", () => {
+    const source = join(scratch, "synthetic report.txt");
+    writeFileSync(source, "synthetic file contents");
+    const name = fill([["file-url", source]]);
+    const frozen = freezePasteboard({ pasteboardName: name });
+    try {
+      expect(frozen).toMatchObject({
+        kind: "file",
+        type: "public.file-url",
+        filename: "synthetic report.txt",
+      });
+      expect(frozen.path).not.toBe(source);
+      expect(readFileSync(frozen.path, "utf8")).toBe("synthetic file contents");
+    } finally {
+      frozen.cleanup();
+    }
+  });
 
-    it("refuses a copied symlink, text-only contents, and an empty pasteboard", () => {
-      const target = join(scratch, "target.txt");
-      const link = join(scratch, "link.txt");
-      writeFileSync(target, "x");
-      symlinkSync(target, link);
-      const code = (fn: () => unknown) => {
-        try {
-          fn();
-        } catch (e) {
-          return (e as PasteboardError).code;
-        }
-        return "none";
-      };
-      expect(code(() => freezePasteboard({ pasteboardName: fill([["file-url", link]]) }))).toBe(
-        "file_unreadable"
-      );
-      expect(
-        code(() =>
-          freezePasteboard({
-            pasteboardName: fill([["public.utf8-plain-text", Buffer.from("hi").toString("hex")]]),
-          })
-        )
-      ).toBe("unsupported_content");
-      expect(code(() => freezePasteboard({ pasteboardName: fill([]) }))).toBe("pasteboard_empty");
-    });
-
-    it("refuses several copied files instead of attaching the first", () => {
-      const first = join(scratch, "first.txt");
-      const second = join(scratch, "second.txt");
-      writeFileSync(first, "1");
-      writeFileSync(second, "2");
+  it("refuses a copied symlink, text-only contents, and an empty pasteboard", () => {
+    const target = join(scratch, "target.txt");
+    const link = join(scratch, "link.txt");
+    writeFileSync(target, "x");
+    symlinkSync(target, link);
+    const code = (fn: () => unknown) => {
       try {
-        freezePasteboard({ pasteboardName: fillFiles([first, second]) });
-        expect.unreachable();
+        fn();
       } catch (e) {
-        expect((e as PasteboardError).code).toBe("multiple_files");
-        expect((e as PasteboardError).envelope).toMatchObject({ count: 2 });
+        return (e as PasteboardError).code;
       }
-    });
-  }
-);
+      return "none";
+    };
+    expect(code(() => freezePasteboard({ pasteboardName: fill([["file-url", link]]) }))).toBe(
+      "file_unreadable"
+    );
+    expect(
+      code(() =>
+        freezePasteboard({
+          pasteboardName: fill([["public.utf8-plain-text", Buffer.from("hi").toString("hex")]]),
+        })
+      )
+    ).toBe("unsupported_content");
+    expect(code(() => freezePasteboard({ pasteboardName: fill([]) }))).toBe("pasteboard_empty");
+  });
+
+  it("refuses several copied files instead of attaching the first", () => {
+    const first = join(scratch, "first.txt");
+    const second = join(scratch, "second.txt");
+    writeFileSync(first, "1");
+    writeFileSync(second, "2");
+    try {
+      freezePasteboard({ pasteboardName: fillFiles([first, second]) });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as PasteboardError).code).toBe("multiple_files");
+      expect((e as PasteboardError).envelope).toMatchObject({ count: 2 });
+    }
+  });
+});
 
 /**
  * Runs the constant JXA program in Node against a fake AppKit bridge, so the
