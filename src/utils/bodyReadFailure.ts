@@ -25,10 +25,19 @@ export interface SizedAttachment {
 
 export type BodyReadFailureKind = "timeout" | "buffer" | "other";
 
+/**
+ * The runner's own overflow error (utils/applescript `outputOverflowMessage`):
+ * the body was larger than the output cap. It is checked before the timeout
+ * patterns, since the runner stops osascript the same way for both.
+ */
+const OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
+
 /** Classify the automation error from a failed body read. */
 export function classifyBodyReadError(error: string | undefined): BodyReadFailureKind {
   if (!error) return "other";
-  if (/ENOBUFS|maxBuffer/i.test(error)) return "buffer";
+  if (OUTPUT_OVERFLOW.test(error) || /ENOBUFS|maxBuffer|ERR_STRING_TOO_LONG/i.test(error)) {
+    return "buffer";
+  }
   if (/timed out|timeout|-1712/i.test(error)) return "timeout";
   return "other";
 }
@@ -70,17 +79,23 @@ export function describeBodyReadFailure(
   if (kind === "other") return base;
 
   const large = attachments ? largeAttachments(attachments) : [];
+  const listed = large.map((a) => `${a.name}, ${formatBytes(a.bytes)}`).join("; ");
+  const holds =
+    large.length > 0
+      ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed}). `
+      : "";
+  if (kind === "buffer") {
+    // A size limit: the same body overflows again, however long the read may take.
+    const cause = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
+    const remedy =
+      "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
+    return `${base}\n\n${cause} ${remedy}`;
+  }
   const cause =
     large.length > 0
-      ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large
-          .map((a) => `${a.name}, ${formatBytes(a.bytes)}`)
-          .join(
-            "; "
-          )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.`
+      ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.`
       : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
   const remedy =
-    kind === "buffer"
-      ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app."
-      : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+    "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
   return `${base}\n\n${cause} ${remedy}`;
 }

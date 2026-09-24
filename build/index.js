@@ -39021,17 +39021,20 @@ function envPositiveNumber(name) {
 function getMaxBuffer() {
   return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
 }
-var NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, bufferConstants.MAX_STRING_LENGTH);
+var MAX_OUTPUT_BYTES = bufferConstants.MAX_STRING_LENGTH;
+var NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, MAX_OUTPUT_BYTES);
 function noteBodyMaxBuffer() {
-  return Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES);
+  return Math.min(Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES), MAX_OUTPUT_BYTES);
 }
 function isOutputOverflowError(error2) {
-  return error2 instanceof Error && error2.code === "ENOBUFS";
+  const code = error2 instanceof Error ? error2.code : void 0;
+  return code === "ENOBUFS" || code === "ERR_STRING_TOO_LONG";
 }
 function outputOverflowMessage(maxBufferBytes) {
   const mib = 1024 * 1024;
   const limit = maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
-  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.`;
+  const remedy = maxBufferBytes >= MAX_OUTPUT_BYTES ? "That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app." : "Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.";
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. ${remedy}`;
 }
 var SCRIPT_TIMEOUT_HEADROOM_MS = 5e3;
 var MIN_ATTEMPT_BUDGET_MS = 1e3;
@@ -39178,7 +39181,7 @@ function executeAppleScript(script, options = {}) {
   const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
-  const maxBufferBytes = options.maxBufferBytes ?? getMaxBuffer();
+  const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
   if (!script || !script.trim()) {
     return {
       success: false,
@@ -49655,9 +49658,12 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
 
 // src/utils/bodyReadFailure.ts
 var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+var OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
 function classifyBodyReadError(error2) {
   if (!error2) return "other";
-  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (OUTPUT_OVERFLOW.test(error2) || /ENOBUFS|maxBuffer|ERR_STRING_TOO_LONG/i.test(error2)) {
+    return "buffer";
+  }
   if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
   return "other";
 }
@@ -49675,10 +49681,17 @@ function describeBodyReadFailure(title, error2, attachments) {
   const kind = classifyBodyReadError(error2);
   if (kind === "other") return base;
   const large = attachments ? largeAttachments(attachments) : [];
-  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
-    "; "
-  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
-  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  const listed = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
+  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed}). ` : "";
+  if (kind === "buffer") {
+    const cause2 = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
+    const remedy2 = "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
+    return `${base}
+
+${cause2} ${remedy2}`;
+  }
+  const cause = large.length > 0 ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
   return `${base}
 
 ${cause} ${remedy}`;
@@ -54756,7 +54769,7 @@ var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
   "transcribe"
 ]);
 var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
 var publicManifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -54884,7 +54897,7 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES
+    maxBuffer: MAX_OUTPUT_BYTES2
   });
   const errno = result.error?.code;
   if (errno === "ETIMEDOUT" || result.signal && result.status === null)
@@ -54924,7 +54937,7 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     };
     child.stdout?.on("data", (chunk) => {
       size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES)
+      if (size > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
@@ -55745,7 +55758,7 @@ var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
 var DEFAULT_TIMEOUT_MS3 = 2e4;
-var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var MAX_OUTPUT_BYTES3 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -55929,7 +55942,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2,
+    maxBuffer: MAX_OUTPUT_BYTES3,
     env: deps.env
   });
   const errno = result.error?.code;

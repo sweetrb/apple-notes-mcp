@@ -165,6 +165,31 @@ describe("executeAppleScript", () => {
       expect(mockExecFileSync).toHaveBeenCalledTimes(1);
     });
 
+    it("clamps any cap to V8's largest string and says raising it will not help", () => {
+      process.env.APPLE_NOTES_MCP_MAX_BUFFER = String(4 * 1024 * 1024 * 1024);
+      mockExecFileSync.mockImplementation(() => {
+        throw makeOverflowError();
+      });
+      const result = executeAppleScript("get body of note 1", {
+        maxBufferBytes: noteBodyMaxBuffer(),
+      });
+      expect(execOptions().maxBuffer).toBe(bufferConstants.MAX_STRING_LENGTH);
+      expect(result.error).toMatch(/^Notes\.app returned more than \d+ MB of output/);
+      expect(result.error).toContain("raising APPLE_NOTES_MCP_MAX_BUFFER will not help");
+      expect(result.error).not.toMatch(/timed? out/i);
+    });
+
+    it("treats output too long for one string as the same overflow", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw Object.assign(new Error("Cannot create a string longer than 0x1fffffe8 characters"), {
+          code: "ERR_STRING_TOO_LONG",
+        });
+      });
+      const result = executeAppleScript("get body of note 1", { maxRetries: 3 });
+      expect(result.error).toMatch(/^Notes\.app returned more than 64 MB of output/);
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
+    });
+
     it("states a cap under 1 MB in bytes", () => {
       process.env.APPLE_NOTES_MCP_MAX_BUFFER = "50";
       mockExecFileSync.mockImplementation(() => {
@@ -188,9 +213,10 @@ describe("executeAppleScript", () => {
       expect(noteBodyMaxBuffer()).toBeGreaterThan(getMaxBuffer());
     });
 
-    it("keeps a larger APPLE_NOTES_MCP_MAX_BUFFER", () => {
+    it("never passes V8's largest string, whatever APPLE_NOTES_MCP_MAX_BUFFER says", () => {
+      // Past that, the output could not become one string.
       process.env.APPLE_NOTES_MCP_MAX_BUFFER = String(2 * 1024 * 1024 * 1024);
-      expect(noteBodyMaxBuffer()).toBe(2 * 1024 * 1024 * 1024);
+      expect(noteBodyMaxBuffer()).toBe(bufferConstants.MAX_STRING_LENGTH);
     });
   });
 

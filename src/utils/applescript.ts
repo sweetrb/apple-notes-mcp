@@ -49,16 +49,26 @@ export function getMaxBuffer(): number {
 }
 
 /**
+ * The most output one call can accept, whatever APPLE_NOTES_MCP_MAX_BUFFER
+ * says: the output becomes one string, and V8 cannot build a string longer
+ * than MAX_STRING_LENGTH (about 512 MB on 64-bit Node). A UTF-8 byte count at
+ * or below this also keeps the decoded string within it.
+ */
+const MAX_OUTPUT_BYTES = bufferConstants.MAX_STRING_LENGTH;
+
+/**
  * Output cap for reading one note body. Notes.app returns a body with every
  * inline image embedded as base64, so a 40 MB TIFF yields a body of about
- * 110 MB, past the general 64 MB cap (#237). The cap stays below V8's largest
- * string, since the output becomes one string.
+ * 110 MB, past the general 64 MB cap (#237).
  */
-const NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, bufferConstants.MAX_STRING_LENGTH);
+const NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, MAX_OUTPUT_BYTES);
 
-/** Output cap for a note body read: the general cap or the body cap, whichever is larger. */
+/**
+ * Output cap for a note body read: the general cap or the body cap, whichever
+ * is larger, and never past the largest string Node.js can hold.
+ */
 export function noteBodyMaxBuffer(): number {
-  return Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES);
+  return Math.min(Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES), MAX_OUTPUT_BYTES);
 }
 
 /**
@@ -66,17 +76,28 @@ export function noteBodyMaxBuffer(): number {
  * child with killSignal (SIGKILL here) and reports ENOBUFS, so this must be
  * checked before isTimeoutError, which also matches SIGKILL. Before #237 an
  * oversized note body was reported as a 30-second timeout and retried.
+ * ERR_STRING_TOO_LONG (output that fit the buffer but not in one string) is
+ * the same failure; the cap is clamped so it should not occur.
  */
 function isOutputOverflowError(error: unknown): boolean {
-  return error instanceof Error && (error as Error & { code?: string }).code === "ENOBUFS";
+  const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+  return code === "ENOBUFS" || code === "ERR_STRING_TOO_LONG";
 }
 
-/** Explains an output overflow; worded so RETRYABLE_ERROR_PATTERNS never match it. */
-function outputOverflowMessage(maxBufferBytes: number): string {
+/**
+ * Explains an output overflow; worded so RETRYABLE_ERROR_PATTERNS never match
+ * it. Every variant starts "Notes.app returned more than <limit> of output",
+ * which classifyBodyReadError (utils/bodyReadFailure) recognizes.
+ */
+export function outputOverflowMessage(maxBufferBytes: number): string {
   const mib = 1024 * 1024;
   const limit =
     maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
-  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.`;
+  const remedy =
+    maxBufferBytes >= MAX_OUTPUT_BYTES
+      ? "That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app."
+      : "Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.";
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. ${remedy}`;
 }
 
 /**
@@ -428,7 +449,7 @@ export function executeAppleScript(
     options.retryDelayMs ??
     envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ??
     DEFAULT_RETRY_DELAY_MS;
-  const maxBufferBytes = options.maxBufferBytes ?? getMaxBuffer();
+  const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
 
   // Validate input - empty scripts are likely programmer errors
   if (!script || !script.trim()) {
