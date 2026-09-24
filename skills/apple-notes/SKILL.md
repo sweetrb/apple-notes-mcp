@@ -79,7 +79,7 @@ Use this skill when the user:
 | `list-attachments`            | List attachments in a note; `includePaths` adds on-disk `assetPaths`/`previewPath`, `firstImage` returns the lead visual in body order              |
 | `add-attachment`              | Attach one local file to an exact note (`filename` renames it); a macOS 27 PDF "outcome uncertain": read the note before retrying                   |
 | `create-note-with-attachment` | Create a note and attach one local file in one call; on a failed attach, reuse the named note id with `add-attachment`                              |
-| `add-attachment-from-pasteboard` | Attach the copied image, PDF, or file to an exact note (pasteboard frozen first, never modified; optional `filename`)                         |
+| `add-attachment-from-pasteboard` | Attach the copied image, PDF, or one file to an exact note (note checked first, pasteboard frozen, never modified); `pasteboard_access_denied`: ask before `allowPasteAlert: true` |
 | `save-attachment`             | Save an attachment to disk                                                                                                                          |
 | `list-paper-attachments`      | List Paper and classic drawings in a note, with Notes' rendered image size and any recognized handwriting text                                      |
 | `export-paper-image`          | Save Notes' rendered PNG (or JPEG) of one drawing to a new file                                                                                     |

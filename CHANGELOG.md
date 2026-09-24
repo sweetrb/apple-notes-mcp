@@ -16,6 +16,23 @@
   extension. The result adds `source` (kind, type, default filename).
   `APPLE_NOTES_MCP_PASTEBOARD_NAME` points the tool at a private named
   pasteboard for testing, so live tests never touch the user's clipboard.
+- Paste privacy (macOS 15.4+): before reading the general pasteboard the tool
+  checks `NSPasteboard.accessBehavior` and reads only when it is
+  `alwaysAllow`, or `default`/`ask` with the `allowPasteAlert: true`
+  argument (which lets macOS show its paste alert). Otherwise it reads nothing
+  and returns `permission_denied` with `pasteboardCode:
+  "pasteboard_access_denied"` and the `accessBehavior`. `alwaysDeny` is never
+  overridden. macOS before 15.4 has no such property and reads as before.
+- The note is resolved and `expectedContentHash` checked (and a malformed
+  `filename` refused) before the pasteboard is read, so an invalid request
+  never captures the clipboard.
+- Several copied files are refused with `pasteboardCode: "multiple_files"`
+  and a `count`, rather than attaching only one.
+- Pasteboard errors use the coded error envelope (`code`, `pasteboardCode`,
+  `committed: false`); `unsupported_content` lists the pasteboard types it
+  found and the supported ones. The read honors the per-call automation
+  timeout and `APPLE_NOTES_MCP_TIMEOUT_MS`, and a timeout is reported as
+  `pasteboard_timeout`.
 - Known limitation (#236): a pasted PDF, like one sent to `add-attachment`,
   is inserted but reported as uncertain on macOS 27, because AppleScript does
   not list PDF attachments.

@@ -1955,25 +1955,54 @@ Attaches whatever image, PDF, or file is on the pasteboard (a screenshot, "Copy
 Image", or a file copied in Finder) to an exact note. The pasteboard is read once
 through AppKit's public `NSPasteboard` API (via JXA, no native build) and its
 bytes are frozen into a private temporary file before anything touches the note.
-The pasteboard itself is never written. The frozen file then goes through
-[`add-attachment`](#add-attachment)'s checks.
+The pasteboard itself is never written. The note and `expectedContentHash` are
+checked before the pasteboard is read, so a request with a wrong id, a stale
+revision, or a malformed `filename` never captures your clipboard. The frozen
+file then goes through [`add-attachment`](#add-attachment)'s checks.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Note ID |
 | `expectedContentHash` | string | Yes | The note's current `contentHash` (from `get-note-content`) |
 | `filename` | string | No | Attachment name. Defaults to the copied file's name, or `Pasted image.png` / `Pasted document.pdf` for image or PDF data. Without an extension, the pasted type's extension is added; with one, it must match the pasted type. Otherwise the same rules as `add-attachment` |
+| `allowPasteAlert` | boolean | No | Default `false`. Read the pasteboard even when macOS will show its paste alert (see **Paste privacy** below). Never overrides a Deny setting |
 
 **Returns:** the `add-attachment` result plus `source` (`kind`: `file` or
 `data`, the pasteboard `type`, and the default `filename`). A copied file wins
 over image data; among data types PNG is preferred, then JPEG, HEIC, GIF, TIFF,
 and PDF.
 
-**Errors** name the cause: an empty pasteboard, text-only contents (use
-`append-to-note` instead), more than 64 MiB, a copied symlink or unreadable file,
-a pasteboard that changed while it was being read, or a pasteboard that is
-unreachable because the MCP host is not running in your logged-in GUI session
-(for example over SSH).
+**Paste privacy (macOS 15.4 and later):** macOS can show an alert asking
+whether to allow a paste when a process reads the general pasteboard without a
+user paste. Before reading anything, the tool checks AppKit's
+[`NSPasteboard.accessBehavior`](https://developer.apple.com/documentation/appkit/nspasteboard/accessbehavior-swift.enum).
+It reads only when the value is `alwaysAllow`, or when you pass
+`allowPasteAlert: true` and the value is `default` or `ask` (macOS then shows
+its alert, and the call waits for your answer up to the automation timeout).
+Otherwise it reads nothing and returns `code: "permission_denied"` with
+`pasteboardCode: "pasteboard_access_denied"` and `accessBehavior` (`default`,
+`ask`, `alwaysDeny`, or `unknown`). `alwaysDeny` is always refused; change it in
+System Settings, where macOS lists an app after its first paste alert. On macOS
+before 15.4 the property does not exist and the pasteboard is read as before.
+
+**Errors** carry a `pasteboardCode` next to the shared `code`, and
+`committed: false` because nothing was written:
+
+| `pasteboardCode` | `code` | Cause |
+|------------------|--------|-------|
+| `pasteboard_access_denied` | `permission_denied` | Reading would show the macOS paste alert, or pasting is denied (see above) |
+| `pasteboard_empty` | `validation_error` | Nothing is on the pasteboard |
+| `unsupported_content` | `validation_error` | No PNG, JPEG, HEIC, GIF, TIFF, PDF, or copied file (text belongs in `append-to-note`); the message and `types` list the pasteboard types found |
+| `multiple_files` | `validation_error` | More than one copied file; `count` says how many. Copy one file, or use `add-attachment` per file |
+| `too_large` | `validation_error` | More than 64 MiB |
+| `file_unreadable` | `validation_error` | The copied file is a symlink, empty, over 64 MiB, or unreadable |
+| `pasteboard_changed` | `operation_failed` | The pasteboard changed while it was being read; try again |
+| `pasteboard_timeout` | `operation_failed` | The read timed out (for example an unanswered paste alert) |
+| `pasteboard_unavailable` | `operation_failed` | The MCP host is not running in your logged-in GUI session (for example over SSH) |
+| `write_failed` | `operation_failed` | The temporary copy could not be written |
+
+The pasteboard read uses the same timeout as other automation steps
+(`APPLE_NOTES_MCP_TIMEOUT_MS`, 30 seconds by default).
 
 **Known limitation ([#236](https://github.com/sweetrb/apple-notes-mcp/issues/236)):** on macOS 27, Notes' AppleScript dictionary does not list
 PDF attachments, so a PDF (pasted or from `add-attachment`) is inserted but
