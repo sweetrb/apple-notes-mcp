@@ -2354,6 +2354,17 @@ distinctive existing `scopeText` so the Shortcut and server can independently
 resolve the same note. Creating a note from Markdown is
 [`create-note`](#create-note) with `format: "markdown"`.
 
+When the Shortcut refuses a request (its Find Notes step did not return
+exactly one note with that exact title and `scopeText`) or stops with its own
+action error, and the note reads back unchanged, the tool reports the
+Shortcut's reason with `code: "operation_failed"`, `committed: false` and
+`indeterminate: false`: nothing was written, so a retry is safe once the cause
+is fixed. Notes search can lag behind a note created or edited moments ago, so
+a refusal on a brand-new note may clear after a minute. A timeout, or a failed
+readback on a note that did change, is still reported as indeterminate.
+If the Shortcut is not installed, the error is `code: "shortcut_not_installed"`
+with `committed: false`.
+
 #### `get-capabilities`
 
 Reports which background operations are implemented, live-verified, installed,

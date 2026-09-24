@@ -48270,6 +48270,7 @@ function comparableVisibleText(html) {
 }
 
 // src/services/backgroundNotes.ts
+var capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
 var backgroundShortcutName = () => process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
 var backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
@@ -48380,10 +48381,14 @@ function validateAppendContent(content, format, options = {}) {
         );
   }
 }
+var BRIDGE_REFUSED = "refused the request without running it: its Find Notes step did not find exactly one note with this exact title whose body contains the scope text. Notes search can lag behind a note created or edited moments ago, so wait a minute and retry, or pass a longer, more distinctive scopeText";
 function runBackgroundShortcut(input, status = backgroundStatus()) {
   if (!status.installed)
-    throw new Error(
-      `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+    throw Object.assign(
+      new Error(
+        `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+      ),
+      { shortcut: status.shortcut, notInstalled: true }
     );
   const directory = mkdtempSync4(join17(tmpdir4(), "apple-notes-background-"));
   try {
@@ -48406,16 +48411,31 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       }),
       { mode: 384 }
     );
+    let output;
     try {
-      execFileSync16("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", file], {
-        encoding: "utf8",
-        timeout: callTimeoutMs() ?? 6e4,
-        maxBuffer: 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"]
-      });
+      output = execFileSync16(
+        "/usr/bin/shortcuts",
+        ["run", status.identifier, "--input-path", file],
+        {
+          encoding: "utf8",
+          timeout: callTimeoutMs() ?? 6e4,
+          maxBuffer: 1024 * 1024,
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      );
     } catch (error2) {
       throw Object.assign(error2, { shortcut: status.shortcut });
     }
+    if (/_REFUSED\b/.test(String(output ?? "")))
+      throw Object.assign(
+        new Error(
+          status.shortcut === markdownShortcutName() ? "refused the request without running it" : BRIDGE_REFUSED
+        ),
+        {
+          shortcut: status.shortcut,
+          refused: true
+        }
+      );
   } finally {
     rmSync4(directory, { recursive: true, force: true });
   }
@@ -48485,6 +48505,7 @@ function assertPreserved(before, after, options = {}) {
 function describeTransportFailure(error2) {
   const detail = error2;
   const named = detail?.shortcut ? `the "${detail.shortcut}" Shortcut` : "the background Shortcut";
+  if (detail?.refused) return `${named} ${detail.message}`;
   return detail?.code === "ETIMEDOUT" ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}` : `${named} failed: ${String(detail?.stderr || detail?.message || "no output").trim().slice(0, 400)}`;
 }
 function mutateBackground(request, operation, data, verify, deps) {
@@ -48502,16 +48523,30 @@ function mutateBackground(request, operation, data, verify, deps) {
     throw new Error("Note revision changed during preflight");
   let transportUncertain = false;
   let transportMessage = "";
+  let transportError;
   try {
     deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
   } catch (error2) {
     transportUncertain = true;
+    transportError = error2 ?? {};
     transportMessage = describeTransportFailure(error2);
   }
   const after = deps.read(request.id);
   try {
     verify(before, after);
   } catch (error2) {
+    const unchanged = after.hash === before.hash && after.pinned === before.pinned;
+    if (transportError?.notInstalled && unchanged)
+      throw new CodedError(
+        `${transportError.message}. The Shortcut never ran, so nothing was written; run apple-notes-mcp setup, then retry.`,
+        { code: "shortcut_not_installed", committed: false, indeterminate: false }
+      );
+    const exitedWithError = typeof transportError?.status === "number" && transportError.status !== 0 && !transportError.signal && transportError.code !== "ETIMEDOUT";
+    if (transportError && (transportError.refused || exitedWithError) && unchanged)
+      throw new CodedError(
+        `${capitalize(transportMessage)}. The note is unchanged, so nothing was written; it is safe to retry once the cause is fixed.`,
+        { code: "operation_failed", committed: false, indeterminate: false }
+      );
     throw new Error(
       `Operation outcome uncertain; read exact note before any retry: ${error2 instanceof Error ? error2.message : "readback failed"}${transportMessage ? "; " + transportMessage : ""}`
     );
@@ -56652,7 +56687,9 @@ function appendChecklistItems(args, deps, readRich) {
         stoppedAt: {
           index,
           text: text2,
-          outcome: wrote ? "uncertain" : "not-written",
+          // A bridge refusal or failure with an unchanged readback is
+          // reported as not written even though verification ran (#248).
+          outcome: wrote && !(error2 instanceof CodedError && error2.envelope.committed === false) ? "uncertain" : "not-written",
           error: error2 instanceof Error ? error2.message : String(error2)
         },
         notAttempted: args.items.slice(index + 1),

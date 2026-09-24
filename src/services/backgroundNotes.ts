@@ -24,6 +24,9 @@ import {
 } from "../utils/appendMarkdown.js";
 import { comparableVisibleText } from "../utils/noteRevision.js";
 import { callTimeoutMs } from "../utils/callTimeout.js";
+import { CodedError } from "../utils/errorCodes.js";
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
 /** The configured background-operations bridge name (env override or default). */
@@ -219,14 +222,21 @@ export function validateAppendContent(
   }
 }
 
+/** Text of the error {@link runBackgroundShortcut} throws when a bridge reports that it ran nothing. */
+export const BRIDGE_REFUSED =
+  "refused the request without running it: its Find Notes step did not find exactly one note with this exact title whose body contains the scope text. Notes search can lag behind a note created or edited moments ago, so wait a minute and retry, or pass a longer, more distinctive scopeText";
+
 /** Invoke an installed bridge (by default Background Operations) with a private temporary JSON request. */
 export function runBackgroundShortcut(
   input: Record<string, string>,
   status: ReturnType<typeof nativeTagsStatus> = backgroundStatus()
 ) {
   if (!status.installed)
-    throw new Error(
-      `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+    throw Object.assign(
+      new Error(
+        `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
+      ),
+      { shortcut: status.shortcut, notInstalled: true }
     );
   const directory = mkdtempSync(join(tmpdir(), "apple-notes-background-"));
   try {
@@ -250,19 +260,41 @@ export function runBackgroundShortcut(
       }),
       { mode: 0o600 }
     );
+    let output: unknown;
     try {
-      execFileSync("/usr/bin/shortcuts", ["run", status.identifier!, "--input-path", file], {
-        encoding: "utf8",
-        timeout: callTimeoutMs() ?? 60000,
-        maxBuffer: 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      output = execFileSync(
+        "/usr/bin/shortcuts",
+        ["run", status.identifier!, "--input-path", file],
+        {
+          encoding: "utf8",
+          timeout: callTimeoutMs() ?? 60000,
+          maxBuffer: 1024 * 1024,
+          stdio: ["ignore", "pipe", "pipe"],
+        }
+      );
     } catch (error) {
       // Carry the Shortcut's name out with the failure. `mutateBackground`
       // reports it, so a stalled run says what it was waiting on instead of a
       // bare "Shortcuts timed out" that names nothing to go and approve (#164).
       throw Object.assign(error as Error, { shortcut: status.shortcut });
     }
+    // Every bridge ends in Stop and Output: "…_DONE" after its operation ran,
+    // "…_REFUSED" when it ran nothing, which for Background Operations means its
+    // Find Notes step did not return exactly one note with the exact title and
+    // scope. A refusal exits 0, so it has to be read from stdout; ignoring it
+    // reported a clean refusal as an uncertain write (#248).
+    if (/_REFUSED\b/.test(String(output ?? "")))
+      throw Object.assign(
+        new Error(
+          status.shortcut === markdownShortcutName()
+            ? "refused the request without running it"
+            : BRIDGE_REFUSED
+        ),
+        {
+          shortcut: status.shortcut,
+          refused: true,
+        }
+      );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -379,12 +411,14 @@ function describeTransportFailure(error: unknown): string {
     stderr?: string | Buffer;
     message?: string;
     shortcut?: string;
+    refused?: boolean;
   };
   // Name the bridge, so an unapproved or missing Shortcut is identified by the
   // exact string Shortcuts.app shows rather than guessed at (#164).
   const named = detail?.shortcut ? `the "${detail.shortcut}" Shortcut` : "the background Shortcut";
   // A timeout is how an unanswered first-run consent prompt presents: the
   // headless run cannot show it, so it waits out the transport timeout (#172).
+  if (detail?.refused) return `${named} ${detail.message}`;
   return detail?.code === "ETIMEDOUT"
     ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}`
     : `${named} failed: ${String(detail?.stderr || detail?.message || "no output")
@@ -418,16 +452,50 @@ export function mutateBackground(
     throw new Error("Note revision changed during preflight");
   let transportUncertain = false;
   let transportMessage = "";
+  let transportError:
+    | {
+        code?: string;
+        message?: string;
+        refused?: boolean;
+        notInstalled?: boolean;
+        status?: number | null;
+        signal?: string | null;
+      }
+    | undefined;
   try {
     deps.run({ ...data, operation, title: before.title, scopeText: request.scopeText });
   } catch (error) {
     transportUncertain = true;
+    transportError = (error ?? {}) as NonNullable<typeof transportError>;
     transportMessage = describeTransportFailure(error);
   }
   const after = deps.read(request.id);
   try {
     verify(before, after);
   } catch (error) {
+    // The bridge said it ran nothing (a refusal), or `shortcuts` exited by
+    // itself with an error (a failed action, as in "Find Notes could not run")
+    // rather than being killed by our timeout, and the note reads back exactly
+    // as it was: nothing was written, so say so instead of reporting an
+    // uncertain outcome that hides the bridge's reason (#248). A timeout or any
+    // other kill stays indeterminate, since the run may still be finishing.
+    const unchanged = after.hash === before.hash && after.pinned === before.pinned;
+    // The bridge was never run, so there is nothing uncertain about it.
+    if (transportError?.notInstalled && unchanged)
+      throw new CodedError(
+        `${transportError.message}. The Shortcut never ran, so nothing was written; run apple-notes-mcp setup, then retry.`,
+        { code: "shortcut_not_installed", committed: false, indeterminate: false }
+      );
+    const exitedWithError =
+      typeof transportError?.status === "number" &&
+      transportError.status !== 0 &&
+      !transportError.signal &&
+      transportError.code !== "ETIMEDOUT";
+    if (transportError && (transportError.refused || exitedWithError) && unchanged)
+      throw new CodedError(
+        `${capitalize(transportMessage)}. The note is unchanged, so nothing was written; it is safe to retry once the cause is fixed.`,
+        { code: "operation_failed", committed: false, indeterminate: false }
+      );
     throw new Error(
       `Operation outcome uncertain; read exact note before any retry: ${error instanceof Error ? error.message : "readback failed"}${transportMessage ? "; " + transportMessage : ""}`
     );

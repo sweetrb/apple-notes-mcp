@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
-import { errorResult } from "../utils/errorCodes.js";
+import { CodedError, errorResult } from "../utils/errorCodes.js";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import {
@@ -154,7 +154,12 @@ export function appendChecklistItems(
         stoppedAt: {
           index,
           text,
-          outcome: wrote ? "uncertain" : "not-written",
+          // A bridge refusal or failure with an unchanged readback is
+          // reported as not written even though verification ran (#248).
+          outcome:
+            wrote && !(error instanceof CodedError && error.envelope.committed === false)
+              ? "uncertain"
+              : "not-written",
           error: error instanceof Error ? error.message : String(error),
         },
         notAttempted: args.items.slice(index + 1),
