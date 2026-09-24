@@ -20,7 +20,7 @@ import {
   looseIdTransform,
   NOTE_ID_MESSAGE,
 } from "../utils/noteIdentifiers.js";
-import { CodedError, errorResult } from "../utils/errorCodes.js";
+import { classifyError, CodedError, errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { attachmentCoreDataId, type AttachmentAssetRecord } from "../utils/attachmentAssets.js";
 import {
@@ -267,11 +267,20 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
           `Failed to create note "${args.title}". Check that the folder and account exist (list-folders, list-accounts); nothing was attached`
         );
       const handOff = `Note ${note.id} was created; attach to it with add-attachment instead of creating another note`;
+      // The note exists from here on, so no failure may report committed:
+      // false: a caller that trusted it would retry and create a second note.
+      const createdError = (message: string, cause: unknown) =>
+        new CodedError(message, {
+          code: classifyError(message, cause).code,
+          committed: true,
+          indeterminate: false,
+        });
       let snapshot: Snapshot;
       try {
         snapshot = readSnapshot(manager, note.id);
       } catch (error) {
-        throw new Error(`${handOff}. The new note could not be read back: ${String(error)}`);
+        const message = `${handOff}. The new note could not be read back: ${String(error)}`;
+        throw createdError(message, error);
       }
       const progress = { insertionStarted: false };
       try {
@@ -296,7 +305,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
         // Before insertion nothing was attached, so add-attachment is the way
         // to finish. After it, the file may already be in the note, and a
         // second attach would duplicate it.
-        if (!progress.insertionStarted) throw new Error(`${handOff}. ${detail}`);
+        if (!progress.insertionStarted) throw createdError(`${handOff}. ${detail}`, error);
         const message = `Note ${note.id} was created, but the attachment outcome is uncertain: ${detail}. Read the note (list-attachments) before attaching again, and do not create another note`;
         throw new CodedError(message, {
           code: "verification_failed",

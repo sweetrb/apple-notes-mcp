@@ -592,6 +592,24 @@ describe("attachment filename override and create-then-attach", () => {
     expect(result.content[0].text).toMatch(
       new RegExp(`Note ${id} was created; attach to it with add-attachment`)
     );
+    expect(result.structuredContent).toMatchObject({ committed: true, indeterminate: false });
+  });
+
+  // The note was created, so a pre-insertion revision conflict must not read
+  // as committed: false, which would invite a retry that creates a second note.
+  it("never reports committed: false once the note exists", async () => {
+    const { manager, handler } = setup("x");
+    manager.listAttachmentsById.mockReset().mockImplementation(() => {
+      throw new Error("Note revision changed");
+    });
+    const result = await handler("create-note-with-attachment")({ title: "New", path: source() });
+    expect(result.isError).toBe(true);
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+    expect(result.structuredContent).toEqual({
+      code: "revision_conflict",
+      committed: true,
+      indeterminate: false,
+    });
   });
 
   // #196: after insertion the file may already be in the note, so sending the

@@ -53662,11 +53662,17 @@ function registerDirectOperations(server2, manager) {
           `Failed to create note "${args.title}". Check that the folder and account exist (list-folders, list-accounts); nothing was attached`
         );
       const handOff = `Note ${note.id} was created; attach to it with add-attachment instead of creating another note`;
+      const createdError = (message, cause) => new CodedError(message, {
+        code: classifyError(message, cause).code,
+        committed: true,
+        indeterminate: false
+      });
       let snapshot;
       try {
         snapshot = readSnapshot(manager, note.id);
       } catch (error2) {
-        throw new Error(`${handOff}. The new note could not be read back: ${String(error2)}`);
+        const message = `${handOff}. The new note could not be read back: ${String(error2)}`;
+        throw createdError(message, error2);
       }
       const progress = { insertionStarted: false };
       try {
@@ -53688,7 +53694,7 @@ function registerDirectOperations(server2, manager) {
         };
       } catch (error2) {
         const detail = error2 instanceof Error ? error2.message : String(error2);
-        if (!progress.insertionStarted) throw new Error(`${handOff}. ${detail}`);
+        if (!progress.insertionStarted) throw createdError(`${handOff}. ${detail}`, error2);
         const message = `Note ${note.id} was created, but the attachment outcome is uncertain: ${detail}. Read the note (list-attachments) before attaching again, and do not create another note`;
         throw new CodedError(message, {
           code: "verification_failed",

@@ -51,7 +51,10 @@
   `add-attachment` after any attach failure, including one where the file may
   already be in the note. That hand-off is now used only for failures before
   insertion; after insertion the error is `verification_failed` with
-  `indeterminate: true` and asks for a read first (#196).
+  `indeterminate: true` and asks for a read first (#196). Every failure after
+  the note is created carries `committed: true`, so a pre-insertion revision
+  conflict no longer reads as `committed: false` and invites a retry that
+  would create a second note.
 - `insert-link` now reports "The text was written, but link verification
   failed" with `committed: true`, and keeps the append step's own error code
   when that step fails (#212).
