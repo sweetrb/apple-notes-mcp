@@ -50050,7 +50050,7 @@ function inventorySql(columns) {
       ORDER BY d.ZNOTE LIMIT ${BODY_BATCH};`
   };
 }
-function decodeBodies(dbPath2, sql, params) {
+function decodeBodies(dbPath2, sql, params, notes) {
   const docs = /* @__PURE__ */ new Map();
   let after = 0;
   for (; ; ) {
@@ -50059,7 +50059,7 @@ function decodeBodies(dbPath2, sql, params) {
     );
     for (const row of rows) {
       after = Math.max(after, row.note);
-      if (row.encrypted || !row.data) continue;
+      if (row.encrypted || !row.data || !notes.has(row.note)) continue;
       try {
         docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
       } catch {
@@ -50107,7 +50107,7 @@ function listNoteLinks(options = {}) {
   if (options.id && !notes.length)
     throw new NoteStoreError(`No note found for ID "${options.id}".`, "invalid_input");
   const includeInline = options.includeInline ?? Boolean(options.id);
-  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params) : /* @__PURE__ */ new Map();
+  const docs = includeInline ? decodeBodies(dbPath2, sql.bodies, params, new Set(notes.map((note) => note.pk))) : /* @__PURE__ */ new Map();
   const noteById = new Map(notes.map((note) => [note.pk, note]));
   const accountById = new Map(context.accounts.map((account) => [account.pk, account]));
   const folderById = new Map(context.folders.map((folder) => [folder.pk, folder]));

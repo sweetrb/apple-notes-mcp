@@ -4,9 +4,9 @@
  * Recently Deleted, folderless and locked notes, link cards and native link
  * chips. The live NoteStore is never touched.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -18,6 +18,24 @@ import {
   listNoteLinks,
   matchFolder,
 } from "./noteLinkInventory.js";
+
+// Lets a test change the store just before the body batches read it, as a
+// concurrent Notes write would; every other call runs unchanged.
+const beforeBodies = vi.hoisted(() => ({ hook: null as null | ((dbPath: string) => void) }));
+vi.mock(import("./noteStoreSql.js"), async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    runReadOnlySql: ((dbPath: string, sql: string, params?: never) => {
+      if (beforeBodies.hook && sql.includes("FROM ZICNOTEDATA d")) {
+        const hook = beforeBodies.hook;
+        beforeBodies.hook = null;
+        hook(dbPath);
+      }
+      return original.runReadOnlySql(dbPath, sql, params);
+    }) as typeof original.runReadOnlySql,
+  };
+});
 
 const varint = (value: number): number[] => {
   const out: number[] = [];
@@ -395,6 +413,25 @@ describe("listNoteLinks (real sqlite3)", () => {
     ]);
     expect(r.links.find((l) => l.kind === "section")!.inBody).toBe(true);
     expect(r.links.find((l) => l.url === "https://example.org/b")!.inBody).toBe(false);
+  });
+
+  it("ignores a body whose note row the earlier read did not return (#217)", () => {
+    const racy = join(dir, "Racy.sqlite");
+    copyFileSync(db, racy);
+    // A note (with an inline link) created in Projects between the two reads.
+    beforeBodies.hook = (path) =>
+      execFileSync("/usr/bin/sqlite3", [
+        path,
+        [
+          insert({ Z_PK: 400, Z_ENT: 3, ZIDENTIFIER: "NEW", ZFOLDER: 10, ZACCOUNT7: 1 }),
+          `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (400, ${hex(body([["n", link("https://example.com/new")]]))});`,
+        ].join("\n"),
+      ]);
+    const r = listNoteLinks({ dbPath: racy, includeInline: true, limit: 2000 });
+    expect(beforeBodies.hook).toBeNull();
+    expect(r.counts).toEqual({ inline: 107, card: 3, note: 1, section: 1 });
+    expect(r.notesWithoutBody).toBe(4);
+    expect(r.links.some((l) => l.url === "https://example.com/new")).toBe(false);
   });
 
   it("scopes by account with the shared name resolution", () => {

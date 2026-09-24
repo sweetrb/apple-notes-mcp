@@ -223,11 +223,16 @@ export function inventorySql(columns: ReadonlySet<string>) {
 /**
  * Decode every body in scope, one batch of rows at a time. Locked, empty and
  * malformed bodies are skipped; the caller counts them as notes without a body.
+ *
+ * The batches are separate reads from the note rows, so a note created or
+ * moved into scope in between can appear here without a note row. Only notes
+ * in `notes` (the pks the note rows returned) are decoded.
  */
 function decodeBodies(
   dbPath: string,
   sql: string,
-  params: Record<string, BoundValue>
+  params: Record<string, BoundValue>,
+  notes: ReadonlySet<number>
 ): Map<number, NoteBlocksDocument> {
   const docs = new Map<number, NoteBlocksDocument>();
   let after = 0;
@@ -237,7 +242,7 @@ function decodeBodies(
     );
     for (const row of rows) {
       after = Math.max(after, row.note);
-      if (row.encrypted || !row.data) continue;
+      if (row.encrypted || !row.data || !notes.has(row.note)) continue;
       try {
         docs.set(row.note, decodeCompressedNoteBlocks(Buffer.from(row.data, "hex")));
       } catch {
@@ -292,7 +297,7 @@ export function listNoteLinks(options: LinkInventoryOptions = {}): LinkInventory
     throw new NoteStoreError(`No note found for ID "${options.id}".`, "invalid_input");
   const includeInline = options.includeInline ?? Boolean(options.id);
   const docs = includeInline
-    ? decodeBodies(dbPath, sql.bodies, params)
+    ? decodeBodies(dbPath, sql.bodies, params, new Set(notes.map((note) => note.pk)))
     : new Map<number, NoteBlocksDocument>();
 
   const noteById = new Map(notes.map((note) => [note.pk, note]));
