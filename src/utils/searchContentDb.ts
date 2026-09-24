@@ -169,7 +169,8 @@ export interface WordCountEnrichment {
  * their bodies from the NoteStore in one batched read-only query, never one
  * AppleScript call per note. `matchedIn` treats the query as a bare phrase:
  * the title, the body, or both. Notes the database does not hold (another
- * store, a stale id) get `wordCount: null` and no `matchedIn`.
+ * store, a stale id) get `wordCount: null` and no `matchedIn`, as do notes
+ * whose text does not contain the query as this server matches it.
  *
  * Best effort: when the database cannot be read (no Full Disk Access, unknown
  * schema), the notes come back unchanged with the reason in `unavailable`.
@@ -204,8 +205,15 @@ export function addWordCountsFromDatabase(
       const key = keys.get(note);
       const text = key && key.store === store ? texts.get(key.pk) : undefined;
       if (typeof text !== "string") return { ...note, wordCount: null };
+      // AppleScript already matched this note, so an empty result means only
+      // that its matching (such as ignoring diacritics) differs from ours: the
+      // location is unknown, not "metadata", and is left out.
       const matchedIn = matchLocations(predicates, note.title, text);
-      return { ...note, ...(matchedIn ? { matchedIn } : {}), wordCount: countWords(text) };
+      return {
+        ...note,
+        ...(matchedIn?.length ? { matchedIn } : {}),
+        wordCount: countWords(text),
+      };
     }),
   };
 }

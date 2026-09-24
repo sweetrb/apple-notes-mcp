@@ -359,6 +359,16 @@ describe("addWordCountsFromDatabase", () => {
     expect(notes.every((n) => n.matchedIn === undefined)).toBe(true);
   });
 
+  it("leaves matchedIn out when the text does not contain the query as matched here", () => {
+    // AppleScript matched the note (for example ignoring diacritics), so the
+    // location is unknown rather than a metadata-only match.
+    const { notes } = addWordCountsFromDatabase([note(100, "Groceries")], "zzz-absent", {
+      dbPath: db,
+    });
+    expect(notes[0].wordCount).toBe(6);
+    expect(notes[0]).not.toHaveProperty("matchedIn");
+  });
+
   it("reads more ids than one query allows in several batches", () => {
     const many = Array.from({ length: 600 }, (_, i) => note(i + 1, `n${i}`));
     const { notes } = addWordCountsFromDatabase(many, "the", { dbPath: db });

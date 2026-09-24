@@ -1259,9 +1259,6 @@ export interface SmartFolder {
 // Query Language Types
 // =============================================================================
 
-/**
- * One note matched by the query-notes tool.
- */
 /** A part of a note where a search phrase was found. */
 export type SearchMatchLocation = "title" | "body";
 
@@ -1287,6 +1284,9 @@ export interface SearchMatchDetails {
   wordCount?: number | null;
 }
 
+/**
+ * One note matched by the query-notes tool.
+ */
 export interface QueryNotesHit extends SearchMatchDetails {
   /** CoreData note ID, accepted by get-note-content and every other id tool */
   id: string;
