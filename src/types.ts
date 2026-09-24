@@ -947,6 +947,59 @@ export interface NoteDrawing {
   svg?: string;
 }
 
+// =============================================================================
+// On-device transcription (public native helper)
+// =============================================================================
+
+/**
+ * ok = complete transcript; partial = some audio transcribed (a take failed or
+ * the helper stopped at its deadline); error = nothing transcribed, with a
+ * code; indeterminate = the helper did not answer in time, so the outcome is
+ * unknown and a retry may succeed.
+ */
+export type TranscriptionStatus = "ok" | "partial" | "error" | "indeterminate";
+
+/** One audio file (a recording take, or a plain audio attachment). */
+export interface TranscribedTake {
+  attachmentId: string;
+  identifier: string;
+  status: TranscriptionStatus;
+  code?: string;
+  message?: string;
+  durationSeconds?: number;
+  wordCount?: number;
+  /** "SpeechAnalyzer" (macOS 26+) or "SFSpeechRecognizer" (older, on-device only). */
+  engine?: string;
+}
+
+/** One audio attachment and its combined transcript. */
+export interface TranscribedRecording {
+  attachmentId: string;
+  identifier: string;
+  typeUti: string;
+  status: TranscriptionStatus;
+  code?: string;
+  message?: string;
+  durationSeconds?: number;
+  wordCount?: number;
+  /** Takes joined in stored order; omitted when includeText is false. */
+  transcript?: string;
+  /** True when the transcript was shortened to fit the response size limit. */
+  transcriptTruncated?: boolean;
+  takes: TranscribedTake[];
+}
+
+/** Result of transcribe-note-audio. */
+export interface NoteTranscriptionResult {
+  id: string;
+  /** BCP-47 locale requested. */
+  locale: string;
+  /** Aggregate over recordings; "none" when the note has no audio. */
+  status: TranscriptionStatus | "none";
+  recordingCount: number;
+  recordings: TranscribedRecording[];
+}
+
 /** Result of get-note-drawings. */
 export interface NoteDrawingsResult {
   id: string;
