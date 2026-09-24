@@ -63,7 +63,7 @@ const templateFileInput = z
   .max(4096)
   .optional()
   .describe(
-    "Absolute path of a JSON template file (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+    "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
   );
 
 /** Template text from exactly one of an inline template or a file. */

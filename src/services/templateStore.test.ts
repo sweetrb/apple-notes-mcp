@@ -279,6 +279,32 @@ describe("template library tools", () => {
     ).toContain("[reserved-name]");
   });
 
+  it("returns none of a file's contents when it is not a template", async () => {
+    // templateFile can name any readable file under home, a temp dir or /Volumes.
+    const { byName, store } = tools();
+    const call = (name: string, args: Record<string, unknown> = {}) => byName[name].handler(args);
+    const files = {
+      "config.json": JSON.stringify({ apiKey: "SECRET-1", nested: { password: "SECRET-2" } }),
+      "versioned.json": JSON.stringify({ schemaVersion: "SECRET-3", token: "SECRET-4" }),
+      "broken.json": '{"token": SECRET-5',
+      "words.json": "SECRET-6 hunter2",
+      "notes.txt": JSON.stringify({ schemaVersion: 1, name: "SECRET-7" }),
+    };
+    for (const [name, text] of Object.entries(files)) {
+      const templateFile = join(root, name);
+      writeFileSync(templateFile, text);
+      for (const result of [
+        await call("validate-markdown-template", { templateFile }),
+        await call("save-markdown-template", { name: "leak", templateFile }),
+      ]) {
+        const shown = JSON.stringify([result.content, result.structuredContent]);
+        expect(shown, name).not.toMatch(/SECRET|hunter2|apiKey|password|token|nested/);
+        expect(result.structuredContent?.valid, name).not.toBe(true);
+      }
+    }
+    expect(store.list().templates).toEqual([]);
+  });
+
   it("reports an unusable library as a listing error", async () => {
     const registerTool = vi.fn();
     writeFileSync(join(root, "not-a-dir"), "x");

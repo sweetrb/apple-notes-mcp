@@ -16,6 +16,9 @@
 - `APPLE_NOTES_MCP_TEMPLATE_DIR` sets the library directory (default
   `~/Library/Application Support/apple-notes-mcp/templates`).
 - The capability matrix lists the library as `markdownTemplateLibrary`.
+- `validate-markdown-template` and `save-markdown-template` read
+  `templateFile` with the same rules as `export-notes-markdown` (`.json`
+  only) and return none of a file's contents when it is not a template.
 
 ## [2.9.12] - 2026-09-24
 

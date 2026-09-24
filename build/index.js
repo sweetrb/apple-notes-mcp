@@ -53687,7 +53687,7 @@ function failure(action, error2) {
 var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
 var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
 var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
-  "Absolute path of a JSON template file (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
 );
 function sourceText(args) {
   if (args.template === void 0 === (args.templateFile === void 0))
