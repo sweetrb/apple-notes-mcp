@@ -220,7 +220,10 @@ describe("attachment filename override and create-then-attach", () => {
       source: { kind: "data", type: "public.png", filename: "Pasted image.png" },
     });
     expect(result.structuredContent).not.toHaveProperty("filenameVerified");
-    expect(pasteboard.freeze).toHaveBeenCalledWith({ pasteboardName: undefined });
+    expect(pasteboard.freeze).toHaveBeenCalledWith({
+      pasteboardName: undefined,
+      allowPasteAlert: false,
+    });
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
@@ -233,7 +236,10 @@ describe("attachment filename override and create-then-attach", () => {
     } finally {
       vi.unstubAllEnvs();
     }
-    expect(pasteboard.freeze).toHaveBeenCalledWith({ pasteboardName: "live-test-board" });
+    expect(pasteboard.freeze).toHaveBeenCalledWith({
+      pasteboardName: "live-test-board",
+      allowPasteAlert: false,
+    });
   });
 
   it("applies a filename override, adding the pasted type's extension when missing", async () => {
@@ -267,7 +273,7 @@ describe("attachment filename override and create-then-attach", () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it("reports a pasteboard failure without touching the note", async () => {
+  it("reports a pasteboard failure with its code and never inserts", async () => {
     pasteboard.freeze.mockImplementation(() => {
       throw new PasteboardError("unsupported_content", "no image on the pasteboard");
     });
@@ -278,7 +284,93 @@ describe("attachment filename override and create-then-attach", () => {
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("no image on the pasteboard");
-    expect(manager.getNoteById).not.toHaveBeenCalled();
+    expect(result.structuredContent).toMatchObject({
+      code: "validation_error",
+      pasteboardCode: "unsupported_content",
+      committed: false,
+    });
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+  });
+
+  it("passes allowPasteAlert through and reports an access refusal as permission_denied", async () => {
+    pasteboard.freeze.mockImplementation(() => {
+      throw new PasteboardError("pasteboard_access_denied", "macOS would ask", {
+        accessBehavior: "default",
+      });
+    });
+    const { manager, handler } = setup("x");
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+      allowPasteAlert: true,
+    });
+    expect(pasteboard.freeze).toHaveBeenCalledWith({
+      pasteboardName: undefined,
+      allowPasteAlert: true,
+    });
+    expect(result.structuredContent).toMatchObject({
+      code: "permission_denied",
+      pasteboardCode: "pasteboard_access_denied",
+      accessBehavior: "default",
+      committed: false,
+    });
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+  });
+
+  it("checks the note, revision, and filename before reading the pasteboard", async () => {
+    frozen("Pasted image.png");
+    const stale = setup("x");
+    const staleResult = await stale.handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "stale",
+    });
+    expect(staleResult.structuredContent).toMatchObject({ code: "revision_conflict" });
+
+    const missing = setup("x");
+    missing.manager.getNoteById.mockReturnValue(null as never);
+    const missingResult = await missing.handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+    });
+    expect(missingResult.structuredContent).toMatchObject({ code: "not_found" });
+
+    const badName = setup("x");
+    const badNameResult = await badName.handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+      filename: "a/b",
+    });
+    expect(badNameResult.isError).toBe(true);
+    expect(badName.manager.getNoteById).not.toHaveBeenCalled();
+
+    expect(pasteboard.freeze).not.toHaveBeenCalled();
+  });
+
+  it("reads the note once before freezing and re-checks it before inserting", async () => {
+    const order: string[] = [];
+    const cleanup = frozen("Pasted image.png");
+    const { manager, handler } = setup("Pasted image.png");
+    manager.getNoteById.mockImplementation(() => {
+      order.push("note");
+      return { id, title: "New", passwordProtected: false };
+    });
+    const frozenValue = pasteboard.freeze();
+    pasteboard.freeze.mockImplementation(() => {
+      order.push("freeze");
+      return frozenValue;
+    });
+    manager.addAttachmentById.mockImplementation(() => {
+      order.push("insert");
+      return attachmentId;
+    });
+    const result = await handler("add-attachment-from-pasteboard")({
+      id,
+      expectedContentHash: "revision",
+    });
+    expect(result.structuredContent).toMatchObject({ ok: true });
+    expect(order.slice(0, 3)).toEqual(["note", "freeze", "note"]);
+    expect(order.indexOf("insert")).toBeGreaterThan(2);
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
   it("names the private copy after the override and verifies the reported name", async () => {

@@ -51790,17 +51790,24 @@ function registerDirectOperations(server2, manager) {
   );
   tool(
     "add-attachment-from-pasteboard",
-    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note) or you have a file path (use add-attachment).\nSafety: reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
+    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note), several copied files (refused; use add-attachment per file), or you have a file path (use add-attachment).\nSafety: checks the note and revision before reading the pasteboard; reads nothing when macOS would show its paste alert unless allowPasteAlert is true (error pasteboardCode pasteboard_access_denied); reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
     {
       id: noteId,
       expectedContentHash: revision,
       filename: attachmentInput.filename.describe(
         `Name the attachment gets in Notes (default: the copied file's name, or "Pasted image.png" / "Pasted document.pdf"). Without an extension, the pasted type's extension is added; with one, it must match the pasted type. Same rules as add-attachment otherwise.`
+      ),
+      allowPasteAlert: external_exports.boolean().optional().describe(
+        "Read the pasteboard even if macOS will show its paste alert (macOS 15.4+ paste privacy). Default false: when pasting is not already always allowed, the tool reads nothing and returns pasteboardCode pasteboard_access_denied. Set true only after the user agrees to answer the alert. Never overrides a Deny setting."
       )
     },
-    ({ id: id2, expectedContentHash, filename }) => {
+    ({ id: id2, expectedContentHash, filename, allowPasteAlert }) => {
+      if (filename !== void 0) checkAttachmentFilename(filename);
+      const before = readSnapshot(manager, id2);
+      if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       const frozen = freezePasteboard({
-        pasteboardName: process.env[PASTEBOARD_NAME_ENV]?.trim() || void 0
+        pasteboardName: process.env[PASTEBOARD_NAME_ENV]?.trim() || void 0,
+        allowPasteAlert: allowPasteAlert === true
       });
       try {
         const source = {
@@ -51809,12 +51816,16 @@ function registerDirectOperations(server2, manager) {
           filename: frozen.filename
         };
         return {
-          ...attachFile(manager, {
-            id: id2,
-            expectedContentHash,
-            path: frozen.path,
-            filename: pasteboardFilename(filename, frozen.filename)
-          }),
+          ...attachFile(
+            manager,
+            {
+              id: id2,
+              expectedContentHash,
+              path: frozen.path,
+              filename: pasteboardFilename(filename, frozen.filename)
+            },
+            before
+          ),
           source
         };
       } finally {
@@ -51823,15 +51834,18 @@ function registerDirectOperations(server2, manager) {
     }
   );
 }
-function attachmentName(path10, filename) {
-  const source = basename6(path10);
-  if (filename === void 0) return source;
+function checkAttachmentFilename(filename) {
   if (Buffer.byteLength(filename, "utf8") > 255)
     throw new Error("filename must be at most 255 bytes");
   if (filename !== filename.trim() || filename === "" || filename.startsWith(".") || /[/:\\\p{Cc}]/u.test(filename))
     throw new Error(
       "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
     );
+}
+function attachmentName(path10, filename) {
+  const source = basename6(path10);
+  if (filename === void 0) return source;
+  checkAttachmentFilename(filename);
   if (extname6(filename).toLowerCase() !== extname6(source).toLowerCase())
     throw new Error(
       `filename must keep the source file's extension (${extname6(source) || "none"})`
@@ -51888,10 +51902,10 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
     );
   return { attachmentId, name: row.filename };
 }
-function attachFile(manager, args) {
+function attachFile(manager, args, checked) {
   const { id: id2, expectedContentHash, path: path10 } = args;
   const name = attachmentName(path10, args.filename);
-  const before = readSnapshot(manager, id2);
+  const before = checked ?? readSnapshot(manager, id2);
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);

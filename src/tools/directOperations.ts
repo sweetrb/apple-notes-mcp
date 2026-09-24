@@ -258,18 +258,29 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
 
   tool(
     "add-attachment-from-pasteboard",
-    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note) or you have a file path (use add-attachment).\nSafety: reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
+    "Use when: the user copied an image, a PDF, or a file (screenshot, Copy Image, Finder Copy) and wants it attached to an exact note.\nReturns: the add-attachment result (attachment id, bytes, name, content hash) plus source: what was taken from the pasteboard (kind, type, default filename).\nDo not use when: the pasteboard holds text (use append-to-note), several copied files (refused; use add-attachment per file), or you have a file path (use add-attachment).\nSafety: checks the note and revision before reading the pasteboard; reads nothing when macOS would show its paste alert unless allowPasteAlert is true (error pasteboardCode pasteboard_access_denied); reads the pasteboard once and freezes its bytes into a private temporary file before attaching, never writes to the pasteboard, then runs add-attachment's checks: fresh rich revision, at most 64 MiB, no insertion retry, existing content and exact bytes verified. Needs the MCP host to run in the logged-in GUI session.",
     {
       id: noteId,
       expectedContentHash: revision,
       filename: attachmentInput.filename.describe(
         'Name the attachment gets in Notes (default: the copied file\'s name, or "Pasted image.png" / "Pasted document.pdf"). Without an extension, the pasted type\'s extension is added; with one, it must match the pasted type. Same rules as add-attachment otherwise.'
       ),
+      allowPasteAlert: z
+        .boolean()
+        .optional()
+        .describe(
+          "Read the pasteboard even if macOS will show its paste alert (macOS 15.4+ paste privacy). Default false: when pasting is not already always allowed, the tool reads nothing and returns pasteboardCode pasteboard_access_denied. Set true only after the user agrees to answer the alert. Never overrides a Deny setting."
+        ),
     },
-    ({ id, expectedContentHash, filename }) => {
+    ({ id, expectedContentHash, filename, allowPasteAlert }) => {
+      // Check the request and the note first, so an invalid call never reads the clipboard.
+      if (filename !== undefined) checkAttachmentFilename(filename);
+      const before = readSnapshot(manager, id);
+      if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
       // A named pasteboard lets live tests run without touching the user's clipboard.
       const frozen = freezePasteboard({
         pasteboardName: process.env[PASTEBOARD_NAME_ENV]?.trim() || undefined,
+        allowPasteAlert: allowPasteAlert === true,
       });
       try {
         const source: PasteboardAttachmentSource = {
@@ -278,12 +289,16 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
           filename: frozen.filename,
         };
         return {
-          ...attachFile(manager, {
-            id,
-            expectedContentHash,
-            path: frozen.path,
-            filename: pasteboardFilename(filename, frozen.filename),
-          }),
+          ...attachFile(
+            manager,
+            {
+              id,
+              expectedContentHash,
+              path: frozen.path,
+              filename: pasteboardFilename(filename, frozen.filename),
+            },
+            before
+          ),
           source,
         };
       } finally {
@@ -293,15 +308,8 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
   );
 }
 
-/**
- * Validate an attachment name override and return the name Notes will show.
- * Notes names a file attachment after the file it received, so the override is
- * applied by naming the private temporary copy. Keeping the source extension
- * keeps the file type Notes infers from the name consistent with the bytes.
- */
-export function attachmentName(path: string, filename?: string): string {
-  const source = basename(path);
-  if (filename === undefined) return source;
+/** Checks a requested attachment name's form, independent of the source file. */
+export function checkAttachmentFilename(filename: string): void {
   if (Buffer.byteLength(filename, "utf8") > 255)
     throw new Error("filename must be at most 255 bytes");
   if (
@@ -313,6 +321,18 @@ export function attachmentName(path: string, filename?: string): string {
     throw new Error(
       "filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
     );
+}
+
+/**
+ * Validate an attachment name override and return the name Notes will show.
+ * Notes names a file attachment after the file it received, so the override is
+ * applied by naming the private temporary copy. Keeping the source extension
+ * keeps the file type Notes infers from the name consistent with the bytes.
+ */
+export function attachmentName(path: string, filename?: string): string {
+  const source = basename(path);
+  if (filename === undefined) return source;
+  checkAttachmentFilename(filename);
   if (extname(filename).toLowerCase() !== extname(source).toLowerCase())
     throw new Error(
       `filename must keep the source file's extension (${extname(source) || "none"})`
@@ -398,14 +418,22 @@ function storedInsertion(
   return { attachmentId, name: row.filename };
 }
 
-/** Insert one verified local file into an exact, unchanged note. */
+/**
+ * Insert one verified local file into an exact, unchanged note.
+ *
+ * `checked` is a snapshot the caller already read and compared with
+ * `expectedContentHash` (add-attachment-from-pasteboard reads the note before
+ * it touches the pasteboard). The revision is still compared again here and
+ * re-read right before insertion.
+ */
 function attachFile(
   manager: AppleNotesManager,
-  args: { id: string; expectedContentHash: string; path: string; filename?: string }
+  args: { id: string; expectedContentHash: string; path: string; filename?: string },
+  checked?: Snapshot
 ): Record<string, unknown> {
   const { id, expectedContentHash, path } = args;
   const name = attachmentName(path, args.filename);
-  const before = readSnapshot(manager, id);
+  const before = checked ?? readSnapshot(manager, id);
   if (before.hash !== expectedContentHash) throw new Error("Note revision changed");
   const bytes = localAttachment(path);
   const beforeAttachments = manager.listAttachmentsById(id);
