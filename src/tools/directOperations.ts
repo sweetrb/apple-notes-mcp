@@ -107,7 +107,18 @@ function localAttachment(path: string): Buffer {
   // no hidden paths and no ~/Library outside iCloud Drive and CloudStorage, so
   // a prompt cannot attach ~/.ssh/id_ed25519 to a synced note; O_NONBLOCK and
   // the regular-file check keep a FIFO from blocking the server.
-  return readAllowedFile(path, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
+  // Nothing has been inserted when the read is refused, so say so; after
+  // create-note-with-attachment has created its note, createdError overrides
+  // committed.
+  try {
+    return readAllowedFile(path, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
+  } catch (error) {
+    throw new CodedError(error instanceof Error ? error.message : String(error), {
+      code: "validation_error",
+      committed: false,
+      indeterminate: false,
+    });
+  }
 }
 
 /** Largest file add-attachment accepts; verification must never cap lower (#243). */

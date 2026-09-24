@@ -15,7 +15,9 @@
   iCloud (the same class as #195), and a FIFO blocked the server on open; the
   file is now opened with `O_NONBLOCK` and must be a regular file.
   `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` covers both tools as well as
-  `contentPath`. Both paths now share one helper, `readAllowedFile` in
+  `contentPath`. A refused read is `validation_error` with `committed: false`
+  (or `committed: true` once `create-note-with-attachment` has created its
+  note). Both paths now share one helper, `readAllowedFile` in
   `src/utils/attachmentFs.ts`. Found while reviewing @oliverames's #256.
 
 ## [2.9.25] - 2026-09-24

@@ -618,6 +618,11 @@ describe("attachment filename override and create-then-attach", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toMatch(/hidden file or directory/);
       expect(result.content[0].text).toMatch(/APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS/);
+      expect(result.structuredContent).toEqual({
+        code: "validation_error",
+        committed: false,
+        indeterminate: false,
+      });
       expect(manager.addAttachmentById).not.toHaveBeenCalled();
     });
 

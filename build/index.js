@@ -53544,7 +53544,15 @@ function assertExistingContentPreserved(before, after) {
 }
 function localAttachment(path10) {
   if (!isAbsolute4(path10)) throw new Error("An absolute local file path is required");
-  return readAllowedFile(path10, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
+  try {
+    return readAllowedFile(path10, MAX_ADD_ATTACHMENT_BYTES, { label: "Attachment" });
+  } catch (error2) {
+    throw new CodedError(error2 instanceof Error ? error2.message : String(error2), {
+      code: "validation_error",
+      committed: false,
+      indeterminate: false
+    });
+  }
 }
 var MAX_ADD_ATTACHMENT_BYTES = 64 * 1024 * 1024;
 function fileMatches(path10, size, expected) {
