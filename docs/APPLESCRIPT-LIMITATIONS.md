@@ -19,7 +19,7 @@ shared, body, id, name, plaintext
 
 ## Pinned notes (#28)
 
-**Status: not feasible via AppleScript; readable via the NoteStore database.**
+**Status: not feasible via AppleScript; read from the NoteStore database and set through a Shortcut.**
 The Notes UI lets you pin a note to the top of a folder, but the `note` class
 has no `pinned` property. Asking for it raises error `-1700`:
 
@@ -33,7 +33,7 @@ end tell
 There is no alternative property, element, or command (`pin`, `pinned`,
 `favorite`, …) in the dictionary. Pinned state lives only in Notes' private
 Core Data store (`NoteStore.sqlite`), which is not part of the scriptable
-surface, and there is no supported way to *set* it at all.
+surface, and AppleScript offers no way to _set_ it.
 
 Reading it, however, did turn out to be worth doing. Since 2.5.0 the BETA
 `get-note-metadata` tool queries `ZISPINNED` on `ZICCLOUDSYNCINGOBJECT` in that
@@ -43,14 +43,17 @@ changes across macOS releases. It requires
 [Full Disk Access](./FULL-DISK-ACCESS.md) and is marked BETA precisely because
 the schema is version-dependent.
 
-**Conclusion:** pin state is **readable** (BETA, from the NoteStore database,
-Full Disk Access required) but **not settable** — and setting will not be added
-while Notes lacks a scriptable property. If a future macOS exposes one, revisit
-by re-running the probe above.
+**Conclusion:** pin state is **not scriptable** through AppleScript in either
+direction. It is **readable** (BETA, from the NoteStore database, Full Disk
+Access required) and, since the native background operations were added,
+**settable** through the packaged Background Operations Shortcut by
+`set-note-pinned`, which checks the expected current state and the note
+revision first. If a future macOS exposes a scriptable property, revisit by
+re-running the probe above.
 
 ## Note-to-note links (#30)
 
-**Status: link *relationships* are not exposed; a shareable deep link is.**
+**Status: link _relationships_ are not exposed to AppleScript; the server reads them from the database and inserts links by other routes.**
 Apple Notes lets you insert a link from one note to another in the UI, but
 AppleScript exposes no property or element for that relationship:
 
@@ -58,7 +61,7 @@ AppleScript exposes no property or element for that relationship:
   (undefined). There is no element that enumerates outgoing/incoming links.
 - Nothing in the dictionary inserts a link into a note's body.
 
-A shareable deep link to a note *is* available, and has been since 2.6.0:
+A shareable deep link to a note _is_ available, and has been since 2.6.0:
 `get-note-link` returns a `notes://showNote?identifier=<uuid>` URL that opens
 the note in Notes.app on macOS and iOS.
 
@@ -84,10 +87,14 @@ It **is** wrapped, as `show-note`, `show-folder`, `show-account`, and
 something useful on a machine with an active desktop session; to read a note's
 content, use `get-note-content` / `get-note-markdown` instead.
 
-**Conclusion:** link relationships between notes cannot be read, so a "list
-links in this note" feature is not possible, and links cannot be inserted into a
-body. To hand a note to a person or another app, use `get-note-link`; to address
-a note in a follow-up tool call, use the `id` returned by every read tool.
+**Conclusion:** AppleScript can neither read link relationships between notes
+nor insert a link into a body. The server does both by other routes:
+`list-note-links` reads a note's or folder's links from the NoteStore database
+(Full Disk Access required), `insert-link` appends a web, mail or Notes link,
+and `insert-note-link` appends another note's real deep link through the
+Background Operations Shortcut. To hand a note to a person or another app, use
+`get-note-link`; to address a note in a follow-up tool call, use the `id`
+returned by every read tool.
 
 ## Tags / hashtags (#29)
 

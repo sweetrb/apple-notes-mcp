@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.23] - 2026-09-24
+## [2.9.22] - 2026-09-24
 
 ### Documentation
 
@@ -28,7 +28,15 @@
 - The Full Disk Access list adds `query-notes`, `get-native-objects`,
   `get-note-tables`, `list-smart-folders`, `delete-folder-by-id`,
   `get-note-drawings`, `transcribe-note-audio` and `native-note-state`.
-- `package.json` has a fuller description and more search keywords.
+- `package.json` has a fuller description (mirrored to the GitHub repository
+  description) and more search keywords.
+- `docs/APPLESCRIPT-LIMITATIONS.md` no longer says pin state cannot be set or
+  links cannot be inserted: its pinned-notes and note-to-note-links conclusions
+  now keep the AppleScript finding and name `set-note-pinned`,
+  `list-note-links`, `insert-link` and `insert-note-link` as the routes the
+  server uses instead.
+- Thanks to @oliverames for auditing the README against the live tool list and
+  input schemas (#254).
 
 ## [2.9.21] - 2026-09-24
 
