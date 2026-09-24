@@ -30351,7 +30351,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject3 = isObject;
+  const isObject4 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -30360,7 +30360,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject3(input)) {
+    if (!isObject4(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -49443,7 +49443,63 @@ function withJsonSchema2020_12(transport2) {
 
 // src/utils/shutdown.ts
 var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
-function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
+var SHUTDOWN_IN_FLIGHT_TIMEOUT_MS = 3e4;
+var InFlightRequests = class {
+  open = /* @__PURE__ */ new Set();
+  waiters = [];
+  get count() {
+    return this.open.size;
+  }
+  received(id2) {
+    this.open.add(id2);
+  }
+  /** A response was sent, or the client cancelled the request (no response follows). */
+  settled(id2) {
+    if (!this.open.delete(id2) || this.open.size > 0) return;
+    const waiters = this.waiters;
+    this.waiters = [];
+    for (const waiter of waiters) waiter();
+  }
+  onIdle(listener) {
+    if (this.open.size === 0) listener();
+    else this.waiters.push(listener);
+  }
+};
+var isObject2 = (value) => typeof value === "object" && value !== null;
+var isId = (value) => typeof value === "string" || typeof value === "number";
+function trackRequests(transport2, requests) {
+  if (typeof transport2.send !== "function") return transport2;
+  let handler;
+  Object.defineProperty(transport2, "onmessage", {
+    configurable: true,
+    enumerable: true,
+    get: () => handler,
+    set: (next) => {
+      handler = next ? (message, extra) => {
+        const m = message;
+        if (typeof m.method === "string") {
+          if (isId(m.id)) requests.received(m.id);
+          else if (m.method === "notifications/cancelled" && isObject2(m.params)) {
+            const id2 = m.params.requestId;
+            if (isId(id2)) requests.settled(id2);
+          }
+        }
+        next(message, extra);
+      } : next;
+    }
+  });
+  const send = transport2.send.bind(transport2);
+  transport2.send = async (message, options) => {
+    try {
+      return await send(message, options);
+    } finally {
+      const m = message;
+      if (typeof m.method !== "string" && isId(m.id)) requests.settled(m.id);
+    }
+  };
+  return transport2;
+}
+function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS, pending, inFlightTimeoutMs = SHUTDOWN_IN_FLIGHT_TIMEOUT_MS) {
   let shuttingDown = false;
   let exited = false;
   const exitOnce = () => {
@@ -49460,8 +49516,11 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
   return () => {
     if (shuttingDown) return;
     shuttingDown = true;
-    timer = setTimeout(exitOnce, timeoutMs);
-    setImmediate(exitWhenDrained);
+    const busy = (pending?.count ?? 0) > 0;
+    timer = setTimeout(exitOnce, busy ? Math.max(timeoutMs, inFlightTimeoutMs) : timeoutMs);
+    setImmediate(
+      () => pending ? pending.onIdle(() => setImmediate(exitWhenDrained)) : exitWhenDrained()
+    );
   };
 }
 
@@ -51899,7 +51958,7 @@ function child(path10, key) {
   if (key.length > MAX_QUOTED_TOKEN) key = `${key.slice(0, MAX_QUOTED_TOKEN - 3)}...`;
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${path10}.${key}` : `${path10}[${JSON.stringify(key)}]`;
 }
-var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isObject3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var describe = (value) => value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
 var describeVersion = (value) => typeof value === "number" && Number.isFinite(value) ? String(value) : describe(value);
 var listed = (values) => values.map((v) => JSON.stringify(v)).join(", ");
@@ -51980,7 +52039,7 @@ var RULE_FIELDS = {
   omit: []
 };
 function validateRule(c, rule, path10) {
-  if (!isObject2(rule)) {
+  if (!isObject3(rule)) {
     c.add(path10, `must be an object, not ${describe(rule)}`);
     return;
   }
@@ -52027,7 +52086,7 @@ function validateInlineOrder(c, value, path10) {
   if (missing.length) c.add(path10, `must list every inline format; missing ${listed(missing)}`);
 }
 function validateOptions(c, value, path10) {
-  if (!isObject2(value)) {
+  if (!isObject3(value)) {
     c.add(path10, `must be an object, not ${describe(value)}`);
     return;
   }
@@ -52048,7 +52107,7 @@ function validateOptions(c, value, path10) {
 }
 function templateErrors(input) {
   const c = new Collector();
-  if (!isObject2(input)) {
+  if (!isObject3(input)) {
     c.add("$", `a template must be a JSON object, not ${describe(input)}`);
     return c.errors;
   }
@@ -52083,7 +52142,7 @@ function templateErrors(input) {
         c.oneOf(value, path10, BUILTIN_TEMPLATE_NAMES);
         break;
       case "assets":
-        if (!isObject2(value)) {
+        if (!isObject3(value)) {
           c.add(path10, `must be an object, not ${describe(value)}`);
           break;
         }
@@ -52099,7 +52158,7 @@ function templateErrors(input) {
         validateInlineOrder(c, value, path10);
         break;
       case "rules":
-        if (!isObject2(value)) {
+        if (!isObject3(value)) {
           c.add(path10, `must be an object keyed by rule id, not ${describe(value)}`);
           break;
         }
@@ -62191,13 +62250,14 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
-var shutdown = createShutdown(process.stdout, () => process.exit(0));
+var inFlight = new InFlightRequests();
+var shutdown = createShutdown(process.stdout, () => process.exit(0), void 0, inFlight);
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, shutdown);
 }
 process.stdin.on("end", shutdown);
 process.stdin.on("close", shutdown);
-var transport = withJsonSchema2020_12(new StdioServerTransport());
+var transport = trackRequests(withJsonSchema2020_12(new StdioServerTransport()), inFlight);
 await server.connect(transport);
 /*! Bundled license information:
 

@@ -91,7 +91,7 @@ import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
 import { errorResult } from "@/utils/errorCodes.js";
-import { createShutdown } from "@/utils/shutdown.js";
+import { createShutdown, InFlightRequests, trackRequests } from "@/utils/shutdown.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import { CALL_TIMEOUT_SECONDS, runWithCallTimeout } from "@/utils/callTimeout.js";
 import { readAllowedTextFile } from "@/utils/attachmentFs.js";
@@ -4899,7 +4899,10 @@ process.on("unhandledRejection", (reason) => {
 // lingering as an orphan. Idempotent so multiple triggers don't double-exit.
 // Pending stdout is drained first (bounded), so a response larger than the pipe
 // buffer isn't truncated when the client closes stdin right after a request.
-const shutdown = createShutdown(process.stdout, () => process.exit(0));
+// Requests still being handled (an asynchronous tool) are answered first, so
+// their responses are not lost when stdin closes (#186).
+const inFlight = new InFlightRequests();
+const shutdown = createShutdown(process.stdout, () => process.exit(0), undefined, inFlight);
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, shutdown);
 }
@@ -4909,5 +4912,5 @@ process.stdin.on("close", shutdown);
 // Wrapped so every tools/list payload declares JSON Schema 2020-12: the SDK
 // stamps draft-07 on every emitted inputSchema/outputSchema, which current MCP
 // clients reject outright. See @/utils/jsonSchemaDialect.js.
-const transport = withJsonSchema2020_12(new StdioServerTransport());
+const transport = trackRequests(withJsonSchema2020_12(new StdioServerTransport()), inFlight);
 await server.connect(transport);
