@@ -1,8 +1,8 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.9.20",
+  "version": "2.9.21",
   "packageManager": "pnpm@11.9.0",
-  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and other AI assistants",
+  "description": "MCP server for Apple Notes on macOS: lets Claude, Codex, and other MCP clients read, search, create, edit, organize, and export notes locally",
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -46,7 +46,16 @@
     "applescript",
     "macos",
     "notes",
-    "model-context-protocol"
+    "model-context-protocol",
+    "mcp-server",
+    "apple",
+    "notes-app",
+    "claude-code",
+    "claude-desktop",
+    "shortcuts",
+    "markdown",
+    "note-taking",
+    "icloud"
   ],
   "author": "Rob Sweet <rob@superiortech.io>",
   "license": "MIT",

@@ -1,5 +1,35 @@
 ## [Unreleased]
 
+## [2.9.21] - 2026-09-24
+
+### Documentation
+
+- The README's opening paragraph now says what the server does and which
+  clients it is documented for, and a short Contents list links the main
+  sections. A new "Other MCP clients" note gives the stdio command any client
+  can run.
+- The Features table now covers native tags, checklist and table creation,
+  pinning, links, paragraph structure, Markdown and HTML export with templates,
+  adding attachments, audio and drawings, and incremental sync.
+- Stale limitations are corrected: pin state can be set with `set-note-pinned`,
+  links can be inserted with `insert-link` and `insert-note-link`, checklist
+  items can be created through Shortcuts, and writes take exact IDs rather than
+  titles.
+- The native background tools (`append-native`, `create-checklist-item`,
+  `create-table`, `set-note-pinned`, `remove-native-tags`,
+  `replace-native-tag`, `insert-note-link`), `add-native-tags` and
+  `get-native-objects` now have parameter tables. `move-note` documents
+  `account`, `append-to-note` documents `scopeText`, and `update-note`,
+  `append-to-note`, `delete-note` and `move-note` document `timeoutSeconds`.
+- The environment variable table adds `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR`,
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, the three Shortcut name
+  overrides, and `APPLE_NOTES_MCP_PASTEBOARD_NAME`, and no longer describes a
+  private-helper timeout as an uncertain write.
+- The Full Disk Access list adds `query-notes`, `get-native-objects`,
+  `get-note-tables`, `list-smart-folders`, `delete-folder-by-id`,
+  `get-note-drawings`, `transcribe-note-audio` and `native-note-state`.
+- `package.json` has a fuller description and more search keywords.
+
 ## [2.9.20] - 2026-09-24
 
 ### Documentation
