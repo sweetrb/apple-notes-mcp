@@ -38983,6 +38983,7 @@ var StdioServerTransport = class {
 
 // src/utils/applescript.ts
 import { execFileSync } from "child_process";
+import { constants as bufferConstants } from "node:buffer";
 
 // src/utils/docsUrls.ts
 var FULL_DISK_ACCESS_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md";
@@ -39019,6 +39020,21 @@ function envPositiveNumber(name) {
 }
 function getMaxBuffer() {
   return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
+}
+var MAX_OUTPUT_BYTES = bufferConstants.MAX_STRING_LENGTH;
+var NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, MAX_OUTPUT_BYTES);
+function noteBodyMaxBuffer() {
+  return Math.min(Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES), MAX_OUTPUT_BYTES);
+}
+function isOutputOverflowError(error2) {
+  const code = error2 instanceof Error ? error2.code : void 0;
+  return code === "ENOBUFS" || code === "ERR_STRING_TOO_LONG";
+}
+function outputOverflowMessage(maxBufferBytes) {
+  const mib = 1024 * 1024;
+  const limit = maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
+  const remedy = maxBufferBytes >= MAX_OUTPUT_BYTES ? "That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app." : "Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.";
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. ${remedy}`;
 }
 var SCRIPT_TIMEOUT_HEADROOM_MS = 5e3;
 var MIN_ATTEMPT_BUDGET_MS = 1e3;
@@ -39165,6 +39181,7 @@ function executeAppleScript(script, options = {}) {
   const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
+  const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
   if (!script || !script.trim()) {
     return {
       success: false,
@@ -39195,7 +39212,7 @@ function executeAppleScript(script, options = {}) {
         killSignal: "SIGKILL",
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
-        maxBuffer: getMaxBuffer()
+        maxBuffer: maxBufferBytes
       });
       const duration3 = Date.now() - attemptStart;
       debugLog("AppleScript succeeded", {
@@ -39213,7 +39230,9 @@ function executeAppleScript(script, options = {}) {
       let errorMessage;
       let isTimeout = false;
       let rawError;
-      if (isTimeoutError(error2)) {
+      if (isOutputOverflowError(error2)) {
+        errorMessage = outputOverflowMessage(maxBufferBytes);
+      } else if (isTimeoutError(error2)) {
         isTimeout = true;
         const timeoutSecs = Math.round(timeoutMs / 1e3);
         errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;
@@ -42201,8 +42220,8 @@ function scopeConflictMessage(reason) {
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync5 } from "fs";
-import { homedir as homedir8 } from "os";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync } from "fs";
+import { homedir as homedir8, tmpdir as tmpdir2 } from "os";
 import { join as join9 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
@@ -42547,6 +42566,34 @@ function buildAppLevelScript(command) {
     end tell
   `;
 }
+var INLINE_EXPECTED_BODY_LIMIT = MAX_CONTENT_LENGTH;
+var ExpectedBodies = class {
+  directory;
+  files = 0;
+  /**
+   * Returns AppleScript `setup` to run before the comparison (empty for a
+   * literal) and the `operand` to compare the note's body against.
+   * `variable` names the AppleScript variable a file-backed body is read into.
+   */
+  bind(body, variable) {
+    if (body.length <= INLINE_EXPECTED_BODY_LIMIT) {
+      return { setup: "", operand: `"${escapeHtmlForAppleScript(body)}"` };
+    }
+    this.directory ??= mkdtempSync2(join9(tmpdir2(), "apple-notes-expected-body-"));
+    const file = join9(this.directory, `body-${this.files++}.html`);
+    writeFileSync(file, body, { encoding: "utf8", mode: 384 });
+    return {
+      setup: `
+      tell current application to set ${variable} to read (POSIX file "${escapePlainStringForAppleScript(file)}") as \xABclass utf8\xBB`,
+      operand: variable
+    };
+  }
+  /** Removes any temporary files. Safe to call more than once. */
+  cleanup() {
+    if (this.directory) rmSync2(this.directory, { recursive: true, force: true });
+    this.directory = void 0;
+  }
+};
 function folderDeleteFactsScript(id2) {
   if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
   return `
@@ -42911,7 +42958,7 @@ var AppleNotesManager = class {
     const safeTitle = escapePlainStringForAppleScript(title);
     const getCommand = `get body of note "${safeTitle}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get content of note "${title}":`, result.error);
@@ -42948,7 +42995,7 @@ var AppleNotesManager = class {
     const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id2}":`, result.error);
       return { body: "", error: result.error };
@@ -43171,25 +43218,25 @@ var AppleNotesManager = class {
    */
   deleteNoteByIdIfUnchanged(id2, expectedBody, scope2, guards = []) {
     const safeId = sanitizeNoteId(id2);
-    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
-    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const trashIds = trashFolderIdList();
-    const guardChecks = guards.map((guard, index) => {
-      const safeGuardId = sanitizeNoteId(guard.id);
-      const ref = `__guardRef${index}`;
-      const folderVar = `__guardFolder${index}`;
-      const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
-      let bodyCheck = "";
-      if (guard.expectedBody !== void 0) {
-        validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
-        const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
-        bodyCheck = `
+    const bodies = new ExpectedBodies();
+    let result;
+    try {
+      const guardChecks = guards.map((guard, index) => {
+        const safeGuardId = sanitizeNoteId(guard.id);
+        const ref = `__guardRef${index}`;
+        const folderVar = `__guardFolder${index}`;
+        const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+        let bodyCheck = "";
+        if (guard.expectedBody !== void 0) {
+          const expected2 = bodies.bind(guard.expectedBody, `__expectedGuardBody${index}`);
+          bodyCheck = `${expected2.setup}
       set __guardBody to body of ${ref}
       considering case
-        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+        if __guardBody is not ${expected2.operand} and __guardBody is not ${expected2.operand} & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
       end considering`;
-      }
-      return `
+        }
+        return `
       if not (exists note id "${safeGuardId}") then ${inactive("missing")}
       set ${ref} to note id "${safeGuardId}"
       if password protected of ${ref} then ${inactive("locked")}
@@ -43199,18 +43246,19 @@ var AppleNotesManager = class {
       end try
       if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
       if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
-    }).join("");
-    const script = buildAppLevelScript(`
+      }).join("");
+      const expected = bodies.bind(expectedBody, "__expectedBody");
+      const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
       if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}${expected.setup}
       set currentBody to body of noteRef
       considering case
-        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
       try
@@ -43218,7 +43266,10 @@ var AppleNotesManager = class {
       end try
       return "SAFETY_DELETED"
     `);
-    const result = executeMutationAppleScript(script);
+      result = executeMutationAppleScript(script);
+    } finally {
+      bodies.cleanup();
+    }
     if (!result.success) {
       console.error(`Failed guarded delete for note ID "${id2}":`, result.error);
       return { status: "failed" };
@@ -47738,8 +47789,8 @@ import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
 import { execFileSync as execFileSync15 } from "node:child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
+import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
 import { join as join16 } from "node:path";
 
 // src/services/shortcutConsent.ts
@@ -47842,10 +47893,10 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join16(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-native-tags-"));
   try {
     const path10 = join16(directory, "request.json");
-    writeFileSync(path10, JSON.stringify(input), { mode: 384 });
+    writeFileSync2(path10, JSON.stringify(input), { mode: 384 });
     execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path10], {
       encoding: "utf8",
       timeout: 6e4,
@@ -47860,14 +47911,14 @@ function runNativeTagsShortcut(input) {
       { shortcut: status.shortcut, code: error2?.code }
     );
   } finally {
-    rmSync2(directory, { recursive: true, force: true });
+    rmSync3(directory, { recursive: true, force: true });
   }
 }
 
 // src/services/backgroundNotes.ts
 import { execFileSync as execFileSync16 } from "node:child_process";
-import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
-import { tmpdir as tmpdir3 } from "node:os";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync3, rmSync as rmSync4 } from "node:fs";
+import { tmpdir as tmpdir4 } from "node:os";
 import { join as join17 } from "node:path";
 
 // src/utils/appendMarkdown.ts
@@ -48193,10 +48244,10 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join17(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync4(join17(tmpdir4(), "apple-notes-background-"));
   try {
     const file = join17(directory, "request.json");
-    writeFileSync2(
+    writeFileSync3(
       file,
       JSON.stringify({
         operation: "",
@@ -48225,7 +48276,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       throw Object.assign(error2, { shortcut: status.shortcut });
     }
   } finally {
-    rmSync3(directory, { recursive: true, force: true });
+    rmSync4(directory, { recursive: true, force: true });
   }
 }
 function backgroundDependencies(manager) {
@@ -49685,9 +49736,12 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
 
 // src/utils/bodyReadFailure.ts
 var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+var OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
 function classifyBodyReadError(error2) {
   if (!error2) return "other";
-  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (OUTPUT_OVERFLOW.test(error2) || /ENOBUFS|maxBuffer|ERR_STRING_TOO_LONG/i.test(error2)) {
+    return "buffer";
+  }
   if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
   return "other";
 }
@@ -49705,10 +49759,17 @@ function describeBodyReadFailure(title, error2, attachments) {
   const kind = classifyBodyReadError(error2);
   if (kind === "other") return base;
   const large = attachments ? largeAttachments(attachments) : [];
-  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
-    "; "
-  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
-  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  const listed = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
+  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed}). ` : "";
+  if (kind === "buffer") {
+    const cause2 = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
+    const remedy2 = "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
+    return `${base}
+
+${cause2} ${remedy2}`;
+  }
+  const cause = large.length > 0 ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
   return `${base}
 
 ${cause} ${remedy}`;
@@ -51464,13 +51525,13 @@ import {
   closeSync as closeSync5,
   constants as constants5,
   fstatSync as fstatSync5,
-  mkdtempSync as mkdtempSync4,
+  mkdtempSync as mkdtempSync5,
   openSync as openSync5,
   readFileSync as readFileSync3,
-  rmSync as rmSync4,
-  writeFileSync as writeFileSync3
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
 } from "node:fs";
-import { tmpdir as tmpdir4 } from "node:os";
+import { tmpdir as tmpdir5 } from "node:os";
 import { basename as basename5, extname as extname5, isAbsolute as isAbsolute3, join as join22 } from "node:path";
 var noteId = exactIdInput(
   "ICNote",
@@ -51713,10 +51774,10 @@ function attachFile(manager, args) {
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
   const beforeStored = storedAttachmentIds(manager, id2);
-  const directory = mkdtempSync4(join22(tmpdir4(), "notes-attachment-add-"));
+  const directory = mkdtempSync5(join22(tmpdir5(), "notes-attachment-add-"));
   const temporaryFile = join22(directory, name);
   try {
-    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    writeFileSync4(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
@@ -51776,7 +51837,7 @@ function attachFile(manager, args) {
       } : {}
     };
   } finally {
-    rmSync4(directory, { recursive: true, force: true });
+    rmSync5(directory, { recursive: true, force: true });
   }
 }
 
@@ -54766,11 +54827,11 @@ import {
   chmodSync,
   existsSync as existsSync14,
   mkdirSync as mkdirSync6,
-  mkdtempSync as mkdtempSync5,
+  mkdtempSync as mkdtempSync6,
   readFileSync as readFileSync4,
   renameSync,
-  rmSync as rmSync5,
-  writeFileSync as writeFileSync4
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
 } from "node:fs";
 import { homedir as homedir19, release as release3 } from "node:os";
 import { dirname as dirname8, join as join24, resolve as resolve5 } from "node:path";
@@ -54788,7 +54849,7 @@ var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
   "transcribe"
 ]);
 var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
 var publicManifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -54916,7 +54977,7 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES
+    maxBuffer: MAX_OUTPUT_BYTES2
   });
   const errno = result.error?.code;
   if (errno === "ETIMEDOUT" || result.signal && result.status === null)
@@ -54956,7 +55017,7 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     };
     child.stdout?.on("data", (chunk) => {
       size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES)
+      if (size > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
@@ -55124,13 +55185,13 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = publicHelperInstallDir(deps.env);
   mkdirSync6(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join24(installDir, ".staging-"));
+  const staging = mkdtempSync6(join24(installDir, ".staging-"));
   try {
     const stagedBinary = join24(staging, PUBLIC_HELPER_BINARY);
     const digestPath = join24(staging, "source-digest.swift");
     const plistPath = join24(staging, "Info.plist");
-    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
-    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    writeFileSync5(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync5(plistPath, publicHelperInfoPlist(), { mode: 384 });
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
@@ -55192,14 +55253,14 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
     };
     chmodSync(stagedBinary, 448);
     renameSync(stagedBinary, join24(installDir, PUBLIC_HELPER_BINARY));
-    writeFileSync4(
+    writeFileSync5(
       join24(installDir, PUBLIC_HELPER_MANIFEST),
       JSON.stringify(manifest, null, 2) + "\n",
       { mode: 384 }
     );
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    rmSync5(staging, { recursive: true, force: true });
+    rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectPublicHelper(deps);
   steps.push({
@@ -55749,10 +55810,10 @@ import {
   chmodSync as chmodSync2,
   existsSync as existsSync16,
   mkdirSync as mkdirSync7,
-  mkdtempSync as mkdtempSync6,
+  mkdtempSync as mkdtempSync7,
   renameSync as renameSync2,
-  rmSync as rmSync6,
-  writeFileSync as writeFileSync5
+  rmSync as rmSync7,
+  writeFileSync as writeFileSync6
 } from "node:fs";
 import { release as release4 } from "node:os";
 import { join as join27 } from "node:path";
@@ -55777,7 +55838,7 @@ var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
 var DEFAULT_TIMEOUT_MS3 = 2e4;
-var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var MAX_OUTPUT_BYTES3 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -55961,7 +56022,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2,
+    maxBuffer: MAX_OUTPUT_BYTES3,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -56160,7 +56221,7 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
   mkdirSync7(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join27(installDir, ".staging-"));
+  const staging = mkdtempSync7(join27(installDir, ".staging-"));
   try {
     const stagedBinary = join27(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
@@ -56240,12 +56301,12 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
     };
     chmodSync2(stagedBinary, 448);
     renameSync2(stagedBinary, join27(installDir, HELPER_BINARY_NAME));
-    writeFileSync5(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    writeFileSync6(join27(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync7(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
