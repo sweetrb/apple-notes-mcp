@@ -60108,7 +60108,7 @@ registerTool(
     if (!note) return errorResponse(`Note with ID "${id2}" not found`);
     const body = notesManager.getNoteContentById(id2);
     if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
-    const rich = readRichNote(id2);
+    const rich = readRichNote(id2, { skipUnsafeLinks: true });
     const tables = (rich.objectData || []).filter((object3) => object3.type?.includes("table")).map((object3) => {
       try {
         return {

@@ -1669,7 +1669,9 @@ registerTool(
     if (!note) return errorResponse(`Note with ID "${id}" not found`);
     const body = notesManager.getNoteContentById(id);
     if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
-    const rich = readRichNote(id);
+    // Read-only, so a tel: or sms: link must not hide the native objects; the
+    // revision (and so contentHash) does not depend on which links are kept.
+    const rich = readRichNote(id, { skipUnsafeLinks: true });
     const tables: Array<Record<string, unknown>> = (rich.objectData || [])
       .filter((object) => object.type?.includes("table"))
       .map((object) => {
