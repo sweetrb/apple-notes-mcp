@@ -134,8 +134,11 @@ import {
   MAX_FOLDER_EXPORT_LIMIT,
   NotesExportError,
 } from "@/services/notesExport.js";
+import { BUILTIN_TEMPLATE_NAMES } from "@/utils/markdownTemplate.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
+import { registerMarkdownTemplates } from "@/tools/markdownTemplates.js";
+import { TEMPLATE_SLUG, TemplateStore } from "@/services/templateStore.js";
 import { registerSvgAnalysis } from "@/tools/svgAnalysis.js";
 import {
   hasScopeGuard,
@@ -212,6 +215,7 @@ const server = new McpServer({
 const notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
+registerMarkdownTemplates(server);
 registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
@@ -4160,7 +4164,7 @@ registerTool(
   "export-notes-markdown",
   {
     description:
-      "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.",
+      "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.\nTemplates: pass template ('standard-markdown' reproduces the default output; 'obsidian' adds YAML front matter and copies attachments beside outputPath) or templateFile (a JSON template) to control how every block, inline style, attachment, per-note header/footer and separator renders. Templated receipts add template, warnings (e.g. missing_asset) and assetFiles; an invalid template is refused with [invalid-template] and every problem's JSON path.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: z
@@ -4192,6 +4196,17 @@ registerTool(
         .max(1000)
         .optional()
         .describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
+      template: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe(
+          `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
+        ),
+      templateFile: exportPathInput(
+        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
+      ),
     },
     outputSchema: {
       format: z.string().optional(),
@@ -4202,6 +4217,14 @@ registerTool(
       assets: z.object({ dir: z.string(), files: z.number() }).optional(),
       stats: exportStatsSchema.optional(),
       skipped: z.array(z.object({ id: z.string(), code: z.string() })).optional(),
+      template: z.object({ name: z.string(), source: z.string() }).optional(),
+      warnings: z
+        .array(
+          z.object({ code: z.string(), noteId: z.string(), attachmentId: z.string().optional() })
+        )
+        .optional(),
+      warningsOmitted: z.number().optional(),
+      assetFiles: z.array(z.string()).optional(),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   },
@@ -4211,6 +4234,8 @@ registerTool(
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) =>
           notesManager.listNoteRefs(account, folder, since, limit),
+        findTemplate: (name) =>
+          TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : undefined,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024,
       });
@@ -4220,9 +4245,17 @@ registerTool(
         error.code === "no-full-disk-access"
           ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
+      if (error instanceof NotesExportError && error.details)
+        return errorResponse(
+          `Error exporting Markdown [${error.code}]: the template is invalid:\n` +
+            error.details.map((detail) => `${detail.path}: ${detail.message}`).join("\n")
+        );
       return errorResponse(`Error exporting Markdown [${error.code}]: ${error.message}${hint}`);
     }
-    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    const warned = receipt.warnings?.length
+      ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)`
+      : "";
+    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
     if (receipt.output)
       return successResponse(
         `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` +

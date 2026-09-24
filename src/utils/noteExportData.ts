@@ -289,3 +289,99 @@ export function readExportNote(
     ordered,
   };
 }
+
+/** Note metadata for templated exports. Absent when the column is missing or NULL. */
+export interface ExportNoteMeta {
+  /** ZIDENTIFIER, the UUID used in notes:// links. */
+  uuid?: string;
+  /** ISO 8601, UTC. */
+  created?: string;
+  modified?: string;
+  /** Title of the note's folder. */
+  folder?: string;
+  /** Name of the note's account. */
+  account?: string;
+}
+
+/** Seconds between the Unix epoch and Core Data's 2001-01-01 reference date. */
+const CORE_DATA_EPOCH = 978307200;
+
+/** A Core Data timestamp (seconds since 2001) as ISO 8601 UTC, or undefined. */
+export function coreDataDate(value: unknown): string | undefined {
+  const seconds =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : NaN;
+  if (!Number.isFinite(seconds) || Math.abs(seconds) > 1e10) return undefined;
+  return new Date((seconds + CORE_DATA_EPOCH) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/**
+ * The metadata query for one bound note key, built from present columns. The
+ * creation, modification and account columns are numbered differently across
+ * macOS releases, so each is the first non-NULL of its candidates.
+ */
+export function noteMetaQuery(columns: Set<string>): string {
+  const first = (names: string[]) => {
+    const present = names.filter((name) => columns.has(name)).map((name) => `n.${name}`);
+    if (!present.length) return "NULL";
+    return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
+  };
+  const accountColumns = [...columns]
+    .filter((name) => /^ZACCOUNT\d*$/.test(name))
+    .sort((a, b) => Number(b.slice(8) || 0) - Number(a.slice(8) || 0));
+  const folder =
+    columns.has("ZFOLDER") && columns.has("ZTITLE2")
+      ? "(SELECT f.ZTITLE2 FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_PK = n.ZFOLDER)"
+      : "NULL";
+  const account =
+    columns.has("ZNAME") && accountColumns.length
+      ? `(SELECT a.ZNAME FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_PK = ${first(accountColumns)})`
+      : "NULL";
+  return (
+    "SELECT json_object(" +
+    `'uuid', ${first(["ZIDENTIFIER"])}, ` +
+    `'created', ${first(["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"])}, ` +
+    `'modified', ${first(["ZMODIFICATIONDATE1", "ZMODIFICATIONDATE"])}, ` +
+    `'folder', ${folder}, 'account', ${account}) ` +
+    "FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;"
+  );
+}
+
+/**
+ * Read one note's metadata (UUID, dates, folder, account) by exact
+ * `x-coredata` id. Throws {@link NoteBlocksError}; an unknown key yields {}.
+ */
+export function readExportNoteMeta(
+  id: string,
+  { dbPath = NOTES_DB_PATH }: { dbPath?: string } = {}
+): ExportNoteMeta {
+  const match = /\/ICNote\/p([0-9]{1,18})$/.exec(id);
+  if (!match) throw new NoteBlocksError("invalid-id", "Not a note id");
+  const output = sqlite(dbPath, [
+    "-cmd",
+    ".parameter init",
+    "-cmd",
+    `.parameter set @pk ${match[1]}`,
+    noteMetaQuery(objectColumns(dbPath)),
+  ]);
+  if (!output) return {};
+  let row: Row;
+  try {
+    row = JSON.parse(output) as Row;
+  } catch {
+    throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
+  }
+  const meta: ExportNoteMeta = {};
+  const set = <K extends keyof ExportNoteMeta>(key: K, value: string | undefined) => {
+    if (value !== undefined) meta[key] = value;
+  };
+  set("uuid", text(row.uuid));
+  set("created", coreDataDate(row.created));
+  set("modified", coreDataDate(row.modified));
+  set("folder", text(row.folder));
+  set("account", text(row.account));
+  return meta;
+}

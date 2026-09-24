@@ -91,7 +91,7 @@ const LAYERS: Array<[keyof Fmt, string, string]> = [
 type TextPiece = Extract<Piece, { type: "text" }>;
 
 /** Concatenate, separating delimiter runs that would otherwise merge. */
-function joinSafe(left: string, right: string): string {
+export function joinSafe(left: string, right: string): string {
   return left && right && /[*~=]$/.test(left) && left.at(-1) === right[0]
     ? `${left}<!-- -->${right}`
     : left + right;
