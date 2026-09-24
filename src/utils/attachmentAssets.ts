@@ -504,7 +504,7 @@ function fallbackFiles(
   identifier: string,
   generation: string | null,
   names: string[],
-  onStale: () => void = () => undefined
+  onStale?: () => void
 ): string[] {
   const base = join(accountDir, rootName, identifier);
   const found: string[] = [];
@@ -522,7 +522,7 @@ function fallbackFiles(
   }
   for (const name of names) add(join(accountDir, rootName, `${identifier}${extname(name)}`));
   // A generation was recorded but none of its files exist: what was found is older.
-  if (gen && recorded === 0 && found.length > 0) onStale();
+  if (gen && recorded === 0 && found.length > 0) onStale?.();
   return found;
 }
 

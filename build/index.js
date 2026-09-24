@@ -41557,7 +41557,7 @@ function generationDirs(base, accountDir) {
   const entries2 = boundedEntries(base, MAX_GENERATION_DIRS) ?? [];
   return entries2.map((e) => realInside(join7(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
 }
-function fallbackFiles(accountDir, rootName, identifier, generation, names, onStale = () => void 0) {
+function fallbackFiles(accountDir, rootName, identifier, generation, names, onStale) {
   const base = join7(accountDir, rootName, identifier);
   const found = [];
   const add = (candidate) => {
@@ -41573,7 +41573,7 @@ function fallbackFiles(accountDir, rootName, identifier, generation, names, onSt
     for (const name of names) add(join7(base, name));
   }
   for (const name of names) add(join7(accountDir, rootName, `${identifier}${extname(name)}`));
-  if (gen && recorded === 0 && found.length > 0) onStale();
+  if (gen && recorded === 0 && found.length > 0) onStale?.();
   return found;
 }
 function previewPixelArea(name) {
