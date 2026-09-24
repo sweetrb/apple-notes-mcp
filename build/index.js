@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants8) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants9);
+          this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants8) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants9);
+        this.rhs = optimizeExpr(this.rhs, names, constants8);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants9) {
-        this.code = optimizeExpr(this.code, names, constants9);
+      optimizeNames(names, constants8) {
+        this.code = optimizeExpr(this.code, names, constants8);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants8) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants9))
+          if (n.optimizeNames(names, constants8))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants8) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
-        if (!(super.optimizeNames(names, constants9) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        if (!(super.optimizeNames(names, constants8) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants9);
+        this.condition = optimizeExpr(this.condition, names, constants8);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants9) {
-        if (!super.optimizeNames(names, constants9))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants9);
+        this.iteration = optimizeExpr(this.iteration, names, constants8);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants9) {
-        if (!super.optimizeNames(names, constants9))
+      optimizeNames(names, constants8) {
+        if (!super.optimizeNames(names, constants8))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants9);
+        this.iterable = optimizeExpr(this.iterable, names, constants8);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants8) {
         var _a, _b;
-        super.optimizeNames(names, constants9);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants9);
+        super.optimizeNames(names, constants8);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants8);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants8);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants9) {
+    function optimizeExpr(expr, names, constants8) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants9[n.str];
+        const c = constants8[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants9[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants8[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve9.call(this, root, ref);
+      let _sch = resolve8.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve9(root, ref) {
+    function resolve8(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve9(baseURI, relativeURI, options) {
+    function resolve8(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve9,
+      resolve: resolve8,
       resolveComponent,
       equal,
       serialize,
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants9 = {
+    var constants8 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants9) {
-      v = { value: constants9[c] };
+    for (c in constants8) {
+      v = { value: constants8[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join30(output, replacement);
+        return join29(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join30(output, rule.append(self.options));
+          output = join29(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join30(output, replacement) {
+    function join29(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
+        await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve9, reject) => {
+    return new Promise((resolve8, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve9(parseResult.data);
+            resolve8(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve9, reject) => {
+    return new Promise((resolve8, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve9, interval);
+      const timeoutId = setTimeout(resolve8, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
+      await new Promise((resolve8) => setTimeout(resolve8, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve9) => {
+    return new Promise((resolve8) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve9();
+        resolve8();
       } else {
-        this._stdout.once("drain", resolve9);
+        this._stdout.once("drain", resolve8);
       }
     });
   }
@@ -38983,6 +38983,7 @@ var StdioServerTransport = class {
 
 // src/utils/applescript.ts
 import { execFileSync } from "child_process";
+import { constants as bufferConstants } from "node:buffer";
 
 // src/utils/docsUrls.ts
 var FULL_DISK_ACCESS_GUIDE_URL = "https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md";
@@ -39019,6 +39020,21 @@ function envPositiveNumber(name) {
 }
 function getMaxBuffer() {
   return envPositiveNumber("APPLE_NOTES_MCP_MAX_BUFFER") ?? DEFAULT_MAX_BUFFER_BYTES;
+}
+var MAX_OUTPUT_BYTES = bufferConstants.MAX_STRING_LENGTH;
+var NOTE_BODY_MAX_BUFFER_BYTES = Math.min(512 * 1024 * 1024, MAX_OUTPUT_BYTES);
+function noteBodyMaxBuffer() {
+  return Math.min(Math.max(getMaxBuffer(), NOTE_BODY_MAX_BUFFER_BYTES), MAX_OUTPUT_BYTES);
+}
+function isOutputOverflowError(error2) {
+  const code = error2 instanceof Error ? error2.code : void 0;
+  return code === "ENOBUFS" || code === "ERR_STRING_TOO_LONG";
+}
+function outputOverflowMessage(maxBufferBytes) {
+  const mib = 1024 * 1024;
+  const limit = maxBufferBytes >= mib ? `${Math.round(maxBufferBytes / mib)} MB` : `${maxBufferBytes} bytes`;
+  const remedy = maxBufferBytes >= MAX_OUTPUT_BYTES ? "That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app." : "Raise APPLE_NOTES_MCP_MAX_BUFFER (in bytes) to allow more.";
+  return `Notes.app returned more than ${limit} of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. ${remedy}`;
 }
 var SCRIPT_TIMEOUT_HEADROOM_MS = 5e3;
 var MIN_ATTEMPT_BUDGET_MS = 1e3;
@@ -39165,6 +39181,7 @@ function executeAppleScript(script, options = {}) {
   const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
+  const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
   if (!script || !script.trim()) {
     return {
       success: false,
@@ -39195,7 +39212,7 @@ function executeAppleScript(script, options = {}) {
         killSignal: "SIGKILL",
         // Raise the output cap above Node's 1 MB default so large exports /
         // long notes aren't truncated into an ENOBUFS failure. (#16)
-        maxBuffer: getMaxBuffer()
+        maxBuffer: maxBufferBytes
       });
       const duration3 = Date.now() - attemptStart;
       debugLog("AppleScript succeeded", {
@@ -39213,7 +39230,9 @@ function executeAppleScript(script, options = {}) {
       let errorMessage;
       let isTimeout = false;
       let rawError;
-      if (isTimeoutError(error2)) {
+      if (isOutputOverflowError(error2)) {
+        errorMessage = outputOverflowMessage(maxBufferBytes);
+      } else if (isTimeoutError(error2)) {
         isTimeout = true;
         const timeoutSecs = Math.round(timeoutMs / 1e3);
         errorMessage = `Operation timed out after ${timeoutSecs} seconds. Notes.app may be unresponsive or the operation involves too many notes.`;
@@ -39567,6 +39586,77 @@ function getChecklistItems(noteId3) {
     };
   }
   return { items };
+}
+
+// src/utils/errorCodes.ts
+var CodedError = class extends Error {
+  envelope;
+  constructor(message, envelope) {
+    super(message);
+    this.name = "CodedError";
+    this.envelope = envelope;
+  }
+};
+var RULES = [
+  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  {
+    code: "verification_failed",
+    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
+  },
+  {
+    code: "revision_conflict",
+    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
+  },
+  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
+  {
+    code: "shortcut_not_installed",
+    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
+  },
+  {
+    code: "not_found",
+    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
+  },
+  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
+  {
+    code: "notes_unavailable",
+    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
+  },
+  {
+    code: "unsupported",
+    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
+  },
+  {
+    code: "validation_error",
+    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
+  }
+];
+var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
+var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
+function classifyError(message, cause) {
+  if (cause instanceof CodedError) return { ...cause.envelope };
+  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message;
+  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
+  let code = "operation_failed";
+  if (timeoutCause) code = "timeout_indeterminate";
+  else if (isPermissionDenied(text2)) code = "permission_denied";
+  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
+  const envelope = { code };
+  if (code === "timeout_indeterminate" || code === "verification_failed") {
+    envelope.indeterminate = true;
+    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
+  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
+    envelope.committed = false;
+    envelope.indeterminate = false;
+  }
+  return envelope;
+}
+function errorResult(message, cause) {
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: classifyError(message, cause),
+    isError: true
+  };
 }
 
 // src/utils/inlineImages.ts
@@ -42130,8 +42220,8 @@ function scopeConflictMessage(reason) {
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync5 } from "fs";
-import { homedir as homedir8 } from "os";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync } from "fs";
+import { homedir as homedir8, tmpdir as tmpdir2 } from "os";
 import { join as join9 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
@@ -42339,6 +42429,24 @@ function buildFolderReference(folderPath) {
 }
 var AS_ACCOUNT_REF = "__acctRef";
 var LIVE_FOLDER_NOT_FOUND = "Folder not found";
+var SMART_FOLDER_DESTINATION = "SMART_FOLDER_DESTINATION";
+function readSmartFolderIds(read = readSmartFolders) {
+  return (read().folders ?? []).map((folder) => folder.id).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+}
+function smartFolderDestinationError(folderPath) {
+  return new CodedError(
+    `Refused: "${folderPath}" is a smart folder. Smart folders only gather notes by their rules and cannot hold notes or folders; choose an ordinary folder (list-folders). Nothing was changed`,
+    {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false,
+      reason: "smart_folder_destination"
+    }
+  );
+}
+function throwIfSmartFolderDestination(error2, folderPath) {
+  if (error2?.includes(SMART_FOLDER_DESTINATION)) throw smartFolderDestinationError(folderPath);
+}
 function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) throw new Error("Invalid AppleScript variable");
   buildFolderReference(folderPath);
@@ -42347,10 +42455,26 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
   const cid = `${varName}_cid`;
   const any = `${varName}_any`;
   const parent = `${varName}_p`;
-  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${escapePlainStringForAppleScript(folderPath)}" number -1728`;
-  const lines = [];
+  const quotedPath = escapePlainStringForAppleScript(folderPath);
+  const notFound = `error "${LIVE_FOLDER_NOT_FOUND}: ${quotedPath}" number -1728`;
+  const excluded = (opts.excludeFolderIds ?? []).filter((id2) => FOLDER_ID_PATTERN.test(id2));
+  const skipIds = `${varName}_sx`;
+  const skipped = `${varName}_sh`;
+  const candidateTest = excluded.length ? [
+    `    if ${skipIds} contains ${cid} then`,
+    `      set ${skipped} to true`,
+    `    else if exists folder id ${cid} then`
+  ] : [`    if exists folder id ${cid} then`];
+  const unresolved = excluded.length ? [
+    `if ${varName} is missing value then`,
+    `  if ${skipped} then error "${SMART_FOLDER_DESTINATION}: ${quotedPath}" number -1728`,
+    `  ${notFound}`,
+    `end if`
+  ] : [`if ${varName} is missing value then ${notFound}`];
+  const lines = excluded.length ? [`set ${skipIds} to {${excluded.map((id2) => `"${id2}"`).join(", ")}}`] : [];
   parts.forEach((part, i) => {
     const name = escapePlainStringForAppleScript(part);
+    if (excluded.length) lines.push(`set ${skipped} to false`);
     if (i === 0) {
       lines.push(
         `set ${varName} to missing value`,
@@ -42358,7 +42482,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${AS_ACCOUNT_REF} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      if class of (container of ${c}) is not folder then`,
         `        set ${varName} to folder id ${cid}`,
         `        exit repeat`,
@@ -42378,7 +42502,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `repeat with ${c} in (folders of ${parent} whose name is "${name}")`,
         `  try`,
         `    set ${cid} to id of ${c}`,
-        `    if exists folder id ${cid} then`,
+        ...candidateTest,
         `      set ${varName} to folder id ${cid}`,
         `      exit repeat`,
         `    end if`,
@@ -42386,7 +42510,7 @@ function buildLiveFolderResolution(folderPath, varName, opts = {}) {
         `end repeat`
       );
     }
-    lines.push(`if ${varName} is missing value then ${notFound}`);
+    lines.push(...unresolved);
   });
   return lines.join("\n");
 }
@@ -42442,6 +42566,34 @@ function buildAppLevelScript(command) {
     end tell
   `;
 }
+var INLINE_EXPECTED_BODY_LIMIT = MAX_CONTENT_LENGTH;
+var ExpectedBodies = class {
+  directory;
+  files = 0;
+  /**
+   * Returns AppleScript `setup` to run before the comparison (empty for a
+   * literal) and the `operand` to compare the note's body against.
+   * `variable` names the AppleScript variable a file-backed body is read into.
+   */
+  bind(body, variable) {
+    if (body.length <= INLINE_EXPECTED_BODY_LIMIT) {
+      return { setup: "", operand: `"${escapeHtmlForAppleScript(body)}"` };
+    }
+    this.directory ??= mkdtempSync2(join9(tmpdir2(), "apple-notes-expected-body-"));
+    const file = join9(this.directory, `body-${this.files++}.html`);
+    writeFileSync(file, body, { encoding: "utf8", mode: 384 });
+    return {
+      setup: `
+      tell current application to set ${variable} to read (POSIX file "${escapePlainStringForAppleScript(file)}") as \xABclass utf8\xBB`,
+      operand: variable
+    };
+  }
+  /** Removes any temporary files. Safe to call more than once. */
+  cleanup() {
+    if (this.directory) rmSync2(this.directory, { recursive: true, force: true });
+    this.directory = void 0;
+  }
+};
 function folderDeleteFactsScript(id2) {
   if (!FOLDER_ID_PATTERN.test(id2)) throw new Error("An exact folder ID is required");
   return `
@@ -42619,7 +42771,9 @@ var AppleNotesManager = class {
     const safeBody = escapeHtmlForAppleScript(`<h1>${htmlTitle}</h1>${bodyContent}`);
     let createCommand;
     if (folder) {
-      createCommand = `${buildLiveFolderResolution(folder, "__folder")}
+      createCommand = `${buildLiveFolderResolution(folder, "__folder", {
+        excludeFolderIds: this.smartFolderIds()
+      })}
       make new note at __folder with properties {body:"${safeBody}"}`;
     } else {
       createCommand = `
@@ -42631,6 +42785,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      if (folder) throwIfSmartFolderDestination(result.error, folder);
       console.error(`Failed to create note "${title}":`, result.error);
       return null;
     }
@@ -42803,7 +42958,7 @@ var AppleNotesManager = class {
     const safeTitle = escapePlainStringForAppleScript(title);
     const getCommand = `get body of note "${safeTitle}"`;
     const script = buildAccountScopedScript({ account: targetAccount }, getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
       console.error(`Failed to get content of note "${title}":`, result.error);
@@ -42840,7 +42995,7 @@ var AppleNotesManager = class {
     const safeId = sanitizeId(id2);
     const getCommand = `get body of note id "${safeId}"`;
     const script = buildAppLevelScript(getCommand);
-    const result = executeAppleScript(script);
+    const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       console.error(`Failed to get content of note with ID "${id2}":`, result.error);
       return { body: "", error: result.error };
@@ -43063,25 +43218,25 @@ var AppleNotesManager = class {
    */
   deleteNoteByIdIfUnchanged(id2, expectedBody, scope2, guards = []) {
     const safeId = sanitizeNoteId(id2);
-    validateLength(expectedBody, MAX_CONTENT_LENGTH, "Expected note content");
-    const safeExpectedBody = escapeHtmlForAppleScript(expectedBody);
     const trashIds = trashFolderIdList();
-    const guardChecks = guards.map((guard, index) => {
-      const safeGuardId = sanitizeNoteId(guard.id);
-      const ref = `__guardRef${index}`;
-      const folderVar = `__guardFolder${index}`;
-      const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
-      let bodyCheck = "";
-      if (guard.expectedBody !== void 0) {
-        validateLength(guard.expectedBody, MAX_CONTENT_LENGTH, "Expected guard note content");
-        const safeGuardBody = escapeHtmlForAppleScript(guard.expectedBody);
-        bodyCheck = `
+    const bodies = new ExpectedBodies();
+    let result;
+    try {
+      const guardChecks = guards.map((guard, index) => {
+        const safeGuardId = sanitizeNoteId(guard.id);
+        const ref = `__guardRef${index}`;
+        const folderVar = `__guardFolder${index}`;
+        const inactive = (reason) => `return "SAFETY_GUARD_INACTIVE:${index}:${reason}"`;
+        let bodyCheck = "";
+        if (guard.expectedBody !== void 0) {
+          const expected2 = bodies.bind(guard.expectedBody, `__expectedGuardBody${index}`);
+          bodyCheck = `${expected2.setup}
       set __guardBody to body of ${ref}
       considering case
-        if __guardBody is not "${safeGuardBody}" and __guardBody is not "${safeGuardBody}" & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
+        if __guardBody is not ${expected2.operand} and __guardBody is not ${expected2.operand} & linefeed then return "SAFETY_GUARD_CONFLICT:${index}"
       end considering`;
-      }
-      return `
+        }
+        return `
       if not (exists note id "${safeGuardId}") then ${inactive("missing")}
       set ${ref} to note id "${safeGuardId}"
       if password protected of ${ref} then ${inactive("locked")}
@@ -43091,18 +43246,19 @@ var AppleNotesManager = class {
       end try
       if ${folderVar} is missing value then ${inactive("folder unknown")}${inRecentlyDeletedScript(folderVar, "__guardInTrash", trashIds)}
       if __guardInTrash then ${inactive("in Recently Deleted")}${bodyCheck}`;
-    }).join("");
-    const script = buildAppLevelScript(`
+      }).join("");
+      const expected = bodies.bind(expectedBody, "__expectedBody");
+      const script = buildAppLevelScript(`
       set noteRef to note id "${safeId}"${buildScopeGuardScript("noteRef", scope2)}
       set originalFolder to missing value
       try
         set originalFolder to container of noteRef
       end try
       if originalFolder is missing value then return "SAFETY_CONTAINER_UNKNOWN"${inRecentlyDeletedScript("originalFolder", "__inTrash", trashIds)}
-      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}
+      if __inTrash then return "SAFETY_IN_RECENTLY_DELETED"${guardChecks}${expected.setup}
       set currentBody to body of noteRef
       considering case
-        if currentBody is not "${safeExpectedBody}" and currentBody is not "${safeExpectedBody}" & linefeed then return "SAFETY_CONFLICT"
+        if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
       try
@@ -43110,7 +43266,10 @@ var AppleNotesManager = class {
       end try
       return "SAFETY_DELETED"
     `);
-    const result = executeMutationAppleScript(script);
+      result = executeMutationAppleScript(script);
+    } finally {
+      bodies.cleanup();
+    }
     if (!result.success) {
       console.error(`Failed guarded delete for note ID "${id2}":`, result.error);
       return { status: "failed" };
@@ -43230,6 +43389,35 @@ var AppleNotesManager = class {
         set AppleScript's text item delimiters to ${AS_RECORD_SEP}
         return (resultList as text)${trashSuffix}
       `;
+  }
+  /**
+   * Smart folder ids that a destination folder must never resolve to. Read
+   * fresh on every write (a smart folder can be added at any time); empty
+   * without Full Disk Access. See {@link readSmartFolderIds}.
+   */
+  smartFolderIds() {
+    return readSmartFolderIds();
+  }
+  /**
+   * Read-only preflight: throws the smart-folder refusal when `folderPath`
+   * resolves in `account` only to a smart folder. For write paths that create
+   * something before they reach their own destination check (the Markdown
+   * bridge creates first and moves second). Other failures are left to the
+   * write itself, which reports them as before.
+   *
+   * @param folderPath - Destination folder path (list-folders syntax)
+   * @param account - Account to resolve in (defaults to Notes' default)
+   */
+  assertNotSmartFolderDestination(folderPath, account) {
+    const excludeFolderIds = this.smartFolderIds();
+    if (excludeFolderIds.length === 0) return;
+    const script = buildAccountScopedScript(
+      { account: this.resolveAccount(account) },
+      `${buildLiveFolderResolution(folderPath, "__folder", { excludeFolderIds })}
+      return id of __folder`
+    );
+    const result = executeAppleScript(script);
+    if (!result.success) throwIfSmartFolderDestination(result.error, folderPath);
   }
   /**
    * Lists every smart folder with its decoded query, read-only.
@@ -43772,37 +43960,40 @@ var AppleNotesManager = class {
       console.error(`Invalid folder name: "${name}"`);
       return null;
     }
+    const smart = { rootOnly: true, excludeFolderIds: this.smartFolderIds() };
     for (let i = 0; i < parts.length; i++) {
       const currentPath = parts.slice(0, i + 1).map((p) => escapeFolderName(p)).join("/");
       const checkScript = buildAccountScopedScript(
         { account: targetAccount },
-        `${buildLiveFolderResolution(currentPath, "__folder", { rootOnly: true })}
+        `${buildLiveFolderResolution(currentPath, "__folder", smart)}
         return id of __folder`
       );
       const checkResult = executeAppleScript(checkScript);
       if (checkResult.success) {
         continue;
       }
+      throwIfSmartFolderDestination(checkResult.error, currentPath);
       const segmentName = escapePlainStringForAppleScript(parts[i]);
       let createCommand;
       if (i === 0) {
         createCommand = `make new folder with properties {name:"${segmentName}"}`;
       } else {
         const parentPath = parts.slice(0, i).map((p) => escapeFolderName(p)).join("/");
-        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", { rootOnly: true })}
+        createCommand = `${buildLiveFolderResolution(parentPath, "__parent", smart)}
         make new folder at __parent with properties {name:"${segmentName}"}`;
       }
       const script = buildAccountScopedScript({ account: targetAccount }, createCommand);
       const result = executeMutationAppleScript(script);
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
+        throwIfSmartFolderDestination(result.error, name);
         console.error(`Failed to create folder "${name}":`, result.error);
         return null;
       }
     }
     const idScript = buildAccountScopedScript(
       { account: targetAccount },
-      `${buildLiveFolderResolution(name, "__folder", { rootOnly: true })}
+      `${buildLiveFolderResolution(name, "__folder", smart)}
       return (id of __folder) & ${AS_FIELD_SEP} & (name of it)`
     );
     const idResult = executeAppleScript(idScript);
@@ -43861,7 +44052,9 @@ var AppleNotesManager = class {
   moveNoteById(id2, destinationFolder, account, scope2) {
     const targetAccount = this.resolveAccount(account);
     const safeId = sanitizeNoteId(id2);
-    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(destinationFolder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const moveCommand = `
       ${buildAccountResolution(targetAccount)}
       ${destFolderSetup}
@@ -43876,6 +44069,7 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
+      throwIfSmartFolderDestination(result.error, destinationFolder);
       console.error(
         `Cannot move note to "${destinationFolder}" (folder may not exist):`,
         result.error
@@ -44770,7 +44964,9 @@ var AppleNotesManager = class {
   batchMoveNotes(ids, folder, account) {
     if (ids.length === 0) return [];
     const targetAccount = this.resolveAccount(account);
-    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder");
+    const destFolderSetup = buildLiveFolderResolution(folder, "destFolder", {
+      excludeFolderIds: this.smartFolderIds()
+    });
     const results = new Array(ids.length);
     const runnable = [];
     ids.forEach((id2, i) => {
@@ -44826,6 +45022,7 @@ var AppleNotesManager = class {
       const res = executeMutationAppleScript(script);
       if (!res.success) {
         throwIfAccountResolutionFailed(res.error);
+        throwIfSmartFolderDestination(res.error, folder);
         for (const r of runnable) {
           results[r.index] = this.createBatchResult(
             ids[r.index],
@@ -46736,13 +46933,6 @@ function describeSearchScope(searchContent, resultCount) {
   return "\n\n\u2139\uFE0F Only note titles were searched, so a term that appears in note bodies would not match. Retry with `searchContent: true` to search bodies instead.";
 }
 
-// src/utils/noteQueryStore.ts
-import { execFileSync as execFileSync14 } from "child_process";
-import * as fs8 from "fs";
-import * as os8 from "os";
-import * as path8 from "path";
-import { gunzipSync as gunzipSync8 } from "zlib";
-
 // src/utils/noteQuery.ts
 var QUERY_LIMITS = {
   /** Maximum number of tokens (terms, operators, parentheses). */
@@ -47174,21 +47364,50 @@ function evaluateNoteQuery(node, note) {
     }
   }
 }
-function positiveTextTerms(node, negated = false) {
+function positiveTextPredicates(node, negated = false) {
   switch (node.type) {
     case "and":
     case "or":
-      return node.children.flatMap((child2) => positiveTextTerms(child2, negated));
+      return node.children.flatMap((child2) => positiveTextPredicates(child2, negated));
     case "not":
-      return positiveTextTerms(node.child, !negated);
+      return positiveTextPredicates(node.child, !negated);
     case "text":
-      return negated ? [] : [node.value];
+      return negated ? [] : [{ field: node.field, value: node.value }];
     default:
       return [];
   }
 }
+function positiveTextTerms(node, negated = false) {
+  return positiveTextPredicates(node, negated).map((predicate) => predicate.value);
+}
+function matchLocations(predicates, title, text2) {
+  if (predicates.length === 0) return void 0;
+  if (text2 === null && predicates.some((p) => p.field !== "title")) return void 0;
+  const firstBreak = text2 === null ? -1 : text2.indexOf("\n");
+  const titleLower = normalizeForMatch(title);
+  const firstLineLower = text2 === null ? "" : normalizeForMatch(firstBreak === -1 ? text2 : text2.slice(0, firstBreak));
+  const bodyLower = text2 === null || firstBreak === -1 ? "" : normalizeForMatch(text2.slice(firstBreak + 1));
+  let inTitle = false;
+  let inBody = false;
+  for (const predicate of predicates) {
+    const needle = normalizeForMatch(predicate.value);
+    if (predicate.field !== "body" && !inTitle) {
+      inTitle = titleLower.includes(needle) || firstLineLower.includes(needle);
+    }
+    if (predicate.field !== "title" && !inBody) inBody = bodyLower.includes(needle);
+  }
+  const locations = [];
+  if (inTitle) locations.push("title");
+  if (inBody) locations.push("body");
+  return locations;
+}
 
 // src/utils/noteQueryStore.ts
+import { execFileSync as execFileSync14 } from "child_process";
+import * as fs8 from "fs";
+import * as os8 from "os";
+import * as path8 from "path";
+import { gunzipSync as gunzipSync8 } from "zlib";
 var NOTES_DB_PATH10 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
@@ -47270,6 +47489,15 @@ function decodeNoteBody(data) {
     objectIds
   };
 }
+function decodeBodyHex(hex3) {
+  try {
+    return decodeNoteBody(
+      new Uint8Array(gunzipSync8(Buffer.from(hex3, "hex"), { maxOutputLength: 32 * 1024 * 1024 }))
+    );
+  } catch {
+    return null;
+  }
+}
 function countWords(text2) {
   let count = 0;
   for (const word of text2.replace(/\ufffc/gu, " ").split(/\s+/u)) {
@@ -47340,17 +47568,78 @@ function presentColumns2(dbPath2) {
   }
   return cols;
 }
+function readStore(dbPath2, build) {
+  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  try {
+    return runSqlite6(dbPath2, build(presentColumns2(dbPath2)));
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) throw error2;
+    const message = error2 instanceof Error ? error2.message : String(error2);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+}
+var NOTE_TEXT_BATCH_MAX = QUERY_RESULTS.MAX;
+function buildNoteTextsSql(available, pks) {
+  const missing = ["Z_PK", "Z_ENT"].filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns search enrichment needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const keys = [...new Set(pks)];
+  if (keys.length > NOTE_TEXT_BATCH_MAX) {
+    throw new NoteQueryStoreError(
+      `At most ${NOTE_TEXT_BATCH_MAX} notes can be read at once.`,
+      "query_error"
+    );
+  }
+  for (const pk of keys) {
+    if (!Number.isSafeInteger(pk) || pk < 1) {
+      throw new NoteQueryStoreError(`Invalid note key ${String(pk)}`, "query_error");
+    }
+  }
+  const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'locked', ${locked}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity2("ICNote")} AND n.Z_PK IN (${keys.length ? keys.join(", ") : "NULL"});`,
+    "COMMIT;"
+  ].join(" ");
+}
+function readNoteTexts(pks, options = {}) {
+  const output = readStore(
+    options.dbPath ?? NOTES_DB_PATH10,
+    (available) => buildNoteTextsSql(available, pks)
+  );
+  let uuid2;
+  const texts = /* @__PURE__ */ new Map();
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line);
+    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    else if (row.k === "note" && typeof row.pk === "number") {
+      const body = row.locked || !row.data ? null : decodeBodyHex(row.data);
+      texts.set(row.pk, body ? body.text : null);
+    }
+  }
+  return { uuid: uuid2, texts };
+}
 var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve9 = (pk, seen) => {
+  const resolve8 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve9(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve8(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47364,7 +47653,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve9(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve8(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -47396,23 +47685,10 @@ function runNoteQuery(ast, options = {}) {
   const withBodies = needsContent(ast);
   const withTags = needsTags(ast);
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH10;
-  if (!fs8.existsSync(dbPath2)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-  let output;
-  try {
-    const available = presentColumns2(dbPath2);
-    output = runSqlite6(
-      dbPath2,
-      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
-    );
-  } catch (error2) {
-    if (error2 instanceof NoteQueryStoreError) throw error2;
-    const message = error2 instanceof Error ? error2.message : String(error2);
-    if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-    }
-    console.error(`query-notes: database read failed: ${message}`);
-    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
-  }
+  const output = readStore(
+    dbPath2,
+    (available) => buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+  );
   let uuid2;
   let eligible = 0;
   const folderRows = [];
@@ -47436,6 +47712,8 @@ function runNoteQuery(ast, options = {}) {
   }
   const folders = resolveFolders(folderRows);
   const textTerms = positiveTextTerms(ast);
+  const textPredicates = positiveTextPredicates(ast);
+  const pendingWordCounts = [];
   const hits = [];
   let matched = 0;
   let unreadable = 0;
@@ -47453,15 +47731,7 @@ function runNoteQuery(ast, options = {}) {
         if (withBodies) unreadable++;
         return decoded;
       }
-      try {
-        decoded = decodeNoteBody(
-          new Uint8Array(
-            gunzipSync8(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
-          )
-        );
-      } catch {
-        decoded = null;
-      }
+      decoded = decodeBodyHex(row.data);
       if (!decoded) unreadable++;
       return decoded;
     };
@@ -47502,6 +47772,8 @@ function runNoteQuery(ast, options = {}) {
     matched++;
     if (hits.length >= limit) continue;
     const body = locked ? null : decode2();
+    const matchedIn = matchLocations(textPredicates, row.title ?? "", body ? body.text : null);
+    if (options.includeWordCount && !withBodies) pendingWordCounts.push(row.pk);
     hits.push({
       id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
       title: row.title ?? "",
@@ -47510,7 +47782,16 @@ function runNoteQuery(ast, options = {}) {
       ...note.modified !== void 0 ? { modified: new Date(note.modified).toISOString() } : {},
       ...note.created !== void 0 ? { created: new Date(note.created).toISOString() } : {},
       snippet: locked ? "" : body ? buildSnippet(body.text, textTerms) : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
-      ...locked ? { locked: true } : {}
+      ...locked ? { locked: true } : {},
+      ...matchedIn ? { matchedIn } : {},
+      ...options.includeWordCount && withBodies ? { wordCount: body ? countWords(body.text) : null } : {}
+    });
+  }
+  if (pendingWordCounts.length) {
+    const { texts } = readNoteTexts(pendingWordCounts, { dbPath: dbPath2 });
+    pendingWordCounts.forEach((pk, index) => {
+      const text2 = texts.get(pk);
+      hits[index].wordCount = typeof text2 === "string" ? countWords(text2) : null;
     });
   }
   return {
@@ -47553,6 +47834,7 @@ function searchContentViaDatabase(options) {
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
     scanLimit: QUERY_SCAN.MAX,
+    includeWordCount: options.includeWordCount,
     dbPath: options.dbPath
   });
   const notes = result.notes.map((hit) => ({
@@ -47563,7 +47845,9 @@ function searchContentViaDatabase(options) {
     created: hit.created ? new Date(hit.created) : /* @__PURE__ */ new Date(0),
     modified: hit.modified ? new Date(hit.modified) : /* @__PURE__ */ new Date(0),
     ...hit.folder !== void 0 ? { folder: hit.folder } : {},
-    ...hit.account !== void 0 ? { account: hit.account } : {}
+    ...hit.account !== void 0 ? { account: hit.account } : {},
+    ...hit.matchedIn ? { matchedIn: hit.matchedIn } : {},
+    ...hit.wordCount !== void 0 ? { wordCount: hit.wordCount } : {}
   }));
   return {
     notes,
@@ -47586,14 +47870,63 @@ function contentSearchFailureHint(message, dbUnavailable) {
   const remedy = dbUnavailable === "no_fda" ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second." : "";
   return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
 }
+var NOTE_ID = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/;
+function addWordCountsFromDatabase(notes, query2, options = {}) {
+  const keys = /* @__PURE__ */ new Map();
+  for (const note of notes) {
+    const match = NOTE_ID.exec(note.id ?? "");
+    if (match) keys.set(note, { store: match[1].toUpperCase(), pk: Number(match[2]) });
+  }
+  const pks = [...new Set([...keys.values()].map((key) => key.pk))];
+  let store;
+  const texts = /* @__PURE__ */ new Map();
+  try {
+    for (let start = 0; start < pks.length; start += NOTE_TEXT_BATCH_MAX) {
+      const read = readNoteTexts(pks.slice(start, start + NOTE_TEXT_BATCH_MAX), options);
+      store = read.uuid?.toUpperCase();
+      for (const [pk, text2] of read.texts) texts.set(pk, text2);
+    }
+  } catch (error2) {
+    if (error2 instanceof NoteQueryStoreError) return { notes, unavailable: error2.kind };
+    throw error2;
+  }
+  const predicates = [{ field: "any", value: query2 }];
+  return {
+    notes: notes.map((note) => {
+      const key = keys.get(note);
+      const text2 = key && key.store === store ? texts.get(key.pk) : void 0;
+      if (typeof text2 !== "string") return { ...note, wordCount: null };
+      const matchedIn = matchLocations(predicates, note.title, text2);
+      return {
+        ...note,
+        ...matchedIn?.length ? { matchedIn } : {},
+        wordCount: countWords(text2)
+      };
+    })
+  };
+}
+function describeMatchDetails(hit) {
+  const parts = [];
+  if (hit.matchedIn) {
+    parts.push(
+      hit.matchedIn.length ? `matched in ${hit.matchedIn.join(", ")}` : "no text match (metadata)"
+    );
+  }
+  if (hit.wordCount !== void 0) {
+    parts.push(
+      hit.wordCount === null ? "word count unavailable" : `${hit.wordCount} word${hit.wordCount === 1 ? "" : "s"}`
+    );
+  }
+  return parts.map((part) => ` \xB7 ${part}`).join("");
+}
 
 // src/tools/doctor.ts
 import { spawnSync } from "child_process";
 
 // src/services/nativeTags.ts
 import { execFileSync as execFileSync15 } from "node:child_process";
-import { mkdtempSync as mkdtempSync2, writeFileSync, rmSync as rmSync2 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
+import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
+import { tmpdir as tmpdir3 } from "node:os";
 import { join as join16 } from "node:path";
 
 // src/services/shortcutConsent.ts
@@ -47696,10 +48029,10 @@ function runNativeTagsShortcut(input) {
   const status = nativeTagsStatus();
   if (!status.installed)
     throw new Error(`Import the supplied ${status.shortcut}.shortcut in Shortcuts first`);
-  const directory = mkdtempSync2(join16(tmpdir2(), "apple-notes-native-tags-"));
+  const directory = mkdtempSync3(join16(tmpdir3(), "apple-notes-native-tags-"));
   try {
     const path10 = join16(directory, "request.json");
-    writeFileSync(path10, JSON.stringify(input), { mode: 384 });
+    writeFileSync2(path10, JSON.stringify(input), { mode: 384 });
     execFileSync15("/usr/bin/shortcuts", ["run", status.identifier, "--input-path", path10], {
       encoding: "utf8",
       timeout: 6e4,
@@ -47714,14 +48047,14 @@ function runNativeTagsShortcut(input) {
       { shortcut: status.shortcut, code: error2?.code }
     );
   } finally {
-    rmSync2(directory, { recursive: true, force: true });
+    rmSync3(directory, { recursive: true, force: true });
   }
 }
 
 // src/services/backgroundNotes.ts
 import { execFileSync as execFileSync16 } from "node:child_process";
-import { mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync2, rmSync as rmSync3 } from "node:fs";
-import { tmpdir as tmpdir3 } from "node:os";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync3, rmSync as rmSync4 } from "node:fs";
+import { tmpdir as tmpdir4 } from "node:os";
 import { join as join17 } from "node:path";
 
 // src/utils/appendMarkdown.ts
@@ -48047,10 +48380,10 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
     throw new Error(
       `Install the supplied "${status.shortcut}" Shortcut once; Shortcuts must list it exactly once`
     );
-  const directory = mkdtempSync3(join17(tmpdir3(), "apple-notes-background-"));
+  const directory = mkdtempSync4(join17(tmpdir4(), "apple-notes-background-"));
   try {
     const file = join17(directory, "request.json");
-    writeFileSync2(
+    writeFileSync3(
       file,
       JSON.stringify({
         operation: "",
@@ -48079,7 +48412,7 @@ function runBackgroundShortcut(input, status = backgroundStatus()) {
       throw Object.assign(error2, { shortcut: status.shortcut });
     }
   } finally {
-    rmSync3(directory, { recursive: true, force: true });
+    rmSync4(directory, { recursive: true, force: true });
   }
 }
 function backgroundDependencies(manager) {
@@ -48307,12 +48640,15 @@ function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
   const segments = (path10) => JSON.stringify(splitFolderPath(path10).map((part) => part.toLocaleLowerCase()));
   if (request.folder) {
     const wanted = segments(request.folder);
-    if (!manager.listAccounts().some(
-      (account) => account.defaultFolder && manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
+    const accounts = manager.listAccounts().filter((account) => account.defaultFolder);
+    if (!accounts.some(
+      (account) => manager.listFolders(account.name).some((folder) => segments(folder.name) === wanted)
     ))
       throw new Error(
         `Folder "${request.folder}" does not exist; create it with create-folder first. Nothing was created`
       );
+    for (const account of accounts)
+      manager.assertNotSmartFolderDestination(request.folder, account.name);
   }
   const defaultFolderNotes = () => new Map(
     manager.listAccounts().flatMap(
@@ -48524,19 +48860,6 @@ var FEATURES = [
     tools: [],
     minimumMacOSVersion: null,
     requirements: [{ kind: "native_write_helper" }]
-  },
-  {
-    name: "markdownTemplateLibrary",
-    description: "Validate, save, list, show and delete Markdown export templates (local JSON files; exporting with one still needs Full Disk Access)",
-    tools: [
-      "list-markdown-templates",
-      "show-markdown-template",
-      "validate-markdown-template",
-      "save-markdown-template",
-      "delete-markdown-template"
-    ],
-    minimumMacOSVersion: null,
-    requirements: []
   }
 ];
 function requirementLabel(requirement) {
@@ -48993,77 +49316,6 @@ function withJsonSchema2020_12(transport2) {
   return transport2;
 }
 
-// src/utils/errorCodes.ts
-var CodedError = class extends Error {
-  envelope;
-  constructor(message, envelope) {
-    super(message);
-    this.name = "CodedError";
-    this.envelope = envelope;
-  }
-};
-var RULES = [
-  { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
-  {
-    code: "verification_failed",
-    pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
-  },
-  {
-    code: "revision_conflict",
-    pattern: /changed after it was read|revision changed|(?:pinned|note) state changed|changed during (?:read|preflight)|changed; read (?:it|the note) again|rich text do not match/i
-  },
-  { code: "full_disk_access_missing", pattern: /Full Disk Access/i },
-  {
-    code: "shortcut_not_installed",
-    pattern: /(?:Install|Import) the supplied|no such shortcut|Run apple-notes-mcp setup/i
-  },
-  {
-    code: "not_found",
-    pattern: /not found|does not exist|\bNo \w+ found\b|does not contain any checklist items|Can[’']t get (?:note|folder|account|attachment)|Cannot find note|Scope is absent/i
-  },
-  { code: "ambiguous", pattern: /ambiguous|more than one|exactly once|Duplicate note IDs/i },
-  {
-    code: "notes_unavailable",
-    pattern: /Notes\.app is (?:not responding|busy)|Lost connection to Notes|isn't running/i
-  },
-  {
-    code: "unsupported",
-    pattern: /password-protected|Locked notes|unsupported|not supported|is blocked|blocked because|has not passed live|refuses to sign|No (?:supported )?background|only one where|Real Notes link unavailable/i
-  },
-  {
-    code: "validation_error",
-    pattern: /\bis required\b|required\b|\bInvalid\b|\bmust\b|\bProvide\b|No (?:note IDs|reviewed notes) provided|response limit|Refusing to write|cannot be resolved|at most \d|between \d+ and \d+|supports the (?:end|default)|Use a distinctive|Use create-table|too large|equal cell counts|Folder path is empty/i
-  }
-];
-var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replacement started|No content was (?:replaced|appended)|Nothing was created/i;
-var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
-function classifyError(message, cause) {
-  if (cause instanceof CodedError) return { ...cause.envelope };
-  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
-${cause.message}` : message;
-  const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
-  let code = "operation_failed";
-  if (timeoutCause) code = "timeout_indeterminate";
-  else if (isPermissionDenied(text2)) code = "permission_denied";
-  else code = RULES.find((rule) => rule.pattern.test(text2))?.code ?? "operation_failed";
-  const envelope = { code };
-  if (code === "timeout_indeterminate" || code === "verification_failed") {
-    envelope.indeterminate = true;
-    if (WRITE_ACCEPTED.test(text2)) envelope.committed = true;
-  } else if (code === "revision_conflict" || NOTHING_WRITTEN.test(text2)) {
-    envelope.committed = false;
-    envelope.indeterminate = false;
-  }
-  return envelope;
-}
-function errorResult(message, cause) {
-  return {
-    content: [{ type: "text", text: message }],
-    structuredContent: classifyError(message, cause),
-    isError: true
-  };
-}
-
 // src/utils/shutdown.ts
 var SHUTDOWN_DRAIN_TIMEOUT_MS = 2e3;
 function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS) {
@@ -49217,7 +49469,7 @@ function selectParagraph(paragraphs, selector) {
     );
   return matches[occurrence - 1];
 }
-var NOTE_ID = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
+var NOTE_ID2 = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
 function titleMatchSql(columns) {
   return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
 }
@@ -49228,7 +49480,7 @@ function checkNoteSelector(selector) {
   if (selector.folder !== void 0 && selector.title === void 0)
     throw new ParagraphLinkError("invalid-argument", "folder only narrows a title lookup");
   if (selector.id === void 0) return void 0;
-  const pk = NOTE_ID.exec(selector.id)?.[1];
+  const pk = NOTE_ID2.exec(selector.id)?.[1];
   if (!pk)
     throw new ParagraphLinkError(
       "invalid-argument",
@@ -49620,9 +49872,12 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText 
 
 // src/utils/bodyReadFailure.ts
 var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+var OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
 function classifyBodyReadError(error2) {
   if (!error2) return "other";
-  if (/ENOBUFS|maxBuffer/i.test(error2)) return "buffer";
+  if (OUTPUT_OVERFLOW.test(error2) || /ENOBUFS|maxBuffer|ERR_STRING_TOO_LONG/i.test(error2)) {
+    return "buffer";
+  }
   if (/timed out|timeout|-1712/i.test(error2)) return "timeout";
   return "other";
 }
@@ -49640,10 +49895,17 @@ function describeBodyReadFailure(title, error2, attachments) {
   const kind = classifyBodyReadError(error2);
   if (kind === "other") return base;
   const large = attachments ? largeAttachments(attachments) : [];
-  const cause = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join(
-    "; "
-  )}). Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
-  const remedy = kind === "buffer" ? "Raise APPLE_NOTES_MCP_MAX_BUFFER (bytes) and retry, or remove the attachment in Notes.app." : "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
+  const listed2 = large.map((a) => `${a.name}, ${formatBytes2(a.bytes)}`).join("; ");
+  const holds = large.length > 0 ? `The note holds ${large.length === 1 ? "a large attachment" : "large attachments"} (${listed2}). ` : "";
+  if (kind === "buffer") {
+    const cause2 = `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body bigger than this server can read in one call.`;
+    const remedy2 = "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
+    return `${base}
+
+${cause2} ${remedy2}`;
+  }
+  const cause = large.length > 0 ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
+  const remedy = "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
   return `${base}
 
 ${cause} ${remedy}`;
@@ -51391,16 +51653,16 @@ var NOTE_PLACEHOLDERS = [
   "exportStem"
 ];
 var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join30) => ({
+var wrap2 = (before, after = "", join29) => ({
   mode: "wrap",
   before,
   after,
-  ...join30 ? { join: join30 } : {}
+  ...join29 ? { join: join29 } : {}
 });
-var pattern = (value, join30) => ({
+var pattern = (value, join29) => ({
   mode: "pattern",
   value,
-  ...join30 ? { join: join30 } : {}
+  ...join29 ? { join: join29 } : {}
 });
 var STANDARD = {
   schemaVersion: 1,
@@ -52785,13 +53047,13 @@ import {
   closeSync as closeSync6,
   constants as constants6,
   fstatSync as fstatSync6,
-  mkdtempSync as mkdtempSync4,
+  mkdtempSync as mkdtempSync5,
   openSync as openSync6,
   readFileSync as readFileSync3,
-  rmSync as rmSync4,
-  writeFileSync as writeFileSync3
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
 } from "node:fs";
-import { tmpdir as tmpdir4 } from "node:os";
+import { tmpdir as tmpdir5 } from "node:os";
 import { basename as basename5, extname as extname6, isAbsolute as isAbsolute4, join as join23 } from "node:path";
 var noteId = exactIdInput(
   "ICNote",
@@ -52915,7 +53177,9 @@ function registerDirectOperations(server2, manager) {
     {
       title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
       content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
-      folder: external_exports.string().max(1e3).optional().describe("Existing folder or nested path; create it first with create-folder"),
+      folder: external_exports.string().max(1e3).optional().describe(
+        "Existing folder or nested path; create it first with create-folder. A smart folder is refused before the note is created"
+      ),
       account: external_exports.string().max(200).optional().describe("Account name; defaults to Notes' default"),
       ...attachmentInput
     },
@@ -53032,10 +53296,10 @@ function attachFile(manager, args) {
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
   const beforeStored = storedAttachmentIds(manager, id2);
-  const directory = mkdtempSync4(join23(tmpdir4(), "notes-attachment-add-"));
+  const directory = mkdtempSync5(join23(tmpdir5(), "notes-attachment-add-"));
   const temporaryFile = join23(directory, name);
   try {
-    writeFileSync3(temporaryFile, bytes, { mode: 384 });
+    writeFileSync4(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
@@ -53095,7 +53359,7 @@ function attachFile(manager, args) {
       } : {}
     };
   } finally {
-    rmSync4(directory, { recursive: true, force: true });
+    rmSync5(directory, { recursive: true, force: true });
   }
 }
 
@@ -53422,426 +53686,9 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
   );
 }
 
-// src/services/templateStore.ts
-import { randomBytes } from "node:crypto";
-import {
-  closeSync as closeSync7,
-  constants as constants7,
-  fstatSync as fstatSync7,
-  linkSync,
-  lstatSync as lstatSync5,
-  mkdirSync as mkdirSync7,
-  openSync as openSync7,
-  readdirSync as readdirSync4,
-  readSync as readSync5,
-  renameSync,
-  unlinkSync as unlinkSync3,
-  writeSync as writeSync5
-} from "node:fs";
-import { homedir as homedir19 } from "node:os";
-import { isAbsolute as isAbsolute5, join as join25, resolve as resolve5 } from "node:path";
-var TEMPLATE_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
-var TemplateStoreError = class extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-    this.name = "TemplateStoreError";
-  }
-  code;
-};
-function templateDir(env = process.env) {
-  const override = env.APPLE_NOTES_MCP_TEMPLATE_DIR?.trim();
-  if (override) {
-    if (!isAbsolute5(override))
-      throw new TemplateStoreError(
-        "unsafe-path",
-        "APPLE_NOTES_MCP_TEMPLATE_DIR must be an absolute path."
-      );
-    return resolve5(override);
-  }
-  return join25(homedir19(), "Library/Application Support/apple-notes-mcp/templates");
-}
-function checkName(name, action) {
-  if (isBuiltinTemplate(name) && action !== "read")
-    throw new TemplateStoreError(
-      "reserved-name",
-      `"${name}" is a built-in template and cannot be ${action === "save" ? "saved over" : "deleted"}.`
-    );
-  if (!TEMPLATE_SLUG.test(name))
-    throw new TemplateStoreError(
-      "invalid-name",
-      `Template names are 1-64 characters of a-z, 0-9, "-" and "_", starting with a letter or digit; got "${name}".`
-    );
-}
-var TemplateStore = class {
-  constructor(dir = templateDir()) {
-    this.dir = dir;
-  }
-  dir;
-  /** The library root, which must be a real directory (not a symlink) when it exists. */
-  root(create) {
-    let stat;
-    try {
-      stat = lstatSync5(this.dir);
-    } catch {
-      if (!create) return void 0;
-      mkdirSync7(this.dir, { recursive: true, mode: 448 });
-      stat = lstatSync5(this.dir);
-    }
-    if (!stat.isDirectory())
-      throw new TemplateStoreError(
-        "unsafe-path",
-        `The template library ${this.dir} is not a directory (symlinks are refused).`
-      );
-    return this.dir;
-  }
-  file(name) {
-    return join25(this.dir, `${name}.json`);
-  }
-  /** Read a saved template's text, refusing symlinks and non-regular files. */
-  readText(path10) {
-    let fd;
-    try {
-      fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
-    } catch (error2) {
-      if (error2.code === "ENOENT") return void 0;
-      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path10}: not a regular file.`);
-    }
-    try {
-      const stat = fstatSync7(fd);
-      if (!stat.isFile())
-        throw new TemplateStoreError(
-          "unsafe-path",
-          `Refusing to read ${path10}: not a regular file.`
-        );
-      if (stat.size > MAX_TEMPLATE_BYTES)
-        throw new TemplateValidationError([
-          {
-            path: "$",
-            message: `template is ${stat.size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`
-          }
-        ]);
-      const data = Buffer.alloc(stat.size);
-      let read = 0;
-      while (read < stat.size) {
-        const n = readSync5(fd, data, read, stat.size - read, read);
-        if (n <= 0) break;
-        read += n;
-      }
-      return { text: data.subarray(0, read).toString("utf8"), bytes: read, mtime: stat.mtime };
-    } finally {
-      closeSync7(fd);
-    }
-  }
-  /** Saved templates in name order; `skipped` counts entries that are not usable. */
-  list() {
-    const templates = [];
-    let skipped = 0;
-    if (!this.root(false)) return { templates, skipped, dir: this.dir };
-    for (const entry of readdirSync4(this.dir).sort()) {
-      if (!entry.endsWith(".json") || entry.startsWith(".")) continue;
-      const name = entry.slice(0, -5);
-      if (!TEMPLATE_SLUG.test(name) || isBuiltinTemplate(name)) {
-        skipped++;
-        continue;
-      }
-      try {
-        const read = this.readText(this.file(name));
-        if (!read) continue;
-        const template = parseTemplate(read.text);
-        templates.push({
-          name,
-          ...template.name && template.name !== name ? { displayName: template.name } : {},
-          ...template.description ? { description: template.description } : {},
-          ...template.extends ? { extends: template.extends } : {},
-          bytes: read.bytes,
-          modified: read.mtime.toISOString()
-        });
-      } catch {
-        skipped++;
-      }
-    }
-    return { templates, skipped, dir: this.dir };
-  }
-  /**
-   * A saved template in its portable (as stored) form, or undefined when
-   * there is none. Throws {@link TemplateValidationError} for a corrupt file.
-   */
-  find(name) {
-    checkName(name, "read");
-    if (!this.root(false)) return void 0;
-    const read = this.readText(this.file(name));
-    return read ? parseTemplate(read.text) : void 0;
-  }
-  /** Like {@link find}, but a missing template is an error. */
-  get(name) {
-    const template = this.find(name);
-    if (!template)
-      throw new TemplateStoreError(
-        "template-not-found",
-        `No saved template named "${name}". Built-in templates: ${BUILTIN_TEMPLATE_NAMES.join(", ")}.`
-      );
-    return template;
-  }
-  /**
-   * Validate and save a template under `name`. Create-only unless `force`.
-   * Returns the file path and whether an existing template was replaced.
-   */
-  save(name, text2, { force = false } = {}) {
-    checkName(name, "save");
-    const template = parseTemplate(text2);
-    const body = JSON.stringify(template, null, 2) + "\n";
-    this.root(true);
-    const path10 = this.file(name);
-    let exists = false;
-    try {
-      const stat = lstatSync5(path10);
-      if (!stat.isFile())
-        throw new TemplateStoreError(
-          "unsafe-path",
-          `Refusing to replace ${path10}: it is not a regular file.`
-        );
-      exists = true;
-    } catch (error2) {
-      if (error2 instanceof TemplateStoreError) throw error2;
-    }
-    if (exists && !force)
-      throw new TemplateStoreError(
-        "template-exists",
-        `A template named "${name}" already exists. Pass force: true to replace it.`
-      );
-    const temp = join25(this.dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
-    const fd = openSync7(
-      temp,
-      constants7.O_WRONLY | constants7.O_CREAT | constants7.O_EXCL | constants7.O_NOFOLLOW,
-      384
-    );
-    try {
-      const data = Buffer.from(body, "utf8");
-      let written = 0;
-      while (written < data.length) written += writeSync5(fd, data, written);
-    } finally {
-      closeSync7(fd);
-    }
-    try {
-      if (force) renameSync(temp, path10);
-      else {
-        try {
-          linkSync(temp, path10);
-        } catch (error2) {
-          if (error2.code === "EEXIST")
-            throw new TemplateStoreError(
-              "template-exists",
-              `A template named "${name}" already exists. Pass force: true to replace it.`
-            );
-          throw error2;
-        }
-      }
-    } finally {
-      try {
-        unlinkSync3(temp);
-      } catch {
-      }
-    }
-    return { path: path10, replaced: exists, bytes: Buffer.byteLength(body), template };
-  }
-  /** Delete a saved template. Built-ins cannot be deleted. */
-  delete(name) {
-    checkName(name, "delete");
-    const path10 = this.file(name);
-    let stat;
-    try {
-      if (!this.root(false)) throw new Error("absent");
-      stat = lstatSync5(path10);
-    } catch (error2) {
-      if (error2 instanceof TemplateStoreError) throw error2;
-      throw new TemplateStoreError("template-not-found", `No saved template named "${name}".`);
-    }
-    if (!stat.isFile())
-      throw new TemplateStoreError(
-        "unsafe-path",
-        `Refusing to delete ${path10}: not a regular file.`
-      );
-    unlinkSync3(path10);
-    return { path: path10 };
-  }
-};
-
-// src/tools/markdownTemplates.ts
-var ok = (text2, structured) => ({
-  content: [{ type: "text", text: text2 }],
-  structuredContent: structured
-});
-function failure(action, error2) {
-  if (error2 instanceof TemplateValidationError)
-    return errorResult(
-      `Error ${action} [invalid-template]: the template is invalid:
-` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
-      error2
-    );
-  if (error2 instanceof TemplateStoreError)
-    return errorResult(`Error ${action} [${error2.code}]: ${error2.message}`, error2);
-  const message = error2 instanceof Error ? error2.message : String(error2);
-  return errorResult(`Error ${action}: ${message}`, error2);
-}
-var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
-var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
-var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
-  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
-);
-function sourceText(args) {
-  if (args.template === void 0 === (args.templateFile === void 0))
-    throw new Error("Provide exactly one of 'template' or 'templateFile'.");
-  if (args.templateFile !== void 0) return readTemplateFile(args.templateFile);
-  return typeof args.template === "string" ? args.template : JSON.stringify(args.template);
-}
-function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
-  const loose = external_exports.object({}).passthrough();
-  server2.registerTool(
-    "list-markdown-templates",
-    {
-      description: "Use when: choosing a Markdown export template, or checking which saved templates exist.\nReturns: the built-in templates, the saved templates (name, display name, description, size, modified date), the library directory, and how many unusable files were skipped.\nDo not use when: you need a template's rules (show-markdown-template).\nSafety: read-only; never opens Notes.",
-      inputSchema: {},
-      outputSchema: loose,
-      annotations: { readOnlyHint: true }
-    },
-    (async () => {
-      try {
-        const listing = store().list();
-        const builtins = BUILTIN_TEMPLATE_NAMES.map((name) => ({
-          name,
-          description: builtinTemplate(name).description ?? ""
-        }));
-        return ok(
-          `${builtins.length} built-in and ${listing.templates.length} saved template(s)` + (listing.skipped ? `; skipped ${listing.skipped} unusable file(s)` : "") + ".",
-          { builtins, ...listing }
-        );
-      } catch (error2) {
-        return failure("listing templates", error2);
-      }
-    })
-  );
-  const showInput = {
-    name: nameInput,
-    expanded: external_exports.boolean().optional().describe("Also return the fully expanded template (every rule filled from its base)")
-  };
-  server2.registerTool(
-    "show-markdown-template",
-    {
-      description: "Use when: reading a built-in or saved template, to copy it as the start of a new one or to see what an export will do.\nReturns: the template in its portable form (as saved, overrides only), its source, and with expanded: true every rule filled in.\nDo not use when: listing names (list-markdown-templates).\nSafety: read-only.",
-      inputSchema: showInput,
-      outputSchema: loose,
-      annotations: { readOnlyHint: true }
-    },
-    (async ({ name, expanded }) => {
-      try {
-        const builtin = isBuiltinTemplate(name);
-        const template = builtin ? builtinTemplate(name) : store().get(name);
-        const structured = {
-          name,
-          source: builtin ? "builtin" : "saved",
-          template,
-          ...expanded ? { expanded: resolveTemplate(template, name) } : {}
-        };
-        return ok(JSON.stringify(template, null, 2), structured);
-      } catch (error2) {
-        return failure("showing template", error2);
-      }
-    })
-  );
-  const validateInput = {
-    name: nameInput.optional(),
-    template: templateInput,
-    templateFile: templateFileInput
-  };
-  server2.registerTool(
-    "validate-markdown-template",
-    {
-      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.',
-      inputSchema: validateInput,
-      outputSchema: loose,
-      annotations: { readOnlyHint: true }
-    },
-    (async (args) => {
-      try {
-        const given = [args.name, args.template, args.templateFile].filter(
-          (value) => value !== void 0
-        ).length;
-        if (given !== 1)
-          throw new Error("Provide exactly one of 'name', 'template' or 'templateFile'.");
-        try {
-          if (args.name !== void 0) {
-            if (!isBuiltinTemplate(args.name)) store().get(args.name);
-          } else parseTemplate(sourceText(args));
-        } catch (error2) {
-          if (!(error2 instanceof TemplateValidationError)) throw error2;
-          return ok(
-            `Invalid template (${error2.errors.length} problem(s)):
-` + error2.errors.map((e) => `${e.path}: ${e.message}`).join("\n"),
-            { valid: false, errors: error2.errors }
-          );
-        }
-        return ok("The template is valid.", { valid: true, errors: [] });
-      } catch (error2) {
-        return failure("validating template", error2);
-      }
-    })
-  );
-  const saveInput = {
-    name: external_exports.string().min(1).max(64).describe(
-      'Name to save under: lowercase a-z, 0-9, "-" and "_", starting with a letter or digit'
-    ),
-    template: templateInput,
-    templateFile: templateFileInput,
-    force: external_exports.boolean().optional().describe("Replace an existing saved template of this name (default false: create-only)")
-  };
-  server2.registerTool(
-    "save-markdown-template",
-    {
-      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
-      inputSchema: saveInput,
-      outputSchema: loose,
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
-    },
-    (async (args) => {
-      try {
-        const saved = store().save(args.name, sourceText(args), { force: args.force });
-        return ok(
-          `${saved.replaced ? "Replaced" : "Saved"} template "${args.name}" (${saved.bytes} bytes) at ${saved.path}.`,
-          { name: args.name, path: saved.path, bytes: saved.bytes, replaced: saved.replaced }
-        );
-      } catch (error2) {
-        return failure("saving template", error2);
-      }
-    })
-  );
-  const deleteInput = { name: external_exports.string().min(1).max(64).describe("Saved template to delete") };
-  server2.registerTool(
-    "delete-markdown-template",
-    {
-      description: "Use when: removing a saved Markdown template the user no longer wants.\nReturns: the name and the path of the removed file.\nDo not use when: the template is built in (standard-markdown, obsidian cannot be deleted).\nSafety: permanently removes one file from the template library; never touches Notes.",
-      inputSchema: deleteInput,
-      outputSchema: loose,
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false }
-    },
-    (async ({ name }) => {
-      try {
-        const removed = store().delete(name);
-        return ok(`Deleted template "${name}" (${removed.path}).`, {
-          name,
-          path: removed.path,
-          deleted: true
-        });
-      } catch (error2) {
-        return failure("deleting template", error2);
-      }
-    })
-  );
-}
-
 // src/utils/svgAnalyzer.ts
 import { createHash as createHash5 } from "node:crypto";
-import { closeSync as closeSync8, constants as constants8, fstatSync as fstatSync8, openSync as openSync8, readSync as readSync6 } from "node:fs";
+import { closeSync as closeSync7, constants as constants7, fstatSync as fstatSync7, openSync as openSync7, readSync as readSync5 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -54782,7 +54629,7 @@ function parseXml(source, limits) {
       if (a.name === "xmlns") scope2.set("", a.value);
       else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
     }
-    const resolve9 = (qualified, isAttribute) => {
+    const resolve8 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
       const prefix = qualified.slice(0, colon);
@@ -54792,12 +54639,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve9(name, false);
+    const resolved = resolve8(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve9(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve8(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -55810,14 +55657,14 @@ function analyzeSvgBuffer(source) {
 function readSvgSource(path10) {
   let fd;
   try {
-    fd = openSync8(path10, constants8.O_RDONLY | constants8.O_NOFOLLOW | constants8.O_NONBLOCK);
+    fd = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW | constants7.O_NONBLOCK);
   } catch (error2) {
     if (error2.code === "ELOOP")
       throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
     throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
   }
   try {
-    const info = fstatSync8(fd);
+    const info = fstatSync7(fd);
     if (!info.isFile())
       throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
     if (info.size > SVG_LIMITS.maxSourceBytes)
@@ -55828,7 +55675,7 @@ function readSvgSource(path10) {
     const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
     let total = 0;
     for (; ; ) {
-      const n = readSync6(fd, buffer, total, buffer.length - total, null);
+      const n = readSync5(fd, buffer, total, buffer.length - total, null);
       if (n === 0) break;
       total += n;
       if (total > SVG_LIMITS.maxSourceBytes)
@@ -55839,7 +55686,7 @@ function readSvgSource(path10) {
     }
     return buffer.subarray(0, total);
   } finally {
-    closeSync8(fd);
+    closeSync7(fd);
   }
 }
 function analyzeSvgFile(path10) {
@@ -56410,7 +56257,7 @@ function registerNativeOperations(server2, manager) {
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { existsSync as existsSync13 } from "node:fs";
 import { release as release2 } from "node:os";
-import { dirname as dirname7, resolve as resolve6 } from "node:path";
+import { dirname as dirname7, resolve as resolve5 } from "node:path";
 import { fileURLToPath } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
@@ -56433,11 +56280,11 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve6(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
+  const baseDirectory = dependencies.baseDirectory || resolve5(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
   const osRelease = (dependencies.osRelease || release2)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve6(baseDirectory, file);
+    const path10 = resolve5(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -56501,15 +56348,15 @@ import { createHash as createHash6 } from "node:crypto";
 import {
   chmodSync,
   existsSync as existsSync14,
-  mkdirSync as mkdirSync8,
-  mkdtempSync as mkdtempSync5,
+  mkdirSync as mkdirSync7,
+  mkdtempSync as mkdtempSync6,
   readFileSync as readFileSync4,
-  renameSync as renameSync2,
-  rmSync as rmSync5,
-  writeFileSync as writeFileSync4
+  renameSync,
+  rmSync as rmSync6,
+  writeFileSync as writeFileSync5
 } from "node:fs";
-import { homedir as homedir20, release as release3 } from "node:os";
-import { dirname as dirname8, join as join26, resolve as resolve7 } from "node:path";
+import { homedir as homedir19, release as release3 } from "node:os";
+import { dirname as dirname8, join as join25, resolve as resolve6 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var PUBLIC_HELPER_PROTOCOL = 1;
 var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
@@ -56524,7 +56371,7 @@ var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
   "transcribe"
 ]);
 var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
 var publicManifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -56537,7 +56384,7 @@ var publicManifestSchema = external_exports.object({
 function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join26(dir, "package.json");
+    const candidate = join25(dir, "package.json");
     if (existsSync14(candidate)) {
       try {
         if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
@@ -56546,7 +56393,7 @@ function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
       }
     }
     const parent = dirname8(dir);
-    if (parent === dir) return resolve7(fromDir, "..");
+    if (parent === dir) return resolve6(fromDir, "..");
     dir = parent;
   }
 }
@@ -56554,7 +56401,7 @@ function defaultPublicHelperDeps(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join26(packageRoot(), PUBLIC_HELPER_SOURCE),
+    sourcePath: join25(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync14,
     readFile: (path10) => readFileSync4(path10),
     spawn: spawnSync3,
@@ -56565,14 +56412,14 @@ function defaultPublicHelperDeps(overrides = {}) {
 function publicHelperInstallDir(env = process.env) {
   const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join26(homedir20(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+  return join25(homedir19(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
 }
 function sha256Hex(data) {
   return createHash6("sha256").update(data).digest("hex");
 }
 function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join26(installDir, PUBLIC_HELPER_BINARY);
+  const binaryPath = join25(installDir, PUBLIC_HELPER_BINARY);
   const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
   const fail = (reason, detail) => ({
     ...base,
@@ -56583,7 +56430,7 @@ function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
   if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join26(installDir, PUBLIC_HELPER_MANIFEST);
+  const manifestPath = join25(installDir, PUBLIC_HELPER_MANIFEST);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -56652,7 +56499,7 @@ function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(),
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES
+    maxBuffer: MAX_OUTPUT_BYTES2
   });
   const errno = result.error?.code;
   if (errno === "ETIMEDOUT" || result.signal && result.status === null)
@@ -56675,9 +56522,9 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     });
     const chunks = [];
     let size = 0;
-    let failure2 = null;
+    let failure = null;
     const stop = (error2) => {
-      failure2 ??= error2;
+      failure ??= error2;
       child2.kill("SIGKILL");
     };
     const timer = setTimeout(
@@ -56692,19 +56539,19 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
     };
     child2.stdout?.on("data", (chunk) => {
       size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES)
+      if (size > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
     child2.on("error", (error2) => {
       settle();
       reject(
-        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+        failure ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
       );
     });
     child2.on("close", (status, exitSignal) => {
       settle();
-      if (failure2) return reject(failure2);
+      if (failure) return reject(failure);
       if (status === null && exitSignal)
         return reject(
           new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
@@ -56822,8 +56669,8 @@ function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputP
 }
 function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const steps = [];
-  const done = (ok2) => ({
-    ok: ok2,
+  const done = (ok) => ({
+    ok,
     checkOnly,
     steps,
     installation: inspectPublicHelper(deps)
@@ -56859,14 +56706,14 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
   const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync8(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join26(installDir, ".staging-"));
+  mkdirSync7(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync6(join25(installDir, ".staging-"));
   try {
-    const stagedBinary = join26(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join26(staging, "source-digest.swift");
-    const plistPath = join26(staging, "Info.plist");
-    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
-    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const stagedBinary = join25(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join25(staging, "source-digest.swift");
+    const plistPath = join25(staging, "Info.plist");
+    writeFileSync5(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync5(plistPath, publicHelperInfoPlist(), { mode: 384 });
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
@@ -56927,15 +56774,15 @@ function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
       compiler
     };
     chmodSync(stagedBinary, 448);
-    renameSync2(stagedBinary, join26(installDir, PUBLIC_HELPER_BINARY));
-    writeFileSync4(
-      join26(installDir, PUBLIC_HELPER_MANIFEST),
+    renameSync(stagedBinary, join25(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync5(
+      join25(installDir, PUBLIC_HELPER_MANIFEST),
       JSON.stringify(manifest, null, 2) + "\n",
       { mode: 384 }
     );
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    rmSync5(staging, { recursive: true, force: true });
+    rmSync6(staging, { recursive: true, force: true });
   }
   const installation = inspectPublicHelper(deps);
   steps.push({
@@ -57152,11 +56999,11 @@ function getNoteDrawings(noteId3, options = {}) {
   if (!install.ready)
     throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
   const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
-  const ok2 = drawings.filter((d) => d.status === "ok").length;
+  const ok = drawings.filter((d) => d.status === "ok").length;
   return {
     id: noteId3,
     drawingCount: drawings.length,
-    status: ok2 === drawings.length ? "ok" : ok2 ? "partial" : "error",
+    status: ok === drawings.length ? "ok" : ok ? "partial" : "error",
     drawings
   };
 }
@@ -57173,8 +57020,8 @@ function formatNoteDrawings(result) {
 }
 
 // src/utils/noteAudio.ts
-import { readdirSync as readdirSync5, statSync as statSync4 } from "node:fs";
-import { join as join27 } from "node:path";
+import { readdirSync as readdirSync4, statSync as statSync4 } from "node:fs";
+import { join as join26 } from "node:path";
 var EXTRA_AUDIO_UTIS = [
   "public.mp3",
   "public.aiff-audio",
@@ -57199,7 +57046,7 @@ function accountDirsFor(containerDir, accountIdentifier) {
   if (own) return [own];
   let names;
   try {
-    names = readdirSync5(join27(containerDir, "Accounts")).sort();
+    names = readdirSync4(join26(containerDir, "Accounts")).sort();
   } catch {
     return [];
   }
@@ -57211,8 +57058,8 @@ function resolveMediaPath(media, accountIdentifier = null, containerDir = NOTES_
   if (!id2 || !filename) return null;
   const generation = safeComponent(media?.generation);
   for (const dir of accountDirsFor(containerDir, accountIdentifier)) {
-    const base = join27(dir, "Media", id2);
-    const candidates = generation ? [join27(base, generation, filename), join27(base, filename)] : [join27(base, filename)];
+    const base = join26(dir, "Media", id2);
+    const candidates = generation ? [join26(base, generation, filename), join26(base, filename)] : [join26(base, filename)];
     for (const candidate of candidates) {
       const real = realInside(candidate, dir);
       if (real && isFile2(real)) return real;
@@ -57484,21 +57331,21 @@ import { spawnSync as spawnSync5 } from "node:child_process";
 import {
   chmodSync as chmodSync2,
   existsSync as existsSync16,
-  mkdirSync as mkdirSync9,
-  mkdtempSync as mkdtempSync6,
-  renameSync as renameSync3,
-  rmSync as rmSync6,
-  writeFileSync as writeFileSync5
+  mkdirSync as mkdirSync8,
+  mkdtempSync as mkdtempSync7,
+  renameSync as renameSync2,
+  rmSync as rmSync7,
+  writeFileSync as writeFileSync6
 } from "node:fs";
 import { release as release4 } from "node:os";
-import { join as join29 } from "node:path";
+import { join as join28 } from "node:path";
 
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync4 } from "node:child_process";
 import { createHash as createHash7 } from "node:crypto";
 import { existsSync as existsSync15, readFileSync as readFileSync5 } from "node:fs";
-import { homedir as homedir21 } from "node:os";
-import { dirname as dirname9, join as join28, resolve as resolve8 } from "node:path";
+import { homedir as homedir20 } from "node:os";
+import { dirname as dirname9, join as join27, resolve as resolve7 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 var PRIVATE_HELPER_PROTOCOL = 1;
 var ENABLE_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE";
@@ -57513,7 +57360,7 @@ var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
 var MANIFEST_NAME = "manifest.json";
 var DEFAULT_TIMEOUT_MS3 = 2e4;
-var MAX_OUTPUT_BYTES2 = 4 * 1024 * 1024;
+var MAX_OUTPUT_BYTES3 = 4 * 1024 * 1024;
 var manifestSchema = external_exports.object({
   schemaVersion: external_exports.literal(1),
   protocolVersion: external_exports.number().int(),
@@ -57526,7 +57373,7 @@ var manifestSchema = external_exports.object({
 function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
   let dir = fromDir;
   for (; ; ) {
-    const candidate = join28(dir, "package.json");
+    const candidate = join27(dir, "package.json");
     if (existsSync15(candidate)) {
       try {
         const pkg = JSON.parse(readFileSync5(candidate, "utf8"));
@@ -57535,7 +57382,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
       }
     }
     const parent = dirname9(dir);
-    if (parent === dir) return resolve8(fromDir, "..");
+    if (parent === dir) return resolve7(fromDir, "..");
     dir = parent;
   }
 }
@@ -57543,7 +57390,7 @@ function defaultDeps2(overrides = {}) {
   return {
     env: process.env,
     platform: process.platform,
-    sourcePath: join28(packageRoot2(), HELPER_SOURCE_RELATIVE),
+    sourcePath: join27(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync15,
     readFile: (path10) => readFileSync5(path10),
     spawn: spawnSync4,
@@ -57556,14 +57403,14 @@ function privateHelperEnabled(env = process.env) {
 function helperInstallDir(env = process.env) {
   const override = env[HELPER_DIR_ENV]?.trim();
   if (override) return override;
-  return join28(homedir21(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
+  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "private-helper");
 }
 function sha256Hex2(data) {
   return createHash7("sha256").update(data).digest("hex");
 }
 function inspectInstallation(deps = defaultDeps2()) {
   const installDir = helperInstallDir(deps.env);
-  const binaryPath = join28(installDir, HELPER_BINARY_NAME);
+  const binaryPath = join27(installDir, HELPER_BINARY_NAME);
   const base = {
     installDir,
     binaryPath,
@@ -57581,7 +57428,7 @@ function inspectInstallation(deps = defaultDeps2()) {
   if (!deps.exists(deps.sourcePath))
     return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
   base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
-  const manifestPath = join28(installDir, MANIFEST_NAME);
+  const manifestPath = join27(installDir, MANIFEST_NAME);
   if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
     return fail(
       "helper_not_installed",
@@ -57697,7 +57544,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     encoding: "utf8",
     timeout,
     killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2,
+    maxBuffer: MAX_OUTPUT_BYTES3,
     env: deps.env
   });
   const errno = result.error?.code;
@@ -57852,8 +57699,8 @@ function compileArguments(sourcePath, outputPath, sourceSha) {
 }
 function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const steps = [];
-  const done = (ok2) => ({
-    ok: ok2,
+  const done = (ok) => ({
+    ok,
     checkOnly,
     steps,
     installation: inspectInstallation(deps)
@@ -57895,10 +57742,10 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
   const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
   steps.push({ step: "find compiler", ok: true, detail: compiler });
   const installDir = helperInstallDir(deps.env);
-  mkdirSync9(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync6(join29(installDir, ".staging-"));
+  mkdirSync8(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync7(join28(installDir, ".staging-"));
   try {
-    const stagedBinary = join29(staging, HELPER_BINARY_NAME);
+    const stagedBinary = join28(staging, HELPER_BINARY_NAME);
     const compile = deps.spawn(
       "/usr/bin/xcrun",
       compileArguments(deps.sourcePath, stagedBinary, sourceSha),
@@ -57975,13 +57822,13 @@ function buildPrivateHelper(checkOnly, deps = defaultBuildDeps()) {
       compiler
     };
     chmodSync2(stagedBinary, 448);
-    renameSync3(stagedBinary, join29(installDir, HELPER_BINARY_NAME));
-    writeFileSync5(join29(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
+    renameSync2(stagedBinary, join28(installDir, HELPER_BINARY_NAME));
+    writeFileSync6(join28(installDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + "\n", {
       mode: 384
     });
     steps.push({ step: "install", ok: true, detail: installDir });
   } finally {
-    if (existsSync16(staging)) rmSync6(staging, { recursive: true, force: true });
+    if (existsSync16(staging)) rmSync7(staging, { recursive: true, force: true });
   }
   const installation = inspectInstallation(deps);
   steps.push({
@@ -58144,7 +57991,6 @@ var server = new McpServer({
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
-registerMarkdownTemplates(server);
 registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
@@ -58363,7 +58209,7 @@ function registerTool(name, config2, cb) {
 registerTool(
   "create-note",
   {
-    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it.",
+    description: "Use when: the user wants to create a brand-new Apple Note.\nReturns: the new note's title and id \u2014 reuse the id for follow-up reads/edits.\nDo not use when: editing an existing note (use update-note).\nNote: the title is prepended as an <h1>; true Apple Notes checklists cannot be created via AppleScript (see the content field). A 'folder' must already exist \u2014 create-folder first (it is idempotent), since this tool does not create it. A smart folder is refused (code unsupported); it cannot hold notes.",
     inputSchema: {
       title: external_exports.string().min(1, "Title is required").max(MAX.TITLE),
       content: external_exports.string().min(1, "Content is required").max(MAX.CONTENT).optional().describe(
@@ -58503,7 +58349,7 @@ registerTool(
 registerTool(
   "search-notes",
   {
-    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
+    description: "Use when: finding notes by a keyword in the title (or body with searchContent=true) and you need their ids.\nReturns: matching notes with title, folder, and id; `source` says whether a body search read the Notes database or fell back to AppleScript. When the note text came from the database, each result has matchedIn (title, body, or both); includeWordCount adds wordCount.\nDo not use when: you already have a note id (use get-note-content), want every note (use list-notes), or need boolean or metadata filters (use query-notes).\nPrefer this first to obtain ids for subsequent read/update/delete/move calls.\nNote: with Full Disk Access, body search reads the Notes database (fast; the most recent 5000 notes, Recently Deleted excluded); without it, it falls back to AppleScript, which scans every body and can time out on broad terms.",
     inputSchema: {
       query: external_exports.string().min(1, "Search query is required").max(MAX.QUERY),
       searchContent: external_exports.boolean().optional().describe(
@@ -58516,112 +58362,132 @@ registerTool(
       ),
       limit: external_exports.number().int().positive().optional().describe(
         "Maximum number of results to return. Defaults to 50 \u2014 a broad query reads several properties per match via AppleScript, so an unbounded search can time out. Pass a higher value to see more; the applied limit is disclosed in the response."
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each result (null when locked or unreadable). A database body search already has the text; otherwise the bodies are read in one batched read-only database query (needs Full Disk Access), which also adds matchedIn"
       )
     },
     outputSchema: {
       notes: external_exports.array(external_exports.object({}).passthrough()).optional(),
       count: external_exports.number().optional(),
       source: external_exports.enum(["database", "applescript"]).optional(),
-      scanTruncated: external_exports.boolean().optional()
+      scanTruncated: external_exports.boolean().optional(),
+      wordCountUnavailable: external_exports.string().optional()
     }
   },
-  withErrorHandling(({ query: query2, searchContent = false, account, folder, modifiedSince, limit }) => {
-    const effectiveLimit = resolveSearchLimit(limit);
-    const limitWasDefault = limit === void 0;
-    let source;
-    let dbScan;
-    let dbUnavailable;
-    const runSearch = () => {
-      if (searchContent) {
+  withErrorHandling(
+    ({ query: query2, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
+      const effectiveLimit = resolveSearchLimit(limit);
+      const limitWasDefault = limit === void 0;
+      let source;
+      let dbScan;
+      let dbUnavailable;
+      const runSearch = () => {
+        if (searchContent) {
+          try {
+            const db = searchContentViaDatabase({
+              query: query2,
+              account: notesManager.searchAccountScope(account),
+              folder,
+              modifiedSince,
+              limit: effectiveLimit,
+              includeWordCount
+            });
+            source = "database";
+            dbScan = db.scan;
+            return db.notes;
+          } catch (error2) {
+            if (!(error2 instanceof NoteQueryStoreError)) throw error2;
+            dbUnavailable = error2.kind;
+          }
+          source = "applescript";
+        }
         try {
-          const db = searchContentViaDatabase({
-            query: query2,
-            account: notesManager.searchAccountScope(account),
+          return notesManager.searchNotes(
+            query2,
+            searchContent,
+            account,
             folder,
             modifiedSince,
-            limit: effectiveLimit
-          });
-          source = "database";
-          dbScan = db.scan;
-          return db.notes;
+            effectiveLimit
+          );
         } catch (error2) {
-          if (!(error2 instanceof NoteQueryStoreError)) throw error2;
-          dbUnavailable = error2.kind;
+          if (!searchContent || !(error2 instanceof Error)) throw error2;
+          throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
         }
-        source = "applescript";
+      };
+      const {
+        result: found,
+        syncBefore,
+        syncInterference
+      } = withSyncAwarenessSync("search-notes", runSearch);
+      let notes = found;
+      let wordCountUnavailable;
+      if (includeWordCount && source !== "database" && found.length > 0) {
+        const enriched = addWordCountsFromDatabase(found, query2);
+        notes = enriched.notes;
+        wordCountUnavailable = enriched.unavailable;
       }
-      try {
-        return notesManager.searchNotes(
-          query2,
-          searchContent,
-          account,
-          folder,
-          modifiedSince,
-          effectiveLimit
-        );
-      } catch (error2) {
-        if (!searchContent || !(error2 instanceof Error)) throw error2;
-        throw new Error(contentSearchFailureHint(error2.message, dbUnavailable));
+      const wordCountFields = wordCountUnavailable ? { wordCountUnavailable } : {};
+      const wordCountNote = wordCountUnavailable ? `
+
+\u2139\uFE0F Word counts were not added: ${wordCountUnavailable === "no_fda" ? "they are read from the Notes database, which needs Full Disk Access (run the doctor tool)" : "the Notes database could not be read"}.` : "";
+      const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
+      const sourceFields = source ? { source } : {};
+      const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
+      const scanNote = describeContentScan(dbScan);
+      const folderInfo = folder ? ` in folder "${folder}"` : "";
+      const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
+      const { info: limitInfo, truncationNote } = describeSearchLimit(
+        effectiveLimit,
+        limitWasDefault,
+        notes.length
+      );
+      const syncWarnings = [];
+      if (syncBefore.syncDetected) {
+        syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
       }
-    };
-    const {
-      result: notes,
-      syncBefore,
-      syncInterference
-    } = withSyncAwarenessSync("search-notes", runSearch);
-    const searchType = searchContent ? source === "database" ? "content via the Notes database" : "content" : "titles";
-    const sourceFields = source ? { source } : {};
-    const scanFields = dbScan ? { scanTruncated: dbScan.scanTruncated } : {};
-    const scanNote = describeContentScan(dbScan);
-    const folderInfo = folder ? ` in folder "${folder}"` : "";
-    const dateInfo = modifiedSince ? ` modified since ${modifiedSince}` : "";
-    const { info: limitInfo, truncationNote } = describeSearchLimit(
-      effectiveLimit,
-      limitWasDefault,
-      notes.length
-    );
-    const syncWarnings = [];
-    if (syncBefore.syncDetected) {
-      syncWarnings.push(`\u26A0\uFE0F iCloud sync was active during search.`);
-    }
-    if (syncInterference) {
-      syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
-    }
-    const syncNote = syncWarnings.length > 0 ? `
+      if (syncInterference) {
+        syncWarnings.push(`\u26A0\uFE0F Sync activity detected - results may be incomplete.`);
+      }
+      const syncNote = syncWarnings.length > 0 ? `
 
 ${syncWarnings.join(" ")}` : "";
-    if (notes.length === 0) {
-      const scopeHint = describeSearchScope(searchContent, notes.length);
+      if (notes.length === 0) {
+        const scopeHint = describeSearchScope(searchContent, notes.length);
+        return successResponse(
+          `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+          { notes: [], count: 0, ...sourceFields, ...scanFields }
+        );
+      }
+      const noteList = notes.map((n) => {
+        const idSuffix = `${n.id ? ` [id: ${n.id}]` : ""}${describeMatchDetails(n)}`;
+        if (n.folder === "Recently Deleted") {
+          return `  - ${n.title} [DELETED]${idSuffix}`;
+        } else if (n.folder) {
+          return `  - ${n.title} (${n.folder})${idSuffix}`;
+        }
+        return `  - ${n.title}${idSuffix}`;
+      }).join("\n");
       return successResponse(
-        `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
-        { notes: [], count: 0, ...sourceFields, ...scanFields }
+        `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
+${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
+        {
+          notes: withStableIdentifiers(notes, "ICNote"),
+          count: notes.length,
+          ...sourceFields,
+          ...scanFields,
+          ...wordCountFields
+        }
       );
-    }
-    const noteList = notes.map((n) => {
-      const idSuffix = n.id ? ` [id: ${n.id}]` : "";
-      if (n.folder === "Recently Deleted") {
-        return `  - ${n.title} [DELETED]${idSuffix}`;
-      } else if (n.folder) {
-        return `  - ${n.title} (${n.folder})${idSuffix}`;
-      }
-      return `  - ${n.title}${idSuffix}`;
-    }).join("\n");
-    return successResponse(
-      `Found ${notes.length} notes (searched ${searchType}${folderInfo}${dateInfo}${limitInfo}):
-${noteList}${truncationNote}${scanNote}${syncNote}`,
-      {
-        notes: withStableIdentifiers(notes, "ICNote"),
-        count: notes.length,
-        ...sourceFields,
-        ...scanFields
-      }
-    );
-  }, "Error searching notes")
+    },
+    "Error searching notes"
+  )
 );
 registerTool(
   "query-notes",
   {
-    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, and snippet, plus scan/match counts. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates never match them.',
     inputSchema: {
       query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
         'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
@@ -58634,6 +58500,9 @@ registerTool(
       ),
       includeDeleted: external_exports.boolean().optional().describe(
         "Also scan notes in Recently Deleted, notes pending deletion, and folderless notes (default false)"
+      ),
+      includeWordCount: external_exports.boolean().optional().describe(
+        "Add wordCount to each returned note (the count words: filters on; null when locked or unreadable). Free when the query reads bodies; a metadata-only query reads just the returned notes' bodies in one extra query (default false)"
       )
     },
     outputSchema: {
@@ -58650,10 +58519,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted }) => {
+  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted, includeWordCount }) => {
     let result;
     try {
-      result = queryNotes(query2, { limit, scanLimit, includeDeleted });
+      result = queryNotes(query2, { limit, scanLimit, includeDeleted, includeWordCount });
     } catch (error2) {
       if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -58684,7 +58553,7 @@ ${notes.join("\n")}` : "";
       const where = [n.account, n.folder].filter(Boolean).join(" / ");
       const snippet = n.snippet ? `
       ${n.snippet}` : "";
-      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${snippet}`;
+      return `  - ${n.title}${where ? ` (${where})` : ""}${n.locked ? " [locked]" : ""} [id: ${n.id}]${describeMatchDetails(n)}${snippet}`;
     }).join("\n");
     return successResponse(
       `Found ${result.matched} matching notes (${scope2}):
@@ -59855,7 +59724,7 @@ registerTool(
 registerTool(
   "move-note",
   {
-    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist. Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
+    description: "Use when: moving one exact note to a different folder by id.\nReturns: confirmation and exact-ID readback.\nDo not use when: you only have a title or want to move many notes (batch-move-notes).\nNote: Notes.app's native move preserves the note id, creation date, body, and attachments. The destination folder must already exist and cannot be a smart folder (refused with code unsupported before the move). Optional ifFolderId, ifAncestorFolderId, and forbiddenAncestorFolderIds (which also covers the destination) are re-checked inside the move AppleScript.",
     inputSchema: {
       id: noteIdInput,
       folder: external_exports.string().min(1, "Destination folder is required").max(MAX.FOLDER),
@@ -60097,7 +59966,7 @@ ${lines.join("\n")}${fullyDecoded ? "" : '\n\nSome rules were not recognized; se
 registerTool(
   "create-folder",
   {
-    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nDo not use when: creating a note (create-note).",
+    description: "Use when: creating a folder, including nested paths like 'Work/Clients' (intermediate folders are created, existing ones skipped).\nReturns: confirmation.\nNote: a path segment that names a smart folder is refused (code unsupported) before anything is created; smart folders cannot hold folders.\nDo not use when: creating a note (create-note).",
     inputSchema: {
       name: external_exports.string().min(1, "Folder name is required").max(MAX.FOLDER).describe(
         'Folder name or nested path separated by "/". E.g., "Retro Tech/PC/CPUs" creates all intermediate folders. Existing segments are skipped.'
@@ -60538,7 +60407,7 @@ registerTool(
 registerTool(
   "batch-move-notes",
   {
-    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder).",
+    description: "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
     inputSchema: {
       ids: noteIdArrayInput.describe(
         `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`
@@ -60939,7 +60808,7 @@ registerTool(
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
       wrap: external_exports.number().int().min(0).max(1e3).optional().describe("Hard-wrap prose at this many columns (0 or omitted: no wrapping)"),
       template: external_exports.string().min(1).max(64).optional().describe(
-        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
+        `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}. Exclusive with templateFile`
       ),
       templateFile: exportPathInput(
         "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
@@ -60968,7 +60837,6 @@ registerTool(
     try {
       receipt = exportNotesMarkdown(request, {
         listNoteRefs: (account, folder, since, limit) => notesManager.listNoteRefs(account, folder, since, limit),
-        findTemplate: (name) => TEMPLATE_SLUG.test(name) ? new TemplateStore().find(name) : void 0,
         // The document travels twice (text and structuredContent).
         maxInlineBytes: Math.floor(exportMaxResponseBytes() / 2) - 64 * 1024
       });

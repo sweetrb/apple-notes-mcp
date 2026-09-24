@@ -14,9 +14,19 @@
  * @module utils/searchContentDb
  */
 
-import type { QueryNode } from "@/utils/noteQuery.js";
-import { QUERY_SCAN, runNoteQuery } from "@/utils/noteQueryStore.js";
-import type { Note, QueryNotesResult } from "@/types.js";
+import { matchLocations, type QueryNode } from "@/utils/noteQuery.js";
+import {
+  countWords,
+  NOTE_TEXT_BATCH_MAX,
+  NoteQueryStoreError,
+  QUERY_SCAN,
+  readNoteTexts,
+  runNoteQuery,
+} from "@/utils/noteQueryStore.js";
+import type { Note, QueryNotesResult, SearchMatchDetails } from "@/types.js";
+
+/** A search-notes result with its optional match details. */
+export type SearchHit = Note & SearchMatchDetails;
 
 export interface SearchContentDbOptions {
   /** Literal text to find in the note (title line included, as AppleScript's `body` does). */
@@ -29,12 +39,14 @@ export interface SearchContentDbOptions {
   modifiedSince?: string;
   /** Result cap (search-notes' effective limit). */
   limit: number;
+  /** Add wordCount to each hit (the bodies are already decoded for the search). */
+  includeWordCount?: boolean;
   /** Test hook: a fixture NoteStore. Production never sets it. */
   dbPath?: string;
 }
 
 export interface SearchContentDbResult {
-  notes: Note[];
+  notes: SearchHit[];
   /** Scan accounting from the query engine, for disclosure. */
   scan: Pick<QueryNotesResult, "scanned" | "eligible" | "scanTruncated" | "matched">;
 }
@@ -78,9 +90,10 @@ export function searchContentViaDatabase(options: SearchContentDbOptions): Searc
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
     scanLimit: QUERY_SCAN.MAX,
+    includeWordCount: options.includeWordCount,
     dbPath: options.dbPath,
   });
-  const notes: Note[] = result.notes.map((hit) => ({
+  const notes: SearchHit[] = result.notes.map((hit) => ({
     id: hit.id,
     title: hit.title,
     content: "",
@@ -89,6 +102,8 @@ export function searchContentViaDatabase(options: SearchContentDbOptions): Searc
     modified: hit.modified ? new Date(hit.modified) : new Date(0),
     ...(hit.folder !== undefined ? { folder: hit.folder } : {}),
     ...(hit.account !== undefined ? { account: hit.account } : {}),
+    ...(hit.matchedIn ? { matchedIn: hit.matchedIn } : {}),
+    ...(hit.wordCount !== undefined ? { wordCount: hit.wordCount } : {}),
   }));
   return {
     notes,
@@ -138,4 +153,88 @@ export function contentSearchFailureHint(
     `so a broad term can exceed the time budget on a large library.${remedy} ` +
     "Otherwise narrow the search with `folder` or `modifiedSince`, or use a more specific term."
   );
+}
+
+const NOTE_ID = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/;
+
+/** Outcome of {@link addWordCountsFromDatabase}. */
+export interface WordCountEnrichment {
+  notes: SearchHit[];
+  /** Why the database could not be read; the notes are then returned unchanged. */
+  unavailable?: NoteQueryStoreError["kind"];
+}
+
+/**
+ * Adds `wordCount` and `matchedIn` to AppleScript search results by reading
+ * their bodies from the NoteStore in one batched read-only query, never one
+ * AppleScript call per note. `matchedIn` treats the query as a bare phrase:
+ * the title, the body, or both. Notes the database does not hold (another
+ * store, a stale id) get `wordCount: null` and no `matchedIn`, as do notes
+ * whose text does not contain the query as this server matches it.
+ *
+ * Best effort: when the database cannot be read (no Full Disk Access, unknown
+ * schema), the notes come back unchanged with the reason in `unavailable`.
+ */
+export function addWordCountsFromDatabase(
+  notes: SearchHit[],
+  query: string,
+  options: { dbPath?: string } = {}
+): WordCountEnrichment {
+  const keys = new Map<SearchHit, { store: string; pk: number }>();
+  for (const note of notes) {
+    const match = NOTE_ID.exec(note.id ?? "");
+    if (match) keys.set(note, { store: match[1].toUpperCase(), pk: Number(match[2]) });
+  }
+  const pks = [...new Set([...keys.values()].map((key) => key.pk))];
+  let store: string | undefined;
+  const texts = new Map<number, string | null>();
+  try {
+    // search-notes' limit is unbounded, so read in batches of the SQL cap.
+    for (let start = 0; start < pks.length; start += NOTE_TEXT_BATCH_MAX) {
+      const read = readNoteTexts(pks.slice(start, start + NOTE_TEXT_BATCH_MAX), options);
+      store = read.uuid?.toUpperCase();
+      for (const [pk, text] of read.texts) texts.set(pk, text);
+    }
+  } catch (error) {
+    if (error instanceof NoteQueryStoreError) return { notes, unavailable: error.kind };
+    throw error;
+  }
+  const predicates = [{ field: "any" as const, value: query }];
+  return {
+    notes: notes.map((note) => {
+      const key = keys.get(note);
+      const text = key && key.store === store ? texts.get(key.pk) : undefined;
+      if (typeof text !== "string") return { ...note, wordCount: null };
+      // AppleScript already matched this note, so an empty result means only
+      // that its matching (such as ignoring diacritics) differs from ours: the
+      // location is unknown, not "metadata", and is left out.
+      const matchedIn = matchLocations(predicates, note.title, text);
+      return {
+        ...note,
+        ...(matchedIn?.length ? { matchedIn } : {}),
+        wordCount: countWords(text),
+      };
+    }),
+  };
+}
+
+/**
+ * Short text-output suffix for one result's match details, e.g.
+ * ` · matched in title, body · 245 words`. Empty when neither is present.
+ */
+export function describeMatchDetails(hit: SearchMatchDetails): string {
+  const parts: string[] = [];
+  if (hit.matchedIn) {
+    parts.push(
+      hit.matchedIn.length ? `matched in ${hit.matchedIn.join(", ")}` : "no text match (metadata)"
+    );
+  }
+  if (hit.wordCount !== undefined) {
+    parts.push(
+      hit.wordCount === null
+        ? "word count unavailable"
+        : `${hit.wordCount} word${hit.wordCount === 1 ? "" : "s"}`
+    );
+  }
+  return parts.map((part) => ` · ${part}`).join("");
 }
