@@ -20,7 +20,7 @@ import {
   looseIdTransform,
   NOTE_ID_MESSAGE,
 } from "../utils/noteIdentifiers.js";
-import { errorResult } from "../utils/errorCodes.js";
+import { CodedError, errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { attachmentCoreDataId, type AttachmentAssetRecord } from "../utils/attachmentAssets.js";
 import {
@@ -227,7 +227,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
 
   tool(
     "create-note-with-attachment",
-    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails after the note exists, the error names the new note's id; attach to it with add-attachment instead of creating another note.",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
     {
       title: z
         .string()
@@ -273,20 +273,36 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
       } catch (error) {
         throw new Error(`${handOff}. The new note could not be read back: ${String(error)}`);
       }
+      const progress = { insertionStarted: false };
       try {
         return {
-          ...attachFile(manager, {
-            id: note.id,
-            expectedContentHash: snapshot.hash,
-            path: args.path,
-            filename: name,
-          }),
+          ...attachFile(
+            manager,
+            {
+              id: note.id,
+              expectedContentHash: snapshot.hash,
+              path: args.path,
+              filename: name,
+            },
+            undefined,
+            progress
+          ),
           title: args.title,
           folder: args.folder,
           noteCreated: true,
         };
       } catch (error) {
-        throw new Error(`${handOff}. ${error instanceof Error ? error.message : String(error)}`);
+        const detail = error instanceof Error ? error.message : String(error);
+        // Before insertion nothing was attached, so add-attachment is the way
+        // to finish. After it, the file may already be in the note, and a
+        // second attach would duplicate it.
+        if (!progress.insertionStarted) throw new Error(`${handOff}. ${detail}`);
+        const message = `Note ${note.id} was created, but the attachment outcome is uncertain: ${detail}. Read the note (list-attachments) before attaching again, and do not create another note`;
+        throw new CodedError(message, {
+          code: "verification_failed",
+          committed: true,
+          indeterminate: true,
+        });
       }
     }
   );
@@ -450,7 +466,8 @@ function storedInsertion(
 function attachFile(
   manager: AppleNotesManager,
   args: { id: string; expectedContentHash: string; path: string; filename?: string },
-  checked?: Snapshot
+  checked?: Snapshot,
+  progress: { insertionStarted: boolean } = { insertionStarted: false }
 ): Record<string, unknown> {
   const { id, expectedContentHash, path } = args;
   const name = attachmentName(path, args.filename);
@@ -467,6 +484,8 @@ function attachFile(
     if (readSnapshot(manager, id).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId: string | undefined;
     let transportUncertain = false;
+    // From here on a failure may leave the attachment in the note.
+    progress.insertionStarted = true;
     try {
       returnedId = manager.addAttachmentById(id, before.body, temporaryFile);
     } catch {

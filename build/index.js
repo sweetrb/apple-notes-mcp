@@ -39088,6 +39088,10 @@ function isPermissionDenied(error2) {
   if (!error2) return false;
   return PERMISSION_DENIED_PATTERN.test(error2) || error2.includes(PERMISSION_DENIED_MESSAGE);
 }
+var QUOTED = /"[^"\n]*"|“[^”\n]*”/g;
+function stripQuoted(text2) {
+  return text2.replace(QUOTED, '""');
+}
 var ERROR_MAPPINGS = [
   // Permission errors
   {
@@ -39158,12 +39162,13 @@ function parseErrorMessage(errorOutput) {
   if (executionError) {
     coreError = executionError[1].trim();
   }
-  if (isPermissionDenied(errorOutput)) {
+  if (isPermissionDenied(stripQuoted(errorOutput))) {
     return PERMISSION_DENIED_MESSAGE;
   }
+  const unquoted = stripQuoted(coreError);
   for (const { pattern: pattern2, message } of ERROR_MAPPINGS) {
     const match = coreError.match(pattern2);
-    if (match) {
+    if (match && (match.length > 1 || pattern2.test(unquoted))) {
       let result = message;
       for (let i = 1; i < match.length; i++) {
         result = result.replace(`$${i}`, match[i] || "");
@@ -39179,7 +39184,10 @@ function parseErrorMessage(errorOutput) {
 }
 function executeAppleScript(script, options = {}) {
   const timeoutMs = options.timeoutMs ?? callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? DEFAULT_TIMEOUT_MS;
-  const maxRetries = options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES;
+  const maxRetries = Math.max(
+    1,
+    options.maxRetries ?? envPositiveNumber("APPLE_NOTES_MCP_MAX_RETRIES") ?? DEFAULT_MAX_RETRIES
+  );
   const retryDelayMs = options.retryDelayMs ?? envPositiveNumber("APPLE_NOTES_MCP_RETRY_DELAY_MS") ?? DEFAULT_RETRY_DELAY_MS;
   const maxBufferBytes = Math.min(options.maxBufferBytes ?? getMaxBuffer(), MAX_OUTPUT_BYTES);
   if (!script || !script.trim()) {
@@ -39588,6 +39596,252 @@ function getChecklistItems(noteId3) {
   return { items };
 }
 
+// src/utils/noteIdentifiers.ts
+import { execFileSync as execFileSync3 } from "child_process";
+import * as fs2 from "fs";
+import * as os2 from "os";
+import * as path2 from "path";
+var NOTES_DB_PATH2 = path2.join(
+  os2.homedir(),
+  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+);
+var UUID_PATTERN = /^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/;
+var NUMERIC_KEY_PATTERN = /^\d{1,18}$/;
+var NOTE_ID_MESSAGE = "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...), or the note's Notes UUID or numeric key";
+function identifierForm(value) {
+  if (UUID_PATTERN.test(value)) return "uuid";
+  if (NUMERIC_KEY_PATTERN.test(value)) return "key";
+  return "other";
+}
+function isAlternateIdentifier(value) {
+  return identifierForm(value) !== "other";
+}
+var IdentifierResolutionError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "IdentifierResolutionError";
+  }
+  code;
+};
+var ENTITY_LABEL = {
+  ICNote: "note",
+  ICFolder: "folder",
+  ICAccount: "account"
+};
+var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access for the Node binary running this server, or the terminal that launches it (System Settings > Privacy & Security > Full Disk Access, then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
+function identifierFailureIn(message) {
+  if (message.includes(NO_FDA_MESSAGE)) return "no_fda";
+  if (/\bNo (?:note|folder|account) found for (?:numeric key|identifier) /.test(message))
+    return "not_found";
+  if (message.includes("Failed to read the Notes database.") || message.includes("The Notes database has no store UUID"))
+    return "query_error";
+  return null;
+}
+function canonicalKey(value) {
+  return BigInt(value).toString();
+}
+function assertAll(values, pattern2, label) {
+  for (const value of values) {
+    if (!pattern2.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
+  }
+}
+function entityClause(entity3) {
+  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${entity3}')`;
+}
+function buildResolveSql(entity3, keys, uuids) {
+  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
+  assertAll(uuids, UUID_PATTERN, "UUID");
+  const matches = [];
+  if (keys.length > 0) {
+    matches.push(`o.Z_PK IN (${[...new Set(keys.map(canonicalKey))].join(", ")})`);
+  }
+  if (uuids.length > 0) {
+    const variants = /* @__PURE__ */ new Set();
+    for (const uuid2 of uuids) {
+      variants.add(uuid2);
+      variants.add(uuid2.toUpperCase());
+      variants.add(uuid2.toLowerCase());
+    }
+    matches.push(`o.ZIDENTIFIER IN (${[...variants].map((v) => `'${v}'`).join(", ")})`);
+  }
+  const where = matches.length > 0 ? matches.join(" OR ") : "0";
+  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object('pk', o.Z_PK, 'identifier', o.ZIDENTIFIER)) FROM ZICCLOUDSYNCINGOBJECT o WHERE o.Z_ENT = ${entityClause(entity3)} AND (${where})));`;
+}
+function buildLookupSql(entity3, keys) {
+  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
+  const pks = [...new Set(keys.map(canonicalKey))];
+  const inList = pks.length > 0 ? pks.join(", ") : "NULL";
+  let fields = "'pk', o.Z_PK, 'identifier', o.ZIDENTIFIER";
+  let joins = "";
+  if (entity3 === "ICNote") {
+    fields += ", 'folderIdentifier', f.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
+    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = o.ZFOLDER LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = f.ZOWNER ";
+  } else if (entity3 === "ICFolder") {
+    fields += ", 'parentIdentifier', p.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
+    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = o.ZPARENT LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = o.ZOWNER ";
+  }
+  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT o ${joins}WHERE o.Z_ENT = ${entityClause(entity3)} AND o.Z_PK IN (${inList})));`;
+}
+function runJsonQuery(sql, dbPath2) {
+  if (!fs2.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+  let out;
+  try {
+    out = execFileSync3("sqlite3", ["-readonly", dbPath2, sql], {
+      encoding: "utf8",
+      timeout: 5e3,
+      stdio: ["pipe", "pipe", "pipe"]
+    }).trim();
+  } catch (error2) {
+    const detail = error2 instanceof Error ? `${error2.message} ${String(error2.stderr ?? "")}` : String(error2);
+    if (detail.includes("authorization denied") || detail.includes("unable to open database")) {
+      throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+    }
+    console.error(`Identifier query failed: ${detail}`);
+    throw new IdentifierResolutionError("query_error", "Failed to read the Notes database.");
+  }
+  const parsed = JSON.parse(out || "{}");
+  const rows = typeof parsed.rows === "string" ? JSON.parse(parsed.rows) : parsed.rows;
+  return { store: parsed.store ?? null, rows: rows ?? [] };
+}
+function coreDataId(store, entity3, pk) {
+  return `x-coredata://${store}/${entity3}/p${pk}`;
+}
+function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH2) {
+  const resolved = /* @__PURE__ */ new Map();
+  const keys = [];
+  const uuids = [];
+  for (const value of values) {
+    const form = identifierForm(value);
+    if (form === "key") keys.push(value);
+    else if (form === "uuid") uuids.push(value);
+    else resolved.set(value, value);
+  }
+  if (keys.length === 0 && uuids.length === 0) return resolved;
+  const { store, rows } = runJsonQuery(
+    buildResolveSql(entity3, keys, uuids),
+    dbPath2
+  );
+  if (!store) {
+    throw new IdentifierResolutionError(
+      "query_error",
+      "The Notes database has no store UUID, so an x-coredata id cannot be built."
+    );
+  }
+  const byKey = new Map(rows.map((row) => [String(row.pk), row]));
+  const byUuid = new Map(
+    rows.filter((row) => row.identifier).map((row) => [String(row.identifier).toUpperCase(), row])
+  );
+  const label = ENTITY_LABEL[entity3];
+  const missing = [];
+  for (const key of keys) {
+    const row = byKey.get(canonicalKey(key));
+    if (row) resolved.set(key, coreDataId(store, entity3, row.pk));
+    else missing.push(`numeric key ${key}`);
+  }
+  for (const uuid2 of uuids) {
+    const row = byUuid.get(uuid2.toUpperCase());
+    if (row) resolved.set(uuid2, coreDataId(store, entity3, row.pk));
+    else missing.push(`identifier ${uuid2}`);
+  }
+  if (missing.length > 0) {
+    throw new IdentifierResolutionError(
+      "not_found",
+      `No ${label} found for ${missing.join(", ")}. A numeric key must belong to a ${label}, not another object type.`
+    );
+  }
+  return resolved;
+}
+var COREDATA_PARTS = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(ICNote|ICFolder|ICAccount)\/p(\d{1,18})$/;
+function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH2) {
+  const result = /* @__PURE__ */ new Map();
+  const wanted = /* @__PURE__ */ new Map();
+  for (const id2 of ids) {
+    const match = COREDATA_PARTS.exec(id2);
+    if (!match || match[2] !== entity3) continue;
+    const pk = canonicalKey(match[3]);
+    const list = wanted.get(pk) ?? [];
+    list.push({ id: id2, store: match[1] });
+    wanted.set(pk, list);
+  }
+  if (wanted.size === 0) return result;
+  let query2;
+  try {
+    query2 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
+  } catch {
+    return result;
+  }
+  const store = query2.store?.toUpperCase();
+  for (const row of query2.rows) {
+    const fields = {};
+    for (const key of [
+      "identifier",
+      "folderIdentifier",
+      "parentIdentifier",
+      "accountIdentifier"
+    ]) {
+      const value = row[key];
+      if (typeof value === "string" && value) fields[key] = value;
+    }
+    for (const target of wanted.get(String(row.pk)) ?? []) {
+      if (target.store.toUpperCase() === store) result.set(target.id, fields);
+    }
+  }
+  return result;
+}
+function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH2) {
+  const ids = items.map((item) => item.id).filter((id2) => typeof id2 === "string");
+  if (ids.length === 0) return items;
+  const found = lookupStableIdentifiers(ids, entity3, dbPath2);
+  if (found.size === 0) return items;
+  return items.map(
+    (item) => item.id && found.has(item.id) ? { ...item, ...found.get(item.id) } : item
+  );
+}
+var defaultResolver = (values, entity3) => resolveIdentifiers(values, entity3);
+var DEFAULT_MAX_ID_LENGTH = 2e3;
+function acceptAlternateForms(pattern2) {
+  return new RegExp(
+    `${pattern2.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
+    pattern2.flags
+  );
+}
+function resolveInSchema(values, entity3, ctx, resolver) {
+  if (!values.some(isAlternateIdentifier)) return new Map(values.map((v) => [v, v]));
+  try {
+    return resolver(values, entity3);
+  } catch (error2) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: error2 instanceof Error ? error2.message : String(error2)
+    });
+    return null;
+  }
+}
+function exactIdInput(entity3, pattern2, message, options = {}) {
+  const resolver = options.resolver ?? defaultResolver;
+  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message).transform((value, ctx) => {
+    const map = resolveInSchema([value], entity3, ctx, resolver);
+    return map ? map.get(value) ?? value : external_exports.NEVER;
+  });
+}
+function exactIdArrayInput(entity3, pattern2, message, options = {}) {
+  const resolver = options.resolver ?? defaultResolver;
+  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message);
+  const array2 = options.maxItems === void 0 ? external_exports.array(item) : external_exports.array(item).max(options.maxItems);
+  return array2.transform((values, ctx) => {
+    const map = resolveInSchema(values, entity3, ctx, resolver);
+    return map ? values.map((value) => map.get(value) ?? value) : external_exports.NEVER;
+  });
+}
+function looseIdTransform(entity3, resolver = defaultResolver) {
+  return (value, ctx) => {
+    if (!isAlternateIdentifier(value)) return value;
+    const map = resolveInSchema([value], entity3, ctx, resolver);
+    return map ? map.get(value) ?? value : external_exports.NEVER;
+  };
+}
+
 // src/utils/errorCodes.ts
 var CodedError = class extends Error {
   envelope;
@@ -39634,8 +39888,10 @@ var NOTHING_WRITTEN = /nothing (?:was )?(?:changed|created|written)|no replaceme
 var WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
 function classifyError(message, cause) {
   if (cause instanceof CodedError) return { ...cause.envelope };
-  const text2 = cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
-${cause.message}` : message;
+  const text2 = stripQuoted(
+    cause instanceof Error && cause.message && !message.includes(cause.message) ? `${message}
+${cause.message}` : message
+  );
   const timeoutCause = typeof cause === "object" && cause !== null && cause.code === "ETIMEDOUT";
   let code = "operation_failed";
   if (timeoutCause) code = "timeout_indeterminate";
@@ -39657,6 +39913,24 @@ function errorResult(message, cause) {
     structuredContent: classifyError(message, cause),
     isError: true
   };
+}
+function unavailableWriteEnvelope(envelope) {
+  if (envelope.code !== "notes_unavailable" || envelope.indeterminate !== void 0 || envelope.committed !== void 0)
+    return envelope;
+  return { ...envelope, indeterminate: true };
+}
+var INPUT_VALIDATION = /^(?:MCP error -?\d+: )?Input validation error:/;
+function inputValidationEnvelope(message) {
+  const failure2 = identifierFailureIn(message);
+  const code = failure2 === "no_fda" ? "full_disk_access_missing" : failure2 === "not_found" ? "not_found" : failure2 === "query_error" ? "operation_failed" : "validation_error";
+  return { code, committed: false, indeterminate: false };
+}
+function sdkToolError(message) {
+  return INPUT_VALIDATION.test(message) ? errorResult(message, new CodedError(message, inputValidationEnvelope(message))) : errorResult(message);
+}
+function installSdkErrorCodes(server2) {
+  const target = server2;
+  if (typeof target.createToolError === "function") target.createToolError = sdkToolError;
 }
 
 // src/utils/inlineImages.ts
@@ -39700,10 +39974,10 @@ function strippedImagesWarning(stripped) {
 }
 
 // src/utils/noteRichText.ts
-import { execFileSync as execFileSync3 } from "node:child_process";
+import { execFileSync as execFileSync4 } from "node:child_process";
 import { createHash } from "node:crypto";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
 import { gunzipSync as gunzipSync2 } from "node:zlib";
 
 // src/utils/uniqueById.ts
@@ -39727,7 +40001,7 @@ var HTML_LOSSY_ORDER = [
   "alignment",
   "highlight"
 ];
-var dbPath = join2(homedir2(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+var dbPath = join3(homedir3(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
 var safeUrl = (url) => /^(?:https?:\/\/|notes:\/\/|applenotes:|mailto:)/i.test(url) && !Array.from(url).some((char) => char.charCodeAt(0) < 32);
 var escapeAttribute = (text2) => text2.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 var normalized = (text2) => text2.replace(/[\s\ufffc]/gu, "");
@@ -39859,7 +40133,7 @@ function readRichNote(id2) {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id2)?.[1];
   if (!pk) throw new Error("Invalid exact note ID");
   const sql = `BEGIN; SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE=${pk}; SELECT json_group_object(ZIDENTIFIER,ZALTTEXT) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} AND ZTYPEUTI1='com.apple.notes.inlinetextattachment.hashtag'; SELECT json_group_array(json_object('id',ZIDENTIFIER,'pk',Z_PK,'type',COALESCE(ZTYPEUTI1,ZTYPEUTI),'mergeable',hex(COALESCE(ZMERGEABLEDATA1,ZMERGEABLEDATA)),'view',ZATTACHMENTVIEWTYPE)) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} OR ZNOTE=${pk}; COMMIT;`;
-  const rows = execFileSync3("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
+  const rows = execFileSync4("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
     encoding: "utf8",
     timeout: 5e3,
     maxBuffer: 64 * 1024 * 1024,
@@ -40055,12 +40329,12 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
 }
 
 // src/utils/audioTranscripts.ts
-import { execFileSync as execFileSync4 } from "node:child_process";
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
+import { execFileSync as execFileSync5 } from "node:child_process";
+import { homedir as homedir4 } from "node:os";
+import { join as join4 } from "node:path";
 import { gunzipSync as gunzipSync3 } from "node:zlib";
-var NOTES_DB_PATH2 = join3(
-  homedir3(),
+var NOTES_DB_PATH3 = join4(
+  homedir4(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var DEFAULT_MAX_SEGMENTS = 2e3;
@@ -40228,10 +40502,11 @@ function buildTranscriptSql(pk, available) {
   if (!/^\d+$/.test(pk)) throw new Error("Invalid primary key");
   const optional2 = (column, key, alias = "a") => available.has(column) ? `, '${key}', ${alias}.${column}` : "";
   const locked = available.has("ZISPASSWORDPROTECTED") ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)" : "0";
+  const isNote = `n.Z_PK = ${pk} AND n.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')`;
   return [
     "BEGIN;",
     // Every statement yields exactly one row, so output lines stay positional.
-    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}), 'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = ${pk}));`,
+    `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${isNote}), 'locked', (SELECT ${locked} FROM ZICCLOUDSYNCINGOBJECT n WHERE ${isNote}));`,
     `SELECT COALESCE((SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = ${pk} LIMIT 1), '');`,
     "SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.ZMERGEABLEDATA1)" + optional2("ZDURATION", "duration") + optional2("ZNEEDSTRANSCRIPTION", "needsTranscription") + ", 'fragments', json((SELECT json_group_array(json_object('identifier', c.ZIDENTIFIER" + optional2("ZDURATION", "duration", "c") + `)) FROM ZICCLOUDSYNCINGOBJECT c WHERE c.ZPARENTATTACHMENT = a.Z_PK)))) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = ${pk} AND a.ZPARENTATTACHMENT IS NULL AND ${AUDIO_UTI_SQL};`,
     "COMMIT;"
@@ -40245,7 +40520,7 @@ var REQUIRED_COLUMNS = [
   "ZIDENTIFIER"
 ];
 function runSqlite(dbPath2, sql) {
-  return execFileSync4("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync5("sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 1e4,
     maxBuffer: 256 * 1024 * 1024,
@@ -40266,7 +40541,7 @@ function bodyAttachmentOrder(gzipped) {
 }
 function readAudioTranscripts(noteId3, options = {}) {
   const { store, pk } = parseNoteId(noteId3);
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH2;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH3;
   const maxSegments = Math.min(
     Math.max(1, Math.floor(options.maxSegments ?? DEFAULT_MAX_SEGMENTS)),
     MAX_SEGMENTS_LIMIT
@@ -40598,12 +40873,12 @@ function collectNoteTables(rich, noteId3) {
 }
 
 // src/utils/smartFolders.ts
-import { execFileSync as execFileSync5 } from "child_process";
-import * as fs2 from "fs";
-import * as os2 from "os";
-import * as path2 from "path";
-var NOTES_DB_PATH3 = path2.join(
-  os2.homedir(),
+import { execFileSync as execFileSync6 } from "child_process";
+import * as fs3 from "fs";
+import * as os3 from "os";
+import * as path3 from "path";
+var NOTES_DB_PATH4 = path3.join(
+  os3.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var FDA_MESSAGE = `Full Disk Access is required to read smart folders. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
@@ -40948,15 +41223,15 @@ function buildSmartFolders(output) {
   );
 }
 function runSqlite2(dbPath2, sql) {
-  return execFileSync5("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync6("sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 5e3,
     maxBuffer: 16 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"]
   });
 }
-function readSmartFolders(dbPath2 = NOTES_DB_PATH3) {
-  if (!fs2.existsSync(dbPath2)) return { folders: null, error: "no_fda", message: FDA_MESSAGE };
+function readSmartFolders(dbPath2 = NOTES_DB_PATH4) {
+  if (!fs3.existsSync(dbPath2)) return { folders: null, error: "no_fda", message: FDA_MESSAGE };
   try {
     const columns = new Set(
       runSqlite2(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").trim().split("\n")
@@ -40981,30 +41256,30 @@ function readSmartFolders(dbPath2 = NOTES_DB_PATH3) {
 }
 
 // src/utils/trashFolders.ts
-import { execFileSync as execFileSync6 } from "child_process";
-import * as fs3 from "fs";
-import * as os3 from "os";
-import * as path3 from "path";
-var NOTES_DB_PATH4 = path3.join(
-  os3.homedir(),
+import { execFileSync as execFileSync7 } from "child_process";
+import * as fs4 from "fs";
+import * as os4 from "os";
+import * as path4 from "path";
+var NOTES_DB_PATH5 = path4.join(
+  os4.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var RECENTLY_DELETED_FOLDER_NAME = "Recently Deleted";
 var CACHE_TTL_MS = 5 * 60 * 1e3;
 var cache = null;
 function query(dbPath2, sql) {
-  return execFileSync6("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync7("sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
   });
 }
-function readTrashFolderIds(dbPath2 = NOTES_DB_PATH4) {
+function readTrashFolderIds(dbPath2 = NOTES_DB_PATH5) {
   if (cache && cache.dbPath === dbPath2 && Date.now() - cache.at < CACHE_TTL_MS) {
     return cache.ids;
   }
   try {
-    if (!fs3.existsSync(dbPath2)) return [];
+    if (!fs4.existsSync(dbPath2)) return [];
     const columns = new Set(
       query(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
     );
@@ -41028,7 +41303,7 @@ function readTrashFolderIds(dbPath2 = NOTES_DB_PATH4) {
 import {
   closeSync,
   constants,
-  existsSync as existsSync4,
+  existsSync as existsSync5,
   fstatSync,
   lstatSync,
   mkdirSync,
@@ -41039,11 +41314,11 @@ import {
   rmSync,
   statSync
 } from "fs";
-import { dirname, isAbsolute, join as join6, relative, resolve, sep } from "path";
-import { homedir as homedir6, tmpdir } from "os";
+import { dirname, isAbsolute, join as join7, relative, resolve, sep } from "path";
+import { homedir as homedir7, tmpdir } from "os";
 function allowedSaveRoots() {
   return [
-    resolve(homedir6()),
+    resolve(homedir7()),
     resolve(tmpdir()),
     "/Volumes",
     "/private/var/folders",
@@ -41052,7 +41327,7 @@ function allowedSaveRoots() {
   ];
 }
 function deniedSaveRoots() {
-  return [join6(homedir6(), "Library/Group Containers/group.com.apple.notes")];
+  return [join7(homedir7(), "Library/Group Containers/group.com.apple.notes")];
 }
 function canonicalize(path10) {
   return realpathSync.native(path10);
@@ -41120,7 +41395,7 @@ function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRo
   if (suffix.split(sep).includes("..")) {
     throw new Error(`Refusing to write outside allowed locations (home, temp, /Volumes): "${abs}"`);
   }
-  const canonicalDest = suffix ? join6(canonicalAncestor, suffix) : canonicalAncestor;
+  const canonicalDest = suffix ? join7(canonicalAncestor, suffix) : canonicalAncestor;
   const allowed = canonicalRoots(roots);
   if (!isWithinRoots(canonicalAncestor, allowed) || !isWithinRoots(canonicalDest, allowed)) {
     throw new Error(
@@ -41214,13 +41489,13 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
 }
 function cleanupTempDir(dir) {
   try {
-    if (existsSync4(dir)) rmSync(dir, { recursive: true, force: true });
+    if (existsSync5(dir)) rmSync(dir, { recursive: true, force: true });
   } catch {
   }
 }
 
 // src/utils/paperAttachments.ts
-import { execFileSync as execFileSync8 } from "node:child_process";
+import { execFileSync as execFileSync9 } from "node:child_process";
 import {
   closeSync as closeSync3,
   constants as constants3,
@@ -41233,10 +41508,10 @@ import {
   unlinkSync as unlinkSync2,
   writeSync as writeSync2
 } from "node:fs";
-import { basename as basename2, dirname as dirname3, extname as extname2, join as join8 } from "node:path";
+import { basename as basename2, dirname as dirname3, extname as extname2, join as join9 } from "node:path";
 
 // src/utils/attachmentAssets.ts
-import { execFileSync as execFileSync7 } from "node:child_process";
+import { execFileSync as execFileSync8 } from "node:child_process";
 import {
   closeSync as closeSync2,
   constants as constants2,
@@ -41250,11 +41525,11 @@ import {
   unlinkSync,
   writeSync
 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { basename, dirname as dirname2, extname, isAbsolute as isAbsolute2, join as join7, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { basename, dirname as dirname2, extname, isAbsolute as isAbsolute2, join as join8, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
 import { gunzipSync as gunzipSync5 } from "node:zlib";
-var NOTES_CONTAINER_DIR = join7(
-  homedir7(),
+var NOTES_CONTAINER_DIR = join8(
+  homedir8(),
   "Library/Group Containers/group.com.apple.notes"
 );
 var AttachmentStoreError = class extends Error {
@@ -41359,7 +41634,7 @@ function buildAttachmentRowsSql(notePk, columns) {
 }
 function runSqlite3(dbPath2, sql) {
   try {
-    return execFileSync7("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+    return execFileSync8("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 1e4,
       maxBuffer: 128 * 1024 * 1024,
@@ -41427,7 +41702,7 @@ function attachmentOrderFromNoteData(hex3) {
     return null;
   }
 }
-function readNoteAttachmentRows(noteId3, dbPath2 = join7(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+function readNoteAttachmentRows(noteId3, dbPath2 = join8(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
   const columnList = runSqlite3(
     dbPath2,
@@ -41488,7 +41763,7 @@ function boundedEntries(dir, limit) {
   }
 }
 function resolveAccountDir(containerDir, accountIdentifier) {
-  const accountsDir = join7(containerDir, "Accounts");
+  const accountsDir = join8(containerDir, "Accounts");
   let accountsReal;
   try {
     accountsReal = realpathSync2.native(accountsDir);
@@ -41497,14 +41772,14 @@ function resolveAccountDir(containerDir, accountIdentifier) {
   }
   const account = safeComponent(accountIdentifier);
   if (account) {
-    const dir = realInside(join7(accountsReal, account), accountsReal);
+    const dir = realInside(join8(accountsReal, account), accountsReal);
     if (dir && isDirectory(dir)) return dir;
   }
   const entries2 = (boundedEntries(accountsReal, 64) ?? []).filter(
-    (e) => isDirectory(join7(accountsReal, e))
+    (e) => isDirectory(join8(accountsReal, e))
   );
   if (entries2.length !== 1) return null;
-  return realInside(join7(accountsReal, entries2[0]), accountsReal);
+  return realInside(join8(accountsReal, entries2[0]), accountsReal);
 }
 function generationRank(name) {
   const m = /^(\d+)_/.exec(name);
@@ -41512,23 +41787,23 @@ function generationRank(name) {
 }
 function generationDirs(base, accountDir) {
   const entries2 = boundedEntries(base, MAX_GENERATION_DIRS) ?? [];
-  return entries2.map((e) => realInside(join7(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
+  return entries2.map((e) => realInside(join8(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
 }
 function fallbackFiles(accountDir, rootName, identifier, generation, names) {
-  const base = join7(accountDir, rootName, identifier);
+  const base = join8(accountDir, rootName, identifier);
   const found = [];
   const add = (candidate) => {
     const real = realInside(candidate, accountDir);
     if (real && isRegularFile(real) && !found.includes(real)) found.push(real);
   };
   const gen = safeComponent(generation);
-  if (gen) for (const name of names) add(join7(base, gen, name));
+  if (gen) for (const name of names) add(join8(base, gen, name));
   if (isDirectory(base)) {
     for (const dir of generationDirs(base, accountDir))
-      for (const name of names) add(join7(dir, name));
-    for (const name of names) add(join7(base, name));
+      for (const name of names) add(join8(dir, name));
+    for (const name of names) add(join8(base, name));
   }
-  for (const name of names) add(join7(accountDir, rootName, `${identifier}${extname(name)}`));
+  for (const name of names) add(join8(accountDir, rootName, `${identifier}${extname(name)}`));
   return found;
 }
 function previewPixelArea(name) {
@@ -41540,7 +41815,7 @@ function previewFileInBundle(bundle, accountDir) {
   const direct = [];
   const nested = [];
   for (const entry of boundedEntries(bundle, MAX_BUNDLE_ENTRIES) ?? []) {
-    const child2 = realInside(join7(bundle, entry), accountDir);
+    const child2 = realInside(join8(bundle, entry), accountDir);
     if (!child2) continue;
     if (isRegularFile(child2)) direct.push(child2);
     else if (isDirectory(child2)) nested.push(child2);
@@ -41548,14 +41823,14 @@ function previewFileInBundle(bundle, accountDir) {
   nested.sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
   const pick2 = (files) => files.find((f) => basename(f) === "Preview.png") ?? files.find((f) => PREVIEW_IMAGE_SUFFIXES.has(extname(f).toLowerCase())) ?? null;
   for (const dir of nested) {
-    const files = (boundedEntries(dir, MAX_BUNDLE_ENTRIES) ?? []).map((e) => realInside(join7(dir, e), accountDir)).filter((p) => p !== null && isRegularFile(p));
+    const files = (boundedEntries(dir, MAX_BUNDLE_ENTRIES) ?? []).map((e) => realInside(join8(dir, e), accountDir)).filter((p) => p !== null && isRegularFile(p));
     const chosen = pick2(files);
     if (chosen) return chosen;
   }
   return pick2(direct);
 }
 function listPreviewEntries(accountDir) {
-  return boundedEntries(join7(accountDir, "Previews"), MAX_PREVIEW_DIR_ENTRIES) ?? [];
+  return boundedEntries(join8(accountDir, "Previews"), MAX_PREVIEW_DIR_ENTRIES) ?? [];
 }
 function previewPaths(accountDir, identifier, entries2) {
   const id2 = safeComponent(identifier);
@@ -41567,7 +41842,7 @@ function previewPaths(accountDir, identifier, entries2) {
   }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
   const files = [];
   for (const name of candidates) {
-    const real = realInside(join7(accountDir, "Previews", name), accountDir);
+    const real = realInside(join8(accountDir, "Previews", name), accountDir);
     if (!real) continue;
     const file = isRegularFile(real) ? real : isDirectory(real) ? previewFileInBundle(real, accountDir) : null;
     if (file && !files.includes(file)) files.push(file);
@@ -41584,13 +41859,13 @@ function assetPathsFor(accountDir, row) {
   const mediaName = safeComponent(row.mediaFilename);
   const mediaGen = safeComponent(row.mediaGeneration);
   if (mediaId && mediaName) {
-    if (mediaGen) add(join7(accountDir, "Media", mediaId, mediaGen, mediaName));
-    add(join7(accountDir, "Media", mediaId, mediaName));
+    if (mediaGen) add(join8(accountDir, "Media", mediaId, mediaGen, mediaName));
+    add(join8(accountDir, "Media", mediaId, mediaName));
   }
   const id2 = safeComponent(row.identifier);
   if (!id2) return found;
   const ownName = safeComponent(row.filename);
-  if (ownName) add(join7(accountDir, "Media", id2, ownName));
+  if (ownName) add(join8(accountDir, "Media", id2, ownName));
   for (const file of fallbackFiles(accountDir, "FallbackImages", id2, row.fallbackImageGeneration, [
     "FallbackImage.png",
     "FallbackImage.jpg"
@@ -41681,10 +41956,10 @@ function canonicalTail(p) {
   const tail = [];
   for (; ; ) {
     try {
-      return join7(realpathSync2.native(current), ...tail);
+      return join8(realpathSync2.native(current), ...tail);
     } catch {
       const parent = dirname2(current);
-      if (parent === current) return join7(current, ...tail);
+      if (parent === current) return join8(current, ...tail);
       tail.unshift(basename(current));
       current = parent;
     }
@@ -41766,7 +42041,7 @@ function exportOneAttachment(record2, dir, source) {
   if (!source) return base;
   const name = exportFileName(record2, source.path, source.kind);
   for (let attempt = 1; attempt <= MAX_COLLISION_SUFFIX; attempt++) {
-    const dest = join7(dir, collisionName(name, attempt));
+    const dest = join8(dir, collisionName(name, attempt));
     try {
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
@@ -41893,7 +42168,7 @@ function buildDrawingRowsSql(notePk, columns) {
 }
 function runSqlite4(dbPath2, sql) {
   try {
-    return execFileSync8("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
+    return execFileSync9("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 1e4,
       maxBuffer: 16 * 1024 * 1024,
@@ -41933,7 +42208,7 @@ function parseDrawingRows(json2) {
   }
   return rows.sort((a, b) => a.pk - b.pk);
 }
-function readDrawingRows(noteId3, dbPath2 = join8(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
+function readDrawingRows(noteId3, dbPath2 = join9(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
   const columns = new Set(
     runSqlite4(
@@ -41977,16 +42252,16 @@ var byGenerationDesc = (a, b) => generationRank(basename2(b)) - generationRank(b
 function findFallbackImage(accountDir, identifier, generation) {
   const id2 = safeComponent(identifier);
   if (!id2) return null;
-  const base = join8(accountDir, "FallbackImages", id2);
+  const base = join9(accountDir, "FallbackImages", id2);
   const names = ["FallbackImage.png", "FallbackImage.jpg"];
   const candidates = [];
   const gen = safeComponent(generation);
-  if (gen) for (const n of names) candidates.push(join8(base, gen, n));
-  const gens = entries(base, MAX_DIR_ENTRIES).map((e) => join8(base, e)).sort(byGenerationDesc);
-  for (const g of gens) for (const n of names) candidates.push(join8(g, n));
-  for (const n of names) candidates.push(join8(base, n));
-  candidates.push(join8(accountDir, "FallbackImages", `${id2}.png`));
-  candidates.push(join8(accountDir, "FallbackImages", `${id2}.jpg`));
+  if (gen) for (const n of names) candidates.push(join9(base, gen, n));
+  const gens = entries(base, MAX_DIR_ENTRIES).map((e) => join9(base, e)).sort(byGenerationDesc);
+  for (const g of gens) for (const n of names) candidates.push(join9(g, n));
+  for (const n of names) candidates.push(join9(base, n));
+  candidates.push(join9(accountDir, "FallbackImages", `${id2}.png`));
+  candidates.push(join9(accountDir, "FallbackImages", `${id2}.jpg`));
   for (const c of candidates) {
     const real = realInside(c, accountDir);
     if (real && kindOf(real) === "file") return real;
@@ -41996,21 +42271,21 @@ function findFallbackImage(accountDir, identifier, generation) {
 function findLargestPreview(accountDir, identifier) {
   const id2 = safeComponent(identifier);
   if (!id2) return null;
-  const dir = join8(accountDir, "Previews");
+  const dir = join9(accountDir, "Previews");
   const prefix = `${id2}-`.toLowerCase();
   const names = entries(dir, MAX_PREVIEW_DIR_ENTRIES2).filter((n) => n.toLowerCase().startsWith(prefix)).filter((n) => {
     const ext = extname2(n).toLowerCase();
     return !ext || IMAGE_SUFFIXES.has(ext) || /^\.\d+$/.test(ext);
   }).sort((a, b) => previewPixelArea(b) - previewPixelArea(a) || a.localeCompare(b));
   for (const name of names) {
-    const real = realInside(join8(dir, name), accountDir);
+    const real = realInside(join9(dir, name), accountDir);
     if (!real) continue;
     const kind = kindOf(real);
     if (kind === "file") return real;
     if (kind !== "dir") continue;
-    const gens = entries(real, MAX_DIR_ENTRIES).map((e) => realInside(join8(real, e), accountDir)).filter((p) => p !== null && kindOf(p) === "dir").sort(byGenerationDesc);
+    const gens = entries(real, MAX_DIR_ENTRIES).map((e) => realInside(join9(real, e), accountDir)).filter((p) => p !== null && kindOf(p) === "dir").sort(byGenerationDesc);
     for (const g of [...gens, real]) {
-      const file = realInside(join8(g, "Preview.png"), accountDir);
+      const file = realInside(join9(g, "Preview.png"), accountDir);
       if (file && kindOf(file) === "file") return file;
     }
   }
@@ -42023,7 +42298,7 @@ function describeDrawings(rows, containerDir = NOTES_CONTAINER_DIR) {
     const id2 = safeComponent(row.identifier);
     const fallbackImagePath = accountDir ? findFallbackImage(accountDir, row.identifier, row.fallbackImageGeneration) : null;
     const previewPath = accountDir ? findLargestPreview(accountDir, row.identifier) : null;
-    const bundle = accountDir && id2 && kind === "paper" ? realInside(join8(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
+    const bundle = accountDir && id2 && kind === "paper" ? realInside(join9(accountDir, "Paper", "Bundles", `${id2}.bundle`), accountDir) : null;
     let raster = null;
     for (const [path10, source] of [
       [fallbackImagePath, "fallback"],
@@ -42220,9 +42495,9 @@ function scopeConflictMessage(reason) {
 
 // src/services/appleNotesManager.ts
 var import_turndown = __toESM(require_turndown_cjs(), 1);
-import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync } from "fs";
-import { homedir as homedir8, tmpdir as tmpdir2 } from "os";
-import { join as join9 } from "path";
+import { existsSync as existsSync6, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync } from "fs";
+import { homedir as homedir9, tmpdir as tmpdir2 } from "os";
+import { join as join10 } from "path";
 var FIELD_SEP = "";
 var RECORD_SEP = "";
 var AS_FIELD_SEP = "(character id 31)";
@@ -42444,6 +42719,11 @@ function smartFolderDestinationError(folderPath) {
     }
   );
 }
+function smartFoldersReadError(kind, message) {
+  return new CodedError(message, {
+    code: kind === "unsupported_schema" ? "unsupported" : kind === "no_fda" ? "full_disk_access_missing" : "operation_failed"
+  });
+}
 function throwIfSmartFolderDestination(error2, folderPath) {
   if (error2?.includes(SMART_FOLDER_DESTINATION)) throw smartFolderDestinationError(folderPath);
 }
@@ -42579,8 +42859,8 @@ var ExpectedBodies = class {
     if (body.length <= INLINE_EXPECTED_BODY_LIMIT) {
       return { setup: "", operand: `"${escapeHtmlForAppleScript(body)}"` };
     }
-    this.directory ??= mkdtempSync2(join9(tmpdir2(), "apple-notes-expected-body-"));
-    const file = join9(this.directory, `body-${this.files++}.html`);
+    this.directory ??= mkdtempSync2(join10(tmpdir2(), "apple-notes-expected-body-"));
+    const file = join10(this.directory, `body-${this.files++}.html`);
     writeFileSync(file, body, { encoding: "utf8", mode: 384 });
     return {
       setup: `
@@ -42626,8 +42906,8 @@ function getNoteLinkFromDB(coreDataId3) {
   const match = coreDataId3.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
-  const dbPath2 = join9(homedir8(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
-  if (!existsSync5(dbPath2)) return null;
+  const dbPath2 = join10(homedir9(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
+  if (!existsSync6(dbPath2)) return null;
   try {
     const { DatabaseSync } = __require("node:sqlite");
     const db = new DatabaseSync(dbPath2, { readOnly: true });
@@ -43261,9 +43541,12 @@ var AppleNotesManager = class {
         if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      set __stillThere to missing value
       try
-        if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        set __stillThere to (id of notes of originalFolder) contains "${safeId}"
       end try
+      if __stillThere is missing value then return "SAFETY_DELETE_UNVERIFIED"
+      if __stillThere then return "SAFETY_NOT_DELETED"
       return "SAFETY_DELETED"
     `);
       result = executeMutationAppleScript(script);
@@ -43286,6 +43569,7 @@ var AppleNotesManager = class {
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
+    if (status === "SAFETY_DELETE_UNVERIFIED") return { status: "unverified" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
   /**
@@ -43433,7 +43717,8 @@ var AppleNotesManager = class {
    */
   listSmartFolders(options = {}) {
     const result = readSmartFolders();
-    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!result.folders)
+      throw smartFoldersReadError(result.error, result.message || "Failed to read smart folders.");
     if (!options.includeMatchingNotes) return result.folders;
     const limit = options.limit ?? 50;
     return result.folders.map((folder) => {
@@ -44821,7 +45106,7 @@ var AppleNotesManager = class {
     if (parts[0] !== "OK") {
       return { success: false, error: parts[1]?.trim() || "attachment not found" };
     }
-    if (!existsSync5(abs) || fileSize(abs) === 0) {
+    if (!existsSync6(abs) || fileSize(abs) === 0) {
       return { success: false, error: `Notes reported success but no file was written to ${abs}` };
     }
     return {
@@ -45329,15 +45614,15 @@ var AppleNotesManager = class {
 };
 
 // src/utils/syncDetection.ts
-import { execFileSync as execFileSync9 } from "child_process";
-import * as fs4 from "fs";
-import * as path4 from "path";
-import * as os4 from "os";
-var NOTES_DB_PATH5 = path4.join(
-  os4.homedir(),
+import { execFileSync as execFileSync10 } from "child_process";
+import * as fs5 from "fs";
+import * as path5 from "path";
+import * as os5 from "os";
+var NOTES_DB_PATH6 = path5.join(
+  os5.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var WAL_PATH = `${NOTES_DB_PATH5}-wal`;
+var WAL_PATH = `${NOTES_DB_PATH6}-wal`;
 var RECENT_ACTIVITY_THRESHOLD_SECONDS = 5;
 var SYNC_STATUS_CACHE_TTL_MS = 2e3;
 var cachedSyncStatus = null;
@@ -45353,14 +45638,14 @@ function getSyncStatus(useCache = true) {
     recentActivity: false
   };
   try {
-    if (!fs4.existsSync(NOTES_DB_PATH5)) {
+    if (!fs5.existsSync(NOTES_DB_PATH6)) {
       status.error = "Notes database not found";
       cachedSyncStatus = status;
       cacheTimestamp = Date.now();
       return status;
     }
-    if (fs4.existsSync(WAL_PATH)) {
-      const walStats = fs4.statSync(WAL_PATH);
+    if (fs5.existsSync(WAL_PATH)) {
+      const walStats = fs5.statSync(WAL_PATH);
       const secondsAgo = (Date.now() - walStats.mtimeMs) / 1e3;
       status.secondsSinceLastChange = Math.round(secondsAgo);
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
@@ -45374,9 +45659,9 @@ function getSyncStatus(useCache = true) {
         WHERE object.ZCLOUDSTATE = state.Z_PK
       );
     `;
-    const result = execFileSync9(
+    const result = execFileSync10(
       "sqlite3",
-      ["-readonly", NOTES_DB_PATH5, query2.replace(/\n/g, " ")],
+      ["-readonly", NOTES_DB_PATH6, query2.replace(/\n/g, " ")],
       {
         encoding: "utf8",
         timeout: 5e3,
@@ -45433,12 +45718,12 @@ function withSyncAwarenessSync(operation, fn) {
 }
 
 // src/utils/noteMetadata.ts
-import { execFileSync as execFileSync10 } from "child_process";
-import * as fs5 from "fs";
-import * as path5 from "path";
-import * as os5 from "os";
-var NOTES_DB_PATH6 = path5.join(
-  os5.homedir(),
+import { execFileSync as execFileSync11 } from "child_process";
+import * as fs6 from "fs";
+import * as path6 from "path";
+import * as os6 from "os";
+var NOTES_DB_PATH7 = path6.join(
+  os6.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var FDA_MESSAGE2 = `Full Disk Access is required to read note metadata. In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server (required under Claude Desktop) or the terminal that launches it, then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} \u2014 run the doctor tool to verify.`;
@@ -45454,7 +45739,7 @@ var COLUMN_MAP = [
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
 function runSqlite5(query2) {
-  return execFileSync10("sqlite3", ["-readonly", NOTES_DB_PATH6, query2], {
+  return execFileSync11("sqlite3", ["-readonly", NOTES_DB_PATH7, query2], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -45479,7 +45764,7 @@ function getNoteMetadata(noteId3) {
     };
   }
   const pk = pkMatch[1];
-  if (!fs5.existsSync(NOTES_DB_PATH6)) {
+  if (!fs6.existsSync(NOTES_DB_PATH7)) {
     return { metadata: null, error: "no_fda", message: FDA_MESSAGE2 };
   }
   try {
@@ -45525,12 +45810,12 @@ function getNoteMetadata(noteId3) {
 import { gunzipSync as gunzipSync6 } from "zlib";
 
 // src/utils/noteStoreSql.ts
-import { execFileSync as execFileSync11 } from "child_process";
-import * as fs6 from "fs";
-import * as os6 from "os";
-import * as path6 from "path";
-var NOTES_DB_PATH7 = path6.join(
-  os6.homedir(),
+import { execFileSync as execFileSync12 } from "child_process";
+import * as fs7 from "fs";
+import * as os7 from "os";
+import * as path7 from "path";
+var NOTES_DB_PATH8 = path7.join(
+  os7.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
@@ -45568,7 +45853,7 @@ function renderValue(value) {
   return `ieee754_from_blob(x'${doubleToHex(double)}')`;
 }
 function runReadOnlySql(dbPath2, sql, params = {}) {
-  if (!fs6.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+  if (!fs7.existsSync(dbPath2)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
   const args = ["-readonly"];
   const names = Object.keys(params);
   if (names.length) args.push("-cmd", ".parameter init");
@@ -45580,7 +45865,7 @@ function runReadOnlySql(dbPath2, sql, params = {}) {
   }
   args.push(dbPath2, sql);
   try {
-    return execFileSync11("sqlite3", args, {
+    return execFileSync12("sqlite3", args, {
       encoding: "utf8",
       timeout: 3e4,
       maxBuffer: 512 * 1024 * 1024,
@@ -45773,7 +46058,7 @@ function buildSpecialNotesSql(columns, kind, scoped) {
   ].join(" ");
 }
 function listSpecialNotes(options) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
   const limit = Math.min(
     Math.max(1, Math.trunc(options.limit ?? SPECIAL_LIMIT.DEFAULT)),
     SPECIAL_LIMIT.MAX
@@ -45829,7 +46114,7 @@ function toSpecialRow(row, uuid2, paths, accountNames, kind) {
   return note;
 }
 var EXACT_NOTE_ID = /^x-coredata:\/\/([0-9A-F-]+)\/ICNote\/p(\d+)$/i;
-function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH7) {
+function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH8) {
   const match = EXACT_NOTE_ID.exec(noteId3);
   if (!match) throw new NoteStoreError(`Not an exact note id: ${noteId3}`, "invalid_input");
   const columns = readColumns(dbPath2);
@@ -45881,7 +46166,7 @@ function referencedObjects(hex3) {
   }
 }
 function nativeTagInventory(options = {}) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
   const columns = readColumns(dbPath2);
   const context = readStoreContext(dbPath2, columns);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
@@ -45943,15 +46228,27 @@ function assembleInventory(rows, accounts, scope2) {
 }
 
 // src/utils/noteBlocks.ts
-import { execFileSync as execFileSync12 } from "node:child_process";
-import { existsSync as existsSync9 } from "node:fs";
-import { homedir as homedir12 } from "node:os";
-import { join as join13 } from "node:path";
+import { execFileSync as execFileSync13 } from "node:child_process";
+import { existsSync as existsSync10 } from "node:fs";
+import { homedir as homedir13 } from "node:os";
+import { join as join14 } from "node:path";
 import { gunzipSync as gunzipSync7 } from "node:zlib";
-var NoteBlocksError = class extends Error {
+var NOTE_BLOCKS_ERROR_CODES = {
+  "invalid-id": "validation_error",
+  "no-full-disk-access": "full_disk_access_missing",
+  "not-found": "not_found",
+  "no-body": "operation_failed",
+  encrypted: "unsupported",
+  "decompress-failed": "unsupported",
+  "malformed-protobuf": "unsupported",
+  "unsupported-structure": "unsupported",
+  "invalid-runs": "unsupported",
+  "query-failed": "operation_failed"
+};
+var NoteBlocksError = class extends CodedError {
   code;
   constructor(code, message) {
-    super(message);
+    super(message, { code: NOTE_BLOCKS_ERROR_CODES[code] });
     this.name = "NoteBlocksError";
     this.code = code;
   }
@@ -46289,23 +46586,23 @@ function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResp
     undecodedFields: doc.undecodedFields
   };
 }
-var NOTES_DB_PATH8 = join13(
-  homedir12(),
+var NOTES_DB_PATH9 = join14(
+  homedir13(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH8 } = {}) {
+function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH9 } = {}) {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,18})$/i.exec(id2)?.[1];
   if (!pk)
     throw new NoteBlocksError(
       "invalid-id",
       `Invalid note ID: expected x-coredata://<store>/ICNote/p<number>`
     );
-  if (!existsSync9(dbPath2))
+  if (!existsSync10(dbPath2))
     throw new NoteBlocksError("no-full-disk-access", "The Notes database is not readable");
   const sql = "SELECT json_object('exists', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT WHERE Z_PK = @pk AND Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICNote')), 'data', (SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE = @pk), 'encrypted', (SELECT ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA WHERE ZNOTE = @pk));";
   let output;
   try {
-    output = execFileSync12(
+    output = execFileSync13(
       "/usr/bin/sqlite3",
       ["-readonly", "-cmd", ".parameter init", "-cmd", `.parameter set @pk ${pk}`, dbPath2, sql],
       {
@@ -46452,7 +46749,7 @@ function resolveFolderPath(folders, paths, input, accountPk) {
   );
 }
 function listRecentNotes(options = {}) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
   const limit = Math.min(
     Math.max(1, Math.trunc(options.limit ?? RECENT_LIMIT.DEFAULT)),
     RECENT_LIMIT.MAX
@@ -46534,7 +46831,7 @@ function compareNodes(a, b) {
   return KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name);
 }
 function folderTree(options = {}) {
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
   const columns = readColumns(dbPath2);
   const context = readStoreContext(dbPath2, columns);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
@@ -46609,244 +46906,6 @@ function assembleFolderTree(context, counts, includeDeleted, scope2) {
 }
 function countNodes(nodes) {
   return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children), 0);
-}
-
-// src/utils/noteIdentifiers.ts
-import { execFileSync as execFileSync13 } from "child_process";
-import * as fs7 from "fs";
-import * as os7 from "os";
-import * as path7 from "path";
-var NOTES_DB_PATH9 = path7.join(
-  os7.homedir(),
-  "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
-);
-var UUID_PATTERN = /^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/;
-var NUMERIC_KEY_PATTERN = /^\d{1,18}$/;
-var NOTE_ID_MESSAGE = "A canonical Apple Note ID is required (x-coredata://.../ICNote/p...), or the note's Notes UUID or numeric key";
-function identifierForm(value) {
-  if (UUID_PATTERN.test(value)) return "uuid";
-  if (NUMERIC_KEY_PATTERN.test(value)) return "key";
-  return "other";
-}
-function isAlternateIdentifier(value) {
-  return identifierForm(value) !== "other";
-}
-var IdentifierResolutionError = class extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-    this.name = "IdentifierResolutionError";
-  }
-  code;
-};
-var ENTITY_LABEL = {
-  ICNote: "note",
-  ICFolder: "folder",
-  ICAccount: "account"
-};
-var NO_FDA_MESSAGE = `Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access for the Node binary running this server, or the terminal that launches it (System Settings > Privacy & Security > Full Disk Access, then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
-function canonicalKey(value) {
-  return BigInt(value).toString();
-}
-function assertAll(values, pattern2, label) {
-  for (const value of values) {
-    if (!pattern2.test(value)) throw new Error(`Refusing to query with an invalid ${label}`);
-  }
-}
-function entityClause(entity3) {
-  return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = '${entity3}')`;
-}
-function buildResolveSql(entity3, keys, uuids) {
-  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
-  assertAll(uuids, UUID_PATTERN, "UUID");
-  const matches = [];
-  if (keys.length > 0) {
-    matches.push(`o.Z_PK IN (${[...new Set(keys.map(canonicalKey))].join(", ")})`);
-  }
-  if (uuids.length > 0) {
-    const variants = /* @__PURE__ */ new Set();
-    for (const uuid2 of uuids) {
-      variants.add(uuid2);
-      variants.add(uuid2.toUpperCase());
-      variants.add(uuid2.toLowerCase());
-    }
-    matches.push(`o.ZIDENTIFIER IN (${[...variants].map((v) => `'${v}'`).join(", ")})`);
-  }
-  const where = matches.length > 0 ? matches.join(" OR ") : "0";
-  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object('pk', o.Z_PK, 'identifier', o.ZIDENTIFIER)) FROM ZICCLOUDSYNCINGOBJECT o WHERE o.Z_ENT = ${entityClause(entity3)} AND (${where})));`;
-}
-function buildLookupSql(entity3, keys) {
-  assertAll(keys, NUMERIC_KEY_PATTERN, "numeric key");
-  const pks = [...new Set(keys.map(canonicalKey))];
-  const inList = pks.length > 0 ? pks.join(", ") : "NULL";
-  let fields = "'pk', o.Z_PK, 'identifier', o.ZIDENTIFIER";
-  let joins = "";
-  if (entity3 === "ICNote") {
-    fields += ", 'folderIdentifier', f.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
-    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = o.ZFOLDER LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = f.ZOWNER ";
-  } else if (entity3 === "ICFolder") {
-    fields += ", 'parentIdentifier', p.ZIDENTIFIER, 'accountIdentifier', a.ZIDENTIFIER";
-    joins = "LEFT JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = o.ZPARENT LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = o.ZOWNER ";
-  }
-  return `SELECT json_object('store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'rows', (SELECT json_group_array(json_object(${fields})) FROM ZICCLOUDSYNCINGOBJECT o ${joins}WHERE o.Z_ENT = ${entityClause(entity3)} AND o.Z_PK IN (${inList})));`;
-}
-function runJsonQuery(sql, dbPath2) {
-  if (!fs7.existsSync(dbPath2)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
-  let out;
-  try {
-    out = execFileSync13("sqlite3", ["-readonly", dbPath2, sql], {
-      encoding: "utf8",
-      timeout: 5e3,
-      stdio: ["pipe", "pipe", "pipe"]
-    }).trim();
-  } catch (error2) {
-    const detail = error2 instanceof Error ? `${error2.message} ${String(error2.stderr ?? "")}` : String(error2);
-    if (detail.includes("authorization denied") || detail.includes("unable to open database")) {
-      throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
-    }
-    console.error(`Identifier query failed: ${detail}`);
-    throw new IdentifierResolutionError("query_error", "Failed to read the Notes database.");
-  }
-  const parsed = JSON.parse(out || "{}");
-  const rows = typeof parsed.rows === "string" ? JSON.parse(parsed.rows) : parsed.rows;
-  return { store: parsed.store ?? null, rows: rows ?? [] };
-}
-function coreDataId(store, entity3, pk) {
-  return `x-coredata://${store}/${entity3}/p${pk}`;
-}
-function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH9) {
-  const resolved = /* @__PURE__ */ new Map();
-  const keys = [];
-  const uuids = [];
-  for (const value of values) {
-    const form = identifierForm(value);
-    if (form === "key") keys.push(value);
-    else if (form === "uuid") uuids.push(value);
-    else resolved.set(value, value);
-  }
-  if (keys.length === 0 && uuids.length === 0) return resolved;
-  const { store, rows } = runJsonQuery(
-    buildResolveSql(entity3, keys, uuids),
-    dbPath2
-  );
-  if (!store) {
-    throw new IdentifierResolutionError(
-      "query_error",
-      "The Notes database has no store UUID, so an x-coredata id cannot be built."
-    );
-  }
-  const byKey = new Map(rows.map((row) => [String(row.pk), row]));
-  const byUuid = new Map(
-    rows.filter((row) => row.identifier).map((row) => [String(row.identifier).toUpperCase(), row])
-  );
-  const label = ENTITY_LABEL[entity3];
-  const missing = [];
-  for (const key of keys) {
-    const row = byKey.get(canonicalKey(key));
-    if (row) resolved.set(key, coreDataId(store, entity3, row.pk));
-    else missing.push(`numeric key ${key}`);
-  }
-  for (const uuid2 of uuids) {
-    const row = byUuid.get(uuid2.toUpperCase());
-    if (row) resolved.set(uuid2, coreDataId(store, entity3, row.pk));
-    else missing.push(`identifier ${uuid2}`);
-  }
-  if (missing.length > 0) {
-    throw new IdentifierResolutionError(
-      "not_found",
-      `No ${label} found for ${missing.join(", ")}. A numeric key must belong to a ${label}, not another object type.`
-    );
-  }
-  return resolved;
-}
-var COREDATA_PARTS = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/(ICNote|ICFolder|ICAccount)\/p(\d{1,18})$/;
-function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH9) {
-  const result = /* @__PURE__ */ new Map();
-  const wanted = /* @__PURE__ */ new Map();
-  for (const id2 of ids) {
-    const match = COREDATA_PARTS.exec(id2);
-    if (!match || match[2] !== entity3) continue;
-    const pk = canonicalKey(match[3]);
-    const list = wanted.get(pk) ?? [];
-    list.push({ id: id2, store: match[1] });
-    wanted.set(pk, list);
-  }
-  if (wanted.size === 0) return result;
-  let query2;
-  try {
-    query2 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
-  } catch {
-    return result;
-  }
-  const store = query2.store?.toUpperCase();
-  for (const row of query2.rows) {
-    const fields = {};
-    for (const key of [
-      "identifier",
-      "folderIdentifier",
-      "parentIdentifier",
-      "accountIdentifier"
-    ]) {
-      const value = row[key];
-      if (typeof value === "string" && value) fields[key] = value;
-    }
-    for (const target of wanted.get(String(row.pk)) ?? []) {
-      if (target.store.toUpperCase() === store) result.set(target.id, fields);
-    }
-  }
-  return result;
-}
-function withStableIdentifiers(items, entity3, dbPath2 = NOTES_DB_PATH9) {
-  const ids = items.map((item) => item.id).filter((id2) => typeof id2 === "string");
-  if (ids.length === 0) return items;
-  const found = lookupStableIdentifiers(ids, entity3, dbPath2);
-  if (found.size === 0) return items;
-  return items.map(
-    (item) => item.id && found.has(item.id) ? { ...item, ...found.get(item.id) } : item
-  );
-}
-var defaultResolver = (values, entity3) => resolveIdentifiers(values, entity3);
-var DEFAULT_MAX_ID_LENGTH = 2e3;
-function acceptAlternateForms(pattern2) {
-  return new RegExp(
-    `${pattern2.source}|${UUID_PATTERN.source}|${NUMERIC_KEY_PATTERN.source}`,
-    pattern2.flags
-  );
-}
-function resolveInSchema(values, entity3, ctx, resolver) {
-  if (!values.some(isAlternateIdentifier)) return new Map(values.map((v) => [v, v]));
-  try {
-    return resolver(values, entity3);
-  } catch (error2) {
-    ctx.addIssue({
-      code: external_exports.ZodIssueCode.custom,
-      message: error2 instanceof Error ? error2.message : String(error2)
-    });
-    return null;
-  }
-}
-function exactIdInput(entity3, pattern2, message, options = {}) {
-  const resolver = options.resolver ?? defaultResolver;
-  return external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message).transform((value, ctx) => {
-    const map = resolveInSchema([value], entity3, ctx, resolver);
-    return map ? map.get(value) ?? value : external_exports.NEVER;
-  });
-}
-function exactIdArrayInput(entity3, pattern2, message, options = {}) {
-  const resolver = options.resolver ?? defaultResolver;
-  const item = external_exports.string().max(options.maxLength ?? DEFAULT_MAX_ID_LENGTH).regex(acceptAlternateForms(pattern2), message);
-  const array2 = options.maxItems === void 0 ? external_exports.array(item) : external_exports.array(item).max(options.maxItems);
-  return array2.transform((values, ctx) => {
-    const map = resolveInSchema(values, entity3, ctx, resolver);
-    return map ? values.map((value) => map.get(value) ?? value) : external_exports.NEVER;
-  });
-}
-function looseIdTransform(entity3, resolver = defaultResolver) {
-  return (value, ctx) => {
-    if (!isAlternateIdentifier(value)) return value;
-    const map = resolveInSchema([value], entity3, ctx, resolver);
-    return map ? map.get(value) ?? value : external_exports.NEVER;
-  };
 }
 
 // src/utils/contentWarnings.ts
@@ -48531,7 +48590,15 @@ function mutateBackground(request, operation, data, verify, deps) {
     transportError = error2 ?? {};
     transportMessage = describeTransportFailure(error2);
   }
-  const after = deps.read(request.id);
+  let after;
+  try {
+    after = deps.read(request.id);
+  } catch (error2) {
+    throw new CodedError(
+      `Operation outcome uncertain; read exact note before any retry: readback failed: ${error2 instanceof Error ? error2.message : String(error2)}${transportMessage ? "; " + transportMessage : ""}`,
+      { code: "verification_failed", indeterminate: true }
+    );
+  }
   try {
     verify(before, after);
   } catch (error2) {
@@ -48797,14 +48864,27 @@ var FEATURES = [
   },
   {
     name: "fullDiskAccessReads",
-    description: "Read-only reads of the Notes database: query-notes, checklist state, note metadata, note links, native objects, native tags, and sync detail",
+    description: "Read-only reads of the Notes database: queries, checklist state, metadata, links, note structure, tables, native objects, tags, smart folders, special and recent notes, folder tree, Paper and attachment exports, Markdown and HTML exports, and sync detail",
     tools: [
       "query-notes",
       "get-checklist-state",
       "get-note-metadata",
       "get-note-link",
       "get-native-objects",
+      "get-note-blocks",
+      "get-note-structure",
+      "get-note-tables",
+      "list-note-links",
       "list-native-tags",
+      "list-smart-folders",
+      "list-special-notes",
+      "list-recent-notes",
+      "list-folder-tree",
+      "list-paper-attachments",
+      "export-paper-image",
+      "export-attachments",
+      "export-notes-markdown",
+      "export-notes-html",
       "get-note-markdown (checklist annotations)",
       "get-sync-status (pending uploads)"
     ],
@@ -48865,7 +48945,8 @@ var FEATURES = [
   // Placeholders for features that need a native WRITE helper, which this
   // server does not ship. The opt-in private helper is read-only (write
   // support was deliberately deferred), so enabling or installing it changes
-  // nothing here: these always report `not_implemented`.
+  // nothing here: these always report `not_implemented`. Reading smart folders
+  // is available through list-smart-folders (fullDiskAccessReads).
   {
     name: "checklistToggle",
     description: "Check or uncheck an existing checklist item in place",
@@ -48889,17 +48970,17 @@ var FEATURES = [
   },
   {
     name: "paragraphLinks",
-    description: "Link to a specific paragraph or heading inside a note",
-    tools: [],
+    description: "List a note's paragraphs and return a link that opens Notes at one paragraph or heading, read from the Notes database",
+    tools: ["list-note-paragraphs", "get-paragraph-link"],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_write_helper" }]
+    requirements: [{ kind: "full_disk_access" }]
   },
   {
     name: "audioTranscription",
-    description: "Transcribe audio recordings attached to a note",
-    tools: [],
+    description: "Read the transcripts Notes stored for a note's audio recordings, or transcribe them on this Mac (transcribe-note-audio also needs the public helper built with setup --public-helper)",
+    tools: ["get-audio-transcripts", "transcribe-note-audio"],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_write_helper" }]
+    requirements: [{ kind: "full_disk_access" }]
   },
   {
     name: "markdownTemplateLibrary",
@@ -49570,7 +49651,7 @@ function resolveNote(dbPath2, columns, selector) {
 function noteBodySql(columns) {
   return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
 }
-function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH7 } = {}) {
+function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH8 } = {}) {
   checkNoteSelector(selector);
   const columns = readColumns(dbPath2);
   const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
@@ -49799,7 +49880,7 @@ function describeNoteStructure(s) {
   if (s.isShared) parts.push("shared");
   return `Note structure: ${parts.join("; ")}.`;
 }
-function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH7, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
+function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH8, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
   const { pk } = parseNoteId2(id2);
   const columns = readColumns(dbPath2);
   const rows = parseJsonLines(
@@ -50045,7 +50126,7 @@ function decodeBodies(dbPath2, sql, params) {
 }
 var KIND_ORDER2 = { inline: 0, card: 1, note: 2, section: 3 };
 function listNoteLinks(options = {}) {
-  const { dbPath: dbPath2 = NOTES_DB_PATH7, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
+  const { dbPath: dbPath2 = NOTES_DB_PATH8, offset = 0, limit = 200, maxBytes = 4 * 1024 * 1024 } = options;
   if (options.id && (options.account || options.folder))
     throw new NoteStoreError("Pass either id or account/folder, not both.", "invalid_input");
   const notePk = options.id ? parseNoteId2(options.id).pk : 0;
@@ -50267,8 +50348,9 @@ function insertLink(request, deps) {
   try {
     readback = verifyLinkReadback(before, deps.readLinks(request.id), insertion, request.url);
   } catch (error2) {
-    throw new Error(
-      `The text was written, but link verification failed: ${error2 instanceof Error ? error2.message : String(error2)}. Do not retry automatically.`
+    throw new CodedError(
+      `The text was written, but link verification failed: ${error2 instanceof Error ? error2.message : String(error2)}. Do not retry automatically.`,
+      { code: "verification_failed", committed: true, indeterminate: true }
     );
   }
   return {
@@ -53480,7 +53562,7 @@ function registerDirectOperations(server2, manager) {
   );
   tool(
     "create-note-with-attachment",
-    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails after the note exists, the error names the new note's id; attach to it with add-attachment instead of creating another note.",
+    "Use when: creating a new note that holds one local file, in one call.\nReturns: the new note id plus the add-attachment result (attachment id, bytes, name, content hash).\nDo not use when: the note already exists (add-attachment).\nSafety: checks the file and filename before creating anything, creates the note through Notes.app like create-note, then attaches with the same byte verification as add-attachment. If the attachment step fails before the file is inserted, the error names the new note's id; attach to it with add-attachment instead of creating another note. If insertion started but could not be verified, the outcome is uncertain: read the note with list-attachments before attaching again.",
     {
       title: external_exports.string().min(1).max(2e3).refine((s) => !/[\r\n\0]/u.test(s), "One-line title"),
       content: external_exports.string().min(1).max(1024 * 1024).optional().describe("Optional plain-text body placed above the attachment"),
@@ -53512,20 +53594,33 @@ function registerDirectOperations(server2, manager) {
       } catch (error2) {
         throw new Error(`${handOff}. The new note could not be read back: ${String(error2)}`);
       }
+      const progress = { insertionStarted: false };
       try {
         return {
-          ...attachFile(manager, {
-            id: note.id,
-            expectedContentHash: snapshot.hash,
-            path: args.path,
-            filename: name
-          }),
+          ...attachFile(
+            manager,
+            {
+              id: note.id,
+              expectedContentHash: snapshot.hash,
+              path: args.path,
+              filename: name
+            },
+            void 0,
+            progress
+          ),
           title: args.title,
           folder: args.folder,
           noteCreated: true
         };
       } catch (error2) {
-        throw new Error(`${handOff}. ${error2 instanceof Error ? error2.message : String(error2)}`);
+        const detail = error2 instanceof Error ? error2.message : String(error2);
+        if (!progress.insertionStarted) throw new Error(`${handOff}. ${detail}`);
+        const message = `Note ${note.id} was created, but the attachment outcome is uncertain: ${detail}. Read the note (list-attachments) before attaching again, and do not create another note`;
+        throw new CodedError(message, {
+          code: "verification_failed",
+          committed: true,
+          indeterminate: true
+        });
       }
     }
   );
@@ -53632,7 +53727,7 @@ function storedInsertion(manager, id2, before, bytes, returnedId) {
     );
   return { attachmentId, name: row.filename };
 }
-function attachFile(manager, args, checked) {
+function attachFile(manager, args, checked, progress = { insertionStarted: false }) {
   const { id: id2, expectedContentHash, path: path10 } = args;
   const name = attachmentName(path10, args.filename);
   const before = checked ?? readSnapshot(manager, id2);
@@ -53647,6 +53742,7 @@ function attachFile(manager, args, checked) {
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
+    progress.insertionStarted = true;
     try {
       returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
     } catch {
@@ -53974,15 +54070,27 @@ function runFolderDelete(manager, args, deps = defaultDeps) {
     throw uncertain(
       `The delete outcome is uncertain (${outcome.reason}); read folder ${args.id} before retrying`
     );
-  if (manager.folderExistsById(args.id))
+  let stillExists;
+  try {
+    stillExists = manager.folderExistsById(args.id);
+  } catch (error2) {
+    throw uncertain(
+      `The delete outcome is uncertain: Notes.app accepted the delete, but the readback failed (${error2 instanceof Error ? error2.message : String(error2)}); read folder ${args.id} before retrying`
+    );
+  }
+  if (stillExists)
     throw uncertain(
       `The delete outcome is uncertain: Notes.app still resolves folder ${args.id}; read it before retrying`
     );
   let storeTombstoned = false;
   for (let attempt = 0; attempt < 5 && !storeTombstoned; attempt++) {
     if (attempt > 0) deps.sleep(200);
-    const after = deps.readStore(coreDataPk(args.id));
-    storeTombstoned = !after || after.markedForDeletion;
+    try {
+      const after = deps.readStore(coreDataPk(args.id));
+      storeTombstoned = !after || after.markedForDeletion;
+    } catch {
+      break;
+    }
   }
   return {
     ...base,
@@ -56651,20 +56759,26 @@ function appendChecklistItems(args, deps, readRich) {
   const landed = [];
   let contentHash = args.expectedContentHash;
   for (const [index, text2] of args.items.entries()) {
-    let wrote = false;
+    let attempted = false;
+    const tracked = {
+      ...deps,
+      run: (input) => {
+        attempted = true;
+        deps.run(input);
+      }
+    };
     try {
       const result = mutateBackground(
         { ...args, expectedContentHash: contentHash },
         "create-checklist-item",
         { text: text2 },
         (before, after) => {
-          wrote = true;
           assertPreserved(before, after, { append: true });
           const added = after.checklist.slice(before.checklist.length);
           if (added.length !== 1 || added[0].text !== text2 || added[0].done)
             throw new Error("Native checklist item not verified");
         },
-        deps
+        tracked
       );
       const items = byPosition(readRich(args.id).checklistItems);
       const fresh = items.filter(
@@ -56680,20 +56794,33 @@ function appendChecklistItems(args, deps, readRich) {
       landed.push({ index, id: fresh[0].id, text: text2 });
       contentHash = result.contentHash;
     } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : String(error2);
+      const uncertain2 = attempted && !(error2 instanceof CodedError && error2.envelope.committed === false);
+      const classified = classifyError(message, error2).code;
+      const envelope = uncertain2 ? {
+        code: classified === "timeout_indeterminate" ? classified : "verification_failed",
+        indeterminate: true
+      } : {
+        code: classified,
+        indeterminate: false,
+        // Earlier items did land, so only an empty batch wrote nothing.
+        ...landed.length === 0 ? { committed: false } : {}
+      };
       return {
         ok: false,
+        ...envelope,
         id: args.id,
         landed,
         stoppedAt: {
           index,
           text: text2,
-          // A bridge refusal or failure with an unchanged readback is
-          // reported as not written even though verification ran (#248).
-          outcome: wrote && !(error2 instanceof CodedError && error2.envelope.committed === false) ? "uncertain" : "not-written",
-          error: error2 instanceof Error ? error2.message : String(error2)
+          outcome: uncertain2 ? "uncertain" : "not-written",
+          error: message
         },
         notAttempted: args.items.slice(index + 1),
-        contentHash,
+        // After an uncertain run the note may have changed, so the last
+        // verified revision would be stale; read the note for a fresh one.
+        ...uncertain2 ? {} : { contentHash },
         message: `Stopped at item ${index + 1} of ${args.items.length}; ${landed.length} item(s) landed and were verified. Read the exact note before retrying, and retry only items that are not present.`
       };
     }
@@ -56703,13 +56830,22 @@ function appendChecklistItems(args, deps, readRich) {
   const orderVerified = tail.length === landed.length && tail.every((item, i) => item.id === landed[i].id && item.text === landed[i].text);
   return {
     ok: orderVerified,
+    ...orderVerified ? {} : { code: "verification_failed", committed: true },
     id: args.id,
     contentHash,
     items: landed,
+    landed,
     orderVerified,
     ...orderVerified ? {} : {
       message: "Every item landed and was verified, but they are not the note's last checklist items in the requested order. Read the note before editing it further."
     }
+  };
+}
+function nativeToolResult(result) {
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    structuredContent: result,
+    ...result.ok === false && typeof result.code === "string" ? { isError: true } : {}
   };
 }
 function registerNativeOperations(server2, manager) {
@@ -56724,11 +56860,7 @@ function registerNativeOperations(server2, manager) {
       },
       (async (args) => {
         try {
-          const result = handler(args);
-          return {
-            content: [{ type: "text", text: JSON.stringify(result) }],
-            structuredContent: result
-          };
+          return nativeToolResult(handler(args));
         } catch (error2) {
           return errorResult(error2 instanceof Error ? error2.message : "Operation failed", error2);
         }
@@ -57576,7 +57708,7 @@ function parseNoteObjectId(noteId3) {
     );
   return { store: match[1], pk: Number(match[2]) };
 }
-function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH7) {
+function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH8) {
   return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
 }
 var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
@@ -57605,7 +57737,7 @@ function drawingRowsSql(columns, dataColumn) {
     `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`
   ].join("\n");
 }
-function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH7) {
+function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH8) {
   const { store, pk } = parseNoteObjectId(noteId3);
   const columns = readColumns(dbPath2);
   const dataColumn = columns.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
@@ -57840,7 +57972,7 @@ function isFile2(path10) {
 var positive = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 function readAudioAssets(noteId3, options = {}) {
   const { store, pk } = parseNoteId2(noteId3);
-  const dbPath2 = options.dbPath ?? NOTES_DB_PATH7;
+  const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
   const columns = readColumns(dbPath2);
   const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
   if (missing.length)
@@ -58219,6 +58351,10 @@ function inspectInstallation(deps = defaultDeps2()) {
     );
   return { ...base, ready: true, reason: null, detail: null };
 }
+function helperTimeoutMs(env) {
+  const value = Number.parseInt(env[TIMEOUT_ENV] || "", 10);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS3;
+}
 var PrivateHelperError = class extends Error {
   constructor(code, message, details = {}) {
     super(message);
@@ -58301,7 +58437,7 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
       throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS3;
+  const timeout = helperTimeoutMs(deps.env);
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
@@ -58311,12 +58447,22 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
     env: deps.env
   });
   const errno = result.error?.code;
-  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+  if (errno === "ETIMEDOUT")
     throw new PrivateHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (errno === "ENOBUFS")
+    throw new PrivateHelperError(
+      "invalid_response",
+      `The helper's output exceeded ${MAX_OUTPUT_BYTES3} bytes and was cut off.`
+    );
   if (result.error)
     throw new PrivateHelperError(
       "helper_unreachable",
       `Could not run the helper: ${result.error.message}`
+    );
+  if (result.signal)
+    throw new PrivateHelperError(
+      "helper_crashed",
+      `The helper was terminated by ${result.signal} before it answered.`
     );
   const stdout = String(result.stdout ?? "").trim();
   let parsed;
@@ -58641,7 +58787,8 @@ function envelopeCode(helperCode, message) {
     case "not_found":
       return "not_found";
     case "timeout":
-      return "timeout_indeterminate";
+    case "helper_crashed":
+      return "operation_failed";
     case "invalid_request":
     case "invalid_json":
     case "input_too_large":
@@ -58751,6 +58898,7 @@ var server = new McpServer({
   version: version2,
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes"
 });
+installSdkErrorCodes(server);
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);
@@ -58766,6 +58914,9 @@ function successResponse(message, structured) {
 }
 function errorResponse(message, cause) {
   return errorResult(message, cause);
+}
+function notFoundResponse(message) {
+  return errorResult(message, new CodedError(message, { code: "not_found" }));
 }
 function withErrorHandling(handler, errorPrefix) {
   return async (params) => {
@@ -58894,6 +59045,9 @@ function bodyReadFailureMessage(id2, title, error2) {
   return describeBodyReadFailure(title, error2, attachments);
 }
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
+function deleteUnverifiedMessage(title, id2) {
+  return `Notes.app accepted the delete for note "${title}", but its original folder could not be re-read to confirm the note left it. The outcome is uncertain; read exact ID ${id2} before retrying.`;
+}
 function containerUnknownMessage(title) {
   return `Could not read which folder note "${title}" is in, so it may already be in Recently Deleted, where deleting it would remove it permanently. Nothing was deleted. Retry in a moment; if it keeps failing, quit and reopen Notes.app, then retry.`;
 }
@@ -58964,11 +59118,31 @@ var folderNameSchema = {
 };
 function registerTool(name, config2, cb) {
   const { outputSchema, ...rest } = config2;
+  const callback = NOTES_WRITE_TOOLS.has(name) ? (async (...args) => writeToolResult(
+    await cb(...args)
+  )) : cb;
   return server.registerTool(
     name,
     outputSchema ? { ...rest, outputSchema: external_exports.object(outputSchema).passthrough() } : rest,
-    cb
+    callback
   );
+}
+var NOTES_WRITE_TOOLS = /* @__PURE__ */ new Set([
+  "create-note",
+  "update-note",
+  "append-to-note",
+  "insert-link",
+  "delete-note",
+  "move-note",
+  "create-folder",
+  "delete-folder",
+  "batch-delete-notes",
+  "batch-move-notes"
+]);
+function writeToolResult(result) {
+  const envelope = result.structuredContent;
+  if (!result.isError || !envelope) return result;
+  return { ...result, structuredContent: unavailableWriteEnvelope(envelope) };
 }
 registerTool(
   "create-note",
@@ -59362,7 +59536,7 @@ registerTool(
     if (id2) {
       const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id2}" not found`);
+        return notFoundResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
@@ -59404,7 +59578,7 @@ registerTool(
     }
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(
@@ -59462,7 +59636,7 @@ registerTool(
     if (id2) {
       const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id2}" not found`);
+        return notFoundResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
@@ -59480,7 +59654,7 @@ registerTool(
     }
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(
@@ -59516,7 +59690,7 @@ registerTool(
   withErrorHandling(({ id: id2 }) => {
     const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id2}" not found`);
+      return notFoundResponse(`Note with ID "${id2}" not found`);
     }
     const metadata = {
       id: note.id,
@@ -59549,7 +59723,7 @@ registerTool(
   withErrorHandling(({ title, account }) => {
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
     const metadata = {
       id: note.id,
@@ -59606,7 +59780,7 @@ registerTool(
     if (id2) {
       const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id2}" not found`);
+        return notFoundResponse(`Note with ID "${id2}" not found`);
       }
       if (note2.passwordProtected) {
         return errorResponse(
@@ -59626,7 +59800,7 @@ registerTool(
     }
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -59704,7 +59878,7 @@ registerTool(
   },
   withErrorHandling(({ id: id2 }) => {
     const note = notesManager.getNoteById(id2);
-    if (!note) return errorResponse(`Note with ID "${id2}" not found`);
+    if (!note) return notFoundResponse(`Note with ID "${id2}" not found`);
     const body = notesManager.getNoteContentById(id2);
     if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
     const rich = readRichNote(id2);
@@ -59810,7 +59984,10 @@ registerTool(
     } catch (error2) {
       if (!(error2 instanceof NoteBlocksError)) throw error2;
       const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
-      return errorResponse(`Error reading note blocks [${error2.code}]: ${error2.message}${hint}`);
+      return errorResponse(
+        `Error reading note blocks [${error2.code}]: ${error2.message}${hint}`,
+        error2
+      );
     }
     const { summary } = page;
     const styles = Object.entries(summary.styles).map(([style, count]) => `${style} ${count}`).join(", ");
@@ -60371,7 +60548,10 @@ registerTool(
             },
             (r) => route = r
           );
-          if (response.isError) throw new Error(response.content[0].text);
+          if (response.isError) {
+            const envelope = response.structuredContent;
+            throw envelope?.code ? new CodedError(response.content[0].text, envelope) : new Error(response.content[0].text);
+          }
           return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
         }
       }
@@ -60463,6 +60643,13 @@ registerTool(
       if (result.status === "not-deleted") {
         return errorResponse(NOT_DELETED_MESSAGE);
       }
+      if (result.status === "unverified") {
+        const message = deleteUnverifiedMessage(snapshot.note.title, id2);
+        return errorResponse(
+          message,
+          new CodedError(message, { code: "verification_failed", indeterminate: true })
+        );
+      }
       if (result.status !== "deleted") {
         return errorResponse(
           `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id2} before retrying.`
@@ -60507,7 +60694,7 @@ registerTool(
   withErrorHandling(({ id: id2, folder, account, ...scopeArgs }) => {
     const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id2}" not found`);
+      return notFoundResponse(`Note with ID "${id2}" not found`);
     }
     const success = notesManager.moveNoteById(id2, folder, account, scopeFrom(scopeArgs));
     if (!success) {
@@ -61038,7 +61225,7 @@ registerTool(
     if (id2) {
       const note2 = notesManager.getNoteById(id2);
       if (!note2) {
-        return errorResponse(`Note with ID "${id2}" not found`);
+        return notFoundResponse(`Note with ID "${id2}" not found`);
       }
       const attachments2 = notesManager.listAttachmentsById(id2);
       if (attachments2.length === 0) {
@@ -61091,7 +61278,7 @@ ${attachmentList2}`,
     }
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -61149,6 +61336,8 @@ registerTool(
       }
       if (result.status === "not-deleted")
         return { id: id2, success: false, error: NOT_DELETED_MESSAGE };
+      if (result.status === "unverified")
+        return { id: id2, success: false, error: deleteUnverifiedMessage(snapshot.note.title, id2) };
       return { id: id2, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;
@@ -61376,10 +61565,12 @@ Safety: writes files; exportDir must be absolute and under the home directory, a
         );
       }
     }
-    return successResponse(
-      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
-      structured
-    );
+    const summary = `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`;
+    if (exported === 0 && failed > 0) {
+      const error2 = errorResponse(summary, new CodedError(summary, { code: "operation_failed" }));
+      return { ...error2, structuredContent: { ...structured, ...error2.structuredContent } };
+    }
+    return successResponse(summary, structured);
   }, "Error exporting attachments")
 );
 registerTool(
@@ -61529,7 +61720,7 @@ registerTool(
     if (id2) {
       const markdown2 = notesManager.getNoteMarkdownById(id2);
       if (!markdown2) {
-        return errorResponse(`Note with ID "${id2}" not found or has no content`);
+        return notFoundResponse(`Note with ID "${id2}" not found or has no content`);
       }
       return successResponse(markdown2, { markdown: markdown2 });
     }
@@ -61538,7 +61729,7 @@ registerTool(
     }
     const markdown = notesManager.getNoteMarkdown(title, account);
     if (!markdown) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found or has no content. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -61613,7 +61804,10 @@ registerTool(
           `Error exporting Markdown [${error2.code}]: the template is invalid:
 ` + error2.details.map((detail) => `${detail.path}: ${detail.message}`).join("\n")
         );
-      return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
+      return errorResponse(
+        `Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`,
+        error2
+      );
     }
     const warned = receipt.warnings?.length ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)` : "";
     const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
@@ -61666,7 +61860,7 @@ registerTool(
     } catch (error2) {
       if (!(error2 instanceof NotesExportError || error2 instanceof NoteBlocksError)) throw error2;
       const hint = error2.code === "no-full-disk-access" ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}` : "";
-      return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`);
+      return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`, error2);
     }
     const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;
     const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
@@ -61694,7 +61888,7 @@ registerTool(
   withErrorHandling(({ id: id2 }) => {
     const note = notesManager.getNoteById(id2);
     if (!note) {
-      return errorResponse(`Note with ID "${id2}" not found`);
+      return notFoundResponse(`Note with ID "${id2}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(

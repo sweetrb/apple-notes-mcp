@@ -54,7 +54,11 @@ export function envelopeCode(helperCode: string, message: string): ErrorCode {
     case "not_found":
       return "not_found";
     case "timeout":
-      return "timeout_indeterminate";
+    case "helper_crashed":
+      // Every helper action is a read, so a timeout leaves nothing
+      // indeterminate (timeout_indeterminate tells a caller to check for a
+      // half-done write). helperCode still names the cause.
+      return "operation_failed";
     case "invalid_request":
     case "invalid_json":
     case "input_too_large":

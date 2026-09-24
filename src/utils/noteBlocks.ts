@@ -36,6 +36,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { CodedError, type ErrorCode } from "./errorCodes.js";
 import {
   decodeWireFields,
   fixed32Float,
@@ -188,10 +189,29 @@ export type NoteBlocksErrorCode =
   | "invalid-runs"
   | "query-failed";
 
-export class NoteBlocksError extends Error {
+/**
+ * The shared error code for each reader failure. Decoding failures are
+ * `unsupported`: the stored body is in a form this reader cannot decode, and
+ * retrying will not change that.
+ */
+export const NOTE_BLOCKS_ERROR_CODES: Record<NoteBlocksErrorCode, ErrorCode> = {
+  "invalid-id": "validation_error",
+  "no-full-disk-access": "full_disk_access_missing",
+  "not-found": "not_found",
+  "no-body": "operation_failed",
+  encrypted: "unsupported",
+  "decompress-failed": "unsupported",
+  "malformed-protobuf": "unsupported",
+  "unsupported-structure": "unsupported",
+  "invalid-runs": "unsupported",
+  "query-failed": "operation_failed",
+};
+
+/** A reader failure. Its envelope carries the shared code for its reader code. */
+export class NoteBlocksError extends CodedError {
   readonly code: NoteBlocksErrorCode;
   constructor(code: NoteBlocksErrorCode, message: string) {
-    super(message);
+    super(message, { code: NOTE_BLOCKS_ERROR_CODES[code] });
     this.name = "NoteBlocksError";
     this.code = code;
   }

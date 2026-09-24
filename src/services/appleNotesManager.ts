@@ -52,7 +52,7 @@ import { stripLargeInlineImages } from "@/utils/inlineImages.js";
 import { enrichNoteRead, readRichNote } from "@/utils/noteRichText.js";
 import { readAudioTranscripts } from "@/utils/audioTranscripts.js";
 import { collectNoteTables } from "@/utils/tableMarkdown.js";
-import { readSmartFolders } from "@/utils/smartFolders.js";
+import { readSmartFolders, type SmartFoldersResult } from "@/utils/smartFolders.js";
 import { uniqueById } from "@/utils/uniqueById.js";
 import { readTrashFolderIds, RECENTLY_DELETED_FOLDER_NAME } from "@/utils/trashFolders.js";
 import {
@@ -750,6 +750,24 @@ export function smartFolderDestinationError(folderPath: string): CodedError {
       reason: "smart_folder_destination",
     }
   );
+}
+
+/**
+ * The error for a smart-folder read that failed. A database without the smart
+ * folder columns is an unsupported macOS version, not an unclassified failure.
+ */
+export function smartFoldersReadError(
+  kind: SmartFoldersResult["error"],
+  message: string
+): CodedError {
+  return new CodedError(message, {
+    code:
+      kind === "unsupported_schema"
+        ? "unsupported"
+        : kind === "no_fda"
+          ? "full_disk_access_missing"
+          : "operation_failed",
+  });
 }
 
 /** Throws {@link smartFolderDestinationError} when an AppleScript error is the smart-folder refusal. */
@@ -1914,6 +1932,7 @@ export class AppleNotesManager {
           | "not-deleted"
           | "in-recently-deleted"
           | "container-unknown"
+          | "unverified"
           | "failed";
       }
     | { status: "scope_conflict"; reason: string }
@@ -1939,6 +1958,7 @@ export class AppleNotesManager {
     // Notes can accept a scripting `delete` without acting on it, so the script
     // re-reads the note's original folder afterwards: a note still listed there
     // was not moved to Recently Deleted and must not be reported as deleted.
+    // When that re-read fails, the outcome is unverified, not deleted.
     //
     // A body too long for a script literal (a note with large inline images) is
     // compared against a private temporary file instead, still in full (#237).
@@ -1987,9 +2007,12 @@ export class AppleNotesManager {
         if currentBody is not ${expected.operand} and currentBody is not ${expected.operand} & linefeed then return "SAFETY_CONFLICT"
         delete noteRef
       end considering
+      set __stillThere to missing value
       try
-        if (id of notes of originalFolder) contains "${safeId}" then return "SAFETY_NOT_DELETED"
+        set __stillThere to (id of notes of originalFolder) contains "${safeId}"
       end try
+      if __stillThere is missing value then return "SAFETY_DELETE_UNVERIFIED"
+      if __stillThere then return "SAFETY_NOT_DELETED"
       return "SAFETY_DELETED"
     `);
       result = executeMutationAppleScript(script);
@@ -2015,6 +2038,7 @@ export class AppleNotesManager {
     if (status === "SAFETY_IN_RECENTLY_DELETED") return { status: "in-recently-deleted" };
     if (status === "SAFETY_CONTAINER_UNKNOWN") return { status: "container-unknown" };
     if (status === "SAFETY_NOT_DELETED") return { status: "not-deleted" };
+    if (status === "SAFETY_DELETE_UNVERIFIED") return { status: "unverified" };
     return status === "SAFETY_DELETED" ? { status: "deleted" } : { status: "failed" };
   }
 
@@ -2196,7 +2220,8 @@ export class AppleNotesManager {
     options: { includeMatchingNotes?: boolean; limit?: number } = {}
   ): SmartFolder[] {
     const result = readSmartFolders();
-    if (!result.folders) throw new Error(result.message || "Failed to read smart folders.");
+    if (!result.folders)
+      throw smartFoldersReadError(result.error, result.message || "Failed to read smart folders.");
     if (!options.includeMatchingNotes) return result.folders;
     const limit = options.limit ?? 50;
     return result.folders.map((folder) => {

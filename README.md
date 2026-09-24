@@ -261,8 +261,10 @@ Two optional booleans describe a write's outcome when it is known.
 id before any retry, and never retry blindly. `committed: true` means the write
 took effect even though its verification failed; `committed: false` means
 nothing was written (for example a `revision_conflict`). An absent flag means
-unknown. Errors the MCP SDK raises itself before a tool runs, such as an
-argument that fails the input schema, carry no `structuredContent`.
+unknown. An argument that fails the input schema is rejected before the tool
+runs, with `code: "validation_error"` and `committed: false`. The exception is
+a Notes UUID or numeric key that could not be resolved to an id: it carries
+`not_found`, or `full_disk_access_missing` when the database is unreadable.
 
 ### Note Operations
 
@@ -2104,9 +2106,12 @@ same verification as [`add-attachment`](#add-attachment).
 ```
 
 **Returns:** the new note's `id` with `noteCreated: true` and the
-`add-attachment` result. If the attachment step fails after the note exists,
-the error names the new note's id: attach to it with `add-attachment` instead of
-calling this tool again, which would create a second note.
+`add-attachment` result. If the attachment step fails after the note exists but
+before the file is inserted, the error names the new note's id: attach to it
+with `add-attachment` instead of calling this tool again, which would create a
+second note. If insertion started and could not be verified, the error is
+`code: "verification_failed"` with `indeterminate: true`: the file may already
+be in the note, so read it with `list-attachments` before attaching again.
 
 ---
 
@@ -2419,11 +2424,13 @@ and currently available, with a specific reason for each unavailable operation.
 It also reports `runtimeOS` (`platform`, `macOSVersion` from `sw_vers`,
 `darwinRelease`) and a `features` matrix, one entry per feature group:
 `applescriptCore`, `fullDiskAccessReads`, `shortcutsBridges`,
-`backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, and the
-placeholders `checklistToggle`, `smartFolders`, `paragraphLinks`, and
-`audioTranscription`, which need a native *write* helper this server does not
-ship (requirement `native_write_helper`). The opt-in private helper below is
-read-only, so enabling it does not change them: they stay `not_implemented`.
+`backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`,
+`paragraphLinks` and `audioTranscription` (both database reads that need Full
+Disk Access), and the placeholders `checklistToggle` and `smartFolders`
+(creating or editing smart folders), which need a native *write* helper this
+server does not ship (requirement `native_write_helper`). The opt-in private
+helper below is read-only, so enabling it does not change them: they stay
+`not_implemented`.
 Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
 `requirements`, `missing`, `unverified`, `tools`, and a machine-readable
 `reason` that is `null` when available and otherwise the first that applies:
@@ -2503,12 +2510,15 @@ the note's last checklist items in the requested order.
 }
 ```
 
-**Returns:** `items`, each with its `index`, native `id` and `text`, plus
-`orderVerified` and the new `contentHash`. The first uncertain result stops the
-call without a retry and returns `ok: false` with `landed` (the verified items),
-`stoppedAt` (the item's index, text, `outcome` of `"not-written"` or
-`"uncertain"`, and the error), and `notAttempted`. After an uncertain stop, read
-the note before retrying, and retry only the items that are not present.
+**Returns:** `items` (also as `landed`), each with its `index`, native `id` and
+`text`, plus `orderVerified` and the new `contentHash`. The first uncertain
+result stops the call without a retry and returns `ok: false` with `landed` (the
+verified items), `stoppedAt` (the item's index, text, `outcome` of
+`"not-written"` or `"uncertain"`, and the error), and `notAttempted`. Every
+`ok: false` result is an error result (`isError: true`) with a `code`; after an
+uncertain stop it has `indeterminate: true` and no `contentHash`, since the note
+may have changed. Read the note before retrying, and retry only the items that
+are not present.
 
 #### `create-table`
 

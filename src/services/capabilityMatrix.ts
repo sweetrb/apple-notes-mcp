@@ -148,14 +148,27 @@ export const FEATURES: FeatureDefinition[] = [
   {
     name: "fullDiskAccessReads",
     description:
-      "Read-only reads of the Notes database: query-notes, checklist state, note metadata, note links, native objects, native tags, and sync detail",
+      "Read-only reads of the Notes database: queries, checklist state, metadata, links, note structure, tables, native objects, tags, smart folders, special and recent notes, folder tree, Paper and attachment exports, Markdown and HTML exports, and sync detail",
     tools: [
       "query-notes",
       "get-checklist-state",
       "get-note-metadata",
       "get-note-link",
       "get-native-objects",
+      "get-note-blocks",
+      "get-note-structure",
+      "get-note-tables",
+      "list-note-links",
       "list-native-tags",
+      "list-smart-folders",
+      "list-special-notes",
+      "list-recent-notes",
+      "list-folder-tree",
+      "list-paper-attachments",
+      "export-paper-image",
+      "export-attachments",
+      "export-notes-markdown",
+      "export-notes-html",
       "get-note-markdown (checklist annotations)",
       "get-sync-status (pending uploads)",
     ],
@@ -218,7 +231,8 @@ export const FEATURES: FeatureDefinition[] = [
   // Placeholders for features that need a native WRITE helper, which this
   // server does not ship. The opt-in private helper is read-only (write
   // support was deliberately deferred), so enabling or installing it changes
-  // nothing here: these always report `not_implemented`.
+  // nothing here: these always report `not_implemented`. Reading smart folders
+  // is available through list-smart-folders (fullDiskAccessReads).
   {
     name: "checklistToggle",
     description: "Check or uncheck an existing checklist item in place",
@@ -243,17 +257,19 @@ export const FEATURES: FeatureDefinition[] = [
   },
   {
     name: "paragraphLinks",
-    description: "Link to a specific paragraph or heading inside a note",
-    tools: [],
+    description:
+      "List a note's paragraphs and return a link that opens Notes at one paragraph or heading, read from the Notes database",
+    tools: ["list-note-paragraphs", "get-paragraph-link"],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_write_helper" }],
+    requirements: [{ kind: "full_disk_access" }],
   },
   {
     name: "audioTranscription",
-    description: "Transcribe audio recordings attached to a note",
-    tools: [],
+    description:
+      "Read the transcripts Notes stored for a note's audio recordings, or transcribe them on this Mac (transcribe-note-audio also needs the public helper built with setup --public-helper)",
+    tools: ["get-audio-transcripts", "transcribe-note-audio"],
     minimumMacOSVersion: null,
-    requirements: [{ kind: "native_write_helper" }],
+    requirements: [{ kind: "full_disk_access" }],
   },
   {
     name: "markdownTemplateLibrary",

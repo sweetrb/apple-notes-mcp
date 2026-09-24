@@ -262,3 +262,25 @@ describe("assertNotSmartFolderDestination (read-only preflight)", () => {
     expect(exec).not.toHaveBeenCalled();
   });
 });
+
+// #191: a database without the smart-folder columns is unsupported, not unclassified.
+describe("list-smart-folders read failures", () => {
+  it.each([
+    ["unsupported_schema", "unsupported"],
+    ["no_fda", "full_disk_access_missing"],
+    ["query_error", "operation_failed"],
+  ] as const)("reports %s as %s", (kind, code) => {
+    vi.mocked(readSmartFolders).mockReturnValueOnce({
+      folders: null,
+      error: kind,
+      message: "This Notes database does not have the columns smart folders need (X).",
+    });
+    let thrown: unknown;
+    try {
+      manager.listSmartFolders();
+    } catch (error) {
+      thrown = error;
+    }
+    expect(errorResult((thrown as Error).message, thrown).structuredContent).toEqual({ code });
+  });
+});

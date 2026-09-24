@@ -1,5 +1,79 @@
 ## [Unreleased]
 
+## [2.9.23] - 2026-09-24
+
+### Fixed
+
+- Error codes no longer depend on words inside a note title. Classification
+  matched the whole message, and messages quote the title, so a missing note
+  titled "Meeting timed out" came back as `timeout_indeterminate` with
+  `indeterminate: true`, and one titled "Draft uncertain" as
+  `verification_failed`. Double-quoted text is now removed before the rules
+  run, the note-not-found responses in `src/index.ts` set `not_found`
+  directly, and the AppleScript error mapping no longer reads a title such as
+  "Lost connection plan" or "Access denied log" as a dropped connection or a
+  permission refusal (#185).
+- A Notes UUID or numeric key that cannot be resolved now keeps its code.
+  Resolution runs in the input schema, so the MCP SDK reported the failure as
+  a validation error with no `structuredContent`. Every input-schema rejection
+  now carries `code: "validation_error"` and `committed: false`, and an
+  unresolved identifier carries `not_found` or `full_disk_access_missing`
+  (#190).
+- A write tool (`create-note`, `update-note`, `append-to-note`, `insert-link`,
+  `delete-note`, `move-note`, `create-folder`, `delete-folder`,
+  `batch-delete-notes`, `batch-move-notes`) that fails with
+  `notes_unavailable`, such as "Lost connection to Notes.app", now reports
+  `indeterminate: true`, since the write may have landed (#185).
+- `get-capabilities` reported `paragraphLinks` and `audioTranscription` as
+  `not_implemented` although `list-note-paragraphs`, `get-paragraph-link`,
+  `get-audio-transcripts` and `transcribe-note-audio` ship. Both are now
+  database reads gated on Full Disk Access, and `fullDiskAccessReads` lists
+  every tool that requires Full Disk Access. A test checks that each tool the
+  matrix names is registered (#184).
+- `create-checklist-items` reported an item as `not-written` when the readback
+  after a bridge run threw, although the item may have landed, so a retry
+  could duplicate it. Any failure after the run starts is now `uncertain`, and
+  a readback that throws inside the shared background write path is
+  `verification_failed` with `indeterminate: true`. An `ok: false` result is
+  now an error result with a `code`, always includes `landed`, and omits
+  `contentHash` after an uncertain item (#201).
+- `delete-folder-by-id` could report a plain error with no outcome after
+  Notes.app accepted the delete, when the existence readback or the store
+  tombstone read threw. The first is now `verification_failed` with
+  `indeterminate: true`, and the second leaves `storeTombstoned: false` (#219).
+- `delete-note` reported a note as deleted when the re-read of its original
+  folder failed. That case is now `verification_failed` with
+  `indeterminate: true`, and `batch-delete-notes` lists it as uncertain (#195).
+- `export-attachments` returned success when every copy failed. It now returns
+  an error with `code: "operation_failed"` when nothing was exported and at
+  least one copy failed; the per-attachment results are kept (#202).
+- `create-note-with-attachment` told the caller to attach with
+  `add-attachment` after any attach failure, including one where the file may
+  already be in the note. That hand-off is now used only for failures before
+  insertion; after insertion the error is `verification_failed` with
+  `indeterminate: true` and asks for a read first (#196).
+- `insert-link` now reports "The text was written, but link verification
+  failed" with `committed: true`, and keeps the append step's own error code
+  when that step fails (#212).
+- The private helper client no longer calls a crash or an oversized response a
+  timeout. Only `ETIMEDOUT` is a timeout; a helper ended by a signal reports
+  `helper_crashed` with the signal's name, and output past the buffer limit is
+  `invalid_response`. A helper timeout is `operation_failed` rather than
+  `timeout_indeterminate`, since every helper action is a read. A zero or
+  negative `APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS` falls back to the
+  default instead of failing with `ERR_OUT_OF_RANGE` (#204).
+- `get-note-blocks` and the Markdown and HTML exports map note reader
+  failures by their own code: undecodable data (`invalid-runs`,
+  `malformed-protobuf`, `decompress-failed`) is `unsupported` rather than
+  `validation_error`, and `no-body` and `query-failed` are `operation_failed`
+  (#192). `list-smart-folders` on a database without the smart folder columns
+  is `unsupported` (#191).
+- `get-audio-transcripts` treated a folder or attachment key as a note with no
+  audio. The note lookup now requires an `ICNote` row, so such an id is
+  `not_found` (#194).
+- `executeAppleScript` with `maxRetries: 0` threw "Cannot read properties of
+  null". Zero now means one attempt.
+
 ## [2.9.22] - 2026-09-24
 
 ### Documentation

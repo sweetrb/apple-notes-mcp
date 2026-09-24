@@ -9,6 +9,7 @@
  */
 import type { NoteLink } from "../utils/noteRichText.js";
 import { buildLinkInsertion, verifyLinkReadback } from "../utils/linkInsert.js";
+import { CodedError } from "../utils/errorCodes.js";
 import type { InsertLinkParams, InsertLinkResult, LinkAppendOutcome } from "../types.js";
 
 /** Collaborators insertLink needs; index.ts supplies the real ones. */
@@ -50,8 +51,9 @@ export function insertLink(
   } catch (error) {
     // The append itself committed; only the link proof failed. Say so, so a
     // caller does not repeat a write that already landed.
-    throw new Error(
-      `The text was written, but link verification failed: ${error instanceof Error ? error.message : String(error)}. Do not retry automatically.`
+    throw new CodedError(
+      `The text was written, but link verification failed: ${error instanceof Error ? error.message : String(error)}. Do not retry automatically.`,
+      { code: "verification_failed", committed: true, indeterminate: true }
     );
   }
   return {

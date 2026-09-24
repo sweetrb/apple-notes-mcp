@@ -469,7 +469,17 @@ export function mutateBackground(
     transportError = (error ?? {}) as NonNullable<typeof transportError>;
     transportMessage = describeTransportFailure(error);
   }
-  const after = deps.read(request.id);
+  let after: BackgroundSnapshot;
+  try {
+    after = deps.read(request.id);
+  } catch (error) {
+    // The bridge has run (or may still be running), so a readback that fails
+    // here says nothing about whether the note changed.
+    throw new CodedError(
+      `Operation outcome uncertain; read exact note before any retry: readback failed: ${error instanceof Error ? error.message : String(error)}${transportMessage ? "; " + transportMessage : ""}`,
+      { code: "verification_failed", indeterminate: true }
+    );
+  }
   try {
     verify(before, after);
   } catch (error) {

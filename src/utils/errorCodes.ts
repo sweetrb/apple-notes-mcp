@@ -8,7 +8,8 @@
  *
  * Classification is centralized here and driven by the error text the server
  * already produces, so existing messages stay the contract and every tool
- * wrapper gets codes from one place. A thrown {@link CodedError} overrides the
+ * wrapper gets codes from one place. Double-quoted segments are removed before
+ * matching because they hold caller data such as note titles. A thrown {@link CodedError} overrides the
  * text rules for a site that knows its outcome exactly.
  *
  * Output-schema safety: the MCP TypeScript client validates `structuredContent`
@@ -20,7 +21,10 @@
  *
  * @module utils/errorCodes
  */
-import { isPermissionDenied } from "./applescript.js";
+import { isPermissionDenied, stripQuoted } from "./applescript.js";
+import { identifierFailureIn } from "./noteIdentifiers.js";
+
+export { stripQuoted };
 
 /** The documented error-code vocabulary. Keys are the codes; values describe them. */
 export const ERROR_CODES = {
@@ -112,10 +116,11 @@ const WRITE_ACCEPTED = /\baccepted (?:the|an) \w+, but/i;
 /** Classify an error message (and optional thrown cause) into an envelope. Pure. */
 export function classifyError(message: string, cause?: unknown): ErrorEnvelope {
   if (cause instanceof CodedError) return { ...cause.envelope };
-  const text =
+  const text = stripQuoted(
     cause instanceof Error && cause.message && !message.includes(cause.message)
       ? `${message}\n${cause.message}`
-      : message;
+      : message
+  );
   const timeoutCause =
     typeof cause === "object" &&
     cause !== null &&
@@ -155,4 +160,65 @@ export function errorResult(message: string, cause?: unknown): ErrorResult {
     structuredContent: classifyError(message, cause),
     isError: true,
   };
+}
+
+/**
+ * The envelope for a write tool's error. When Notes.app stopped answering
+ * (`notes_unavailable`) the write may already have landed, so the outcome is
+ * indeterminate unless the error already says what happened.
+ */
+export function unavailableWriteEnvelope(envelope: ErrorEnvelope): ErrorEnvelope {
+  if (
+    envelope.code !== "notes_unavailable" ||
+    envelope.indeterminate !== undefined ||
+    envelope.committed !== undefined
+  )
+    return envelope;
+  return { ...envelope, indeterminate: true };
+}
+
+/**
+ * How the MCP SDK words a call its input schema rejected. The McpError it
+ * throws adds its own "MCP error -32602: " prefix.
+ */
+const INPUT_VALIDATION = /^(?:MCP error -?\d+: )?Input validation error:/;
+
+/**
+ * The envelope for a call the input schema rejected. The handler never ran,
+ * so nothing was written. Note, folder and account ids given as a Notes UUID
+ * or numeric key are resolved inside the schema, so a failed resolution
+ * arrives here too and keeps its own code.
+ */
+export function inputValidationEnvelope(message: string): ErrorEnvelope {
+  const failure = identifierFailureIn(message);
+  const code: ErrorCode =
+    failure === "no_fda"
+      ? "full_disk_access_missing"
+      : failure === "not_found"
+        ? "not_found"
+        : failure === "query_error"
+          ? "operation_failed"
+          : "validation_error";
+  return { code, committed: false, indeterminate: false };
+}
+
+/**
+ * The error result for a failure the MCP SDK reports itself: an input-schema
+ * rejection, or an exception a handler did not catch.
+ */
+export function sdkToolError(message: string): ErrorResult {
+  return INPUT_VALIDATION.test(message)
+    ? errorResult(message, new CodedError(message, inputValidationEnvelope(message)))
+    : errorResult(message);
+}
+
+/**
+ * Give the MCP SDK's own error results a code. McpServer builds them in its
+ * `createToolError` method, which it does not expose, so this replaces that
+ * method on one server instance. `errorCodes.test.ts` calls the built server
+ * with rejected input and fails if an SDK update stops routing through it.
+ */
+export function installSdkErrorCodes(server: object): void {
+  const target = server as { createToolError?: (message: string) => unknown };
+  if (typeof target.createToolError === "function") target.createToolError = sdkToolError;
 }

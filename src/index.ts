@@ -84,7 +84,13 @@ import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
-import { errorResult } from "@/utils/errorCodes.js";
+import {
+  CodedError,
+  errorResult,
+  installSdkErrorCodes,
+  unavailableWriteEnvelope,
+  type ErrorEnvelope,
+} from "@/utils/errorCodes.js";
 import { createShutdown } from "@/utils/shutdown.js";
 import { comparableVisibleText } from "@/utils/noteRevision.js";
 import { CALL_TIMEOUT_SECONDS, runWithCallTimeout } from "@/utils/callTimeout.js";
@@ -207,6 +213,9 @@ const server = new McpServer({
   version,
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes",
 });
+// Input-schema rejections, including a Notes UUID or numeric key that could
+// not be resolved, get a code like every other failed call.
+installSdkErrorCodes(server);
 
 /**
  * Singleton instance of the Apple Notes manager.
@@ -252,6 +261,14 @@ function successResponse(message: string, structured?: Record<string, unknown>):
  */
 function errorResponse(message: string, cause?: unknown): ToolResponse {
   return errorResult(message, cause);
+}
+
+/**
+ * A `not_found` error response. The message interpolates a caller-supplied
+ * title or id, so the code is set here rather than inferred from the text.
+ */
+function notFoundResponse(message: string): ToolResponse {
+  return errorResult(message, new CodedError(message, { code: "not_found" }));
 }
 
 /**
@@ -518,6 +535,14 @@ const NOT_DELETED_MESSAGE =
   "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 
 /**
+ * Notes.app accepted a delete event, but the note's original folder could not
+ * be re-read, so whether the note left it is unknown.
+ */
+function deleteUnverifiedMessage(title: string, id: string): string {
+  return `Notes.app accepted the delete for note "${title}", but its original folder could not be re-read to confirm the note left it. The outcome is uncertain; read exact ID ${id} before retrying.`;
+}
+
+/**
  * Notes.app could not report the note's folder, so whether it is in Recently
  * Deleted (where a delete is permanent) cannot be ruled out (#198).
  */
@@ -676,11 +701,42 @@ function registerTool<
   cb: ToolCallback<InputArgs>
 ): RegisteredTool {
   const { outputSchema, ...rest } = config;
+  const callback = NOTES_WRITE_TOOLS.has(name)
+    ? ((async (...args: Parameters<ToolCallback<InputArgs>>) =>
+        writeToolResult(
+          await (cb as (...a: typeof args) => Promise<ToolResponse>)(...args)
+        )) as unknown as ToolCallback<InputArgs>)
+    : cb;
   return server.registerTool(
     name,
     outputSchema ? { ...rest, outputSchema: z.object(outputSchema).passthrough() } : rest,
-    cb
+    callback
   );
+}
+
+/** Tools registered here that change notes or folders through Notes.app. */
+const NOTES_WRITE_TOOLS = new Set([
+  "create-note",
+  "update-note",
+  "append-to-note",
+  "insert-link",
+  "delete-note",
+  "move-note",
+  "create-folder",
+  "delete-folder",
+  "batch-delete-notes",
+  "batch-move-notes",
+]);
+
+/**
+ * A write that fails because Notes.app stopped answering (lost connection, not
+ * responding) may already have landed, so its outcome is indeterminate unless
+ * the error says otherwise.
+ */
+function writeToolResult(result: ToolResponse): ToolResponse {
+  const envelope = result.structuredContent as ErrorEnvelope | undefined;
+  if (!result.isError || !envelope) return result;
+  return { ...result, structuredContent: unavailableWriteEnvelope(envelope) };
 }
 
 registerTool(
@@ -1228,7 +1284,7 @@ registerTool(
       // Check for password protection first for better error message
       const note = notesManager.getNoteById(id);
       if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return notFoundResponse(`Note with ID "${id}" not found`);
       }
       if (note.passwordProtected) {
         return errorResponse(
@@ -1276,7 +1332,7 @@ registerTool(
     // Check for password protection first for better error message
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(
@@ -1351,7 +1407,7 @@ registerTool(
     if (id) {
       const note = notesManager.getNoteById(id);
       if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return notFoundResponse(`Note with ID "${id}" not found`);
       }
       if (note.passwordProtected) {
         return errorResponse(
@@ -1372,7 +1428,7 @@ registerTool(
 
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(
@@ -1415,7 +1471,7 @@ registerTool(
     const note = notesManager.getNoteById(id);
 
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return notFoundResponse(`Note with ID "${id}" not found`);
     }
 
     // Return structured metadata as JSON
@@ -1456,7 +1512,7 @@ registerTool(
     const note = notesManager.getNoteDetails(title, account);
 
     if (!note) {
-      return errorResponse(`Note "${title}" not found`);
+      return notFoundResponse(`Note "${title}" not found`);
     }
 
     // Return structured metadata as JSON
@@ -1537,7 +1593,7 @@ registerTool(
     if (id) {
       const note = notesManager.getNoteById(id);
       if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return notFoundResponse(`Note with ID "${id}" not found`);
       }
       if (note.passwordProtected) {
         return errorResponse(
@@ -1559,7 +1615,7 @@ registerTool(
 
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -1655,7 +1711,7 @@ registerTool(
   },
   withErrorHandling(({ id }) => {
     const note = notesManager.getNoteById(id);
-    if (!note) return errorResponse(`Note with ID "${id}" not found`);
+    if (!note) return notFoundResponse(`Note with ID "${id}" not found`);
     const body = notesManager.getNoteContentById(id);
     if (!body) return errorResponse(`Failed to read content of note "${note.title}"`);
     const rich = readRichNote(id);
@@ -1788,7 +1844,10 @@ registerTool(
         error.code === "no-full-disk-access"
           ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
-      return errorResponse(`Error reading note blocks [${error.code}]: ${error.message}${hint}`);
+      return errorResponse(
+        `Error reading note blocks [${error.code}]: ${error.message}${hint}`,
+        error
+      );
     }
     const { summary } = page;
     const styles = Object.entries(summary.styles)
@@ -2619,7 +2678,14 @@ registerTool(
             },
             (r) => (route = r)
           );
-          if (response.isError) throw new Error(response.content[0].text);
+          if (response.isError) {
+            // Keep the append's own envelope (committed, indeterminate) rather
+            // than re-deriving it from the text.
+            const envelope = response.structuredContent as ErrorEnvelope | undefined;
+            throw envelope?.code
+              ? new CodedError(response.content[0].text, envelope)
+              : new Error(response.content[0].text);
+          }
           return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
         },
       }
@@ -2727,6 +2793,13 @@ registerTool(
       if (result.status === "not-deleted") {
         return errorResponse(NOT_DELETED_MESSAGE);
       }
+      if (result.status === "unverified") {
+        const message = deleteUnverifiedMessage(snapshot.note.title, id);
+        return errorResponse(
+          message,
+          new CodedError(message, { code: "verification_failed", indeterminate: true })
+        );
+      }
       if (result.status !== "deleted") {
         return errorResponse(
           `The delete result for note "${snapshot.note.title}" is uncertain. Inspect exact ID ${id} before retrying.`
@@ -2782,7 +2855,7 @@ registerTool(
   withErrorHandling(({ id, folder, account, ...scopeArgs }) => {
     const note = notesManager.getNoteById(id);
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return notFoundResponse(`Note with ID "${id}" not found`);
     }
     const success = notesManager.moveNoteById(id, folder, account, scopeFrom(scopeArgs));
     if (!success) {
@@ -3487,7 +3560,7 @@ registerTool(
     if (id) {
       const note = notesManager.getNoteById(id);
       if (!note) {
-        return errorResponse(`Note with ID "${id}" not found`);
+        return notFoundResponse(`Note with ID "${id}" not found`);
       }
       const attachments = notesManager.listAttachmentsById(id);
       if (attachments.length === 0) {
@@ -3542,7 +3615,7 @@ registerTool(
 
     const note = notesManager.getNoteDetails(title, account);
     if (!note) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -3611,6 +3684,8 @@ registerTool(
       }
       if (result.status === "not-deleted")
         return { id, success: false, error: NOT_DELETED_MESSAGE };
+      if (result.status === "unverified")
+        return { id, success: false, error: deleteUnverifiedMessage(snapshot.note.title, id) };
       return { id, success: false, error: "Delete result uncertain; inspect this exact ID" };
     });
     const succeeded = results.filter((r) => r.success).length;
@@ -3898,10 +3973,14 @@ registerTool(
         );
       }
     }
-    return successResponse(
-      `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`,
-      structured
-    );
+    const summary = `Exported ${exported} file(s) to ${r.exportDir} (${previews} preview-only, ${skipped} with nothing on disk, ${failed} failed).`;
+    // Every copy that was attempted failed: that is a failed call, not a success
+    // with nothing in it. The per-attachment errors stay in `results`.
+    if (exported === 0 && failed > 0) {
+      const error = errorResponse(summary, new CodedError(summary, { code: "operation_failed" }));
+      return { ...error, structuredContent: { ...structured, ...error.structuredContent } };
+    }
+    return successResponse(summary, structured);
   }, "Error exporting attachments")
 );
 
@@ -4119,7 +4198,7 @@ registerTool(
     if (id) {
       const markdown = notesManager.getNoteMarkdownById(id);
       if (!markdown) {
-        return errorResponse(`Note with ID "${id}" not found or has no content`);
+        return notFoundResponse(`Note with ID "${id}" not found or has no content`);
       }
       return successResponse(markdown, { markdown });
     }
@@ -4131,7 +4210,7 @@ registerTool(
 
     const markdown = notesManager.getNoteMarkdown(title, account);
     if (!markdown) {
-      return errorResponse(
+      return notFoundResponse(
         `Note "${title}" not found or has no content. Use search-notes to find notes, then use the note's ID for reliable operations.`
       );
     }
@@ -4252,7 +4331,10 @@ registerTool(
           `Error exporting Markdown [${error.code}]: the template is invalid:\n` +
             error.details.map((detail) => `${detail.path}: ${detail.message}`).join("\n")
         );
-      return errorResponse(`Error exporting Markdown [${error.code}]: ${error.message}${hint}`);
+      return errorResponse(
+        `Error exporting Markdown [${error.code}]: ${error.message}${hint}`,
+        error
+      );
     }
     const warned = receipt.warnings?.length
       ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)`
@@ -4341,7 +4423,7 @@ registerTool(
         error.code === "no-full-disk-access"
           ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
           : "";
-      return errorResponse(`Error exporting HTML [${error.code}]: ${error.message}${hint}`);
+      return errorResponse(`Error exporting HTML [${error.code}]: ${error.message}${hint}`, error);
     }
     const assets = receipt.assets
       ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}`
@@ -4376,7 +4458,7 @@ registerTool(
     // Verify the note exists and is accessible
     const note = notesManager.getNoteById(id);
     if (!note) {
-      return errorResponse(`Note with ID "${id}" not found`);
+      return notFoundResponse(`Note with ID "${id}" not found`);
     }
     if (note.passwordProtected) {
       return errorResponse(

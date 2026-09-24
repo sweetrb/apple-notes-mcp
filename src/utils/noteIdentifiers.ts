@@ -97,6 +97,24 @@ const NO_FDA_MESSAGE =
   "then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders " +
   `work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
 
+/**
+ * The identifier failure an input-validation message reports, if any.
+ * Resolution runs inside the input schema, so the MCP SDK reports a failure
+ * as validation text; this recovers which failure it was from the fixed
+ * wording above and in resolveIdentifiers.
+ */
+export function identifierFailureIn(message: string): IdentifierErrorCode | null {
+  if (message.includes(NO_FDA_MESSAGE)) return "no_fda";
+  if (/\bNo (?:note|folder|account) found for (?:numeric key|identifier) /.test(message))
+    return "not_found";
+  if (
+    message.includes("Failed to read the Notes database.") ||
+    message.includes("The Notes database has no store UUID")
+  )
+    return "query_error";
+  return null;
+}
+
 /** Normalizes a numeric key to canonical digits (no leading zeros). */
 function canonicalKey(value: string): string {
   return BigInt(value).toString();

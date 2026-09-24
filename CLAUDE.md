@@ -115,7 +115,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 
 **You cannot create an Apple Notes checklist (the interactive ☐ / ☑ items) via this MCP server.** This is an Apple Notes limitation, not a server bug.
 
-The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–20, one bridge run of a few seconds each; a client-side timeout does not stop the server, so read the note before any retry). If `create-checklist-items` returns `ok: false`, only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
+The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–20, one bridge run of a few seconds each; a client-side timeout does not stop the server, so read the note before any retry). If `create-checklist-items` returns `ok: false` (an error result with a `code`), only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
 
 When you send checklist HTML or markdown to `create-note` or `update-note`:
 
@@ -247,7 +247,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### add-attachment / create-note-with-attachment
 - `filename` sets the name the attachment shows in Notes. It must keep the source file's extension and be a single path component.
 - macOS 27: Notes' AppleScript never lists PDF attachments. When AppleScript shows no new attachment, the tool verifies through the read-only NoteStore rows (needs Full Disk Access) and returns `verifiedBy: "database"`; without FDA a PDF attach reports "outcome uncertain", and the PDF was probably created, so read the note before retrying.
-- `create-note-with-attachment` creates the note, then attaches. If the attach step fails, the error names the new note's id: call `add-attachment` on that id rather than repeating the tool, which would create a second note.
+- `create-note-with-attachment` creates the note, then attaches. If the attach step fails before the file is inserted, the error names the new note's id: call `add-attachment` on that id rather than repeating the tool, which would create a second note. If the error says the attachment outcome is uncertain (`indeterminate: true`), the file may already be attached: run `list-attachments` on that id before attaching again.
 
 ### add-attachment-from-pasteboard
 - Use when the user says "attach what I copied" or "put this screenshot in the note". Same `id`, `expectedContentHash`, and `filename` as `add-attachment`; a `filename` without an extension gets the pasted type's extension.
@@ -325,7 +325,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### get-capabilities / doctor feature matrix
 - Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.
 - `unverified: ["notes_automation"]` means the probe did not contact Notes.app, not that Automation is denied. Run `doctor` to confirm it.
-- Placeholder features (`checklistToggle`, `smartFolders`, `paragraphLinks`, `audioTranscription`) always report `not_implemented`; do not attempt them through other tools.
+- Placeholder features (`checklistToggle`, and `smartFolders` for creating or editing smart folders) always report `not_implemented`; do not attempt them through other tools. `paragraphLinks` and `audioTranscription` are real features gated on Full Disk Access.
 
 ### export-notes-markdown
 - Exactly one of `id` (exact note ID) or `folder` (path, optional `account`, `limit` default 100)
@@ -430,7 +430,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
 | "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
 
-Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections raised by the MCP SDK itself carry no code.
+Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections carry `validation_error` with `committed: false`; a Notes UUID or numeric key that could not be resolved carries `not_found` or `full_disk_access_missing` instead.
 
 ## Recurring macOS permission prompts → offer the official-Node fix
 

@@ -203,6 +203,16 @@ export function inspectInstallation(deps: PrivateHelperDeps = defaultDeps()): In
   return { ...base, ready: true, reason: null, detail: null };
 }
 
+/**
+ * The helper timeout from {@link TIMEOUT_ENV}, in milliseconds. Only a finite
+ * positive value is honoured: spawnSync rejects a negative timeout with
+ * ERR_OUT_OF_RANGE, and zero would mean no timeout at all.
+ */
+export function helperTimeoutMs(env: NodeJS.ProcessEnv): number {
+  const value = Number.parseInt(env[TIMEOUT_ENV] || "", 10);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
+}
+
 /** A helper failure with a stable helper code. */
 export class PrivateHelperError extends Error {
   constructor(
@@ -324,7 +334,7 @@ export function callPrivateHelper(
       throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
     binaryPath = install.binaryPath;
   }
-  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS;
+  const timeout = helperTimeoutMs(deps.env);
   const result = deps.spawn(binaryPath, [], {
     input: JSON.stringify({ protocol: PRIVATE_HELPER_PROTOCOL, action, ...fields }),
     encoding: "utf8",
@@ -334,12 +344,25 @@ export function callPrivateHelper(
     env: deps.env,
   });
   const errno = (result.error as NodeJS.ErrnoException | undefined)?.code;
-  if (errno === "ETIMEDOUT" || (result.signal && result.status === null))
+  // Only our own timeout is a timeout. spawnSync also kills the helper when
+  // its output passes maxBuffer (ENOBUFS), and a crash ends it with a signal
+  // of its own; neither is slowness, and retrying will not help.
+  if (errno === "ETIMEDOUT")
     throw new PrivateHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (errno === "ENOBUFS")
+    throw new PrivateHelperError(
+      "invalid_response",
+      `The helper's output exceeded ${MAX_OUTPUT_BYTES} bytes and was cut off.`
+    );
   if (result.error)
     throw new PrivateHelperError(
       "helper_unreachable",
       `Could not run the helper: ${result.error.message}`
+    );
+  if (result.signal)
+    throw new PrivateHelperError(
+      "helper_crashed",
+      `The helper was terminated by ${result.signal} before it answered.`
     );
   const stdout = String(result.stdout ?? "").trim();
   let parsed: unknown;

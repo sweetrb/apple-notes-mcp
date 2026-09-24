@@ -348,6 +348,55 @@ describe("executeAppleScript", () => {
     });
   });
 
+  describe("quoted names in error text", () => {
+    it("does not read a quoted note title as a transport failure", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error('execution error: Can\'t get note "Lost connection plan". (-1728)');
+      });
+
+      const result = executeAppleScript('get note "Lost connection plan"', { maxRetries: 1 });
+
+      expect(result.error).toBe(
+        'Note "Lost connection plan" not found. Verify the title is exact (case-sensitive).'
+      );
+    });
+
+    it("does not read a quoted note title as a permission refusal", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error('execution error: Can\'t get note "Access denied log". (-1728)');
+      });
+
+      const result = executeAppleScript('get note "Access denied log"', { maxRetries: 1 });
+
+      expect(result.error).toContain("not found");
+      expect(result.error).not.toBe(PERMISSION_DENIED_MESSAGE);
+    });
+
+    it("does not read a quoted note title as a script syntax error", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error('execution error: Can\'t get note "Expected results". (-1728)');
+      });
+
+      const result = executeAppleScript('get note "Expected results"', { maxRetries: 1 });
+
+      expect(result.error).toContain("not found");
+    });
+  });
+
+  describe("maxRetries: 0", () => {
+    it("runs the script once instead of throwing", () => {
+      mockExecFileSync.mockImplementation(() => {
+        throw new Error("execution error: Note not found (-1728)");
+      });
+
+      const result = executeAppleScript("get note 1", { maxRetries: 0 });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Note not found");
+      expect(mockExecFileSync).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("input validation", () => {
     it("returns error for empty script", () => {
       const result = executeAppleScript("");

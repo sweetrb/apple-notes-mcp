@@ -8,10 +8,14 @@ import {
   ERROR_CODES,
   classifyError,
   errorResult,
+  inputValidationEnvelope,
+  installSdkErrorCodes,
+  sdkToolError,
   type ErrorCode,
   type ErrorEnvelope,
 } from "@/utils/errorCodes.js";
 import { PERMISSION_DENIED_MESSAGE } from "@/utils/applescript.js";
+import { resolveIdentifiers } from "@/utils/noteIdentifiers.js";
 
 // Real messages the server produces today, copied from their throw/return sites.
 const CASES: Array<[string, ErrorEnvelope]> = [
@@ -181,6 +185,16 @@ describe("classifyError", () => {
     expect([...covered].sort()).toEqual(Object.keys(ERROR_CODES).sort());
   });
 
+  it.each([
+    ['Note "Meeting timed out" not found', "not_found"],
+    ['Error updating note: Note "Draft uncertain" not found', "not_found"],
+    ['Note "Build not verified" not found', "not_found"],
+    ["Note “Lost connection to Notes” not found", "not_found"],
+    ['Folder "Password-protected stuff" not found. Use list-folders', "not_found"],
+  ] as const)("ignores rule words inside quoted caller data: %s", (message, code) => {
+    expect(classifyError(message)).toEqual({ code });
+  });
+
   it("honors a thrown ETIMEDOUT code even when the text does not say so", () => {
     const cause = Object.assign(new Error("spawnSync /usr/bin/shortcuts"), { code: "ETIMEDOUT" });
     expect(classifyError("Error creating note: spawnSync /usr/bin/shortcuts", cause)).toEqual({
@@ -203,6 +217,55 @@ describe("classifyError", () => {
       code: "verification_failed",
       committed: true,
       indeterminate: true,
+    });
+  });
+});
+
+describe("SDK-reported errors (#190)", () => {
+  const prefix =
+    "MCP error -32602: Input validation error: Invalid arguments for tool get-note-blocks: ";
+
+  it.each([
+    ["Expected string, received number at id", "validation_error"],
+    [
+      "No note found for identifier 00000000-0000-0000-0000-000000000000. A numeric key must belong to a note, not another object type. at id",
+      "not_found",
+    ],
+    [
+      "Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access at id",
+      "validation_error",
+    ],
+    ["Failed to read the Notes database. at id", "operation_failed"],
+  ] as const)("codes the input rejection %s", (detail, code) => {
+    expect(sdkToolError(prefix + detail).structuredContent).toEqual({
+      code,
+      committed: false,
+      indeterminate: false,
+    });
+  });
+
+  it("recognizes the full Full Disk Access resolution message", () => {
+    let message = "";
+    try {
+      resolveIdentifiers(["00000000-0000-0000-0000-000000000000"], "ICNote", "/nonexistent/db");
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(inputValidationEnvelope(prefix + message + " at id").code).toBe(
+      "full_disk_access_missing"
+    );
+  });
+
+  it("classifies an uncaught handler error by its text", () => {
+    expect(sdkToolError("Note not found").structuredContent).toEqual({ code: "not_found" });
+  });
+
+  it("replaces createToolError on a server that has one", () => {
+    const server = { createToolError: (m: string) => ({ text: m }) };
+    installSdkErrorCodes(server);
+    expect(server.createToolError(prefix + "bad")).toMatchObject({
+      isError: true,
+      structuredContent: { code: "validation_error" },
     });
   });
 });
@@ -260,5 +323,29 @@ describe("error envelope vs every advertised outputSchema (built server)", () =>
           failures.push(`${tool.name}: ${envelope.code}: ${ajv.errorsText(validate.errors)}`);
     }
     expect(failures).toEqual([]);
+  });
+
+  // #190: a call the SDK rejects before the handler runs still carries a code.
+  // Neither call reaches Notes.app: the input schema refuses both.
+  it("codes an input-schema rejection", async () => {
+    const result = await client.callTool({ name: "get-note-blocks", arguments: { id: 42 } });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      code: "validation_error",
+      committed: false,
+      indeterminate: false,
+    });
+  });
+
+  it("keeps the code of a Notes UUID that does not resolve", async () => {
+    const result = await client.callTool({
+      name: "get-note-blocks",
+      arguments: { id: "00000000-0000-0000-0000-000000000000" },
+    });
+    expect(result.isError).toBe(true);
+    // not_found with Full Disk Access, full_disk_access_missing without it.
+    expect(["not_found", "full_disk_access_missing"]).toContain(
+      (result.structuredContent as ErrorEnvelope).code
+    );
   });
 });
