@@ -41557,7 +41557,7 @@ function generationDirs(base, accountDir) {
   const entries2 = boundedEntries(base, MAX_GENERATION_DIRS) ?? [];
   return entries2.map((e) => realInside(join7(base, e), accountDir)).filter((p) => p !== null && isDirectory(p)).sort((a, b) => generationRank(basename(b)) - generationRank(basename(a)));
 }
-function fallbackFiles(accountDir, rootName, identifier, generation, names) {
+function fallbackFiles(accountDir, rootName, identifier, generation, names, onStale = () => void 0) {
   const base = join7(accountDir, rootName, identifier);
   const found = [];
   const add = (candidate) => {
@@ -41566,12 +41566,14 @@ function fallbackFiles(accountDir, rootName, identifier, generation, names) {
   };
   const gen = safeComponent(generation);
   if (gen) for (const name of names) add(join7(base, gen, name));
+  const recorded = found.length;
   if (isDirectory(base)) {
     for (const dir of generationDirs(base, accountDir))
       for (const name of names) add(join7(dir, name));
     for (const name of names) add(join7(base, name));
   }
   for (const name of names) add(join7(accountDir, rootName, `${identifier}${extname(name)}`));
+  if (gen && recorded === 0 && found.length > 0) onStale();
   return found;
 }
 function previewPixelArea(name) {
@@ -41617,7 +41619,7 @@ function previewPaths(accountDir, identifier, entries2) {
   }
   return files;
 }
-function assetPathsFor(accountDir, row) {
+function assetPathsFor(accountDir, row, onStale) {
   const found = [];
   const add = (candidate) => {
     const real = realInside(candidate, accountDir);
@@ -41634,14 +41636,23 @@ function assetPathsFor(accountDir, row) {
   if (!id2) return found;
   const ownName = safeComponent(row.filename);
   if (ownName) add(join7(accountDir, "Media", id2, ownName));
-  for (const file of fallbackFiles(accountDir, "FallbackImages", id2, row.fallbackImageGeneration, [
-    "FallbackImage.png",
-    "FallbackImage.jpg"
-  ]))
+  for (const file of fallbackFiles(
+    accountDir,
+    "FallbackImages",
+    id2,
+    row.fallbackImageGeneration,
+    ["FallbackImage.png", "FallbackImage.jpg"],
+    onStale
+  ))
     add(file);
-  for (const file of fallbackFiles(accountDir, "FallbackPDFs", id2, row.fallbackPdfGeneration, [
-    "FallbackPDF.pdf"
-  ]))
+  for (const file of fallbackFiles(
+    accountDir,
+    "FallbackPDFs",
+    id2,
+    row.fallbackPdfGeneration,
+    ["FallbackPDF.pdf"],
+    onStale
+  ))
     add(file);
   return found;
 }
@@ -41669,10 +41680,11 @@ function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTA
     const accountDir = accountDirFor(row.accountIdentifier ?? parent?.accountIdentifier ?? null);
     let assetPaths = [];
     let previews = [];
+    let fallbackStale = false;
     if (accountDir) {
       if (!previewEntries.has(accountDir))
         previewEntries.set(accountDir, listPreviewEntries(accountDir));
-      assetPaths = assetPathsFor(accountDir, row);
+      assetPaths = assetPathsFor(accountDir, row, () => fallbackStale = true);
       previews = previewPaths(accountDir, row.identifier, previewEntries.get(accountDir));
     }
     const previewPath = previews[0] ?? null;
@@ -41685,6 +41697,7 @@ function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTA
       filename: row.filename ?? row.mediaFilename,
       bodyIndex: parent ? null : indexOf(row),
       assetPaths,
+      ...fallbackStale ? { fallbackStale: true } : {},
       previewPath,
       paths: previewPath ? [...assetPaths, previewPath] : [...assetPaths]
     };
@@ -41823,7 +41836,12 @@ function exportOneAttachment(record2, dir, source, inBody) {
         throw new Error(`Refusing to write outside the export directory: "${dest}"`);
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
-      return { ...base, exportedTo: dest, exportedKind: source.kind };
+      return {
+        ...base,
+        exportedTo: dest,
+        exportedKind: source.kind,
+        ...source.kind === "fallback" && record2.fallbackStale ? { stale: true } : {}
+      };
     } catch (error2) {
       if (error2.code === "EEXIST") continue;
       return { ...base, error: error2 instanceof Error ? error2.message : String(error2) };
@@ -50593,7 +50611,14 @@ var AssetLocator = class {
           ["FallbackImage.png", "FallbackImage.jpg"]
         );
         if (fallback)
-          return { primary: { path: fallback, name: `${source.kind}.png`, role: "fallback" } };
+          return {
+            primary: {
+              path: fallback.path,
+              name: `${source.kind}.png`,
+              role: "fallback",
+              ...fallback.stale ? { stale: true } : {}
+            }
+          };
         return preview ? { primary: preview } : {};
       }
       case "scan": {
@@ -50601,7 +50626,14 @@ var AssetLocator = class {
           "FallbackPDF.pdf"
         ]);
         return {
-          ...pdf ? { primary: { path: pdf, name: "scan.pdf", role: "fallback" } } : {},
+          ...pdf ? {
+            primary: {
+              path: pdf.path,
+              name: "scan.pdf",
+              role: "fallback",
+              ...pdf.stale ? { stale: true } : {}
+            }
+          } : {},
           ...preview ? { preview } : {}
         };
       }
@@ -50630,7 +50662,11 @@ var AssetLocator = class {
     }
     return void 0;
   }
-  /** <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation. */
+  /**
+   * <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation.
+   * `stale` is set when a generation was recorded but the file came from
+   * somewhere else.
+   */
   fallback(account, dir, id2, generation, names) {
     const base = join19(account, dir, id2);
     const gen = safeComponent2(generation);
@@ -50642,7 +50678,7 @@ var AssetLocator = class {
     for (const g of generations)
       for (const name of names) {
         const path10 = confine(g ? join19(base, g, name) : join19(base, name), account);
-        if (path10 && isFile(path10)) return path10;
+        if (path10 && isFile(path10)) return { path: path10, stale: Boolean(gen) && g !== gen };
       }
     return void 0;
   }
@@ -50990,7 +51026,10 @@ function titleBlockIndex(note) {
   return first2.text.trim() === note.title.trim() && first2.style !== "monospaced" ? first2.index : -1;
 }
 function place(ctx, asset) {
-  return asset && ctx.writer ? ctx.writer.place(asset) : void 0;
+  const placed = asset && ctx.writer ? ctx.writer.place(asset) : void 0;
+  if (asset?.stale && placed && "url" in placed)
+    ctx.stats.staleRenderings = (ctx.stats.staleRenderings ?? 0) + 1;
+  return placed;
 }
 function planAttachment(attachment, ctx) {
   ctx.stats.attachments++;
@@ -61962,7 +62001,8 @@ var exportStatsSchema = external_exports.object({
   unavailable: external_exports.number(),
   tables: external_exports.number(),
   unreadableTables: external_exports.number(),
-  unreferenced: external_exports.number()
+  unreferenced: external_exports.number(),
+  staleRenderings: external_exports.number().optional()
 });
 registerTool(
   "export-notes-markdown",

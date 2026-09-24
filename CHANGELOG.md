@@ -78,6 +78,16 @@
 - `add-attachment-from-pasteboard` refuses several copied images or PDFs
   (`multiple_items`) instead of attaching only the first, and takes the PDF
   when a copy offers both a PDF and a raster preview of it (#238).
+- `get-native-objects` reads a note that also holds a `tel:` or `sms:` link,
+  using the same read-only path as `get-note-tables` (#193); it used the strict
+  read that write guards need and failed on those links.
+- `get-note-structure` counts words with the shared word count, so its
+  `wordCount` equals the `words:` filter and the other tools' counts: a run of
+  punctuation is no longer a word, and unspaced scripts are split (#244).
+- Markdown and HTML exports, `export-attachments` and `list-attachments` paths
+  flag a Notes rendering taken from an older generation because the recorded
+  one is missing (`stats.staleRenderings`, `stale: true`, `fallbackStale`),
+  as `list-paper-attachments` already does (#203).
 
 ## [2.9.24] - 2026-09-24
 
