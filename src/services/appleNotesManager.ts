@@ -1765,7 +1765,9 @@ export class AppleNotesManager {
    * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
    */
   getNoteTablesById(id: string): NoteTablesResult {
-    return collectNoteTables(readRichNote(id), id);
+    // Tables never feed a rewrite, so a link Notes stores with a scheme the
+    // write path refuses (tel:, sms:) must not make the tables unreadable.
+    return collectNoteTables(readRichNote(id, { skipUnsafeLinks: true }), id);
   }
 
   /**

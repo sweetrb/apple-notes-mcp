@@ -377,6 +377,18 @@ describe("Notes rich text", () => {
       /scheme/
     );
   });
+  it("skips unsafe links, keeping native objects, only when a read asks for it (#193)", () => {
+    const withPhone = document("Call \ufffc", [
+      run(5, "tel:+15555550100"),
+      Buffer.concat([n(1, 1), b(12, Buffer.concat([b(1, "T1"), b(2, "com.apple.notes.table")]))]),
+    ]);
+    expect(() => parseRichNote(withPhone)).toThrow(/scheme/);
+    const lenient = parseRichNote(withPhone, [], { skipUnsafeLinks: true });
+    expect(lenient.links).toEqual([]);
+    expect(lenient.objects).toEqual([
+      { id: "T1", type: "com.apple.notes.table", start: 5, length: 1 },
+    ]);
+  });
   it("treats a bare http(s) origin as equal to the same origin with a trailing slash (#172)", () => {
     // Notes rewrites a path-less origin to add a trailing slash on save, so a
     // link written as "https://growthpath.systems" reads back as

@@ -35,7 +35,8 @@ describe("getNoteTablesById", () => {
       ],
     });
     const result = manager.getNoteTablesById(id);
-    expect(read).toHaveBeenCalledWith(id);
+    // Lenient: a tel: or sms: link elsewhere in the note must not hide its tables (#193).
+    expect(read).toHaveBeenCalledWith(id, { skipUnsafeLinks: true });
     expect(exec).not.toHaveBeenCalled();
     expect(result.tableCellsComplete).toBe(true);
     expect(result.tables).toHaveLength(1);

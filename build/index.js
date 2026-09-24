@@ -39760,7 +39760,7 @@ function styleValue(field) {
   }
   return Buffer.from(field.value).toString("hex");
 }
-function parseRichNote(data, nativeTags = []) {
+function parseRichNote(data, nativeTags = [], options = {}) {
   const doc = decodeMessage(data);
   const wrapper = embeddedMessage(getField(doc, 2));
   const body = wrapper && embeddedMessage(getField(wrapper, 3));
@@ -39800,7 +39800,7 @@ function parseRichNote(data, nativeTags = []) {
       if (varintValue(getField(fields, 14))) lossy.add("highlight");
     }
     const url = stringValue(getField(fields, 9));
-    if (url) {
+    if (url && !(options.skipUnsafeLinks && !safeUrl(url))) {
       if (!safeUrl(url)) throw new Error("Unsupported link scheme in note");
       const previous = links.at(-1);
       if (previous?.url === url && previous.start + previous.length === position) {
@@ -39855,7 +39855,7 @@ function parseRichNote(data, nativeTags = []) {
     ...lossy.size ? { htmlLossyFormatting: HTML_LOSSY_ORDER.filter((f) => lossy.has(f)) } : {}
   };
 }
-function readRichNote(id2) {
+function readRichNote(id2, options = {}) {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id2)?.[1];
   if (!pk) throw new Error("Invalid exact note ID");
   const sql = `BEGIN; SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE=${pk}; SELECT json_group_object(ZIDENTIFIER,ZALTTEXT) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} AND ZTYPEUTI1='com.apple.notes.inlinetextattachment.hashtag'; SELECT json_group_array(json_object('id',ZIDENTIFIER,'pk',Z_PK,'type',COALESCE(ZTYPEUTI1,ZTYPEUTI),'mergeable',hex(COALESCE(ZMERGEABLEDATA1,ZMERGEABLEDATA)),'view',ZATTACHMENTVIEWTYPE)) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} OR ZNOTE=${pk}; COMMIT;`;
@@ -39870,7 +39870,9 @@ function readRichNote(id2) {
   if (!tags || Array.isArray(tags) || typeof tags !== "object" || Object.values(tags).some((tag) => typeof tag !== "string"))
     throw new Error("Invalid native tags");
   const rich = parseRichNote(
-    gunzipSync2(Buffer.from(rows[0], "hex"), { maxOutputLength: 32 * 1024 * 1024 })
+    gunzipSync2(Buffer.from(rows[0], "hex"), { maxOutputLength: 32 * 1024 * 1024 }),
+    [],
+    options
   );
   const tagMap = tags;
   const objectData = JSON.parse(rows[2] || "[]");
@@ -43106,7 +43108,7 @@ var AppleNotesManager = class {
    * @throws Error when the note's rich data cannot be read (e.g. no Full Disk Access)
    */
   getNoteTablesById(id2) {
-    return collectNoteTables(readRichNote(id2), id2);
+    return collectNoteTables(readRichNote(id2, { skipUnsafeLinks: true }), id2);
   }
   /**
    * Retrieves detailed metadata for a note by title.

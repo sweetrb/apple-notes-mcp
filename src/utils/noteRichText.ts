@@ -127,8 +127,23 @@ function styleValue(field: ReturnType<typeof decodeMessage>[number]): unknown {
   return Buffer.from(field.value).toString("hex");
 }
 
+/** Options for a rich-text read. */
+export interface RichNoteReadOptions {
+  /**
+   * Leave links with an unexpected scheme (tel:, sms:, ...) out of `links`
+   * instead of refusing the whole note. Only for reads that never feed a
+   * rewrite, such as reading native tables: a write needs the strict parse so
+   * it cannot drop a link it did not understand.
+   */
+  skipUnsafeLinks?: boolean;
+}
+
 /** Decode the rich-text metadata stored for one Apple Notes record. */
-export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): RichNote {
+export function parseRichNote(
+  data: Uint8Array,
+  nativeTags: string[] = [],
+  options: RichNoteReadOptions = {}
+): RichNote {
   const doc = decodeMessage(data);
   const wrapper = embeddedMessage(getField(doc, 2));
   const body = wrapper && embeddedMessage(getField(wrapper, 3));
@@ -174,7 +189,7 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
       if (varintValue(getField(fields, 14))) lossy.add("highlight");
     }
     const url = stringValue(getField(fields, 9));
-    if (url) {
+    if (url && !(options.skipUnsafeLinks && !safeUrl(url))) {
       if (!safeUrl(url)) throw new Error("Unsupported link scheme in note");
       const previous = links.at(-1);
       if (previous?.url === url && previous.start + previous.length === position) {
@@ -234,7 +249,7 @@ export function parseRichNote(data: Uint8Array, nativeTags: string[] = []): Rich
 }
 
 /** Read rich metadata for one canonical CoreData note ID without modifying Notes. */
-export function readRichNote(id: string): RichNote {
+export function readRichNote(id: string, options: RichNoteReadOptions = {}): RichNote {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id)?.[1];
   if (!pk) throw new Error("Invalid exact note ID");
   // One read-only transaction, scoped to the requested note; no library dump.
@@ -257,7 +272,9 @@ export function readRichNote(id: string): RichNote {
   )
     throw new Error("Invalid native tags");
   const rich = parseRichNote(
-    gunzipSync(Buffer.from(rows[0], "hex"), { maxOutputLength: 32 * 1024 * 1024 })
+    gunzipSync(Buffer.from(rows[0], "hex"), { maxOutputLength: 32 * 1024 * 1024 }),
+    [],
+    options
   );
   const tagMap = tags as Record<string, string>;
   const objectData: unknown = JSON.parse(rows[2] || "[]");
