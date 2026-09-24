@@ -32,7 +32,6 @@
  * @module utils/svgAnalyzer
  */
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { parseColor, parsePaint, type Paint, type Rgba } from "./svgColor.js";
 import {
   IDENTITY,
@@ -1332,53 +1331,4 @@ export function analyzeSvgBuffer(source: Buffer): SvgAnalysisResult {
   const analyzer = new Analyzer(root);
   const viewport = analyzer.run();
   return analysisFor(source, analyzer, viewport);
-}
-
-/**
- * Read one SVG file: a regular file (not a symlink) of at most 1 MiB. The file
- * is opened without following links, and the opened descriptor is checked.
- */
-export function readSvgSource(path: string): Buffer {
-  // Open first and check the opened descriptor, so there is no window between
-  // a check and the open. O_NOFOLLOW refuses a symbolic link (ELOOP), and
-  // O_NONBLOCK keeps a FIFO from blocking the event loop; neither affects a
-  // regular file.
-  let fd: number;
-  try {
-    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ELOOP")
-      throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
-    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
-  }
-  try {
-    const info = fstatSync(fd);
-    if (!info.isFile())
-      throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
-    if (info.size > SVG_LIMITS.maxSourceBytes)
-      throw new SvgError(
-        "svg_file_invalid",
-        `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-      );
-    const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
-    let total = 0;
-    for (;;) {
-      const n = readSync(fd, buffer, total, buffer.length - total, null);
-      if (n === 0) break;
-      total += n;
-      if (total > SVG_LIMITS.maxSourceBytes)
-        throw new SvgError(
-          "svg_file_invalid",
-          `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-        );
-    }
-    return buffer.subarray(0, total);
-  } finally {
-    closeSync(fd);
-  }
-}
-
-/** Read and analyze one SVG file. Never writes anything. */
-export function analyzeSvgFile(path: string): SvgAnalysisResult {
-  return analyzeSvgBuffer(readSvgSource(path));
 }

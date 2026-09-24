@@ -337,7 +337,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - `outputPath` is create-only; `[output_exists]` means choose a new path, never delete the old file on the user's behalf
 - Pass `assetsDir` to copy attachment files; without it attachments are placeholders like `\[Image: name\]`
 - Password-protected notes are listed in `skipped`; Full Disk Access is required
-- `template` (`standard-markdown`, `obsidian`) or `templateFile` (JSON, exclusive) renders through a Markdown template; the schema is in docs/markdown-templates.md. `standard-markdown` output equals the default export
+- `template` (`standard-markdown`, `obsidian`) or `templateFile` (JSON, exclusive; same private-location refusal as `contentPath`) renders through a Markdown template; the schema is in docs/markdown-templates.md. `standard-markdown` output equals the default export
 - `[invalid-template]` lists one `$.json.path: problem` per line: fix those fields, do not guess a new template
 - Templated `warnings` (for example `missing_asset`, `assets_dir_required`) do not fail the export; report them
 
@@ -364,6 +364,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 ### analyze-svg
 - Standalone, read-only analysis of one local SVG file (absolute path in home, temp, or `/Volumes`; at most 1 MiB). It opens no Notes data.
+- `path` follows `contentPath`'s read scope: hidden paths and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. Do not copy the file elsewhere to get around a refusal; ask the user.
 - Branch on `classification` and `requiredLosses`, not on the issue text. `safe` needs no approximation; `lossy` needs `geometry-approximation` or `paint-approximation`; `unsupported` drops visible content or has nothing drawable (`importable: false`).
 - Refusals are errors with `svgCode` (`svg_unsafe`, `svg_invalid`, `svg_reference_invalid`, `svg_complexity_limit`, `svg_geometry_invalid`, `svg_file_invalid`). An unsafe file cannot be analyzed with any option; do not try to strip parts of it on the user's behalf.
 - `includeDrawing: true` returns the normalized strokes; leave it off unless you need them, since it can be large.

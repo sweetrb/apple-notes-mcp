@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants10) {
+      optimizeNames(names, constants9) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants10);
+          this.rhs = optimizeExpr(this.rhs, names, constants9);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants10) {
+      optimizeNames(names, constants9) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants10);
+        this.rhs = optimizeExpr(this.rhs, names, constants9);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants10) {
-        this.code = optimizeExpr(this.code, names, constants10);
+      optimizeNames(names, constants9) {
+        this.code = optimizeExpr(this.code, names, constants9);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants10) {
+      optimizeNames(names, constants9) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants10))
+          if (n.optimizeNames(names, constants9))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants10) {
+      optimizeNames(names, constants9) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
-        if (!(super.optimizeNames(names, constants10) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
+        if (!(super.optimizeNames(names, constants9) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants10);
+        this.condition = optimizeExpr(this.condition, names, constants9);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants10) {
-        if (!super.optimizeNames(names, constants10))
+      optimizeNames(names, constants9) {
+        if (!super.optimizeNames(names, constants9))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants10);
+        this.iteration = optimizeExpr(this.iteration, names, constants9);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants10) {
-        if (!super.optimizeNames(names, constants10))
+      optimizeNames(names, constants9) {
+        if (!super.optimizeNames(names, constants9))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants10);
+        this.iterable = optimizeExpr(this.iterable, names, constants9);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants10) {
+      optimizeNames(names, constants9) {
         var _a, _b;
-        super.optimizeNames(names, constants10);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants10);
+        super.optimizeNames(names, constants9);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants9);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants10) {
+    function optimizeExpr(expr, names, constants9) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants10[n.str];
+        const c = constants9[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants10[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants9[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants10 = {
+    var constants9 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants10) {
-      v = { value: constants10[c] };
+    for (c in constants9) {
+      v = { value: constants9[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -39857,6 +39857,10 @@ var CodedError = class extends Error {
 };
 var RULES = [
   { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  // A scope guard is checked before the write runs, so nothing was written:
+  // the note is not where it was reviewed. Its advice to read the note before
+  // retrying must not make it look like an unverified write.
+  { code: "revision_conflict", pattern: /\bScope guard failed:/ },
   {
     code: "verification_failed",
     pattern: /\buncertain\b|may have (?:been|succeeded)|\baccepted (?:the|an) \w+, but|\bnot verified\b|Do not retry automatically|before any retry|read (?:the )?(?:exact )?(?:note|ID)\b[^.]*before retr/i
@@ -53141,33 +53145,9 @@ function templateAssetsDir(directory, outputDir, values) {
   return dir;
 }
 function readTemplateFile(path10) {
-  const abs = assertExportPath(path10);
-  if (extname4(abs).toLowerCase() !== ".json")
-    throw new Error(`Template file must have a .json extension: ${abs}`);
-  let fd;
-  try {
-    fd = openRegular(abs);
-  } catch (error2) {
-    const code = error2.code;
-    throw new Error(
-      code === "ENOENT" ? `Template file not found: ${abs}` : code === "ELOOP" ? `Refusing to read the symbolic link ${abs}` : `Template file is not a readable regular file: ${abs}`
-    );
-  }
-  try {
-    const size = fstatSync5(fd).size;
-    if (size > MAX_TEMPLATE_BYTES)
-      throw new Error(`Template file is ${size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`);
-    const data = Buffer.alloc(size);
-    let read = 0;
-    while (read < size) {
-      const n = readSync4(fd, data, read, size - read, read);
-      if (n <= 0) break;
-      read += n;
-    }
-    return data.subarray(0, read).toString("utf8");
-  } finally {
-    closeSync5(fd);
-  }
+  if (extname4(path10).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${path10}`);
+  return readAllowedFile(path10, MAX_TEMPLATE_BYTES, { label: "Template file" }).toString("utf8");
 }
 
 // src/services/notesExport.ts
@@ -54759,7 +54739,7 @@ function failure(action, error2) {
 var nameInput = external_exports.string().min(1).max(64).describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
 var templateInput = external_exports.union([external_exports.record(external_exports.unknown()), external_exports.string().max(MAX_TEMPLATE_BYTES)]).optional().describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
 var templateFileInput = external_exports.string().min(1).max(4096).optional().describe(
-  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+  "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; hidden paths and ~/Library outside iCloud Drive and CloudStorage refused unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; symlinks refused; at most 256 KiB)"
 );
 function sourceText(args) {
   if (args.template === void 0 === (args.templateFile === void 0))
@@ -54829,7 +54809,7 @@ function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
   server2.registerTool(
     "validate-markdown-template",
     {
-      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.',
+      description: 'Use when: checking a template before saving it or exporting with it.\nReturns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\nDo not use when: you want to store it (save-markdown-template validates too).\nSafety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile. templateFile reads only a regular .json file in home, temp or /Volumes, refusing hidden paths (~/.docker, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; errors never quote the file.',
       inputSchema: validateInput,
       outputSchema: loose,
       annotations: { readOnlyHint: true }
@@ -54870,7 +54850,7 @@ function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
   server2.registerTool(
     "save-markdown-template",
     {
-      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
+      description: "Use when: storing a template so export-notes-markdown can use it by name.\nReturns: name, path, bytes and whether an existing template was replaced.\nDo not use when: exporting once (pass templateFile to export-notes-markdown instead).\nSafety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved. templateFile follows the same read scope as validate-markdown-template.",
       inputSchema: saveInput,
       outputSchema: loose,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
@@ -54913,7 +54893,6 @@ function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
 
 // src/utils/svgAnalyzer.ts
 import { createHash as createHash5 } from "node:crypto";
-import { closeSync as closeSync9, constants as constants9, fstatSync as fstatSync9, openSync as openSync9, readSync as readSync7 } from "node:fs";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -55756,7 +55735,7 @@ function decodeEntities(raw, line) {
     if (body in PREDEFINED) return PREDEFINED[body];
     throw new SvgError(
       "svg_unsafe",
-      `Named entity "&${body.slice(0, 40)};" on line ${line}: only the five XML entities are allowed`
+      `A named entity on line ${line} is not allowed: only the five XML entities are`
     );
   });
 }
@@ -55827,6 +55806,8 @@ function parseXml(source, limits) {
     if (!NAME_START.test(source[i] ?? "")) fail("Invalid tag");
     while (i < source.length && NAME_CHAR.test(source[i])) i++;
     const name = source.slice(pos + 1, i);
+    if (!root && !stack.length && name.slice(name.indexOf(":") + 1) !== "svg")
+      fail("The root element is not <svg>");
     const rawAttributes = [];
     const attributeNames = /* @__PURE__ */ new Set();
     let selfClosing = false;
@@ -56944,50 +56925,12 @@ function analyzeSvgBuffer(source) {
   const viewport = analyzer.run();
   return analysisFor(source, analyzer, viewport);
 }
-function readSvgSource(path10) {
-  let fd;
-  try {
-    fd = openSync9(path10, constants9.O_RDONLY | constants9.O_NOFOLLOW | constants9.O_NONBLOCK);
-  } catch (error2) {
-    if (error2.code === "ELOOP")
-      throw new SvgError("svg_file_invalid", "The SVG path is a symbolic link");
-    throw new SvgError("svg_file_invalid", "The SVG file does not exist or cannot be read");
-  }
-  try {
-    const info = fstatSync9(fd);
-    if (!info.isFile())
-      throw new SvgError("svg_file_invalid", "The SVG path is not a regular file");
-    if (info.size > SVG_LIMITS.maxSourceBytes)
-      throw new SvgError(
-        "svg_file_invalid",
-        `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-      );
-    const buffer = Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1);
-    let total = 0;
-    for (; ; ) {
-      const n = readSync7(fd, buffer, total, buffer.length - total, null);
-      if (n === 0) break;
-      total += n;
-      if (total > SVG_LIMITS.maxSourceBytes)
-        throw new SvgError(
-          "svg_file_invalid",
-          `The SVG is larger than ${SVG_LIMITS.maxSourceBytes} bytes`
-        );
-    }
-    return buffer.subarray(0, total);
-  } finally {
-    closeSync9(fd);
-  }
-}
-function analyzeSvgFile(path10) {
-  return analyzeSvgBuffer(readSvgSource(path10));
-}
 
 // src/tools/svgAnalysis.ts
 function runSvgAnalysis(args, roots = allowedSaveRoots()) {
-  let abs;
+  let source;
   try {
-    abs = assertReadableInRoots(args.path, roots, "SVG file");
+    source = readAllowedFile(args.path, SVG_LIMITS.maxSourceBytes, { roots, label: "SVG file" });
   } catch (error2) {
     throw new CodedError(error2.message, {
       code: "validation_error",
@@ -56995,7 +56938,7 @@ function runSvgAnalysis(args, roots = allowedSaveRoots()) {
     });
   }
   try {
-    const result = analyzeSvgFile(abs);
+    const result = analyzeSvgBuffer(source);
     return {
       ...result.analysis,
       ...args.includeDrawing ? { drawing: result.drawing } : {}
@@ -57013,7 +56956,7 @@ function runSvgAnalysis(args, roots = allowedSaveRoots()) {
 function registerSvgAnalysis(server2) {
   const inputSchema = {
     path: external_exports.string().min(1).max(4096).describe(
-      `Absolute path of one .svg file (home, temp, or /Volumes; not a symbolic link; at most ${SVG_LIMITS.maxSourceBytes} bytes of UTF-8)`
+      `Absolute path of one .svg file (home, temp, or /Volumes; not a hidden path or ~/Library outside iCloud Drive and CloudStorage; not a symbolic link; at most ${SVG_LIMITS.maxSourceBytes} bytes of UTF-8)`
     ),
     includeDrawing: external_exports.boolean().optional().describe(
       "Also return the normalized drawing (strokes with sRGB color, width and points). Off by default: it can be large."
@@ -57022,7 +56965,7 @@ function registerSvgAnalysis(server2) {
   server2.registerTool(
     "analyze-svg",
     {
-      description: "Use when: checking whether an SVG file can be represented as editable monoline strokes, and what that conversion would approximate or drop.\nReturns: classification (safe, lossy, unsupported), importable, defaultWriteAllowed, requiredLosses (geometry-approximation, paint-approximation, drop-content), issues with element locations, counts and work budgets, the source SHA-256, and analysisDigest, a SHA-256 over the canonical analysis and normalized drawing. includeDrawing adds the drawing.\nDo not use when: you want to attach the SVG file itself to a note (add-attachment).\nSafety: read-only and local. Opens no Notes data and makes no network request. Scripts, event handlers, style elements, animation, DOCTYPE/entities and external resources are refused with svgCode svg_unsafe; malformed files with svg_invalid; oversized work with svg_complexity_limit.",
+      description: "Use when: checking whether an SVG file can be represented as editable monoline strokes, and what that conversion would approximate or drop.\nReturns: classification (safe, lossy, unsupported), importable, defaultWriteAllowed, requiredLosses (geometry-approximation, paint-approximation, drop-content), issues with element locations, counts and work budgets, the source SHA-256, and analysisDigest, a SHA-256 over the canonical analysis and normalized drawing. includeDrawing adds the drawing.\nDo not use when: you want to attach the SVG file itself to a note (add-attachment).\nSafety: read-only and local. Opens no Notes data and makes no network request. Reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; a file whose root element is not <svg> is refused without quoting it. Scripts, event handlers, style elements, animation, DOCTYPE/entities and external resources are refused with svgCode svg_unsafe; malformed files with svg_invalid; oversized work with svg_complexity_limit.",
       inputSchema,
       outputSchema: external_exports.object({ classification: external_exports.string().optional() }).passthrough(),
       annotations: { readOnlyHint: true, openWorldHint: false }
@@ -62209,7 +62152,7 @@ var exportStatsSchema = external_exports.object({
 registerTool(
   "export-notes-markdown",
   {
-    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.\nTemplates: pass template ('standard-markdown' reproduces the default output; 'obsidian' adds YAML front matter and copies attachments beside outputPath) or templateFile (a JSON template) to control how every block, inline style, attachment, per-note header/footer and separator renders. Templated receipts add template, warnings (e.g. missing_asset) and assetFiles; an invalid template is refused with [invalid-template] and every problem's JSON path.",
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one Markdown document rendered from the decoded note body: headings, bulleted/dashed/numbered lists with indent, checklists with state, block quotes, monospaced blocks, bold/italic/strikethrough/underline/highlight, links, tables, and attachments in body order.\nReturns: the Markdown inline (capped by APPLE_NOTES_MCP_EXPORT_MAX_BYTES), or with outputPath a receipt {format, count, bytes, output}; plus attachment counts and skipped notes (for example password-protected ones).\nDo not use when: you need the legacy HTML-converted Markdown of one note (get-note-markdown) or a restorable backup (export-notes-json). A folder document separates notes with '---' and is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is create-only (an existing file is refused with [output_exists]); assetsDir copies attachment files without replacing existing ones (collisions get -2, -3 suffixes). Without assetsDir, attachments render as labeled placeholders.\nTemplates: pass template ('standard-markdown' reproduces the default output; 'obsidian' adds YAML front matter and copies attachments beside outputPath) or templateFile (a JSON template; hidden paths and ~/Library outside iCloud Drive and CloudStorage are refused unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1) to control how every block, inline style, attachment, per-note header/footer and separator renders. Templated receipts add template, warnings (e.g. missing_asset) and assetFiles; an invalid template is refused with [invalid-template] and every problem's JSON path.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
@@ -62224,7 +62167,7 @@ registerTool(
         `Render through this template: built-in ${BUILTIN_TEMPLATE_NAMES.map((n) => `'${n}'`).join(" or ")}, or a saved template's name (list-markdown-templates). Exclusive with templateFile`
       ),
       templateFile: exportPathInput(
-        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB)"
+        "JSON template file (.json) to render through (exclusive with template; at most 256 KiB; hidden paths and ~/Library outside iCloud Drive and CloudStorage refused unless APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1)"
       )
     },
     outputSchema: {

@@ -1,19 +1,13 @@
 /**
  * SVG analyzer tests. Every fixture is a small synthetic SVG written here.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import {
   SVG_LIMITS,
   SvgError,
   analyzeSvgBuffer,
-  analyzeSvgFile,
   computeAnalysisDigest,
   parseLength,
-  readSvgSource,
   viewBoxMatrix,
   type SvgAnalysisResult,
 } from "./svgAnalyzer.js";
@@ -569,47 +563,5 @@ describe("limits and elements", () => {
     for (let i = 1; i < 5; i++)
       defs += `<g id="d${i}">${chain.replace("<g></g>", `<g><use href="#d${i - 1}"/></g>`)}</g>`;
     expect(refused(svg(`<defs>${defs}</defs><use href="#d4"/>`)).code).toBe("svg_complexity_limit");
-  });
-});
-
-describe("files", () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "svg-analyzer-test-"));
-  });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
-  it("reads a regular file and refuses links, directories and missing paths", () => {
-    const file = join(dir, "a.svg");
-    writeFileSync(file, svg(`<path d="M0 0 L1 1" stroke="red" ${ROUND}/>`));
-    expect(analyzeSvgFile(file).analysis.classification).toBe("safe");
-    expect(readSvgSource(file).length).toBeGreaterThan(0);
-    const link = join(dir, "link.svg");
-    symlinkSync(file, link);
-    const code = (p: string) => {
-      try {
-        readSvgSource(p);
-      } catch (error) {
-        return (error as SvgError).code;
-      }
-      return "ok";
-    };
-    expect(code(link)).toBe("svg_file_invalid");
-    mkdirSync(join(dir, "d.svg"));
-    expect(code(join(dir, "d.svg"))).toBe("svg_file_invalid");
-    expect(code(join(dir, "missing.svg"))).toBe("svg_file_invalid");
-    const big = join(dir, "big.svg");
-    writeFileSync(big, Buffer.alloc(SVG_LIMITS.maxSourceBytes + 1, 0x20));
-    expect(code(big)).toBe("svg_file_invalid");
-  });
-
-  it("refuses a FIFO without blocking on the open", () => {
-    const fifo = join(dir, "pipe.svg");
-    try {
-      execFileSync("mkfifo", [fifo]);
-    } catch {
-      return; // no mkfifo on this platform
-    }
-    expect(() => readSvgSource(fifo)).toThrow(/not a regular file/);
   });
 });

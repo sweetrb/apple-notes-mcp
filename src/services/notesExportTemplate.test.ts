@@ -159,8 +159,34 @@ describe("chooseTemplate", () => {
       failure(() => chooseTemplate({ templateFile: join(dir, "none.json") }, {}))
     ).toMatchObject({
       code: "invalid-path",
-      message: expect.stringContaining("templateFile: Template file not found"),
+      message: expect.stringContaining("templateFile: Template file does not exist"),
     });
+  });
+
+  it("never quotes a templateFile's contents in a refusal or a parse error", () => {
+    const secret = "hunter2-SECRET-VALUE";
+    const bodies = [
+      `{"auths":{"registry.example":{"auth":"${secret}"}}}`,
+      `{"schemaVersion":"${secret}"}`,
+      `{"token": ${secret}}`,
+      `${secret}`,
+    ];
+    bodies.forEach((body, index) => {
+      const file = join(dir, `leak-${index}.json`);
+      writeFileSync(file, body);
+      const result = failure(() => chooseTemplate({ templateFile: file }, {}));
+      expect(result.code).toBe("invalid-template");
+      expect(JSON.stringify(result)).not.toContain(secret);
+    });
+    mkdirSync(join(dir, ".docker"), { recursive: true });
+    const hidden = join(dir, ".docker", "config.json");
+    writeFileSync(hidden, bodies[0]);
+    const refused = failure(() => chooseTemplate({ templateFile: hidden }, {}));
+    expect(refused).toMatchObject({
+      code: "invalid-path",
+      message: expect.stringContaining("hidden file or directory"),
+    });
+    expect(JSON.stringify(refused)).not.toContain(secret);
   });
 });
 

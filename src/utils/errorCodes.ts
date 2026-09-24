@@ -70,6 +70,10 @@ export class CodedError extends Error {
 /** Ordered text rules: the first match wins. */
 const RULES: Array<{ code: ErrorCode; pattern: RegExp }> = [
   { code: "timeout_indeterminate", pattern: /timed out|\bETIMEDOUT\b/i },
+  // A scope guard is checked before the write runs, so nothing was written:
+  // the note is not where it was reviewed. Its advice to read the note before
+  // retrying must not make it look like an unverified write.
+  { code: "revision_conflict", pattern: /\bScope guard failed:/ },
   {
     code: "verification_failed",
     pattern:

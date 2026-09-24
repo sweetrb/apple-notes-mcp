@@ -1752,11 +1752,12 @@ single note.
 | `assetsDir` | string | No | Absolute directory for attachment copies. Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
 | `wrap` | number | No | Hard-wrap prose at this many columns. Code, tables and headings are never wrapped |
 | `template` | string | No | Render through a template: `standard-markdown`, `obsidian`, or a saved template's name. Exclusive with `templateFile` |
-| `templateFile` | string | No | Render through the JSON template in this `.json` file (same path rules; at most 256 KiB) |
+| `templateFile` | string | No | Render through the JSON template in this `.json` file (at most 256 KiB), read under the same rules as `create-note`'s [`contentPath`](#create-note): hidden paths (such as `~/.docker` or a project `.env`) and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused, checked again after resolving symbolic links and letter case, unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. Errors name the file, never its contents |
 
 Both paths follow the `save-attachment` rules (absolute, under the home
 directory, a temp directory, or `/Volumes`, no symlink escapes) and may not
-point inside the Notes library container. With `outputPath`, asset links are
+point inside the Notes library container. `templateFile` is a read, so it
+also follows `contentPath`'s private-location rule. With `outputPath`, asset links are
 relative to the document's directory; without it they are absolute paths.
 
 **Returns:** without `outputPath`, the Markdown itself (refused with
@@ -1863,7 +1864,7 @@ or `templateFile`.
 |-----------|------|----------|-------------|
 | `name` | string | One of three | A saved or built-in template |
 | `template` | object or string | One of three | The template as a JSON object or JSON text |
-| `templateFile` | string | One of three | Absolute path of a JSON template file (home, a temp directory, or `/Volumes`; at most 256 KiB) |
+| `templateFile` | string | One of three | Absolute path of a JSON template file (home, a temp directory, or `/Volumes`; at most 256 KiB), read under the same rules as `create-note`'s [`contentPath`](#create-note): hidden paths (such as `~/.docker` or a project `.env`) and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused, checked again after resolving symbolic links and letter case, unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` |
 
 **Returns:** `valid`, and `errors` as `{path, message}` pairs such as
 `$.rules["inline.bold"].after: is required when mode is "wrap"`. An invalid
@@ -1880,7 +1881,7 @@ can use it by `template` name.
 |-----------|------|----------|-------------|
 | `name` | string | Yes | Lowercase `a-z`, `0-9`, `-` and `_`, 1-64 characters, starting with a letter or digit. Built-in names are reserved |
 | `template` | object or string | One of `template`/`templateFile` | The template |
-| `templateFile` | string | One of `template`/`templateFile` | A JSON template file |
+| `templateFile` | string | One of `template`/`templateFile` | A JSON template file, under the same rules as `validate-markdown-template`'s |
 | `force` | boolean | No | Replace an existing template of this name (default `false`) |
 
 Saving is create-only: an existing name is refused with `[template-exists]`
@@ -2264,7 +2265,7 @@ Analyzes one local SVG file and reports whether it can be represented as editabl
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `path` | string | Yes | Absolute path of one `.svg` file: a regular file, not a symbolic link, at most 1 MiB of UTF-8, in home, temp, or `/Volumes` |
+| `path` | string | Yes | Absolute path of one `.svg` file: a regular file, not a symbolic link, at most 1 MiB of UTF-8, in home, temp, or `/Volumes`, read under the same rules as `create-note`'s [`contentPath`](#create-note): hidden paths (such as `~/.docker` or a project `.env`) and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused, checked again after resolving symbolic links and letter case, unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. A file whose first element is not `<svg>` is refused without quoting any of it |
 | `includeDrawing` | boolean | No | Also return the normalized drawing. Off by default because it can be large |
 
 **Returns:** `classification`, `importable`, `defaultWriteAllowed`, `requiredLosses`, `issues` (each with a `code`, the `loss` it causes or `null`, an element `location` such as `svg/g[2]/path[1]#id`, and a message), `viewport`, `counts` (elements, references, path segments, output strokes and points, and the `geometryWork`, `dashWork`, and `scanWork` budgets as `{used, max}`), `source` (`sha256`, `bytes`), `drawingBytes`, and `analysisDigest`.
@@ -2780,7 +2781,7 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_BACKGROUND_SHORTCUT` | `Apple Notes MCP - Background Operations v5` | Name or UUID of the installed Background Operations bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_MARKDOWN_SHORTCUT` | `Apple Notes MCP - Create Markdown Note` | Name or UUID of the installed Create Markdown Note bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_PASTEBOARD_NAME` | unset | Testing only: makes [`add-attachment-from-pasteboard`](#add-attachment-from-pasteboard) read a private named pasteboard instead of the general clipboard. |
-| `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), and [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
+| `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, [`analyze-svg`](#analyze-svg) read a `path`, and the Markdown template tools read a `templateFile`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
 ### Configuration file (when the host strips `env`)

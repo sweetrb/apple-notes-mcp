@@ -39,6 +39,7 @@ import {
   MAX_TEMPLATE_BYTES,
   type PlaceholderValues,
 } from "./markdownTemplate.js";
+import { readAllowedFile } from "./attachmentFs.js";
 
 const CHUNK = 1024 * 1024;
 
@@ -277,40 +278,18 @@ export function templateAssetsDir(
 }
 
 /**
- * Read a template file from an allowed location (home, a temp directory, or
- * /Volumes; never inside the Notes library). Refuses a name without a .json
- * extension, symlinks, non-regular files, and files over the template size limit.
+ * Read a template file under the same policy as `create-note`'s `contentPath`
+ * and `add-attachment`'s `path` ({@link readAllowedFile}): a regular file in
+ * home, a temp directory, or /Volumes, with hidden paths (`~/.docker`,
+ * `~/.config`, a project `.env`) and `~/Library` outside iCloud Drive and
+ * `~/Library/CloudStorage` refused unless the server sets
+ * `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. The name must end in .json,
+ * checked before anything is opened. Symlinks, non-regular files (a FIFO is
+ * opened non-blocking and refused), empty files and files over the template
+ * size limit are refused. Errors name the path, never the file's contents.
  */
 export function readTemplateFile(path: string): string {
-  const abs = assertExportPath(path);
-  if (extname(abs).toLowerCase() !== ".json")
-    throw new Error(`Template file must have a .json extension: ${abs}`);
-  let fd: number;
-  try {
-    fd = openRegular(abs);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    throw new Error(
-      code === "ENOENT"
-        ? `Template file not found: ${abs}`
-        : code === "ELOOP"
-          ? `Refusing to read the symbolic link ${abs}`
-          : `Template file is not a readable regular file: ${abs}`
-    );
-  }
-  try {
-    const size = fstatSync(fd).size;
-    if (size > MAX_TEMPLATE_BYTES)
-      throw new Error(`Template file is ${size} bytes; the limit is ${MAX_TEMPLATE_BYTES}`);
-    const data = Buffer.alloc(size);
-    let read = 0;
-    while (read < size) {
-      const n = readSync(fd, data, read, size - read, read);
-      if (n <= 0) break;
-      read += n;
-    }
-    return data.subarray(0, read).toString("utf8");
-  } finally {
-    closeSync(fd);
-  }
+  if (extname(path).toLowerCase() !== ".json")
+    throw new Error(`Template file must have a .json extension: ${path}`);
+  return readAllowedFile(path, MAX_TEMPLATE_BYTES, { label: "Template file" }).toString("utf8");
 }

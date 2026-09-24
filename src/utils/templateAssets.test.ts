@@ -2,7 +2,7 @@
  * Template asset writers, per-note asset directories and template file reads,
  * against real files in a temporary directory.
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
@@ -19,6 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MAX_TEMPLATE_BYTES } from "./markdownTemplate.js";
+import { ALLOW_PRIVATE_CONTENT_ENV } from "./attachmentFs.js";
 import {
   HashedSidecarWriter,
   readTemplateFile,
@@ -142,7 +143,7 @@ describe("HashedSidecarWriter", () => {
     );
     const template = join(dir, "pipe.json");
     execFileSync("mkfifo", [template]);
-    expect(() => readTemplateFile(template)).toThrow(/not a readable regular file/);
+    expect(() => readTemplateFile(template)).toThrow(/not a regular file/);
   });
 
   it("reports unreadable sources", () => {
@@ -202,17 +203,85 @@ describe("readTemplateFile", () => {
   });
 
   it("refuses other extensions, missing files, symlinks, directories, oversize files and other locations", () => {
-    expect(() => readTemplateFile(join(dir, "missing.json"))).toThrow("Template file not found");
+    expect(() => readTemplateFile(join(dir, "missing.json"))).toThrow(
+      "Template file does not exist"
+    );
     symlinkSync(join(dir, "t.json"), join(dir, "link.json"));
     expect(() => readTemplateFile(join(dir, "link.json"))).toThrow("symbolic link");
     mkdirSync(join(dir, "folder.json"));
-    expect(() => readTemplateFile(join(dir, "folder.json"))).toThrow("not a readable regular file");
+    expect(() => readTemplateFile(join(dir, "folder.json"))).toThrow("not a regular file");
     writeFileSync(join(dir, "notes.txt"), '{"schemaVersion":1}');
     expect(() => readTemplateFile(join(dir, "notes.txt"))).toThrow("must have a .json extension");
     expect(() => readTemplateFile(join(dir, "lib"))).toThrow("must have a .json extension");
     writeFileSync(join(dir, "big.json"), Buffer.alloc(MAX_TEMPLATE_BYTES + 1, 32));
-    expect(() => readTemplateFile(join(dir, "big.json"))).toThrow("the limit is");
-    expect(() => readTemplateFile("/etc/hosts")).toThrow("outside allowed locations");
+    expect(() => readTemplateFile(join(dir, "big.json"))).toThrow(/over the \d+-byte limit/);
+    expect(() => readTemplateFile("/etc/template.json")).toThrow("outside allowed locations");
     expect(() => readTemplateFile("relative.json")).toThrow("must be absolute");
+  });
+
+  describe("private locations", () => {
+    const secret = "hunter2-SECRET-VALUE";
+    const credential = `{"auths":{"registry.example":{"auth":"${secret}"}}}`;
+    const refusal = (path: string) => {
+      try {
+        readTemplateFile(path);
+      } catch (error) {
+        return (error as Error).message;
+      }
+      return "";
+    };
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("refuses a credential JSON in a hidden directory without quoting it", () => {
+      mkdirSync(join(dir, ".docker"), { recursive: true });
+      const config = join(dir, ".docker", "config.json");
+      writeFileSync(config, credential);
+      const message = refusal(config);
+      expect(message).toMatch(/hidden file or directory/);
+      expect(message).toContain(ALLOW_PRIVATE_CONTENT_ENV);
+      expect(message).not.toContain(secret);
+      // Reached through a symlinked, plain-looking directory: caught after realpath.
+      symlinkSync(join(dir, ".docker"), join(dir, "docker-link"));
+      expect(refusal(join(dir, "docker-link", "config.json"))).toMatch(/hidden file or directory/);
+    });
+
+    it("refuses ~/Library outside iCloud Drive and CloudStorage, and hidden entries inside them", () => {
+      const home = join(dir, "home");
+      vi.stubEnv("HOME", home);
+      for (const sub of [
+        "Library/Application Support/app",
+        "Library/Mobile Documents/.hidden",
+        "Library/CloudStorage/Box",
+      ])
+        mkdirSync(join(home, sub), { recursive: true });
+      const put = (sub: string) => {
+        const path = join(home, sub);
+        writeFileSync(path, '{"schemaVersion":1}');
+        return path;
+      };
+      expect(refusal(put("Library/Application Support/app/t.json"))).toMatch(/in ~\/Library/);
+      expect(refusal(join(home, "library/Application Support/app/t.json"))).toMatch(
+        /in ~\/Library/
+      );
+      expect(refusal(put("Library/Mobile Documents/.hidden/t.json"))).toMatch(
+        /hidden file or directory/
+      );
+      expect(readTemplateFile(put("Library/CloudStorage/Box/t.json"))).toBe('{"schemaVersion":1}');
+    });
+
+    it("honours APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1", () => {
+      mkdirSync(join(dir, ".templates"), { recursive: true });
+      const file = join(dir, ".templates", "t.json");
+      writeFileSync(file, '{"schemaVersion":1}');
+      expect(refusal(file)).toMatch(/hidden file or directory/);
+      vi.stubEnv(ALLOW_PRIVATE_CONTENT_ENV, "1");
+      expect(readTemplateFile(file)).toBe('{"schemaVersion":1}');
+    });
+
+    it("refuses an empty file", () => {
+      const file = join(dir, "empty.json");
+      writeFileSync(file, "");
+      expect(refusal(file)).toMatch(/is empty/);
+    });
   });
 });

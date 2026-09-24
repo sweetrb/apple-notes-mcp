@@ -25,7 +25,7 @@ Pass exactly one of these to `export-notes-markdown`:
 | Parameter | Meaning |
 | --- | --- |
 | `template` | A built-in name (`standard-markdown` or `obsidian`) or a saved template's name |
-| `templateFile` | An absolute path to a JSON template file ending in `.json` (home, a temp directory, or `/Volumes`; at most 256 KiB; symlinks refused) |
+| `templateFile` | An absolute path to a JSON template file ending in `.json` (home, a temp directory, or `/Volumes`; at most 256 KiB; symlinks refused). Hidden paths and `~/Library` other than iCloud Drive and `~/Library/CloudStorage` are refused unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`. Errors name the file, never its contents |
 
 The template is read and validated before any note is opened. An invalid
 template is refused with `[invalid-template]` and one line per problem, each

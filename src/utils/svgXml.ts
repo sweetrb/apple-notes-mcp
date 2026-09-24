@@ -101,7 +101,7 @@ export function decodeEntities(raw: string, line: number): string {
     if (body in PREDEFINED) return PREDEFINED[body];
     throw new SvgError(
       "svg_unsafe",
-      `Named entity "&${body.slice(0, 40)};" on line ${line}: only the five XML entities are allowed`
+      `A named entity on line ${line} is not allowed: only the five XML entities are`
     );
   });
 }
@@ -178,6 +178,11 @@ export function parseXml(source: string, limits: XmlLimits): XmlElement {
     if (!NAME_START.test(source[i] ?? "")) fail("Invalid tag");
     while (i < source.length && NAME_CHAR.test(source[i])) i++;
     const name = source.slice(pos + 1, i);
+    // Refuse a file that is not SVG at its first tag, before any error could
+    // quote one of its names: analyze-svg can be pointed at any readable file,
+    // and its errors must not echo another format's contents.
+    if (!root && !stack.length && name.slice(name.indexOf(":") + 1) !== "svg")
+      fail("The root element is not <svg>");
     const rawAttributes: { name: string; value: string }[] = [];
     const attributeNames = new Set<string>();
     let selfClosing = false;

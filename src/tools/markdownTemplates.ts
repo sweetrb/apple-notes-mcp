@@ -63,7 +63,7 @@ const templateFileInput = z
   .max(4096)
   .optional()
   .describe(
-    "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; symlinks refused; at most 256 KiB)"
+    "Absolute path of a JSON template file ending in .json (home, a temp dir, or /Volumes; hidden paths and ~/Library outside iCloud Drive and CloudStorage refused unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; symlinks refused; at most 256 KiB)"
   );
 
 /** Template text from exactly one of an inline template or a file. */
@@ -160,7 +160,7 @@ export function registerMarkdownTemplates(
         "Use when: checking a template before saving it or exporting with it.\n" +
         'Returns: valid true, or valid false with every problem as {path, message}, where path is a JSON path such as $.rules["inline.bold"].after.\n' +
         "Do not use when: you want to store it (save-markdown-template validates too).\n" +
-        "Safety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile.",
+        "Safety: read-only. Pass exactly one of name (a saved or built-in template), template (JSON object or text) or templateFile. templateFile reads only a regular .json file in home, temp or /Volumes, refusing hidden paths (~/.docker, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; errors never quote the file.",
       inputSchema: validateInput,
       outputSchema: loose,
       annotations: { readOnlyHint: true },
@@ -213,7 +213,7 @@ export function registerMarkdownTemplates(
         "Use when: storing a template so export-notes-markdown can use it by name.\n" +
         "Returns: name, path, bytes and whether an existing template was replaced.\n" +
         "Do not use when: exporting once (pass templateFile to export-notes-markdown instead).\n" +
-        "Safety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved.",
+        "Safety: writes one file in the template library only (APPLE_NOTES_MCP_TEMPLATE_DIR, default ~/Library/Application Support/apple-notes-mcp/templates, mode 0600). Validates first; an invalid template is refused with every JSON path. Create-only: an existing name is refused with [template-exists] unless force is true. Built-in names are reserved. templateFile follows the same read scope as validate-markdown-template.",
       inputSchema: saveInput,
       outputSchema: loose,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },

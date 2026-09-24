@@ -110,6 +110,16 @@ const CASES: Array<[string, ErrorEnvelope]> = [
     { code: "verification_failed", indeterminate: true },
   ],
   // revision_conflict
+  // A scope guard refusal: nothing ran, so not an unverified write, despite
+  // its "read the note ... before retrying" advice.
+  [
+    "Scope guard failed: a forbidden folder id does not match any folder. Nothing was changed; read the note's current folder and review before retrying.",
+    { code: "revision_conflict", committed: false, indeterminate: false },
+  ],
+  [
+    "Scope guard failed: the note is inside a forbidden folder. Nothing was changed; read the note's current folder and review before retrying.",
+    { code: "revision_conflict", committed: false, indeterminate: false },
+  ],
   [
     'Note "Plan" changed after it was read. Read it again and review the newer version before retrying.',
     { code: "revision_conflict", committed: false, indeterminate: false },
