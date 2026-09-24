@@ -4182,6 +4182,7 @@ const exportStatsSchema = z.object({
   tables: z.number(),
   unreadableTables: z.number(),
   unreferenced: z.number(),
+  staleRenderings: z.number().optional(),
 });
 
 registerTool(

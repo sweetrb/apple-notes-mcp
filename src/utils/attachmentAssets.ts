@@ -88,6 +88,11 @@ export interface AttachmentAssetRecord {
   bodyIndex: number | null;
   /** The attachment's own files (media asset, fallback image or PDF), best first. */
   assetPaths: string[];
+  /**
+   * Set when a fallback rendering in assetPaths comes from an older generation
+   * than the one Notes recorded (that one is missing on disk).
+   */
+  fallbackStale?: true;
   /** The largest rendered preview image, or null. Always a file, never a directory. */
   previewPath: string | null;
   /** assetPaths followed by previewPath: everything on disk for this attachment. */
@@ -134,6 +139,8 @@ export interface AttachmentExportResult {
   exportedKind: "asset" | "fallback" | "preview" | null;
   /** false when the attachment is no longer referenced from the note body. */
   inBody?: false;
+  /** A "fallback" rendering from an older generation than Notes recorded. */
+  stale?: true;
   error?: string;
 }
 
@@ -496,7 +503,8 @@ function fallbackFiles(
   rootName: string,
   identifier: string,
   generation: string | null,
-  names: string[]
+  names: string[],
+  onStale: () => void = () => undefined
 ): string[] {
   const base = join(accountDir, rootName, identifier);
   const found: string[] = [];
@@ -506,12 +514,15 @@ function fallbackFiles(
   };
   const gen = safeComponent(generation);
   if (gen) for (const name of names) add(join(base, gen, name));
+  const recorded = found.length;
   if (isDirectory(base)) {
     for (const dir of generationDirs(base, accountDir))
       for (const name of names) add(join(dir, name));
     for (const name of names) add(join(base, name));
   }
   for (const name of names) add(join(accountDir, rootName, `${identifier}${extname(name)}`));
+  // A generation was recorded but none of its files exist: what was found is older.
+  if (gen && recorded === 0 && found.length > 0) onStale();
   return found;
 }
 
@@ -583,7 +594,12 @@ export function previewPaths(accountDir: string, identifier: string, entries: st
 }
 
 /** The attachment's own files, best first: media asset, then Notes' fallback renderings. */
-export function assetPathsFor(accountDir: string, row: AttachmentRow): string[] {
+export function assetPathsFor(
+  accountDir: string,
+  row: AttachmentRow,
+  /** Called when a fallback rendering comes from an older generation than recorded. */
+  onStale?: () => void
+): string[] {
   const found: string[] = [];
   const add = (candidate: string) => {
     const real = realInside(candidate, accountDir);
@@ -600,14 +616,23 @@ export function assetPathsFor(accountDir: string, row: AttachmentRow): string[] 
   if (!id) return found;
   const ownName = safeComponent(row.filename);
   if (ownName) add(join(accountDir, "Media", id, ownName));
-  for (const file of fallbackFiles(accountDir, "FallbackImages", id, row.fallbackImageGeneration, [
-    "FallbackImage.png",
-    "FallbackImage.jpg",
-  ]))
+  for (const file of fallbackFiles(
+    accountDir,
+    "FallbackImages",
+    id,
+    row.fallbackImageGeneration,
+    ["FallbackImage.png", "FallbackImage.jpg"],
+    onStale
+  ))
     add(file);
-  for (const file of fallbackFiles(accountDir, "FallbackPDFs", id, row.fallbackPdfGeneration, [
-    "FallbackPDF.pdf",
-  ]))
+  for (const file of fallbackFiles(
+    accountDir,
+    "FallbackPDFs",
+    id,
+    row.fallbackPdfGeneration,
+    ["FallbackPDF.pdf"],
+    onStale
+  ))
     add(file);
   return found;
 }
@@ -652,10 +677,11 @@ export function assembleAttachmentAssets(
     const accountDir = accountDirFor(row.accountIdentifier ?? parent?.accountIdentifier ?? null);
     let assetPaths: string[] = [];
     let previews: string[] = [];
+    let fallbackStale = false;
     if (accountDir) {
       if (!previewEntries.has(accountDir))
         previewEntries.set(accountDir, listPreviewEntries(accountDir));
-      assetPaths = assetPathsFor(accountDir, row);
+      assetPaths = assetPathsFor(accountDir, row, () => (fallbackStale = true));
       previews = previewPaths(accountDir, row.identifier, previewEntries.get(accountDir)!);
     }
     const previewPath = previews[0] ?? null;
@@ -668,6 +694,7 @@ export function assembleAttachmentAssets(
       filename: row.filename ?? row.mediaFilename,
       bodyIndex: parent ? null : indexOf(row),
       assetPaths,
+      ...(fallbackStale ? { fallbackStale: true as const } : {}),
       previewPath,
       paths: previewPath ? [...assetPaths, previewPath] : [...assetPaths],
     };
@@ -866,7 +893,12 @@ export function exportOneAttachment(
         throw new Error(`Refusing to write outside the export directory: "${dest}"`);
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
-      return { ...base, exportedTo: dest, exportedKind: source.kind };
+      return {
+        ...base,
+        exportedTo: dest,
+        exportedKind: source.kind,
+        ...(source.kind === "fallback" && record.fallbackStale ? { stale: true as const } : {}),
+      };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
       return { ...base, error: error instanceof Error ? error.message : String(error) };

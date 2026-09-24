@@ -70,6 +70,11 @@ export interface ResolvedAsset {
   name: string;
   /** "original" is the attachment's own file; the others stand in for it. */
   role: "original" | "fallback" | "preview";
+  /**
+   * A fallback rendering from an older generation than the one Notes
+   * recorded (that one is missing on disk), so it may lag the attachment.
+   */
+  stale?: true;
 }
 
 /** The files found for one attachment. */
@@ -187,7 +192,14 @@ export class AssetLocator {
           ["FallbackImage.png", "FallbackImage.jpg"]
         );
         if (fallback)
-          return { primary: { path: fallback, name: `${source.kind}.png`, role: "fallback" } };
+          return {
+            primary: {
+              path: fallback.path,
+              name: `${source.kind}.png`,
+              role: "fallback",
+              ...(fallback.stale ? { stale: true as const } : {}),
+            },
+          };
         return preview ? { primary: preview } : {};
       }
       case "scan": {
@@ -195,7 +207,16 @@ export class AssetLocator {
           "FallbackPDF.pdf",
         ]);
         return {
-          ...(pdf ? { primary: { path: pdf, name: "scan.pdf", role: "fallback" as const } } : {}),
+          ...(pdf
+            ? {
+                primary: {
+                  path: pdf.path,
+                  name: "scan.pdf",
+                  role: "fallback" as const,
+                  ...(pdf.stale ? { stale: true as const } : {}),
+                },
+              }
+            : {}),
           ...(preview ? { preview } : {}),
         };
       }
@@ -226,14 +247,18 @@ export class AssetLocator {
     return undefined;
   }
 
-  /** <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation. */
+  /**
+   * <dir>/<id>/<generation>/<name>, <dir>/<id>/<name>, then any generation.
+   * `stale` is set when a generation was recorded but the file came from
+   * somewhere else.
+   */
   private fallback(
     account: string,
     dir: string,
     id: string,
     generation: string | undefined,
     names: string[]
-  ): string | undefined {
+  ): { path: string; stale: boolean } | undefined {
     const base = join(account, dir, id);
     const gen = safeComponent(generation);
     const generations = [
@@ -246,7 +271,7 @@ export class AssetLocator {
     for (const g of generations)
       for (const name of names) {
         const path = confine(g ? join(base, g, name) : join(base, name), account);
-        if (path && isFile(path)) return path;
+        if (path && isFile(path)) return { path, stale: Boolean(gen) && g !== gen };
       }
     return undefined;
   }

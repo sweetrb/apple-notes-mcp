@@ -296,6 +296,39 @@ describe("unreferenced attachments (#210)", () => {
   });
 });
 
+describe("stale renderings", () => {
+  it("counts a Notes rendering taken from an older generation in the export stats", () => {
+    const note = exportNote(
+      [
+        block("Sketch", "title"),
+        block("\ufffc", "body", {}, [attachmentRun("D", "com.apple.paper")]),
+      ],
+      [attachment("D", "com.apple.paper")]
+    );
+    const writer: AssetWriter = {
+      count: 0,
+      place: (a) => ({ url: `assets/${a.name}`, mime: "image/png" }),
+    };
+    const locator = (stale: boolean) =>
+      ({
+        locate: () => ({
+          primary: {
+            path: "/p",
+            name: "paper.png",
+            role: "fallback",
+            ...(stale ? { stale: true } : {}),
+          },
+        }),
+      }) as unknown as AssetLocator;
+    const fresh: ExportContext = { stats: emptyStats(), writer, locator: locator(false) };
+    renderNoteHtml(note, fresh);
+    expect(fresh.stats).not.toHaveProperty("staleRenderings");
+    const old: ExportContext = { stats: emptyStats(), writer, locator: locator(true) };
+    renderNoteHtml(note, old);
+    expect(old.stats.staleRenderings).toBe(1);
+  });
+});
+
 describe("renderNotesHtml", () => {
   it("builds one standalone document with separators and no script", () => {
     const html = renderNotesHtml(

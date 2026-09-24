@@ -175,6 +175,15 @@ describe("AssetLocator", () => {
     expect(exact.primary).toMatchObject({ name: "paper.png", role: "fallback" });
     const scanned = locator().locate({ id: PAPER, kind: "drawing" });
     expect(scanned.primary?.name).toBe("drawing.png");
+    // Only a recorded generation that is missing makes the rendering stale.
+    expect(exact.primary?.stale).toBeUndefined();
+    expect(scanned.primary?.stale).toBeUndefined();
+  });
+
+  it("flags a rendering from an older generation than the one recorded", () => {
+    const stale = locator().locate({ id: PAPER, kind: "paper", fallbackImageGeneration: "9_GONE" });
+    expect(stale.primary).toMatchObject({ role: "fallback", stale: true });
+    expect(stale.primary?.path).toContain("3_GEN");
   });
 
   it("falls back to a bundled preview for a drawing without a fallback image", () => {

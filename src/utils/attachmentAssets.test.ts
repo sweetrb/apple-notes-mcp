@@ -490,6 +490,66 @@ describe("asset and preview discovery (synthetic container)", () => {
     ]);
     expect(assetPathsFor(accountDir, { ...row, identifier: ".." })).toEqual([]);
   });
+
+  it("flags fallback renderings from an older generation than the one recorded", () => {
+    const row: AttachmentRow = {
+      pk: 1,
+      identifier: ID.paper,
+      uti: "com.apple.paper",
+      parentPk: null,
+      filename: null,
+      mediaIdentifier: null,
+      mediaFilename: null,
+      mediaGeneration: null,
+      fallbackImageGeneration: "3_NEW",
+      fallbackPdfGeneration: null,
+      accountIdentifier: null,
+    };
+    let stale = false;
+    assetPathsFor(accountDir, row, () => (stale = true));
+    expect(stale).toBe(false);
+    const paths = assetPathsFor(
+      accountDir,
+      { ...row, fallbackImageGeneration: "9_GONE" },
+      () => (stale = true)
+    );
+    expect(stale).toBe(true);
+    expect(paths[0]).toContain("3_NEW");
+    // Without a recorded generation there is nothing to be stale against.
+    stale = false;
+    assetPathsFor(accountDir, { ...row, fallbackImageGeneration: null }, () => (stale = true));
+    expect(stale).toBe(false);
+  });
+
+  it("carries the stale flag into the record and the export result", () => {
+    const [record] = assembleAttachmentAssets(
+      [
+        {
+          pk: 1,
+          identifier: ID.paper,
+          uti: "com.apple.paper",
+          parentPk: null,
+          filename: null,
+          mediaIdentifier: null,
+          mediaFilename: null,
+          mediaGeneration: null,
+          fallbackImageGeneration: "9_GONE",
+          fallbackPdfGeneration: null,
+          accountIdentifier: ACCT,
+        },
+      ],
+      null,
+      container
+    ).attachments;
+    expect(record.fallbackStale).toBe(true);
+    const dir = join(exportRoot, "stale");
+    const result = exportOneAttachment(
+      record,
+      prepareExportDir(dir, container),
+      exportSource(record)
+    );
+    expect(result).toMatchObject({ exportedKind: "fallback", stale: true });
+  });
 });
 
 describe("small helpers", () => {

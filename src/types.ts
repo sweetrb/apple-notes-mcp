@@ -1480,6 +1480,8 @@ export interface NotesExportAttachmentStats {
   tables: number;
   unreadableTables: number;
   unreferenced: number;
+  /** Notes renderings taken from an older generation than recorded; only when any. */
+  staleRenderings?: number;
 }
 
 /** A note that was selected but could not be exported. */

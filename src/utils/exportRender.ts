@@ -61,6 +61,11 @@ export interface ExportStats {
   unreadableTables: number;
   /** Attachments with no body marker, appended after the body. */
   unreferenced: number;
+  /**
+   * Notes renderings placed from an older generation than the one recorded
+   * (that one is missing on disk); present only when there are any.
+   */
+  staleRenderings?: number;
 }
 
 export const emptyStats = (): ExportStats => ({
@@ -161,7 +166,10 @@ export function titleBlockIndex(note: ExportNote): number {
 }
 
 function place(ctx: ExportContext, asset: ResolvedAsset | undefined): PlacedAsset | undefined {
-  return asset && ctx.writer ? ctx.writer.place(asset) : undefined;
+  const placed = asset && ctx.writer ? ctx.writer.place(asset) : undefined;
+  if (asset?.stale && placed && "url" in placed)
+    ctx.stats.staleRenderings = (ctx.stats.staleRenderings ?? 0) + 1;
+  return placed;
 }
 
 /** Decide how to render one attachment. Counts it in `ctx.stats`. */
