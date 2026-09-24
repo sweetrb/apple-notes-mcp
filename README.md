@@ -261,7 +261,7 @@ Creates a new note in Apple Notes.
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
 | `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
-| `timeoutSeconds` | number | No | Whole seconds, 1–120, for each Notes.app automation step this call runs; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only. A timed-out write is uncertain, not failed: read the note by id before any retry. Also accepted by `update-note`, `append-to-note`, `delete-note` and `move-note` |
+| `timeoutSeconds` | number | No | Whole seconds, 1–120, for each Notes.app automation step this call runs; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only. A timed-out write is uncertain, not failed: read the note by id before any retry. Also accepted by `get-note-content`, `update-note`, `append-to-note`, `delete-note` and `move-note` |
 
 **Example (tagged with inline hashtags):**
 ```json
@@ -531,8 +531,11 @@ Retrieves the full content of a specific note.
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Note title (use `id` instead when available) |
 | `account` | string | No | Account containing the note (defaults to Notes.app's default account; exact or unique-prefix match, ignored if `id` is provided) |
+| `timeoutSeconds` | number | No | Whole seconds, 1–120, for the body read; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended as it's unique and avoids issues with duplicate titles.
+
+**Large images:** Notes.app returns images inside the body as base64, so a note holding a very large image (tens of MB) can take longer to read than the timeout allows. When the read times out or overflows the output buffer, the error says so and, with Full Disk Access, names the attachments of 5 MB or more. Retry with a larger `timeoutSeconds`; `delete-note` accepts the same argument, and it needs a successful read to verify the note before deleting it.
 
 **Example - Using ID (recommended):**
 ```json
@@ -1854,6 +1857,37 @@ Decodes a note's classic PencilKit drawings (`com.apple.drawing.2` and the older
 
 ---
 
+#### `transcribe-note-audio`
+
+Transcribes a note's voice recordings and audio attachments now, on this Mac, with Apple's Speech framework through the [public native helper](#public-native-helper). Recognition is on-device only: `SpeechAnalyzer` on macOS 26 and later, or `SFSpeechRecognizer` with on-device recognition required on older systems (a locale without on-device support is refused, never sent to a server). The audio files are opened read-only where Notes keeps them.
+
+**Requires:** Full Disk Access for the MCP host process, and the public native helper built once with `apple-notes-mcp setup --public-helper`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Note ID (use `search-notes` to find it first) |
+| `locale` | string | No | BCP-47 language of the speech, such as `"en-US"` (default), `"it-IT"`, or `"fr-FR"` |
+| `attachmentId` | string | No | Only transcribe this audio attachment (an `x-coredata://…/ICAttachment/pN` id) |
+| `includeText` | boolean | No | Include transcript text (default `true`); `false` returns statuses and word counts only |
+| `downloadAssets` | boolean | No | Let macOS download the language's on-device speech model when it is missing (default `false`: the call returns `asset_unavailable` at once) |
+| `maxSeconds` | integer | No | Total time budget for the call, 30 to 3600 seconds (default 900) |
+
+**Returns:** Overall `status` and, per audio attachment, `status`, `durationSeconds`, `wordCount`, `transcript`, and `takes` (a Notes recording can hold several takes; each is transcribed and the texts are joined in stored order). Statuses:
+
+- `ok`: the whole recording was transcribed.
+- `partial`: some text came back, but a take failed or the helper stopped at its deadline (`code: "incomplete"`).
+- `error`: nothing was transcribed; `code` says why (`asset_unavailable` when the audio file is not on this Mac or the language's speech model is not installed, `permission_required`, `unsupported_locale`, `unsupported_audio`, `time_limit`, ...).
+- `indeterminate`: the helper did not answer in time, so the outcome is unknown and a retry may succeed.
+- `none` (overall only): the note has no audio.
+
+Each take gets a deadline of 1.5 times its length plus a minute (at most 30 minutes), shortened to what is left of `maxSeconds`. A take that cannot start before the budget runs out reports `code: "time_limit"`. The helper runs as a separate process without blocking the server, and cancelling the request stops it. On macOS 27 a 16-minute recording took about 22 seconds. Some MCP clients stop waiting for a tool after a fixed time, so transcribe long recordings one at a time with `attachmentId`. Transcripts longer than `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` are shortened and marked `transcriptTruncated`.
+
+**Speech models:** the call never starts a download on its own. When the language's on-device model is not installed, it returns `asset_unavailable` right away. Pass `downloadAssets: true` to let macOS download it (a one-time download); if it is still downloading when the call ends, try again shortly.
+
+**Speech Recognition permission:** the server never shows the Speech Recognition prompt, because nobody may be watching an MCP server to answer it. The helper reads the current authorization first. On older macOS, the `SFSpeechRecognizer` path needs that access, and macOS attributes the grant to the app that launches the MCP server (Claude Desktop, Codex, Terminal, and so on), not to the helper. Without it the call returns `code: "permission_required"`; allow the app under System Settings > Privacy & Security > Speech Recognition. On macOS 26 and later, `SpeechAnalyzer` transcribed files without any grant in testing (authorization stayed "not determined"), so only an explicit refusal (denied or restricted) stops it.
+
+---
+
 #### `add-attachment`
 
 Adds one nonempty local file of at most 64 MiB to an exact note using `id`, the
@@ -2530,13 +2564,13 @@ Every tool that does not read the Notes database works normally without Full Dis
 - `get-note-link` returns an error on macOS 26+; on macOS 12–15 it still works via the AppleScript `note link` fallback
 - `get-note-markdown` returns plain list items without `[x]`/`[ ]` annotations (graceful fallback)
 - `get-sync-status` still answers, but reports no pending uploads and no active sync — treat that as "unknown", not "idle"
-- `get-note-drawings` returns the same Full Disk Access error
+- `get-note-drawings` and `transcribe-note-audio` return the same Full Disk Access error
 
 ---
 
 ## Public native helper
 
-`get-note-drawings` needs Apple's PencilKit framework, which has no AppleScript or command-line interface. For it, the server uses a small Swift helper that links public Apple frameworks only (AppKit and PencilKit). No prebuilt binary ships with the package. Build it once on your Mac:
+`get-note-drawings` needs Apple's PencilKit framework and `transcribe-note-audio` needs the Speech framework; neither has an AppleScript or command-line interface. For them, the server uses a small Swift helper that links public Apple frameworks only (AppKit, PencilKit, AVFoundation, and Speech). No prebuilt binary ships with the package. Build it once on your Mac:
 
 ```bash
 apple-notes-mcp setup --public-helper          # compile, sign, verify, install
@@ -2545,7 +2579,7 @@ apple-notes-mcp setup --public-helper --check  # report the installed state only
 
 Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
 
-The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin; the helper answers with one JSON object on stdout.
+The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin, or, for transcription, names one audio file that the helper opens for reading; the helper answers with one JSON object on stdout.
 
 ---
 
