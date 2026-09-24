@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildPublicHelper,
   callPublicHelper,
+  callPublicHelperAsync,
   defaultPublicHelperBuildDeps,
   defaultPublicHelperDeps,
   formatPublicHelperBuild,
@@ -130,6 +131,10 @@ describe("compile inputs", () => {
       "AppKit",
       "-framework",
       "PencilKit",
+      "-framework",
+      "AVFoundation",
+      "-framework",
+      "Speech",
       "-Xlinker",
       "-sectcreate",
       "-Xlinker",
@@ -156,6 +161,13 @@ describe("compile inputs", () => {
     const source = readFileSync(join(packageRoot(), PUBLIC_HELPER_SOURCE), "utf8");
     expect(source).not.toMatch(/NotesShared|dlopen|NSClassFromString|PrivateFrameworks/);
     expect(source).toContain("let protocolVersion = 1");
+  });
+
+  it("never asks for Speech Recognition access: no prompt call, no usage string", () => {
+    const source = readFileSync(join(packageRoot(), PUBLIC_HELPER_SOURCE), "utf8");
+    expect(source).not.toMatch(/\.requestAuthorization\s*[({]/);
+    expect(source).toContain("SFSpeechRecognizer.authorizationStatus()");
+    expect(publicHelperInfoPlist()).not.toContain("NSSpeechRecognitionUsageDescription");
   });
 });
 
@@ -370,6 +382,74 @@ describe("callPublicHelper", () => {
   });
 });
 
+describe("callPublicHelperAsync (real child processes)", () => {
+  /** A stand-in helper: a shell script with the given body, run directly. */
+  const script = (name: string, body: string) => {
+    const path = join(dir, name);
+    writeFileSync(path, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+    return path;
+  };
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const run = (binaryPath: string, options: Record<string, unknown> = {}) =>
+    callPublicHelperAsync("transcribe", { path: "/a" }, defaultPublicHelperDeps({ sourcePath }), {
+      binaryPath,
+      ...options,
+    });
+
+  it("reads the request from stdin and returns the ok object", async () => {
+    // Echo the request back inside an ok response, so the test sees what was sent.
+    const echo = script("echo.sh", `read line; printf '{"status":"ok","got":%s}' "$line"`);
+    const out = await run(echo);
+    expect(out).toEqual({
+      status: "ok",
+      got: { protocol: PUBLIC_HELPER_PROTOCOL, action: "transcribe", path: "/a" },
+    });
+    await expect(
+      run(script("err.sh", `printf '{"status":"error","code":"x","message":"m"}'; exit 1`))
+    ).rejects.toMatchObject({ code: "x" });
+  });
+
+  it("kills a sleeping helper when the request is aborted", async () => {
+    const pidFile = join(dir, "pid");
+    const sleeper = script("sleep.sh", `echo $$ > "${pidFile}"; exec sleep 30`);
+    const controller = new AbortController();
+    const pending = run(sleeper, { signal: controller.signal, timeoutMs: 60_000 });
+    for (let i = 0; i < 100 && !existsSync(pidFile); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    const pid = Number(readFileSync(pidFile, "utf8"));
+    expect(alive(pid)).toBe(true);
+    const started = Date.now();
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "aborted" });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(alive(pid)).toBe(false);
+  });
+
+  it("times out a sleeping helper, refuses an aborted signal before spawning, and reports crashes", async () => {
+    const sleeper = script("slow.sh", "exec sleep 30");
+    await expect(run(sleeper, { timeoutMs: 100 })).rejects.toMatchObject({ code: "timeout" });
+    await expect(run(sleeper, { signal: AbortSignal.abort() })).rejects.toMatchObject({
+      code: "aborted",
+    });
+    await expect(run(script("crash.sh", "kill -SEGV $$"))).rejects.toMatchObject({
+      code: "helper_crashed",
+    });
+    await expect(run(join(dir, "missing"))).rejects.toMatchObject({ code: "helper_unreachable" });
+    await expect(
+      callPublicHelperAsync("encode_drawing", {}, defaultPublicHelperDeps({ sourcePath }), {
+        binaryPath: sleeper,
+      })
+    ).rejects.toMatchObject({ code: "unknown_action" });
+  });
+});
+
 describe("PublicHelperError envelope", () => {
   it("reports an unavailable helper as unsupported and other failures as operation_failed", () => {
     const unavailable = errorResult("Error", new PublicHelperError("helper_stale", "rebuild"));
@@ -384,5 +464,14 @@ describe("PublicHelperError envelope", () => {
       code: "operation_failed",
       helperCode: "decode_failed",
     });
+  });
+
+  it("maps a rejected request and a missing attachment to their envelope codes", () => {
+    expect(new PublicHelperError("invalid_request", "bad locale").envelope.code).toBe(
+      "validation_error"
+    );
+    expect(new PublicHelperError("attachment_not_found", "no such audio").envelope.code).toBe(
+      "not_found"
+    );
   });
 });

@@ -368,6 +368,15 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Overall `status` is `none` when the note has no classic drawing. A per-drawing `status: "error"` carries a `code` (`no_data`, `undecodable`, `timeout`, ...) and does not fail the call.
 - For large drawings pass `includePoints: false` or `format: "svg"`; the server also drops points itself (`pointsOmitted`) past the response size limit.
 
+### transcribe-note-audio (on-device transcription)
+- Transcribes a note's voice recordings and audio attachments on this Mac with the Speech framework (never a server). Same prerequisites as `get-note-drawings`: Full Disk Access and `apple-notes-mcp setup --public-helper`.
+- Pass `locale` (BCP-47, default `en-US`) when the speech is not US English. Transcribe long recordings one at a time with `attachmentId`; clients may stop waiting after a fixed time.
+- Per-recording `status`: `ok`, `partial` (some text; `code: "incomplete"` or a failed take), `error` (with `code`), or `indeterminate` (the helper timed out; the outcome is unknown, so a retry may work). Overall `none` means the note has no audio.
+- `asset_unavailable` can mean the audio file has not downloaded from iCloud, or that the language's on-device speech model is not installed. The server never downloads a model on its own: ask the user before retrying with `downloadAssets: true`.
+- The server never shows a permission prompt. `permission_required` means the app hosting this server lacks Speech Recognition access; tell the user to allow it under System Settings > Privacy & Security > Speech Recognition rather than retrying.
+- `maxSeconds` (30 to 3600, default 900) caps the whole call; takes not started in time report `time_limit`, so transcribe the rest by `attachmentId`. Cancelling the request stops the helper.
+- Use `includeText: false` when only statuses and word counts are needed.
+
 ### Private helper tools (opt-in)
 - `native-helper-status` and `native-note-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).
 - Always call `native-helper-status` first. Do not suggest enabling the helper unprompted: it is unsupported API and can break on any macOS update.

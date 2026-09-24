@@ -4,7 +4,8 @@
  * needs a compiled helper, and CI does not compile native code).
  *
  *   node build/index.js setup --public-helper
- *   node scripts/test-public-helper.mjs            # verify the fixture decodes
+ *   node scripts/test-public-helper.mjs            # verify the fixture decodes and
+ *                                                  # synthetic speech transcribes
  *   node scripts/test-public-helper.mjs --write    # regenerate the fixture
  *
  * The fixture is synthetic: the strokes below are encoded by PencilKit itself
@@ -15,8 +16,8 @@
  * decode, which proves the checked-in bytes are a real PencilKit drawing.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
@@ -99,4 +100,24 @@ if (process.argv.includes("--write")) {
     process.exit(1);
   }
   console.log(`ok: fixture decodes to ${decoded.strokeCount} strokes; garbage refused (${refusal.code})`);
+
+  // Transcription: synthesize a known sentence with `say`, then transcribe it on-device.
+  const dir = mkdtempSync(join(tmpdir(), "public-helper-speech-"));
+  try {
+    const sentence = "The quick brown fox jumps over the lazy dog";
+    const aiff = join(dir, "speech.aiff");
+    const say = spawnSync("/usr/bin/say", ["-o", aiff, sentence]);
+    if (say.status !== 0) throw new Error("say failed");
+    const heard = call("transcribe", { path: aiff, locale: "en-US", timeoutSeconds: 120 });
+    const words = heard.transcript.toLowerCase().match(/[a-z]+/g) ?? [];
+    const expected = sentence.toLowerCase().split(" ");
+    const matched = expected.filter((w) => words.includes(w)).length;
+    if (!heard.complete || matched < expected.length - 1) {
+      console.error(`FAIL: transcription matched ${matched}/${expected.length} words`);
+      process.exit(1);
+    }
+    console.log(`ok: transcribed synthetic speech with ${heard.engine} (${matched}/${expected.length} words)`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

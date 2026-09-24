@@ -121,6 +121,7 @@ import {
 } from "@/utils/noteBlocks.js";
 import { pageParagraphs, paragraphLink, readNoteParagraphs } from "@/utils/noteParagraphs.js";
 import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
+import { classifyBodyReadError, describeBodyReadFailure } from "@/utils/bodyReadFailure.js";
 import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
 import { MAX_LINK_LABEL_LENGTH, MAX_LINK_URL_LENGTH } from "@/utils/linkInsert.js";
 import { insertLink } from "@/services/linkInsert.js";
@@ -155,6 +156,12 @@ import {
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
 import { formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
+import {
+  fitTranscriptions,
+  formatTranscription,
+  TRANSCRIBE_MAX_SECONDS,
+  transcribeNoteAudio,
+} from "@/services/noteTranscription.js";
 import { buildPrivateHelper, formatHelperBuild } from "@/services/privateHelperBuild.js";
 import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
 
@@ -256,6 +263,25 @@ function withErrorHandling<T extends Record<string, unknown>>(
       return runWithCallTimeout(typeof seconds === "number" ? seconds : undefined, () =>
         handler(params)
       );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return errorResponse(`${errorPrefix}: ${message}`, error);
+    }
+  };
+}
+
+/**
+ * {@link withErrorHandling} for a handler that awaits long-running work. The
+ * handler gets the request's abort signal, which fires when the client
+ * cancels the request, so it can stop child processes it started.
+ */
+function withAsyncErrorHandling<T extends Record<string, unknown>>(
+  handler: (params: T, signal: AbortSignal | undefined) => Promise<ToolResponse>,
+  errorPrefix: string
+) {
+  return async (params: T, extra?: { signal?: AbortSignal }): Promise<ToolResponse> => {
+    try {
+      return await handler(params, extra?.signal);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return errorResponse(`${errorPrefix}: ${message}`, error);
@@ -453,10 +479,32 @@ function readExactNoteSnapshot(id: string): ExactNoteSnapshot | { error: string 
       error: `Note "${note.title}" is password-protected and cannot be changed. Unlock it in Notes.app first.`,
     };
   }
-  const body = notesManager.getNoteContentById(id);
-  if (!body) return { error: `Failed to read content of note "${note.title}"` };
+  const { body, error } = notesManager.readNoteBodyById(id);
+  if (!body) {
+    // The read comes before any write, so a failure here changed nothing.
+    const reason = bodyReadFailureMessage(id, note.title, error);
+    return { error: `${reason}${error ? "\n\nNothing was changed." : ""}` };
+  }
   const rich = enrichNoteRead(id, body);
   return { note, body, rich, contentHash: richContentHash(body, rich) };
+}
+
+/**
+ * Error text for a failed body read. When the read timed out or overflowed the
+ * output buffer, the note's attachment sizes are looked up in the NoteStore
+ * database (needs Full Disk Access; skipped quietly without it) so the message
+ * can name an oversized image as the likely cause (#237).
+ */
+function bodyReadFailureMessage(id: string, title: string, error: string | undefined): string {
+  let attachments;
+  if (classifyBodyReadError(error) !== "other") {
+    try {
+      attachments = readNoteStructure(id, { includeText: false }).attachments;
+    } catch {
+      attachments = undefined;
+    }
+  }
+  return describeBodyReadFailure(title, error, attachments);
 }
 
 /** Notes.app accepted a delete event but the note stayed in its folder. */
@@ -1090,7 +1138,7 @@ registerTool(
   "get-note-content",
   {
     description:
-      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app.",
+      "Use when: reading the full body text of one known note, by id (preferred) or title.\nReturns: the exact note id, content, contentHash revision token, parsed hashtags, nativeTags, restored links, richContentComplete/writable, and strippedImages/truncated when the body was capped. Read the warning when writable is false.\nDo not use when: you only need metadata (get-note-details) or Markdown with checklist state (get-note-markdown).\nNote: password-protected notes must be unlocked in Notes.app first.\nSafety: inline images larger than APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES (default 256 KB) are replaced with '[inline image omitted: ...]' text placeholders, so the returned body is lossy whenever truncated is true. Mutations refuse attachment-bearing notes; edit those in Notes.app. Notes.app returns images inside the body as base64, so a note with a very large image can time out; the error then names the cause, and a larger timeoutSeconds gives the read more time.",
     inputSchema: {
       id: looseNoteId(z.string())
         .optional()
@@ -1107,6 +1155,7 @@ registerTool(
         .describe(
           "Account name (defaults to Notes.app's default account; exact or unique-prefix match, ignored if id is provided)"
         ),
+      timeoutSeconds: timeoutSecondsInput,
     },
     outputSchema: {
       id: z.string().optional(),
@@ -1143,9 +1192,9 @@ registerTool(
           `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
         );
       }
-      const rawContent = notesManager.getNoteContentById(id);
+      const { body: rawContent, error: readError } = notesManager.readNoteBodyById(id);
       if (!rawContent) {
-        return errorResponse(`Failed to read content of note "${note.title}"`);
+        return errorResponse(bodyReadFailureMessage(id, note.title, readError));
       }
       // Cap inline base64 images so an image-heavy note cannot produce a
       // response large enough to blow the client's MCP message limit.
@@ -1192,9 +1241,9 @@ registerTool(
       );
     }
 
-    const rawContent = notesManager.getNoteContent(title, account);
+    const { body: rawContent, error: readError } = notesManager.readNoteBodyById(note.id);
     if (!rawContent) {
-      return errorResponse(`Failed to read content of note "${title}"`);
+      return errorResponse(bodyReadFailureMessage(note.id, title, readError));
     }
 
     const rich = enrichNoteRead(note.id, rawContent);
@@ -4520,6 +4569,73 @@ registerTool(
       ...(pointsOmitted ? { pointsOmitted } : {}),
     } as unknown as Record<string, unknown>);
   }, "Error reading drawings")
+);
+
+// --- transcribe-note-audio (public native helper, Speech framework) ---
+
+registerTool(
+  "transcribe-note-audio",
+  {
+    description:
+      "Use when: you need the words spoken in a note's voice recordings or audio attachments, transcribed now on this Mac, by note id.\nReturns: per audio attachment a status (ok / partial / error / indeterminate), duration, word count, per-take results, and the transcript; overall status ok / partial / error / indeterminate / none.\nDo not use when: you only need the audio file (save-attachment) or a note has no audio.\nNote: read-only; recognition runs entirely on-device (never sent to a server). Needs Full Disk Access and the public native helper built once with `apple-notes-mcp setup --public-helper`. Long recordings take time: pass attachmentId to transcribe one at a time. An indeterminate result means the helper timed out; retrying may succeed. Never prompts: code permission_required means the user must allow the host app under System Settings > Privacy & Security > Speech Recognition. asset_unavailable can mean the language's speech model is not installed; pass downloadAssets: true only if the user agrees to the download.",
+    inputSchema: {
+      id: noteIdInput,
+      locale: z
+        .string()
+        .max(35)
+        .optional()
+        .describe('BCP-47 language of the speech, e.g. "en-US" (default), "it-IT", "fr-FR"'),
+      attachmentId: z
+        .string()
+        .max(MAX.ATTACHMENT_ID)
+        .optional()
+        .describe("Only transcribe this audio attachment (x-coredata ICAttachment id)"),
+      includeText: z
+        .boolean()
+        .optional()
+        .describe("Include transcript text (default true); false returns statuses and counts only"),
+      downloadAssets: z
+        .boolean()
+        .optional()
+        .describe(
+          "Let macOS download the language's on-device speech model if it is missing (default false: returns asset_unavailable at once)"
+        ),
+      maxSeconds: z
+        .number()
+        .int()
+        .min(TRANSCRIBE_MAX_SECONDS.min)
+        .max(TRANSCRIBE_MAX_SECONDS.max)
+        .optional()
+        .describe(
+          `Total time budget for the call in seconds (default ${TRANSCRIBE_MAX_SECONDS.default}); recordings not started in time report code time_limit`
+        ),
+    },
+    outputSchema: {
+      id: z.string().optional(),
+      locale: z.string().optional(),
+      status: z.string().optional(),
+      recordingCount: z.number().optional(),
+      recordings: z.array(z.object({}).passthrough()).optional(),
+    },
+  },
+  withAsyncErrorHandling(async (params, signal) => {
+    const { id, locale, attachmentId, includeText, downloadAssets, maxSeconds } = params;
+    const result = fitTranscriptions(
+      await transcribeNoteAudio(id, {
+        locale,
+        attachmentId,
+        includeText,
+        downloadAssets,
+        maxSeconds,
+        signal,
+      }),
+      exportMaxResponseBytes()
+    );
+    return successResponse(
+      formatTranscription(result),
+      result as unknown as Record<string, unknown>
+    );
+  }, "Error transcribing audio")
 );
 
 // --- list-recent-notes ---

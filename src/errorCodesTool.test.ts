@@ -6,12 +6,17 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<unknown>>());
-const manager = vi.hoisted(() => ({
-  getNoteById: vi.fn(),
-  getNoteContentById: vi.fn(),
-  listAccounts: vi.fn(),
-  getFolderById: vi.fn(),
-}));
+const manager = vi.hoisted(() => {
+  const m = {
+    getNoteById: vi.fn(),
+    getNoteContentById: vi.fn(),
+    listAccounts: vi.fn(),
+    getFolderById: vi.fn(),
+    // readNoteBodyById is the error-keeping form of getNoteContentById (#237).
+    readNoteBodyById: vi.fn((id: string) => ({ body: m.getNoteContentById(id) ?? "" })),
+  };
+  return m;
+});
 
 vi.mock(import("@modelcontextprotocol/sdk/server/mcp.js"), async (importOriginal) => ({
   ...(await importOriginal()),

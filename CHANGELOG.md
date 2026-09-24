@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.10] - 2026-09-23
+## [2.9.12] - 2026-09-24
 
 ### Added
 
@@ -31,6 +31,65 @@
 
 - `export-notes-markdown` without a template produces the same output as
   2.8.49.
+## [2.9.11] - 2026-09-23
+
+### Added
+
+- `transcribe-note-audio` transcribes a note's voice recordings and audio
+  attachments on this Mac with the Speech framework, through the public native
+  helper. Recognition is on-device only (`SpeechAnalyzer` on macOS 26+,
+  `SFSpeechRecognizer` with on-device recognition required before that). Takes
+  a BCP-47 `locale`, an optional `attachmentId`, `includeText`,
+  `downloadAssets`, and `maxSeconds`. Each recording and take reports `ok`,
+  `partial`, `error` (with a code), or `indeterminate` when the helper timed
+  out. Audio files are located read-only from the recording's takes and their
+  media rows, and resolved only inside the note's account folder with the same
+  path helpers `list-attachments` uses. Call-level errors use the coded error
+  envelope: `validation_error` for a malformed `locale` or `maxSeconds`,
+  `not_found` for an `attachmentId` that is not one of the note's audio
+  attachments, and the same helper and note codes as `get-note-drawings`.
+- The server never asks for Speech Recognition access. The helper reads the
+  current authorization status first and returns `permission_required`, with
+  where to grant access (System Settings > Privacy & Security > Speech
+  Recognition, for the app running the server), instead of prompting. Before
+  macOS 26 the recognizer needs that grant; on macOS 26+ an explicit refusal
+  stops `SpeechAnalyzer` too. Permission is decided from that status, not from
+  error text. The helper's Info.plist carries no Speech usage description.
+- Transcription runs the helper asynchronously, so the server keeps answering
+  other requests. Cancelling the MCP request kills the running helper, and
+  `maxSeconds` (default 900, 30 to 3600) caps the whole call across takes; a
+  take that is not started in time reports `time_limit`.
+- A language whose on-device speech model is not installed returns
+  `asset_unavailable` at once. `downloadAssets: true` lets macOS download it.
+- The public native helper gains a `transcribe` action, added to the
+  server's action allowlist, and links AVFoundation and Speech. Rebuild it
+  with `apple-notes-mcp setup --public-helper`; the old binary is reported
+  stale until you do.
+- `scripts/test-public-helper.mjs` also transcribes synthetic `say` speech.
+
+### Changed
+
+- A helper call's own timeout (used for transcription, which scales with the
+  recording length) now takes precedence over
+  `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, which remains the default for
+  other calls.
+
+## [2.9.10] - 2026-09-23
+
+### Fixed
+
+- A body read that times out on a note holding a very large image now says
+  why (#237). Notes.app returns images inside `body of note` as base64, so a
+  multi-megabyte image can make the read outlast the timeout; the error used
+  to be a bare "Failed to read content", which also left `delete-note` with
+  no way forward. When the read times out or overflows the output buffer,
+  `get-note-content` and every tool that verifies a note's revision first
+  (such as `delete-note`) now return the underlying error, the likely cause,
+  and the remedy, and with Full Disk Access they name the note's attachments
+  of 5 MB or more. `get-note-content` now accepts `timeoutSeconds` (1-120),
+  so the read can be given the same extra time `delete-note` already
+  allowed. A title lookup now reads the body of the exact note it resolved.
+  Thanks to @oliverames for the report.
 
 ## [2.9.9] - 2026-09-23
 
