@@ -17,13 +17,17 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { gzipSync } from "zlib";
 import {
+  buildNoteTextsSql,
   buildScanSql,
   countWords,
+  decodeBodyHex,
   decodeNoteBody,
   facetsForAttachmentType,
+  NOTE_TEXT_BATCH_MAX,
   NoteQueryStoreError,
   queryNotes,
   QUERY_SCAN,
+  readNoteTexts,
   resolveFolders,
 } from "./noteQueryStore.js";
 import { NoteQueryError } from "./noteQuery.js";
@@ -513,6 +517,128 @@ describe("queryNotes against a fixture NoteStore", () => {
 // -----------------------------------------------------------------------------
 // Generated SQL
 // -----------------------------------------------------------------------------
+
+describe("queryNotes match details against a fixture NoteStore", () => {
+  const hit = (query: string, pk: number, options: Parameters<typeof queryNotes>[1] = {}) => {
+    const found = queryNotes(query, { dbPath: full, ...options }).notes.find(
+      (n) => n.id === `x-coredata://${UUID}/ICNote/p${pk}`
+    );
+    if (!found) throw new Error(`note ${pk} did not match ${query}`);
+    return found;
+  };
+
+  it("reports where a bare word occurs: title, body, or both", () => {
+    expect(hit("budget", 100).matchedIn).toEqual(["body"]);
+    expect(hit("invoice", 101).matchedIn).toEqual(["title"]);
+    expect(hit("meeting budget", 100).matchedIn).toEqual(["title", "body"]);
+    expect(hit("budget", 104, { includeDeleted: true }).matchedIn).toEqual(["title", "body"]);
+  });
+
+  it("answers a title:-only query from the title without reading bodies", () => {
+    const result = queryNotes("title:invoice", { dbPath: full });
+    expect(result.notes[0].matchedIn).toEqual(["title"]);
+    // The body was not fetched: the column snippet, not a decoded one, is shown.
+    expect(queryNotes("title:meeting", { dbPath: full }).notes[0].snippet).toBe("column snippet");
+  });
+
+  it("omits matchedIn for a locked note and for a query without text terms", () => {
+    const locked = hit("budget", 103);
+    expect(locked.locked).toBe(true);
+    expect(locked).not.toHaveProperty("matchedIn");
+    expect(hit("pinned", 100)).not.toHaveProperty("matchedIn");
+  });
+
+  it("reports an empty list for a note that matched through a metadata branch", () => {
+    expect(hit("pinned OR zzz", 100).matchedIn).toEqual([]);
+  });
+
+  it("adds no wordCount unless asked", () => {
+    expect(hit("budget", 100)).not.toHaveProperty("wordCount");
+  });
+
+  it("counts words from bodies the query already decoded, null for locked notes", () => {
+    const result = queryNotes("budget", { dbPath: full, includeWordCount: true });
+    expect(result.notes.map((n) => n.wordCount)).toEqual([null, 12]);
+    // The same count the words: filter uses.
+    expect(hit("words:>250", 106, { includeWordCount: true }).wordCount).toBe(302);
+  });
+
+  it("reads bodies for the returned notes only when a metadata-only query asks for counts", () => {
+    const result = queryNotes("account:icloud", { dbPath: full, includeWordCount: true });
+    expect(result.notes.map((n) => [Number(n.id.split("/p")[1]), n.wordCount])).toEqual([
+      [103, null],
+      [100, 12],
+      [106, 302],
+      [101, 4],
+      [102, 2],
+      [107, null],
+    ]);
+    expect(result.unreadable).toBe(0);
+    const limited = queryNotes("account:icloud", {
+      dbPath: full,
+      includeWordCount: true,
+      limit: 1,
+    });
+    expect(limited.notes.map((n) => n.wordCount)).toEqual([null]);
+  });
+});
+
+describe("readNoteTexts and buildNoteTextsSql", () => {
+  const all = new Set(FULL_COLUMNS.map((c) => c.split(" ")[0]));
+
+  it("decodes text for the requested notes; locked and unreadable bodies are null", () => {
+    const { uuid, texts } = readNoteTexts([100, 103, 107, 999, 100], { dbPath: full });
+    expect(uuid).toBe(UUID);
+    expect(texts.get(100)).toContain("Agenda: budget review and hiring");
+    expect(texts.get(103)).toBeNull();
+    expect(texts.get(107)).toBeNull();
+    expect(texts.has(999)).toBe(false);
+    // Folder and account rows are not notes.
+    expect(readNoteTexts([10, 1], { dbPath: full }).texts.size).toBe(0);
+  });
+
+  it("still returns null for a locked body on a store without the lock column", () => {
+    expect(readNoteTexts([103], { dbPath: minimal }).texts.get(103)).toBeNull();
+  });
+
+  it("classifies a missing database as a Full Disk Access problem", () => {
+    expect(() => readNoteTexts([1], { dbPath: join(dir, "absent.sqlite") })).toThrow(
+      expect.objectContaining({ kind: "no_fda" })
+    );
+  });
+
+  it("compiles on real sqlite3, read-only, with and without optional columns", () => {
+    const minimalSet = new Set(MINIMAL_COLUMNS.map((c) => c.split(" ")[0]));
+    for (const [columns, path] of [
+      [all, full],
+      [minimalSet, minimal],
+    ] as const) {
+      for (const keys of [[], [100], [100, 101, 106]]) {
+        const sql = buildNoteTextsSql(columns, keys);
+        expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ATTACH|PRAGMA)\b/i);
+        expect(() =>
+          execFileSync("sqlite3", ["-readonly", path, sql], { stdio: ["pipe", "pipe", "pipe"] })
+        ).not.toThrow();
+      }
+    }
+    expect(buildNoteTextsSql(minimalSet, [1])).toContain("'locked', 0");
+    expect(buildNoteTextsSql(all, [])).toContain("IN (NULL)");
+  });
+
+  it("refuses keys that are not positive safe integers, too many keys, or a bare schema", () => {
+    for (const bad of [0, -1, 1.5, Number.NaN, 2 ** 53]) {
+      expect(() => buildNoteTextsSql(all, [bad])).toThrow(NoteQueryStoreError);
+    }
+    const tooMany = Array.from({ length: NOTE_TEXT_BATCH_MAX + 1 }, (_, i) => i + 1);
+    expect(() => buildNoteTextsSql(all, tooMany)).toThrow(/At most/);
+    expect(() => buildNoteTextsSql(new Set(["Z_PK"]), [1])).toThrow(/Z_ENT/);
+  });
+
+  it("decodeBodyHex returns null for bytes that are not a gzipped document", () => {
+    expect(decodeBodyHex(Buffer.from("not gzip").toString("hex"))).toBeNull();
+    expect(decodeBodyHex(noteDocument("A\nb").toString("hex"))?.text).toBe("A\nb");
+  });
+});
 
 describe("buildScanSql", () => {
   const all = new Set(FULL_COLUMNS.map((c) => c.split(" ")[0]));

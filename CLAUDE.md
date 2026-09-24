@@ -97,6 +97,7 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **Markdown title line:** with `format: "markdown"`, a first line that is exactly `# <title>` is removed (plus one blank line), since `title` is supplied separately. A different first heading is kept.
 - **`markdownRoute: "html"`** imports Markdown through AppleScript HTML instead of the Shortcut: any account, tags allowed, no real Heading styles. Task items (`- [ ]`, `- [x]`) become list rows starting with a visible ☐ / ☑ character. Those are text, not checkable checklist items; tell the user so. Block quotes, fenced code and inline code are refused on this route, and a `---` line stays literal text; only the Shortcut route imports these natively.
 - **`timeoutSeconds`** (1–120) on `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` sets the timeout of each Notes.app automation step for that call. A timed-out write is uncertain: read the note by id before retrying.
+- **Notes with large images stay readable and deletable.** A body embeds its inline images as base64, so a 40 MB image makes a body of about 110 MB. `get-note-content` accepts bodies up to 512 MB, and `delete-note` still compares the whole body before deleting. An error saying Notes.app "returned more than … of output" is a size limit, not a timeout; retrying will not help.
 - **`delete-note` checks placement.** If Notes.app accepts the delete but the note is still in its original folder, the call reports that nothing was deleted.
 - **`delete-note` and `batch-delete-notes` refuse a note already in Recently Deleted**, where a delete is permanent. The folder is read live from Notes.app; the database only identifies which folder is Recently Deleted.
 - **Copy-then-retire with `delete-note`:** after copying note A to note B and verifying B, read both with `get-note-content`, then call `delete-note` on A with `guardNoteId` = B and `expectedGuardContentHash` = B's `contentHash`. The delete stops if B changed, was locked, moved to Recently Deleted, or is a Quick Note. It needs Full Disk Access (the Quick Note flag is only in the database); a B the database has not saved yet still passes on Notes.app's live checks. It is a guard, not a transaction. `requireActiveNoteId` only requires the other note to stay active; it does not fingerprint its content.
@@ -193,6 +194,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `limit` to cap the number of results returned. **`limit` defaults to 50** — a broad query (e.g. a single common letter) reads several properties per match via AppleScript, so an unbounded search over hundreds of matches times out; the default keeps it useful. The response discloses the applied limit and warns when results were truncated — pass a higher `limit`, or narrow with `folder`/`modifiedSince`, to see more.
 - Use `folder` to restrict search to a specific folder (supports nested paths)
 - With Full Disk Access, `searchContent: true` reads the Notes database instead of asking Notes.app (`source: "database"` in the response): it matches the full plain text, title line included, scans the 5000 most recently modified notes, and excludes Recently Deleted. Without Full Disk Access it falls back to AppleScript (`source: "applescript"`), which scans every body before `limit` applies and can time out on a broad term; the timeout error then says how to fix it
+- `matchedIn` (`["title"]`, `["body"]`, or both; body = text after the first line) appears when the note text came from the database: always on a database body search, and on any search with `includeWordCount`. It is absent for locked notes and for AppleScript searches without `includeWordCount`; its absence is not evidence either way
+- `includeWordCount: true` adds `wordCount` (null = locked or unreadable). An AppleScript search reads the bodies in one batched read-only database query, never per note; without Full Disk Access the results stay unchanged and `wordCountUnavailable` says why
 
 ### query-notes
 - Boolean search read straight from the NoteStore database (read-only, needs Full Disk Access). Prefer it over `search-notes` when Full Disk Access is available: one call matches title **or** body, and it returns in well under a second instead of ~200ms per result
@@ -200,6 +203,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Scans the 500 most recently modified notes by default (`scanLimit` up to 5000). When `scanTruncated` is true, older notes were not examined — raise `scanLimit` before concluding a note does not exist
 - Excludes Recently Deleted and folderless notes unless `includeDeleted: true`
 - Locked notes match on title and metadata only; body predicates never match them
+- Each hit has `matchedIn` (where the positive text terms occur: `title`, `body`, or both) when the query has a text term and the body is readable; a `title:` term only counts toward the title and a `body:` term only toward the body. An empty list means the note matched through a non-text branch (`pinned OR x`)
+- `includeWordCount: true` adds `wordCount`, the same count `words:` filters on (null = locked or unreadable). A metadata-only query reads just the returned notes' bodies in one extra query
 - Result ids chain directly into `get-note-content` and every other id-based tool
 
 ### list-notes
@@ -236,6 +241,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 ### move-note
 - Native move — the note is relocated in place via Notes.app's `move`, so its id, creation date, and embedded attachments are preserved
 - The destination folder must already exist (create it first with `create-folder`)
+- **Smart folders are refused as destinations** by `move-note`, `batch-move-notes`, `create-note`, `create-note-with-attachment`, and `create-folder` (any path segment): `code: "unsupported"`, `committed: false`, `reason: "smart_folder_destination"`, nothing written. Notes.app would otherwise move the note to Recently Deleted. Pick an ordinary folder from `list-folders`. Needs Full Disk Access to detect; without it the guard is off
 - Prefer using `id` parameter to avoid issues with duplicate titles
 
 ### add-attachment / create-note-with-attachment

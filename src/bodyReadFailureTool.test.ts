@@ -95,6 +95,27 @@ describe("body read failure on a note with a large image (#237)", () => {
     expect(readNoteStructure).not.toHaveBeenCalled();
   });
 
+  it("explains a body over the read cap as a size limit, not a timeout", async () => {
+    const overflow =
+      "Notes.app returned more than 512 MB of output, the most this server accepts from one AppleScript call. A note whose body carries large inline images or attachments can reach this. That is the longest string Node.js can hold, so raising APPLE_NOTES_MCP_MAX_BUFFER will not help; remove or shrink the large image or attachment in Notes.app.";
+    manager.readNoteBodyById.mockReturnValue({ body: "", error: overflow });
+    const read = await call("get-note-content", { id: ID });
+    expect(read.isError).toBe(true);
+    expect(read.content[0].text).toContain("scan.tiff, 36.0 MB");
+    expect(read.content[0].text).toContain("will not help");
+    expect(read.content[0].text).not.toContain("Retry with a longer timeoutSeconds");
+    expect(readNoteStructure).toHaveBeenCalledWith(ID, { includeText: false });
+
+    const del = await call("delete-note", {
+      id: ID,
+      expectedContentHash: `sha256:${"0".repeat(64)}`,
+    });
+    expect(del.isError).toBe(true);
+    expect(del.content[0].text).toContain("will not help");
+    expect(del.content[0].text).toContain("Nothing was changed.");
+    expect(manager.deleteNoteByIdIfUnchanged).not.toHaveBeenCalled();
+  });
+
   it("delete-note explains the failure and deletes nothing", async () => {
     const r = await call("delete-note", {
       id: ID,

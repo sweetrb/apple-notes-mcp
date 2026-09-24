@@ -5,6 +5,7 @@ import {
   formatBytes,
   largeAttachments,
 } from "./bodyReadFailure.js";
+import { noteBodyMaxBuffer, outputOverflowMessage } from "./applescript.js";
 
 const TIMEOUT =
   "Operation timed out after 30 seconds. Notes.app may be unresponsive or the operation involves too many notes.";
@@ -17,6 +18,14 @@ describe("classifyBodyReadError", () => {
     expect(classifyBodyReadError("spawnSync osascript ENOBUFS")).toBe("buffer");
     expect(classifyBodyReadError("Not found: note id x")).toBe("other");
     expect(classifyBodyReadError(undefined)).toBe("other");
+  });
+
+  it("recognizes the runner's own overflow error as a size limit, not a timeout", () => {
+    // What executeAppleScript reports once osascript prints more than the cap.
+    expect(classifyBodyReadError(outputOverflowMessage(64 * MB))).toBe("buffer");
+    expect(classifyBodyReadError(outputOverflowMessage(noteBodyMaxBuffer()))).toBe("buffer");
+    expect(classifyBodyReadError(outputOverflowMessage(50))).toBe("buffer");
+    expect(classifyBodyReadError("Cannot create a string (ERR_STRING_TOO_LONG)")).toBe("buffer");
   });
 });
 
@@ -58,10 +67,32 @@ describe("describeBodyReadFailure", () => {
     expect(text).toContain("timeoutSeconds");
   });
 
-  it("points a buffer overflow at APPLE_NOTES_MCP_MAX_BUFFER", () => {
-    expect(describeBodyReadFailure("Test", "spawnSync osascript ENOBUFS", [])).toContain(
-      "APPLE_NOTES_MCP_MAX_BUFFER"
+  it("explains a body over the read cap as a size limit that retrying cannot fix", () => {
+    const overflow = outputOverflowMessage(noteBodyMaxBuffer());
+    const text = describeBodyReadFailure("Test", overflow, [
+      { filename: "scan.tiff", fileSize: 400 * MB },
+    ]);
+    expect(text.startsWith(`Failed to read content of note "Test": ${overflow}\n\n`)).toBe(true);
+    expect(text).toContain("scan.tiff, 400.0 MB");
+    expect(text).toContain("will not help");
+    expect(text).toContain("delete-note needs a successful read");
+    // None of the timeout explanation or its remedy.
+    expect(text).not.toMatch(
+      /in time|timeout allows|Retry with a longer|APPLE_NOTES_MCP_TIMEOUT_MS/
     );
+  });
+
+  it("keeps the cap's own remedy when the general cap overflowed", () => {
+    const text = describeBodyReadFailure("Test", outputOverflowMessage(64 * MB), undefined);
+    expect(text).toContain("Raise APPLE_NOTES_MCP_MAX_BUFFER");
+    expect(text).toContain("base64");
+    expect(text).not.toContain("Retry with a longer");
+  });
+
+  it("treats a raw ENOBUFS the same way", () => {
+    const text = describeBodyReadFailure("Test", "spawnSync osascript ENOBUFS", []);
+    expect(text).toContain("will not help");
+    expect(text).not.toContain("Retry with a longer");
   });
 
   it("keeps other failures to the plain message", () => {

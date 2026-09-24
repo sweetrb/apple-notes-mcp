@@ -13,6 +13,8 @@ import {
   normalizeForMatch,
   NoteQueryError,
   parseNoteQuery,
+  matchLocations,
+  positiveTextPredicates,
   positiveTextTerms,
   QUERY_LIMITS,
   tokenize,
@@ -502,5 +504,64 @@ describe("query analysis helpers", () => {
       "e",
       "g",
     ]);
+  });
+
+  it("positiveTextPredicates keeps each term's field", () => {
+    expect(positiveTextPredicates(parseNoteQuery("a -b title:c body:d pinned -(-g)"))).toEqual([
+      { field: "any", value: "a" },
+      { field: "title", value: "c" },
+      { field: "body", value: "d" },
+      { field: "any", value: "g" },
+    ]);
+  });
+});
+
+describe("matchLocations", () => {
+  const where = (query: string, title: string, noteText: string | null) =>
+    matchLocations(positiveTextPredicates(parseNoteQuery(query)), title, noteText);
+
+  it("reports title, body, or both for a bare word, case- and accent-form-insensitively", () => {
+    expect(where("budget", "Budget 2026", "Budget 2026\nrent and food")).toEqual(["title"]);
+    expect(where("rent", "Budget 2026", "Budget 2026\nRENT and food")).toEqual(["body"]);
+    expect(where("budget", "Budget", "Budget\nthe budget line")).toEqual(["title", "body"]);
+    // NFD input matches NFC text.
+    expect(where("café", "Menu", "Menu\ncafé list")).toEqual(["body"]);
+  });
+
+  it("looks for a field term only where its field points", () => {
+    expect(where("title:plan", "Plan", "Plan\nplan b")).toEqual(["title"]);
+    expect(where("body:plan", "Plan", "Plan\nplan b")).toEqual(["body"]);
+    expect(where("body:plan", "Plan", "Plan\nnothing")).toEqual([]);
+  });
+
+  it("treats the first text line as the title when the stored title differs", () => {
+    expect(where("draft", "", "Draft ideas\nmore")).toEqual(["title"]);
+  });
+
+  it("combines several terms across locations", () => {
+    expect(where("alpha beta", "Alpha", "Alpha\nbeta")).toEqual(["title", "body"]);
+    expect(where("alpha OR zzz", "Alpha", "Alpha\n")).toEqual(["title"]);
+  });
+
+  it("returns an empty list when a note matched only through a metadata branch", () => {
+    expect(where("pinned OR zzz", "Groceries", "Groceries\nmilk")).toEqual([]);
+  });
+
+  it("is undefined without a positive text term", () => {
+    expect(where("pinned", "A", "A\nb")).toBeUndefined();
+    expect(where("-secret", "A", "A\nb")).toBeUndefined();
+  });
+
+  it("is undefined when a body-capable term needs text that is unavailable", () => {
+    expect(where("budget", "Budget", null)).toBeUndefined();
+    expect(where("title:budget body:x", "Budget", null)).toBeUndefined();
+    // A title-only query does not need the body.
+    expect(where("title:budget", "Budget", null)).toEqual(["title"]);
+    expect(where("title:zzz OR pinned", "Budget", null)).toEqual([]);
+  });
+
+  it("handles a one-line note, which has no body", () => {
+    expect(where("solo", "Solo", "Solo")).toEqual(["title"]);
+    expect(where("body:solo", "Solo", "Solo")).toEqual([]);
   });
 });
