@@ -185,6 +185,19 @@ response says when older notes were left out. Recently Deleted is excluded
 unless `includeDeleted` is true. Locked notes match on title and metadata only.
 The returned ids work with every id-based tool.
 
+Both search tools can say where a note matched and how long it is. Results
+whose text came from the database carry `matchedIn` (`title`, `body`, or both);
+`query-notes` always has it for readable notes, and `search-notes` has it for a
+database body search. Pass `includeWordCount: true` to either tool for a
+`wordCount` per result (null for locked notes). On a `search-notes` title search
+it reads the bodies in one database query and adds `matchedIn` too, which
+answers "does this note also mention it in the body?" without opening each note.
+
+```
+User: "Which of my budget notes are long, and do they mention it in the body?"
+Action: Use query-notes with query='budget' and includeWordCount=true
+```
+
 ### Reading Notes
 
 When the user wants to see note contents:
@@ -276,7 +289,7 @@ User: "Create a Work folder"
 Action: Use create-folder with name="Work"
 ```
 
-`create-folder` takes a whole nested path (`name="Work/Clients/Omnia"`) and creates every missing segment, skipping ones that already exist — so it is idempotent and safe to call unconditionally. Do call it first: `create-note`, `move-note`, and `batch-move-notes` all require the destination folder to already exist, and `create-note` reports a missing folder with a generic "check that Notes.app is configured and accessible" message that looks like a permissions problem but is not.
+`create-folder` takes a whole nested path (`name="Work/Clients/Omnia"`) and creates every missing segment, skipping ones that already exist — so it is idempotent and safe to call unconditionally. Do call it first: `create-note`, `move-note`, and `batch-move-notes` all require the destination folder to already exist (and never a smart folder: those are refused with `reason: "smart_folder_destination"`, since Notes would send a moved note to Recently Deleted), and `create-note` reports a missing folder with a generic "check that Notes.app is configured and accessible" message that looks like a permissions problem but is not.
 
 ### Sharing and Revealing Notes
 
@@ -391,6 +404,7 @@ Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `
 - **Slow Notes.app**: `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` accept `timeoutSeconds` (1–120) for each automation step of that call. A timed-out write is uncertain; read the exact note before retrying
 - **Read times out on a note with a large image**: Notes.app returns images inside the body as base64, so a multi-megabyte image can outlast the read timeout, which also blocks `delete-note`. The error names the large attachments when Full Disk Access is granted. Retry `get-note-content` (and then `delete-note`) with a larger `timeoutSeconds`; if it still fails, have the user remove the image or delete the note in Notes.app
 - **"Notes.app accepted the delete, but the note is still in its original folder"**: nothing was deleted. Read the note again before retrying
+- **"Notes.app returned more than … of output"**: a size limit, not a timeout, so retrying will not help. Note bodies embed inline images as base64; body reads accept up to 512 MB, and other calls follow `APPLE_NOTES_MCP_MAX_BUFFER` (64 MB default). A note with a large image can still be read and deleted by id
 - **"Folder not empty"**: Cannot delete folders with notes; move notes first
 - **Attachment-risk update**: The mutation is rejected. Use Notes.app or create a separate note.
 - **Notes accumulate blank lines after repeated updates**: Apple Notes' internal HTML processing preserves empty `<div><br></div>` artifacts from previous edits, and they persist even when you update with clean content. Fix: delete the note with delete-note and create a fresh one with create-note — the artifacts are baked into the note's internal representation, so this is more reliable than trying to fix the whitespace through updates

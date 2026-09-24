@@ -205,7 +205,9 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
         .string()
         .max(1000)
         .optional()
-        .describe("Existing folder or nested path; create it first with create-folder"),
+        .describe(
+          "Existing folder or nested path; create it first with create-folder. A smart folder is refused before the note is created"
+        ),
       account: z.string().max(200).optional().describe("Account name; defaults to Notes' default"),
       ...attachmentInput,
     },

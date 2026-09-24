@@ -34,10 +34,12 @@ import { escapeFolderName } from "@/services/appleNotesManager.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import {
   evaluateNoteQuery,
+  matchLocations,
   needsContent,
   needsTags,
   normalizeForMatch,
   parseNoteQuery,
+  positiveTextPredicates,
   positiveTextTerms,
   type Facet,
   type NoteContent,
@@ -200,6 +202,17 @@ export function decodeNoteBody(data: Uint8Array): DecodedNoteBody | null {
   };
 }
 
+/** Decodes a hex-encoded, gzipped note document; null when it cannot be read. */
+export function decodeBodyHex(hex: string): DecodedNoteBody | null {
+  try {
+    return decodeNoteBody(
+      new Uint8Array(gunzipSync(Buffer.from(hex, "hex"), { maxOutputLength: 32 * 1024 * 1024 }))
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** Counts whitespace-delimited words that contain at least one letter or digit. */
 export function countWords(text: string): number {
   let count = 0;
@@ -332,6 +345,106 @@ function presentColumns(dbPath: string): Set<string> {
   return cols;
 }
 
+/**
+ * Detects the schema, builds SQL for it, and runs it read-only, turning
+ * permission and sqlite failures into {@link NoteQueryStoreError}s.
+ */
+function readStore(dbPath: string, build: (available: ReadonlySet<string>) => string): string {
+  if (!fs.existsSync(dbPath)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+  try {
+    return runSqlite(dbPath, build(presentColumns(dbPath)));
+  } catch (error) {
+    if (error instanceof NoteQueryStoreError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("authorization denied") || message.includes("unable to open database")) {
+      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
+    }
+    console.error(`query-notes: database read failed: ${message}`);
+    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
+  }
+}
+
+/** Most notes one batched text read accepts (the query-notes result cap). */
+export const NOTE_TEXT_BATCH_MAX = QUERY_RESULTS.MAX;
+
+/**
+ * Builds the read of the newest document row for specific notes, by primary
+ * key, used to enrich search results without a per-note AppleScript call.
+ * Every key is validated as a positive safe integer before it enters the SQL.
+ * Exported so tests can run the generated SQL through real sqlite3.
+ */
+export function buildNoteTextsSql(available: ReadonlySet<string>, pks: number[]): string {
+  const missing = ["Z_PK", "Z_ENT"].filter((c) => !available.has(c));
+  if (missing.length) {
+    throw new NoteQueryStoreError(
+      `This macOS version's Notes database lacks columns search enrichment needs (${missing.join(", ")}).`,
+      "schema"
+    );
+  }
+  const keys = [...new Set(pks)];
+  if (keys.length > NOTE_TEXT_BATCH_MAX) {
+    throw new NoteQueryStoreError(
+      `At most ${NOTE_TEXT_BATCH_MAX} notes can be read at once.`,
+      "query_error"
+    );
+  }
+  for (const pk of keys) {
+    if (!Number.isSafeInteger(pk) || pk < 1) {
+      throw new NoteQueryStoreError(`Invalid note key ${String(pk)}`, "query_error");
+    }
+  }
+  const locked = available.has("ZISPASSWORDPROTECTED")
+    ? "COALESCE(n.ZISPASSWORDPROTECTED, 0)"
+    : "0";
+  return [
+    "BEGIN;",
+    "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
+    `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'locked', ${locked}, ` +
+      "'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) " +
+      `FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity("ICNote")} ` +
+      `AND n.Z_PK IN (${keys.length ? keys.join(", ") : "NULL"});`,
+    "COMMIT;",
+  ].join(" ");
+}
+
+/** Decoded text for specific notes, keyed by primary key. */
+export interface NoteTexts {
+  /** The store UUID, to confirm an x-coredata id belongs to this store. */
+  uuid: string | undefined;
+  /** Text per found note; null when the note is locked or its body is unreadable. */
+  texts: Map<number, string | null>;
+}
+
+/**
+ * Reads and decodes the text of specific notes in one read-only query. Notes
+ * that do not exist are absent from the map.
+ *
+ * @throws NoteQueryStoreError for permission, schema, or database failures
+ */
+export function readNoteTexts(pks: number[], options: { dbPath?: string } = {}): NoteTexts {
+  const output = readStore(options.dbPath ?? NOTES_DB_PATH, (available) =>
+    buildNoteTextsSql(available, pks)
+  );
+  let uuid: string | undefined;
+  const texts = new Map<number, string | null>();
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const row = JSON.parse(line) as {
+      k: string;
+      uuid?: unknown;
+      pk?: number;
+      locked?: number;
+      data?: string | null;
+    };
+    if (row.k === "meta") uuid = typeof row.uuid === "string" ? row.uuid : undefined;
+    else if (row.k === "note" && typeof row.pk === "number") {
+      const body = row.locked || !row.data ? null : decodeBodyHex(row.data);
+      texts.set(row.pk, body ? body.text : null);
+    }
+  }
+  return { uuid, texts };
+}
+
 // -----------------------------------------------------------------------------
 // Row assembly
 // -----------------------------------------------------------------------------
@@ -429,6 +542,12 @@ export interface QueryNotesOptions {
   scanLimit?: number;
   includeDeleted?: boolean;
   /**
+   * Add `wordCount` to each returned note. Free when the query already read
+   * bodies; otherwise one extra read-only query fetches only the returned
+   * notes' bodies.
+   */
+  includeWordCount?: boolean;
+  /**
    * Database to read. Tests point this at a fixture store; the tool never sets
    * it, so production reads always target the live NoteStore (read-only).
    */
@@ -468,24 +587,9 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
   const withTags = needsTags(ast);
 
   const dbPath = options.dbPath ?? NOTES_DB_PATH;
-  if (!fs.existsSync(dbPath)) throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-
-  let output: string;
-  try {
-    const available = presentColumns(dbPath);
-    output = runSqlite(
-      dbPath,
-      buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
-    );
-  } catch (error) {
-    if (error instanceof NoteQueryStoreError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      throw new NoteQueryStoreError(QUERY_FDA_MESSAGE, "no_fda");
-    }
-    console.error(`query-notes: database read failed: ${message}`);
-    throw new NoteQueryStoreError("Failed to read the Notes database.", "query_error");
-  }
+  const output = readStore(dbPath, (available) =>
+    buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
+  );
 
   let uuid: string | undefined;
   let eligible = 0;
@@ -511,6 +615,8 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
 
   const folders = resolveFolders(folderRows);
   const textTerms = positiveTextTerms(ast);
+  const textPredicates = positiveTextPredicates(ast);
+  const pendingWordCounts: number[] = [];
   const hits: QueryNotesHit[] = [];
   let matched = 0;
   let unreadable = 0;
@@ -533,15 +639,7 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
         if (withBodies) unreadable++;
         return decoded;
       }
-      try {
-        decoded = decodeNoteBody(
-          new Uint8Array(
-            gunzipSync(Buffer.from(row.data, "hex"), { maxOutputLength: 32 * 1024 * 1024 })
-          )
-        );
-      } catch {
-        decoded = null;
-      }
+      decoded = decodeBodyHex(row.data);
       if (!decoded) unreadable++;
       return decoded;
     };
@@ -585,6 +683,10 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
     matched++;
     if (hits.length >= limit) continue;
     const body = locked ? null : decode();
+    // Without fetched bodies (a metadata-only query), every text predicate is
+    // title:, so the title alone answers matchedIn.
+    const matchedIn = matchLocations(textPredicates, row.title ?? "", body ? body.text : null);
+    if (options.includeWordCount && !withBodies) pendingWordCounts.push(row.pk);
     hits.push({
       id: `x-coredata://${uuid}/ICNote/p${row.pk}`,
       title: row.title ?? "",
@@ -598,6 +700,20 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
           ? buildSnippet(body.text, textTerms)
           : (row.snippet ?? "").replace(/\s+/gu, " ").trim(),
       ...(locked ? { locked: true } : {}),
+      ...(matchedIn ? { matchedIn } : {}),
+      ...(options.includeWordCount && withBodies
+        ? { wordCount: body ? countWords(body.text) : null }
+        : {}),
+    });
+  }
+
+  // A metadata-only query never fetched bodies; read just the returned notes'
+  // bodies in one extra query instead of the whole scan window.
+  if (pendingWordCounts.length) {
+    const { texts } = readNoteTexts(pendingWordCounts, { dbPath });
+    pendingWordCounts.forEach((pk, index) => {
+      const text = texts.get(pk);
+      hits[index].wordCount = typeof text === "string" ? countWords(text) : null;
     });
   }
 

@@ -43,6 +43,7 @@ import {
   readBackgroundSnapshot,
   setNativeTag,
 } from "./backgroundNotes.js";
+import { smartFolderDestinationError } from "./appleNotesManager.js";
 
 const id = "x-coredata://ABCDEF/ICNote/p1";
 const scopeText = "Unique project marker";
@@ -333,6 +334,7 @@ describe("create-note Markdown bridge (#172)", () => {
         { id: "folder-2", name: "Work/Clients\\/Partners", account: "iCloud" },
       ]),
       moveNoteById: vi.fn(() => true),
+      assertNotSmartFolderDestination: vi.fn(),
     };
     mock.enrich.mockReturnValue({ revision: "r1" });
     mock.readRich.mockImplementation((noteId: string) => ({
@@ -372,6 +374,25 @@ describe("create-note Markdown bridge (#172)", () => {
     });
     expect(manager.listNoteRefs).toHaveBeenCalledWith("iCloud", "Notes");
     expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
+    // Only accounts with a default folder can receive the note, so only those are checked.
+    expect(manager.assertNotSmartFolderDestination.mock.calls).toEqual([["Work", "iCloud"]]);
+  });
+
+  it("refuses a smart-folder destination before the bridge creates anything", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    manager.assertNotSmartFolderDestination.mockImplementation(() => {
+      throw smartFolderDestinationError("Work");
+    });
+    expect(() =>
+      createMarkdownNote(manager as unknown as AppleNotesManager, {
+        title: "Plan",
+        content: "## Goals",
+        folder: "Work",
+      })
+    ).toThrow(/^Refused: "Work" is a smart folder/);
+    expect(execFileSync).not.toHaveBeenCalled();
+    expect(manager.listNoteRefs).not.toHaveBeenCalled();
+    expect(manager.moveNoteById).not.toHaveBeenCalled();
   });
 
   it("escapes Markdown punctuation so the title stays literal", () => {
