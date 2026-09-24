@@ -775,18 +775,21 @@ export function exportFileName(
   kind: "asset" | "preview"
 ): string {
   const ext = extname(source);
+  // The identifier comes from the store like the file name, so it gets the
+  // same one-component check, with a constant fallback.
+  const id = safeComponent(record.identifier) ?? "attachment";
   if (kind === "preview") {
     // A preview is a thumbnail in its own format: never present it under the
     // asset's name and extension.
     const stored = safeComponent(record.filename ? basename(record.filename) : null);
-    const stem = stored ? basename(stored, extname(stored)) : record.identifier;
-    return `${safeComponent(stem) ?? record.identifier}-preview${ext}`;
+    const stem = stored ? basename(stored, extname(stored)) : id;
+    return `${safeComponent(stem) ?? id}-preview${ext}`;
   }
   const stored = safeComponent(record.filename ? basename(record.filename) : null);
   if (stored && !GENERIC_FILE_NAMES.has(stored.toLowerCase())) return stored;
-  const own = basename(source);
-  if (!GENERIC_FILE_NAMES.has(own.toLowerCase())) return own;
-  return `${record.identifier}${ext}`;
+  const own = safeComponent(basename(source));
+  if (own && !GENERIC_FILE_NAMES.has(own.toLowerCase())) return own;
+  return `${id}${ext}`;
 }
 
 /** `name`, then `stem-2.ext`, `stem-3.ext`, ... */
@@ -830,6 +833,8 @@ export function exportOneAttachment(
   for (let attempt = 1; attempt <= MAX_COLLISION_SUFFIX; attempt++) {
     const dest = join(dir, collisionName(name, attempt));
     try {
+      if (dirname(dest) !== resolve(dir))
+        throw new Error(`Refusing to write outside the export directory: "${dest}"`);
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
       return { ...base, exportedTo: dest, exportedKind: source.kind };

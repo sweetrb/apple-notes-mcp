@@ -10,6 +10,7 @@ import {
   ellipseSubpath,
   flattenCubic,
   flattenSubpath,
+  subpathControlPoints,
   multiply,
   parseNumberList,
   parsePathData,
@@ -19,6 +20,7 @@ import {
   scanFill,
   type Matrix,
   type Point,
+  type Subpath,
 } from "./svgGeometry.js";
 
 const near = (a: number[], b: number[], digits = 6) =>
@@ -175,6 +177,39 @@ describe("shapes and flattening", () => {
     expect(pts[0]).toEqual(pts[pts.length - 1]);
     for (const [x, y] of pts)
       expect(Math.abs((x / 100) ** 2 + (y / 50) ** 2 - 1)).toBeLessThan(0.02);
+  });
+  it("charges once per emitted point and stops when the charge throws", () => {
+    let charged = 0;
+    const pts = flattenSubpath(ellipseSubpath(0, 0, 100, 50), IDENTITY, 0.25, () => charged++);
+    expect(charged).toBe(pts.length);
+    let calls = 0;
+    const budget = () => {
+      if (++calls > 10) throw new Error("budget");
+    };
+    const huge: Subpath = {
+      start: [0, 0],
+      closed: false,
+      segments: [{ kind: "C", c1: [1e6, 1e6], c2: [-1e6, 1e6], to: [0, 0] }],
+    };
+    expect(() => flattenSubpath(huge, IDENTITY, 1e-9, budget)).toThrow("budget");
+    expect(calls).toBe(11);
+  });
+  it("lists control points in output space", () => {
+    const sub: Subpath = {
+      start: [0, 0],
+      closed: false,
+      segments: [
+        { kind: "L", to: [1, 0] },
+        { kind: "C", c1: [2, 0], c2: [3, 0], to: [4, 0] },
+      ],
+    };
+    expect(subpathControlPoints(sub, [2, 0, 0, 2, 0, 0] as Matrix)).toEqual([
+      [0, 0],
+      [2, 0],
+      [4, 0],
+      [6, 0],
+      [8, 0],
+    ]);
   });
   it("flattens after transforming, closing an open closed path", () => {
     const pts = flattenSubpath(

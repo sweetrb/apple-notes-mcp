@@ -40,6 +40,7 @@ import {
   dashPolyline,
   ellipseSubpath,
   flattenSubpath,
+  subpathControlPoints,
   multiply,
   parseNumberList,
   parsePathData,
@@ -61,6 +62,8 @@ export const SVG_ANALYZER_VERSION = "apple-notes-mcp/svg-analyzer@1";
 export const SVG_LIMITS = {
   maxSourceBytes: 1_048_576,
   maxSourceElements: 16_384,
+  maxAttributesPerElement: 1_024,
+  maxNamespaceDeclarations: 1_024,
   maxExpandedElements: 16_384,
   maxReferenceExpansions: 8_192,
   maxDepth: 64,
@@ -329,10 +332,11 @@ function attr(el: XmlElement, local: string): string | undefined {
   return el.attributes.find((a) => a.local === local && a.ns === null)?.value;
 }
 
+/** SVG 2: a plain `href` wins over `xlink:href` when both are present. */
 function href(el: XmlElement): string | undefined {
   return (
-    el.attributes.find((a) => a.local === "href" && (a.ns === null || a.ns === XLINK_NS))?.value ??
-    undefined
+    el.attributes.find((a) => a.local === "href" && a.ns === null)?.value ??
+    el.attributes.find((a) => a.local === "href" && a.ns === XLINK_NS)?.value
   );
 }
 
@@ -358,7 +362,40 @@ function hasText(el: XmlElement): boolean {
 // ---------------------------------------------------------------------------
 // Safety pre-pass: runs over every element, rendered or not.
 
-const ACTIVE_SCHEME = /^\s*(?:javascript|vbscript|data)\s*:/i;
+const ACTIVE_SCHEME = /^(?:javascript|vbscript|data)\s*:/i;
+
+/**
+ * A URL as a browser's URL parser sees it: ASCII tab and newline removed
+ * anywhere, then leading and trailing C0 controls and spaces trimmed. Without
+ * this, `java&#9;script:` (the tab survives attribute normalization as a
+ * character reference) would slip past the scheme check.
+ */
+function urlAsParsed(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\t\n\r]/g, "").replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, "");
+}
+
+/**
+ * Resolve CSS escapes (`u\72 l(`, `\@import`) so the url() and active-content
+ * checks see what a CSS parser would. An escaped newline is dropped, as in a
+ * CSS string; NUL, surrogates and out-of-range code points become U+FFFD.
+ */
+export function unescapeCss(value: string): string {
+  if (!value.includes("\\")) return value;
+  return value.replace(
+    /\\(?:([0-9A-Fa-f]{1,6})(?:\r\n|[ \t\n\r\f])?|(\r\n|[\n\r\f])|([\s\S]))/g,
+    (_m, hex: string | undefined, newline: string | undefined, other: string | undefined) => {
+      if (hex !== undefined) {
+        const code = Number.parseInt(hex, 16);
+        return code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)
+          ? "�"
+          : String.fromCodePoint(code);
+      }
+      if (newline !== undefined) return "";
+      return other as string;
+    }
+  );
+}
 
 function assertInert(el: XmlElement, location: string): void {
   if (UNSAFE_ELEMENTS.has(el.local))
@@ -376,7 +413,7 @@ function assertInert(el: XmlElement, location: string): void {
       );
     const value = a.value;
     if (a.local === "href" && (a.ns === null || a.ns === XLINK_NS)) {
-      const target = value.trim();
+      const target = urlAsParsed(value);
       if (el.local === "a") {
         if (ACTIVE_SCHEME.test(target))
           throw new SvgError("svg_unsafe", "Link uses an active URL scheme", location);
@@ -390,10 +427,11 @@ function assertInert(el: XmlElement, location: string): void {
         );
       }
     }
-    for (const m of value.matchAll(/url\(\s*['"]?([^'")]*)/gi))
-      if (!m[1].trim().startsWith("#"))
+    const css = unescapeCss(value);
+    for (const m of css.matchAll(/url\(\s*['"]?([^'")]*)/gi))
+      if (!urlAsParsed(m[1]).startsWith("#"))
         throw new SvgError("svg_unsafe", "url() references must be local (#id)", location);
-    if (a.local === "style" && /@import|expression\s*\(|javascript\s*:/i.test(value))
+    if (a.local === "style" && /@import|expression\s*\(|javascript\s*:/i.test(urlAsParsed(css)))
       throw new SvgError("svg_unsafe", "Active content in a style attribute", location);
   }
   const counts = new Map<string, number>();
@@ -530,7 +568,9 @@ class Analyzer {
     if (styleAttr) declarations.push(...parseStyleAttribute(styleAttr));
     const diag = Math.hypot(ctx.viewport[0], ctx.viewport[1]) / Math.SQRT2;
     for (const [name, value] of declarations) {
-      if (value === "inherit") continue;
+      // CSS keywords are ASCII case-insensitive (`NONE`, `EvenOdd`).
+      const keyword = value.toLowerCase();
+      if (keyword === "inherit") continue;
       const invalid = () =>
         this.issue(
           "invalid_value",
@@ -570,23 +610,25 @@ class Analyzer {
           break;
         }
         case "fill-rule":
-          if (value === "evenodd" || value === "nonzero") style.evenOdd = value === "evenodd";
+          if (keyword === "evenodd" || keyword === "nonzero") style.evenOdd = keyword === "evenodd";
           else invalid();
           break;
         case "visibility":
-          style.visible = value === "visible";
+          style.visible = keyword === "visible";
           break;
         case "display":
-          if (value === "none") display = false;
+          // The last declaration wins, so style="display:inline" re-shows an
+          // element whose display attribute is none.
+          display = keyword !== "none";
           break;
         case "stroke-linecap":
-          style.linecap = value;
+          style.linecap = keyword;
           break;
         case "stroke-linejoin":
-          style.linejoin = value;
+          style.linejoin = keyword;
           break;
         case "stroke-dasharray": {
-          if (value === "none") {
+          if (keyword === "none") {
             style.dasharray = null;
             break;
           }
@@ -612,7 +654,7 @@ class Analyzer {
         case "overflow":
           break;
         case "mix-blend-mode":
-          if (value !== "normal")
+          if (keyword !== "normal")
             this.issue(
               "blend_mode_ignored",
               "paint-approximation",
@@ -621,7 +663,7 @@ class Analyzer {
             );
           break;
         case "paint-order":
-          if (value !== "normal" && !/^fill(\s+stroke)?(\s+markers)?$/.test(value))
+          if (keyword !== "normal" && !/^fill(\s+stroke)?(\s+markers)?$/.test(keyword))
             this.issue(
               "paint_order_ignored",
               "paint-approximation",
@@ -631,7 +673,7 @@ class Analyzer {
           break;
         default:
           if (DROPPED_MODIFIERS.has(name)) {
-            if (value !== "none")
+            if (keyword !== "none")
               this.issue(
                 "modifier_dropped",
                 "drop-content",
@@ -658,7 +700,7 @@ class Analyzer {
           .filter(([n]) => n === name)
           .pop()
       : undefined;
-    return fromStyle ? fromStyle[1] : attr(el, name);
+    return (fromStyle ? fromStyle[1] : attr(el, name))?.trim().toLowerCase();
   }
 
   run(): { width: number; height: number } {
@@ -1090,11 +1132,11 @@ class Analyzer {
     const polylines = geometry.subpaths
       .filter((s) => s.segments.length > 0)
       .map((s) => {
-        const pts = flattenSubpath(s, ctx.matrix, TOLERANCE);
-        this.charge("geometryWork", pts.length);
-        // Checked before clipping, so geometry far outside the viewport is refused too.
+        // Checked on the control points before flattening, and before clipping,
+        // so geometry far outside the viewport is refused without subdividing it.
+        // The flattened curve stays inside the control points' convex hull.
         if (
-          pts.some(
+          subpathControlPoints(s, ctx.matrix).some(
             (p) =>
               !(
                 Math.abs(p[0]) <= SVG_LIMITS.maxCoordinate &&
@@ -1107,7 +1149,9 @@ class Analyzer {
             "Geometry is not finite or exceeds the coordinate limit",
             ctx.location
           );
-        return pts;
+        // Charged per emitted point, so the budget stops a runaway subpath
+        // before its polyline is fully built.
+        return flattenSubpath(s, ctx.matrix, TOLERANCE, () => this.charge("geometryWork", 1));
       });
     if (!polylines.length) return;
     const fill = this.paintColor(style.fill, style);
@@ -1282,6 +1326,8 @@ export function analyzeSvgBuffer(source: Buffer): SvgAnalysisResult {
   const root = parseXml(text, {
     maxElements: SVG_LIMITS.maxSourceElements,
     maxDepth: SVG_LIMITS.maxDepth,
+    maxAttributes: SVG_LIMITS.maxAttributesPerElement,
+    maxNamespaceDeclarations: SVG_LIMITS.maxNamespaceDeclarations,
   });
   const analyzer = new Analyzer(root);
   const viewport = analyzer.run();

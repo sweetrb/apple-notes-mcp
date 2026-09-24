@@ -443,6 +443,13 @@ function distanceToChord(p: Point, a: Point, b: Point): number {
   return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / len;
 }
 
+/**
+ * Called once per emitted point, before the point is stored. Throwing from it
+ * stops flattening, so a caller can enforce a work budget while the polyline
+ * grows instead of after a whole subpath (up to 65,536 points per cubic) exists.
+ */
+export type PointCharge = () => void;
+
 /** Flatten a cubic to points after p0 (p0 itself is not emitted). */
 export function flattenCubic(
   p0: Point,
@@ -451,12 +458,14 @@ export function flattenCubic(
   p3: Point,
   tolerance: number,
   out: Point[],
-  depth = 0
+  depth = 0,
+  charge?: PointCharge
 ): void {
   if (
     depth >= 16 ||
     Math.max(distanceToChord(c1, p0, p3), distanceToChord(c2, p0, p3)) <= tolerance
   ) {
+    charge?.();
     out.push(p3);
     return;
   }
@@ -467,33 +476,63 @@ export function flattenCubic(
   const d = mid(a, b);
   const e = mid(b, c);
   const m = mid(d, e);
-  flattenCubic(p0, a, d, m, tolerance, out, depth + 1);
-  flattenCubic(m, e, c, p3, tolerance, out, depth + 1);
+  flattenCubic(p0, a, d, m, tolerance, out, depth + 1, charge);
+  flattenCubic(m, e, c, p3, tolerance, out, depth + 1, charge);
 }
 
-/** Map a subpath through `m` and flatten it into a polyline in output space. */
-export function flattenSubpath(sub: Subpath, m: Matrix, tolerance: number): Point[] {
+/**
+ * Map a subpath through `m` and flatten it into a polyline in output space.
+ * `charge`, when given, runs once per emitted point (see {@link PointCharge}).
+ */
+export function flattenSubpath(
+  sub: Subpath,
+  m: Matrix,
+  tolerance: number,
+  charge?: PointCharge
+): Point[] {
+  charge?.();
   const points: Point[] = [apply(m, sub.start)];
   let pen = sub.start;
   for (const seg of sub.segments) {
-    if (seg.kind === "L") points.push(apply(m, seg.to));
-    else
+    if (seg.kind === "L") {
+      charge?.();
+      points.push(apply(m, seg.to));
+    } else
       flattenCubic(
         apply(m, pen),
         apply(m, seg.c1),
         apply(m, seg.c2),
         apply(m, seg.to),
         tolerance,
-        points
+        points,
+        0,
+        charge
       );
     pen = seg.to;
   }
   if (sub.closed) {
     const first = points[0];
     const last = points[points.length - 1];
-    if (last[0] !== first[0] || last[1] !== first[1]) points.push(first);
+    if (last[0] !== first[0] || last[1] !== first[1]) {
+      charge?.();
+      points.push(first);
+    }
   }
   return points;
+}
+
+/**
+ * Every point that defines a subpath (start, line ends and cubic control
+ * points), mapped through `m`. A flattened cubic stays inside the convex hull
+ * of its control points, so bounding these bounds the flattened polyline.
+ */
+export function subpathControlPoints(sub: Subpath, m: Matrix): Point[] {
+  const out: Point[] = [apply(m, sub.start)];
+  for (const seg of sub.segments) {
+    if (seg.kind === "C") out.push(apply(m, seg.c1), apply(m, seg.c2));
+    out.push(apply(m, seg.to));
+  }
+  return out;
 }
 
 export interface Rect {

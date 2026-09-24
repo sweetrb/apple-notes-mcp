@@ -41459,11 +41459,36 @@ function assertReadableInRoots(p, roots = allowedSaveRoots(), label = "Content f
     );
   return abs;
 }
-function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
+var ALLOW_PRIVATE_CONTENT_ENV = "APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS";
+function privateContentReason(p, roots) {
+  const containing = roots.map((r) => r.endsWith(sep) ? r.slice(0, -1) : r).filter((r) => isWithinRoots(p, [r])).sort((a, b) => b.length - a.length)[0];
+  const below = containing === void 0 ? p : relative(containing, p);
+  if (below.split(sep).some((part) => part.startsWith("."))) return "a hidden file or directory";
+  const home = resolve(homedir7());
+  const libraries = [
+    join7(home, "Library"),
+    ...canonicalRoots([home]).map((h) => join7(h, "Library"))
+  ];
+  if (!isWithinRoots(p, libraries)) return null;
+  const cloudDocuments = libraries.flatMap((l) => CLOUD_DOCUMENT_DIRS.map((d) => join7(l, d)));
+  return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
+}
+var CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
+function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1") {
   const abs = assertReadableInRoots(p, roots);
+  const assertNotPrivate = (candidate, candidateRoots) => {
+    if (allowPrivate) return;
+    const reason = privateContentReason(candidate, candidateRoots);
+    if (reason)
+      throw new Error(
+        `Refusing to read "${abs}": it is in ${reason}, which can hold credentials or app data. Move the file to a regular folder, or set ${ALLOW_PRIVATE_CONTENT_ENV}=1 for the server to allow it.`
+      );
+  };
+  assertNotPrivate(abs, roots);
+  assertNotPrivate(canonicalize(abs), canonicalRoots(roots));
   let descriptor;
   try {
-    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW);
+    descriptor = openSync(abs, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   } catch (error2) {
     if (error2.code === "ELOOP")
       throw new Error(`Refusing to read the symbolic link "${abs}".`);
@@ -41472,6 +41497,20 @@ function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots()) {
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile()) throw new Error(`Content file is not a regular file: "${abs}"`);
+    let after;
+    try {
+      after = canonicalize(abs);
+    } catch {
+      throw new Error(`Content file changed while it was being opened; try again: "${abs}"`);
+    }
+    if (!isWithinRoots(after, canonicalRoots(roots)))
+      throw new Error(
+        `Refusing to read outside allowed locations (home, temp, /Volumes): "${abs}" resolves to "${after}".`
+      );
+    assertNotPrivate(after, canonicalRoots(roots));
+    const named = statSync(after);
+    if (named.dev !== stat.dev || named.ino !== stat.ino)
+      throw new Error(`Content file changed while it was being opened; try again: "${abs}"`);
     if (stat.size === 0) throw new Error(`Content file is empty: "${abs}"`);
     if (stat.size > maxBytes)
       throw new Error(`Content file is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
@@ -42000,16 +42039,17 @@ function copyFileExclusive(src, dest) {
 }
 function exportFileName(record2, source, kind) {
   const ext = extname(source);
+  const id2 = safeComponent(record2.identifier) ?? "attachment";
   if (kind === "preview") {
     const stored2 = safeComponent(record2.filename ? basename(record2.filename) : null);
-    const stem = stored2 ? basename(stored2, extname(stored2)) : record2.identifier;
-    return `${safeComponent(stem) ?? record2.identifier}-preview${ext}`;
+    const stem = stored2 ? basename(stored2, extname(stored2)) : id2;
+    return `${safeComponent(stem) ?? id2}-preview${ext}`;
   }
   const stored = safeComponent(record2.filename ? basename(record2.filename) : null);
   if (stored && !GENERIC_FILE_NAMES.has(stored.toLowerCase())) return stored;
-  const own = basename(source);
-  if (!GENERIC_FILE_NAMES.has(own.toLowerCase())) return own;
-  return `${record2.identifier}${ext}`;
+  const own = safeComponent(basename(source));
+  if (own && !GENERIC_FILE_NAMES.has(own.toLowerCase())) return own;
+  return `${id2}${ext}`;
 }
 function collisionName(name, attempt) {
   if (attempt <= 1) return name;
@@ -42043,6 +42083,8 @@ function exportOneAttachment(record2, dir, source) {
   for (let attempt = 1; attempt <= MAX_COLLISION_SUFFIX; attempt++) {
     const dest = join8(dir, collisionName(name, attempt));
     try {
+      if (dirname2(dest) !== resolve2(dir))
+        throw new Error(`Refusing to write outside the export directory: "${dest}"`);
       assertSafeSavePath(dest);
       copyFileExclusive(source.path, dest);
       return { ...base, exportedTo: dest, exportedKind: source.kind };
@@ -52672,21 +52714,23 @@ function renderNotesWithTemplate(notes, ctx, options) {
 }
 
 // src/utils/templateAssets.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash2, randomBytes } from "node:crypto";
 import {
   closeSync as closeSync5,
   constants as constants5,
   fstatSync as fstatSync5,
+  linkSync,
   lstatSync as lstatSync4,
   mkdirSync as mkdirSync5,
   openSync as openSync5,
   readSync as readSync4,
+  unlinkSync as unlinkSync3,
   writeSync as writeSync4
 } from "node:fs";
 import { extname as extname4, isAbsolute as isAbsolute3, join as join21, relative as relative4, resolve as resolve4, sep as sep4 } from "node:path";
 var CHUNK = 1024 * 1024;
 function openRegular(path10) {
-  const fd = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW);
+  const fd = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW | constants5.O_NONBLOCK);
   if (!fstatSync5(fd).isFile()) {
     closeSync5(fd);
     throw new Error("not a regular file");
@@ -52772,26 +52816,56 @@ var HashedSidecarWriter = class {
       closeSync5(source);
     }
   }
+  /**
+   * Copy to a private temporary name, then hard-link it into place, so the
+   * hashed name only ever holds complete content: an interrupted copy can't
+   * leave a truncated file that later exports would report as name-taken.
+   * Where the volume has no hard links, copy straight to the hashed name and
+   * remove it if the copy fails.
+   */
   copy(source, target) {
-    const out = openSync5(
-      target,
-      constants5.O_WRONLY | constants5.O_CREAT | constants5.O_EXCL | constants5.O_NOFOLLOW,
-      420
-    );
+    const temp = join21(this.dir, `.asset-${randomBytes(6).toString("hex")}.tmp`);
+    writeNew(source, temp);
     try {
-      const chunk = Buffer.alloc(CHUNK);
-      for (let position = 0; ; ) {
-        const n = readSync4(source, chunk, 0, chunk.length, position);
-        if (n <= 0) break;
-        let written = 0;
-        while (written < n) written += writeSync4(out, chunk, written, n - written);
-        position += n;
-      }
+      linkSync(temp, target);
+      return;
+    } catch (error2) {
+      const code = error2.code;
+      if (code !== "ENOTSUP" && code !== "EPERM" && code !== "EXDEV") throw error2;
     } finally {
-      closeSync5(out);
+      try {
+        unlinkSync3(temp);
+      } catch {
+      }
     }
+    writeNew(source, target);
   }
 };
+function writeNew(source, target) {
+  const out = openSync5(
+    target,
+    constants5.O_WRONLY | constants5.O_CREAT | constants5.O_EXCL | constants5.O_NOFOLLOW,
+    420
+  );
+  try {
+    const chunk = Buffer.alloc(CHUNK);
+    for (let position = 0; ; ) {
+      const n = readSync4(source, chunk, 0, chunk.length, position);
+      if (n <= 0) break;
+      let written = 0;
+      while (written < n) written += writeSync4(out, chunk, written, n - written);
+      position += n;
+    }
+  } catch (error2) {
+    closeSync5(out);
+    try {
+      unlinkSync3(target);
+    } catch {
+    }
+    throw error2;
+  }
+  closeSync5(out);
+}
 var ReferenceWriter = class {
   constructor(linkBase) {
     this.linkBase = linkBase;
@@ -53358,7 +53432,7 @@ function pasteboardFilename(requested, frozenFilename) {
 function readRegularFile(path10) {
   let descriptor;
   try {
-    descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW);
+    descriptor = openSync6(path10, constants6.O_RDONLY | constants6.O_NOFOLLOW | constants6.O_NONBLOCK);
   } catch {
     throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
   }
@@ -54139,19 +54213,19 @@ function registerFolderDelete(server2, manager, deps = defaultDeps) {
 }
 
 // src/services/templateStore.ts
-import { randomBytes } from "node:crypto";
+import { randomBytes as randomBytes2 } from "node:crypto";
 import {
   closeSync as closeSync8,
   constants as constants8,
   fstatSync as fstatSync8,
-  linkSync,
+  linkSync as linkSync2,
   lstatSync as lstatSync5,
   mkdirSync as mkdirSync7,
   openSync as openSync8,
   readdirSync as readdirSync4,
   readSync as readSync6,
   renameSync,
-  unlinkSync as unlinkSync3,
+  unlinkSync as unlinkSync4,
   writeSync as writeSync5
 } from "node:fs";
 import { homedir as homedir19 } from "node:os";
@@ -54214,14 +54288,26 @@ var TemplateStore = class {
   file(name) {
     return join26(this.dir, `${name}.json`);
   }
-  /** Read a saved template's text, refusing symlinks and non-regular files. */
+  /**
+   * Read a saved template's text, refusing symlinks and non-regular files.
+   * O_NONBLOCK keeps a FIFO from blocking the event loop (it is then refused as
+   * not a regular file); it does not affect reading a regular file. Only a
+   * symlink (ELOOP) is reported as unsafe-path; other open failures, such as
+   * EACCES, are rethrown as they are.
+   */
   readText(path10) {
     let fd;
     try {
-      fd = openSync8(path10, constants8.O_RDONLY | constants8.O_NOFOLLOW);
+      fd = openSync8(path10, constants8.O_RDONLY | constants8.O_NOFOLLOW | constants8.O_NONBLOCK);
     } catch (error2) {
-      if (error2.code === "ENOENT") return void 0;
-      throw new TemplateStoreError("unsafe-path", `Refusing to read ${path10}: not a regular file.`);
+      const errno = error2.code;
+      if (errno === "ENOENT") return void 0;
+      if (errno === "ELOOP")
+        throw new TemplateStoreError(
+          "unsafe-path",
+          `Refusing to read ${path10}: it is a symbolic link.`
+        );
+      throw error2;
     }
     try {
       const stat = fstatSync8(fd);
@@ -54326,7 +54412,7 @@ var TemplateStore = class {
         "template-exists",
         `A template named "${name}" already exists. Pass force: true to replace it.`
       );
-    const temp = join26(this.dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
+    const temp = join26(this.dir, `.${name}.${randomBytes2(6).toString("hex")}.tmp`);
     const fd = openSync8(
       temp,
       constants8.O_WRONLY | constants8.O_CREAT | constants8.O_EXCL | constants8.O_NOFOLLOW,
@@ -54336,14 +54422,20 @@ var TemplateStore = class {
       const data = Buffer.from(body, "utf8");
       let written = 0;
       while (written < data.length) written += writeSync5(fd, data, written);
-    } finally {
+    } catch (error2) {
       closeSync8(fd);
+      try {
+        unlinkSync4(temp);
+      } catch {
+      }
+      throw error2;
     }
+    closeSync8(fd);
     try {
       if (force) renameSync(temp, path10);
       else {
         try {
-          linkSync(temp, path10);
+          linkSync2(temp, path10);
         } catch (error2) {
           if (error2.code === "EEXIST")
             throw new TemplateStoreError(
@@ -54355,7 +54447,7 @@ var TemplateStore = class {
       }
     } finally {
       try {
-        unlinkSync3(temp);
+        unlinkSync4(temp);
       } catch {
       }
     }
@@ -54378,7 +54470,7 @@ var TemplateStore = class {
         "unsafe-path",
         `Refusing to delete ${path10}: not a regular file.`
       );
-    unlinkSync3(path10);
+    unlinkSync4(path10);
     return { path: path10 };
   }
 };
@@ -54764,7 +54856,7 @@ function parseColor(value) {
 }
 function parsePaint(value) {
   const v = value.trim();
-  if (v === "none") return { kind: "none" };
+  if (/^none$/i.test(v)) return { kind: "none" };
   if (/^currentcolor$/i.test(v)) return { kind: "current" };
   const url = /^url\(\s*['"]?([^'")]*)['"]?\s*\)/i.exec(v);
   if (url) return { kind: "url", target: url[1].trim() };
@@ -55139,8 +55231,9 @@ function distanceToChord(p, a, b) {
   if (len === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
   return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / len;
 }
-function flattenCubic(p0, c1, c2, p3, tolerance, out, depth = 0) {
+function flattenCubic(p0, c1, c2, p3, tolerance, out, depth = 0, charge) {
   if (depth >= 16 || Math.max(distanceToChord(c1, p0, p3), distanceToChord(c2, p0, p3)) <= tolerance) {
+    charge?.();
     out.push(p3);
     return;
   }
@@ -55151,31 +55244,47 @@ function flattenCubic(p0, c1, c2, p3, tolerance, out, depth = 0) {
   const d = mid(a, b);
   const e = mid(b, c);
   const m = mid(d, e);
-  flattenCubic(p0, a, d, m, tolerance, out, depth + 1);
-  flattenCubic(m, e, c, p3, tolerance, out, depth + 1);
+  flattenCubic(p0, a, d, m, tolerance, out, depth + 1, charge);
+  flattenCubic(m, e, c, p3, tolerance, out, depth + 1, charge);
 }
-function flattenSubpath(sub4, m, tolerance) {
+function flattenSubpath(sub4, m, tolerance, charge) {
+  charge?.();
   const points = [apply(m, sub4.start)];
   let pen = sub4.start;
   for (const seg of sub4.segments) {
-    if (seg.kind === "L") points.push(apply(m, seg.to));
-    else
+    if (seg.kind === "L") {
+      charge?.();
+      points.push(apply(m, seg.to));
+    } else
       flattenCubic(
         apply(m, pen),
         apply(m, seg.c1),
         apply(m, seg.c2),
         apply(m, seg.to),
         tolerance,
-        points
+        points,
+        0,
+        charge
       );
     pen = seg.to;
   }
   if (sub4.closed) {
     const first2 = points[0];
     const last = points[points.length - 1];
-    if (last[0] !== first2[0] || last[1] !== first2[1]) points.push(first2);
+    if (last[0] !== first2[0] || last[1] !== first2[1]) {
+      charge?.();
+      points.push(first2);
+    }
   }
   return points;
+}
+function subpathControlPoints(sub4, m) {
+  const out = [apply(m, sub4.start)];
+  for (const seg of sub4.segments) {
+    if (seg.kind === "C") out.push(apply(m, seg.c1), apply(m, seg.c2));
+    out.push(apply(m, seg.to));
+  }
+  return out;
 }
 function clipSegment(a, b, r) {
   const dx = b[0] - a[0];
@@ -55356,6 +55465,13 @@ var SvgError = class extends Error {
   code;
   location;
 };
+function lookupNamespace(scope2, prefix) {
+  for (let s = scope2; s; s = s.parent) {
+    const ns = s.own?.get(prefix);
+    if (ns !== void 0) return ns;
+  }
+  return void 0;
+}
 var NAME_START = /[A-Za-z_À-￿]/;
 var NAME_CHAR = /[A-Za-z0-9_.\-:·À-￿]/;
 var PREDEFINED = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
@@ -55384,6 +55500,9 @@ function parseXml(source, limits) {
   let pos = 0;
   let line = 1;
   let elementCount = 0;
+  let namespaceDeclarations = 0;
+  const maxAttributes = limits.maxAttributes ?? 1024;
+  const maxNamespaceDeclarations = limits.maxNamespaceDeclarations ?? 1024;
   const stack = [];
   let root = null;
   const fail = (message) => {
@@ -55445,6 +55564,7 @@ function parseXml(source, limits) {
     while (i < source.length && NAME_CHAR.test(source[i])) i++;
     const name = source.slice(pos + 1, i);
     const rawAttributes = [];
+    const attributeNames = /* @__PURE__ */ new Set();
     let selfClosing = false;
     for (; ; ) {
       const ws = i;
@@ -55474,8 +55594,13 @@ function parseXml(source, limits) {
       if (close < 0) fail("Unterminated attribute value");
       const rawValue = source.slice(i + 1, close);
       if (rawValue.includes("<")) fail("'<' in an attribute value");
-      if (rawAttributes.some((a) => a.name === attrName))
-        fail(`Duplicate attribute ${attrName.slice(0, 40)}`);
+      if (attributeNames.has(attrName)) fail(`Duplicate attribute ${attrName.slice(0, 40)}`);
+      attributeNames.add(attrName);
+      if (attributeNames.size > maxAttributes)
+        throw new SvgError(
+          "svg_complexity_limit",
+          `An element has more than ${maxAttributes} attributes (line ${line})`
+        );
       rawAttributes.push({
         name: attrName,
         value: decodeEntities(rawValue.replace(/[\t\n\r]/g, " "), line)
@@ -55492,19 +55617,30 @@ function parseXml(source, limits) {
       );
     if (stack.length + 1 > limits.maxDepth)
       throw new SvgError("svg_complexity_limit", `Elements nest deeper than ${limits.maxDepth}`);
-    const parentScope = stack.length ? stack[stack.length - 1].scope : /* @__PURE__ */ new Map();
-    const scope2 = new Map(parentScope);
+    const parentScope = stack.length ? stack[stack.length - 1].scope : null;
+    let own = null;
     for (const a of rawAttributes) {
-      if (a.name === "xmlns") scope2.set("", a.value);
-      else if (a.name.startsWith("xmlns:")) scope2.set(a.name.slice(6), a.value);
+      const prefix = a.name === "xmlns" ? "" : a.name.startsWith("xmlns:") ? a.name.slice(6) : null;
+      if (prefix === null) continue;
+      if (++namespaceDeclarations > maxNamespaceDeclarations)
+        throw new SvgError(
+          "svg_complexity_limit",
+          `The document declares more than ${maxNamespaceDeclarations} namespaces`
+        );
+      (own ??= /* @__PURE__ */ new Map()).set(prefix, a.value);
     }
+    const scope2 = own ? { own, parent: parentScope } : parentScope ?? { own: null, parent: null };
     const resolve9 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
-      if (colon < 0) return { local: qualified, ns: isAttribute ? null : scope2.get("") ?? null };
+      if (colon < 0)
+        return {
+          local: qualified,
+          ns: isAttribute ? null : lookupNamespace(scope2, "") ?? null
+        };
       const prefix = qualified.slice(0, colon);
       const local = qualified.slice(colon + 1);
       if (prefix === "xml") return { local, ns: XML_NS };
-      const ns = scope2.get(prefix);
+      const ns = lookupNamespace(scope2, prefix);
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
@@ -55532,6 +55668,8 @@ var SVG_ANALYZER_VERSION = "apple-notes-mcp/svg-analyzer@1";
 var SVG_LIMITS = {
   maxSourceBytes: 1048576,
   maxSourceElements: 16384,
+  maxAttributesPerElement: 1024,
+  maxNamespaceDeclarations: 1024,
   maxExpandedElements: 16384,
   maxReferenceExpansions: 8192,
   maxDepth: 64,
@@ -55703,7 +55841,7 @@ function attr(el, local) {
   return el.attributes.find((a) => a.local === local && a.ns === null)?.value;
 }
 function href(el) {
-  return el.attributes.find((a) => a.local === "href" && (a.ns === null || a.ns === XLINK_NS))?.value ?? void 0;
+  return el.attributes.find((a) => a.local === "href" && a.ns === null)?.value ?? el.attributes.find((a) => a.local === "href" && a.ns === XLINK_NS)?.value;
 }
 function parseStyleAttribute(value) {
   const out = [];
@@ -55719,7 +55857,24 @@ function parseStyleAttribute(value) {
 function hasText(el) {
   return el.text.trim().length > 0 || el.children.some(hasText);
 }
-var ACTIVE_SCHEME = /^\s*(?:javascript|vbscript|data)\s*:/i;
+var ACTIVE_SCHEME = /^(?:javascript|vbscript|data)\s*:/i;
+function urlAsParsed(value) {
+  return value.replace(/[\t\n\r]/g, "").replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, "");
+}
+function unescapeCss(value) {
+  if (!value.includes("\\")) return value;
+  return value.replace(
+    /\\(?:([0-9A-Fa-f]{1,6})(?:\r\n|[ \t\n\r\f])?|(\r\n|[\n\r\f])|([\s\S]))/g,
+    (_m, hex3, newline, other) => {
+      if (hex3 !== void 0) {
+        const code = Number.parseInt(hex3, 16);
+        return code === 0 || code > 1114111 || code >= 55296 && code <= 57343 ? "\uFFFD" : String.fromCodePoint(code);
+      }
+      if (newline !== void 0) return "";
+      return other;
+    }
+  );
+}
 function assertInert(el, location) {
   if (UNSAFE_ELEMENTS.has(el.local))
     throw new SvgError(
@@ -55736,7 +55891,7 @@ function assertInert(el, location) {
       );
     const value = a.value;
     if (a.local === "href" && (a.ns === null || a.ns === XLINK_NS)) {
-      const target = value.trim();
+      const target = urlAsParsed(value);
       if (el.local === "a") {
         if (ACTIVE_SCHEME.test(target))
           throw new SvgError("svg_unsafe", "Link uses an active URL scheme", location);
@@ -55749,10 +55904,11 @@ function assertInert(el, location) {
         );
       }
     }
-    for (const m of value.matchAll(/url\(\s*['"]?([^'")]*)/gi))
-      if (!m[1].trim().startsWith("#"))
+    const css = unescapeCss(value);
+    for (const m of css.matchAll(/url\(\s*['"]?([^'")]*)/gi))
+      if (!urlAsParsed(m[1]).startsWith("#"))
         throw new SvgError("svg_unsafe", "url() references must be local (#id)", location);
-    if (a.local === "style" && /@import|expression\s*\(|javascript\s*:/i.test(value))
+    if (a.local === "style" && /@import|expression\s*\(|javascript\s*:/i.test(urlAsParsed(css)))
       throw new SvgError("svg_unsafe", "Active content in a style attribute", location);
   }
   const counts = /* @__PURE__ */ new Map();
@@ -55834,7 +55990,8 @@ var Analyzer = class {
     if (styleAttr) declarations.push(...parseStyleAttribute(styleAttr));
     const diag = Math.hypot(ctx.viewport[0], ctx.viewport[1]) / Math.SQRT2;
     for (const [name, value] of declarations) {
-      if (value === "inherit") continue;
+      const keyword = value.toLowerCase();
+      if (keyword === "inherit") continue;
       const invalid2 = () => this.issue(
         "invalid_value",
         null,
@@ -55873,23 +56030,23 @@ var Analyzer = class {
           break;
         }
         case "fill-rule":
-          if (value === "evenodd" || value === "nonzero") style.evenOdd = value === "evenodd";
+          if (keyword === "evenodd" || keyword === "nonzero") style.evenOdd = keyword === "evenodd";
           else invalid2();
           break;
         case "visibility":
-          style.visible = value === "visible";
+          style.visible = keyword === "visible";
           break;
         case "display":
-          if (value === "none") display = false;
+          display = keyword !== "none";
           break;
         case "stroke-linecap":
-          style.linecap = value;
+          style.linecap = keyword;
           break;
         case "stroke-linejoin":
-          style.linejoin = value;
+          style.linejoin = keyword;
           break;
         case "stroke-dasharray": {
-          if (value === "none") {
+          if (keyword === "none") {
             style.dasharray = null;
             break;
           }
@@ -55910,7 +56067,7 @@ var Analyzer = class {
         case "overflow":
           break;
         case "mix-blend-mode":
-          if (value !== "normal")
+          if (keyword !== "normal")
             this.issue(
               "blend_mode_ignored",
               "paint-approximation",
@@ -55919,7 +56076,7 @@ var Analyzer = class {
             );
           break;
         case "paint-order":
-          if (value !== "normal" && !/^fill(\s+stroke)?(\s+markers)?$/.test(value))
+          if (keyword !== "normal" && !/^fill(\s+stroke)?(\s+markers)?$/.test(keyword))
             this.issue(
               "paint_order_ignored",
               "paint-approximation",
@@ -55929,7 +56086,7 @@ var Analyzer = class {
           break;
         default:
           if (DROPPED_MODIFIERS.has(name)) {
-            if (value !== "none")
+            if (keyword !== "none")
               this.issue(
                 "modifier_dropped",
                 "drop-content",
@@ -55951,7 +56108,7 @@ var Analyzer = class {
   propertyValue(el, name) {
     const styleAttr = attr(el, "style");
     const fromStyle = styleAttr ? parseStyleAttribute(styleAttr).filter(([n]) => n === name).pop() : void 0;
-    return fromStyle ? fromStyle[1] : attr(el, name);
+    return (fromStyle ? fromStyle[1] : attr(el, name))?.trim().toLowerCase();
   }
   run() {
     const root = this.root;
@@ -56351,9 +56508,7 @@ var Analyzer = class {
     if (!geometry || !ctx.style.visible) return;
     const { style } = ctx;
     const polylines = geometry.subpaths.filter((s) => s.segments.length > 0).map((s) => {
-      const pts = flattenSubpath(s, ctx.matrix, TOLERANCE);
-      this.charge("geometryWork", pts.length);
-      if (pts.some(
+      if (subpathControlPoints(s, ctx.matrix).some(
         (p) => !(Math.abs(p[0]) <= SVG_LIMITS.maxCoordinate && Math.abs(p[1]) <= SVG_LIMITS.maxCoordinate)
       ))
         throw new SvgError(
@@ -56361,7 +56516,7 @@ var Analyzer = class {
           "Geometry is not finite or exceeds the coordinate limit",
           ctx.location
         );
-      return pts;
+      return flattenSubpath(s, ctx.matrix, TOLERANCE, () => this.charge("geometryWork", 1));
     });
     if (!polylines.length) return;
     const fill = this.paintColor(style.fill, style);
@@ -56517,7 +56672,9 @@ function analyzeSvgBuffer(source) {
   if (text2.charCodeAt(0) === 65279) text2 = text2.slice(1);
   const root = parseXml(text2, {
     maxElements: SVG_LIMITS.maxSourceElements,
-    maxDepth: SVG_LIMITS.maxDepth
+    maxDepth: SVG_LIMITS.maxDepth,
+    maxAttributes: SVG_LIMITS.maxAttributesPerElement,
+    maxNamespaceDeclarations: SVG_LIMITS.maxNamespaceDeclarations
   });
   const analyzer = new Analyzer(root);
   const viewport = analyzer.run();
@@ -59154,7 +59311,7 @@ registerTool(
         'Note body; required unless contentPath is given (pass exactly one). In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown" (markdownRoute "shortcut"), `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles (see create-note-markdown-blocks in get-capabilities).'
       ),
       contentPath: external_exports.string().min(1).max(MAX.SAVE_PATH).optional().describe(
-        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
+        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes), except hidden paths (such as ~/.ssh or ~/.config) and ~/Library (iCloud Drive and ~/Library/CloudStorage are allowed); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."

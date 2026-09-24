@@ -10,15 +10,17 @@
  *
  * @module utils/templateAssets
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   constants,
   fstatSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   openSync,
   readSync,
+  unlinkSync,
   writeSync,
 } from "node:fs";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -39,9 +41,13 @@ import {
 
 const CHUNK = 1024 * 1024;
 
-/** Open a regular file without following a final symlink. */
+/**
+ * Open a regular file without following a final symlink. O_NONBLOCK keeps a
+ * FIFO from blocking the event loop (it is then refused as not a regular
+ * file); it does not affect reading a regular file.
+ */
 function openRegular(path: string): number {
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   if (!fstatSync(fd).isFile()) {
     closeSync(fd);
     throw new Error("not a regular file");
@@ -140,25 +146,59 @@ export class HashedSidecarWriter implements AssetWriter {
     }
   }
 
+  /**
+   * Copy to a private temporary name, then hard-link it into place, so the
+   * hashed name only ever holds complete content: an interrupted copy can't
+   * leave a truncated file that later exports would report as name-taken.
+   * Where the volume has no hard links, copy straight to the hashed name and
+   * remove it if the copy fails.
+   */
   private copy(source: number, target: string) {
-    const out = openSync(
-      target,
-      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-      0o644
-    );
+    const temp = join(this.dir, `.asset-${randomBytes(6).toString("hex")}.tmp`);
+    writeNew(source, temp);
     try {
-      const chunk = Buffer.alloc(CHUNK);
-      for (let position = 0; ;) {
-        const n = readSync(source, chunk, 0, chunk.length, position);
-        if (n <= 0) break;
-        let written = 0;
-        while (written < n) written += writeSync(out, chunk, written, n - written);
-        position += n;
-      }
+      linkSync(temp, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOTSUP" && code !== "EPERM" && code !== "EXDEV") throw error;
     } finally {
-      closeSync(out);
+      try {
+        unlinkSync(temp);
+      } catch {
+        /* already gone */
+      }
     }
+    writeNew(source, target);
   }
+}
+
+/** Create `target` (never replacing anything) with `source`'s content; remove it on failure. */
+function writeNew(source: number, target: string) {
+  const out = openSync(
+    target,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o644
+  );
+  try {
+    const chunk = Buffer.alloc(CHUNK);
+    for (let position = 0; ;) {
+      const n = readSync(source, chunk, 0, chunk.length, position);
+      if (n <= 0) break;
+      let written = 0;
+      while (written < n) written += writeSync(out, chunk, written, n - written);
+      position += n;
+    }
+  } catch (error) {
+    closeSync(out);
+    try {
+      unlinkSync(target);
+    } catch {
+      /* already gone */
+    }
+    throw error;
+  }
+  closeSync(out);
 }
 
 /** Links to the original files in place. Copies nothing. */

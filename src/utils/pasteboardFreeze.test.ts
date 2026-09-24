@@ -181,6 +181,12 @@ describe("freezePasteboard (real JXA, private named pasteboards)", { timeout: 60
     expect(code(() => freezePasteboard({ pasteboardName: fill([["file-url", link]]) }))).toBe(
       "file_unreadable"
     );
+    // A copied FIFO is refused without blocking the event loop on open.
+    const fifo = join(scratch, "pipe.txt");
+    execFileSync("mkfifo", [fifo]);
+    expect(code(() => freezePasteboard({ pasteboardName: fill([["file-url", fifo]]) }))).toBe(
+      "file_unreadable"
+    );
     expect(
       code(() =>
         freezePasteboard({

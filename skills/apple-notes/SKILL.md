@@ -356,7 +356,9 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
   become list rows with a visible ☐ / ☑ character (text, not a checkable
   checklist; say so to the user).
 - To import a Markdown or text file, pass its absolute path as `contentPath`
-  instead of `content` (UTF-8, at most 1 MiB, inside home, temp, or `/Volumes`).
+  instead of `content` (UTF-8, at most 1 MiB, inside home, temp, or `/Volumes`;
+  hidden paths such as `~/.ssh` and anything in `~/Library` are refused, except
+  iCloud Drive and `~/Library/CloudStorage`).
 - On the default Shortcut route, `create-note` with `format: "markdown"` also
   maps block constructs to native Notes styles (`create-note-markdown-blocks` in `get-capabilities`): `- [ ]`/`- [x]` → native checklist items with that done state,
   `> text` → a block quote, a bare ` ``` ` fence (no language) →

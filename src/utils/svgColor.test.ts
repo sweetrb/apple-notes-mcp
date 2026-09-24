@@ -49,6 +49,7 @@ describe("parseColor", () => {
 describe("parsePaint", () => {
   it("classifies every paint form", () => {
     expect(parsePaint("none")).toEqual({ kind: "none" });
+    expect(parsePaint("NONE")).toEqual({ kind: "none" });
     expect(parsePaint("currentColor")).toEqual({ kind: "current" });
     expect(parsePaint("url(#grad) red")).toEqual({ kind: "url", target: "#grad" });
     expect(parsePaint("url('#g')")).toEqual({ kind: "url", target: "#g" });
