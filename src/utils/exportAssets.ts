@@ -458,10 +458,21 @@ export interface AssetWriter {
  * `-2`, `-3`, ... suffix; the same source placed twice reuses its copy. URLs
  * are relative to `linkBase` when given, otherwise the absolute copy path.
  */
+/** Message for an assets directory that could not be created. */
+export function directoryFailure(dir: string, error: unknown): string {
+  return `Could not create the assets directory ${dir}: ${error instanceof Error ? error.message : String(error)}`;
+}
+
 export class SidecarWriter implements AssetWriter {
   private readonly placed = new Map<string, { url: string; mime: string }>();
   private created = false;
   count = 0;
+  /**
+   * Set when the directory could not be created. Every later asset fails the
+   * same way without another attempt; the export checks this and fails
+   * instead of reporting each asset as unavailable.
+   */
+  directoryError?: string;
 
   constructor(
     readonly dir: string,
@@ -471,6 +482,7 @@ export class SidecarWriter implements AssetWriter {
   place(asset: ResolvedAsset): PlacedAsset {
     const done = this.placed.get(asset.path);
     if (done) return done;
+    if (this.directoryError) return { error: this.directoryError };
     let source: { fd: number; size: number };
     try {
       source = openSource(asset.path);
@@ -480,8 +492,13 @@ export class SidecarWriter implements AssetWriter {
     try {
       const mime = sniffMime(readHead(source.fd), asset.name);
       if (!this.created) {
-        assertExportPath(this.dir);
-        mkdirSync(this.dir, { recursive: true });
+        try {
+          assertExportPath(this.dir);
+          mkdirSync(this.dir, { recursive: true });
+        } catch (error) {
+          this.directoryError = directoryFailure(this.dir, error);
+          return { error: this.directoryError };
+        }
         this.created = true;
       }
       const name = safeAssetName(asset.name, mime);

@@ -1494,6 +1494,8 @@ export interface NotesExportReceipt {
   format: "markdown" | "html";
   /** Notes rendered into the document. */
   count: number;
+  /** Folder exports: the folder holds more notes than `limit`; only the first were exported. */
+  truncated?: boolean;
   /** UTF-8 size of the document. */
   bytes: number;
   /** The document itself, only when no outputPath was given. */

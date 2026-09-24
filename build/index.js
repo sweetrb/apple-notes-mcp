@@ -50639,6 +50639,9 @@ function readHead(fd) {
   const n = readSync3(fd, head, 0, 16, 0);
   return head.subarray(0, n);
 }
+function directoryFailure(dir, error2) {
+  return `Could not create the assets directory ${dir}: ${error2 instanceof Error ? error2.message : String(error2)}`;
+}
 var SidecarWriter = class {
   constructor(dir, linkBase) {
     this.dir = dir;
@@ -50649,9 +50652,16 @@ var SidecarWriter = class {
   placed = /* @__PURE__ */ new Map();
   created = false;
   count = 0;
+  /**
+   * Set when the directory could not be created. Every later asset fails the
+   * same way without another attempt; the export checks this and fails
+   * instead of reporting each asset as unavailable.
+   */
+  directoryError;
   place(asset) {
     const done = this.placed.get(asset.path);
     if (done) return done;
+    if (this.directoryError) return { error: this.directoryError };
     let source;
     try {
       source = openSource(asset.path);
@@ -50661,8 +50671,13 @@ var SidecarWriter = class {
     try {
       const mime = sniffMime(readHead(source.fd), asset.name);
       if (!this.created) {
-        assertExportPath(this.dir);
-        mkdirSync4(this.dir, { recursive: true });
+        try {
+          assertExportPath(this.dir);
+          mkdirSync4(this.dir, { recursive: true });
+        } catch (error2) {
+          this.directoryError = directoryFailure(this.dir, error2);
+          return { error: this.directoryError };
+        }
         this.created = true;
       }
       const name = safeAssetName(asset.name, mime);
@@ -50981,6 +50996,7 @@ function inlinePlanHtml(plan) {
   }
 }
 function blockPlanHtml(plan) {
+  if (!isHtmlBlockPlan(plan)) return `<p>${inlinePlanHtml(plan)}</p>`;
   switch (plan.type) {
     case "table":
       return tableHtml(plan.rows);
@@ -52676,16 +52692,26 @@ var HashedSidecarWriter = class {
   /** Absolute paths of files written or reused. */
   files = [];
   count = 0;
+  /** Set when the directory could not be created; see SidecarWriter.directoryError. */
+  directoryError;
+  /** Creates the directory once; returns an error message when it cannot. */
   prepare() {
-    if (this.ready) return;
-    assertExportPath(this.dir);
-    mkdirSync5(this.dir, { recursive: true });
-    if (!lstatSync4(this.dir).isDirectory()) throw new Error("assets directory is not a directory");
+    if (this.ready) return void 0;
+    try {
+      assertExportPath(this.dir);
+      mkdirSync5(this.dir, { recursive: true });
+      if (!lstatSync4(this.dir).isDirectory())
+        throw new Error("assets directory is not a directory");
+    } catch (error2) {
+      return this.directoryError = directoryFailure(this.dir, error2);
+    }
     this.ready = true;
+    return void 0;
   }
   place(asset) {
     const done = this.placed.get(asset.path);
     if (done) return done;
+    if (this.directoryError) return { error: this.directoryError };
     let source;
     try {
       source = openRegular(asset.path);
@@ -52695,7 +52721,8 @@ var HashedSidecarWriter = class {
     try {
       const { hash, head } = digest(source);
       const mime = sniffMime(head, asset.name);
-      this.prepare();
+      const directoryError = this.prepare();
+      if (directoryError) return { error: directoryError };
       const name = safeAssetName(asset.name, mime);
       const ext = extname4(name);
       const target = join21(
@@ -52895,10 +52922,11 @@ function validPath(path10, what) {
 function selectNotes(request, deps) {
   if (!!request.id === !!request.folder)
     throw new NotesExportError("invalid-request", "Provide exactly one of 'id' or 'folder'.");
-  if (request.id) return [request.id];
+  if (request.id) return { ids: [request.id], truncated: false };
   const limit = Math.min(request.limit ?? DEFAULT_FOLDER_EXPORT_LIMIT, MAX_FOLDER_EXPORT_LIMIT);
   try {
-    return deps.listNoteRefs(request.account, request.folder, void 0, limit).map((ref) => ref.id);
+    const ids = deps.listNoteRefs(request.account, request.folder, void 0, limit + 1).map((ref) => ref.id);
+    return { ids: ids.slice(0, limit), truncated: ids.length > limit };
   } catch (error2) {
     throw new NotesExportError(
       "folder-unavailable",
@@ -52930,9 +52958,13 @@ function openOutput(output) {
     throw error2;
   }
 }
-function renderInto(fd, render) {
+function renderInto(fd, render, writers = []) {
   try {
-    return render();
+    const document = render();
+    const directoryError = writers.find((writer) => writer.directoryError)?.directoryError;
+    if (directoryError)
+      throw new NotesExportError("invalid-path", `${directoryError}. Nothing was exported.`);
+    return document;
   } catch (error2) {
     if (fd !== void 0) writeAllAndClose(fd, "");
     throw error2;
@@ -52949,10 +52981,15 @@ function exportNotesMarkdown(request, deps) {
       "invalid-request",
       `assetsDir has no effect: template "${chosen.info.name}" sets assets.mode to "${chosen.template.assets.mode}".`
     );
-  const ids = selectNotes(request, deps);
+  const { ids, truncated } = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
-  if (chosen)
-    return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
+  if (chosen) {
+    const receipt2 = exportWithTemplate(request, deps, chosen, notes, skipped, {
+      output,
+      assetsDir
+    });
+    return truncated ? { ...receipt2, truncated } : receipt2;
+  }
   const fd = output ? openOutput(output) : void 0;
   const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
   const ctx = {
@@ -52961,12 +52998,14 @@ function exportNotesMarkdown(request, deps) {
   };
   const markdown = renderInto(
     fd,
-    () => renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 })
+    () => renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 }),
+    writer ? [writer] : []
   );
   const bytes = Buffer.byteLength(markdown);
   const receipt = {
     format: "markdown",
     count: notes.length,
+    ...truncated ? { truncated } : {},
     bytes,
     stats: ctx.stats,
     skipped,
@@ -53002,7 +53041,7 @@ function exportNotesHtml(request, deps) {
   const assetsDir = embed ? void 0 : validPath(request.assetsDir ?? defaultSidecarDir(output), "assetsDir");
   if (assetsDir === output)
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
-  const ids = selectNotes(request, deps);
+  const { ids, truncated } = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
   const writer = assetsDir ? new SidecarWriter(assetsDir, dirname6(output)) : new DataUrlWriter();
@@ -53012,11 +53051,16 @@ function exportNotesHtml(request, deps) {
     locator: deps.locator ?? new AssetLocator()
   };
   const title = request.id ? notes[0]?.title || "Note" : request.folder;
-  const html = renderInto(fd, () => renderNotesHtml(notes, ctx, { title }));
+  const html = renderInto(
+    fd,
+    () => renderNotesHtml(notes, ctx, { title }),
+    writer instanceof SidecarWriter ? [writer] : []
+  );
   const bytes = writeAllAndClose(fd, html);
   return {
     format: "html",
     count: notes.length,
+    ...truncated ? { truncated } : {},
     bytes,
     output,
     stats: ctx.stats,
@@ -53098,7 +53142,7 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
     });
     warnings = result.warnings;
     return result.markdown;
-  });
+  }, [...writers.values()]);
   const bytes = Buffer.byteLength(markdown);
   const used = [...writers.values()].filter((writer) => writer.count > 0);
   const files = used.flatMap((writer) => writer.files);
@@ -61656,6 +61700,7 @@ registerTool(
     outputSchema: {
       format: external_exports.string().optional(),
       count: external_exports.number().optional(),
+      truncated: external_exports.boolean().optional(),
       bytes: external_exports.number().optional(),
       markdown: external_exports.string().optional(),
       output: external_exports.string().optional(),
@@ -61691,7 +61736,7 @@ registerTool(
       return errorResponse(`Error exporting Markdown [${error2.code}]: ${error2.message}${hint}`);
     }
     const warned = receipt.warnings?.length ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)` : "";
-    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
+    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned + (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
     if (receipt.output)
       return successResponse(
         `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` + (receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : "") + `${skipped}.`,
@@ -61722,6 +61767,7 @@ registerTool(
     outputSchema: {
       format: external_exports.string().optional(),
       count: external_exports.number().optional(),
+      truncated: external_exports.boolean().optional(),
       bytes: external_exports.number().optional(),
       output: external_exports.string().optional(),
       assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
@@ -61744,7 +61790,7 @@ registerTool(
       return errorResponse(`Error exporting HTML [${error2.code}]: ${error2.message}${hint}`);
     }
     const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;
-    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
     return successResponse(
       `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
       { ...receipt }

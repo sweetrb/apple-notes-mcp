@@ -4224,6 +4224,7 @@ registerTool(
     outputSchema: {
       format: z.string().optional(),
       count: z.number().optional(),
+      truncated: z.boolean().optional(),
       bytes: z.number().optional(),
       markdown: z.string().optional(),
       output: z.string().optional(),
@@ -4268,7 +4269,10 @@ registerTool(
     const warned = receipt.warnings?.length
       ? `; ${receipt.warnings.length + (receipt.warningsOmitted ?? 0)} warning(s)`
       : "";
-    const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + warned;
+    const skipped =
+      (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") +
+      warned +
+      (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
     if (receipt.output)
       return successResponse(
         `Wrote ${receipt.count} note(s) as Markdown (${receipt.bytes} bytes) to ${receipt.output}` +
@@ -4329,6 +4333,7 @@ registerTool(
     outputSchema: {
       format: z.string().optional(),
       count: z.number().optional(),
+      truncated: z.boolean().optional(),
       bytes: z.number().optional(),
       output: z.string().optional(),
       assets: z.object({ dir: z.string(), files: z.number() }).optional(),
@@ -4357,7 +4362,9 @@ registerTool(
     const assets = receipt.assets
       ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}`
       : `; embedded ${receipt.embedded ?? 0} asset(s)`;
-    const skipped = receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "";
+    const skipped =
+      (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") +
+      (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
     return successResponse(
       `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
       { ...receipt }

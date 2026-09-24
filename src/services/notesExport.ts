@@ -29,7 +29,6 @@ import {
   OutputExistsError,
   SidecarWriter,
   writeAllAndClose,
-  type AssetWriter,
 } from "../utils/exportAssets.js";
 import { emptyStats, type ExportContext } from "../utils/exportRender.js";
 import { renderNotesHtml } from "../utils/htmlExport.js";
@@ -186,16 +185,23 @@ function validPath(path: string, what: string): string {
   }
 }
 
-/** Resolve the request to note ids. */
-function selectNotes(request: NotesExportRequest, deps: NotesExportDeps): string[] {
+/**
+ * Resolve the request to note ids. A folder is read one note past the limit,
+ * so `truncated` says whether the folder holds more notes than were exported.
+ */
+function selectNotes(
+  request: NotesExportRequest,
+  deps: NotesExportDeps
+): { ids: string[]; truncated: boolean } {
   if (!!request.id === !!request.folder)
     throw new NotesExportError("invalid-request", "Provide exactly one of 'id' or 'folder'.");
-  if (request.id) return [request.id];
+  if (request.id) return { ids: [request.id], truncated: false };
   const limit = Math.min(request.limit ?? DEFAULT_FOLDER_EXPORT_LIMIT, MAX_FOLDER_EXPORT_LIMIT);
   try {
-    return deps
-      .listNoteRefs(request.account, request.folder, undefined, limit)
+    const ids = deps
+      .listNoteRefs(request.account, request.folder, undefined, limit + 1)
       .map((ref) => ref.id);
+    return { ids: ids.slice(0, limit), truncated: ids.length > limit };
   } catch (error) {
     throw new NotesExportError(
       "folder-unavailable",
@@ -236,10 +242,22 @@ function openOutput(output: string): number {
   }
 }
 
-/** Render into an open output file; on failure close it and leave it in place. */
-function renderInto(fd: number | undefined, render: () => string): string {
+/**
+ * Render into an open output file; on failure close it and leave it in place.
+ * An assets directory that could not be created fails the export here, before
+ * the document is written, instead of leaving every asset marked unavailable.
+ */
+function renderInto(
+  fd: number | undefined,
+  render: () => string,
+  writers: ReadonlyArray<{ directoryError?: string }> = []
+): string {
   try {
-    return render();
+    const document = render();
+    const directoryError = writers.find((writer) => writer.directoryError)?.directoryError;
+    if (directoryError)
+      throw new NotesExportError("invalid-path", `${directoryError}. Nothing was exported.`);
+    return document;
   } catch (error) {
     if (fd !== undefined) writeAllAndClose(fd, "");
     throw error;
@@ -263,26 +281,34 @@ export function exportNotesMarkdown(
       `assetsDir has no effect: template "${chosen.info.name}" sets assets.mode to "${chosen.template.assets.mode}".`
     );
 
-  const ids = selectNotes(request, deps);
+  const { ids, truncated } = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
-  if (chosen)
-    return exportWithTemplate(request, deps, chosen, notes, skipped, { output, assetsDir });
+  if (chosen) {
+    const receipt = exportWithTemplate(request, deps, chosen, notes, skipped, {
+      output,
+      assetsDir,
+    });
+    return truncated ? { ...receipt, truncated } : receipt;
+  }
   const fd = output ? openOutput(output) : undefined;
 
-  const writer: AssetWriter | undefined = assetsDir
+  const writer: SidecarWriter | undefined = assetsDir
     ? new SidecarWriter(assetsDir, output ? dirname(output) : undefined)
     : undefined;
   const ctx: ExportContext = {
     stats: emptyStats(),
     ...(writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}),
   };
-  const markdown = renderInto(fd, () =>
-    renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 })
+  const markdown = renderInto(
+    fd,
+    () => renderNotesMarkdown(notes, ctx, { wrap: request.wrap ?? 0 }),
+    writer ? [writer] : []
   );
   const bytes = Buffer.byteLength(markdown);
   const receipt: NotesExportReceipt = {
     format: "markdown",
     count: notes.length,
+    ...(truncated ? { truncated } : {}),
     bytes,
     stats: ctx.stats,
     skipped,
@@ -334,10 +360,10 @@ export function exportNotesHtml(
   if (assetsDir === output)
     throw new NotesExportError("invalid-path", "outputPath and assetsDir must differ.");
 
-  const ids = selectNotes(request, deps);
+  const { ids, truncated } = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
-  const writer: AssetWriter = assetsDir
+  const writer: SidecarWriter | DataUrlWriter = assetsDir
     ? new SidecarWriter(assetsDir, dirname(output))
     : new DataUrlWriter();
   const ctx: ExportContext = {
@@ -346,11 +372,16 @@ export function exportNotesHtml(
     locator: deps.locator ?? new AssetLocator(),
   };
   const title = request.id ? notes[0]?.title || "Note" : request.folder!;
-  const html = renderInto(fd, () => renderNotesHtml(notes, ctx, { title }));
+  const html = renderInto(
+    fd,
+    () => renderNotesHtml(notes, ctx, { title }),
+    writer instanceof SidecarWriter ? [writer] : []
+  );
   const bytes = writeAllAndClose(fd, html);
   return {
     format: "html",
     count: notes.length,
+    ...(truncated ? { truncated } : {}),
     bytes,
     output,
     stats: ctx.stats,
@@ -456,7 +487,7 @@ function exportWithTemplate(
     });
     warnings = result.warnings;
     return result.markdown;
-  });
+  }, [...writers.values()]);
   const bytes = Buffer.byteLength(markdown);
   const used = [...writers.values()].filter((writer) => writer.count > 0);
   const files = used.flatMap((writer) => writer.files);

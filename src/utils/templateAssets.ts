@@ -24,6 +24,7 @@ import {
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   assertExportPath,
+  directoryFailure,
   encodePathUrl,
   safeAssetName,
   sniffMime,
@@ -81,23 +82,33 @@ export class HashedSidecarWriter implements AssetWriter {
   /** Absolute paths of files written or reused. */
   readonly files: string[] = [];
   count = 0;
+  /** Set when the directory could not be created; see SidecarWriter.directoryError. */
+  directoryError?: string;
 
   constructor(
     readonly dir: string,
     private readonly linkBase?: string
   ) {}
 
-  private prepare() {
-    if (this.ready) return;
-    assertExportPath(this.dir);
-    mkdirSync(this.dir, { recursive: true });
-    if (!lstatSync(this.dir).isDirectory()) throw new Error("assets directory is not a directory");
+  /** Creates the directory once; returns an error message when it cannot. */
+  private prepare(): string | undefined {
+    if (this.ready) return undefined;
+    try {
+      assertExportPath(this.dir);
+      mkdirSync(this.dir, { recursive: true });
+      if (!lstatSync(this.dir).isDirectory())
+        throw new Error("assets directory is not a directory");
+    } catch (error) {
+      return (this.directoryError = directoryFailure(this.dir, error));
+    }
     this.ready = true;
+    return undefined;
   }
 
   place(asset: ResolvedAsset): PlacedAsset {
     const done = this.placed.get(asset.path);
     if (done) return done;
+    if (this.directoryError) return { error: this.directoryError };
     let source: number;
     try {
       source = openRegular(asset.path);
@@ -107,7 +118,8 @@ export class HashedSidecarWriter implements AssetWriter {
     try {
       const { hash, head } = digest(source);
       const mime = sniffMime(head, asset.name);
-      this.prepare();
+      const directoryError = this.prepare();
+      if (directoryError) return { error: directoryError };
       const name = safeAssetName(asset.name, mime);
       const ext = extname(name);
       const target = join(

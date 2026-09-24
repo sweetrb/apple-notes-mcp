@@ -84,8 +84,10 @@ describe("exportNotesMarkdown", () => {
   it("exports a folder, skipping unreadable notes, and passes the limit", () => {
     const listNoteRefs = vi.fn(deps().listNoteRefs);
     const receipt = exportNotesMarkdown({ folder: "F", account: "A" }, deps({ listNoteRefs }));
-    expect(listNoteRefs).toHaveBeenCalledWith("A", "F", undefined, DEFAULT_FOLDER_EXPORT_LIMIT);
+    // One past the limit, to tell whether the folder holds more (#209).
+    expect(listNoteRefs).toHaveBeenCalledWith("A", "F", undefined, DEFAULT_FOLDER_EXPORT_LIMIT + 1);
     expect(receipt.count).toBe(2);
+    expect(receipt.truncated).toBeUndefined();
     expect(receipt.skipped).toEqual([{ id: ID(2), code: "encrypted" }]);
     expect(receipt.markdown).toContain("\n\n---\n\n# Three");
     exportNotesMarkdown({ folder: "F", limit: 5000 }, deps({ listNoteRefs }));
@@ -93,8 +95,58 @@ describe("exportNotesMarkdown", () => {
       undefined,
       "F",
       undefined,
-      MAX_FOLDER_EXPORT_LIMIT
+      MAX_FOLDER_EXPORT_LIMIT + 1
     );
+  });
+
+  it("reports truncated when the folder holds more notes than the limit (#209)", () => {
+    const listNoteRefs = vi.fn((_a?: string, _f?: string, _s?: string, limit?: number) =>
+      [ID(1), ID(3), ID(1)].slice(0, limit).map((id) => ({ id, title: "t" }))
+    );
+    const cut = exportNotesMarkdown({ folder: "F", limit: 2 }, deps({ listNoteRefs }));
+    expect(listNoteRefs).toHaveBeenCalledWith(undefined, "F", undefined, 3);
+    expect(cut).toMatchObject({ count: 2, truncated: true });
+    const whole = exportNotesMarkdown({ folder: "F", limit: 3 }, deps({ listNoteRefs }));
+    expect(whole.count).toBe(3);
+    expect(whole.truncated).toBeUndefined();
+    const html = exportNotesHtml(
+      { folder: "F", limit: 1, outputPath: join(dir, "cut.html") },
+      deps({ listNoteRefs })
+    );
+    expect(html).toMatchObject({ count: 1, truncated: true });
+  });
+
+  it("fails when the assets directory cannot be created instead of marking every asset unavailable (#209)", () => {
+    const blocker = join(dir, "assets-blocker");
+    writeFileSync(blocker, "");
+    const output = join(dir, "no-assets.md");
+    const error = (() => {
+      try {
+        exportNotesMarkdown(
+          { id: ID(3), outputPath: output, assetsDir: join(blocker, "assets") },
+          deps()
+        );
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(error).toBeInstanceOf(NotesExportError);
+    expect((error as NotesExportError).code).toBe("invalid-path");
+    expect((error as NotesExportError).message).toMatch(/Could not create the assets directory/);
+    expect(readFileSync(output, "utf8")).toBe("");
+    expect(
+      code(() =>
+        exportNotesHtml(
+          {
+            id: ID(3),
+            outputPath: join(dir, "no-assets.html"),
+            embedAssets: false,
+            assetsDir: join(blocker, "html-assets"),
+          },
+          deps()
+        )
+      )
+    ).toBe("invalid-path");
   });
 
   it("writes create-only output with sidecar assets and relative links", () => {

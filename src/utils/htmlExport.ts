@@ -112,6 +112,9 @@ export function inlinePlanHtml(plan: AttachmentPlan): string {
 
 /** Render a plan as a block element. */
 export function blockPlanHtml(plan: AttachmentPlan): string {
+  // A file without a preview image (and every other inline plan) has no
+  // block form; wrap its inline rendering in a paragraph.
+  if (!isHtmlBlockPlan(plan)) return `<p>${inlinePlanHtml(plan)}</p>`;
   switch (plan.type) {
     case "table":
       return tableHtml(plan.rows);
