@@ -74,9 +74,10 @@ export interface Note {
    * Application-level tags supplied at create time.
    *
    * This is a pass-through convenience field: Apple Notes does NOT store these
-   * in any scriptable property. Apple's own "tags" are inline `#hashtag` tokens
-   * typed into the note body — surface those with `parseHashtags` (the
-   * `get-note-content` tool returns them as `hashtags` in its structuredContent).
+   * in any scriptable property. Textual `#hashtag` tokens in the body are
+   * surfaced by `parseHashtags` (`get-note-content` returns them as `hashtags`),
+   * but writing them through AppleScript does not create native Notes tags;
+   * those need the native-tags tools (`add-native-tags`).
    * See docs/APPLESCRIPT-LIMITATIONS.md and issue #29.
    */
   tags: string[];

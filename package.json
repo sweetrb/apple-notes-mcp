@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.9.21",
+  "version": "2.9.23",
   "packageManager": "pnpm@11.9.0",
   "description": "MCP server for Apple Notes on macOS: lets Claude, Codex, and other MCP clients read, search, create, edit, organize, and export notes locally",
   "type": "module",
