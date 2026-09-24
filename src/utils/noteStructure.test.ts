@@ -4,6 +4,7 @@
  * optional columns). Bodies are built with a small protobuf encoder. The live
  * NoteStore is never touched.
  */
+import { countWords } from "./wordCount.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -379,6 +380,13 @@ describe("wordCount and charCount", () => {
     expect(wordCount("Title\nTwo  words \ufffc\n")).toBe(3);
     expect(wordCount("\ufffc")).toBe(0);
     expect(charCount("a\ufffcb\n😀")).toBe(4);
+  });
+
+  it("is the shared count query-notes' words: filter uses", () => {
+    // Punctuation-only runs are not words, and unspaced scripts are split.
+    for (const text of ["a — b", "今日は良い天気です", "Title\n- [ ] one\n42 · x", "a\ufffcb"])
+      expect(wordCount(text)).toBe(countWords(text));
+    expect(wordCount("a — b")).toBe(2);
   });
 });
 

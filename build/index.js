@@ -49934,7 +49934,7 @@ function lastViewedOf(raw, columnPresent = true, now = Date.now()) {
   return { lastViewed: new Date(ms).toISOString(), lastViewedStatus: "viewed" };
 }
 var visible = (text2) => text2.replace(/\ufffc/g, "");
-var wordCount = (text2) => visible(text2).split(/\s+/u).filter((word) => word !== "").length;
+var wordCount = (text2) => countWords(text2);
 var charCount = (text2) => Array.from(visible(text2)).length;
 function noteStructureSql(columns) {
   const c = (alias, name) => col(columns, alias, name);

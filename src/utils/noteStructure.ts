@@ -13,6 +13,7 @@
  * @module utils/noteStructure
  */
 
+import { countWords } from "./wordCount.js";
 import { dirname } from "node:path";
 import {
   assembleAttachmentAssets,
@@ -86,11 +87,11 @@ export function lastViewedOf(
 /** Visible text: the note text without attachment placeholder characters. */
 const visible = (text: string) => text.replace(/\ufffc/g, "");
 
-/** Whitespace-separated words of the visible text. */
-export const wordCount = (text: string): number =>
-  visible(text)
-    .split(/\s+/u)
-    .filter((word) => word !== "").length;
+/**
+ * Words of the visible text (attachment characters separate words), counted by utils/wordCount: the same count
+ * query-notes filters on with words: and the other tools report.
+ */
+export const wordCount = (text: string): number => countWords(text);
 
 /** Unicode code points of the visible text, newlines included. */
 export const charCount = (text: string): number => Array.from(visible(text)).length;
