@@ -121,6 +121,17 @@ describe("readAllowedTextFile", () => {
       "a hidden file or directory"
     );
     expect(privateContentReason(join(homedir(), "Documents", "plan.md"), roots)).toBeNull();
+    // iCloud Drive and File Provider folders hold documents, not app data.
+    const icloud = join(homedir(), "Library", "Mobile Documents", "com~apple~CloudDocs", "a.md");
+    expect(privateContentReason(icloud, roots)).toBeNull();
+    const dropbox = join(homedir(), "Library", "CloudStorage", "Dropbox", "a.md");
+    expect(privateContentReason(dropbox, roots)).toBeNull();
+    expect(
+      privateContentReason(join(homedir(), "Library", "CloudStorage", ".x", "a.md"), roots)
+    ).toBe("a hidden file or directory");
+    expect(privateContentReason(join(homedir(), "Library", "Mobile Documentsx", "a"), roots)).toBe(
+      "~/Library"
+    );
     expect(privateContentReason("/Volumes/Drive/notes/plan.md", roots)).toBeNull();
   });
 

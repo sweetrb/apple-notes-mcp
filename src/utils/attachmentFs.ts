@@ -332,7 +332,9 @@ export const ALLOW_PRIVATE_CONTENT_ENV = "APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_
  *
  * Private means a hidden component below the containing root (`~/.ssh`,
  * `~/.aws`, `~/.config/gh/hosts.yml`, a project's `.env`) or anything under
- * `~/Library` (keychains, cookies, app containers). It narrows the
+ * `~/Library` (keychains, cookies, app containers) except iCloud Drive
+ * (`~/Library/Mobile Documents`) and cloud storage folders
+ * (`~/Library/CloudStorage`). It narrows the
  * `save-attachment` roots (home, temp, /Volumes) to places a user keeps
  * documents. `roots` must be in the same spelling as `p` (both literal, or
  * both canonical).
@@ -349,9 +351,15 @@ export function privateContentReason(p: string, roots: string[]): string | null 
     join(home, "Library"),
     ...canonicalRoots([home]).map((h) => join(h, "Library")),
   ];
-  if (isWithinRoots(p, libraries)) return "~/Library";
-  return null;
+  if (!isWithinRoots(p, libraries)) return null;
+  // iCloud Drive and File Provider cloud folders (Dropbox, Google Drive,
+  // OneDrive, ...) live under ~/Library but hold the user's documents.
+  const cloudDocuments = libraries.flatMap((l) => CLOUD_DOCUMENT_DIRS.map((d) => join(l, d)));
+  return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
 }
+
+/** Folders under `~/Library` that hold user documents, not app data. */
+const CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
 
 /**
  * Read a local UTF-8 text file that a tool takes as a content source (for

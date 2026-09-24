@@ -41194,9 +41194,11 @@ function privateContentReason(p, roots) {
     join6(home, "Library"),
     ...canonicalRoots([home]).map((h) => join6(h, "Library"))
   ];
-  if (isWithinRoots(p, libraries)) return "~/Library";
-  return null;
+  if (!isWithinRoots(p, libraries)) return null;
+  const cloudDocuments = libraries.flatMap((l) => CLOUD_DOCUMENT_DIRS.map((d) => join6(l, d)));
+  return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
 }
+var CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
 function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1") {
   const abs = assertReadableInRoots(p, roots);
   const assertNotPrivate = (candidate, candidateRoots) => {
@@ -54746,7 +54748,7 @@ function parseColor(value) {
 }
 function parsePaint(value) {
   const v = value.trim();
-  if (v === "none") return { kind: "none" };
+  if (/^none$/i.test(v)) return { kind: "none" };
   if (/^currentcolor$/i.test(v)) return { kind: "current" };
   const url = /^url\(\s*['"]?([^'")]*)['"]?\s*\)/i.exec(v);
   if (url) return { kind: "url", target: url[1].trim() };
@@ -59135,7 +59137,7 @@ registerTool(
         'Note body; required unless contentPath is given (pass exactly one). In plaintext and HTML, AppleScript cannot create true Apple Notes checklists \u2014 `<input type="checkbox">`, checklist CSS classes, and markdown `- [ ]` lines do not render as checkable items; create a plain `<ul>` or `- ` list and convert it in Notes.app with \u21E7\u2318L. With format "markdown" (markdownRoute "shortcut"), `- [ ]`/`- [x]` lines, `>` block quotes, ``` fenced code, `---` dividers and `inline code` (which Notes renders as a highlight, not monospace) become native styles (see create-note-markdown-blocks in get-capabilities).'
       ),
       contentPath: external_exports.string().min(1).max(MAX.SAVE_PATH).optional().describe(
-        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes), except hidden paths (such as ~/.ssh or ~/.config) and ~/Library; symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
+        `Absolute path of a local UTF-8 file to use as the body instead of content (pass exactly one). The same locations save-attachment may write to are allowed (home, temp, /Volumes), except hidden paths (such as ~/.ssh or ~/.config) and ~/Library (iCloud Drive and ~/Library/CloudStorage are allowed); symbolic links and non-regular files are refused. Limit ${MAX_CONTENT_FILE_BYTES} bytes.`
       ),
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."

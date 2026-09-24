@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [2.9.25] - 2026-09-24
+## [2.9.24] - 2026-09-24
 
 ### Fixed
 
@@ -17,7 +17,8 @@
   a browser's URL parser does, so `java&#9;script:` is refused.
 - `analyze-svg` now follows the cascade and CSS keyword rules browsers use:
   a later `display` declaration can show content an earlier `display="none"`
-  hid, keywords such as `NONE`, `EvenOdd` and `Round` match case-insensitively,
+  hid, keywords such as `NONE` (including `fill` and `stroke`), `EvenOdd` and
+  `Round` match case-insensitively,
   and a plain `href` wins over `xlink:href`, as in SVG 2.
 - The SVG reader checks duplicate attributes with a set instead of a scan per
   attribute (a 1 MiB element took tens of seconds), links each element's
@@ -36,7 +37,10 @@
 - `create-note`'s `contentPath` refuses hidden paths (any component starting
   with `.`, such as `~/.ssh`, `~/.aws` or `~/.config/gh/hosts.yml`) and
   `~/Library`, which hold keys, tokens and app data, unless the server sets
-  `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` (#195). It also opens the
+  `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1` (#195). iCloud Drive
+  (`~/Library/Mobile Documents`) and cloud storage folders
+  (`~/Library/CloudStorage`: Dropbox, Google Drive, OneDrive) stay readable,
+  since they hold documents. It also opens the
   file with `O_NONBLOCK` and, after opening, resolves the path again and
   requires it to name the same file as the open descriptor, since
   `O_NOFOLLOW` only guards the last path component.

@@ -237,7 +237,7 @@ export function parseColor(value: string): Rgba | null {
 /** Parse a `fill` or `stroke` value. */
 export function parsePaint(value: string): Paint {
   const v = value.trim();
-  if (v === "none") return { kind: "none" };
+  if (/^none$/i.test(v)) return { kind: "none" };
   if (/^currentcolor$/i.test(v)) return { kind: "current" };
   const url = /^url\(\s*['"]?([^'")]*)['"]?\s*\)/i.exec(v);
   if (url) return { kind: "url", target: url[1].trim() };
