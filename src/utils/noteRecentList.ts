@@ -24,6 +24,7 @@
  */
 
 import { decodeCompressedNoteBlocks } from "@/utils/noteBlocks.js";
+import { countWords } from "@/utils/wordCount.js";
 import {
   accountRef,
   activeNoteSql,
@@ -156,14 +157,12 @@ export function parseSince(input: string): SyncCursor {
 
 /**
  * Word and character counts for decoded note text. Attachment placeholders
- * (U+FFFC) are not counted. A word is a whitespace-separated token holding at
- * least one letter or digit; characters are Unicode code points.
+ * (U+FFFC) are not counted. Words are counted by utils/wordCount (the count
+ * query-notes' words: filter uses); characters are Unicode code points.
  */
 export function textStats(text: string): { wordCount: number; charCount: number } {
   const visible = text.replace(OBJECT_REPLACEMENT, "");
-  let wordCount = 0;
-  for (const token of visible.split(/\s+/u)) if (/[\p{L}\p{N}]/u.test(token)) wordCount++;
-  return { wordCount, charCount: [...visible].length };
+  return { wordCount: countWords(visible), charCount: [...visible].length };
 }
 
 /** A one-line preview: placeholders removed, whitespace collapsed, 180 code points. */

@@ -15,6 +15,7 @@
  *
  * @module utils/noteAudio
  */
+import { countWords } from "./wordCount.js";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -229,7 +230,5 @@ export function readAudioAssets(
   });
 }
 
-/** Counts words the way a reader would: whitespace-separated runs that contain a letter or digit. */
-export function countWords(text: string): number {
-  return text.split(/\s+/u).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
-}
+/** Counts words the way every other tool does; see utils/wordCount. */
+export { countWords };

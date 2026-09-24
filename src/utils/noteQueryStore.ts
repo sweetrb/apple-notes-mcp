@@ -17,6 +17,7 @@
  * @see TECHNICAL_NOTES.md#query-notes-data-sources
  */
 
+import { countWords } from "@/utils/wordCount.js";
 import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
@@ -34,6 +35,7 @@ import { escapeFolderName } from "@/services/appleNotesManager.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import {
   evaluateNoteQuery,
+  noteBodyText,
   matchLocations,
   needsContent,
   needsTags,
@@ -213,14 +215,8 @@ export function decodeBodyHex(hex: string): DecodedNoteBody | null {
   }
 }
 
-/** Counts whitespace-delimited words that contain at least one letter or digit. */
-export function countWords(text: string): number {
-  let count = 0;
-  for (const word of text.replace(/\ufffc/gu, " ").split(/\s+/u)) {
-    if (/[\p{L}\p{N}]/u.test(word)) count++;
-  }
-  return count;
-}
+/** Counts words as every word-reporting tool does; see utils/wordCount. */
+export { countWords };
 
 // -----------------------------------------------------------------------------
 // SQL
@@ -657,7 +653,6 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
         const body = decode();
         if (!body) return (content = null);
         const text = body.text;
-        const firstBreak = text.indexOf("\n");
         const tags = new Set<string>();
         for (const [id, alt] of row.tags ?? []) {
           // Only tag objects still referenced from the body count; Notes keeps
@@ -669,7 +664,7 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
         if (tags.size) facets.add("tag");
         content = {
           textLower: normalizeForMatch(text),
-          bodyLower: normalizeForMatch(firstBreak === -1 ? "" : text.slice(firstBreak + 1)),
+          bodyLower: normalizeForMatch(noteBodyText(text)),
           words: countWords(text),
           facets,
           checklist: body.checklist,

@@ -205,7 +205,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Excludes Recently Deleted and folderless notes unless `includeDeleted: true`
 - Locked notes match on title and metadata only; body predicates never match them, negated or not (`-body:x` does not match a locked or undecodable note)
 - Each hit has `matchedIn` (where the positive text terms occur: `title`, `body`, or both) when the query has a text term and the body is readable; a `title:` term only counts toward the title and a `body:` term only toward the body. An empty list means the note matched through a non-text branch (`pinned OR x`)
-- `includeWordCount: true` adds `wordCount`, the same count `words:` filters on (null = locked or unreadable). A metadata-only query reads just the returned notes' bodies in one extra query
+- `includeWordCount: true` adds `wordCount`, the same count `words:` filters on (null = locked or unreadable). Chinese, Japanese and Thai text is counted by word boundaries, not by spaces. A metadata-only query reads just the returned notes' bodies in one extra query
 - Result ids chain directly into `get-note-content` and every other id-based tool
 
 ### list-notes

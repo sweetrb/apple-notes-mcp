@@ -46623,6 +46623,25 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH9 } = {}) {
   return decodeCompressedNoteBlocks(Buffer.from(row.data, "hex"));
 }
 
+// src/utils/wordCount.ts
+var UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+var segmenter;
+function countWords(text2) {
+  let count = 0;
+  for (const run of text2.replace(/￼/gu, " ").split(/\s+/u)) {
+    if (!/[\p{L}\p{N}]/u.test(run)) continue;
+    if (!UNSPACED_SCRIPT.test(run)) {
+      count++;
+      continue;
+    }
+    segmenter ??= new Intl.Segmenter(void 0, { granularity: "word" });
+    let words = 0;
+    for (const segment of segmenter.segment(run)) if (segment.isWordLike) words++;
+    count += Math.max(1, words);
+  }
+  return count;
+}
+
 // src/utils/noteRecentList.ts
 var RECENT_LIMIT = { DEFAULT: 50, MAX: 1e3 };
 var CHECKPOINT_PREFIX = "cdts1:";
@@ -46677,9 +46696,7 @@ function parseSince(input) {
 }
 function textStats(text2) {
   const visible2 = text2.replace(OBJECT_REPLACEMENT, "");
-  let wordCount2 = 0;
-  for (const token of visible2.split(/\s+/u)) if (/[\p{L}\p{N}]/u.test(token)) wordCount2++;
-  return { wordCount: wordCount2, charCount: [...visible2].length };
+  return { wordCount: countWords(visible2), charCount: [...visible2].length };
 }
 function previewText(text2) {
   const flat = text2.replace(OBJECT_REPLACEMENT, " ").replace(/\s+/gu, " ").trim();
@@ -47301,6 +47318,10 @@ var Parser = class {
 function parseNoteQuery(input) {
   return new Parser(tokenize(input), input.length).parse();
 }
+function noteBodyText(text2) {
+  const firstBreak = text2.indexOf("\n");
+  return firstBreak === -1 ? "" : text2.slice(firstBreak + 1);
+}
 function normalizeForMatch(text2) {
   return text2.normalize("NFC").replace(/[\ufffc\u00a0]/gu, " ").toLowerCase();
 }
@@ -47460,7 +47481,7 @@ function matchLocations(predicates, title, text2) {
   const firstBreak = text2 === null ? -1 : text2.indexOf("\n");
   const titleLower = normalizeForMatch(title);
   const firstLineLower = text2 === null ? "" : normalizeForMatch(firstBreak === -1 ? text2 : text2.slice(0, firstBreak));
-  const bodyLower = text2 === null || firstBreak === -1 ? "" : normalizeForMatch(text2.slice(firstBreak + 1));
+  const bodyLower = text2 === null ? "" : normalizeForMatch(noteBodyText(text2));
   let inTitle = false;
   let inBody = false;
   for (const predicate of predicates) {
@@ -47571,13 +47592,6 @@ function decodeBodyHex(hex3) {
   } catch {
     return null;
   }
-}
-function countWords(text2) {
-  let count = 0;
-  for (const word of text2.replace(/\ufffc/gu, " ").split(/\s+/u)) {
-    if (/[\p{L}\p{N}]/u.test(word)) count++;
-  }
-  return count;
 }
 var REQUIRED_COLUMNS3 = ["Z_PK", "Z_ENT", "ZTITLE1", "ZFOLDER", "ZMODIFICATIONDATE1"];
 function col2(available, alias, name) {
@@ -47823,7 +47837,6 @@ function runNoteQuery(ast, options = {}) {
         const body2 = decode2();
         if (!body2) return content = null;
         const text2 = body2.text;
-        const firstBreak = text2.indexOf("\n");
         const tags = /* @__PURE__ */ new Set();
         for (const [id2, alt] of row.tags ?? []) {
           if (id2 && alt && body2.objectIds.has(id2))
@@ -47833,7 +47846,7 @@ function runNoteQuery(ast, options = {}) {
         if (tags.size) facets.add("tag");
         content = {
           textLower: normalizeForMatch(text2),
-          bodyLower: normalizeForMatch(firstBreak === -1 ? "" : text2.slice(firstBreak + 1)),
+          bodyLower: normalizeForMatch(noteBodyText(text2)),
           words: countWords(text2),
           facets,
           checklist: body2.checklist,
@@ -58083,9 +58096,6 @@ function readAudioAssets(noteId3, options = {}) {
     };
   });
 }
-function countWords2(text2) {
-  return text2.split(/\s+/u).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
-}
 
 // src/services/noteTranscription.ts
 var DEFAULT_TRANSCRIPTION_LOCALE = "en-US";
@@ -58179,7 +58189,7 @@ async function transcribeTake(take, ctx) {
       status: complete ? "ok" : text2 ? "partial" : "indeterminate",
       ...complete ? {} : { code: "incomplete", message: stopReason ?? "stopped early" },
       ...durationSeconds !== void 0 ? { durationSeconds } : {},
-      wordCount: countWords2(text2),
+      wordCount: countWords(text2),
       ...engine ? { engine } : {}
     },
     text: text2
@@ -58206,7 +58216,7 @@ async function transcribeRecording(asset, includeText, ctx) {
     status,
     ...status !== "ok" && firstProblem?.code ? { code: firstProblem.code, message: firstProblem.message } : {},
     ...asset.durationSeconds !== null ? { durationSeconds: Math.round(asset.durationSeconds) } : {},
-    wordCount: countWords2(transcript),
+    wordCount: countWords(transcript),
     ...includeText ? { transcript } : {},
     takes: outcomes.map((o) => o.take)
   };

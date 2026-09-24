@@ -444,6 +444,16 @@ export interface QueryableNote {
   content(): NoteContent | null;
 }
 
+/**
+ * The part of a note's text that `body:` searches and `matchedIn` calls the
+ * body: everything after the first line (the title line). Empty for a
+ * one-line note.
+ */
+export function noteBodyText(text: string): string {
+  const firstBreak = text.indexOf("\n");
+  return firstBreak === -1 ? "" : text.slice(firstBreak + 1);
+}
+
 /** Normalizes text for case-insensitive substring matching. */
 export function normalizeForMatch(text: string): string {
   return text
@@ -685,8 +695,7 @@ export function matchLocations(
   const titleLower = normalizeForMatch(title);
   const firstLineLower =
     text === null ? "" : normalizeForMatch(firstBreak === -1 ? text : text.slice(0, firstBreak));
-  const bodyLower =
-    text === null || firstBreak === -1 ? "" : normalizeForMatch(text.slice(firstBreak + 1));
+  const bodyLower = text === null ? "" : normalizeForMatch(noteBodyText(text));
   let inTitle = false;
   let inBody = false;
   for (const predicate of predicates) {
