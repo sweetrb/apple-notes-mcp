@@ -2276,30 +2276,26 @@ describe("AppleNotesManager", () => {
       expect(existsSync(paths[0])).toBe(false);
     });
 
-    // osacompile and osascript exist only on macOS, where CI runs this.
-    it.skipIf(process.platform !== "darwin")(
-      "generates a file-backed delete script that AppleScript compiles",
-      () => {
-        mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
-        manager.deleteNoteByIdIfUnchanged(id, largeBody("Photo"), undefined, [
-          { id: copy, expectedBody: largeBody("Copy") },
-        ]);
-        const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
-        const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
-        try {
-          writeFileSync(join(dir, "delete.applescript"), script);
-          expect(() =>
-            execFileSync(
-              "/usr/bin/osacompile",
-              ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
-              { stdio: "pipe" }
-            )
-          ).not.toThrow();
-        } finally {
-          rmSync(dir, { recursive: true, force: true });
-        }
+    it("generates a file-backed delete script that AppleScript compiles", () => {
+      mockExecuteAppleScript.mockReturnValue({ success: true, output: "SAFETY_DELETED" });
+      manager.deleteNoteByIdIfUnchanged(id, largeBody("Photo"), undefined, [
+        { id: copy, expectedBody: largeBody("Copy") },
+      ]);
+      const script = String(mockExecuteAppleScript.mock.calls[0]?.[0]);
+      const dir = mkdtempSync(join(tmpdir(), "delete-script-"));
+      try {
+        writeFileSync(join(dir, "delete.applescript"), script);
+        expect(() =>
+          execFileSync(
+            "/usr/bin/osacompile",
+            ["-o", join(dir, "delete.scpt"), join(dir, "delete.applescript")],
+            { stdio: "pipe" }
+          )
+        ).not.toThrow();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
       }
-    );
+    });
   });
 
   describe("ExpectedBodies", () => {
@@ -2313,28 +2309,24 @@ describe("AppleNotesManager", () => {
       bodies.cleanup();
     });
 
-    // osascript exists only on macOS, where CI runs this.
-    it.skipIf(process.platform !== "darwin")(
-      "reads a long body back through real osascript byte for byte",
-      () => {
-        const body = `<div>Line one "q" \\ é 😀\ttab</div>\n<div>${"B".repeat(5 * 1024 * 1024)}</div>`;
-        const bodies = new ExpectedBodies();
-        try {
-          const { setup, operand } = bodies.bind(body, "__roundTrip");
-          expect(operand).toBe("__roundTrip");
-          // Inside a Notes tell block, as in the delete script, but without
-          // sending Notes anything: the read runs in osascript itself.
-          const output = execFileSync("osascript", ["-"], {
-            input: `${setup}\nreturn __roundTrip`,
-            encoding: "utf8",
-            maxBuffer: 64 * 1024 * 1024,
-          });
-          expect(output).toBe(`${body}\n`);
-        } finally {
-          bodies.cleanup();
-        }
+    it("reads a long body back through real osascript byte for byte", () => {
+      const body = `<div>Line one "q" \\ é 😀\ttab</div>\n<div>${"B".repeat(5 * 1024 * 1024)}</div>`;
+      const bodies = new ExpectedBodies();
+      try {
+        const { setup, operand } = bodies.bind(body, "__roundTrip");
+        expect(operand).toBe("__roundTrip");
+        // Inside a Notes tell block, as in the delete script, but without
+        // sending Notes anything: the read runs in osascript itself.
+        const output = execFileSync("osascript", ["-"], {
+          input: `${setup}\nreturn __roundTrip`,
+          encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+        });
+        expect(output).toBe(`${body}\n`);
+      } finally {
+        bodies.cleanup();
       }
-    );
+    });
   });
 
   describe("Recently Deleted (#198, #207)", () => {
