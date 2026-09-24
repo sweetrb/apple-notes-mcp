@@ -34,7 +34,7 @@ const DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
  * variable is unset or not a valid positive number. Shared by the reliability
  * knobs (max buffer, timeout, retries) so they all validate the same way.
  */
-function envPositiveNumber(name: string): number | undefined {
+export function envPositiveNumber(name: string): number | undefined {
   const raw = process.env[name];
   if (raw !== undefined) {
     const n = Number(raw);

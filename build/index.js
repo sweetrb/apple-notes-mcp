@@ -51420,19 +51420,42 @@ var PASTEBOARD_DATA_TYPES = [
   { type: "public.tiff", ext: "tiff", label: "image" },
   { type: "com.adobe.pdf", ext: "pdf", label: "document" }
 ];
+var PASTEBOARD_ACCESS_BEHAVIORS = {
+  0: "default",
+  1: "ask",
+  2: "alwaysAllow",
+  3: "alwaysDeny"
+};
 var PASTEBOARD_FREEZE_JXA = `
 ObjC.import("AppKit");
 function run(argv) {
   var dir = argv[0], name = argv[1], limit = Number(argv[2]), prefs = JSON.parse(argv[3]);
+  var allowAlert = argv[4] === "1";
   var pb = name ? $.NSPasteboard.pasteboardWithName(name) : $.NSPasteboard.generalPasteboard;
   if (!pb || pb.isNil()) return JSON.stringify({ status: "error", code: "pasteboard_unavailable" });
+  if (!name && pb.respondsToSelector("accessBehavior")) {
+    var behavior = Number(pb.accessBehavior);
+    if (behavior === 3 || (behavior !== 2 && !allowAlert))
+      return JSON.stringify({ status: "error", code: "pasteboard_access_denied", accessBehavior: behavior });
+  }
   var before = pb.changeCount;
   var types = ObjC.deepUnwrap(pb.types) || [];
   if (types.length === 0) return JSON.stringify({ status: "error", code: "pasteboard_empty" });
   var result = null;
-  if (types.indexOf("public.file-url") >= 0) {
-    var value = ObjC.unwrap(pb.stringForType("public.file-url"));
-    var url = value ? $.NSURL.URLWithString(value) : null;
+  var items = pb.pasteboardItems;
+  var itemCount = items && !items.isNil() ? Number(items.count) : 0;
+  var fileUrls = [];
+  for (var k = 0; k < itemCount; k++) {
+    var item = items.objectAtIndex(k);
+    var itemTypes = ObjC.deepUnwrap(item.types) || [];
+    if (itemTypes.indexOf("public.file-url") < 0) continue;
+    var value = ObjC.unwrap(item.stringForType("public.file-url"));
+    if (value) fileUrls.push(value);
+  }
+  if (fileUrls.length > 1)
+    return JSON.stringify({ status: "error", code: "multiple_files", count: fileUrls.length });
+  if (fileUrls.length === 1) {
+    var url = $.NSURL.URLWithString(fileUrls[0]);
     if (url && !url.isNil() && url.isFileURL) {
       result = { status: "ok", kind: "file", type: "public.file-url", path: ObjC.unwrap(url.path) };
     }
@@ -51453,27 +51476,79 @@ function run(argv) {
   return JSON.stringify(result || { status: "error", code: "unsupported_content", types: types.slice(0, 20) });
 }
 `;
-var PasteboardError = class extends Error {
-  constructor(code, message) {
-    super(message);
+var ENVELOPE_CODES = {
+  pasteboard_access_denied: "permission_denied",
+  pasteboard_unavailable: "operation_failed",
+  pasteboard_timeout: "operation_failed",
+  pasteboard_empty: "validation_error",
+  pasteboard_changed: "operation_failed",
+  unsupported_content: "validation_error",
+  multiple_files: "validation_error",
+  too_large: "validation_error",
+  write_failed: "operation_failed",
+  file_unreadable: "validation_error"
+};
+var PasteboardError = class extends CodedError {
+  constructor(code, message, details = {}) {
+    super(message, {
+      ...details,
+      code: ENVELOPE_CODES[code],
+      pasteboardCode: code,
+      committed: false
+    });
     this.code = code;
     this.name = "PasteboardError";
   }
   code;
 };
+var SUPPORTED = "an image (PNG, JPEG, HEIC, GIF, TIFF), a PDF, or one copied file";
 var MESSAGES = {
+  pasteboard_access_denied: "Reading the pasteboard now would make macOS ask whether to allow the paste, so nothing was read. Call again with allowPasteAlert: true to let macOS show its paste alert, or allow pasting for the app that runs this server in System Settings, where macOS lists it after its first paste alert.",
   pasteboard_unavailable: "The pasteboard is not reachable from this process. The MCP host must run in your logged-in GUI session (not over SSH or as a background daemon).",
+  pasteboard_timeout: "Reading the pasteboard timed out; nothing was attached. If macOS showed a paste alert, answer it and try again.",
   pasteboard_empty: "The pasteboard is empty. Copy an image or a file first.",
   pasteboard_changed: "The pasteboard changed while it was being read. Try again.",
-  unsupported_content: "The pasteboard holds no image, PDF, or file. Text belongs in append-to-note, not in an attachment.",
+  unsupported_content: `The pasteboard holds no supported content: copy ${SUPPORTED}. Text belongs in append-to-note, not in an attachment.`,
+  multiple_files: "The pasteboard holds more than one copied file. Copy exactly one file, or attach each file with add-attachment.",
   too_large: "The pasteboard contents exceed the 64 MiB attachment limit.",
   write_failed: "Could not write the pasteboard contents to a temporary file.",
   file_unreadable: "The copied file could not be read as a regular file of at most 64 MiB."
 };
+function replyError(code, reply) {
+  if (code === "pasteboard_access_denied") {
+    const raw = typeof reply.accessBehavior === "number" ? reply.accessBehavior : void 0;
+    const accessBehavior = raw !== void 0 && PASTEBOARD_ACCESS_BEHAVIORS[raw] || "unknown";
+    const message = accessBehavior === "alwaysDeny" ? "macOS is set to deny pasteboard access to the app that runs this server, so nothing was read. Change it to allow in System Settings, then try again." : MESSAGES.pasteboard_access_denied;
+    return new PasteboardError(code, message, { accessBehavior });
+  }
+  if (code === "multiple_files") {
+    const count = typeof reply.count === "number" ? reply.count : void 0;
+    return new PasteboardError(
+      code,
+      count ? `The pasteboard holds ${count} copied files. Copy exactly one file, or attach each file with add-attachment.` : MESSAGES[code],
+      count ? { count } : {}
+    );
+  }
+  if (code === "unsupported_content" && Array.isArray(reply.types)) {
+    const types = reply.types.filter((t) => typeof t === "string").slice(0, 20);
+    if (types.length)
+      return new PasteboardError(
+        code,
+        `${MESSAGES[code]} Pasteboard types found: ${types.join(", ")}.`,
+        { types }
+      );
+  }
+  if (code === "too_large" && typeof reply.bytes === "number")
+    return new PasteboardError(code, MESSAGES[code], { bytes: reply.bytes });
+  return new PasteboardError(code, MESSAGES[code]);
+}
+function pasteboardTimeoutMs() {
+  return callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? 3e4;
+}
 function defaultRunJxa(args) {
   return execFileSync19("osascript", ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
     encoding: "utf8",
-    timeout: 3e4,
+    timeout: pasteboardTimeoutMs(),
     maxBuffer: 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"]
   });
@@ -51510,10 +51585,11 @@ function freezePasteboard(options = {}) {
         directory,
         options.pasteboardName ?? "",
         String(MAX_PASTEBOARD_BYTES),
-        prefs
+        prefs,
+        options.allowPasteAlert ? "1" : "0"
       ]);
-    } catch {
-      throw new PasteboardError("pasteboard_unavailable", MESSAGES.pasteboard_unavailable);
+    } catch (error2) {
+      throw error2?.code === "ETIMEDOUT" ? new PasteboardError("pasteboard_timeout", MESSAGES.pasteboard_timeout) : new PasteboardError("pasteboard_unavailable", MESSAGES.pasteboard_unavailable);
     }
     let reply;
     try {
@@ -51523,7 +51599,7 @@ function freezePasteboard(options = {}) {
     }
     if (reply.status !== "ok" || !reply.path || !reply.type) {
       const code = reply.code && reply.code in MESSAGES ? reply.code : "pasteboard_unavailable";
-      throw new PasteboardError(code, MESSAGES[code]);
+      throw replyError(code, reply);
     }
     if (reply.kind === "file") {
       const bytes = readRegularFile(reply.path);
@@ -54994,14 +55070,14 @@ var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
   "helper_modified",
   "helper_manifest_invalid"
 ]);
-var ENVELOPE_CODES = {
+var ENVELOPE_CODES2 = {
   invalid_request: "validation_error",
   attachment_not_found: "not_found"
 };
 var PublicHelperError = class extends CodedError {
   constructor(code, message) {
     super(message, {
-      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES[code] ?? "operation_failed",
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES2[code] ?? "operation_failed",
       helperCode: code
     });
     this.code = code;
