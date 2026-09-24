@@ -257,7 +257,7 @@ Creates a new note in Apple Notes.
 | `content` | string | One of `content`/`contentPath` | The body content of the note (do not repeat the title here) |
 | `contentPath` | string | One of `content`/`contentPath` | Absolute path of a local UTF-8 file to use as the body instead of `content`. Allowed in the same places [`save-attachment`](#save-attachment) may write (home, temp, `/Volumes`); symbolic links, non-regular files, invalid UTF-8 and files over 1 MiB are refused before anything is written. A leading byte-order mark is dropped |
 | `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags). Refused with `format: "markdown"` |
-| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). Defaults to account root |
+| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). A smart folder is refused (see [`move-note`](#move-note)). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
 | `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
@@ -999,6 +999,13 @@ Deletes a note (moves to Recently Deleted in Notes.app).
 Title-only deletion is rejected. If the note changed after the supplied hash
 was read, deletion is also rejected.
 
+**Notes with large images.** Notes.app returns a note's body with each inline
+image embedded as base64, so a note holding one 40 MB image has a body of about
+110 MB. Body reads accept up to 512 MB of output, and `delete-note` compares a
+body longer than 5 MB against a private temporary file rather than embedding it
+in the AppleScript. The comparison still covers the whole body, and the file
+is removed when the delete finishes.
+
 **Copy-then-retire.** To delete an original only while its copy is still good,
 read both notes, verify the copy, and pass the copy as `guardNoteId` with its
 `contentHash` as `expectedGuardContentHash`. The copy's revision is re-read just
@@ -1041,6 +1048,8 @@ such a note for good, do it in Notes.app.
 #### `move-note`
 
 Moves a note to a different folder. The note is relocated in place via Notes.app's native `move`, so its id, creation date, and all embedded attachments (files, images, scans, PDFs, audio) are preserved. The destination folder must already exist — create it first with [`create-folder`](#create-folder).
+
+A smart folder is never a destination: it only gathers notes by its rules, and Notes.app would move the note to Recently Deleted or store a created note where no folder shows it. `create-note`, `create-note-with-attachment`, `move-note`, `batch-move-notes`, and `create-folder` refuse one before writing anything, with `code: "unsupported"`, `committed: false`, and `reason: "smart_folder_destination"`. An ordinary folder that shares a smart folder's name is still found. Detection reads the NoteStore database, so it needs Full Disk Access; without it, destinations resolve as before.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -1412,7 +1421,7 @@ Creates a new folder, including a whole nested hierarchy in one call.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped |
+| `name` | string | Yes | Folder name, or a nested path separated by `/` (e.g. `"Retro Tech/PC/CPUs"`). Every intermediate folder is created; segments that already exist are skipped. A segment that names a smart folder is refused before anything is created |
 | `account` | string | No | Account to create folder in (defaults to Notes.app's default account; exact or unique-prefix match) |
 
 **Example:**
@@ -1600,7 +1609,7 @@ Moves multiple notes to a folder.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ids` | string[] | Yes | Array of note IDs to move (max 500 per request) |
-| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder) |
+| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`). Must already exist — create it with [`create-folder`](#create-folder). A smart folder is refused for the whole call before any note moves |
 | `account` | string | No | Account containing the folder |
 
 **Returns:** Summary of successes and failures. Each success is reported only
@@ -2479,7 +2488,7 @@ All configuration is optional — the server works out of the box. Override beha
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APPLE_NOTES_MCP_MAX_BUFFER` | `67108864` (64 MB) | Max bytes captured from a single AppleScript invocation. Raise it if a very large export/list is truncated; lower it to cap memory. |
+| `APPLE_NOTES_MCP_MAX_BUFFER` | `67108864` (64 MB) | Max bytes captured from a single AppleScript invocation. Raise it if a very large export/list is truncated; lower it to cap memory. Reading one note body allows at least 512 MB regardless, since a body embeds its inline images. Output past the cap fails with an error naming this variable, not as a timeout. |
 | `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES` | `26214400` (25 MB) | Max size of an attachment that [`fetch-attachment`](#fetch-attachment) will base64-encode inline. Larger attachments are rejected with an error pointing at [`save-attachment`](#save-attachment) (which streams to disk and has no such limit). Raise it to fetch bigger attachments inline; lower it to cap memory. |
 | `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` | `262144` (256 KB) | Per-image cap on the base64 payload kept inline in a [`get-note-content`](#get-note-content) response. Inline images over the cap are replaced with placeholders (with a warning appended) so an image-heavy note cannot exceed the MCP client's message limit and drop the connection; export the real files with [`save-attachment`](#save-attachment) or [`fetch-attachment`](#fetch-attachment). Raise it to keep bigger images inline. |
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |

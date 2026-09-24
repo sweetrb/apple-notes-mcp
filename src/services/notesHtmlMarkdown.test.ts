@@ -5,6 +5,7 @@ import { NOTES_NORMALIZED_HTML_FIXTURES } from "@/services/__fixtures__/notesNor
 // SQLite-backed checklist reader (no Full Disk Access in unit tests).
 vi.mock("@/utils/applescript.js", () => ({
   executeAppleScript: vi.fn(),
+  noteBodyMaxBuffer: () => 512 * 1024 * 1024,
 }));
 vi.mock("@/utils/checklistParser.js", () => ({
   getChecklistItems: vi.fn().mockReturnValue({ items: null }),
