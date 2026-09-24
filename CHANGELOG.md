@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [2.9.21] - 2026-09-24
+
+### Documentation
+
+- `get-note-content`'s tool description no longer says every mutation refuses
+  attachment-bearing notes. It now states each route: `update-note` refuses a
+  full-body replacement, `append-to-note` with `scopeText` appends natively at
+  the end and keeps the attachments, `add-attachment` adds a file, and
+  `move-note` / `delete-note` work as usual. The README's lossy-body warning
+  gets the same correction.
+- The README and `docs/APPLESCRIPT-LIMITATIONS.md` no longer claim that typed
+  `#hashtags` become real Notes tags. Text written through AppleScript stays
+  plain text; `get-note-content` reports it as textual `hashtags`, and native
+  tags are written with `add-native-tags`. This matches the `get-note-content`
+  and `list-native-tags` sections. Thanks to @oliverames for spotting both in
+  #252.
+
 ## [2.9.20] - 2026-09-24
 
 ### Documentation

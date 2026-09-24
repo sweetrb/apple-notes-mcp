@@ -256,14 +256,14 @@ Creates a new note in Apple Notes.
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
 | `content` | string | One of `content`/`contentPath` | The body content of the note (do not repeat the title here) |
 | `contentPath` | string | One of `content`/`contentPath` | Absolute path of a local UTF-8 file to use as the body instead of `content`. Allowed in the same places [`save-attachment`](#save-attachment) may write (home, temp, `/Volumes`); symbolic links, non-regular files, invalid UTF-8 and files over 1 MiB are refused before anything is written. A leading byte-order mark is dropped |
-| `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Use inline `#hashtags` in `content` instead (Notes.app turns those into real tags). Refused with `format: "markdown"` |
+| `tags` | string[] | No | Returned-only metadata — **NOT written to Notes.app**. Apple Notes tags can't be set via AppleScript, so values passed here are echoed back in the response but do not appear on the created note. Inline `#hashtags` in `content` stay searchable text and are returned as `hashtags`, but they do not become native Notes tags; add real tags afterwards with [`add-native-tags`](#add-native-tags). Refused with `format: "markdown"` |
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). A smart folder is refused (see [`move-note`](#move-note)). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
 | `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
 | `timeoutSeconds` | number | No | Whole seconds, 1–120, for each Notes.app automation step this call runs; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only. A timed-out write is uncertain, not failed: read the note by id before any retry. Also accepted by `get-note-content`, `update-note`, `append-to-note`, `delete-note` and `move-note` |
 
-**Example (tagged with inline hashtags):**
+**Example (with inline textual hashtags):**
 ```json
 {
   "title": "Meeting Notes",
@@ -587,8 +587,9 @@ base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
 image-heavy note cannot blow the MCP message limit. `structuredContent` reports
 this as `strippedImages` (count) and `truncated` (boolean). When either is set,
 passing this body to an unguarded full-body writer would replace the real images
-with placeholder text. This server refuses update and append operations on
-attachment-bearing notes; edit them in Notes.app.
+with placeholder text. This server's `update-note` refuses attachment-bearing
+notes, and `append-to-note` routes them to native end-append with `scopeText`,
+which never rewrites the existing body; make any other edit in Notes.app.
 
 ---
 
