@@ -2409,7 +2409,7 @@ listed under the tool itself:
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact note ID: x-coredata id, Notes UUID, or numeric key (see [Identifier forms](#identifier-forms)) |
 | `expectedContentHash` | string | Yes | `contentHash` (`sha256:…`) from a fresh read of the note |
-| `scopeText` | string | Yes | Distinctive phrase already in the note, 12–500 characters, that Notes search can find. Prefer plain words without punctuation, hashtags, or paths |
+| `scopeText` | string | Yes | Distinctive phrase already in the note below its title line, 12–500 characters, that Notes search can find. Prefer plain words without punctuation, hashtags, or paths |
 
 When the Shortcut refuses a request (its Find Notes step did not return
 exactly one note with that exact title and `scopeText`) or stops with its own

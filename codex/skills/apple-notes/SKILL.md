@@ -251,7 +251,8 @@ survives. Do not hand-roll read-then-`update-note` for an addition.
 
 A note that already contains native objects (a table, a checklist, native tags)
 cannot be spliced, so `append-to-note` routes it to the native end-append bridge
-instead. That path additionally needs `scopeText` (a unique existing phrase),
+instead. That path additionally needs `scopeText` (a unique existing phrase
+from below the title line; a title-only phrase is refused),
 keeps the default blank-line `separator` and `position: "after"`, and accepts a
 fixed HTML subset: `<a> <b> <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li>
 <ol> <p> <s> <span> <strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u>

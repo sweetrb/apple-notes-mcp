@@ -75,7 +75,7 @@ const common = {
     .min(12)
     .max(500)
     .describe(
-      "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
+      "Distinctive existing phrase from below the title line, used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
     ),
 };
 /**

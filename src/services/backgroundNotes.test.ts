@@ -12,6 +12,7 @@ import {
   BRIDGE_REFUSED,
   mutateBackground,
   validateAppendContent,
+  textBelowTitle,
   type BackgroundSnapshot,
 } from "./backgroundNotes.js";
 const noteId = "x-coredata://ABC/ICNote/p1";
@@ -250,6 +251,27 @@ describe("background note mutation boundaries", () => {
     expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
       /the "Named Bridge" Shortcut failed: no such shortcut/
     );
+  });
+  it("rejects a scope marker found only in the title line (#248)", () => {
+    const f = fixture();
+    f.before.title = "Garden planning ideas";
+    f.before.rich.text = "Garden planning ideas\nUnique project marker";
+    expect(() =>
+      mutateBackground(
+        { ...request, scopeText: "Garden planning ideas" },
+        "set-pinned",
+        {},
+        pinVerify,
+        f.deps
+      )
+    ).toThrow(/only in the note's title line/);
+    expect(f.deps.run).not.toHaveBeenCalled();
+  });
+  it("finds the scope below the title line", () => {
+    expect(textBelowTitle("Title here\nBody words", "Title here")).toBe("Body words");
+    expect(textBelowTitle(" Title here \nBody", "Title here")).toBe("Body");
+    expect(textBelowTitle("Title only", "Title only")).toBe("");
+    expect(textBelowTitle("Not the title\nBody", "Title")).toBe("Not the title\nBody");
   });
   it("rejects absent and multiline scope markers before a write", () => {
     for (const scopeText of ["different project marker", "Unique project\nmarker"]) {

@@ -426,6 +426,14 @@ function describeTransportFailure(error: unknown): string {
         .slice(0, 400)}`;
 }
 
+/** The note text below its first line when that line is the title. */
+export function textBelowTitle(text: string, title: string): string {
+  const lineEnd = text.indexOf("\n");
+  const firstLine = lineEnd < 0 ? text : text.slice(0, lineEnd);
+  if (firstLine.trim() !== title.trim()) return text;
+  return lineEnd < 0 ? "" : text.slice(lineEnd + 1);
+}
+
 /** Run one guarded native mutation and verify its outcome by exact-ID readback. */
 export function mutateBackground(
   request: BackgroundInput,
@@ -445,6 +453,13 @@ export function mutateBackground(
     throw new Error("Note revision changed; read it again");
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
+  // The bridge's Find Notes step matches scopeText against the note's Body,
+  // which leaves out the title line (observed on macOS 27.2, #248). A phrase
+  // found only in the title makes the bridge refuse every time.
+  if (!textBelowTitle(before.rich.text, before.title).includes(request.scopeText))
+    throw new Error(
+      "scopeText appears only in the note's title line. The bridge's Find Notes step matches it against the body below the title, so it would refuse; pass a phrase from below the title. Nothing changed"
+    );
   const candidates = deps.candidates(before.title, request.scopeText);
   if (candidates.length !== 1 || candidates[0] !== request.id)
     throw new Error("Ambiguous note selection; nothing changed");

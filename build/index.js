@@ -48723,6 +48723,12 @@ function describeTransportFailure(error2) {
   if (detail?.refused) return `${named} ${detail.message}`;
   return detail?.code === "ETIMEDOUT" ? `Shortcuts timed out waiting for ${named}. ${shortcutConsentHint(detail.shortcut)}` : `${named} failed: ${String(detail?.stderr || detail?.message || "no output").trim().slice(0, 400)}`;
 }
+function textBelowTitle(text2, title) {
+  const lineEnd = text2.indexOf("\n");
+  const firstLine = lineEnd < 0 ? text2 : text2.slice(0, lineEnd);
+  if (firstLine.trim() !== title.trim()) return text2;
+  return lineEnd < 0 ? "" : text2.slice(lineEnd + 1);
+}
 function mutateBackground(request, operation, data, verify, deps) {
   if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
     throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
@@ -48731,6 +48737,10 @@ function mutateBackground(request, operation, data, verify, deps) {
     throw new Error("Note revision changed; read it again");
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
+  if (!textBelowTitle(before.rich.text, before.title).includes(request.scopeText))
+    throw new Error(
+      "scopeText appears only in the note's title line. The bridge's Find Notes step matches it against the body below the title, so it would refuse; pass a phrase from below the title. Nothing changed"
+    );
   const candidates = deps.candidates(before.title, request.scopeText);
   if (candidates.length !== 1 || candidates[0] !== request.id)
     throw new Error("Ambiguous note selection; nothing changed");
@@ -57108,7 +57118,7 @@ var common = {
   id,
   expectedContentHash: revision3,
   scopeText: external_exports.string().min(12).max(500).describe(
-    "Distinctive existing phrase used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
+    "Distinctive existing phrase from below the title line, used by Notes search. Prefer plain words without punctuation, hashtags, or paths."
   )
 };
 var EMPTY_TABLE_ROWS = [
