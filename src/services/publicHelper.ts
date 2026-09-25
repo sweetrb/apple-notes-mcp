@@ -63,6 +63,7 @@ export const PUBLIC_HELPER_ACTIONS: ReadonlySet<string> = new Set([
   "hello",
   "decode_drawing",
   "transcribe",
+  "speech_status",
 ]);
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;

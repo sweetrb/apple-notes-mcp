@@ -501,7 +501,7 @@ can match titles and bodies together.
 |-----------|------|----------|-------------|
 | `query` | string | Yes | Query expression (syntax below), at most 2000 characters |
 | `limit` | number | No | Maximum notes to return. Defaults to 50, maximum 500. The response reports the total match count. |
-| `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 5000. The response says when older notes were left unscanned. |
+| `scanLimit` | number | No | How many of the most recently modified notes to examine. Defaults to 500, maximum 10000. The response says when older notes were left unscanned. A large scan decodes more bodies, so it takes longer. |
 | `includeDeleted` | boolean | No | Also scan notes in Recently Deleted, notes pending deletion, and folderless notes. Defaults to `false`. |
 | `includeWordCount` | boolean | No | Add `wordCount` to each returned note, the same count `words:` filters on (`null` when locked or unreadable). Free when the query already reads bodies; a metadata-only query (for example `pinned`) reads just the returned notes' bodies in one extra read-only query. Defaults to `false`. |
 
@@ -514,9 +514,9 @@ can match titles and bodies together.
 | `folder:Work`, `folder:"Work/Clients"` | The note's own folder, by name or full path, case-insensitive (notes in subfolders are not included); a literal `/` in a name can be written `\/` as in `list-folders` |
 | `account:iCloud` | Account name, case-insensitive |
 | `tag:finance` | Native Notes tag (with or without `#`); textual hashtags are ordinary words |
-| `has:link`, `has:attachment`, `has:checklist`, `has:drawing`, `has:image`, `has:video`, `has:audio`, `has:pdf`, `has:table`, `has:scan`, `has:tag` | The note body contains that kind of object |
+| `has:link`, `has:attachment`, `has:checklist`, `has:drawing`, `has:image`, `has:video`, `has:audio`, `has:pdf`, `has:table`, `has:scan`, `has:url`, `has:map`, `has:tag` | The note body contains that kind of object. `has:url` is a link preview card (it also counts as `has:link`, as inline links do); `has:map` is a map attachment |
 | `checklist:open`, `checklist:done` | At least one unchecked item; or items present and all checked |
-| `pinned`, `locked`, `shared` (or `is:pinned` …) | Note flags; `shared` includes notes in a shared folder |
+| `pinned`, `locked`, `shared`, `quicknote` (or `is:pinned` …) | Note flags; `shared` includes notes in a shared folder, and `quicknote` is a note created as a Quick Note |
 | `words:>250` | Word count, with `=`, `>`, `>=`, `<`, `<=` |
 | `created:>=2026-07-01`, `modified:<2026-09-01` | Dates as `YYYY-MM-DD` in local time, with the same operators; `=` means that whole day |
 | `a b`, `a AND b`, `a OR b`, `NOT a`, `-a`, `( … )` | AND is implicit and binds tighter than OR |
@@ -713,6 +713,7 @@ IDs.
 | `linkableOnly` | boolean | No | Return only paragraphs with a `url` |
 | `offset` | number | No | First paragraph to return (default 0). Use `page.nextOffset` |
 | `limit` | number | No | Maximum paragraphs per page (default 500, max 5000) |
+| `recordAnchors` | boolean | No | Also record a [paragraph anchor](#paragraph-anchors) for each returned paragraph (at most 500 per call); each row gains `anchorId` and the result gains `anchorsRecorded` (the new ones). Writes only the local anchor registry |
 
 ---
 
@@ -747,6 +748,123 @@ and an edit in Notes can later replace the ID and break the link.
 | `match` | string | One of `contains`, `match`, `blockIndex` | The whole paragraph |
 | `blockIndex` | number | One of `contains`, `match`, `blockIndex` | The paragraph's `blockIndex` |
 | `occurrence` | number | No | Which match to use when several paragraphs match |
+| `recordAnchor` | boolean | No | Also record a [paragraph anchor](#paragraph-anchors) for the linked paragraph and return its `anchorId`. Writes only the local anchor registry |
+
+---
+
+#### Paragraph anchors
+
+A paragraph link breaks when Notes replaces or copies the paragraph's ID. A
+paragraph anchor records enough about the paragraph to find it again: the
+note's Notes UUID, the paragraph ID and its status, the paragraph's normalized
+text and a fingerprint of it, the fingerprints of the paragraphs before and
+after it, its `blockIndex`, and when it was recorded. Anchors are kept in one
+local file, `~/Library/Application Support/apple-notes-mcp/paragraph-anchors.json`
+(or the absolute path in `APPLE_NOTES_MCP_ANCHOR_FILE`). It is created with
+mode 0600 in a 0700 directory, replaced atomically under a lock file, and
+holds the text of every anchored paragraph. A symlinked, unreadable or
+corrupt registry is refused and left as it is. The anchor tools never change
+Notes.
+
+Resolving an anchor tries three steps in order, and every step fails closed:
+
+1. **Paragraph ID.** A paragraph whose ID is still unique in the note is the
+   anchored paragraph, even if its text was edited or it moved. A link to that
+   ID opens exactly that paragraph.
+2. **Exact text.** The same normalized text. When several paragraphs have it,
+   only the one whose neighbours still match is chosen; a tie is `ambiguous`.
+3. **Text and neighbours.** Similar text between both recorded neighbours, or
+   nearly identical text beside one of them. Two close candidates are
+   `ambiguous`; one below `minConfidence` is `low-confidence`.
+
+A match whose ID is now shared or missing is `needs-reminting`: the paragraph
+is found (the result names its block), but no safe link exists until it gets a
+new ID. Public automation cannot set a paragraph ID. `remint: true` gives the
+block a new ID through the opt-in private writer's `native-set-paragraph-id`
+(with a fresh revision, refusing if the paragraph changed) and resolves again.
+It runs only when `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` and
+`APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1` are set and the writer is built
+(plus `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` until that write is
+live-validated); otherwise it reports `writer-unavailable`.
+
+To share anchored links outside Notes, see the
+[paragraph anchor resolver](#paragraph-anchor-resolver-opt-in).
+
+#### `create-paragraph-anchor`
+
+Records an anchor for one paragraph, selected exactly as in
+`get-paragraph-link` (note by `id` or `title`/`folder`; paragraph by one of
+`contains`, `match`, `blockIndex`, plus `occurrence`). Unlike
+`get-paragraph-link`, a paragraph whose ID is shared or missing can be
+anchored. Recording the same paragraph again (same note, ID, text and block)
+returns the existing anchor with `created: false`.
+
+Returns `anchor`, `created`, and `url` when the paragraph currently has a
+unique ID.
+
+**Requires:** Full Disk Access. Writes only the anchor registry.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id`, `title`, `folder` | string | One of `id`, `title` | Note selector, as in `list-note-paragraphs` |
+| `contains`, `match`, `blockIndex`, `occurrence` | | One of `contains`, `match`, `blockIndex` | Paragraph selector, as in `get-paragraph-link` |
+
+#### `resolve-paragraph-anchor`
+
+Finds an anchored paragraph in the note as it is now. The result has `status`
+(`resolved`, `needs-reminting`, `ambiguous`, `low-confidence`, `not-found`,
+`note-not-found`, `note-deleted` for a note in Recently Deleted, or
+`note-unreadable` for a locked note), `method` (`paragraph-id`, `exact-text`,
+`text-and-neighbours`), `confidence` (0 to 1), `match` (`blockIndex`, `text`,
+`paragraphId`, `paragraphIdStatus`), `changes` (`textChanged`,
+`blockIndexChanged`, `paragraphIdChanged`), and `message`. `url`, the current
+`applenotes://` link, is present only when `status` is `resolved`.
+
+**Requires:** Full Disk Access.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `anchorId` | string | Yes | The anchor (`pa_` and 24 hex digits) |
+| `minConfidence` | number | No | Lowest confidence accepted as a match (default 0.6) |
+| `refresh` | boolean | No | After a match with confidence 0.8 or more, store the paragraph as it is now (text, neighbours, block, ID), so later edits are tracked from here. Reports `refreshed` or `refreshSkipped` |
+| `remint` | boolean | No | On `needs-reminting`, give the paragraph a new ID through the private writer and resolve again. Reports `remint.reason: "writer-unavailable"` unless both writer switches are on, and `"writer-failed"` (with the writer's message and `committed`) when the writer refuses |
+
+#### `list-paragraph-anchors`
+
+Lists recorded anchors in the order recorded, with `total`, the `registry`
+path and `page` info. Reads only the registry.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `noteIdentifier` | string | No | Only anchors in the note with this Notes UUID |
+| `offset` | number | No | First anchor to return (default 0) |
+| `limit` | number | No | Maximum anchors (default 100, max 1000) |
+
+#### `get-paragraph-anchor`
+
+Returns one stored anchor as recorded. Reads only the registry.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `anchorId` | string | Yes | The anchor |
+
+#### `prune-paragraph-anchors`
+
+Removes anchors that no longer resolve, or the anchors you list. It is a dry
+run unless `dryRun` is `false`. Without `anchorIds` it resolves every anchor
+in scope and treats `not-found` and `note-not-found` as stale. A note in
+Recently Deleted (`note-deleted`) is kept by default because it can be
+restored. Returns `stale` (`anchorId`, `status`, `message`), `examined`, and
+`removed`.
+
+**Requires:** Full Disk Access unless `anchorIds` is given.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `anchorIds` | string[] | No | Remove exactly these anchors instead of resolving |
+| `noteIdentifier` | string | No | Only anchors in the note with this Notes UUID |
+| `statuses` | string[] | No | Statuses treated as stale (default `not-found`, `note-not-found`) |
+| `dryRun` | boolean | No | Report without removing (default `true`) |
 
 ---
 
@@ -1129,6 +1247,10 @@ alone and the call fails with `Scope guard failed: …`. The one exception is a
 native append to a protected note (it runs through Shortcuts): there the check
 is a separate read just before the append, so it is not atomic.
 
+The [private writer](#private-writer-opt-in-unsupported-apple-api) tools take
+the same three guards and check them inside the writer's own transaction; see
+that section for how they differ.
+
 **Example - retire a note only while it is still in the inbox:**
 ```json
 {
@@ -1255,11 +1377,13 @@ the write happened so it is not repeated.
   detection. The result reports `linkStored: false`.
 - Notes with native objects (a table, a checklist, native tags) take the native
   end-append path, so only `position: "end"` with `blankLine: true` works there.
-- The link always gets its own paragraph. Placing it at the end of one existing
-  paragraph, or inside the text, is not available.
+- The link always gets its own paragraph. To place it at the end of one
+  existing paragraph, or to link text in place, use the opt-in writer's
+  `native-edit-note` (`append_to_paragraph`, or `replace` with a linked run).
 - Rich URL preview cards (the link tile Notes makes when you paste a URL) are
   not produced. No public automation route creates one: the Shortcuts Notes
-  actions write text, and AppleScript's `body` has no card markup.
+  actions write text, and AppleScript's `body` has no card markup. The opt-in
+  private writer's [`native-add-url-card`](#native-add-url-card) can add one.
 - To start a new note with a link, use [`create-note`](#create-note) with
   `format: "html"` and an `<a href>` in `content`; the link is stored the same
   way.
@@ -1793,7 +1917,7 @@ disabled checkboxes, block quotes and monospaced paragraphs become
 `blockquote` and `pre`, and inline runs keep bold, italic, underline,
 strikethrough, highlight, superscript, subscript, text color and safe links.
 Tables are semantic `<table>` elements with a header row. Images, drawings
-(Notes' fallback image, or its preview), scans (PDF with preview), audio,
+(see below), scans (PDF with preview), audio,
 video, files and link cards (title, domain and preview thumbnail) appear in
 body order. Attachments with no body marker are appended in creation order.
 An attachment with no usable source renders a visible
@@ -1802,6 +1926,19 @@ An attachment with no usable source renders a visible
 
 A folder export is one presentation document with notes separated by
 `<hr class="note-separator">`. It is not a backup or restore format.
+
+Classic PencilKit drawings (`com.apple.drawing.2` and `com.apple.drawing`)
+are rendered as SVG, decoded through the public native helper exactly as
+[`get-note-drawings`](#get-note-drawings) does. The SVG is embedded as a data
+URL, or written to the sidecar directory with `embedAssets: false`, and it is
+subject to the same size limits as any other asset. It stays sharp at any
+zoom, while Notes' own fallback image is a fixed-size PNG. Paper drawings
+(`com.apple.paper`) have no public decoder and keep Notes' fallback image or
+preview. If the helper is not built (`apple-notes-mcp setup --public-helper`),
+a drawing does not decode, the helper stopped at its stroke limit, or the SVG
+is too large, that drawing falls back to the PNG; the export never fails for
+it. The SVG traces each stroke's points with its color and mean width, so
+pencil grain and marker blending are approximated.
 
 **Requires:** Full Disk Access. Password-protected notes are skipped in a
 folder export and refused for a single note.
@@ -1815,6 +1952,7 @@ folder export and refused for a single note.
 | `outputPath` | string | Yes | Absolute HTML file to create. Create-only: an existing file is refused with `[output_exists]` |
 | `embedAssets` | boolean | No | Embed assets as data URLs (default `true`). Each asset is capped at 10 MiB and a document at 256 MiB of embedded assets; a larger one renders as unavailable with a hint to use `embedAssets: false` |
 | `assetsDir` | string | No | With `embedAssets: false`, the sidecar directory (default `<output stem>.assets` beside the file). Existing files are never replaced; a taken name gets `-2`, `-3`, ... |
+| `vectorDrawings` | boolean | No | Render classic drawings as SVG through the public native helper (default `true`). `false` keeps Notes' PNG for every drawing and never runs the helper |
 
 The HTML is always written to a file, because an embedded document is too
 large for an MCP message. Paths follow the `save-attachment` rules and may not
@@ -1822,8 +1960,14 @@ point inside the Notes library container. Sidecar URLs are relative to the
 HTML file, so the file and its `.assets` directory can be moved together.
 
 **Returns:** `format`, `count`, `bytes`, `output`, either `embedded` (assets
-embedded) or `assets` (`dir`, `files`), `stats`, and `skipped`. Nothing
-already written is deleted if a later step fails.
+embedded) or `assets` (`dir`, `files`), `stats`, and `skipped`. When the notes
+contain classic drawings and `vectorDrawings` is on, `vectorDrawings` reports
+`rendered` (drawings placed as SVG), `fallback` (drawings left as PNG), and
+`fallbackReasons`, a count per code such as `helper_not_installed`,
+`undecodable`, `truncated`, `timeout`, or `too-large`. After one helper
+timeout, or when the helper is not usable, the remaining drawings in the
+export are not decoded. Nothing already written is deleted if a later step
+fails.
 
 ---
 
@@ -1906,6 +2050,20 @@ be deleted.
 | `name` | string | Yes | The saved template to delete |
 
 **Returns:** `name`, `path`, and `deleted: true`.
+
+#### Template editor (command line)
+
+`apple-notes-mcp templates edit [name]` starts a local web editor for
+templates: edit the JSON on one side and see it validated and rendered
+against built-in sample notes on the other, then save it to the library
+(create-only unless you tick "replace"). It prints one address with a
+per-run token, listens on `127.0.0.1` only, refuses cross-origin requests,
+and stops on Ctrl-C or after 30 idle minutes (`--idle-minutes`). It reads a
+real note only when you pass `--note <id>`, and then read-only. `--tailnet`
+listens on this Mac's Tailscale address instead, so another device on your
+tailnet can open it; it never changes Tailscale or firewall settings. See
+[docs/markdown-templates.md](docs/markdown-templates.md#editing-in-a-browser)
+for options and exactly what it exposes.
 
 ---
 
@@ -2630,6 +2788,638 @@ title, modification date, folder identifier, lock/trash/shared/editable
 flags, iCloud version counters, and a `revision` change token (compare two
 reads to detect a change). Opens the store with Core Data's read-only option.
 
+### Private writer (opt-in, unsupported Apple API)
+
+An optional **writer** adds writes as a separate layer on top of the
+read-only helper. It is a second program
+(`native/private-helper/apple-notes-private-writer.m`) with its own binary,
+checksum manifest (`writer-manifest.json`), and setup command. The read-only
+helper above is unchanged, and nothing in its build or dispatch path can
+reach the writer. The writer is **off by default** and needs two switches:
+
+```bash
+apple-notes-mcp setup --native-writer          # build, ad-hoc sign, install
+apple-notes-mcp setup --native-writer --check  # report only
+```
+
+- `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` (the private opt-in) **and**
+  `APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1` (the write opt-in). The writer
+  itself refuses a read-write open of the live store without the second one.
+- `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` for a write that has not passed live
+  validation in a release (every write so far).
+
+Every write takes an `ifRevision` compare-and-swap token (the `revision` from
+`native-note-state` or a feature's own read), saves through Notes' own data
+model with optimistic locking, and re-reads the note through a fresh Core Data
+stack before it reports success. Failures carry `committed: false` (nothing
+was saved) or `indeterminate: true` (read the note before any retry). The
+writer cannot upload to iCloud; only Notes.app can, and it may skip a note it
+already holds in memory. The optional `nudge` asks Notes.app to save the note
+by moving it into the folder it is already in.
+
+Every writer tool that writes a note also takes the three
+[folder scope guards](#folder-scope-guards) (`ifFolderId`,
+`ifAncestorFolderId`, `forbiddenAncestorFolderIds`); the smart-folder writes
+apply them to the smart folder's parent. The writer checks them itself, in
+the same Core Data transaction as the write and just before the save, and a
+dry run checks them too. A failure is `code: "revision_conflict"` with
+`helperCode: "scope_conflict"` and `committed: false`. Unlike the AppleScript
+tools, every id must name an existing folder: an unknown id, or a forbidden id
+that names a deleted folder, refuses the call (`helperCode:
+"scope_folder_not_found"`) instead of matching nothing. `compose-note` takes
+the guards in `append` and `prepend` mode only.
+
+#### `native-writer-status`
+
+Reports both switches, the writer's installation and checksum state, its live
+probe, and per-feature availability with a `reason` (`disabled`,
+`writes_disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`,
+`not_live_validated`, `private_api_unavailable`, `store_unavailable`, …).
+Read-only.
+
+#### `native-append-plain-text`
+
+Appends plain text paragraphs to one note by Notes UUID (`identifier`) or
+x-coredata `id`, guarded by `ifRevision` and verified by read-back. Returns
+`committed`, `verified`, `revisionBefore`/`revisionAfter`, and sync state
+(`cloudSync`, `pushState`; `pushScheduled` is always false). With
+`nudge: true` it then moves the note in place and watches Notes' upload
+counters for `nudgeWaitSeconds` (default 30), reported under `sync`. Refuses
+locked, shared, trashed, and still-downloading notes.
+
+#### `native-sync-push`
+
+Gets writer-saved changes uploaded after the fact, for example a note written
+without `nudge` or one whose nudge timed out, and reports from Notes' own
+counters whether they were. Pass up to 50 note or folder UUIDs in
+`identifiers`. It never writes to the Notes database.
+
+- `method: "status"` reads each target's `currentLocalVersion` and
+  `latestVersionSyncedToCloud`, plus the library-wide `pendingUploadCount`.
+  Read-only.
+- `method: "nudge"` (default) makes a running Notes.app save each pending
+  note by moving it into the folder it is already in, as `nudge: true` does
+  after a write. Text, title, and modification date do not change
+  (`contentUnchanged` compares the revision token). Locked, shared, trashed,
+  and non-iCloud notes, and folders, are skipped with a `reason`.
+- `method: "relaunch"` quits and reopens Notes.app (or opens it when it is not
+  running) so its launch sweep uploads everything pending, folders included.
+  It interrupts anyone using Notes, so it requires `confirm: true`, and the
+  tool is annotated as destructive. It only counts this user's Notes.app
+  process, and stops without relaunching when it cannot tell whether Notes.app
+  quit.
+
+Afterwards the tool watches the counters for `waitSeconds` (default 30, or 0
+for `status`). `uploadRecorded` is true only when Notes recorded the current
+version as synced to iCloud; `pushScheduled` is always `false`.
+
+After a relaunch, each folder target also reports `adoptedByNotesApp`: whether
+the reopened Notes.app shows the folder by its id (or, for a deleted folder,
+no longer shows it), read through AppleScript for up to 20 seconds, with the
+details under `adoption`. `null` means it could not be checked. If reading the
+counters fails after Notes.app was restarted, the error
+(`helperCode: "relaunch_failed"`, `relaunched: true`) says so; check again with
+`method: "status"` rather than relaunching again.
+
+#### `native-edit-note`
+
+Edits selected text inside one note in place and leaves everything outside
+the edited ranges alone: attachments, tables, checklist state, paragraph
+styles, and inline formatting. Operations, applied together against one
+snapshot of the note:
+
+- `replace`: literal text (`match: "substring"` or `"equals"`), with plain
+  `text` that inherits the replaced range's formatting, or `runs`. A run is
+  `{text, bold?, italic?, underline?, strikethrough?, link?, highlight?,
+  color?}`, the same fields as a `compose-note` run: `link` is an http,
+  https, mailto, tel, notes, or applenotes URL, `highlight` is `purple`,
+  `pink`, `orange`, `mint`, or `blue`, and `color` is `#RRGGBB`. A run's
+  formatting is exactly what it states, so a run without `link` is not
+  linked even when it replaces linked text.
+- `insert_after` / `insert_before`: new paragraphs (`heading`, `subheading`,
+  `body`, `monospaced`, `bulleted`, `dashed`, `numbered`, `checklist` with
+  `checked: true` or `false`) next to a paragraph matched by its exact text or
+  by style and position (`{kind: "style", style: "subheading", occurrence: 2}`).
+  Only a `body` block may be empty.
+- `append_to_paragraph`: adds `runs` at the end of one existing paragraph, on
+  its own line, for example a source link after a bullet's text. `anchor`
+  names the paragraph like an insert anchor. The runs take the paragraph's
+  style and font; start the first run with a space.
+- `replace_checklist`: replaces a checklist with new `items`, each
+  `{text | runs, checked, indent?}`. With `select: "block"` (the default) it
+  replaces one contiguous run of checklist rows: the one holding a row whose
+  whole text is `containing`, the `occurrence`-th, or the only one. With
+  `select: "all"` it replaces every checklist row: the first run becomes the
+  new items and the other runs are removed. Every other paragraph and
+  attachment stays as it is; a run that holds the title or an attachment is
+  refused. The dry run lists `removedItems` (text and checked state), and the
+  optional `expectedCount` counts replaced rows.
+- `delete_paragraph`: a paragraph matched by its exact text, or an empty list,
+  checklist, or heading row (`{kind: "blank", style}`). Each paragraph goes
+  with its own line break; deleting the last paragraph removes only its text
+  and leaves the previous paragraph's line break, as `trim_blank_lines` does.
+  Adjacent paragraphs matched by one operation are removed as one range.
+- `set_title`: the first paragraph.
+- `trim_blank_lines`: removes redundant empty paragraphs. `mode: "runs"`
+  keeps the first `keep` (default 1) of every run of blank lines, `"end"`
+  removes trailing blank lines, and `"around"` removes the blank lines
+  directly before and/or after (`side`) the one paragraph `anchor` names
+  (`keep` defaults to 0 for both). Only paragraphs holding nothing but
+  whitespace, in a title, heading, subheading, or body style, are removed,
+  each with its own newline; the title paragraph and empty list, checklist,
+  monospaced, and attachment rows are never touched. The dry run lists every
+  paragraph it would remove (`paragraphIndex`, `paragraphStyle`,
+  `blankUTF16`). Here `expectedCount` is optional and counts removed
+  paragraphs.
+
+`expectedCount` (default 1) must equal the number of matches, and
+`occurrence` picks one of them, so it may not exceed `expectedCount`.
+Matching is case-sensitive, stays inside one paragraph, never splits a
+character (a match inside an emoji or before a combining accent is refused
+with `unsupported_selection`), and never touches an attachment glyph unless an
+attachment selector names it.
+
+An attachment selector, `{kind: "attachment", identifier | id | ordinal}`,
+names one of the note's attachments by its Notes UUID or x-coredata id (both
+from `get-note-structure`; `list-attachments` gives the id) or by its
+1-based position among the note's attachments in body order. Inline objects
+(hashtags, mentions, note links) are not counted and cannot be selected.
+Notes stores some attachments, such as an image added through AppleScript, as
+two adjacent glyphs; the selector treats them as one attachment, counts it
+once, and edits all of its glyphs together.
+
+- In `replace`, `position: "self"` (the default) replaces the attachment with
+  the replacement text, and empty text removes it from the body.
+  `position: "before"` or `"after"` inserts the text inline beside it.
+- In `replace` with `position: "self"`, `replacement: {file, filename?}` puts
+  a new attachment in its place in the same save: `file` is an absolute path
+  in your home folder, a temporary folder, or `/Volumes` to a non-empty image
+  or PDF of at most 64 MiB (the final path component may not be a link), and
+  `filename` is the name Notes shows, which must keep the file's extension.
+  The attachment it replaces must be a file (image, PDF, or other file), not a
+  table, drawing, or link card. The dry run reads the file and reports its
+  size and SHA-256 in `replacementFiles` without writing anything; the apply
+  creates the attachment, verifies its type, name, and bytes in a fresh read,
+  and removes it again if anything fails before the save.
+- In `delete_paragraph`, it removes the attachment's own paragraph, which must
+  hold nothing but the attachment and whitespace.
+- As an `insert_after` / `insert_before` / `append_to_paragraph` anchor, it
+  names the paragraph that holds the attachment.
+
+Only the named attachment's glyphs may be inside an edited range. The plan
+lists `removedAttachments`. The apply proves that every other attachment row
+still belongs to the note with the same stored values and reports what
+happened to each removed attachment's row (`rowStillInNote`,
+`markedForDeletion`). Removing an attachment from the body does not delete its
+file; Notes decides when to clean up the row.
+
+Always call it twice. `dryRun: true` is read-only and returns the plan
+(targets, `lengthBefore`/`lengthAfter`, `unchangedUTF16`, `wouldChange`),
+`revisionBefore`, and `planDigest`. Then send the identical request with
+`dryRun: false`, `ifRevision` set to that `revisionBefore`, and `ifPlanDigest`
+set to that `planDigest`. The digest covers the operations,
+`requireNonSystemPaper`, and each replacement file's bytes, so the apply
+refuses (`plan_mismatch`, reported as `revision_conflict`) when anything
+differs from the dry run. The apply re-reads the note in a
+fresh Core Data stack and returns `preservation`, which says that every
+character outside the edits kept its formatting, that the attachment glyph
+sequence is the planned one, and that the note's attachment rows did not
+change (apart from an attachment the request removed or a replacement file
+added). The comparison reads every stored field of each paragraph style
+(including checklist state and list numbering), font, color, link, and
+attachment reference; a note holding formatting of any other kind is refused
+at the dry run (`unsupported_note`) rather than edited without that proof.
+Refusals commit nothing: `revision_conflict`, `match_count_mismatch`,
+`mixed_formatting` (use `runs`), `conflicting_operations`, `title_invariant`,
+`unsupported_selection`, `unsupported_attachment`, and
+`unexpected_side_effect` (the edit would change
+another object, for example an attachment Notes uses for the title). Takes
+`nudge` like `native-append-plain-text`. Planning needs the two writer
+switches; applying also needs `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` until the
+edit path is live-validated.
+
+#### `compose-note`
+
+Writes natively formatted content through the writer in one save: headings,
+subheadings, body paragraphs, block quotes, monospaced blocks, bulleted,
+dashed, and numbered lists with indent, checklists with their checked state,
+native dividers (`{"type":"divider"}`), native tables
+(`{"type":"table","rows":[["A","B"],["1","2"]]}`), local files
+(`{"type":"file","path":"/Users/me/Report.pdf","filename":"Q3 Report.pdf"}`),
+rich link cards (`{"type":"urlCard","url":"https://example.com/"}`), and links
+to other notes (`{"type":"noteLink","identifier":"<uuid>","text":"See"}`).
+Inline runs carry bold, italic, underline, strikethrough, links (http,
+https, mailto, tel, notes, applenotes), named highlights (purple, pink,
+orange, mint, blue), and `#RRGGBB` text color. A link must already be
+well-formed (spaces and non-ASCII characters percent-encoded), so the stored
+link equals the request. Every link to a note, from a `noteLink` block, a run,
+or Markdown, must name an existing note that is not locked or in Recently
+Deleted. Give `blocks` or `markdown`, not both.
+
+File and link-card blocks go where they appear, in the same save as the text.
+A file follows `add-attachment`'s rules: an absolute path to a nonempty
+regular file (not a symbolic link) of at most 64 MiB, and an optional
+`filename` that keeps the source extension. The writer reads each file once
+and creates the attachment from exactly those bytes; one request takes at
+most 20 file and link-card blocks and 128 MiB of files. A link card is an
+absolute http(s) URL; Notes fetches its title and image later, as with
+`native-add-url-card`. If anything fails before the save, the writer rolls
+back every row and deletes every attachment file it wrote.
+
+| `mode` | Target | Guard |
+|--------|--------|-------|
+| `create` | `title` plus optional `folder` and `account` | Notes.app creates the note (AppleScript), then the writer appends the content below the title under a revision read immediately after |
+| `append` | `identifier` or `id` | `dryRun: true`, then the identical request with `ifRevision` set to the plan's `revisionBefore` |
+| `prepend` | `identifier` or `id` | Same; inserts directly below the title line |
+
+`append` also takes `insertBeforeHeading` (`text`, `occurrence`,
+`expectedCount`) to insert before one exact Heading-style paragraph; a count
+mismatch returns `selector_conflict` with nothing written.
+`requireNonSystemPaper` refuses a Quick Note target. A note with no body at
+all (not even a title line) is refused, because its first paragraph is the
+title. After saving, the writer
+re-reads the note through a new Core Data stack and compares every written
+paragraph's style, indent, block quote, checklist state, and runs with the
+request; `readBack` reports them, and `unitStart` and `objectURI` say where
+the written paragraphs begin. The server then checks `readBack` against the
+request itself: each run's length and attribute values (link URL, highlight,
+color, styles) and, for each object, its kind, type, card URL, or file name.
+A mismatch at either step returns `verification_failed` with
+`committed: true` and `indeterminate: true`. On the live store the server then
+decodes the same paragraphs from NoteStore.sqlite with its own block decoder
+(the one behind `get-note-blocks`) and reports the comparison of text and
+attribute values as `databaseReadBack` (`matches`, or `checked: false` with a
+reason).
+
+Appending or prepending never changes what the note already holds. Before
+anything changes, the writer fingerprints every existing attachment: each
+attachment row (identifier, type, metadata, and mergeable data such as a
+table's cells), its media row, its file's bytes where the file is on this
+Mac, every inline attachment, and the order of attachment glyphs. It takes
+the same fingerprint again just before the save and refuses with
+`attachment_drift` (`committed: false`) on any difference, and once more
+after the save, where a difference is `verification_failed` with
+`attachmentDrift`. `frozenAttachments` in the result reports the counts. The
+one change it accepts is a raised version floor
+(`minimumSupportedNotesVersion`), which Notes' own model applies to every
+attachment when new content, such as a divider, needs a newer Notes; those
+rows are listed in `frozenAttachments.versionFloorRaised`.
+
+With `nudge: true` a verified write is followed by the same move-in-place
+nudge as `native-append-plain-text`. `create` checks every limit before
+Notes.app creates the note: content rules, the writer's size limits (table
+cell text counts toward the 200,000 UTF-16 limit, at most 10,000 per cell and
+20,000 runs), and the writer's 1 MiB request size. If the compose still fails
+with nothing written, the server moves the new title-only note to Recently
+Deleted (`createdNote: "moved_to_recently_deleted"`), but only when the note
+is still exactly as created. Otherwise the error names it (`noteCreated`,
+`id`, `identifier`, `createdNote: "kept"`).
+
+```json
+{
+  "mode": "append",
+  "identifier": "D629A948-0C61-43BA-8FDE-04CD6DED38C7",
+  "dryRun": true,
+  "blocks": [
+    { "type": "heading", "text": "Review" },
+    { "type": "body", "runs": [{ "text": "Ready", "bold": true }, { "text": " to ship" }] },
+    { "type": "checklist", "items": ["Draft", "Publish"], "checked": [true, false] },
+    { "type": "bulleted", "items": ["Owner", { "text": "Backup owner", "indent": 1 }] },
+    { "type": "code", "text": "npm test\nnpm run build" }
+  ]
+}
+```
+
+The Markdown importer maps `#` and `##` to Heading and `###` and deeper to
+Subheading, and imports `-`/`*`/`+` and `1.` lists with nesting, `- [ ]` and
+`- [x]` checklists, `>` quotes, fenced code, `**bold**`, `*italic*`,
+`~~strikethrough~~`, `<u>underline</u>`, and links, and turns `---` into a
+divider and pipe tables into native tables (cells as plain text). A table
+needs a delimiter row with pipes and the header's cell count (`|-|-|` is
+enough); extra cells in a body row are dropped with a warning. An image alone
+on a line becomes a file block when it points at an absolute path
+(`![](/Users/me/chart.png)`) and a link card when it points at an http(s) URL;
+the alt text is dropped. In `create` mode a leading `# ` line equal to the
+title is dropped. Dividers, tables, files, and link cards are created only on
+apply and reported under `objects`; the dry run lists what it would create,
+with each file's size and SHA-256. The writer re-reads each object, every
+table cell, each card's URL, and each file's bytes. Writes need both writer
+switches and, until this path passes live validation in a release,
+`APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`; dry runs do not. Files and link cards
+also need the writer's `composeAttachments` feature (`native-writer-status`).
+
+#### `native-checklist-state`
+
+Lists a note's native checklist items from Notes' own model: each item's
+`todoIdentifier` (32 hex digits, the same `id` `get-native-objects` reports),
+`done`, `index`, `text`, line and styled-character offsets, plus the note's
+`revision`. Read-only, but it runs through the writer, so it needs both
+switches. Items come from the exact characters that carry each todo identity,
+so a newline stored in the next item's run never shifts an item onto the
+wrong line.
+
+#### `native-set-checklist-item`
+
+Checks (`done: true`) or unchecks (`done: false`) one existing checklist item
+by `todoIdentifier`, guarded by `ifRevision`. Only that item's done bit
+changes: its identity, text, indentation, and every other attribute are kept.
+The writer re-reads the note through a new Core Data stack and reports
+`persistedDone`, and fails verification if the text, the item's characters,
+or any other item changed. When the item already has the requested state it
+writes nothing and returns `status: "unchanged"`, `committed: false`. An
+identifier that matches no item is `not_found`; one that appears in two places,
+or that two adjacent lines share, is `ambiguous_target` (envelope code
+`ambiguous`). Sync reporting and the
+optional `nudge` match `native-append-plain-text`; the nudge is skipped when
+nothing was written.
+
+#### `native-highlight-text`
+
+Applies Notes' highlight (`purple`, `pink`, `orange`, `mint`, `blue`) to, or
+removes it (`color: "none"`) from, every exact occurrence of a literal,
+case-sensitive `match` within one paragraph. It refuses with
+`match_count_mismatch` (envelope code `validation_error`, with `found`),
+writing nothing, unless the text occurs exactly `expectedCount` times
+(default 1). A match that starts or ends inside a composed character (a
+letter and its combining accent, an emoji sequence) is refused with
+`invalid_request` and `splittingMatches`; include the whole character.
+`dryRun: true` reports each match and its current highlight without writing,
+plus `writeAvailable` (whether this macOS offers the write); a write needs
+`ifRevision` from `native-note-state`. Only the
+highlight attribute of the matched characters changes. The writer re-reads
+the note through a new Core Data stack and requires the text to be unchanged,
+every highlight run in the note to match the request, and Notes' `hasEmphasis`
+flag to agree, then returns the stored runs per match (`ranges`). When every
+match already has the requested state it writes nothing
+(`status: "unchanged"`). Sync reporting and the optional `nudge` match
+`native-append-plain-text`. Writes also require
+`APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` until live-validated in a release; dry
+runs do not.
+
+`scope: "note"` targets the whole body after the title instead of `match`
+(which, like `expectedCount`, is refused with it). It skips the title
+paragraph through its newline and every attachment glyph (images, files,
+tables, drawings, inline tags), whose contents are never changed, and keeps
+paragraph separators in the body. Every result reports `rangeCount` and
+`characterCount` (UTF-16 units targeted), and for this scope `skipped`:
+`titleUTF16`, `attachmentGlyphs`, and `highlightedAttachmentGlyphs` (glyphs
+that already carry a highlight, which keep `hasEmphasis` true after a
+removal). A note with no text after its title outside attachments is refused
+as `nothing_to_highlight` (envelope code `validation_error`).
+
+#### `native-add-url-card`
+
+Adds a rich web link card (the preview tile Notes shows for a pasted URL) to
+one note: a new `public.url` attachment plus its attachment glyph on a line of
+its own, at the end of the note or directly after the one paragraph whose full
+text equals `afterParagraph`. After a paragraph, the card goes after that
+paragraph's own line break and ends with a body-style line break of its own
+(`terminatorInserted`), so it never takes the paragraph's style: a card after
+a checklist item is a plain line, not a second item. Zero or several matching
+paragraphs refuse with `match_count_mismatch` (envelope code
+`validation_error`, with `found`) and write nothing. `url` must be an absolute
+`http` or `https` URL. `dryRun: true` reports the insertion point without
+writing, plus `writeAvailable` (whether this macOS offers the write); a write
+needs `ifRevision` from `native-note-state`. The writer re-reads the note
+through a new Core Data stack and requires the text to equal the old text plus
+the card at the planned index, the glyph to name the new attachment exactly
+once, the card's line to have the body paragraph style, and the attachment
+row to be a `public.url` attachment for that URL on that note. It makes no
+network request: Notes fetches the card's title and preview image itself. The
+result carries the attachment's own `cloudSync` counters. Not idempotent: a
+repeat adds a second card, but the replayed revision is refused. Sync
+reporting and the optional `nudge` match `native-append-plain-text`. Writes
+also require `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` until live-validated in a
+release; dry runs do not.
+
+#### `native-set-paragraph-id`
+
+Gives one paragraph a paragraph identifier of its own, so
+`get-paragraph-link` and `list-note-paragraphs` can link it. Use it when
+`list-note-paragraphs` reports the paragraph's `paragraphIdStatus` as `shared`
+or `missing`. Pass the paragraph's `blockIndex` and `text` (as
+`expectedText`) from `list-note-paragraphs`, and `ifRevision` from
+`native-note-state`. The writer applies the same block and uniqueness rules
+as `list-note-paragraphs`, mints a UUID (or assigns `paragraphId` if it is
+unused), and verifies by read-back that only that paragraph's identifier
+changed. Returns `status: "updated"` with the new `paragraphId` and `url`, or
+`status: "unchanged"` (nothing written) when the identifier was already
+unique. `paragraph_changed` (code `revision_conflict`, `committed: false`)
+means the block no longer holds that text. Takes the optional `nudge`.
+
+#### `native-add-section-link`
+
+Inserts a native section-link chip, the chip Notes pastes for Copy Link to
+Section, into a note (macOS 27 or later). The chip opens a paragraph of the
+same note or, with `target`, of another note. Choose the paragraph by
+`blockIndex` plus `expectedText` from `list-note-paragraphs`, by a
+`paragraphId` that is unique in the target, or by `heading` (title, heading,
+or subheading text, exact and case-insensitive); with none of them it links
+the first heading or subheading. When the paragraph's identifier is `shared`
+or `missing`, the writer mints one in the same save (`paragraphIdMinted`).
+`position` is `end` (default) or `belowTitle`, and
+`clearExistingSectionLinks: true` first removes the note's section-link chips
+(note-link chips stay). Needs `ifRevision` for the note and, for another
+note, `ifTargetRevision`, both from `native-note-state`. Returns `url`,
+`token`, `section`, `paragraphId`, `inlineAttachmentIdentifier`,
+`clearedSectionLinks`, the revisions of both notes, and sync state.
+`list-note-links` then reports the chip as kind `section`. With `nudge: true`
+it nudges the note, and the target note too when an identifier was minted
+there.
+
+#### Native tables
+
+Five tools edit native tables by their CRDT identifiers. Tables, rows, and
+columns are addressed by native identifier, never by position alone, and
+every write needs two tokens: the note `revision` as `ifRevision` and the
+table `digest` as `ifTableDigest`.
+
+Each apply verifies through a fresh Core Data stack that the body text is
+unchanged and the table equals the planned result. A stale token fails with
+`revision_conflict` (the envelope code for both the note and the table
+token; `helperCode` says which) and `committed: false`. Applies take the
+same optional `nudge`; its `uploadRecorded` covers the note record, not the
+table attachment's own record. Dry runs and `native-read-tables` are not
+gated by `APPLE_NOTES_MCP_ALLOW_UNVERIFIED`; applies are.
+
+#### `native-read-tables`
+
+Read-only. Returns every active table in a note with its `identifier`,
+`glyphCount`, `orphan` flag, `digest`, `columnIdentifiers`, and `rows`
+(`{identifier, cells}`), plus the note `revision`.
+
+#### `native-delete-table-row`
+
+Two phases. `dryRun: true` opens the store read-only and returns the row, its
+cells, and both tokens; `dryRun: false` with those tokens deletes it. A
+table's only row cannot be deleted.
+
+#### `native-insert-table-row`
+
+Adds a row after `afterRowIdentifier` (or at the end) with optional
+plain-text `cells`, and returns the new `rowIdentifier`.
+
+#### `native-set-table-cell`
+
+Replaces one cell's text and returns `previousText`.
+
+#### `native-prune-orphan-table`
+
+Two phases, like the row delete. Tombstones a table attachment that no body
+glyph shows (`orphan: true`), the same way Notes deletes an attachment. It
+refuses a visible table, and a note whose body has an attachment glyph it
+cannot identify, since that glyph could be the table's
+(`unsupported_attachment`, `unidentifiedGlyphs`). Before saving it refuses
+any change beyond the note and the table (`unexpected_changes`), and the
+read-back requires the table row to exist and be marked deleted.
+
+#### Smart folders
+
+Four tools create, edit, and delete smart folders. Find a smart folder and
+its rules with the read-only `list-smart-folders` first; it returns each
+folder's `identifier` and stored query (`rawQuery`).
+
+Each query goes through Notes' own query parser, and the writer stores the
+form Notes regenerates from it. A query Notes cannot store without changing
+its meaning is refused (`query_not_representable`); a tag must exist exactly
+once in the destination account (`tag_not_found`), and a folder filter must
+name an ordinary folder there. Like the smart-folder destination guard, a
+smart folder is never a parent: the create refuses one with `code:
+"unsupported"`, `committed: false`, and `reason: "smart_folder_destination"`.
+Every write is verified through a fresh Core Data stack. The sync nudge is
+not offered, because it moves notes and a folder has no equivalent; check
+`cloudSync` with `native-read-smart-folder` after Notes.app saves. After a
+committed write, the result reports `adoptedByNotesApp`: whether a running
+Notes.app shows the change (the folder, with its title, or after a delete its
+absence), polled for `adoptionWaitSeconds` (0 to 60, default 10). Notes.app is
+never launched for this; when it is not running, `adoptedByNotesApp` is
+`null`. Writes
+need `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`; the read and the delete's dry run
+do not.
+
+#### `native-read-smart-folder`
+
+Read-only. One smart folder's state by `identifier`, with its canonical
+`queryJSON`, decoded rules, child and note counts, `cloudSync`, and a folder
+`revision` (`f1:…`).
+
+#### `native-create-smart-folder`
+
+`title` plus `query` (an object or a JSON string), at the root of `account`
+(default: Notes' default account) or inside the ordinary folder
+`parentIdentifier`. Calling it again with the same title, destination, and
+query returns `status: "ok"` and writes nothing; a different folder with that
+title is refused (`folder_exists`).
+
+#### `native-update-smart-folder`
+
+Replaces one smart folder's query, guarded by its `revision` as `ifRevision`.
+It changes only the query. A folder that has no title or parent timestamp
+keeps it missing, and the result lists it in `timestampsMissing` rather than
+stamping one.
+
+#### `native-delete-smart-folder`
+
+Two phases. `dryRun: true` returns the folder and its `revision`;
+`dryRun: false` with that revision marks it deleted, the way Notes deletes a
+folder. Only empty smart folders.
+
+#### `native-add-paper`
+
+Adds one drawing to the end of a note as editable ink: a Paper drawing
+(`com.apple.paper`), or a classic drawing (`com.apple.drawing.2`) with
+`format: "drawing"` or when this macOS cannot create Paper. Pass exactly one
+source:
+
+- `drawing`: `strokes` (each with `points` as `[x, y]` or `[x, y, width]`,
+  plus optional `ink`, `color` as sRGB `[r, g, b, a]` from 0 to 1, and
+  `width`) and `shapes` (`rectangle`, `ellipse`, `line`, `arrow`, `polygon`,
+  `star`, `chatBubble`, `polyline`). Shapes are written as strokes that trace
+  them (`shapePersistence: "stroke-fallback"`), not as Notes shape objects.
+- `svgPath`: an SVG file, converted by the same analyzer as `analyze-svg` and
+  analyzed again at write time. A `safe` SVG needs nothing more. A `lossy` one
+  needs `ifSvgAnalysis` equal to its `analysisDigest` and `allowSvgLosses`
+  equal to its `requiredLosses`, no more and no less.
+
+Inks are `pen` (default), `pencil`, `marker`, `fountainpen`, `watercolor`, and
+`crayon`; the writer refuses an ink that PencilKit would store as a different
+one. Guarded by `ifRevision` like every write; `dryRun: true` validates and
+reports the plan (format, stroke and point counts, bounds) without writing and
+without `APPLE_NOTES_MCP_ALLOW_UNVERIFIED`. A write is verified by decoding
+the saved drawing in a fresh Core Data stack (`decodedStrokeCount`,
+`decodedPointCount`) and returns `attachmentIdentifier` and the usual sync
+fields; `nudge` works as for `native-append-plain-text`. The writer embeds a
+bundle identifier because PencilKit needs one to build a drawing, so the
+first Paper write creates
+`~/Library/Preferences/io.github.apple-notes-mcp.private-writer.plist`.
+
+#### `native-repair-purge-flag`
+
+Finds and repairs a note that carries Notes' permanent-deletion flag
+(`markedForDeletion`) while it is still in an ordinary folder. Notes deletes a
+note by moving it to Recently Deleted and sets that flag only when the note
+leaves Recently Deleted for good. A note flagged outside Recently Deleted is in
+neither state: Notes hides it and will purge it, but the user cannot recover
+it. The known cause is a tool that set the flag instead of moving the note.
+
+- No `identifier` (dry run): scans the store and returns up to 50 candidates.
+- `identifier` with `dryRun` (the default): returns the note's `state`
+  (`active`, `in_recently_deleted`, `purging_from_recently_deleted`,
+  `purge_flag_outside_recently_deleted`, `purge_flag_without_folder`,
+  `folderless`), `repairable`, `blockers` (`locked`, `shared`, `downloading`,
+  `attachments_marked_for_deletion`, `no_recently_deleted_folder`, …), and the
+  note's `revision`.
+- `dryRun: false` with that `revision` as `ifRevision` and `confirm: true`
+  clears the flag and moves the note to its account's Recently Deleted
+  folder, as an ordinary delete would, and stamps the folder time, which
+  starts Notes' 30-day clock. It never purges anything. A fresh read-back
+  checks the flag, the folder, the timestamp, and an unchanged body.
+
+Risk: a flag Notes set on purpose, for example a permanent delete on another
+device that has not finished syncing, looks the same on this Mac. Repairing
+that note brings it back into Recently Deleted, and the move syncs to every
+device. Only repair a note the user recognizes as wrongly lost. The move then
+needs Notes.app to upload it; the in-place nudge skips trashed notes, so use
+`native-sync-push` with `method: "relaunch"` if it should upload now. The
+apply needs `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1` until live-validated.
+
+#### `native-read-paper`
+
+Read-only. Decodes one Paper drawing (`com.apple.paper`) in a note, in three
+layers that each report whether they ran:
+
+- `strokes`: every pen stroke with its `ink`, sRGB `color`, `width`,
+  `transform`, `renderBounds`, and `points` as compact arrays in `pointFields`
+  order (x, y, width, height, opacity, force, azimuth, altitude, timeOffset).
+  `maxPoints` (default 20000, at most 40000) caps the points returned;
+  `includePoints: false` leaves them out.
+- `shapes` (macOS 27 or later): the drawing's typed shapes as Notes stores
+  them, not traced strokes: `kind` (`rectangle`, `roundedRectangle`,
+  `ellipse`, `line`, `arrowShape`, `star`, `regularPolygon`, `chatBubble`),
+  `frame` and `rotation` (radians about the frame's center), `lineWidth`,
+  `opacity`, `fillColor`, `strokeColor`, `startLineMarker` and `endLineMarker`
+  (`none` or `arrow`), `path` as SVG path data in drawing coordinates with the
+  frame and rotation applied, and `text` for a text box (a rectangle with
+  text). `shapeDecode` gives `available`, a `reason` when it did not run
+  (`requires_macos_27`, `private_api_unavailable` with `missing`, or
+  `not_requested` with `includeShapes: false`), and `elementKinds`, the count
+  of every PaperKit element by kind.
+- `fallbackGeometry`: the painted paths of the fallback PDF Notes keeps for
+  older devices, when the drawing has one (`reason: "no_fallback_pdf"`
+  otherwise). Each path has `paint` (`stroke`, `fill`, or `fillStroke`),
+  `kind` (`rectangle` or `path`), `d` as SVG path data in PDF page space
+  (points, origin at the bottom left), `fillRule`, colors, and `lineWidth`.
+  Text, images, and shadings are counted in `skipped`, not decoded.
+
+Pass `attachmentIdentifier` when the note has more than one Paper drawing
+(`ambiguous_attachment` lists them). The writer opens the store read-only and
+decodes a private copy of the drawing's bundle, never the live one. The typed
+shapes come from PaperKit through two internal entry points, so they are
+checked at run time and offered only on macOS 27; the other layers use
+NotesShared's drawing reader and the stored PDF. Like every writer tool it
+needs both writer switches, but it writes nothing and needs no
+`APPLE_NOTES_MCP_ALLOW_UNVERIFIED`.
+
 ## Usage Patterns
 
 ### Basic Workflow
@@ -2767,6 +3557,8 @@ All configuration is optional — the server works out of the box. Override beha
 | `APPLE_NOTES_MCP_CONFIG_FILE` | `~/Library/Application Support/apple-notes-mcp/config.json` | Path to the JSON config file (see below). |
 | `APPLE_NOTES_MCP_TIMEOUT_MS` | `30000` (30 s) | Total AppleScript operation timeout, including retry attempts and delays. Raise it if full-library operations (large searches, exports) time out on a big Notes library. Per-call `timeoutMs` options still win, and a write tool's `timeoutSeconds` argument overrides it for that call. |
 | `APPLE_NOTES_MCP_TEMPLATE_DIR` | `~/Library/Application Support/apple-notes-mcp/templates` | Absolute directory of the saved Markdown template library (`save-markdown-template` and friends). |
+| `APPLE_NOTES_MCP_ANCHOR_FILE` | `~/Library/Application Support/apple-notes-mcp/paragraph-anchors.json` | Absolute path of the [paragraph anchor](#paragraph-anchors) registry. |
+| `APPLE_NOTES_MCP_ANCHORS_TOKEN` | unset | Token for `apple-notes-mcp anchors serve` (at least 32 characters). Unset, the resolver makes a new random token each run. |
 | `APPLE_NOTES_MCP_EXPORT_MAX_BYTES` | `8388608` (8 MB) | Largest response `export-notes-json` sends; a page closes early to stay under it. `export-notes-markdown` returns inline Markdown up to half of it. The default sits below the 10 MB per-message limit of MCP SDK stdio clients, which drop the connection on anything larger. Raise it only if your MCP client accepts bigger messages. |
 | `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES` | `4194304` (4 MB) | Largest block payload one [`get-note-blocks`](#get-note-blocks) page returns; the page closes early to stay under it, and a single oversized paragraph comes back with `textOmitted: true`. [`get-note-structure`](#get-note-structure) also omits note text larger than this. A [`list-note-paragraphs`](#list-note-paragraphs) or [`list-note-links`](#list-note-links) page also stops early to stay under it. |
 | `APPLE_NOTES_MCP_MAX_RETRIES` | `2` | Maximum attempts for a read-only AppleScript call that fails with a **transient** error (Notes.app busy / not responding / lost connection). `2` means one retry; set `1` to fail fast with no retries. Retries share the single `APPLE_NOTES_MCP_TIMEOUT_MS` budget rather than each getting a fresh one, and a retry is skipped when under a second of that budget remains — so this is a ceiling, not a guarantee. In particular a call that exhausts the budget with a **timeout** has no time left to retry by construction. Mutating operations run once because a timeout can occur after Notes.app applied the change. Non-transient errors (e.g. "note not found") never retry. |
@@ -2840,6 +3632,41 @@ Every tool that does not read the Notes database works normally without Full Dis
 
 ---
 
+## Permissions check
+
+`apple-notes-mcp setup --permissions` checks, in one report, the four grants that decide what the server can do on this Mac:
+
+| Item | How it is checked | Needed for |
+|------|-------------------|------------|
+| Full Disk Access | one read-only `SELECT 1` against `NoteStore.sqlite` | every database-backed tool (see [Full Disk Access](#full-disk-access)) |
+| Automation of Notes.app | one read-only Apple event (the first account's name) | every AppleScript tool |
+| Shortcut bridges (optional) | `shortcuts list`, like `setup --check` | the native-write tools |
+| Speech Recognition (optional) | the public helper's `speech_status`, read without prompting | `transcribe-note-audio` before macOS 26 |
+
+```bash
+apple-notes-mcp setup --permissions          # report, then press Enter to check again
+apple-notes-mcp setup --permissions --open   # also open the System Settings pane of each missing grant
+apple-notes-mcp setup --permissions --once   # report once and exit (also --json)
+```
+
+For each missing grant the report names the System Settings pane and its URL, for example `x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles` (the `com.apple.preference.security` form before macOS 13). Panes open only with `--open`, each once per run. The command never changes a setting or a grant: you make the change in System Settings, then press Enter to check again. Type `q` to stop. It exits 0 when Full Disk Access and Automation are both granted, 1 otherwise. The first check may make macOS ask whether the app may control Notes; choose **Allow**, since that prompt is the only way to add an Automation grant.
+
+macOS attributes these grants to the app that launched the process, so the report names it (for example `/Applications/iTerm.app`). Run the check from the app you use as the MCP host when you can. Claude Desktop launches servers as their own responsible process, so for it use the `doctor` tool inside Claude Desktop, and add the Node binary it names to Full Disk Access. The Speech item reads `unknown` until the [public native helper](#public-native-helper) is built.
+
+### Optional checklist window
+
+The same checklist is also available in a small window with **Open Settings** and **Re-check** buttons. Like the public helper, it is built on your Mac from the packaged Swift source, never shipped as a binary:
+
+```bash
+apple-notes-mcp setup --permissions-window           # compile, ad-hoc sign, verify, install
+apple-notes-mcp setup --permissions-window --check   # report the installed state only
+apple-notes-mcp setup --permissions --window         # open the window
+```
+
+Setup compiles `native/permissions-window/apple-notes-permissions-window.swift`, signs it ad hoc, runs its `hello` handshake (which shows no window), and installs it in `~/Library/Application Support/apple-notes-mcp/permissions-window/` with a manifest of source and binary SHA-256 digests; `APPLE_NOTES_MCP_PERMISSIONS_WINDOW_DIR` overrides the folder. The window probes nothing itself. The command runs every check and sends the results to it, and opens a pane only for an item it reported. If the window is not built, is stale after an upgrade, or was modified, `--window` says so and shows the checklist in the terminal instead. The server never uses the window.
+
+---
+
 ## Public native helper
 
 `get-note-drawings` needs Apple's PencilKit framework and `transcribe-note-audio` needs the Speech framework; neither has an AppleScript or command-line interface. For them, the server uses a small Swift helper that links public Apple frameworks only (AppKit, PencilKit, AVFoundation, and Speech). No prebuilt binary ships with the package. Build it once on your Mac:
@@ -2852,6 +3679,45 @@ apple-notes-mcp setup --public-helper --check  # report the installed state only
 Setup compiles `native/public-helper/apple-notes-public-helper.swift` with `xcrun swiftc` (install the Command Line Tools with `xcode-select --install` if it is missing), signs it ad hoc, runs its `hello` handshake, and installs it in `~/Library/Application Support/apple-notes-mcp/public-helper/` next to a manifest recording the SHA-256 of the source and the binary. Before every use the server re-checks both digests: after an upgrade that changes the helper source, or if the binary is replaced, the helper is refused until you run setup again. `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` overrides the install folder and `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` the per-call timeout.
 
 The helper never opens the Notes database and never writes under the Notes group container. The server reads the bytes it needs (read-only) and passes them to the helper on stdin, or, for transcription, names one audio file that the helper opens for reading; the helper answers with one JSON object on stdout.
+
+---
+
+## Paragraph anchor resolver (opt-in)
+
+An `applenotes://` paragraph link only opens on an Apple device, and it breaks
+when the paragraph's ID changes. For links shared outside Notes, you can run a
+small local resolver that looks up a [paragraph anchor](#paragraph-anchors)
+when the link is opened and redirects to the paragraph's current link:
+
+```bash
+apple-notes-mcp anchors serve                 # http://127.0.0.1:<random port>
+apple-notes-mcp anchors serve --port 8765     # a fixed port
+apple-notes-mcp anchors serve --tailnet       # this Mac's Tailscale address instead
+```
+
+It serves one route, `GET /a/<anchor-id>?token=<token>`. A `resolved` anchor
+answers with a 302 redirect to the `applenotes://` link. Any other status gets
+a short plain-text answer and no redirect: 409 for `ambiguous`,
+`low-confidence`, `needs-reminting` and `note-unreadable`, and 404 for a gone
+paragraph or note.
+
+- **Off by default.** Only this command starts it; the MCP server never does.
+  It runs in the foreground until you press Ctrl-C.
+- **Loopback by default.** It binds `127.0.0.1`. `--tailnet` binds the first
+  `100.64.0.0/10` address on this Mac (a Tailscale address) instead, and fails
+  if there is none. It never runs `tailscale` and never changes Tailscale,
+  firewall or system settings.
+- **Token required.** Every request needs the token, as `?token=` or
+  `Authorization: Bearer`. It is `APPLE_NOTES_MCP_ANCHORS_TOKEN` when set (at
+  least 32 characters; use this for links that must survive a restart), or a
+  random token printed once at startup. Tokens are compared in constant time
+  and never logged; request logs on stderr omit the query string. After 20
+  failed token checks in a minute, requests get 429 until the minute passes.
+- **Host check.** The `Host` header must name the bound address, which blocks
+  DNS rebinding. Only `GET` and `HEAD` are served, with `Cache-Control:
+  no-store` and `Referrer-Policy: no-referrer`.
+- It needs Full Disk Access for the terminal or process that runs it, and it
+  reads the same registry as the anchor tools.
 
 ---
 
@@ -2944,6 +3810,7 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 - macOS needs automation permission
 - Go to System Settings > Privacy & Security > Automation
 - Ensure your terminal/Claude has permission to control Notes
+- `apple-notes-mcp setup --permissions --open` checks every grant and opens the pane of each missing one ([Permissions check](#permissions-check))
 
 ### Native writes time out or report an uncertain outcome
 - Symptom: `add-native-tags`, `set-note-pinned`, `append-native` or another native write fails with "Shortcuts timed out waiting for …", "Operation outcome uncertain" or "readback was not verified", while `doctor` and `get-capabilities` report the bridges installed

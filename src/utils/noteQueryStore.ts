@@ -56,7 +56,7 @@ const NOTES_DB_PATH = path.join(
 );
 
 /** Scan window: how many of the most recently modified notes are examined. */
-export const QUERY_SCAN = { DEFAULT: 500, MAX: 5000 } as const;
+export const QUERY_SCAN = { DEFAULT: 500, MAX: 10000 } as const;
 /** Result cap: how many matching notes are returned. */
 export const QUERY_RESULTS = { DEFAULT: 50, MAX: 500 } as const;
 
@@ -99,7 +99,9 @@ export function facetsForAttachmentType(uti: string): Facet[] {
   if (type.startsWith("com.apple.notes.inlinetextattachment.")) return [];
   if (type === "com.apple.notes.table") return ["table"];
   const facets: Facet[] = ["attachment"];
-  if (type === "public.url") facets.push("link");
+  // A URL attachment is a link preview card: a link, and also its own facet.
+  if (type === "public.url") facets.push("link", "url");
+  else if (type === "com.apple.mapkit.map") facets.push("map");
   else if (type === "com.apple.paper.doc.scan" || type === "com.apple.notes.gallery")
     facets.push("scan");
   else if (type === "com.adobe.pdf" || type === "com.apple.paper.doc.pdf") facets.push("pdf");
@@ -303,7 +305,8 @@ export function buildScanSql(available: ReadonlySet<string>, options: ScanSqlOpt
     `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'title', n.ZTITLE1, 'folder', n.ZFOLDER, ` +
     `'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, ` +
     `'pinned', ${bool("ZISPINNED")}, 'locked', ${bool("ZISPASSWORDPROTECTED")}, ` +
-    `'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'snippet', ${col(available, "n", "ZSNIPPET")}, ` +
+    `'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'quicknote', ${bool("ZISSYSTEMPAPER")}, ` +
+    `'snippet', ${col(available, "n", "ZSNIPPET")}, ` +
     `'data', ${dataExpr}, 'tags', ${tagsExpr}) ` +
     `FROM ZICCLOUDSYNCINGOBJECT n ` +
     `WHERE ${whereSql} ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT ${scan};`;
@@ -463,6 +466,7 @@ interface NoteRow {
   pinned: number;
   locked: number;
   shared: number;
+  quicknote: number;
   snippet: string | null;
   data: string | null;
   tags: Array<[string | null, string | null]> | null;
@@ -646,6 +650,7 @@ export function runNoteQuery(ast: QueryNode, options: QueryNotesOptions = {}): Q
       pinned: Boolean(row.pinned),
       locked,
       shared: Boolean(row.shared) || Boolean(folder?.shared),
+      quicknote: Boolean(row.quicknote),
       created: coreDataMs(row.created),
       modified: coreDataMs(row.modified),
       content: () => {

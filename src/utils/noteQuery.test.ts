@@ -303,6 +303,7 @@ interface Fixture {
   pinned?: boolean;
   locked?: boolean;
   shared?: boolean;
+  quicknote?: boolean;
   created?: Date;
   modified?: Date;
   facets?: Facet[];
@@ -321,6 +322,7 @@ function makeNote(f: Fixture): QueryableNote & { contentCalls: number } {
     pinned: f.pinned ?? false,
     locked: f.locked ?? false,
     shared: f.shared ?? false,
+    quicknote: f.quicknote ?? false,
     created: f.created?.getTime(),
     modified: f.modified?.getTime(),
     content(): NoteContent | null {
@@ -386,6 +388,9 @@ describe("evaluateNoteQuery", () => {
     expect(matches("tag:fin", note)).toBe(false);
     expect(matches("has:link has:table", note)).toBe(true);
     expect(matches("has:image", note)).toBe(false);
+    expect(matches("has:url", { facets: ["url"] })).toBe(true);
+    expect(matches("has:map", { facets: ["map"] })).toBe(true);
+    expect(matches("has:map", note)).toBe(false);
   });
 
   it("distinguishes checklist:open from checklist:done", () => {
@@ -402,6 +407,11 @@ describe("evaluateNoteQuery", () => {
     expect(matches("pinned", {})).toBe(false);
     expect(matches("is:shared", { shared: true })).toBe(true);
     expect(matches("-locked", { locked: true })).toBe(false);
+    expect(matches("quicknote", { quicknote: true })).toBe(true);
+    expect(matches("is:QuickNote", { quicknote: true })).toBe(true);
+    expect(matches("quicknote", {})).toBe(false);
+    // Quoted, it is an ordinary word again.
+    expect(matches('"quicknote"', { quicknote: true })).toBe(false);
   });
 
   it("compares word counts", () => {

@@ -474,6 +474,13 @@ export type PlacedAsset = { url: string; mime: string } | { error: string };
 /** Places assets into an export. */
 export interface AssetWriter {
   place(asset: ResolvedAsset): PlacedAsset;
+  /**
+   * Places content generated during the export (not a Notes library file),
+   * such as a drawing rendered as SVG. `key` identifies the content so placing
+   * it twice reuses the first result. Writers that cannot hold generated
+   * content leave this out.
+   */
+  placeBytes?(data: Buffer, name: string, mime: string, key: string): PlacedAsset;
   /** Files written (sidecar) or assets embedded (data URL). */
   readonly count: number;
 }
@@ -516,6 +523,34 @@ export class SidecarWriter implements AssetWriter {
     }
     try {
       const mime = sniffMime(readHead(source.fd), asset.name);
+      return this.write(asset.path, asset.name, mime, (out) => {
+        const chunk = Buffer.alloc(1024 * 1024);
+        for (let position = 0; ;) {
+          const n = readSync(source.fd, chunk, 0, chunk.length, position);
+          if (n <= 0) break;
+          let written = 0;
+          while (written < n) written += writeSync(out, chunk, written, n - written);
+          position += n;
+        }
+      });
+    } finally {
+      closeSync(source.fd);
+    }
+  }
+
+  placeBytes(data: Buffer, name: string, mime: string, key: string): PlacedAsset {
+    const done = this.placed.get(`generated:${key}`);
+    if (done) return done;
+    return this.write(`generated:${key}`, name, mime, (out) => {
+      let written = 0;
+      while (written < data.length) written += writeSync(out, data, written, data.length - written);
+    });
+  }
+
+  /** Creates a free name in the directory and fills it; remembers the result under `key`. */
+  private write(key: string, name: string, mime: string, fill: (out: number) => void): PlacedAsset {
+    if (this.directoryError) return { error: this.directoryError };
+    try {
       if (!this.created) {
         try {
           assertExportPath(this.dir);
@@ -526,13 +561,13 @@ export class SidecarWriter implements AssetWriter {
         }
         this.created = true;
       }
-      const name = safeAssetName(asset.name, mime);
-      const ext = extname(name);
-      const stem = name.slice(0, name.length - ext.length);
+      const safe = safeAssetName(name, mime);
+      const ext = extname(safe);
+      const stem = safe.slice(0, safe.length - ext.length);
       let target: string | undefined;
       let out: number | undefined;
       for (let n = 1; n <= 1000 && out === undefined; n++) {
-        target = join(this.dir, n === 1 ? name : `${stem}-${n}${ext}`);
+        target = join(this.dir, n === 1 ? safe : `${stem}-${n}${ext}`);
         try {
           out = openSync(target, CREATE_FLAGS, 0o644);
         } catch (error) {
@@ -541,14 +576,7 @@ export class SidecarWriter implements AssetWriter {
       }
       if (out === undefined || !target) return { error: "no-free-name" };
       try {
-        const chunk = Buffer.alloc(1024 * 1024);
-        for (let position = 0; ;) {
-          const n = readSync(source.fd, chunk, 0, chunk.length, position);
-          if (n <= 0) break;
-          let written = 0;
-          while (written < n) written += writeSync(out, chunk, written, n - written);
-          position += n;
-        }
+        fill(out);
       } finally {
         closeSync(out);
       }
@@ -557,12 +585,10 @@ export class SidecarWriter implements AssetWriter {
         ? encodePathUrl(relative(this.linkBase, target).split(sep).join("/"))
         : target;
       const result = { url, mime };
-      this.placed.set(asset.path, result);
+      this.placed.set(key, result);
       return result;
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
-    } finally {
-      closeSync(source.fd);
     }
   }
 }
@@ -591,8 +617,7 @@ export class DataUrlWriter implements AssetWriter {
       return { error: "unreadable" };
     }
     try {
-      if (source.size > this.maxBytes || this.embeddedBytes + source.size > this.totalBytes)
-        return { error: "too-large" };
+      if (!this.fits(source.size)) return { error: "too-large" };
       const data = Buffer.alloc(source.size);
       let read = 0;
       while (read < source.size) {
@@ -601,16 +626,28 @@ export class DataUrlWriter implements AssetWriter {
         read += n;
       }
       const mime = sniffMime(data.subarray(0, 16), asset.name);
-      const result = {
-        url: `data:${mime};base64,${data.subarray(0, read).toString("base64")}`,
-        mime,
-      };
-      this.count++;
-      this.embeddedBytes += read;
-      this.placed.set(asset.path, result);
-      return result;
+      return this.embed(asset.path, data.subarray(0, read), mime);
     } finally {
       closeSync(source.fd);
     }
+  }
+
+  placeBytes(data: Buffer, _name: string, mime: string, key: string): PlacedAsset {
+    const done = this.placed.get(`generated:${key}`);
+    if (done) return done;
+    if (!this.fits(data.length)) return { error: "too-large" };
+    return this.embed(`generated:${key}`, data, mime);
+  }
+
+  private fits(size: number): boolean {
+    return size <= this.maxBytes && this.embeddedBytes + size <= this.totalBytes;
+  }
+
+  private embed(key: string, data: Buffer, mime: string): PlacedAsset {
+    const result = { url: `data:${mime};base64,${data.toString("base64")}`, mime };
+    this.count++;
+    this.embeddedBytes += data.length;
+    this.placed.set(key, result);
+    return result;
   }
 }

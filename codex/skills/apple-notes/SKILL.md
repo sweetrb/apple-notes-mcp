@@ -52,12 +52,14 @@ Use this skill when the user:
 | `get-selected-notes`         | Read the notes currently selected in Notes.app                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `export-notes-json`          | Export notes as JSON one page at a time (`offset`/`limit`/`modifiedSince`); repeat with `page.nextOffset` while `page.hasMore`                                                                                                                                                                                                                                                                                                                               |
 | `export-notes-markdown`      | Export one note or a folder as one Markdown document from the decoded body; optional create-only `outputPath` and `assetsDir` for attachment copies; `template`/`templateFile` render through a JSON Markdown template such as `obsidian` front matter (presentation format, not a backup)                                                                                                                                                                   |
-| `export-notes-html`          | Export one note or a folder as one standalone HTML file (semantic tables, attachments in body order); `outputPath` required and create-only; assets embedded (10 MiB each) or in a sidecar directory with `embedAssets: false`                                                                                                                                                                                                                               |
+| `export-notes-html`          | Export one note or a folder as one standalone HTML file (semantic tables, attachments in body order); `outputPath` required and create-only; assets embedded (10 MiB each) or in a sidecar directory with `embedAssets: false`; classic drawings become SVG through the public helper (Paper keeps its PNG; failures fall back to PNG)                                                                                                                       |
 | `list-markdown-templates`    | List built-in and saved Markdown export templates                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `show-markdown-template`     | Show a template's JSON (portable form; `expanded` for every rule)                                                                                                                                                                                                                                                                                                                                                                                            |
 | `validate-markdown-template` | Check a template; returns every problem with a JSON path                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `save-markdown-template`     | Save a template to the library by slug name (create-only unless `force`)                                                                                                                                                                                                                                                                                                                                                                                     |
 | `delete-markdown-template`   | Delete a saved template (built-ins cannot be deleted)                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+To edit a template visually, the user can run `apple-notes-mcp templates edit [name]` in a terminal: a local, token-gated web editor with live validation and a preview on sample notes. It is a command-line tool, not an MCP tool, so suggest it rather than trying to start it.
 
 ### Folder Operations
 
@@ -118,6 +120,11 @@ Use this skill when the user:
 | `get-native-objects`             | Read a note's native object ids, checklist ids and state, native tags, and decoded tables, with the current revision                                                               |
 | `list-note-paragraphs`           | List a note's paragraphs with style, stored paragraph ID, and a direct link when the ID is unique                                                                                  |
 | `get-paragraph-link`             | Get a link that opens Notes at one paragraph, refused when its ID is shared                                                                                                        |
+| `create-paragraph-anchor`        | Record an anchor for one paragraph so it can be found again after edits or ID changes (local registry only)                                                                        |
+| `resolve-paragraph-anchor`       | Find an anchored paragraph again; `url` only when `status` is `resolved`, fails closed on ambiguity                                                                                |
+| `list-paragraph-anchors`         | List recorded paragraph anchors, all or for one note                                                                                                                               |
+| `get-paragraph-anchor`           | Show one stored paragraph anchor                                                                                                                                                   |
+| `prune-paragraph-anchors`        | Remove anchors that no longer resolve (dry run unless `dryRun: false`)                                                                                                             |
 | `get-note-structure`             | Read a note's links by kind, tags, attachments (as list-attachments reports them), counts, and view/lock/share/trash state in one call                                             |
 | `list-note-links`                | List links (inline, card, note, section) in a note, folder (with subfolders), account, or the whole library                                                                        |
 | `get-audio-transcripts`          | Read the transcripts and summaries Notes stored for a note's audio recordings                                                                                                      |
@@ -139,6 +146,42 @@ read-only: write support was deliberately deferred by the maintainer.
 | ---------------------- | ------------------------------------------------------------------------- |
 | `native-helper-status` | Report opt-in, build, and live-probe state with a reason code (read-only) |
 | `native-note-state`    | Read a note's native state and `revision` change token (read-only)        |
+
+### Private Writer (opt-in, unsupported Apple API)
+
+A separate writer (`apple-notes-mcp setup --native-writer`), off unless both
+`APPLE_NOTES_MCP_ENABLE_PRIVATE=1` and `APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1`
+are set; unvalidated writes also need `APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1`.
+Call `native-writer-status` first. Every write needs a fresh `revision` as
+`ifRevision`; on `revision_conflict` or `indeterminate: true`, read the note
+before retrying. Every write also takes the folder scope guards
+(`ifFolderId`, `ifAncestorFolderId`, `forbiddenAncestorFolderIds`), checked
+inside the writer just before the save; `helperCode: "scope_conflict"` means
+the note is no longer where the guard requires, and
+`scope_folder_not_found` means a guard id names no existing folder.
+
+| Tool                         | Purpose                                                                                                                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native-writer-status`       | Report both switches, writer build state, and live probe (read-only)                                                                                                                                           |
+| `native-append-plain-text`   | Append plain paragraphs with a revision guard and read-back; optional sync nudge                                                                                                                               |
+| `native-sync-push`           | Check or get writer changes uploaded later (status, nudge, confirmed relaunch)                                                                                                                                 |
+| `native-edit-note`           | Edit text (runs with links, highlights, colors), append a link to a paragraph, replace a checklist, remove or swap one attachment for a file, or trim blank lines in place: dry run, then apply                |
+| `native-checklist-state`     | List native checklist items with `todoIdentifier`, `done`, and the note `revision` (read-only)                                                                                                                 |
+| `native-set-checklist-item`  | Check or uncheck one item by `todoIdentifier` with `ifRevision`; `persistedDone` read-back; same state writes nothing                                                                                          |
+| `native-highlight-text`      | Highlight (purple/pink/orange/mint/blue) or remove (`none`) exact text (`expectedCount` guard) or, with `scope: "note"`, the whole body after the title, skipping attachments; `dryRun`, stored runs read back |
+| `native-add-url-card`        | Add a rich URL link card at the end or after one exact paragraph; `dryRun`, read-back of glyph and attachment; not idempotent                                                                                  |
+| `native-read-tables`         | List a note's tables with native row/column ids and `digest` tokens (read-only)                                                                                                                                |
+| `native-delete-table-row`    | Delete one table row by id; dry run first, then apply with both tokens                                                                                                                                         |
+| `native-insert-table-row`    | Insert a row after a row id (or at the end) with plain-text cells                                                                                                                                              |
+| `native-set-table-cell`      | Replace one cell's text by row and column id                                                                                                                                                                   |
+| `native-prune-orphan-table`  | Tombstone a table no body glyph shows; dry run first, then apply                                                                                                                                               |
+| `native-read-smart-folder`   | Read one smart folder's state and `f1:` revision (read-only)                                                                                                                                                   |
+| `native-create-smart-folder` | Create a smart folder from a query Notes validates; idempotent                                                                                                                                                 |
+| `native-update-smart-folder` | Replace a smart folder's query, guarded by its revision                                                                                                                                                        |
+| `native-delete-smart-folder` | Delete one empty smart folder; dry run first, then apply with its revision                                                                                                                                     |
+| `compose-note`               | Write styled blocks or Markdown (headings, lists, checklists, quotes, code, dividers, tables, local files, link cards) in one verified save; create, append, or prepend; existing attachments proven unchanged  |
+| `native-repair-purge-flag`   | Find a note flagged for purge outside Recently Deleted and move it there; dry run, then `confirm: true`                                                                                                        |
+| `native-read-paper`          | Decode one Paper drawing: strokes, typed shapes (macOS 27; check `shapeDecode`), and fallback-PDF geometry (read-only)                                                                                         |
 
 ## Usage Patterns
 
@@ -193,12 +236,13 @@ Action: Use query-notes with query='words:>250 has:pdf -folder:Archive'
 
 Bare words and "quoted phrases" match title or body. Fields are `title:`,
 `body:`, `text:`, `folder:`, `account:`, and `tag:`; facets are
-`has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag`;
-`checklist:open|done`; flags `pinned`, `locked`, `shared`; and `words:`,
+`has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|url|map|tag`
+(`has:url` is a link preview card, `has:map` a map);
+`checklist:open|done`; flags `pinned`, `locked`, `shared`, `quicknote`; and `words:`,
 `created:`, `modified:` take `=`, `>`, `>=`, `<`, `<=` with `YYYY-MM-DD` local
 dates. AND is implicit; use `OR`, `NOT` or a leading `-`, and parentheses.
 Quote an operator word (`"and"`) to search it literally. It scans the 500 most
-recently modified notes unless `scanLimit` is raised (max 5000), and the
+recently modified notes unless `scanLimit` is raised (max 10000), and the
 response says when older notes were left out. Recently Deleted is excluded
 unless `includeDeleted` is true. Locked notes match on title and metadata only.
 The returned ids work with every id-based tool.
@@ -438,7 +482,7 @@ Plain text cannot confirm structure. It carries no list markers, so it cannot sh
 Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, `operation_failed`). Branch on the code rather than the wording. If `indeterminate` is `true`, the write may have landed: read the exact note before deciding whether to retry. `committed: false` means nothing was written.
 
 - **"Note not found"**: Use search-notes to find similar titles
-- **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
+- **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation. The user can run `apple-notes-mcp setup --permissions --open` in their terminal to check every grant and open each missing pane
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
 - **Slow Notes.app**: `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` accept `timeoutSeconds` (1–120) for each automation step of that call. A timed-out write is uncertain; read the exact note before retrying
 - **Read times out on a note with a large image**: Notes.app returns images inside the body as base64, so a multi-megabyte image can outlast the read timeout, which also blocks `delete-note`. The error names the large attachments when Full Disk Access is granted. Retry `get-note-content` (and then `delete-note`) with a larger `timeoutSeconds`; if it still fails, have the user remove the image or delete the note in Notes.app

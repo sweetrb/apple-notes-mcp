@@ -401,6 +401,44 @@ export function readAllowedFile(
   maxBytes: number,
   options: AllowedReadOptions = {}
 ): Buffer {
+  const label = options.label ?? "Content file";
+  const { descriptor, size } = openAllowedFile(p, maxBytes, options);
+  try {
+    const bytes = readFileSync(descriptor);
+    if (bytes.length !== size)
+      throw new Error(`${label} changed while it was being read; try again`);
+    return bytes;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+/**
+ * Check a local file under the {@link readAllowedFile} policy without reading
+ * it, for a caller that hands the path to another program (the private
+ * writer's `compose-note` file blocks). Returns the file's size.
+ *
+ * @throws on any path, type, or size violation
+ */
+export function assertAllowedFile(
+  p: string,
+  maxBytes: number,
+  options: AllowedReadOptions = {}
+): number {
+  const { descriptor, size } = openAllowedFile(p, maxBytes, options);
+  closeSync(descriptor);
+  return size;
+}
+
+/**
+ * Open a file under the {@link readAllowedFile} policy and return the open
+ * descriptor with its size. The caller must close the descriptor.
+ */
+function openAllowedFile(
+  p: string,
+  maxBytes: number,
+  options: AllowedReadOptions
+): { descriptor: number; size: number } {
   const roots = options.roots ?? allowedSaveRoots();
   const allowPrivate = options.allowPrivate ?? process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1";
   const label = options.label ?? "Content file";
@@ -446,12 +484,10 @@ export function readAllowedFile(
     if (stat.size === 0) throw new Error(`${label} is empty: "${abs}"`);
     if (stat.size > maxBytes)
       throw new Error(`${label} is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
-    const bytes = readFileSync(descriptor);
-    if (bytes.length !== stat.size)
-      throw new Error(`${label} changed while it was being read; try again`);
-    return bytes;
-  } finally {
+    return { descriptor, size: stat.size };
+  } catch (error) {
     closeSync(descriptor);
+    throw error;
   }
 }
 

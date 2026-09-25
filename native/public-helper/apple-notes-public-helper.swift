@@ -17,6 +17,8 @@
 //   encode_drawing  strokes -> PencilKit drawing bytes (base64); used to build
 //                   synthetic test fixtures, never to write to Notes
 //   transcribe      on-device Speech transcription of one audio file
+//   speech_status   the Speech Recognition authorization status, read without
+//                   prompting, and whether transcription would need a grant
 //
 // Build (done by `apple-notes-mcp setup --public-helper`, which also generates
 // the one-line source-digest file that defines helperSourceSHA256 and the
@@ -613,9 +615,22 @@ func transcribe(_ request: [String: Any]) async throws -> [String: Any] {
     return response
 }
 
+/// Reports what `transcribe` would find, without asking for access. On
+/// macOS 26+ SpeechAnalyzer needs no grant, so only an explicit refusal
+/// blocks it; earlier releases use the legacy recognizer, which needs one.
+func speechStatus() -> [String: Any] {
+    var requiresGrant = true
+    if #available(macOS 26, *) { requiresGrant = false }
+    return [
+        "status": "ok",
+        "speechAuthorization": authorizationName(SFSpeechRecognizer.authorizationStatus()),
+        "requiresGrant": requiresGrant,
+    ]
+}
+
 // MARK: - Dispatch
 
-let actions = ["hello", "decode_drawing", "encode_drawing", "transcribe"]
+let actions = ["hello", "decode_drawing", "encode_drawing", "transcribe", "speech_status"]
 
 func handle(_ request: [String: Any]) async throws -> [String: Any] {
     guard (request["protocol"] as? NSNumber)?.intValue == protocolVersion else {
@@ -635,6 +650,8 @@ func handle(_ request: [String: Any]) async throws -> [String: Any] {
         return try encodeDrawing(request)
     case "transcribe":
         return try await transcribe(request)
+    case "speech_status":
+        return speechStatus()
     default:
         throw HelperFailure(code: "unknown_action", message: "unknown action")
     }

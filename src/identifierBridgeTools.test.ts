@@ -127,6 +127,7 @@ const STRICT_NOTE_ID: Array<[string, string]> = [
   ["get-note-blocks", "id"],
   ["list-note-paragraphs", "id"],
   ["get-paragraph-link", "id"],
+  ["create-paragraph-anchor", "id"],
   ["get-note-structure", "id"],
   ["list-note-links", "id"],
   ["get-note-tables", "id"],
@@ -273,7 +274,28 @@ describe("id inputs accept Notes UUIDs and numeric keys", () => {
     // show-account takes an account id, which the bridge does not resolve.
     // The private-helper tools take a Notes UUID in their own `identifier`
     // field, so their `id` field is x-coredata only and needs no bridge.
-    const exempt = new Set(["show-account.id", "native-note-state.id"]);
+    // The private-writer tools follow the same rule.
+    const exempt = new Set([
+      "show-account.id",
+      "native-note-state.id",
+      "native-append-plain-text.id",
+      "native-edit-note.id",
+      "compose-note.id",
+      "native-checklist-state.id",
+      "native-set-checklist-item.id",
+      "native-highlight-text.id",
+      "native-add-url-card.id",
+      "native-set-paragraph-id.id",
+      "native-add-section-link.id",
+      "native-read-tables.id",
+      "native-delete-table-row.id",
+      "native-insert-table-row.id",
+      "native-set-table-cell.id",
+      "native-prune-orphan-table.id",
+      "native-add-paper.id",
+      "native-repair-purge-flag.id",
+      "native-read-paper.id",
+    ]);
     const idFields: string[] = [];
     for (const [tool, { config }] of registered) {
       for (const name of Object.keys(config.inputSchema ?? {})) {

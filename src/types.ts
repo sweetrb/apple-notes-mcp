@@ -1450,10 +1450,31 @@ export interface NotesExportRequest {
    * set). False copies them to a sidecar directory.
    */
   embedAssets?: boolean;
+  /**
+   * HTML only: render classic PencilKit drawings as SVG through the public
+   * native helper instead of Notes' raster rendering (default true). Paper
+   * drawings always use the raster rendering.
+   */
+  vectorDrawings?: boolean;
   /** Render through this template: a built-in name or a saved template's name. */
   template?: string;
   /** Render through the template in this JSON file (exclusive with `template`). */
   templateFile?: string;
+}
+
+/** How an HTML export rendered classic PencilKit drawings. */
+export interface ExportVectorDrawingStats {
+  /** Drawings placed as SVG. */
+  rendered: number;
+  /** Drawings that fell back to Notes' raster rendering. */
+  fallback: number;
+  /**
+   * Why drawings fell back, by code: a helper code such as
+   * `helper_not_installed` or `timeout`, a per-drawing code such as
+   * `undecodable` or `no_data`, `truncated` (the helper stopped at its stroke
+   * limit), or `too-large` (over the embedded-asset size limits).
+   */
+  fallbackReasons?: Record<string, number>;
 }
 
 /** The template an export used. */
@@ -1508,6 +1529,8 @@ export interface NotesExportReceipt {
   assets?: { dir: string; files: number };
   /** HTML only: assets embedded as data URLs. */
   embedded?: number;
+  /** HTML only, when vector drawings are on and the notes have classic drawings. */
+  vectorDrawings?: ExportVectorDrawingStats;
   stats: NotesExportAttachmentStats;
   skipped: NotesExportSkip[];
   /** Templated exports only: the template used. */

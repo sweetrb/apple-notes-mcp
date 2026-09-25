@@ -134,7 +134,13 @@ import {
   pageNoteBlocks,
   readNoteBlocks,
 } from "@/utils/noteBlocks.js";
-import { pageParagraphs, paragraphLink, readNoteParagraphs } from "@/utils/noteParagraphs.js";
+import {
+  pageParagraphs,
+  paragraphLink,
+  readNoteParagraphs,
+  selectParagraph,
+  type NoteParagraph,
+} from "@/utils/noteParagraphs.js";
 import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
 import { classifyBodyReadError, describeBodyReadFailure } from "@/utils/bodyReadFailure.js";
 import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
@@ -180,7 +186,43 @@ import {
   transcribeNoteAudio,
 } from "@/services/noteTranscription.js";
 import { buildPrivateHelper, formatHelperBuild } from "@/services/privateHelperBuild.js";
+import {
+  defaultPermissionsCliDeps,
+  openSettingsPane,
+  parsePermissionsArgs,
+  runPermissionsCli,
+} from "@/services/permissions.js";
+import {
+  buildPermissionsWindow,
+  formatPermissionsWindowBuild,
+  inspectPermissionsWindow,
+  runPermissionsWindow,
+} from "@/services/permissionsWindow.js";
 import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
+import { buildPrivateWriter, formatWriterBuild } from "@/services/privateWriterBuild.js";
+import { registerPrivateWriterTools } from "@/tools/privateWriterTools.js";
+import { registerComposeNoteTool } from "@/tools/composeNoteTool.js";
+import { registerPrivateWriterChecklistTools } from "@/tools/privateWriterChecklistTools.js";
+import { registerPrivateWriterHighlightTools } from "@/tools/privateWriterHighlightTools.js";
+import { registerPrivateWriterLinkCardTools } from "@/tools/privateWriterLinkCardTools.js";
+import { registerPrivateWriterParagraphTools } from "@/tools/privateWriterParagraphTools.js";
+import { registerPrivateWriterTableTools } from "@/tools/privateWriterTableTools.js";
+import { registerPrivateWriterSmartFolderTools } from "@/tools/privateWriterSmartFolderTools.js";
+import { registerPrivatePaperWriterTools } from "@/tools/privatePaperWriterTools.js";
+import { registerPrivateWriterPurgeRepairTools } from "@/tools/privateWriterPurgeRepairTools.js";
+import { installWriterParagraphIdReminter } from "@/services/privateWriterReminter.js";
+import { runTemplatesCommand } from "@/services/templateEditorCli.js";
+import { runAnchorsCli } from "@/services/anchorServer.js";
+import { AnchorRegistry } from "@/services/anchorRegistry.js";
+import {
+  DEFAULT_PRUNE_STATUSES,
+  MAX_ANCHORS_PER_CALL,
+  pruneParagraphAnchors,
+  recordParagraphAnchors,
+  registryLookup,
+  resolveStoredAnchor,
+} from "@/services/paragraphAnchorOps.js";
+import { ANCHOR_ID_PATTERN, DEFAULT_MIN_CONFIDENCE } from "@/utils/paragraphAnchors.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
@@ -202,10 +244,51 @@ if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-help
   process.stdout.write(formatHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-writer")) {
+  // Opt-in private WRITER: a separate binary from the read-only helper.
+  const report = buildPrivateWriter(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatWriterBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions-window")) {
+  // Optional checklist window, compiled locally like the public helper.
+  const report = buildPermissionsWindow(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPermissionsWindowBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions")) {
+  // Guided permissions check; opens System Settings panes only with --open.
+  const args = process.argv.slice(3);
+  const cli = defaultPermissionsCliDeps();
+  let code: number;
+  const window = args.includes("--window") ? inspectPermissionsWindow() : null;
+  if (window?.ready) {
+    code = await runPermissionsWindow(window.binaryPath, {
+      check: cli.check,
+      open: (item) => openSettingsPane(item),
+      log: cli.write,
+    });
+  } else {
+    if (window) cli.write(`${window.detail} Showing the checklist here instead.\n\n`);
+    code = await runPermissionsCli(parsePermissionsArgs(args), cli);
+  }
+  cli.close();
+  process.exit(code);
+}
 if (process.argv[2] === "setup") {
   const report = setupShortcuts(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatShortcutSetup(report) + "\n");
   process.exit(report.ready || !report.checkOnly ? 0 : 1);
+}
+if (process.argv[2] === "templates") {
+  // Local template editor (templates edit): a token-gated web page on loopback.
+  process.exit(await runTemplatesCommand(process.argv.slice(3)));
+}
+if (process.argv[2] === "anchors") {
+  // Opt-in paragraph anchor resolver (loopback by default, token-gated).
+  process.exit(
+    await runAnchorsCli(process.argv.slice(3), { resolve: registryLookup(new AnchorRegistry()) })
+  );
 }
 // =============================================================================
 // Server Initialization
@@ -235,6 +318,18 @@ registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 registerPrivateHelperTools(server, notesManager);
+registerPrivateWriterTools(server, notesManager);
+registerComposeNoteTool(server, notesManager);
+registerPrivateWriterChecklistTools(server, notesManager);
+registerPrivateWriterHighlightTools(server, notesManager);
+registerPrivateWriterLinkCardTools(server, notesManager);
+registerPrivateWriterParagraphTools(server, notesManager);
+registerPrivateWriterTableTools(server, notesManager);
+registerPrivateWriterSmartFolderTools(server);
+registerPrivatePaperWriterTools(server, notesManager);
+registerPrivateWriterPurgeRepairTools(server, notesManager);
+// resolve-paragraph-anchor remint: the writer's set_paragraph_id, only with both writer switches on.
+installWriterParagraphIdReminter();
 
 // =============================================================================
 // Response Helpers
@@ -1137,9 +1232,9 @@ registerTool(
   {
     description:
       "Use when: finding notes with a boolean expression over text and metadata — e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\n" +
-      'Syntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\n' +
+      'Syntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|url|map|tag (has:url = a link preview card, has:map = a map); checklist:open|done; flags pinned, locked, shared, quicknote (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\n' +
       "Returns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\n" +
-      "Do not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\n" +
+      "Do not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500, max 10000); raise it for older notes.\n" +
       "Safety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates (including negated ones such as -body:x) never match them.",
     inputSchema: {
       query: z
@@ -1877,6 +1972,13 @@ registerTool(
 
 // --- list-note-paragraphs / get-paragraph-link ---
 
+const recordAnchorsInput = z
+  .boolean()
+  .optional()
+  .describe(
+    "Also record a paragraph anchor for each returned paragraph (at most 500 per call) so resolve-paragraph-anchor can find it after edits; each row gains anchorId (default false; writes only the local anchor registry)"
+  );
+
 const paragraphNoteSelector = {
   id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
   title: z
@@ -1917,6 +2019,7 @@ registerTool(
         .max(5000)
         .optional()
         .describe("Maximum paragraphs to return (default 500, max 5000)"),
+      recordAnchors: recordAnchorsInput,
     },
     outputSchema: {
       id: z.string().optional(),
@@ -1924,23 +2027,39 @@ registerTool(
       counts: z.record(z.unknown()).optional(),
       paragraphs: z.array(z.record(z.unknown())).optional(),
       page: z.record(z.unknown()).optional(),
+      anchorsRecorded: z.number().optional(),
     },
     annotations: { readOnlyHint: true },
   },
-  withErrorHandling(({ id, title, folder, linkableOnly, offset, limit }) => {
+  withErrorHandling(({ id, title, folder, linkableOnly, offset, limit, recordAnchors }) => {
     const note = readNoteParagraphs({ id, title, folder });
     const page = pageParagraphs(note.paragraphs, {
       offset,
-      limit,
+      limit: recordAnchors ? Math.min(limit ?? 500, MAX_ANCHORS_PER_CALL) : limit,
       linkableOnly,
       maxBytes: blocksMaxResponseBytes(),
     });
+    let anchorsRecorded: number | undefined;
+    let paragraphs: Array<NoteParagraph & { anchorId?: string }> = page.paragraphs;
+    if (recordAnchors) {
+      const recorded = recordParagraphAnchors(note, page.paragraphs);
+      anchorsRecorded = recorded.filter((r) => r.created).length;
+      paragraphs = page.paragraphs.map((p, i) => ({ ...p, anchorId: recorded[i].anchor.anchorId }));
+    }
     const { unique, shared, missing } = note.counts;
     return successResponse(
       `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` +
         (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") +
+        (anchorsRecorded !== undefined ? `; ${anchorsRecorded} new anchor(s) recorded` : "") +
         ".",
-      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+      {
+        id: note.id,
+        identifier: note.identifier,
+        counts: note.counts,
+        paragraphs,
+        page: page.page,
+        ...(anchorsRecorded !== undefined ? { anchorsRecorded } : {}),
+      }
     );
   }, "Error listing paragraphs")
 );
@@ -1978,25 +2097,270 @@ registerTool(
         .min(1)
         .optional()
         .describe("Which match to use (1-based) when contains or match hits several paragraphs"),
+      recordAnchor: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also record a paragraph anchor for the linked paragraph so resolve-paragraph-anchor can find it after edits (default false; writes only the local anchor registry)"
+        ),
     },
     outputSchema: {
       url: z.string().optional(),
       id: z.string().optional(),
       identifier: z.string().nullable().optional(),
       paragraph: z.record(z.unknown()).optional(),
+      anchorId: z.string().optional(),
     },
     annotations: { readOnlyHint: true },
   },
+  withErrorHandling(
+    ({ id, title, folder, contains, match, blockIndex, occurrence, recordAnchor }) => {
+      const note = readNoteParagraphs({ id, title, folder });
+      const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+      const anchorId = recordAnchor
+        ? recordParagraphAnchors(note, [result.paragraph])[0].anchor.anchorId
+        : undefined;
+      return successResponse(
+        `Paragraph link: ${result.url}` + (anchorId ? `\nAnchor: ${anchorId}` : ""),
+        {
+          url: result.url,
+          id: note.id,
+          identifier: note.identifier,
+          paragraph: { ...result.paragraph },
+          ...(anchorId ? { anchorId } : {}),
+        }
+      );
+    },
+    "No paragraph link"
+  )
+);
+
+// --- Paragraph anchors ---
+
+const anchorIdInput = z
+  .string()
+  .regex(ANCHOR_ID_PATTERN, "Expected an anchor id: pa_ and 24 hex digits")
+  .describe(
+    "Anchor id (pa_ and 24 hex digits) from create-paragraph-anchor or list-paragraph-anchors"
+  );
+
+const noteIdentifierInput = z
+  .string()
+  .regex(/^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/, "Expected a Notes UUID")
+  .optional();
+
+registerTool(
+  "create-paragraph-anchor",
+  {
+    description:
+      "Use when: you want a reference to one paragraph that can be found again after the note is edited, for example before sharing a paragraph link that should keep working.\nReturns: the anchor (anchorId, note identifier, paragraph ID and its status, normalized text, fingerprints of the paragraph and its neighbours, block index, created time), whether it is new, and the paragraph's current direct url when its ID is unique.\nDo not use when: you only need a link right now (get-paragraph-link).\nSafety: reads the NoteStore database (Full Disk Access) and never changes Notes. Writes one local file, the anchor registry (APPLE_NOTES_MCP_ANCHOR_FILE, default ~/Library/Application Support/apple-notes-mcp/paragraph-anchors.json, mode 0600), which stores the paragraph's text. Unlike get-paragraph-link, a paragraph with a shared or missing ID can be anchored. Recording the same paragraph again returns the existing anchor.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: z
+        .string()
+        .min(1)
+        .max(MAX.CONTENT)
+        .optional()
+        .describe("Snippet of the paragraph; give one of contains, match, blockIndex"),
+      match: z.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text"),
+      blockIndex: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Which match to use (1-based) when contains or match hits several paragraphs"),
+    },
+    outputSchema: {
+      anchor: z.record(z.unknown()).optional(),
+      created: z.boolean().optional(),
+      url: z.string().optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
   withErrorHandling(({ id, title, folder, contains, match, blockIndex, occurrence }) => {
     const note = readNoteParagraphs({ id, title, folder });
-    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
-    return successResponse(`Paragraph link: ${result.url}`, {
-      url: result.url,
-      id: note.id,
-      identifier: note.identifier,
-      paragraph: { ...result.paragraph },
+    const paragraph = selectParagraph(note.paragraphs, { contains, match, blockIndex, occurrence });
+    const [{ anchor, created }] = recordParagraphAnchors(note, [paragraph]);
+    return successResponse(
+      `${created ? "Recorded" : "Reusing"} anchor ${anchor.anchorId} for block ${anchor.blockIndex} (paragraph ID ${paragraph.paragraphIdStatus}).`,
+      { anchor: { ...anchor }, created, ...(paragraph.url ? { url: paragraph.url } : {}) }
+    );
+  }, "Error recording paragraph anchor")
+);
+
+registerTool(
+  "resolve-paragraph-anchor",
+  {
+    description:
+      "Use when: you have an anchorId and need the paragraph's current link, or want to check that an anchored paragraph still exists after edits.\nReturns: status (resolved, needs-reminting, ambiguous, low-confidence, not-found, note-not-found, note-deleted, note-unreadable), method (paragraph-id, exact-text, text-and-neighbours), confidence from 0 to 1, the matched block (blockIndex, text, paragraphId, paragraphIdStatus) and what changed. url is present only when status is resolved.\nDo not use when: you have no anchor yet (create-paragraph-anchor, or get-paragraph-link with recordAnchor).\nSafety: reads the NoteStore database (Full Disk Access); changes Notes only with remint and the opt-in private writer. Fails closed: equally good candidates give ambiguous and no url. needs-reminting means the paragraph was found but its stored ID is shared or missing, so no safe link exists until the paragraph gets a new ID. remint: true then calls the private writer's native-set-paragraph-id on the matched block (with a fresh revision, refusing if the paragraph changed) and resolves again; it runs only when APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1 (and, until live-validated, APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1), and otherwise reports writer-unavailable. refresh rewrites the stored anchor (local registry only) after a match with confidence 0.8 or more.",
+    inputSchema: {
+      anchorId: anchorIdInput,
+      minConfidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe(`Lowest confidence accepted as a match (default ${DEFAULT_MIN_CONFIDENCE})`),
+      refresh: z
+        .boolean()
+        .optional()
+        .describe(
+          "Update the stored anchor to the matched paragraph as it is now (default false; only at confidence 0.8 or more)"
+        ),
+      remint: z
+        .boolean()
+        .optional()
+        .describe(
+          "On needs-reminting, give the paragraph a new ID through the private writer and resolve again (default false; reports writer-unavailable unless both writer switches are on)"
+        ),
+    },
+    outputSchema: {
+      anchorId: z.string().optional(),
+      status: z.string().optional(),
+      resolved: z.boolean().optional(),
+      url: z.string().optional(),
+      needsReminting: z.boolean().optional(),
+      method: z.string().optional(),
+      confidence: z.number().optional(),
+      match: z.record(z.unknown()).optional(),
+      changes: z.record(z.unknown()).optional(),
+      candidates: z.number().optional(),
+      noteId: z.string().optional(),
+      message: z.string().optional(),
+      refreshed: z.boolean().optional(),
+      refreshSkipped: z.string().optional(),
+      remint: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  withAsyncErrorHandling(async ({ anchorId, minConfidence, refresh, remint }) => {
+    const result = await resolveStoredAnchor(anchorId, { minConfidence, refresh, remint });
+    return successResponse(
+      `${result.status}: ${result.message}` + (result.url ? `\nLink: ${result.url}` : ""),
+      { ...result }
+    );
+  }, "Error resolving paragraph anchor")
+);
+
+registerTool(
+  "list-paragraph-anchors",
+  {
+    description:
+      "Use when: you need the recorded paragraph anchors, all of them or those of one note.\nReturns: one page of anchors in the order recorded (anchorId, noteIdentifier, paragraphId, text, blockIndex, created time), the total, and the registry path.\nDo not use when: you need an anchor's current location (resolve-paragraph-anchor).\nSafety: read-only; reads only the local anchor registry, never Notes.",
+    inputSchema: {
+      noteIdentifier: noteIdentifierInput.describe(
+        "Only anchors in the note with this Notes UUID (its identifier)"
+      ),
+      offset: z.number().int().min(0).optional().describe("First anchor to return (default 0)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe("Maximum anchors to return (default 100, max 1000)"),
+    },
+    outputSchema: {
+      anchors: z.array(z.record(z.unknown())).optional(),
+      total: z.number().optional(),
+      registry: z.string().optional(),
+      page: z.record(z.unknown()).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ noteIdentifier, offset = 0, limit = 100 }) => {
+    const registry = new AnchorRegistry();
+    let anchors = registry.load();
+    if (noteIdentifier)
+      anchors = anchors.filter((a) => a.noteIdentifier === noteIdentifier.toUpperCase());
+    const slice = anchors.slice(offset, offset + limit);
+    const next = offset + slice.length;
+    return successResponse(`${anchors.length} anchor(s); returned ${slice.length}.`, {
+      anchors: slice.map((a) => ({ ...a })),
+      total: anchors.length,
+      registry: registry.path,
+      page: {
+        offset,
+        returned: slice.length,
+        hasMore: next < anchors.length,
+        ...(next < anchors.length ? { nextOffset: next } : {}),
+      },
     });
-  }, "No paragraph link")
+  }, "Error listing paragraph anchors")
+);
+
+registerTool(
+  "get-paragraph-anchor",
+  {
+    description:
+      "Use when: inspecting one recorded anchor as stored.\nReturns: the stored anchor record.\nDo not use when: you need the paragraph's current location or link (resolve-paragraph-anchor).\nSafety: read-only; reads only the local anchor registry, never Notes.",
+    inputSchema: { anchorId: anchorIdInput },
+    outputSchema: { anchor: z.record(z.unknown()).optional() },
+    annotations: { readOnlyHint: true },
+  },
+  withErrorHandling(({ anchorId }) => {
+    const anchor = new AnchorRegistry().get(anchorId);
+    return successResponse(
+      `Anchor ${anchor.anchorId}: note ${anchor.noteIdentifier}, block ${anchor.blockIndex}, recorded ${anchor.createdAt}.`,
+      { anchor: { ...anchor } }
+    );
+  }, "Error reading paragraph anchor")
+);
+
+registerTool(
+  "prune-paragraph-anchors",
+  {
+    description:
+      "Use when: cleaning up anchors that no longer resolve, or removing specific anchors.\nReturns: the stale anchors found (anchorId, status, message), how many were examined, and the ids removed (none on a dry run).\nDo not use when: an anchor is only ambiguous or needs reminting; it still points at something.\nSafety: dryRun defaults to true, so nothing is removed until you call again with dryRun false. Removes entries from the local anchor registry only; never changes Notes. Without anchorIds it resolves every anchor in scope (Full Disk Access) and treats not-found and note-not-found as stale unless statuses says otherwise. A note in Recently Deleted gives note-deleted, which is not pruned by default because the note can be restored.",
+    inputSchema: {
+      anchorIds: z
+        .array(anchorIdInput)
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe("Remove exactly these anchors instead of resolving to find stale ones"),
+      noteIdentifier: noteIdentifierInput.describe("Only anchors in the note with this Notes UUID"),
+      statuses: z
+        .array(
+          z.enum([
+            "not-found",
+            "note-not-found",
+            "note-deleted",
+            "note-unreadable",
+            "ambiguous",
+            "low-confidence",
+          ])
+        )
+        .min(1)
+        .optional()
+        .describe(
+          `Resolution statuses treated as stale (default ${DEFAULT_PRUNE_STATUSES.join(", ")})`
+        ),
+      dryRun: z.boolean().optional().describe("Report without removing (default true)"),
+    },
+    outputSchema: {
+      dryRun: z.boolean().optional(),
+      examined: z.number().optional(),
+      stale: z.array(z.record(z.unknown())).optional(),
+      removed: z.array(z.string()).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  withErrorHandling(({ anchorIds, noteIdentifier, statuses, dryRun }) => {
+    const result = pruneParagraphAnchors({ anchorIds, noteIdentifier, statuses, dryRun });
+    return successResponse(
+      result.dryRun
+        ? `Dry run: ${result.stale.length} of ${result.examined} anchor(s) would be removed.`
+        : `Removed ${result.removed.length} of ${result.examined} anchor(s).`,
+      { ...result }
+    );
+  }, "Error pruning paragraph anchors")
 );
 
 // --- get-note-structure ---
@@ -4386,7 +4750,7 @@ registerTool(
   "export-notes-html",
   {
     description:
-      "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.",
+      "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.\nDrawings: classic PencilKit drawings are rendered as SVG through the public native helper (setup --public-helper) instead of Notes' PNG; Paper drawings keep the PNG. A drawing that cannot be decoded falls back to the PNG and is counted in vectorDrawings.fallbackReasons; it never fails the export. vectorDrawings false keeps every PNG.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: z
@@ -4423,6 +4787,12 @@ registerTool(
       assetsDir: exportPathInput(
         "Sidecar directory when embedAssets is false (default <stem>.assets)"
       ),
+      vectorDrawings: z
+        .boolean()
+        .optional()
+        .describe(
+          "Render classic PencilKit drawings as SVG via the public native helper (default true). False keeps Notes' PNG rendering"
+        ),
     },
     outputSchema: {
       format: z.string().optional(),
@@ -4432,6 +4802,13 @@ registerTool(
       output: z.string().optional(),
       assets: z.object({ dir: z.string(), files: z.number() }).optional(),
       embedded: z.number().optional(),
+      vectorDrawings: z
+        .object({
+          rendered: z.number(),
+          fallback: z.number(),
+          fallbackReasons: z.record(z.string(), z.number()).optional(),
+        })
+        .optional(),
       stats: exportStatsSchema.optional(),
       skipped: z.array(z.object({ id: z.string(), code: z.string() })).optional(),
     },
@@ -4459,8 +4836,17 @@ registerTool(
     const skipped =
       (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") +
       (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
+    const vector = receipt.vectorDrawings;
+    const drawings = vector
+      ? `; ${vector.rendered} drawing(s) as SVG` +
+        (vector.fallback
+          ? `, ${vector.fallback} as PNG (${Object.entries(vector.fallbackReasons ?? {})
+              .map(([code, n]) => `${code}: ${n}`)
+              .join(", ")})`
+          : "")
+      : "";
     return successResponse(
-      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
+      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${drawings}${skipped}.`,
       { ...receipt }
     );
   }, "Error exporting HTML")

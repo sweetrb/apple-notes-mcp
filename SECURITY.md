@@ -29,5 +29,14 @@ This MCP server:
 - Does not transmit data to external servers
 - Does not store credentials or passwords
 - Cannot access password-protected notes
+- Listens on no network port. Two optional command-line servers do, and only
+  when you start them yourself: the template editor
+  (`apple-notes-mcp templates edit`), which stops on Ctrl-C or when idle, and
+  the paragraph anchor resolver (`apple-notes-mcp anchors serve`), which
+  stops on Ctrl-C. Each binds 127.0.0.1 (or, with `--tailnet`, your
+  Tailscale address), requires a token on every request, and checks the
+  `Host` header. The MCP server never starts either. See
+  [docs/markdown-templates.md](docs/markdown-templates.md#what-the-editor-exposes)
+  and [Paragraph anchor resolver](README.md#paragraph-anchor-resolver-opt-in)
 
 The server requires macOS automation permissions to function. These permissions are managed by macOS and can be revoked at any time in System Settings > Privacy & Security > Automation.

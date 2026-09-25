@@ -3,11 +3,32 @@
  * support was deliberately deferred. These tests read the shipped Objective-C
  * source and fail if a save or write path reappears, so re-adding writes has
  * to be a deliberate, reviewed change to this file too.
+ *
+ * An opt-in WRITER is added as a separate program
+ * (apple-notes-private-writer.m, `setup --native-writer`). The read-only
+ * guarantees below still apply, unchanged, to everything the read-only build
+ * path touches: the helper source `setup --native-helper` compiles, the
+ * client that dispatches to it, and the build module that installs it. The
+ * last block checks that none of those can reach the writer.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { HELPER_SOURCE_RELATIVE, READ_ONLY_ACTIONS, packageRoot } from "./privateHelper.js";
+import {
+  HELPER_BINARY_NAME,
+  HELPER_SOURCE_RELATIVE,
+  MANIFEST_NAME,
+  READ_ONLY_ACTIONS,
+  defaultDeps,
+  packageRoot,
+} from "./privateHelper.js";
+import { compileArguments, defaultBuildDeps } from "./privateHelperBuild.js";
+import {
+  WRITER_ACTIONS,
+  WRITER_BINARY_NAME,
+  WRITER_MANIFEST_NAME,
+  WRITER_SOURCE_RELATIVE,
+} from "./privateWriter.js";
 
 const SOURCE = readFileSync(join(packageRoot(__dirname), HELPER_SOURCE_RELATIVE), "utf8");
 /** The source with comments and string literals removed, so only code is matched. */
@@ -62,5 +83,40 @@ describe("native helper source is read-only", () => {
 
   it("advertises readOnly in hello and probe", () => {
     expect(SOURCE.match(/@"readOnly" : @YES/g)).toHaveLength(2);
+  });
+});
+
+describe("the read-only build path cannot reach the writer", () => {
+  const root = packageRoot(__dirname);
+  const readOnlyModules = ["privateHelper.ts", "privateHelperBuild.ts"].map((file) =>
+    readFileSync(join(root, "src", "services", file), "utf8")
+  );
+
+  it("compiles only the read-only helper source", () => {
+    expect(defaultDeps().sourcePath).toBe(join(root, HELPER_SOURCE_RELATIVE));
+    expect(defaultBuildDeps().sourcePath).toBe(join(root, HELPER_SOURCE_RELATIVE));
+    expect(HELPER_SOURCE_RELATIVE).not.toBe(WRITER_SOURCE_RELATIVE);
+    const args = compileArguments("/reader.m", "/out", "0".repeat(64));
+    expect(args.filter((arg) => arg.endsWith(".m"))).toEqual(["/reader.m"]);
+  });
+
+  it("installs to a binary and manifest the writer never uses", () => {
+    expect(HELPER_BINARY_NAME).not.toBe(WRITER_BINARY_NAME);
+    expect(MANIFEST_NAME).not.toBe(WRITER_MANIFEST_NAME);
+  });
+
+  it("has no reference to the writer in the helper source or the read-only modules", () => {
+    for (const text of [SOURCE, ...readOnlyModules]) {
+      expect(text).not.toMatch(/private-writer|privateWriter|ENABLE_PRIVATE_WRITES/);
+      expect(text).not.toMatch(/#(?:include|import)\s+"[^"]*writer/);
+    }
+  });
+
+  it("whitelists no action the writer treats as a write", () => {
+    const writes = Object.entries(WRITER_ACTIONS)
+      .filter(([, kind]) => kind === "write")
+      .map(([action]) => action);
+    expect(writes.length).toBeGreaterThan(0);
+    for (const action of writes) expect(READ_ONLY_ACTIONS.has(action)).toBe(false);
   });
 });

@@ -139,8 +139,10 @@ export function blockPlanHtml(plan: AttachmentPlan): string {
       const name = escapeHtml(plan.name ?? plan.label);
       const src = escapeHtml(plan.url);
       const caption = plan.name ? `<figcaption>${name}</figcaption>` : "";
-      if (plan.display === "image")
-        return `<figure class="attachment attachment-image"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      if (plan.display === "image") {
+        const vector = plan.mime === "image/svg+xml" ? " attachment-vector" : "";
+        return `<figure class="attachment attachment-image${vector}"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      }
       if (plan.display === "audio" || plan.display === "video")
         return `<figure class="attachment attachment-${plan.display}"><${plan.display} controls preload="metadata" src="${src}"></${plan.display}>${caption}</figure>`;
       return (
@@ -335,6 +337,7 @@ th { background: var(--card); }
 figure { margin: 1rem 0; }
 figure img, figure video { max-width: 100%; height: auto; border-radius: 6px; }
 figcaption { color: var(--muted); font-size: .875rem; }
+.attachment-vector img { background: #fff; }
 .attachment-gallery { display: flex; flex-wrap: wrap; gap: .5rem; }
 .attachment-gallery figure { margin: 0; flex: 1 1 12rem; }
 .link-card { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; padding: .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }

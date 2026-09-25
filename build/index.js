@@ -417,11 +417,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants10) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants9);
+          this.rhs = optimizeExpr(this.rhs, names, constants10);
         return this;
       }
       get names() {
@@ -438,10 +438,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants10) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants9);
+        this.rhs = optimizeExpr(this.rhs, names, constants10);
         return this;
       }
       get names() {
@@ -502,8 +502,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants9) {
-        this.code = optimizeExpr(this.code, names, constants9);
+      optimizeNames(names, constants10) {
+        this.code = optimizeExpr(this.code, names, constants10);
         return this;
       }
       get names() {
@@ -532,12 +532,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants10) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants9))
+          if (n.optimizeNames(names, constants10))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -590,12 +590,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants10) {
         var _a;
-        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
-        if (!(super.optimizeNames(names, constants9) || this.else))
+        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
+        if (!(super.optimizeNames(names, constants10) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants9);
+        this.condition = optimizeExpr(this.condition, names, constants10);
         return this;
       }
       get names() {
@@ -618,10 +618,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants9) {
-        if (!super.optimizeNames(names, constants9))
+      optimizeNames(names, constants10) {
+        if (!super.optimizeNames(names, constants10))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants9);
+        this.iteration = optimizeExpr(this.iteration, names, constants10);
         return this;
       }
       get names() {
@@ -657,10 +657,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants9) {
-        if (!super.optimizeNames(names, constants9))
+      optimizeNames(names, constants10) {
+        if (!super.optimizeNames(names, constants10))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants9);
+        this.iterable = optimizeExpr(this.iterable, names, constants10);
         return this;
       }
       get names() {
@@ -702,11 +702,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants9) {
+      optimizeNames(names, constants10) {
         var _a, _b;
-        super.optimizeNames(names, constants9);
-        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants9);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants9);
+        super.optimizeNames(names, constants10);
+        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants10);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants10);
         return this;
       }
       get names() {
@@ -1007,7 +1007,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants9) {
+    function optimizeExpr(expr, names, constants10) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1022,14 +1022,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants9[n.str];
+        const c = constants10[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants9[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants10[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -2227,20 +2227,20 @@ var require_resolve = __commonJS({
       return false;
     }
     function countKeys(schema) {
-      let count = 0;
+      let count2 = 0;
       for (const key in schema) {
         if (key === "$ref")
           return Infinity;
-        count++;
+        count2++;
         if (SIMPLE_INLINED.has(key))
           continue;
         if (typeof schema[key] == "object") {
-          (0, util_1.eachItem)(schema[key], (sch) => count += countKeys(sch));
+          (0, util_1.eachItem)(schema[key], (sch) => count2 += countKeys(sch));
         }
-        if (count === Infinity)
+        if (count2 === Infinity)
           return Infinity;
       }
-      return count;
+      return count2;
     }
     function getFullPath(resolver, id2 = "", normalize) {
       if (normalize !== false)
@@ -2991,7 +2991,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve9.call(this, root, ref);
+      let _sch = resolve10.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3018,7 +3018,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve9(root, ref) {
+    function resolve10(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve9(baseURI, relativeURI, options) {
+    function resolve10(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4205,7 +4205,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve9,
+      resolve: resolve10,
       resolveComponent,
       equal,
       serialize,
@@ -5049,8 +5049,8 @@ var require_multipleOf = __commonJS({
         const { gen, data, schemaCode, it } = cxt;
         const prec = it.opts.multipleOfPrecision;
         const res = gen.let("res");
-        const invalid2 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid2}))`);
+        const invalid10 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
+        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid10}))`);
       }
     };
     exports.default = def;
@@ -5710,8 +5710,8 @@ var require_contains = __commonJS({
         cxt.result(valid, () => cxt.reset());
         function validateItemsWithCount() {
           const schValid = gen.name("_valid");
-          const count = gen.let("count", 0);
-          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
+          const count2 = gen.let("count", 0);
+          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count2)));
         }
         function validateItems(_valid, block) {
           gen.forRange("i", 0, len, (i) => {
@@ -5724,16 +5724,16 @@ var require_contains = __commonJS({
             block();
           });
         }
-        function checkLimits(count) {
-          gen.code((0, codegen_1._)`${count}++`);
+        function checkLimits(count2) {
+          gen.code((0, codegen_1._)`${count2}++`);
           if (max === void 0) {
-            gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
+            gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true).break());
           } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
+            gen.if((0, codegen_1._)`${count2} > ${max}`, () => gen.assign(valid, false).break());
             if (min === 1)
               gen.assign(valid, true);
             else
-              gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true));
+              gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true));
           }
         }
       }
@@ -7422,7 +7422,7 @@ var require_DOMException = __commonJS({
       "INVALID_NODE_TYPE_ERR (24): the supplied node is invalid or has an invalid ancestor for this operation",
       "DATA_CLONE_ERR (25): the object can not be cloned."
     ];
-    var constants9 = {
+    var constants10 = {
       INDEX_SIZE_ERR,
       DOMSTRING_SIZE_ERR: 2,
       // historical
@@ -7461,8 +7461,8 @@ var require_DOMException = __commonJS({
       this.name = names[code];
     }
     DOMException.prototype.__proto__ = Error.prototype;
-    for (c in constants9) {
-      v = { value: constants9[c] };
+    for (c in constants10) {
+      v = { value: constants10[c] };
       Object.defineProperty(DOMException, c, v);
       Object.defineProperty(DOMException.prototype, c, v);
     }
@@ -11232,16 +11232,16 @@ var require_CharacterData = __commonJS({
       //     Return a DOMString whose value is the UTF-16 code
       //     units from the offsetth UTF-16 code unit to the
       //     offset+countth UTF-16 code unit in data.
-      substringData: { value: function substringData(offset, count) {
+      substringData: { value: function substringData(offset, count2) {
         if (arguments.length < 2) {
           throw new TypeError("Not enough arguments");
         }
         offset = offset >>> 0;
-        count = count >>> 0;
-        if (offset > this.data.length || offset < 0 || count < 0) {
+        count2 = count2 >>> 0;
+        if (offset > this.data.length || offset < 0 || count2 < 0) {
           utils.IndexSizeError();
         }
-        return this.data.substring(offset, offset + count);
+        return this.data.substring(offset, offset + count2);
       } },
       // void appendData(DOMString data);
       // The appendData(data) method must append data to the context
@@ -11277,8 +11277,8 @@ var require_CharacterData = __commonJS({
       //
       //     Starting from offset UTF-16 code units remove count
       //     UTF-16 code units from the context object's data.
-      deleteData: { value: function deleteData(offset, count) {
-        return this.replaceData(offset, count, "");
+      deleteData: { value: function deleteData(offset, count2) {
+        return this.replaceData(offset, count2, "");
       } },
       // void replaceData(unsigned long offset, unsigned long count,
       //          DOMString data);
@@ -11288,15 +11288,15 @@ var require_CharacterData = __commonJS({
       // count as arguments followed by the insertData() method
       // with offset and data as arguments and re-throw any
       // exceptions these methods might have thrown.
-      replaceData: { value: function replaceData(offset, count, data) {
+      replaceData: { value: function replaceData(offset, count2, data) {
         var curtext = this.data, len = curtext.length;
         offset = offset >>> 0;
-        count = count >>> 0;
+        count2 = count2 >>> 0;
         data = String(data);
         if (offset > len || offset < 0) utils.IndexSizeError();
-        if (offset + count > len)
-          count = len - offset;
-        var prefix = curtext.substring(0, offset), suffix = curtext.substring(offset + count);
+        if (offset + count2 > len)
+          count2 = len - offset;
+        var prefix = curtext.substring(0, offset), suffix = curtext.substring(offset + count2);
         this.data = prefix + data + suffix;
       } },
       // Utility method that Node.isEqualNode() calls to test Text and
@@ -18235,12 +18235,12 @@ var require_HTMLParser = __commonJS({
       this.attrs.push(this.MARKER);
     };
     HTMLParser.ActiveFormattingElements.prototype.push = function(elt, attrs) {
-      var count = 0;
+      var count2 = 0;
       for (var i = this.list.length - 1; i >= 0; i--) {
         if (this.list[i] === this.MARKER) break;
         if (equal(elt, this.list[i], this.attrs[i])) {
-          count++;
-          if (count === 3) {
+          count2++;
+          if (count2 === 3) {
             this.list.splice(i, 1);
             this.attrs.splice(i, 1);
             break;
@@ -23866,8 +23866,8 @@ var require_turndown_cjs = __commonJS({
       }
       return destination;
     }
-    function repeat(character, count) {
-      return Array(count + 1).join(character);
+    function repeat(character, count2) {
+      return Array(count2 + 1).join(character);
     }
     function trimLeadingNewlines(string3) {
       return string3.replace(/^\n*/, "");
@@ -24287,11 +24287,11 @@ var require_turndown_cjs = __commonJS({
     function Node(node, options) {
       node.isBlock = isBlock(node);
       node.isCode = node.nodeName === "CODE" || node.parentNode.isCode;
-      node.isBlank = isBlank(node);
+      node.isBlank = isBlank2(node);
       node.flankingWhitespace = flankingWhitespace(node, options);
       return node;
     }
-    function isBlank(node) {
+    function isBlank2(node) {
       return !isVoid(node) && !isMeaningfulWhenBlank(node) && /^\s*$/i.test(node.textContent) && !hasVoid(node) && !hasMeaningfulWhenBlank(node);
     }
     function flankingWhitespace(node, options) {
@@ -24465,14 +24465,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join31(output, replacement);
+        return join35(output, replacement);
       }, "");
     }
     function postProcess(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join31(output, rule.append(self.options));
+          output = join35(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -24484,7 +24484,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join31(output, replacement) {
+    function join35(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -30351,7 +30351,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject4 = isObject;
+  const isObject5 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -30360,7 +30360,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
-    if (!isObject4(input)) {
+    if (!isObject5(input)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -36608,7 +36608,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
+        await new Promise((resolve10) => setTimeout(resolve10, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -36625,7 +36625,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve9, reject) => {
+    return new Promise((resolve10, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -36703,7 +36703,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve9(parseResult.data);
+            resolve10(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -36964,12 +36964,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve9, reject) => {
+    return new Promise((resolve10, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve9, interval);
+      const timeoutId = setTimeout(resolve10, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -38282,7 +38282,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve9) => setTimeout(resolve9, pollInterval));
+      await new Promise((resolve10) => setTimeout(resolve10, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -38970,12 +38970,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve9) => {
+    return new Promise((resolve10) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve9();
+        resolve10();
       } else {
-        this._stdout.once("drain", resolve9);
+        this._stdout.once("drain", resolve10);
       }
     });
   }
@@ -39471,9 +39471,9 @@ function queryNoteData(noteId3) {
     return { hex: null, error: "invalid_id" };
   }
   const pk = pkMatch[1];
-  const query2 = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
+  const query3 = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
   try {
-    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query2], {
+    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query3], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -39662,10 +39662,10 @@ function buildResolveSql(entity3, keys, uuids) {
   }
   if (uuids.length > 0) {
     const variants = /* @__PURE__ */ new Set();
-    for (const uuid2 of uuids) {
-      variants.add(uuid2);
-      variants.add(uuid2.toUpperCase());
-      variants.add(uuid2.toLowerCase());
+    for (const uuid3 of uuids) {
+      variants.add(uuid3);
+      variants.add(uuid3.toUpperCase());
+      variants.add(uuid3.toLowerCase());
     }
     matches.push(`o.ZIDENTIFIER IN (${[...variants].map((v) => `'${v}'`).join(", ")})`);
   }
@@ -39743,10 +39743,10 @@ function resolveIdentifiers(values, entity3, dbPath2 = NOTES_DB_PATH2) {
     if (row) resolved.set(key, coreDataId(store, entity3, row.pk));
     else missing.push(`numeric key ${key}`);
   }
-  for (const uuid2 of uuids) {
-    const row = byUuid.get(uuid2.toUpperCase());
-    if (row) resolved.set(uuid2, coreDataId(store, entity3, row.pk));
-    else missing.push(`identifier ${uuid2}`);
+  for (const uuid3 of uuids) {
+    const row = byUuid.get(uuid3.toUpperCase());
+    if (row) resolved.set(uuid3, coreDataId(store, entity3, row.pk));
+    else missing.push(`identifier ${uuid3}`);
   }
   if (missing.length > 0) {
     throw new IdentifierResolutionError(
@@ -39769,14 +39769,14 @@ function lookupStableIdentifiers(ids, entity3, dbPath2 = NOTES_DB_PATH2) {
     wanted.set(pk, list);
   }
   if (wanted.size === 0) return result;
-  let query2;
+  let query3;
   try {
-    query2 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
+    query3 = runJsonQuery(buildLookupSql(entity3, [...wanted.keys()]), dbPath2);
   } catch {
     return result;
   }
-  const store = query2.store?.toUpperCase();
-  for (const row of query2.rows) {
+  const store = query3.store?.toUpperCase();
+  for (const row of query3.rows) {
     const fields = {};
     for (const key of [
       "identifier",
@@ -40063,10 +40063,10 @@ function parseRichNote(data, nativeTags = [], options = {}) {
     const length = varintValue(getField(fields, 1));
     if (length === void 0 || length < 0 || position + length > text2.length)
       throw new Error("Invalid Notes run length");
-    const paragraph = embeddedMessage(getField(fields, 2));
+    const paragraph2 = embeddedMessage(getField(fields, 2));
     styleRuns.push({
-      paragraphStyle: paragraph ? varintValue(getField(paragraph, 1)) ?? 3 : 3,
-      blockQuote: Boolean(paragraph && varintValue(getField(paragraph, 8))),
+      paragraphStyle: paragraph2 ? varintValue(getField(paragraph2, 1)) ?? 3 : 3,
+      blockQuote: Boolean(paragraph2 && varintValue(getField(paragraph2, 8))),
       highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
@@ -40078,7 +40078,7 @@ function parseRichNote(data, nativeTags = [], options = {}) {
       const baseline = varintValue(getField(fields, 8)) ?? 0;
       if (baseline > 0) lossy.add("superscript");
       if (baseline < 0) lossy.add("subscript");
-      if (paragraph && (varintValue(getField(paragraph, 2)) ?? 0) !== 0) lossy.add("alignment");
+      if (paragraph2 && (varintValue(getField(paragraph2, 2)) ?? 0) !== 0) lossy.add("alignment");
       if (varintValue(getField(fields, 14))) lossy.add("highlight");
     }
     const url = stringValue(getField(fields, 9));
@@ -40103,9 +40103,9 @@ function parseRichNote(data, nativeTags = [], options = {}) {
         length
       });
     }
-    hasChecklist ||= Boolean(paragraph && varintValue(getField(paragraph, 1)) === 103);
-    if (paragraph && varintValue(getField(paragraph, 1)) === 103) {
-      const checklist = embeddedMessage(getField(paragraph, 5));
+    hasChecklist ||= Boolean(paragraph2 && varintValue(getField(paragraph2, 1)) === 103);
+    if (paragraph2 && varintValue(getField(paragraph2, 1)) === 103) {
+      const checklist = embeddedMessage(getField(paragraph2, 5));
       const rawId = checklist && getField(checklist, 1)?.value;
       const itemId = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : "";
       const start = checklistRunLineStart(text2, position, length);
@@ -40329,9 +40329,9 @@ function assertLinkedWrite(rich, content, format, allowLinkChanges = false) {
     needed.set(key, (needed.get(key) || 0) + 1);
   }
   const incoming = linkSignature(next);
-  for (const [key, count] of needed) {
+  for (const [key, count2] of needed) {
     const sequence = key.slice(1, -1);
-    if (incoming.split(sequence).length - 1 < count)
+    if (incoming.split(sequence).length - 1 < count2)
       throw new Error(
         "Update would remove or change an existing link. Preserve its label and URL from get-note-content."
       );
@@ -40381,8 +40381,8 @@ function parseAudioRecording(data) {
     (f) => f.value instanceof Uint8Array ? Buffer.from(f.value).toString("hex") : ""
   );
   const uuidSlot = /* @__PURE__ */ new Map();
-  uuids.forEach((uuid2, i) => {
-    if (uuid2 && !uuidSlot.has(uuid2)) uuidSlot.set(uuid2, i);
+  uuids.forEach((uuid3, i) => {
+    if (uuid3 && !uuidSlot.has(uuid3)) uuidSlot.set(uuid3, i);
   });
   const entry = (index) => {
     const value = entries2[index];
@@ -40456,9 +40456,9 @@ function parseAudioRecording(data) {
           index: need(varintValue(getField(pair, 1)), "segment index"),
           uuid: getField(pair, 2)?.value
         })).sort((a, b) => a.index - b.index);
-        for (const { uuid: uuid2 } of ordering) {
-          if (!(uuid2 instanceof Uint8Array)) throw new Error("Invalid segment UUID");
-          const slot = uuidSlot.get(Buffer.from(uuid2).toString("hex"));
+        for (const { uuid: uuid3 } of ordering) {
+          if (!(uuid3 instanceof Uint8Array)) throw new Error("Invalid segment UUID");
+          const slot = uuidSlot.get(Buffer.from(uuid3).toString("hex"));
           const segmentIndex = slot === void 0 ? void 0 : bySlot.get(slot);
           if (segmentIndex === void 0) throw new Error("Unresolved transcript segment");
           const segment = customMap(entry(segmentIndex));
@@ -40679,9 +40679,9 @@ var clock = (seconds) => {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 };
 function formatTranscriptsText(result) {
-  const count = result.attachments.length;
-  if (count === 0) return `No audio attachments found in note ${result.id}.`;
-  const lines = [`${count} audio attachment${count === 1 ? "" : "s"} in note ${result.id}:`];
+  const count2 = result.attachments.length;
+  if (count2 === 0) return `No audio attachments found in note ${result.id}.`;
+  const lines = [`${count2} audio attachment${count2 === 1 ? "" : "s"} in note ${result.id}:`];
   result.attachments.forEach((a, i) => {
     const facts = [
       `status ${a.status}`,
@@ -40775,15 +40775,15 @@ function decodeTable(compressed, strict) {
     }
     return { ids, map };
   };
-  const rows = ordered("crRows"), columns = ordered("crColumns");
-  if (!rows.ids.length || !columns.ids.length || rows.ids.length * columns.ids.length > 1e5)
+  const rows = ordered("crRows"), columns2 = ordered("crColumns");
+  if (!rows.ids.length || !columns2.ids.length || rows.ids.length * columns2.ids.length > 1e5)
     throw new Error("Unsupported table size");
-  const values = rows.ids.map(() => columns.ids.map(() => ""));
+  const values = rows.ids.map(() => columns2.ids.map(() => ""));
   const incomplete = [];
   const cellRef = refs.get("cellColumns");
   if (cellRef === void 0) throw new Error("Missing table cells");
   for (const column of many2(sub2(entry(cellRef), 6), 1)) {
-    const ci = columns.map.get(uuidIndex(num(sub2(column, 1), 6)));
+    const ci = columns2.map.get(uuidIndex(num(sub2(column, 1), 6)));
     const cells = entry(num(sub2(column, 2), 6));
     for (const row of many2(sub2(cells, 6), 1)) {
       const ri = rows.map.get(uuidIndex(num(sub2(row, 1), 6)));
@@ -40809,13 +40809,13 @@ function decodeTable(compressed, strict) {
       (m) => stringValue(getField(sub2(m, 2), 4)) === "CRTableColumnDirectionRightToLeft"
     );
   });
-  const width = columns.ids.length;
+  const width = columns2.ids.length;
   if (rtl) {
     for (const row of values) row.reverse();
-    columns.ids.reverse();
+    columns2.ids.reverse();
   }
   const incompleteCells = incomplete.map(({ ri, ci, reason }) => ({ row: ri, column: rtl ? width - 1 - ci : ci, reason })).sort((a, b) => a.row - b.row || a.column - b.column);
-  return { rows: values, rowIds: rows.ids, columnIds: columns.ids, incompleteCells };
+  return { rows: values, rowIds: rows.ids, columnIds: columns2.ids, incompleteCells };
 }
 
 // src/utils/tableMarkdown.ts
@@ -41064,12 +41064,12 @@ var Decoder = class {
         const verb = key.startsWith("creation") ? "created" : "edited";
         if (value.type === 6) {
           const amount = value.customAmount;
-          const unit = typeof value.customUnit === "number" ? CUSTOM_UNITS[value.customUnit] : null;
-          if (typeof amount !== "number" || !unit) return null;
+          const unit2 = typeof value.customUnit === "number" ? CUSTOM_UNITS[value.customUnit] : null;
+          if (typeof amount !== "number" || !unit2) return null;
           return {
             type: key,
             value,
-            description: `${verb} in the last ${amount} ${unit}`
+            description: `${verb} in the last ${amount} ${unit2}`
           };
         }
         const range = RELATIVE_RANGES[value.type];
@@ -41124,7 +41124,7 @@ function decodeSmartFolderQuery(raw, context = {}) {
       inner = type.and.filter((clause) => !isDeletedWrapper(clause));
     }
   }
-  const query2 = inner.length === 1 ? inner[0] : { and: inner };
+  const query3 = inner.length === 1 ? inner[0] : { and: inner };
   let match = "all";
   let filters;
   const only = inner.length === 1 && isClause(inner[0]) ? inner[0] : void 0;
@@ -41143,7 +41143,7 @@ function decodeSmartFolderQuery(raw, context = {}) {
   return {
     match,
     filters,
-    query: query2,
+    query: query3,
     ...includesRecentlyDeleted === void 0 ? {} : { includesRecentlyDeleted },
     fullyDecoded: decoder.fullyDecoded
   };
@@ -41195,13 +41195,13 @@ function buildSmartFolders(output) {
   if (lines.length < 4) throw new Error("Unexpected smart folder query output");
   const [storeUuid, rowsJson, foldersJson, tagsJson] = lines;
   if (!/^[0-9A-F-]+$/i.test(storeUuid)) throw new Error("Unexpected Notes store identifier");
-  const coreDataId3 = (entity3, pk) => `x-coredata://${storeUuid}/${entity3}/p${pk}`;
+  const coreDataId4 = (entity3, pk) => `x-coredata://${storeUuid}/${entity3}/p${pk}`;
   const rows = JSON.parse(rowsJson);
   const folderRows = JSON.parse(foldersJson || "{}");
   const tagRows = JSON.parse(tagsJson || "[]");
   const folders = {};
   for (const [identifier, row] of Object.entries(folderRows)) {
-    folders[identifier] = { id: coreDataId3("ICFolder", row.pk), title: row.title };
+    folders[identifier] = { id: coreDataId4("ICFolder", row.pk), title: row.title };
   }
   const tags = {};
   for (const tag of tagRows) {
@@ -41212,14 +41212,14 @@ function buildSmartFolders(output) {
   return rows.map((row) => {
     const decoded = decodeSmartFolderQuery(row.query, { folders, tags });
     return {
-      id: coreDataId3("ICFolder", row.pk),
+      id: coreDataId4("ICFolder", row.pk),
       identifier: row.identifier,
       name: row.title,
       account: row.accountName,
-      accountId: row.accountPk === null ? null : coreDataId3("ICAccount", row.accountPk),
+      accountId: row.accountPk === null ? null : coreDataId4("ICAccount", row.accountPk),
       accountIdentifier: row.accountIdentifier,
       parent: row.parentTitle,
-      parentId: row.parentPk === null ? null : coreDataId3("ICFolder", row.parentPk),
+      parentId: row.parentPk === null ? null : coreDataId4("ICFolder", row.parentPk),
       parentIdentifier: row.parentIdentifier,
       match: decoded.match,
       filters: decoded.filters,
@@ -41243,10 +41243,10 @@ function runSqlite2(dbPath2, sql) {
 function readSmartFolders(dbPath2 = NOTES_DB_PATH4) {
   if (!fs3.existsSync(dbPath2)) return { folders: null, error: "no_fda", message: FDA_MESSAGE };
   try {
-    const columns = new Set(
+    const columns2 = new Set(
       runSqlite2(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").trim().split("\n")
     );
-    const missing = REQUIRED_COLUMNS2.filter((column) => !columns.has(column));
+    const missing = REQUIRED_COLUMNS2.filter((column) => !columns2.has(column));
     if (missing.length) {
       return {
         folders: null,
@@ -41290,18 +41290,18 @@ function readTrashFolderIds(dbPath2 = NOTES_DB_PATH5) {
   }
   try {
     if (!fs4.existsSync(dbPath2)) return [];
-    const columns = new Set(
+    const columns2 = new Set(
       query(dbPath2, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');").split("\n").map((line) => line.trim()).filter(Boolean)
     );
     const predicates = [];
-    if (columns.has("ZFOLDERTYPE")) predicates.push("COALESCE(ZFOLDERTYPE, 0) = 1");
-    if (columns.has("ZIDENTIFIER"))
+    if (columns2.has("ZFOLDERTYPE")) predicates.push("COALESCE(ZFOLDERTYPE, 0) = 1");
+    if (columns2.has("ZIDENTIFIER"))
       predicates.push("COALESCE(ZIDENTIFIER, '') LIKE 'TrashFolder%'");
     if (!predicates.length) return [];
     const sql = `SELECT (SELECT Z_UUID FROM Z_METADATA LIMIT 1); SELECT Z_PK FROM ZICCLOUDSYNCINGOBJECT WHERE Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICFolder') AND (${predicates.join(" OR ")}) ORDER BY Z_PK;`;
-    const [uuid2, ...pks] = query(dbPath2, sql).split("\n").map((line) => line.trim()).filter(Boolean);
-    if (!uuid2 || !/^[0-9A-F-]+$/i.test(uuid2)) return [];
-    const ids = pks.filter((pk) => /^\d+$/.test(pk)).map((pk) => `x-coredata://${uuid2}/ICFolder/p${pk}`);
+    const [uuid3, ...pks] = query(dbPath2, sql).split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!uuid3 || !/^[0-9A-F-]+$/i.test(uuid3)) return [];
+    const ids = pks.filter((pk) => /^\d+$/.test(pk)).map((pk) => `x-coredata://${uuid3}/ICFolder/p${pk}`);
     cache = { dbPath: dbPath2, at: Date.now(), ids };
     return ids;
   } catch {
@@ -41485,6 +41485,23 @@ function privateContentReason(p, roots) {
 }
 var CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
 function readAllowedFile(p, maxBytes, options = {}) {
+  const label = options.label ?? "Content file";
+  const { descriptor, size } = openAllowedFile(p, maxBytes, options);
+  try {
+    const bytes = readFileSync(descriptor);
+    if (bytes.length !== size)
+      throw new Error(`${label} changed while it was being read; try again`);
+    return bytes;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+function assertAllowedFile(p, maxBytes, options = {}) {
+  const { descriptor, size } = openAllowedFile(p, maxBytes, options);
+  closeSync(descriptor);
+  return size;
+}
+function openAllowedFile(p, maxBytes, options) {
   const roots = options.roots ?? allowedSaveRoots();
   const allowPrivate = options.allowPrivate ?? process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1";
   const label = options.label ?? "Content file";
@@ -41527,12 +41544,10 @@ function readAllowedFile(p, maxBytes, options = {}) {
     if (stat.size === 0) throw new Error(`${label} is empty: "${abs}"`);
     if (stat.size > maxBytes)
       throw new Error(`${label} is ${stat.size} bytes, over the ${maxBytes}-byte limit.`);
-    const bytes = readFileSync(descriptor);
-    if (bytes.length !== stat.size)
-      throw new Error(`${label} changed while it was being read; try again`);
-    return bytes;
-  } finally {
+    return { descriptor, size: stat.size };
+  } catch (error2) {
     closeSync(descriptor);
+    throw error2;
   }
 }
 function readAllowedTextFile(p, maxBytes, roots = allowedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_CONTENT_ENV] === "1") {
@@ -41648,29 +41663,29 @@ function parseNoteId2(noteId3) {
 function attachmentCoreDataId(noteId3, pk) {
   return noteId3.replace(/ICNote\/p\d+$/, `ICAttachment/p${pk}`);
 }
-function buildAttachmentRowsSql(notePk, columns) {
+function buildAttachmentRowsSql(notePk, columns2) {
   if (!Number.isSafeInteger(notePk) || notePk < 0) throw new Error("Invalid note primary key");
-  const col3 = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+  const col3 = (alias, name) => columns2.has(name) ? `${alias}.${name}` : "NULL";
   const firstOf = (alias, names) => {
-    const present = names.filter((n) => columns.has(n)).map((n) => `${alias}.${n}`);
+    const present = names.filter((n) => columns2.has(n)).map((n) => `${alias}.${n}`);
     if (present.length === 0) return "NULL";
     return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
   };
-  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const accountCols = [...columns2].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
   const accountRefs = [
     ...accountCols.map((c) => `a.${c}`),
     ...accountCols.map((c) => `n.${c}`)
   ].join(", ");
   const account = accountCols.length ? `(SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAccount') AND acc.Z_PK IN (${accountRefs}) LIMIT 1)` : "NULL";
-  const noteLink = columns.has("ZNOTE") ? "a.ZNOTE" : "NULL";
+  const noteLink = columns2.has("ZNOTE") ? "a.ZNOTE" : "NULL";
   const parent = col3("a", "ZPARENTATTACHMENT");
-  const deleted = columns.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  const deleted = columns2.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
   const fields = [
     `'pk', a.Z_PK`,
     `'identifier', a.ZIDENTIFIER`,
     `'uti', ${col3("a", "ZTYPEUTI")}`,
     `'parentPk', ${parent}`,
-    `'parentDeleted', ${parent !== "NULL" && columns.has("ZMARKEDFORDELETION") ? `(SELECT COALESCE(p.ZMARKEDFORDELETION, 0) FROM ZICCLOUDSYNCINGOBJECT p WHERE p.Z_PK = ${parent})` : "0"}`,
+    `'parentDeleted', ${parent !== "NULL" && columns2.has("ZMARKEDFORDELETION") ? `(SELECT COALESCE(p.ZMARKEDFORDELETION, 0) FROM ZICCLOUDSYNCINGOBJECT p WHERE p.Z_PK = ${parent})` : "0"}`,
     `'filename', ${col3("a", "ZFILENAME")}`,
     `'mediaIdentifier', m.ZIDENTIFIER`,
     `'mediaFilename', ${col3("m", "ZFILENAME")}`,
@@ -41679,7 +41694,7 @@ function buildAttachmentRowsSql(notePk, columns) {
     `'fallbackPdfGeneration', ${col3("a", "ZFALLBACKPDFGENERATION")}`,
     `'accountIdentifier', ${account}`
   ].join(", ");
-  const mediaJoin = columns.has("ZMEDIA") ? "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON m.Z_PK = a.ZMEDIA" : "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON 0";
+  const mediaJoin = columns2.has("ZMEDIA") ? "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON m.Z_PK = a.ZMEDIA" : "LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON 0";
   const childClause = parent === "NULL" ? "" : ` OR a.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE p.ZNOTE = ${notePk})`;
   return [
     "BEGIN;",
@@ -41766,11 +41781,11 @@ function readNoteAttachmentRows(noteId3, dbPath2 = join8(NOTES_CONTAINER_DIR, "N
     dbPath2,
     "SELECT group_concat(name, ',') FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
   ).trim();
-  const columns = new Set(columnList.split(",").filter(Boolean));
-  if (!columns.has("ZIDENTIFIER")) {
+  const columns2 = new Set(columnList.split(",").filter(Boolean));
+  if (!columns2.has("ZIDENTIFIER")) {
     throw new AttachmentStoreError("Unsupported Notes database schema", "query_error");
   }
-  const lines = runSqlite3(dbPath2, buildAttachmentRowsSql(pk, columns)).split("\n");
+  const lines = runSqlite3(dbPath2, buildAttachmentRowsSql(pk, columns2)).split("\n");
   if (lines[0]?.trim() !== "1") {
     throw new AttachmentStoreError(
       `No note found in the database for ID "${noteId3}".`,
@@ -42239,15 +42254,15 @@ function readImageInfo(path10) {
     closeSync3(fd);
   }
 }
-function buildDrawingRowsSql(notePk, columns) {
+function buildDrawingRowsSql(notePk, columns2) {
   if (!Number.isSafeInteger(notePk) || notePk < 0) throw new Error("Invalid note primary key");
-  const col3 = (name) => columns.has(name) ? `a.${name}` : "NULL";
-  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const col3 = (name) => columns2.has(name) ? `a.${name}` : "NULL";
+  const accountCols = [...columns2].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
   const account = accountCols.length ? `(SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'ICAccount') AND acc.Z_PK IN (${[
     ...accountCols.map((c) => `a.${c}`),
     ...accountCols.map((c) => `n.${c}`)
   ].join(", ")}) LIMIT 1)` : "NULL";
-  const deleted = columns.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  const deleted = columns2.has("ZMARKEDFORDELETION") ? " AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
   const fields = [
     `'pk', a.Z_PK`,
     `'identifier', a.ZIDENTIFIER`,
@@ -42307,16 +42322,16 @@ function parseDrawingRows(json2) {
 }
 function readDrawingRows(noteId3, dbPath2 = join9(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
-  const columns = new Set(
+  const columns2 = new Set(
     runSqlite4(
       dbPath2,
       "SELECT group_concat(name, ',') FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"
     ).trim().split(",").filter(Boolean)
   );
-  if (!columns.has("ZIDENTIFIER") || !columns.has("ZTYPEUTI") || !columns.has("ZNOTE")) {
+  if (!columns2.has("ZIDENTIFIER") || !columns2.has("ZTYPEUTI") || !columns2.has("ZNOTE")) {
     throw new AttachmentStoreError("Unsupported Notes database schema", "query_error");
   }
-  const lines = runSqlite4(dbPath2, buildDrawingRowsSql(pk, columns)).split("\n");
+  const lines = runSqlite4(dbPath2, buildDrawingRowsSql(pk, columns2)).split("\n");
   if (lines[0]?.trim() !== "1") {
     throw new AttachmentStoreError(
       `No note found in the database for ID "${noteId3}".`,
@@ -43018,8 +43033,8 @@ function folderDeleteFactsScript(id2) {
       end repeat
       set noteCount to count of notes of f`;
 }
-function getNoteLinkFromDB(coreDataId3) {
-  const match = coreDataId3.match(/\/p(\d+)$/);
+function getNoteLinkFromDB(coreDataId4) {
+  const match = coreDataId4.match(/\/p(\d+)$/);
   if (!match) return null;
   const pk = parseInt(match[1], 10);
   const dbPath2 = join10(homedir9(), "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite");
@@ -43241,9 +43256,9 @@ var AppleNotesManager = class {
    * const topResults = manager.searchNotes("project", false, undefined, undefined, undefined, 10);
    * ```
    */
-  searchNotes(query2, searchContent = false, account, folder, modifiedSince, limit) {
+  searchNotes(query3, searchContent = false, account, folder, modifiedSince, limit) {
     const targetAccount = this.resolveAccount(account);
-    const safeQuery = escapePlainStringForAppleScript(query2);
+    const safeQuery = escapePlainStringForAppleScript(query3);
     const safeLimit = limit !== void 0 && limit > 0 ? Math.floor(limit) : void 0;
     const whereParts = [];
     if (searchContent) {
@@ -43301,7 +43316,7 @@ var AppleNotesManager = class {
     const script = buildAccountScopedScript({ account: targetAccount }, searchCommand);
     const result = executeAppleScript(script);
     if (!result.success) {
-      throw new Error(`Failed to search notes for "${query2}": ${result.error ?? "unknown error"}`);
+      throw new Error(`Failed to search notes for "${query3}": ${result.error ?? "unknown error"}`);
     }
     if (!result.output.trim()) {
       return [];
@@ -44163,7 +44178,7 @@ var AppleNotesManager = class {
     if (!result.success) throw new Error(result.error || "Folder not found");
     const parts = result.output.replace(/\n$/, "").split(FIELD_SEP);
     if (parts.length !== 7 || !parts[0] || !parts[2]) throw new Error("Incomplete folder metadata");
-    const count = (value) => {
+    const count2 = (value) => {
       const parsed = Number(value.trim());
       if (!Number.isInteger(parsed) || parsed < 0) throw new Error("Incomplete folder metadata");
       return parsed;
@@ -44175,8 +44190,8 @@ var AppleNotesManager = class {
       accountId: parts[2],
       defaultFolderId: parts[3] || null,
       shared: parts[4].trim() === "true",
-      childFolderCount: count(parts[5]),
-      noteCount: count(parts[6])
+      childFolderCount: count2(parts[5]),
+      noteCount: count2(parts[6])
     };
   }
   /**
@@ -45767,7 +45782,7 @@ function getSyncStatus(useCache = true) {
       status.secondsSinceLastChange = Math.round(secondsAgo);
       status.recentActivity = secondsAgo < RECENT_ACTIVITY_THRESHOLD_SECONDS;
     }
-    const query2 = `
+    const query3 = `
       SELECT COUNT(*) FROM ZICCLOUDSTATE state
       WHERE state.ZCURRENTLOCALVERSION > state.ZLATESTVERSIONSYNCEDTOCLOUD
       AND state.ZLATESTVERSIONSYNCEDTOCLOUD IS NOT NULL
@@ -45778,7 +45793,7 @@ function getSyncStatus(useCache = true) {
     `;
     const result = execFileSync10(
       "sqlite3",
-      ["-readonly", NOTES_DB_PATH6, query2.replace(/\n/g, " ")],
+      ["-readonly", NOTES_DB_PATH6, query3.replace(/\n/g, " ")],
       {
         encoding: "utf8",
         timeout: 5e3,
@@ -45855,8 +45870,8 @@ var COLUMN_MAP = [
   { key: "widgetSnippet", column: "ZWIDGETSNIPPET", type: "text" },
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
-function runSqlite5(query2) {
-  return execFileSync11("sqlite3", ["-readonly", NOTES_DB_PATH7, query2], {
+function runSqlite5(query3) {
+  return execFileSync11("sqlite3", ["-readonly", NOTES_DB_PATH7, query3], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -46016,8 +46031,8 @@ function readColumns(dbPath2) {
   );
   return new Set(parseJsonLines(out).map((row) => row.name));
 }
-function requireColumns(columns, required2, tool) {
-  const missing = required2.filter((column) => !columns.has(column));
+function requireColumns(columns2, required2, tool) {
+  const missing = required2.filter((column) => !columns2.has(column));
   if (missing.length) {
     throw new NoteStoreError(
       `This macOS version's Notes database lacks columns ${tool} needs (${missing.join(", ")}).`,
@@ -46025,33 +46040,33 @@ function requireColumns(columns, required2, tool) {
     );
   }
 }
-function col(columns, alias, name, fallback = "NULL") {
-  return columns.has(name) ? `${alias}.${name}` : fallback;
+function col(columns2, alias, name, fallback = "NULL") {
+  return columns2.has(name) ? `${alias}.${name}` : fallback;
 }
 function entity(name) {
   return `(SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME='${name}')`;
 }
-function accountRef(columns, alias) {
-  const refs = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort().map((name) => `${alias}.${name}`);
+function accountRef(columns2, alias) {
+  const refs = [...columns2].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort().map((name) => `${alias}.${name}`);
   if (!refs.length) return "NULL";
   return refs.length === 1 ? refs[0] : `COALESCE(${refs.join(", ")})`;
 }
-function trashFolderSql(columns, f) {
+function trashFolderSql(columns2, f) {
   const parts = [];
-  if (columns.has("ZFOLDERTYPE")) parts.push(`COALESCE(${f}.ZFOLDERTYPE, 0) = 1`);
-  if (columns.has("ZIDENTIFIER")) parts.push(`COALESCE(${f}.ZIDENTIFIER, '') LIKE 'TrashFolder%'`);
+  if (columns2.has("ZFOLDERTYPE")) parts.push(`COALESCE(${f}.ZFOLDERTYPE, 0) = 1`);
+  if (columns2.has("ZIDENTIFIER")) parts.push(`COALESCE(${f}.ZIDENTIFIER, '') LIKE 'TrashFolder%'`);
   return parts.length ? `(${parts.join(" OR ")})` : "0";
 }
-function notTombstonedSql(columns, alias) {
-  return columns.has("ZMARKEDFORDELETION") ? `COALESCE(${alias}.ZMARKEDFORDELETION, 0) = 0` : "1";
+function notTombstonedSql(columns2, alias) {
+  return columns2.has("ZMARKEDFORDELETION") ? `COALESCE(${alias}.ZMARKEDFORDELETION, 0) = 0` : "1";
 }
-function activeNoteSql(columns, n, f) {
+function activeNoteSql(columns2, n, f) {
   return [
     `${n}.ZFOLDER IS NOT NULL`,
     `${f}.Z_PK IS NOT NULL`,
-    notTombstonedSql(columns, n),
-    notTombstonedSql(columns, f),
-    `NOT ${trashFolderSql(columns, f)}`
+    notTombstonedSql(columns2, n),
+    notTombstonedSql(columns2, f),
+    `NOT ${trashFolderSql(columns2, f)}`
   ].join(" AND ");
 }
 function coreDataToIso(seconds) {
@@ -46062,12 +46077,12 @@ function coreDataToIso(seconds) {
 function noteIdFor(storeUuid, pk) {
   return `x-coredata://${storeUuid}/ICNote/p${pk}`;
 }
-function readStoreContext(dbPath2, columns) {
+function readStoreContext(dbPath2, columns2) {
   const sql = [
     "BEGIN;",
     "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
-    `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col(columns, "a", "ZNAME")}, 'identifier', ${col(columns, "a", "ZIDENTIFIER")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity("ICAccount")} AND ${notTombstonedSql(columns, "a")};`,
-    `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col(columns, "f", "ZTITLE2")}, 'identifier', ${col(columns, "f", "ZIDENTIFIER")}, 'parent', ${col(columns, "f", "ZPARENT")}, 'account', ${col(columns, "f", "ZOWNER", accountRef(columns, "f"))}, 'folderType', ${col(columns, "f", "ZFOLDERTYPE")}, 'trash', ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "f")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity("ICFolder")};`,
+    `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col(columns2, "a", "ZNAME")}, 'identifier', ${col(columns2, "a", "ZIDENTIFIER")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity("ICAccount")} AND ${notTombstonedSql(columns2, "a")};`,
+    `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col(columns2, "f", "ZTITLE2")}, 'identifier', ${col(columns2, "f", "ZIDENTIFIER")}, 'parent', ${col(columns2, "f", "ZPARENT")}, 'account', ${col(columns2, "f", "ZOWNER", accountRef(columns2, "f"))}, 'folderType', ${col(columns2, "f", "ZFOLDERTYPE")}, 'trash', ${trashFolderSql(columns2, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns2, "f")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity("ICFolder")};`,
     "COMMIT;"
   ].join(" ");
   const rows = parseJsonLines(runReadOnlySql(dbPath2, sql));
@@ -46132,44 +46147,44 @@ var KIND_COLUMN = {
   "recently-deleted": ["ZFOLDERTYPE", "ZIDENTIFIER"],
   locked: ["ZISPASSWORDPROTECTED"]
 };
-function kindSupported(columns, kind) {
-  return KIND_COLUMN[kind].some((name) => columns.has(name));
+function kindSupported(columns2, kind) {
+  return KIND_COLUMN[kind].some((name) => columns2.has(name));
 }
-var flag = (columns, alias, name) => columns.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
-function kindPredicate(columns, kind) {
+var flag = (columns2, alias, name) => columns2.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
+function kindPredicate(columns2, kind) {
   switch (kind) {
     case "pinned":
-      return `${flag(columns, "n", "ZISPINNED")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+      return `${flag(columns2, "n", "ZISPINNED")} = 1 AND ${activeNoteSql(columns2, "n", "f")}`;
     case "quick-notes":
-      return `${flag(columns, "n", "ZISSYSTEMPAPER")} = 1 AND ${activeNoteSql(columns, "n", "f")}`;
+      return `${flag(columns2, "n", "ZISSYSTEMPAPER")} = 1 AND ${activeNoteSql(columns2, "n", "f")}`;
     case "recently-deleted":
-      return `f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")} AND ${notTombstonedSql(columns, "n")}`;
+      return `f.Z_PK IS NOT NULL AND ${trashFolderSql(columns2, "f")} AND ${notTombstonedSql(columns2, "n")}`;
     case "locked":
-      return `${flag(columns, "n", "ZISPASSWORDPROTECTED")} = 1`;
+      return `${flag(columns2, "n", "ZISPASSWORDPROTECTED")} = 1`;
   }
 }
-function folderAccountJoins(columns) {
-  const owner = col(columns, "f", "ZOWNER");
-  const account = owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;
+function folderAccountJoins(columns2) {
+  const owner = col(columns2, "f", "ZOWNER");
+  const account = owner === "NULL" ? accountRef(columns2, "n") : `COALESCE(${owner}, ${accountRef(columns2, "n")})`;
   return `LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")}`;
 }
-function noteFrom(columns) {
-  return `FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)}`;
+function noteFrom(columns2) {
+  return `FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns2)}`;
 }
 var REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZTITLE1"];
-function buildSpecialNotesSql(columns, kind, scoped) {
-  requireColumns(columns, REQUIRED, "list-special-notes");
-  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
+function buildSpecialNotesSql(columns2, kind, scoped) {
+  requireColumns(columns2, REQUIRED, "list-special-notes");
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns2.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
   const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
-  const modified = col(columns, "n", "ZMODIFICATIONDATE1");
-  const locked = flag(columns, "n", "ZISPASSWORDPROTECTED");
-  const where = `WHERE n.Z_ENT = ${entity("ICNote")} AND ${kindPredicate(columns, kind)}` + (scoped ? " AND a.Z_PK = @account" : "");
-  const snippet = `CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns, "n", "ZSNIPPET")} END`;
-  const hint = kind === "locked" ? col(columns, "n", "ZPASSWORDHINT") : "NULL";
-  const row = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', ${modified}, 'pinned', ${flag(columns, "n", "ZISPINNED")}, 'locked', ${locked}, 'quick', ${flag(columns, "n", "ZISSYSTEMPAPER")}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "n")}, 'snippet', ${snippet}, 'hint', ${hint}) ${noteFrom(columns)} ${where} ORDER BY ${modified} DESC, n.Z_PK DESC LIMIT @limit;`;
+  const modified = col(columns2, "n", "ZMODIFICATIONDATE1");
+  const locked = flag(columns2, "n", "ZISPASSWORDPROTECTED");
+  const where = `WHERE n.Z_ENT = ${entity("ICNote")} AND ${kindPredicate(columns2, kind)}` + (scoped ? " AND a.Z_PK = @account" : "");
+  const snippet = `CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns2, "n", "ZSNIPPET")} END`;
+  const hint = kind === "locked" ? col(columns2, "n", "ZPASSWORDHINT") : "NULL";
+  const row = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${col(columns2, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', ${modified}, 'pinned', ${flag(columns2, "n", "ZISPINNED")}, 'locked', ${locked}, 'quick', ${flag(columns2, "n", "ZISSYSTEMPAPER")}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns2, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns2, "n")}, 'snippet', ${snippet}, 'hint', ${hint}) ${noteFrom(columns2)} ${where} ORDER BY ${modified} DESC, n.Z_PK DESC LIMIT @limit;`;
   return [
     "BEGIN;",
-    `SELECT json_object('k', 'total', 'n', COUNT(*)) ${noteFrom(columns)} ${where};`,
+    `SELECT json_object('k', 'total', 'n', COUNT(*)) ${noteFrom(columns2)} ${where};`,
     row,
     "COMMIT;"
   ].join(" ");
@@ -46180,7 +46195,7 @@ function listSpecialNotes(options) {
     Math.max(1, Math.trunc(options.limit ?? SPECIAL_LIMIT.DEFAULT)),
     SPECIAL_LIMIT.MAX
   );
-  const columns = readColumns(dbPath2);
+  const columns2 = readColumns(dbPath2);
   const empty = {
     kind: options.kind,
     notes: [],
@@ -46189,13 +46204,13 @@ function listSpecialNotes(options) {
     limit,
     supported: false
   };
-  if (!kindSupported(columns, options.kind)) return empty;
-  const context = readStoreContext(dbPath2, columns);
+  if (!kindSupported(columns2, options.kind)) return empty;
+  const context = readStoreContext(dbPath2, columns2);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
   const params = { limit: { int: limit } };
   if (scope2) params.account = { int: scope2.pk };
   const rows = parseJsonLines(
-    runReadOnlySql(dbPath2, buildSpecialNotesSql(columns, options.kind, Boolean(scope2)), params)
+    runReadOnlySql(dbPath2, buildSpecialNotesSql(columns2, options.kind, Boolean(scope2)), params)
   );
   const paths = folderPaths(context.folders);
   const accountNames = new Map(context.accounts.map((account) => [account.pk, account.name]));
@@ -46210,10 +46225,10 @@ function listSpecialNotes(options) {
     ...scope2 ? { account: scope2.name } : {}
   };
 }
-function toSpecialRow(row, uuid2, paths, accountNames, kind) {
+function toSpecialRow(row, uuid3, paths, accountNames, kind) {
   const locked = Boolean(row.locked);
   const note = {
-    id: noteIdFor(uuid2, row.pk),
+    id: noteIdFor(uuid3, row.pk),
     identifier: row.identifier ?? null,
     title: row.title ?? null,
     folder: row.folder !== null ? paths.get(row.folder) ?? null : null,
@@ -46234,8 +46249,8 @@ var EXACT_NOTE_ID = /^x-coredata:\/\/([0-9A-F-]+)\/ICNote\/p(\d+)$/i;
 function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH8) {
   const match = EXACT_NOTE_ID.exec(noteId3);
   if (!match) throw new NoteStoreError(`Not an exact note id: ${noteId3}`, "invalid_input");
-  const columns = readColumns(dbPath2);
-  const sql = `SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'quick', (SELECT ${flag(columns, "n", "ZISSYSTEMPAPER")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}));`;
+  const columns2 = readColumns(dbPath2);
+  const sql = `SELECT json_object('uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1), 'quick', (SELECT ${flag(columns2, "n", "ZISSYSTEMPAPER")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}));`;
   const [row] = parseJsonLines(
     runReadOnlySql(dbPath2, sql, { pk: { int: Number(match[2]) } })
   );
@@ -46248,18 +46263,18 @@ function quickNoteFlag(noteId3, dbPath2 = NOTES_DB_PATH8) {
   return row.quick === null ? null : row.quick === 1;
 }
 var TAG_REQUIRED = ["Z_PK", "Z_ENT", "ZFOLDER", "ZNOTE1", "ZTYPEUTI1", "ZALTTEXT", "ZIDENTIFIER"];
-function buildTagInventorySql(columns, scoped) {
-  requireColumns(columns, TAG_REQUIRED, "list-native-tags");
+function buildTagInventorySql(columns2, scoped) {
+  requireColumns(columns2, TAG_REQUIRED, "list-native-tags");
   const accountFilter = scoped ? " AND a.Z_PK = @account" : "";
-  const uses = `FROM ZICCLOUDSYNCINGOBJECT i JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = i.ZNOTE1 AND n.Z_ENT = ${entity("ICNote")} ${folderAccountJoins(columns)} WHERE i.ZTYPEUTI1 = '${HASHTAG_UTI}' AND ${notTombstonedSql(columns, "i")} AND ${activeNoteSql(columns, "n", "f")}${accountFilter}`;
-  const tagAccount = accountRef(columns, "t");
-  const display = ["ZDISPLAYTEXT", "ZSTANDARDIZEDCONTENT", "ZNAME"].filter((name) => columns.has(name)).map((name) => `t.${name}`);
+  const uses = `FROM ZICCLOUDSYNCINGOBJECT i JOIN ZICCLOUDSYNCINGOBJECT n ON n.Z_PK = i.ZNOTE1 AND n.Z_ENT = ${entity("ICNote")} ${folderAccountJoins(columns2)} WHERE i.ZTYPEUTI1 = '${HASHTAG_UTI}' AND ${notTombstonedSql(columns2, "i")} AND ${activeNoteSql(columns2, "n", "f")}${accountFilter}`;
+  const tagAccount = accountRef(columns2, "t");
+  const display = ["ZDISPLAYTEXT", "ZSTANDARDIZEDCONTENT", "ZNAME"].filter((name) => columns2.has(name)).map((name) => `t.${name}`);
   const displayExpr = display.length > 1 ? `COALESCE(${display.join(", ")})` : display[0] || "NULL";
   return [
     "BEGIN;",
-    `SELECT json_object('k', 'tag', 'text', ${displayExpr}, 'account', ta.Z_PK) FROM ZICCLOUDSYNCINGOBJECT t LEFT JOIN ZICCLOUDSYNCINGOBJECT ta ON ta.Z_PK = ${tagAccount} AND ta.Z_ENT = ${entity("ICAccount")} WHERE t.Z_ENT = ${entity("ICHashtag")} AND ${notTombstonedSql(columns, "t")}${scoped ? " AND ta.Z_PK = @account" : ""};`,
-    `SELECT json_object('k', 'use', 'note', n.Z_PK, 'object', i.ZIDENTIFIER, 'text', i.ZALTTEXT, 'account', a.Z_PK, 'locked', ${flag(columns, "n", "ZISPASSWORDPROTECTED")}) ${uses};`,
-    `SELECT json_object('k', 'body', 'note', b.Z_PK, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = b.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT b WHERE b.Z_PK IN (SELECT n.Z_PK ${uses}) AND ${flag(columns, "b", "ZISPASSWORDPROTECTED")} = 0;`,
+    `SELECT json_object('k', 'tag', 'text', ${displayExpr}, 'account', ta.Z_PK) FROM ZICCLOUDSYNCINGOBJECT t LEFT JOIN ZICCLOUDSYNCINGOBJECT ta ON ta.Z_PK = ${tagAccount} AND ta.Z_ENT = ${entity("ICAccount")} WHERE t.Z_ENT = ${entity("ICHashtag")} AND ${notTombstonedSql(columns2, "t")}${scoped ? " AND ta.Z_PK = @account" : ""};`,
+    `SELECT json_object('k', 'use', 'note', n.Z_PK, 'object', i.ZIDENTIFIER, 'text', i.ZALTTEXT, 'account', a.Z_PK, 'locked', ${flag(columns2, "n", "ZISPASSWORDPROTECTED")}) ${uses};`,
+    `SELECT json_object('k', 'body', 'note', b.Z_PK, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = b.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT b WHERE b.Z_PK IN (SELECT n.Z_PK ${uses}) AND ${flag(columns2, "b", "ZISPASSWORDPROTECTED")} = 0;`,
     "COMMIT;"
   ].join(" ");
 }
@@ -46284,13 +46299,13 @@ function referencedObjects(hex3) {
 }
 function nativeTagInventory(options = {}) {
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
-  const columns = readColumns(dbPath2);
-  const context = readStoreContext(dbPath2, columns);
+  const columns2 = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns2);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
   const rows = parseJsonLines(
     runReadOnlySql(
       dbPath2,
-      buildTagInventorySql(columns, Boolean(scope2)),
+      buildTagInventorySql(columns2, Boolean(scope2)),
       scope2 ? { account: { int: scope2.pk } } : {}
     )
   );
@@ -46447,8 +46462,8 @@ function decodeParagraph(fields, tally) {
   const checklistId = checklist && bytesOf(checklist, 1);
   if (attrs.styleType === 103 && checklistId)
     attrs.checklist = { id: hex2(checklistId), done: varintOf(checklist, 2) === 1 };
-  const uuid2 = bytesOf(fields, 9);
-  if (uuid2?.length === 16) attrs.paragraphUuid = uuidString(uuid2);
+  const uuid3 = bytesOf(fields, 9);
+  if (uuid3?.length === 16) attrs.paragraphUuid = uuidString(uuid3);
   return attrs;
 }
 function decodeInline(fields) {
@@ -46757,19 +46772,19 @@ function readNoteBlocks(id2, { dbPath: dbPath2 = NOTES_DB_PATH9 } = {}) {
 var UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 var segmenter;
 function countWords(text2) {
-  let count = 0;
+  let count2 = 0;
   for (const run of text2.replace(/￼/gu, " ").split(/\s+/u)) {
     if (!/[\p{L}\p{N}]/u.test(run)) continue;
     if (!UNSPACED_SCRIPT.test(run)) {
-      count++;
+      count2++;
       continue;
     }
     segmenter ??= new Intl.Segmenter(void 0, { granularity: "word" });
     let words = 0;
     for (const segment of segmenter.segment(run)) if (segment.isWordLike) words++;
-    count += Math.max(1, words);
+    count2 += Math.max(1, words);
   }
-  return count;
+  return count2;
 }
 
 // src/utils/noteRecentList.ts
@@ -46840,18 +46855,18 @@ function decodeBodyText(hex3) {
     return null;
   }
 }
-var flag2 = (columns, alias, name) => columns.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
+var flag2 = (columns2, alias, name) => columns2.has(name) ? `COALESCE(${alias}.${name}, 0)` : "0";
 var REQUIRED2 = ["Z_PK", "Z_ENT", "ZFOLDER", "ZTITLE1", "ZMODIFICATIONDATE1"];
-function buildRecentNotesSql(columns, options) {
-  requireColumns(columns, REQUIRED2, "list-recent-notes");
-  const owner = col(columns, "f", "ZOWNER");
-  const account = owner === "NULL" ? accountRef(columns, "n") : `COALESCE(${owner}, ${accountRef(columns, "n")})`;
-  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
+function buildRecentNotesSql(columns2, options) {
+  requireColumns(columns2, REQUIRED2, "list-recent-notes");
+  const owner = col(columns2, "f", "ZOWNER");
+  const account = owner === "NULL" ? accountRef(columns2, "n") : `COALESCE(${owner}, ${accountRef(columns2, "n")})`;
+  const created = ["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"].filter((name) => columns2.has(name)).map((name) => `n.${name}`).join(", ") || "NULL";
   const createdExpr = created.includes(",") ? `COALESCE(${created})` : created;
-  const locked = flag2(columns, "n", "ZISPASSWORDPROTECTED");
-  const cloud = ["ZNEEDSTOBEFETCHEDFROMCLOUD", "ZNEEDSINITIALFETCHFROMCLOUD"].filter((name) => columns.has(name)).map((name) => `COALESCE(n.${name}, 0)`);
+  const locked = flag2(columns2, "n", "ZISPASSWORDPROTECTED");
+  const cloud = ["ZNEEDSTOBEFETCHEDFROMCLOUD", "ZNEEDSINITIALFETCHFROMCLOUD"].filter((name) => columns2.has(name)).map((name) => `COALESCE(n.${name}, 0)`);
   const where = [`n.Z_ENT = ${entity("ICNote")}`];
-  if (!options.includeDeleted) where.push(activeNoteSql(columns, "n", "f"));
+  if (!options.includeDeleted) where.push(activeNoteSql(columns2, "n", "f"));
   if (options.scoped) where.push("a.Z_PK = @account");
   if (options.inFolder) where.push("n.ZFOLDER = @folder");
   if (options.since) {
@@ -46861,7 +46876,7 @@ function buildRecentNotesSql(columns, options) {
   }
   const order = options.since ? "n.ZMODIFICATIONDATE1 ASC, n.Z_PK ASC" : "n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC";
   const data = options.withBodies ? `CASE WHEN ${locked} = 1 THEN NULL ELSE (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1) END` : "NULL";
-  return `SELECT json_object('pk', n.Z_PK, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'bits', hex(ieee754_to_blob(n.ZMODIFICATIONDATE1)), 'pinned', ${flag2(columns, "n", "ZISPINNED")}, 'locked', ${locked}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns, "n")}, 'cloud', ${cloud.length ? cloud.join(" + ") : "0"}, 'snippet', CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns, "n", "ZSNIPPET")} END, 'data', ${data}) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT @limit;`;
+  return `SELECT json_object('pk', n.Z_PK, 'identifier', ${col(columns2, "n", "ZIDENTIFIER")}, 'title', n.ZTITLE1, 'folder', f.Z_PK, 'account', a.Z_PK, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'bits', hex(ieee754_to_blob(n.ZMODIFICATIONDATE1)), 'pinned', ${flag2(columns2, "n", "ZISPINNED")}, 'locked', ${locked}, 'trash', f.Z_PK IS NOT NULL AND ${trashFolderSql(columns2, "f")}, 'tombstoned', NOT ${notTombstonedSql(columns2, "n")}, 'cloud', ${cloud.length ? cloud.join(" + ") : "0"}, 'snippet', CASE WHEN ${locked} = 1 THEN NULL ELSE ${col(columns2, "n", "ZSNIPPET")} END, 'data', ${data}) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER AND f.Z_ENT = ${entity("ICFolder")} LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${account} AND a.Z_ENT = ${entity("ICAccount")} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT @limit;`;
 }
 function resolveFolderPath(folders, paths, input, accountPk) {
   const candidates = folders.filter(
@@ -46890,8 +46905,8 @@ function listRecentNotes(options = {}) {
     RECENT_LIMIT.MAX
   );
   const since = options.since !== void 0 ? parseSince(options.since) : void 0;
-  const columns = readColumns(dbPath2);
-  const context = readStoreContext(dbPath2, columns);
+  const columns2 = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns2);
   const paths = folderPaths(context.folders);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
   const folder = options.folder ? resolveFolderPath(context.folders, paths, options.folder, scope2?.pk) : void 0;
@@ -46901,7 +46916,7 @@ function listRecentNotes(options = {}) {
   if (folder) params.folder = { int: folder.pk };
   if (since) params.since = { double: since.modified };
   if (since?.pk !== void 0) params.sincePk = { int: since.pk };
-  const sql = buildRecentNotesSql(columns, {
+  const sql = buildRecentNotesSql(columns2, {
     includeDeleted: Boolean(options.includeDeleted),
     scoped: Boolean(scope2),
     inFolder: Boolean(folder),
@@ -46957,9 +46972,9 @@ function toRecentRow(row, context, paths, accountNames, options) {
   }
   return note;
 }
-function buildFolderCountsSql(columns) {
-  requireColumns(columns, ["Z_PK", "Z_ENT", "ZFOLDER"], "list-folder-tree");
-  return `SELECT json_object('folder', n.ZFOLDER, 'n', COUNT(*)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZFOLDER IS NOT NULL AND ${notTombstonedSql(columns, "n")} GROUP BY n.ZFOLDER;`;
+function buildFolderCountsSql(columns2) {
+  requireColumns(columns2, ["Z_PK", "Z_ENT", "ZFOLDER"], "list-folder-tree");
+  return `SELECT json_object('folder', n.ZFOLDER, 'n', COUNT(*)) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZFOLDER IS NOT NULL AND ${notTombstonedSql(columns2, "n")} GROUP BY n.ZFOLDER;`;
 }
 var KIND_ORDER = { folder: 0, smart: 1, trash: 2 };
 function compareNodes(a, b) {
@@ -46967,12 +46982,12 @@ function compareNodes(a, b) {
 }
 function folderTree(options = {}) {
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
-  const columns = readColumns(dbPath2);
-  const context = readStoreContext(dbPath2, columns);
+  const columns2 = readColumns(dbPath2);
+  const context = readStoreContext(dbPath2, columns2);
   const scope2 = options.account ? resolveAccountName(context.accounts, options.account) : void 0;
   const counts = new Map(
     parseJsonLines(
-      runReadOnlySql(dbPath2, buildFolderCountsSql(columns))
+      runReadOnlySql(dbPath2, buildFolderCountsSql(columns2))
     ).map((row) => [row.folder, row.n])
   );
   return assembleFolderTree(context, counts, Boolean(options.includeDeleted), scope2);
@@ -47150,9 +47165,11 @@ var FACETS = [
   "pdf",
   "table",
   "scan",
+  "url",
+  "map",
   "tag"
 ];
-var FLAGS = ["pinned", "locked", "shared"];
+var FLAGS = ["pinned", "locked", "shared", "quicknote"];
 var NoteQueryError = class extends Error {
   constructor(message, position) {
     super(position === void 0 ? message : `${message} (at position ${position + 1})`);
@@ -47637,7 +47654,7 @@ var NOTES_DB_PATH10 = path8.join(
   os8.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
-var QUERY_SCAN = { DEFAULT: 500, MAX: 5e3 };
+var QUERY_SCAN = { DEFAULT: 500, MAX: 1e4 };
 var QUERY_RESULTS = { DEFAULT: 50, MAX: 500 };
 var CORE_DATA_EPOCH_MS2 = Date.UTC(2001, 0, 1);
 var SNIPPET_BEFORE = 60;
@@ -47658,7 +47675,8 @@ function facetsForAttachmentType(uti) {
   if (type.startsWith("com.apple.notes.inlinetextattachment.")) return [];
   if (type === "com.apple.notes.table") return ["table"];
   const facets = ["attachment"];
-  if (type === "public.url") facets.push("link");
+  if (type === "public.url") facets.push("link", "url");
+  else if (type === "com.apple.mapkit.map") facets.push("map");
   else if (type === "com.apple.paper.doc.scan" || type === "com.apple.notes.gallery")
     facets.push("scan");
   else if (type === "com.adobe.pdf" || type === "com.apple.paper.doc.pdf") facets.push("pdf");
@@ -47696,9 +47714,9 @@ function decodeNoteBody(data) {
       for (const facet of facetsForAttachmentType(stringValue(getField(attachment, 2)) ?? ""))
         facets.add(facet);
     }
-    const paragraph = embeddedMessage(getField(fields, 2));
-    if (paragraph && varintValue(getField(paragraph, 1)) === CHECKLIST_STYLE) {
-      const item = embeddedMessage(getField(paragraph, 5));
+    const paragraph2 = embeddedMessage(getField(fields, 2));
+    if (paragraph2 && varintValue(getField(paragraph2, 1)) === CHECKLIST_STYLE) {
+      const item = embeddedMessage(getField(paragraph2, 5));
       const rawId = item && getField(item, 1)?.value;
       const key = rawId instanceof Uint8Array ? Buffer.from(rawId).toString("hex") : `line:${text2.lastIndexOf("\n", position - 1) + 1}`;
       checklist.set(key, (item && varintValue(getField(item, 2))) === 1);
@@ -47759,7 +47777,7 @@ function buildScanSql(available, options) {
   const folderRow = `SELECT json_object('k', 'folder', 'pk', f.Z_PK, 'name', ${col2(available, "f", "ZTITLE2")}, 'parent', ${col2(available, "f", "ZPARENT")}, 'type', ${col2(available, "f", "ZFOLDERTYPE")}, 'owner', ${col2(available, "f", "ZOWNER")}, 'shared', ${notNull("f", "ZSERVERSHAREDATA")}) FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_ENT = ${entity2("ICFolder")};`;
   const accountRow = `SELECT json_object('k', 'account', 'pk', a.Z_PK, 'name', ${col2(available, "a", "ZNAME")}) FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_ENT = ${entity2("ICAccount")};`;
   const dataExpr = options.withBodies ? "(SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK ORDER BY d.Z_PK DESC LIMIT 1)" : "NULL";
-  const noteRow = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'title', n.ZTITLE1, 'folder', n.ZFOLDER, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'pinned', ${bool("ZISPINNED")}, 'locked', ${bool("ZISPASSWORDPROTECTED")}, 'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'snippet', ${col2(available, "n", "ZSNIPPET")}, 'data', ${dataExpr}, 'tags', ${tagsExpr}) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql} ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT ${scan};`;
+  const noteRow = `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'title', n.ZTITLE1, 'folder', n.ZFOLDER, 'created', ${createdExpr}, 'modified', n.ZMODIFICATIONDATE1, 'pinned', ${bool("ZISPINNED")}, 'locked', ${bool("ZISPASSWORDPROTECTED")}, 'shared', ${notNull("n", "ZSERVERSHAREDATA")}, 'quicknote', ${bool("ZISSYSTEMPAPER")}, 'snippet', ${col2(available, "n", "ZSNIPPET")}, 'data', ${dataExpr}, 'tags', ${tagsExpr}) FROM ZICCLOUDSYNCINGOBJECT n WHERE ${whereSql} ORDER BY n.ZMODIFICATIONDATE1 DESC, n.Z_PK DESC LIMIT ${scan};`;
   return [
     "BEGIN;",
     "SELECT json_object('k', 'meta', 'uuid', (SELECT Z_UUID FROM Z_METADATA LIMIT 1));",
@@ -47770,8 +47788,8 @@ function buildScanSql(available, options) {
     "COMMIT;"
   ].join(" ");
 }
-function runSqlite6(dbPath2, query2) {
-  return execFileSync14("sqlite3", ["-readonly", dbPath2, query2], {
+function runSqlite6(dbPath2, query3) {
+  return execFileSync14("sqlite3", ["-readonly", dbPath2, query3], {
     encoding: "utf8",
     timeout: 3e4,
     maxBuffer: 512 * 1024 * 1024,
@@ -47834,30 +47852,30 @@ function readNoteTexts(pks, options = {}) {
     options.dbPath ?? NOTES_DB_PATH10,
     (available) => buildNoteTextsSql(available, pks)
   );
-  let uuid2;
+  let uuid3;
   const texts = /* @__PURE__ */ new Map();
   for (const line of output.split("\n")) {
     if (!line.trim()) continue;
     const row = JSON.parse(line);
-    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    if (row.k === "meta") uuid3 = typeof row.uuid === "string" ? row.uuid : void 0;
     else if (row.k === "note" && typeof row.pk === "number") {
       const body = row.locked || !row.data ? null : decodeBodyHex(row.data);
       texts.set(row.pk, body ? body.text : null);
     }
   }
-  return { uuid: uuid2, texts };
+  return { uuid: uuid3, texts };
 }
 var escapeSegment = escapeFolderName;
 function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
-  const resolve9 = (pk, seen) => {
+  const resolve10 = (pk, seen) => {
     const cached2 = resolved.get(pk);
     if (cached2) return cached2;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
-    const parent = row.parent !== null ? resolve9(row.parent, seen) : void 0;
+    const parent = row.parent !== null ? resolve10(row.parent, seen) : void 0;
     const name = row.name ?? "";
     const path10 = parent ? `${parent.path}/${escapeSegment(name)}` : escapeSegment(name);
     const plainPath = parent ? `${parent.plainPath}/${name}` : name;
@@ -47871,7 +47889,7 @@ function resolveFolders(rows) {
     resolved.set(pk, info);
     return info;
   };
-  for (const row of rows) resolve9(row.pk, /* @__PURE__ */ new Set());
+  for (const row of rows) resolve10(row.pk, /* @__PURE__ */ new Set());
   return resolved;
 }
 var coreDataMs = (seconds) => seconds === null || !Number.isFinite(seconds) ? void 0 : CORE_DATA_EPOCH_MS2 + seconds * 1e3;
@@ -47907,7 +47925,7 @@ function runNoteQuery(ast, options = {}) {
     dbPath2,
     (available) => buildScanSql(available, { scanLimit, includeDeleted, withBodies, withTags })
   );
-  let uuid2;
+  let uuid3;
   let eligible = 0;
   const folderRows = [];
   const accounts = /* @__PURE__ */ new Map();
@@ -47915,14 +47933,14 @@ function runNoteQuery(ast, options = {}) {
   for (const line of output.split("\n")) {
     if (!line.trim()) continue;
     const row = JSON.parse(line);
-    if (row.k === "meta") uuid2 = typeof row.uuid === "string" ? row.uuid : void 0;
+    if (row.k === "meta") uuid3 = typeof row.uuid === "string" ? row.uuid : void 0;
     else if (row.k === "total") eligible = Number(row.n) || 0;
     else if (row.k === "folder") folderRows.push(row);
     else if (row.k === "account" && typeof row.name === "string")
       accounts.set(Number(row.pk), row.name);
     else if (row.k === "note") notes.push(row);
   }
-  if (!uuid2 || !/^[0-9A-Fa-f-]+$/.test(uuid2)) {
+  if (!uuid3 || !/^[0-9A-Fa-f-]+$/.test(uuid3)) {
     throw new NoteQueryStoreError(
       "The Notes database has no store identifier, so note IDs cannot be formed.",
       "schema"
@@ -47960,6 +47978,7 @@ function runNoteQuery(ast, options = {}) {
       pinned: Boolean(row.pinned),
       locked,
       shared: Boolean(row.shared) || Boolean(folder?.shared),
+      quicknote: Boolean(row.quicknote),
       created: coreDataMs(row.created),
       modified: coreDataMs(row.modified),
       content: () => {
@@ -47992,7 +48011,7 @@ function runNoteQuery(ast, options = {}) {
     const matchedIn = matchLocations(textPredicates, row.title ?? "", body ? body.text : null);
     if (options.includeWordCount && !withBodies) pendingWordCounts.push(row.pk);
     hits.push({
-      id: `x-coredata://${uuid2}/ICNote/p${row.pk}`,
+      id: `x-coredata://${uuid3}/ICNote/p${row.pk}`,
       title: row.title ?? "",
       ...folder ? { folder: folder.path } : {},
       ...account !== void 0 ? { account } : {},
@@ -48026,6 +48045,7 @@ function runNoteQuery(ast, options = {}) {
 }
 
 // src/utils/searchContentDb.ts
+var SEARCH_CONTENT_SCAN_LIMIT = 5e3;
 function buildSearchContentQuery(options) {
   const children = [{ type: "text", field: "any", value: options.query }];
   const folder = options.folder?.trim();
@@ -48050,7 +48070,7 @@ function buildSearchContentQuery(options) {
 function searchContentViaDatabase(options) {
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
-    scanLimit: QUERY_SCAN.MAX,
+    scanLimit: SEARCH_CONTENT_SCAN_LIMIT,
     includeWordCount: options.includeWordCount,
     dbPath: options.dbPath
   });
@@ -48088,7 +48108,7 @@ function contentSearchFailureHint(message, dbUnavailable) {
   return `${message} Body search through AppleScript scans every note body before the result limit applies, so a broad term can exceed the time budget on a large library.${remedy} Otherwise narrow the search with \`folder\` or \`modifiedSince\`, or use a more specific term.`;
 }
 var NOTE_ID = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/;
-function addWordCountsFromDatabase(notes, query2, options = {}) {
+function addWordCountsFromDatabase(notes, query3, options = {}) {
   const keys = /* @__PURE__ */ new Map();
   for (const note of notes) {
     const match = NOTE_ID.exec(note.id ?? "");
@@ -48107,7 +48127,7 @@ function addWordCountsFromDatabase(notes, query2, options = {}) {
     if (error2 instanceof NoteQueryStoreError) return { notes, unavailable: error2.kind };
     throw error2;
   }
-  const predicates = [{ field: "any", value: query2 }];
+  const predicates = [{ field: "any", value: query3 }];
   return {
     notes: notes.map((note) => {
       const key = keys.get(note);
@@ -49841,8 +49861,8 @@ function selectParagraph(paragraphs, selector) {
   return matches[occurrence - 1];
 }
 var NOTE_ID2 = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]{1,15})$/i;
-function titleMatchSql(columns) {
-  return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns, "n", "f")} ORDER BY n.Z_PK;`;
+function titleMatchSql(columns2) {
+  return `SELECT json_object('pk', n.Z_PK, 'folder', n.ZFOLDER) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZTITLE1 = CAST(@title AS TEXT) AND ${activeNoteSql(columns2, "n", "f")} ORDER BY n.Z_PK;`;
 }
 function checkNoteSelector(selector) {
   const given = [selector.id, selector.title].filter((value) => value !== void 0).length;
@@ -49859,15 +49879,15 @@ function checkNoteSelector(selector) {
     );
   return Number(pk);
 }
-function resolveNote(dbPath2, columns, selector) {
+function resolveNote(dbPath2, columns2, selector) {
   const idPk = checkNoteSelector(selector);
   if (idPk !== void 0) return { pk: idPk, id: selector.id };
-  requireColumns(columns, ["ZTITLE1", "ZFOLDER"], "title lookup");
-  const context = readStoreContext(dbPath2, columns);
+  requireColumns(columns2, ["ZTITLE1", "ZFOLDER"], "title lookup");
+  const context = readStoreContext(dbPath2, columns2);
   const paths = folderPaths(context.folders);
   const names = new Map(context.folders.map((f) => [f.pk, escapeFolderName(f.name ?? "")]));
   let matches = parseJsonLines(
-    runReadOnlySql(dbPath2, titleMatchSql(columns), {
+    runReadOnlySql(dbPath2, titleMatchSql(columns2), {
       title: { blob: Buffer.from(selector.title, "utf8") }
     })
   );
@@ -49885,14 +49905,14 @@ function resolveNote(dbPath2, columns, selector) {
     );
   return { pk: matches[0].pk, id: noteIdFor(context.uuid, matches[0].pk) };
 }
-function noteBodySql(columns) {
-  return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
+function noteBodySql(columns2) {
+  return `SELECT json_object('isNote', n.Z_ENT = ${entity("ICNote")}, 'identifier', ${col(columns2, "n", "ZIDENTIFIER")}, 'data', (SELECT hex(d.ZDATA) FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK), 'locked', ${col(columns2, "n", "ZISPASSWORDPROTECTED")}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
 }
 function readNoteParagraphs(selector, { dbPath: dbPath2 = NOTES_DB_PATH8 } = {}) {
   checkNoteSelector(selector);
-  const columns = readColumns(dbPath2);
-  const { pk, id: id2 } = resolveNote(dbPath2, columns, selector);
-  const [row] = parseJsonLines(runReadOnlySql(dbPath2, noteBodySql(columns), { pk: { int: pk } }));
+  const columns2 = readColumns(dbPath2);
+  const { pk, id: id2 } = resolveNote(dbPath2, columns2, selector);
+  const [row] = parseJsonLines(runReadOnlySql(dbPath2, noteBodySql(columns2), { pk: { int: pk } }));
   if (!row?.isNote) throw new ParagraphLinkError("not-found", `No note found for ID "${id2}"`);
   if (row.encrypted || row.locked)
     throw new ParagraphLinkError(
@@ -49940,18 +49960,18 @@ function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 10
   };
 }
 function paragraphLink(note, selector) {
-  const paragraph = selectParagraph(note.paragraphs, selector);
-  if (paragraph.paragraphIdStatus === "shared")
+  const paragraph2 = selectParagraph(note.paragraphs, selector);
+  if (paragraph2.paragraphIdStatus === "shared")
     throw new ParagraphLinkError(
       "paragraph-id-shared",
-      `This paragraph's ID is shared with ${paragraph.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
+      `This paragraph's ID is shared with ${paragraph2.sharedWith} other paragraph(s) in the note, so a link could open the wrong one`
     );
-  if (!paragraph.url)
+  if (!paragraph2.url)
     throw new ParagraphLinkError(
       "paragraph-id-missing",
-      paragraph.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
+      paragraph2.paragraphId ? "The note has no stored identifier, so no link can be built" : "This paragraph has no stored paragraph ID, so Notes cannot open it directly"
     );
-  return { url: paragraph.url, paragraph };
+  return { url: paragraph2.url, paragraph: paragraph2 };
 }
 
 // src/utils/noteStructure.ts
@@ -49964,12 +49984,12 @@ var UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 function parseNotesShowUrl(url) {
   const match = /^(?:apple)?notes:\/\/showNote\?(.*)$/i.exec(url);
   if (!match) return void 0;
-  const query2 = new URLSearchParams(match[1]);
-  const note = query2.get("identifier") ?? "";
-  const paragraph = query2.get("paragraphID") ?? "";
+  const query3 = new URLSearchParams(match[1]);
+  const note = query3.get("identifier") ?? "";
+  const paragraph2 = query3.get("paragraphID") ?? "";
   const result = {};
   if (UUID.test(note)) result.targetNote = note.toUpperCase();
-  if (UUID.test(paragraph)) result.paragraphId = paragraph.toUpperCase();
+  if (UUID.test(paragraph2)) result.paragraphId = paragraph2.toUpperCase();
   return result;
 }
 function inlineLinks(doc) {
@@ -50057,15 +50077,15 @@ function lastViewedOf(raw, columnPresent = true, now = Date.now()) {
 var visible = (text2) => text2.replace(/\ufffc/g, "");
 var wordCount = (text2) => countWords(text2);
 var charCount = (text2) => Array.from(visible(text2)).length;
-function noteStructureSql(columns) {
-  const c = (alias, name) => col(columns, alias, name);
-  const sharedExpr = columns.has("ZSERVERSHAREDATA") ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
+function noteStructureSql(columns2) {
+  const c = (alias, name) => col(columns2, alias, name);
+  const sharedExpr = columns2.has("ZSERVERSHAREDATA") ? `(n.ZSERVERSHAREDATA IS NOT NULL OR EXISTS (
          WITH RECURSIVE up(pk, depth) AS (
            SELECT n.ZFOLDER, 0 UNION ALL
            SELECT ${c("p", "ZPARENT")}, depth + 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT p ON p.Z_PK = up.pk
            WHERE depth < 64)
          SELECT 1 FROM up JOIN ZICCLOUDSYNCINGOBJECT s ON s.Z_PK = up.pk WHERE s.ZSERVERSHAREDATA IS NOT NULL))` : "NULL";
-  const children = columns.has("ZPARENTATTACHMENT") ? ` OR att.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE ${c("p", "ZNOTE")} = @pk)` : "";
+  const children = columns2.has("ZPARENTATTACHMENT") ? ` OR att.ZPARENTATTACHMENT IN (SELECT p.Z_PK FROM ZICCLOUDSYNCINGOBJECT p WHERE ${c("p", "ZNOTE")} = @pk)` : "";
   return [
     "BEGIN;",
     `SELECT json_object('k', 'note',
@@ -50073,7 +50093,7 @@ function noteStructureSql(columns) {
       'identifier', ${c("n", "ZIDENTIFIER")},
       'title', ${c("n", "ZTITLE1")},
       'folder', ${c("f", "ZTITLE2")},
-      'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns, "f")} END,
+      'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns2, "f")} END,
       'account', ${c("a", "ZNAME")},
       'locked', ${c("n", "ZISPASSWORDPROTECTED")},
       'pinned', ${c("n", "ZISPINNED")},
@@ -50083,7 +50103,7 @@ function noteStructureSql(columns) {
       'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK))
     FROM ZICCLOUDSYNCINGOBJECT n
     LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${c("n", "ZFOLDER")}
-    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountRef(columns, "n")} AND a.Z_ENT = ${entity("ICAccount")}
+    LEFT JOIN ZICCLOUDSYNCINGOBJECT a ON a.Z_PK = ${accountRef(columns2, "n")} AND a.Z_ENT = ${entity("ICAccount")}
     WHERE n.Z_PK = @pk;`,
     `SELECT json_object('k', 'attachment',
       'pk', att.Z_PK,
@@ -50091,7 +50111,7 @@ function noteStructureSql(columns) {
       'url', ${c("att", "ZURLSTRING")},
       'fileSize', ${c("att", "ZFILESIZE")})
     FROM ZICCLOUDSYNCINGOBJECT att
-    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+    WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns2, "att")}
       AND (${c("att", "ZNOTE")} = @pk${children});`,
     `SELECT json_object('k', 'inline',
       'identifier', ${c("i", "ZIDENTIFIER")},
@@ -50100,7 +50120,7 @@ function noteStructureSql(columns) {
       'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")})
     FROM ZICCLOUDSYNCINGOBJECT i
     WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${c("i", "ZNOTE1")} = @pk
-      AND ${notTombstonedSql(columns, "i")} AND ${c("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI2}', '${NOTE_LINK_UTI}');`,
+      AND ${notTombstonedSql(columns2, "i")} AND ${c("i", "ZTYPEUTI1")} IN ('${HASHTAG_UTI2}', '${NOTE_LINK_UTI}');`,
     "COMMIT;"
   ].join("\n");
 }
@@ -50119,9 +50139,9 @@ function describeNoteStructure(s) {
 }
 function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH8, includeText = true, maxTextBytes = 4 * 1024 * 1024 } = {}) {
   const { pk } = parseNoteId2(id2);
-  const columns = readColumns(dbPath2);
+  const columns2 = readColumns(dbPath2);
   const rows = parseJsonLines(
-    runReadOnlySql(dbPath2, noteStructureSql(columns), { pk: { int: pk } })
+    runReadOnlySql(dbPath2, noteStructureSql(columns2), { pk: { int: pk } })
   );
   const note = rows.find((row) => row.k === "note");
   if (!note?.isNote) throw new NoteStoreError(`No note found for ID "${id2}".`, "invalid_input");
@@ -50205,7 +50225,7 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH8, includeText 
   }
   const linkCounts = { inline: 0, card: 0, note: 0, section: 0 };
   for (const link of links) linkCounts[link.kind]++;
-  const lastViewed = lastViewedOf(note.lastViewed, columns.has("ZLASTVIEWEDMODIFICATIONDATE"));
+  const lastViewed = lastViewedOf(note.lastViewed, columns2.has("ZLASTVIEWEDMODIFICATIONDATE"));
   const first2 = selectFirstImage(assets);
   return {
     id: id2,
@@ -50302,38 +50322,38 @@ function matchFolder(folders, wanted, account) {
     );
   return { folder: matches[0], path: paths.get(matches[0].pk) };
 }
-function inventorySql(columns) {
-  requireColumns(columns, ["ZFOLDER"], "list-note-links");
-  const c = (alias, name) => col(columns, alias, name);
-  const subtree = columns.has("ZPARENT") ? `WITH RECURSIVE sub(pk) AS (SELECT @folder UNION
+function inventorySql(columns2) {
+  requireColumns(columns2, ["ZFOLDER"], "list-note-links");
+  const c = (alias, name) => col(columns2, alias, name);
+  const subtree = columns2.has("ZPARENT") ? `WITH RECURSIVE sub(pk) AS (SELECT @folder UNION
          SELECT x.Z_PK FROM ZICCLOUDSYNCINGOBJECT x JOIN sub ON x.ZPARENT = sub.pk
          WHERE @subfolders <> 0 AND x.Z_ENT = ${entity("ICFolder")})
        SELECT pk FROM sub` : "SELECT @folder";
   const scopeWhere = `n.Z_ENT = ${entity("ICNote")} AND (
       (@note <> 0 AND n.Z_PK = @note) OR
-      (@note = 0 AND ${activeNoteSql(columns, "n", "f")}
+      (@note = 0 AND ${activeNoteSql(columns2, "n", "f")}
         AND (@account = 0 OR a.Z_PK = @account)
         AND (@folder = 0 OR n.ZFOLDER IN (${subtree}))))`;
-  const scope2 = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere}`;
+  const scope2 = `SELECT n.Z_PK FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns2)} WHERE ${scopeWhere}`;
   return {
     rows: [
       "BEGIN;",
       `SELECT json_object('k', 'note', 'pk', n.Z_PK, 'identifier', ${c("n", "ZIDENTIFIER")},
         'title', ${c("n", "ZTITLE1")}, 'folder', n.ZFOLDER, 'account', a.Z_PK,
         'modified', ${c("n", "ZMODIFICATIONDATE1")})
-      FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns)} WHERE ${scopeWhere};`,
+      FROM ZICCLOUDSYNCINGOBJECT n ${folderAccountJoins(columns2)} WHERE ${scopeWhere};`,
       `SELECT json_object('k', 'card', 'pk', att.Z_PK, 'note', ${c("att", "ZNOTE")},
         'identifier', ${c("att", "ZIDENTIFIER")}, 'url', ${c("att", "ZURLSTRING")},
         'title', ${c("att", "ZTITLE")})
       FROM ZICCLOUDSYNCINGOBJECT att
-      WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns, "att")}
+      WHERE att.Z_ENT = ${entity("ICAttachment")} AND ${notTombstonedSql(columns2, "att")}
         AND ${c("att", "ZTYPEUTI")} LIKE 'public.url%' AND ${c("att", "ZURLSTRING")} IS NOT NULL
         AND ${c("att", "ZNOTE")} IN (${scope2});`,
       `SELECT json_object('k', 'chip', 'note', ${c("i", "ZNOTE1")},
         'identifier', ${c("i", "ZIDENTIFIER")}, 'token', ${c("i", "ZTOKENCONTENTIDENTIFIER")},
         'alt', ${c("i", "ZALTTEXT")})
       FROM ZICCLOUDSYNCINGOBJECT i
-      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notTombstonedSql(columns, "i")}
+      WHERE i.Z_ENT = ${entity("ICInlineAttachment")} AND ${notTombstonedSql(columns2, "i")}
         AND ${c("i", "ZTYPEUTI1")} = '${NOTE_LINK_UTI}' AND ${c("i", "ZNOTE1")} IN (${scope2});`,
       "COMMIT;"
     ].join("\n"),
@@ -50367,9 +50387,9 @@ function listNoteLinks(options = {}) {
   if (options.id && (options.account || options.folder))
     throw new NoteStoreError("Pass either id or account/folder, not both.", "invalid_input");
   const notePk = options.id ? parseNoteId2(options.id).pk : 0;
-  const columns = readColumns(dbPath2);
-  const sql = inventorySql(columns);
-  const context = readStoreContext(dbPath2, columns);
+  const columns2 = readColumns(dbPath2);
+  const sql = inventorySql(columns2);
+  const context = readStoreContext(dbPath2, columns2);
   const paths = folderPaths(context.folders);
   const scope2 = {};
   let accountPk = 0;
@@ -50605,8 +50625,8 @@ function insertLink(request, deps) {
 }
 
 // src/services/notesExport.ts
-import { mkdirSync as mkdirSync6 } from "node:fs";
-import { basename as basename4, dirname as dirname6, extname as extname5, join as join22 } from "node:path";
+import { mkdirSync as mkdirSync7 } from "node:fs";
+import { basename as basename4, dirname as dirname7, extname as extname5, join as join23 } from "node:path";
 
 // src/utils/exportAssets.ts
 import {
@@ -50970,6 +50990,32 @@ var SidecarWriter = class {
     }
     try {
       const mime = sniffMime(readHead(source.fd), asset.name);
+      return this.write(asset.path, asset.name, mime, (out) => {
+        const chunk = Buffer.alloc(1024 * 1024);
+        for (let position = 0; ; ) {
+          const n = readSync3(source.fd, chunk, 0, chunk.length, position);
+          if (n <= 0) break;
+          let written = 0;
+          while (written < n) written += writeSync3(out, chunk, written, n - written);
+          position += n;
+        }
+      });
+    } finally {
+      closeSync4(source.fd);
+    }
+  }
+  placeBytes(data, name, mime, key) {
+    const done = this.placed.get(`generated:${key}`);
+    if (done) return done;
+    return this.write(`generated:${key}`, name, mime, (out) => {
+      let written = 0;
+      while (written < data.length) written += writeSync3(out, data, written, data.length - written);
+    });
+  }
+  /** Creates a free name in the directory and fills it; remembers the result under `key`. */
+  write(key, name, mime, fill) {
+    if (this.directoryError) return { error: this.directoryError };
+    try {
       if (!this.created) {
         try {
           assertExportPath(this.dir);
@@ -50980,13 +51026,13 @@ var SidecarWriter = class {
         }
         this.created = true;
       }
-      const name = safeAssetName(asset.name, mime);
-      const ext = extname3(name);
-      const stem = name.slice(0, name.length - ext.length);
+      const safe2 = safeAssetName(name, mime);
+      const ext = extname3(safe2);
+      const stem = safe2.slice(0, safe2.length - ext.length);
       let target;
       let out;
       for (let n = 1; n <= 1e3 && out === void 0; n++) {
-        target = join19(this.dir, n === 1 ? name : `${stem}-${n}${ext}`);
+        target = join19(this.dir, n === 1 ? safe2 : `${stem}-${n}${ext}`);
         try {
           out = openSync4(target, CREATE_FLAGS, 420);
         } catch (error2) {
@@ -50995,26 +51041,17 @@ var SidecarWriter = class {
       }
       if (out === void 0 || !target) return { error: "no-free-name" };
       try {
-        const chunk = Buffer.alloc(1024 * 1024);
-        for (let position = 0; ; ) {
-          const n = readSync3(source.fd, chunk, 0, chunk.length, position);
-          if (n <= 0) break;
-          let written = 0;
-          while (written < n) written += writeSync3(out, chunk, written, n - written);
-          position += n;
-        }
+        fill(out);
       } finally {
         closeSync4(out);
       }
       this.count++;
       const url = this.linkBase ? encodePathUrl(relative3(this.linkBase, target).split(sep3).join("/")) : target;
       const result = { url, mime };
-      this.placed.set(asset.path, result);
+      this.placed.set(key, result);
       return result;
     } catch (error2) {
       return { error: error2 instanceof Error ? error2.message : String(error2) };
-    } finally {
-      closeSync4(source.fd);
     }
   }
 };
@@ -51038,8 +51075,7 @@ var DataUrlWriter = class {
       return { error: "unreadable" };
     }
     try {
-      if (source.size > this.maxBytes || this.embeddedBytes + source.size > this.totalBytes)
-        return { error: "too-large" };
+      if (!this.fits(source.size)) return { error: "too-large" };
       const data = Buffer.alloc(source.size);
       let read = 0;
       while (read < source.size) {
@@ -51048,17 +51084,26 @@ var DataUrlWriter = class {
         read += n;
       }
       const mime = sniffMime(data.subarray(0, 16), asset.name);
-      const result = {
-        url: `data:${mime};base64,${data.subarray(0, read).toString("base64")}`,
-        mime
-      };
-      this.count++;
-      this.embeddedBytes += read;
-      this.placed.set(asset.path, result);
-      return result;
+      return this.embed(asset.path, data.subarray(0, read), mime);
     } finally {
       closeSync4(source.fd);
     }
+  }
+  placeBytes(data, _name, mime, key) {
+    const done = this.placed.get(`generated:${key}`);
+    if (done) return done;
+    if (!this.fits(data.length)) return { error: "too-large" };
+    return this.embed(`generated:${key}`, data, mime);
+  }
+  fits(size) {
+    return size <= this.maxBytes && this.embeddedBytes + size <= this.totalBytes;
+  }
+  embed(key, data, mime) {
+    const result = { url: `data:${mime};base64,${data.toString("base64")}`, mime };
+    this.count++;
+    this.embeddedBytes += data.length;
+    this.placed.set(key, result);
+    return result;
   }
 };
 
@@ -51188,6 +51233,18 @@ function planAttachment(attachment, ctx) {
         ctx.stats.placeholders++;
         return { type: "placeholder", label, ...name ? { name } : {} };
       }
+      const vector = attachment.kind === "drawing" ? ctx.vectorDrawing?.(attachment) : void 0;
+      if (vector) {
+        ctx.stats.placed++;
+        return {
+          type: "asset",
+          label,
+          ...name ? { name } : {},
+          display: "image",
+          url: vector.url,
+          mime: vector.mime
+        };
+      }
       const files = ctx.locator?.locate(attachment) ?? {};
       const primary = place(ctx, files.primary);
       const visual = ["image", "drawing", "paper"].includes(attachment.kind);
@@ -51316,8 +51373,10 @@ function blockPlanHtml(plan) {
       const name = escapeHtml(plan.name ?? plan.label);
       const src = escapeHtml(plan.url);
       const caption = plan.name ? `<figcaption>${name}</figcaption>` : "";
-      if (plan.display === "image")
-        return `<figure class="attachment attachment-image"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      if (plan.display === "image") {
+        const vector = plan.mime === "image/svg+xml" ? " attachment-vector" : "";
+        return `<figure class="attachment attachment-image${vector}"><img src="${src}" alt="${name}" loading="lazy"></figure>`;
+      }
       if (plan.display === "audio" || plan.display === "video")
         return `<figure class="attachment attachment-${plan.display}"><${plan.display} controls preload="metadata" src="${src}"></${plan.display}>${caption}</figure>`;
       return `<figure class="attachment attachment-document"><a href="${src}"><img src="${escapeHtml(plan.previewUrl)}" alt="${name}" loading="lazy"></a><figcaption><a href="${src}">${name}</a></figcaption></figure>`;
@@ -51477,6 +51536,7 @@ th { background: var(--card); }
 figure { margin: 1rem 0; }
 figure img, figure video { max-width: 100%; height: auto; border-radius: 6px; }
 figcaption { color: var(--muted); font-size: .875rem; }
+.attachment-vector img { background: #fff; }
 .attachment-gallery { display: flex; flex-wrap: wrap; gap: .5rem; }
 .attachment-gallery figure { margin: 0; flex: 1 1 12rem; }
 .link-card { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; padding: .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
@@ -51512,6 +51572,776 @@ ${CSS}
     "</html>",
     ""
   ].join("\n");
+}
+
+// src/utils/noteStoreQuery.ts
+function parseNoteObjectId(noteId3) {
+  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/.exec(noteId3);
+  if (!match)
+    throw new NoteStoreError(
+      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`,
+      "invalid_input"
+    );
+  return { store: match[1], pk: Number(match[2]) };
+}
+function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH8) {
+  return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
+}
+var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
+function assertNoteReadable(stateLine, noteId3) {
+  let state;
+  try {
+    state = JSON.parse(stateLine || "{}");
+  } catch {
+    throw new NoteStoreError("Unexpected response from the Notes database.", "query_error");
+  }
+  if (!state.found)
+    throw new CodedError(`No note found in the database for ID "${noteId3}".`, {
+      code: "not_found"
+    });
+  if (state.locked)
+    throw new CodedError(
+      "This note is password-protected; its attachments are encrypted and cannot be read.",
+      { code: "unsupported" }
+    );
+}
+
+// src/utils/noteDrawings.ts
+function drawingRowsSql(columns2, dataColumn) {
+  return [
+    NOTE_STATE_SQL,
+    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns2, "a")} ORDER BY a.Z_PK) a;`
+  ].join("\n");
+}
+function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH8) {
+  const { store, pk } = parseNoteObjectId(noteId3);
+  const columns2 = readColumns(dbPath2);
+  const dataColumn = columns2.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns2.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
+  if (!dataColumn)
+    throw new NoteStoreError(
+      "This macOS version's Notes database has no drawing data column.",
+      "schema"
+    );
+  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns2, dataColumn), pk, dbPath2);
+  assertNoteReadable(stateLine, noteId3);
+  const rows = JSON.parse(rowsLine || "[]");
+  return rows.map((row) => ({
+    pk: row.pk,
+    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
+    identifier: row.identifier ?? "",
+    typeUti: row.uti,
+    data: row.data ? Buffer.from(row.data, "hex") : null
+  }));
+}
+function svgNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+function escapeAttribute2(value) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+var clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value || 0)));
+var clampUnit = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+function drawingViewBox(strokes, fallback) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const stroke of strokes) {
+    const pad = stroke.width / 2;
+    const extend2 = (x, y, r) => {
+      minX = Math.min(minX, x - r);
+      minY = Math.min(minY, y - r);
+      maxX = Math.max(maxX, x + r);
+      maxY = Math.max(maxY, y + r);
+    };
+    if (stroke.points?.length) for (const p of stroke.points) extend2(p.x, p.y, pad);
+    else {
+      extend2(stroke.bounds.x, stroke.bounds.y, 0);
+      extend2(stroke.bounds.x + stroke.bounds.width, stroke.bounds.y + stroke.bounds.height, 0);
+    }
+  }
+  if (minX === Infinity) return fallback ?? { x: 0, y: 0, width: 1, height: 1 };
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+function drawingToSvg(strokes, fallback) {
+  const box = drawingViewBox(strokes, fallback);
+  const parts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${svgNumber(box.x)} ${svgNumber(box.y)} ${svgNumber(box.width)} ${svgNumber(box.height)}" width="${svgNumber(box.width)}" height="${svgNumber(box.height)}">`
+  ];
+  for (const stroke of strokes) {
+    const points = stroke.points ?? [];
+    if (points.length === 0) continue;
+    const c = stroke.color;
+    const color = `rgb(${clampChannel(c.red)},${clampChannel(c.green)},${clampChannel(c.blue)})`;
+    const shared = `stroke="${color}" stroke-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"`;
+    if (points.length === 1) {
+      parts.push(
+        `<circle cx="${svgNumber(points[0].x)}" cy="${svgNumber(points[0].y)}" r="${svgNumber(stroke.width / 2)}" fill="${color}" fill-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"/>`
+      );
+      continue;
+    }
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${svgNumber(p.x)} ${svgNumber(p.y)}`).join(" ");
+    parts.push(
+      `<path d="${d}" fill="none" ${shared} stroke-width="${svgNumber(stroke.width)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    );
+  }
+  parts.push("</svg>");
+  return parts.join("\n");
+}
+
+// src/services/publicHelper.ts
+import { spawn, spawnSync as spawnSync2 } from "node:child_process";
+import { createHash as createHash2 } from "node:crypto";
+import {
+  chmodSync,
+  existsSync as existsSync13,
+  mkdirSync as mkdirSync5,
+  mkdtempSync as mkdtempSync5,
+  readFileSync as readFileSync3,
+  renameSync,
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
+} from "node:fs";
+import { homedir as homedir17, release as release2 } from "node:os";
+import { dirname as dirname6, join as join20, resolve as resolve4 } from "node:path";
+import { fileURLToPath } from "node:url";
+var PUBLIC_HELPER_PROTOCOL = 1;
+var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
+var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
+var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
+var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
+var PUBLIC_HELPER_MANIFEST = "manifest.json";
+var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "decode_drawing",
+  "transcribe",
+  "speech_status"
+]);
+var DEFAULT_TIMEOUT_MS2 = 3e4;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
+var publicManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot(fromDir = dirname6(fileURLToPath(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join20(dir, "package.json");
+    if (existsSync13(candidate)) {
+      try {
+        if (JSON.parse(readFileSync3(candidate, "utf8")).name === "apple-notes-mcp")
+          return dir;
+      } catch {
+      }
+    }
+    const parent = dirname6(dir);
+    if (parent === dir) return resolve4(fromDir, "..");
+    dir = parent;
+  }
+}
+function defaultPublicHelperDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join20(packageRoot(), PUBLIC_HELPER_SOURCE),
+    exists: existsSync13,
+    readFile: (path10) => readFileSync3(path10),
+    spawn: spawnSync2,
+    spawnAsync: spawn,
+    ...overrides
+  };
+}
+function publicHelperInstallDir(env = process.env) {
+  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join20(homedir17(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+}
+function sha256Hex(data) {
+  return createHash2("sha256").update(data).digest("hex");
+}
+function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
+  const installDir = publicHelperInstallDir(deps.env);
+  const binaryPath = join20(installDir, PUBLIC_HELPER_BINARY);
+  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  const manifestPath = join20(installDir, PUBLIC_HELPER_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail(
+      "helper_manifest_invalid",
+      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
+    return {
+      ...fail(
+        "helper_stale",
+        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
+      ),
+      manifest
+    };
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return {
+      ...fail(
+        "helper_modified",
+        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
+      ),
+      manifest
+    };
+  return { ...base, manifest, ready: true, reason: null, detail: null };
+}
+var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid"
+]);
+var ENVELOPE_CODES = {
+  invalid_request: "validation_error",
+  attachment_not_found: "not_found"
+};
+var PublicHelperError = class extends CodedError {
+  constructor(code, message) {
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES[code] ?? "operation_failed",
+      helperCode: code
+    });
+    this.code = code;
+    this.name = "PublicHelperError";
+  }
+  code;
+};
+var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
+var publicHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const result = deps.spawn(binaryPath, [], {
+    input,
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES2
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PublicHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  return parseHelperOutput(result.status, String(result.stdout ?? ""));
+}
+async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const { signal } = options;
+  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
+  if (signal?.aborted) throw aborted2();
+  return new Promise((resolvePromise, reject) => {
+    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+      stdio: ["pipe", "pipe", "ignore"]
+    });
+    const chunks = [];
+    let size = 0;
+    let failure2 = null;
+    const stop = (error2) => {
+      failure2 ??= error2;
+      child2.kill("SIGKILL");
+    };
+    const timer = setTimeout(
+      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
+      timeout
+    );
+    const onAbort = () => stop(aborted2());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    child2.stdout?.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES2)
+        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
+      else chunks.push(chunk);
+    });
+    child2.on("error", (error2) => {
+      settle();
+      reject(
+        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+      );
+    });
+    child2.on("close", (status, exitSignal) => {
+      settle();
+      if (failure2) return reject(failure2);
+      if (status === null && exitSignal)
+        return reject(
+          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
+        );
+      try {
+        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
+      } catch (error2) {
+        reject(error2);
+      }
+    });
+    child2.stdin?.on("error", () => {
+    });
+    child2.stdin?.end(input);
+  });
+}
+function prepareCall(action, fields, deps, options) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
+  return { binaryPath, timeout, input };
+}
+function parseHelperOutput(status, stdout) {
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout.trim());
+  } catch {
+    throw new PublicHelperError(
+      "invalid_response",
+      `The helper exited with status ${status} and no JSON response.`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
+  const object3 = parsed;
+  if (status !== 0 || object3.status !== "ok") {
+    const error2 = errorSchema.safeParse(object3);
+    if (!error2.success)
+      throw new PublicHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized response (exit ${status}).`
+      );
+    throw new PublicHelperError(error2.data.code, error2.data.message);
+  }
+  return object3;
+}
+function defaultPublicHelperBuildDeps() {
+  return {
+    ...defaultPublicHelperDeps(),
+    osVersion: () => {
+      const r = spawnSync2("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release2()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function sourceDigestSwift(sourceSha) {
+  return `let helperSourceSHA256 = "${sourceSha}"
+`;
+}
+var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
+function publicHelperInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>apple-notes-mcp public helper</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
+  const steps = [];
+  const done = (ok2) => ({
+    ok: ok2,
+    checkOnly,
+    steps,
+    installation: inspectPublicHelper(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectPublicHelper(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = publicHelperInstallDir(deps.env);
+  mkdirSync5(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync5(join20(installDir, ".staging-"));
+  try {
+    const stagedBinary = join20(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join20(staging, "source-digest.swift");
+    const plistPath = join20(staging, "Info.plist");
+    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = publicHelloSchema.parse(
+        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync(stagedBinary, 448);
+    renameSync(stagedBinary, join20(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync4(
+      join20(installDir, PUBLIC_HELPER_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync5(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPublicHelper(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatPublicHelperBuild(report) {
+  const lines = ["Apple Notes MCP public native helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
+  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+
+// src/services/noteDrawings.ts
+var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
+var strokeSchema = external_exports.object({
+  inkType: external_exports.string(),
+  color: external_exports.object({
+    red: external_exports.number(),
+    green: external_exports.number(),
+    blue: external_exports.number(),
+    alpha: external_exports.number()
+  }),
+  width: external_exports.number(),
+  pointCount: external_exports.number().int(),
+  bounds,
+  points: external_exports.array(
+    external_exports.object({
+      x: external_exports.number(),
+      y: external_exports.number(),
+      width: external_exports.number(),
+      opacity: external_exports.number(),
+      force: external_exports.number()
+    })
+  ).optional(),
+  transformApplied: external_exports.boolean().optional(),
+  masked: external_exports.boolean().optional(),
+  pointsTruncated: external_exports.boolean().optional()
+}).strip();
+var decodedDrawingSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  strokeCount: external_exports.number().int(),
+  strokes: external_exports.array(strokeSchema),
+  truncated: external_exports.boolean(),
+  bounds,
+  hiddenStrokeCount: external_exports.number().int().optional()
+});
+function decodeRow(row, format, includePoints, deps) {
+  const base = {
+    attachmentId: row.attachmentId,
+    identifier: row.identifier,
+    typeUti: row.typeUti,
+    status: "error"
+  };
+  if (!row.data || row.data.length === 0)
+    return { ...base, code: "no_data", message: "This drawing has no stored PencilKit data." };
+  let decoded;
+  try {
+    const needPoints = includePoints || format !== "json";
+    const raw = callPublicHelper(
+      "decode_drawing",
+      { dataBase64: row.data.toString("base64"), includePoints: needPoints },
+      deps
+    );
+    const parsed = decodedDrawingSchema.safeParse(raw);
+    if (!parsed.success)
+      return { ...base, code: "invalid_response", message: "Unexpected helper response." };
+    decoded = parsed.data;
+  } catch (error2) {
+    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
+    return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
+  }
+  const strokes = decoded.strokes;
+  const result = {
+    ...base,
+    status: "ok",
+    strokeCount: decoded.strokeCount,
+    bounds: decoded.bounds,
+    truncated: decoded.truncated,
+    ...decoded.hiddenStrokeCount ? { hiddenStrokeCount: decoded.hiddenStrokeCount } : {}
+  };
+  if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
+  if (format !== "svg")
+    result.strokes = includePoints ? strokes : strokes.map(({ points: _points, ...rest }) => rest);
+  return result;
+}
+function getNoteDrawings(noteId3, options = {}) {
+  const format = options.format ?? "json";
+  const includePoints = options.includePoints ?? true;
+  const deps = options.deps ?? defaultPublicHelperDeps();
+  const rows = (options.readRows ?? readDrawingRows2)(noteId3, options.dbPath);
+  if (rows.length === 0) return { id: noteId3, drawingCount: 0, status: "none", drawings: [] };
+  const install = inspectPublicHelper(deps);
+  if (!install.ready)
+    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+  const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
+  const ok2 = drawings.filter((d) => d.status === "ok").length;
+  return {
+    id: noteId3,
+    drawingCount: drawings.length,
+    status: ok2 === drawings.length ? "ok" : ok2 ? "partial" : "error",
+    drawings
+  };
+}
+function fitNoteDrawings(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
+  let next = result;
+  let pointsOmitted = false;
+  let svgOmitted = false;
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.strokes?.some((s) => s.points))) {
+    next = {
+      ...next,
+      drawings: next.drawings.map(
+        (d) => d.strokes ? { ...d, strokes: d.strokes.map(({ points: _points, ...rest }) => rest) } : d
+      )
+    };
+    pointsOmitted = true;
+  }
+  if (measure(next) > maxBytes && next.drawings.some((d) => d.svg !== void 0)) {
+    next = {
+      ...next,
+      drawings: next.drawings.map(({ svg: _svg, ...rest }) => rest)
+    };
+    svgOmitted = true;
+  }
+  return { result: next, pointsOmitted, svgOmitted, oversized: measure(next) > maxBytes };
+}
+function formatNoteDrawings(result) {
+  if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
+  const lines = [
+    `${result.drawingCount} classic drawing${result.drawingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}):`
+  ];
+  for (const d of result.drawings)
+    lines.push(
+      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.hiddenStrokeCount ? ` (${d.hiddenStrokeCount} fully erased)` : ""}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
+    );
+  return lines.join("\n");
+}
+
+// src/services/exportVectorDrawings.ts
+var defaultReadNoteDrawings = (noteId3) => getNoteDrawings(noteId3, { format: "svg" });
+var STOP_CODES = /* @__PURE__ */ new Set(["timeout"]);
+function errorCode(error2) {
+  if (error2 instanceof PublicHelperError) return error2.code;
+  const code = error2?.code;
+  if (typeof code === "string") return code;
+  const kind = error2?.kind;
+  return typeof kind === "string" ? kind : "internal_error";
+}
+function prepareVectorDrawings(notes, writer, readDrawings = defaultReadNoteDrawings) {
+  const outcomes = /* @__PURE__ */ new Map();
+  let stopped;
+  for (const note of notes) {
+    const pending = [...note.attachments.values()].filter((a) => a.kind === "drawing");
+    if (pending.length === 0) continue;
+    if (stopped) {
+      for (const attachment of pending) outcomes.set(attachment.id, { reason: stopped });
+      continue;
+    }
+    let result;
+    try {
+      result = readDrawings(note.id);
+    } catch (error2) {
+      const reason = errorCode(error2);
+      if (error2 instanceof PublicHelperError) stopped = reason;
+      for (const attachment of pending) outcomes.set(attachment.id, { reason });
+      continue;
+    }
+    for (const drawing of result.drawings) {
+      if (drawing.status !== "ok" || !drawing.svg) {
+        const reason = drawing.code ?? "undecodable";
+        outcomes.set(drawing.identifier, { reason });
+        if (STOP_CODES.has(reason)) stopped = reason;
+      } else if (drawing.truncated) {
+        outcomes.set(drawing.identifier, { reason: "truncated" });
+      } else {
+        outcomes.set(drawing.identifier, { svg: drawing.svg });
+      }
+    }
+  }
+  const stats = { rendered: 0, fallback: 0 };
+  const fallback = (reason) => {
+    stats.fallback++;
+    stats.fallbackReasons = stats.fallbackReasons ?? {};
+    stats.fallbackReasons[reason] = (stats.fallbackReasons[reason] ?? 0) + 1;
+    return void 0;
+  };
+  const vectorDrawing = (attachment) => {
+    if (attachment.kind !== "drawing") return void 0;
+    const outcome = outcomes.get(attachment.id) ?? { reason: "not_decoded" };
+    if ("reason" in outcome) return fallback(outcome.reason);
+    if (!writer.placeBytes) return fallback("unsupported");
+    const placed = writer.placeBytes(
+      Buffer.from(outcome.svg, "utf8"),
+      `${attachment.title?.trim() || "Drawing"}.svg`,
+      "image/svg+xml",
+      `drawing:${attachment.id}`
+    );
+    if ("error" in placed) return fallback(placed.error);
+    stats.rendered++;
+    return placed;
+  };
+  return { vectorDrawing, stats };
 }
 
 // src/utils/markdownExport.ts
@@ -51748,10 +52578,10 @@ function renderNotesMarkdown(notes, ctx, { wrap: wrap3 = 0 } = {}) {
 
 // src/utils/noteExportData.ts
 import { execFileSync as execFileSync18 } from "node:child_process";
-import { homedir as homedir17 } from "node:os";
-import { join as join20 } from "node:path";
-var NOTES_DB_PATH11 = join20(
-  homedir17(),
+import { homedir as homedir18 } from "node:os";
+import { join as join21 } from "node:path";
+var NOTES_DB_PATH11 = join21(
+  homedir18(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 var IMAGE_UTIS2 = /* @__PURE__ */ new Set([
@@ -51833,24 +52663,24 @@ function sqlite(dbPath2, args) {
   }
 }
 function objectColumns(dbPath2 = NOTES_DB_PATH11) {
-  let columns = columnCache.get(dbPath2);
-  if (!columns) {
-    columns = new Set(
+  let columns2 = columnCache.get(dbPath2);
+  if (!columns2) {
+    columns2 = new Set(
       sqlite(dbPath2, ["SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');"]).split("\n").filter(Boolean)
     );
-    columnCache.set(dbPath2, columns);
+    columnCache.set(dbPath2, columns2);
   }
-  return columns;
+  return columns2;
 }
-function attachmentQuery(columns) {
-  const col3 = (alias, name) => columns.has(name) ? `${alias}.${name}` : "NULL";
+function attachmentQuery(columns2) {
+  const col3 = (alias, name) => columns2.has(name) ? `${alias}.${name}` : "NULL";
   const fields = ATTACHMENT_COLUMNS.map(([key, alias, name]) => `'${key}', ${col3(alias, name)}`);
   const uti = `COALESCE(${col3("a", "ZTYPEUTI")}, ${col3("a", "ZTYPEUTI1")})`;
-  const mergeable = columns.has("ZMERGEABLEDATA1") ? columns.has("ZMERGEABLEDATA") ? "COALESCE(a.ZMERGEABLEDATA1, a.ZMERGEABLEDATA)" : "a.ZMERGEABLEDATA1" : col3("a", "ZMERGEABLEDATA");
-  const noteLinks = ["ZNOTE", "ZNOTE1"].filter((c) => columns.has(c)).map((c) => `a.${c} = @pk`);
+  const mergeable = columns2.has("ZMERGEABLEDATA1") ? columns2.has("ZMERGEABLEDATA") ? "COALESCE(a.ZMERGEABLEDATA1, a.ZMERGEABLEDATA)" : "a.ZMERGEABLEDATA1" : col3("a", "ZMERGEABLEDATA");
+  const noteLinks = ["ZNOTE", "ZNOTE1"].filter((c) => columns2.has(c)).map((c) => `a.${c} = @pk`);
   const owner = noteLinks.length ? `(${noteLinks.join(" OR ")})` : "0";
-  const media = columns.has("ZMEDIA") ? "m.Z_PK = a.ZMEDIA" : "0";
-  const live = columns.has("ZMARKEDFORDELETION") ? "AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
+  const media = columns2.has("ZMEDIA") ? "m.Z_PK = a.ZMEDIA" : "0";
+  const live = columns2.has("ZMARKEDFORDELETION") ? "AND COALESCE(a.ZMARKEDFORDELETION, 0) = 0" : "";
   return `SELECT json_object('title', (SELECT ${col3("n", "ZTITLE1")} FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk), 'attachments', (SELECT json_group_array(json_object('pk', a.Z_PK, 'id', a.ZIDENTIFIER, ${fields.join(", ")}, 'table', CASE WHEN ${uti} = 'com.apple.notes.table' THEN hex(${mergeable}) END)) FROM ZICCLOUDSYNCINGOBJECT a LEFT JOIN ZICCLOUDSYNCINGOBJECT m ON ${media} WHERE ${owner} AND a.ZIDENTIFIER IS NOT NULL ${live}));`;
 }
 var text = (value) => typeof value === "string" && value.length ? value : typeof value === "number" ? String(value) : void 0;
@@ -51923,15 +52753,15 @@ function coreDataDate(value) {
   if (!Number.isFinite(seconds) || Math.abs(seconds) > 1e10) return void 0;
   return new Date((seconds + CORE_DATA_EPOCH) * 1e3).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
-function noteMetaQuery(columns) {
+function noteMetaQuery(columns2) {
   const first2 = (names) => {
-    const present = names.filter((name) => columns.has(name)).map((name) => `n.${name}`);
+    const present = names.filter((name) => columns2.has(name)).map((name) => `n.${name}`);
     if (!present.length) return "NULL";
     return present.length === 1 ? present[0] : `COALESCE(${present.join(", ")})`;
   };
-  const accountColumns = [...columns].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort((a, b) => Number(b.slice(8) || 0) - Number(a.slice(8) || 0));
-  const folder = columns.has("ZFOLDER") && columns.has("ZTITLE2") ? "(SELECT f.ZTITLE2 FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_PK = n.ZFOLDER)" : "NULL";
-  const account = columns.has("ZNAME") && accountColumns.length ? `(SELECT a.ZNAME FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_PK = ${first2(accountColumns)})` : "NULL";
+  const accountColumns = [...columns2].filter((name) => /^ZACCOUNT\d*$/.test(name)).sort((a, b) => Number(b.slice(8) || 0) - Number(a.slice(8) || 0));
+  const folder = columns2.has("ZFOLDER") && columns2.has("ZTITLE2") ? "(SELECT f.ZTITLE2 FROM ZICCLOUDSYNCINGOBJECT f WHERE f.Z_PK = n.ZFOLDER)" : "NULL";
+  const account = columns2.has("ZNAME") && accountColumns.length ? `(SELECT a.ZNAME FROM ZICCLOUDSYNCINGOBJECT a WHERE a.Z_PK = ${first2(accountColumns)})` : "NULL";
   return `SELECT json_object('uuid', ${first2(["ZIDENTIFIER"])}, 'created', ${first2(["ZCREATIONDATE3", "ZCREATIONDATE1", "ZCREATIONDATE"])}, 'modified', ${first2(["ZMODIFICATIONDATE1", "ZMODIFICATIONDATE"])}, 'folder', ${folder}, 'account', ${account}) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;`;
 }
 function readExportNoteMeta(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
@@ -52062,16 +52892,16 @@ var NOTE_PLACEHOLDERS = [
   "exportStem"
 ];
 var PLACEHOLDER_MODIFIERS = ["raw", "yaml"];
-var wrap2 = (before, after = "", join31) => ({
+var wrap2 = (before, after = "", join35) => ({
   mode: "wrap",
   before,
   after,
-  ...join31 ? { join: join31 } : {}
+  ...join35 ? { join: join35 } : {}
 });
-var pattern = (value, join31) => ({
+var pattern = (value, join35) => ({
   mode: "pattern",
   value,
-  ...join31 ? { join: join31 } : {}
+  ...join35 ? { join: join35 } : {}
 });
 var STANDARD = {
   schemaVersion: 1,
@@ -52946,20 +53776,20 @@ function renderNotesWithTemplate(notes, ctx, options) {
 }
 
 // src/utils/templateAssets.ts
-import { createHash as createHash2, randomBytes } from "node:crypto";
+import { createHash as createHash3, randomBytes } from "node:crypto";
 import {
   closeSync as closeSync5,
   constants as constants5,
   fstatSync as fstatSync5,
   linkSync,
   lstatSync as lstatSync4,
-  mkdirSync as mkdirSync5,
+  mkdirSync as mkdirSync6,
   openSync as openSync5,
   readSync as readSync4,
   unlinkSync as unlinkSync3,
   writeSync as writeSync4
 } from "node:fs";
-import { extname as extname4, isAbsolute as isAbsolute3, join as join21, relative as relative4, resolve as resolve4, sep as sep4 } from "node:path";
+import { extname as extname4, isAbsolute as isAbsolute3, join as join22, relative as relative4, resolve as resolve5, sep as sep4 } from "node:path";
 var CHUNK = 1024 * 1024;
 function openRegular(path10) {
   const fd = openSync5(path10, constants5.O_RDONLY | constants5.O_NOFOLLOW | constants5.O_NONBLOCK);
@@ -52970,7 +53800,7 @@ function openRegular(path10) {
   return fd;
 }
 function digest(fd) {
-  const hash = createHash2("sha256");
+  const hash = createHash3("sha256");
   const chunk = Buffer.alloc(CHUNK);
   let head = Buffer.alloc(0);
   for (let position = 0; ; ) {
@@ -53004,7 +53834,7 @@ var HashedSidecarWriter = class {
     if (this.ready) return void 0;
     try {
       assertExportPath(this.dir);
-      mkdirSync5(this.dir, { recursive: true });
+      mkdirSync6(this.dir, { recursive: true });
       if (!lstatSync4(this.dir).isDirectory())
         throw new Error("assets directory is not a directory");
     } catch (error2) {
@@ -53030,7 +53860,7 @@ var HashedSidecarWriter = class {
       if (directoryError) return { error: directoryError };
       const name = safeAssetName(asset.name, mime);
       const ext = extname4(name);
-      const target = join21(
+      const target = join22(
         this.dir,
         `${name.slice(0, name.length - ext.length)}-${hash.slice(0, 8)}${ext}`
       );
@@ -53067,7 +53897,7 @@ var HashedSidecarWriter = class {
    * remove it if the copy fails.
    */
   copy(source, target) {
-    const temp = join21(this.dir, `.asset-${randomBytes(6).toString("hex")}.tmp`);
+    const temp = join22(this.dir, `.asset-${randomBytes(6).toString("hex")}.tmp`);
     writeNew(source, temp);
     try {
       linkSync(temp, target);
@@ -53143,14 +53973,14 @@ function pathComponent(value) {
   return clean || "untitled";
 }
 function templateAssetsDir(directory, outputDir, values) {
-  const safe = {};
+  const safe2 = {};
   for (const [key, value] of Object.entries(values)) {
     const raw = typeof value === "string" ? value : value?.raw;
-    if (raw !== void 0) safe[key] = pathComponent(raw);
+    if (raw !== void 0) safe2[key] = pathComponent(raw);
   }
-  const filled = fillPlaceholders(directory, safe);
-  const base = resolve4(outputDir);
-  const dir = resolve4(base, filled);
+  const filled = fillPlaceholders(directory, safe2);
+  const base = resolve5(outputDir);
+  const dir = resolve5(base, filled);
   if (isAbsolute3(filled) || filled.split("/").includes("..") || !dir.startsWith(base + sep4))
     throw new Error(`assets.directory "${directory}" resolves outside the output directory`);
   return dir;
@@ -53182,7 +54012,7 @@ function chooseTemplate(request, deps) {
       "invalid-request",
       "Provide at most one of 'template' or 'templateFile'."
     );
-  const invalid2 = (error2, where) => new NotesExportError("invalid-template", `${where}: ${error2.message}`, error2.errors);
+  const invalid10 = (error2, where) => new NotesExportError("invalid-template", `${where}: ${error2.message}`, error2.errors);
   if (request.template !== void 0) {
     const name2 = request.template;
     if (isBuiltinTemplate(name2))
@@ -53195,7 +54025,7 @@ function chooseTemplate(request, deps) {
       portable2 = deps.findTemplate?.(name2);
     } catch (error2) {
       if (error2 instanceof TemplateValidationError)
-        throw invalid2(error2, `Saved template "${name2}"`);
+        throw invalid10(error2, `Saved template "${name2}"`);
       throw error2;
     }
     if (!portable2) throw new NotesExportError("template-not-found", `No template named "${name2}".`);
@@ -53215,7 +54045,7 @@ function chooseTemplate(request, deps) {
   try {
     portable = parseTemplate(text2);
   } catch (error2) {
-    throw invalid2(error2, "templateFile");
+    throw invalid10(error2, "templateFile");
   }
   const name = portable.name ?? basename4(request.templateFile, extname5(request.templateFile));
   return { info: { name, source: "file" }, template: resolveTemplate(portable, name) };
@@ -53260,7 +54090,7 @@ function loadNotes(ids, single, read) {
   return { notes, skipped };
 }
 function openOutput(output) {
-  mkdirSync6(dirname6(output), { recursive: true });
+  mkdirSync7(dirname7(output), { recursive: true });
   try {
     return openCreateOnly(output);
   } catch (error2) {
@@ -53302,7 +54132,7 @@ function exportNotesMarkdown(request, deps) {
     return truncated ? { ...receipt2, truncated } : receipt2;
   }
   const fd = output ? openOutput(output) : void 0;
-  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname6(output) : void 0) : void 0;
+  const writer = assetsDir ? new SidecarWriter(assetsDir, output ? dirname7(output) : void 0) : void 0;
   const ctx = {
     stats: emptyStats(),
     ...writer ? { writer, locator: deps.locator ?? new AssetLocator() } : {}
@@ -53334,7 +54164,7 @@ function exportNotesMarkdown(request, deps) {
   return { ...receipt, markdown };
 }
 function defaultSidecarDir(output) {
-  return join22(dirname6(output), `${basename4(output, extname5(output))}.assets`);
+  return join23(dirname7(output), `${basename4(output, extname5(output))}.assets`);
 }
 function exportNotesHtml(request, deps) {
   if (!request.outputPath)
@@ -53355,11 +54185,13 @@ function exportNotesHtml(request, deps) {
   const { ids, truncated } = selectNotes(request, deps);
   const { notes, skipped } = loadNotes(ids, !!request.id, deps.readNote);
   const fd = openOutput(output);
-  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname6(output)) : new DataUrlWriter();
+  const writer = assetsDir ? new SidecarWriter(assetsDir, dirname7(output)) : new DataUrlWriter();
+  const vector = request.vectorDrawings === false ? void 0 : prepareVectorDrawings(notes, writer, deps.readDrawings);
   const ctx = {
     stats: emptyStats(),
     writer,
-    locator: deps.locator ?? new AssetLocator()
+    locator: deps.locator ?? new AssetLocator(),
+    ...vector ? { vectorDrawing: vector.vectorDrawing } : {}
   };
   const title = request.id ? notes[0]?.title || "Note" : request.folder;
   const html = renderInto(
@@ -53376,7 +54208,8 @@ function exportNotesHtml(request, deps) {
     output,
     stats: ctx.stats,
     skipped,
-    ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count }
+    ...assetsDir ? { assets: { dir: assetsDir, files: writer.count } } : { embedded: writer.count },
+    ...vector && vector.stats.rendered + vector.stats.fallback > 0 ? { vectorDrawings: vector.stats } : {}
   };
 }
 function readMetaSafely(read, id2) {
@@ -53392,7 +54225,7 @@ function pathValues(note, meta, exportStem) {
   return values;
 }
 function assetBindings(template, notes, meta, { output, assetsDir, exportStem }) {
-  const linkBase = template.assets.pathStyle === "relative" && output ? dirname6(output) : void 0;
+  const linkBase = template.assets.pathStyle === "relative" && output ? dirname7(output) : void 0;
   const writers = /* @__PURE__ */ new Map();
   const writerFor = (dir) => {
     let writer = writers.get(dir);
@@ -53411,7 +54244,7 @@ function assetBindings(template, notes, meta, { output, assetsDir, exportStem })
         try {
           dir = templateAssetsDir(
             template.assets.directory,
-            dirname6(output),
+            dirname7(output),
             pathValues(note, meta.get(note) ?? {}, exportStem)
           );
         } catch (error2) {
@@ -53468,7 +54301,7 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
     ...warnings.length > MAX_EXPORT_WARNINGS ? { warningsOmitted: warnings.length - MAX_EXPORT_WARNINGS } : {},
     ...used.length ? {
       assets: {
-        dir: used.length === 1 ? used[0].dir : dirname6(output),
+        dir: used.length === 1 ? used[0].dir : dirname7(output),
         files: files.length
       },
       assetFiles: files.slice(0, MAX_LISTED_ASSETS)
@@ -53487,19 +54320,19 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
 }
 
 // src/tools/directOperations.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 import {
   closeSync as closeSync7,
   constants as constants7,
   fstatSync as fstatSync7,
-  mkdtempSync as mkdtempSync6,
+  mkdtempSync as mkdtempSync7,
   openSync as openSync7,
   readSync as readSync5,
-  rmSync as rmSync6,
-  writeFileSync as writeFileSync5
+  rmSync as rmSync7,
+  writeFileSync as writeFileSync6
 } from "node:fs";
 import { tmpdir as tmpdir6 } from "node:os";
-import { basename as basename6, extname as extname7, isAbsolute as isAbsolute4, join as join24 } from "node:path";
+import { basename as basename6, extname as extname7, isAbsolute as isAbsolute4, join as join25 } from "node:path";
 
 // src/utils/pasteboardFreeze.ts
 import { execFileSync as execFileSync19 } from "node:child_process";
@@ -53507,15 +54340,15 @@ import {
   closeSync as closeSync6,
   constants as constants6,
   fstatSync as fstatSync6,
-  mkdtempSync as mkdtempSync5,
+  mkdtempSync as mkdtempSync6,
   openSync as openSync6,
-  readFileSync as readFileSync3,
-  rmSync as rmSync5,
+  readFileSync as readFileSync4,
+  rmSync as rmSync6,
   statSync as statSync4,
-  writeFileSync as writeFileSync4
+  writeFileSync as writeFileSync5
 } from "node:fs";
 import { tmpdir as tmpdir5 } from "node:os";
-import { basename as basename5, extname as extname6, join as join23 } from "node:path";
+import { basename as basename5, extname as extname6, join as join24 } from "node:path";
 var PASTEBOARD_NAME_ENV = "APPLE_NOTES_MCP_PASTEBOARD_NAME";
 var MAX_PASTEBOARD_BYTES = 64 * 1024 * 1024;
 var PASTEBOARD_DATA_TYPES = [
@@ -53593,7 +54426,7 @@ function run(argv) {
   return JSON.stringify(result || { status: "error", code: "unsupported_content", types: types.slice(0, 20) });
 }
 `;
-var ENVELOPE_CODES = {
+var ENVELOPE_CODES2 = {
   pasteboard_access_denied: "permission_denied",
   pasteboard_unavailable: "operation_failed",
   pasteboard_timeout: "operation_failed",
@@ -53610,7 +54443,7 @@ var PasteboardError = class extends CodedError {
   constructor(code, message, details = {}) {
     super(message, {
       ...details,
-      code: ENVELOPE_CODES[code],
+      code: ENVELOPE_CODES2[code],
       pasteboardCode: code,
       committed: false
     });
@@ -53641,9 +54474,9 @@ function replyError(code, reply) {
     return new PasteboardError(code, message, { accessBehavior });
   }
   if (code === "multiple_files" || code === "multiple_items") {
-    const count = typeof reply.count === "number" ? reply.count : void 0;
-    const counted = code === "multiple_files" ? `The pasteboard holds ${count} copied files. Copy exactly one file, or attach each file with add-attachment.` : `The pasteboard holds ${count} images or PDFs. Copy exactly one, or save each and attach it with add-attachment.`;
-    return new PasteboardError(code, count ? counted : MESSAGES[code], count ? { count } : {});
+    const count2 = typeof reply.count === "number" ? reply.count : void 0;
+    const counted = code === "multiple_files" ? `The pasteboard holds ${count2} copied files. Copy exactly one file, or attach each file with add-attachment.` : `The pasteboard holds ${count2} images or PDFs. Copy exactly one, or save each and attach it with add-attachment.`;
+    return new PasteboardError(code, count2 ? counted : MESSAGES[code], count2 ? { count: count2 } : {});
   }
   if (code === "unsupported_content" && Array.isArray(reply.types)) {
     const types = reply.types.filter((t) => typeof t === "string").slice(0, 20);
@@ -53685,14 +54518,14 @@ function readRegularFile(path10) {
     const stat = fstatSync6(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > MAX_PASTEBOARD_BYTES)
       throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
-    return readFileSync3(descriptor);
+    return readFileSync4(descriptor);
   } finally {
     closeSync6(descriptor);
   }
 }
 function freezePasteboard(options = {}) {
-  const directory = mkdtempSync5(join23(tmpdir5(), "notes-pasteboard-"));
-  const cleanup = () => rmSync5(directory, { recursive: true, force: true });
+  const directory = mkdtempSync6(join24(tmpdir5(), "notes-pasteboard-"));
+  const cleanup = () => rmSync6(directory, { recursive: true, force: true });
   try {
     const prefs = JSON.stringify(PASTEBOARD_DATA_TYPES.map((t) => [t.type, t.ext]));
     let raw;
@@ -53720,17 +54553,17 @@ function freezePasteboard(options = {}) {
     if (reply.kind === "file") {
       const bytes = readRegularFile(reply.path);
       const filename2 = basename5(reply.path);
-      const path11 = join23(directory, filename2);
-      writeFileSync4(path11, bytes, { mode: 384 });
+      const path11 = join24(directory, filename2);
+      writeFileSync5(path11, bytes, { mode: 384 });
       return { kind: "file", type: reply.type, path: path11, filename: filename2, bytes: bytes.length, cleanup };
     }
-    if (join23(directory, basename5(reply.path)) !== reply.path)
+    if (join24(directory, basename5(reply.path)) !== reply.path)
       throw new PasteboardError("write_failed", MESSAGES.write_failed);
     const label = PASTEBOARD_DATA_TYPES.find((t) => t.type === reply.type)?.label ?? "item";
     const filename = `Pasted ${label}${extname6(reply.path)}`;
-    const path10 = join23(directory, filename);
-    writeFileSync4(path10, readFileSync3(reply.path), { mode: 384 });
-    rmSync5(reply.path, { force: true });
+    const path10 = join24(directory, filename);
+    writeFileSync5(path10, readFileSync4(reply.path), { mode: 384 });
+    rmSync6(reply.path, { force: true });
     return { kind: "data", type: reply.type, path: path10, filename, bytes: statSync4(path10).size, cleanup };
   } catch (error2) {
     cleanup();
@@ -53800,7 +54633,7 @@ function fileMatches(path10, size, expected) {
     descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
     const stat = fstatSync7(descriptor);
     if (!stat.isFile() || stat.size !== size) return false;
-    const hash = createHash3("sha256");
+    const hash = createHash4("sha256");
     const chunk = Buffer.allocUnsafe(1024 * 1024);
     let total = 0;
     for (; ; ) {
@@ -54017,7 +54850,7 @@ function attachmentName(path10, filename) {
 }
 var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
 var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-var sha256 = (data) => createHash3("sha256").update(data).digest("hex");
+var sha256 = (data) => createHash4("sha256").update(data).digest("hex");
 function storedAttachmentIds(manager, id2) {
   try {
     return new Set(
@@ -54062,10 +54895,10 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
   const bytes = localAttachment(path10);
   const beforeAttachments = manager.listAttachmentsById(id2);
   const beforeStored = storedAttachmentIds(manager, id2);
-  const directory = mkdtempSync6(join24(tmpdir6(), "notes-attachment-add-"));
-  const temporaryFile = join24(directory, name);
+  const directory = mkdtempSync7(join25(tmpdir6(), "notes-attachment-add-"));
+  const temporaryFile = join25(directory, name);
   try {
-    writeFileSync5(temporaryFile, bytes, { mode: 384 });
+    writeFileSync6(temporaryFile, bytes, { mode: 384 });
     if (readSnapshot(manager, id2).hash !== before.hash) throw new Error("Note revision changed");
     let returnedId;
     let transportUncertain = false;
@@ -54092,7 +54925,7 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
     if (inserted.length === 1 && !(persistentReturnedId && returnedId !== inserted[0].id)) {
       attachmentId = inserted[0].id;
       reportedName = inserted[0].name;
-      const verifyPath = join24(directory, "verify", "attachment.bin");
+      const verifyPath = join25(directory, "verify", "attachment.bin");
       const saved = manager.saveAttachmentById(id2, attachmentId, verifyPath);
       if (!saved.success || !fileMatches(saved.savedPath ?? verifyPath, bytes.length, sha256(bytes)))
         throw new Error("Attachment bytes were not verified; read the exact note before retrying");
@@ -54126,12 +54959,12 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
       } : {}
     };
   } finally {
-    rmSync6(directory, { recursive: true, force: true });
+    rmSync7(directory, { recursive: true, force: true });
   }
 }
 
 // src/tools/folderDelete.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 
 // src/utils/folderStore.ts
 import { execFileSync as execFileSync20 } from "child_process";
@@ -54221,20 +55054,20 @@ function readFolderStoreFacts(pk, dbPath2 = NOTE_STORE_PATH) {
   if (!Number.isSafeInteger(pk) || pk <= 0) {
     throw new FolderStoreError("Folder key must be a positive integer", "query_error");
   }
-  let columns;
+  let columns2;
   let row;
   try {
-    columns = new Set(
+    columns2 = new Set(
       runSqlite7(dbPath2, "PRAGMA table_info(ZICCLOUDSYNCINGOBJECT);").split("\n").map((line) => line.split("|")[1]).filter(Boolean)
     );
-    const missing = REQUIRED_FOLDER_COLUMNS.filter((column) => !columns.has(column));
+    const missing = REQUIRED_FOLDER_COLUMNS.filter((column) => !columns2.has(column));
     if (missing.length > 0) {
       throw new FolderStoreError(
         `This macOS Notes schema lacks ${missing.join(", ")}; folder safety cannot be verified`,
         "schema"
       );
     }
-    row = runSqlite7(dbPath2, buildFolderFactsSql(columns.has("ZSMARTFOLDERQUERYJSON")), pk);
+    row = runSqlite7(dbPath2, buildFolderFactsSql(columns2.has("ZSMARTFOLDERQUERYJSON")), pk);
   } catch (error2) {
     if (error2 instanceof FolderStoreError) throw error2;
     throw classify(error2);
@@ -54320,7 +55153,7 @@ function folderDeleteRevision(app, store) {
     store.childFolderCount,
     store.noteCount
   ];
-  return `sha256:${createHash4("sha256").update(JSON.stringify(state)).digest("hex")}`;
+  return `sha256:${createHash5("sha256").update(JSON.stringify(state)).digest("hex")}`;
 }
 function checkFolder(manager, args, deps) {
   const app = manager.readFolderForDelete(args.id);
@@ -54475,16 +55308,16 @@ import {
   fstatSync as fstatSync8,
   linkSync as linkSync2,
   lstatSync as lstatSync5,
-  mkdirSync as mkdirSync7,
+  mkdirSync as mkdirSync8,
   openSync as openSync8,
   readdirSync as readdirSync4,
   readSync as readSync6,
-  renameSync,
+  renameSync as renameSync2,
   unlinkSync as unlinkSync4,
   writeSync as writeSync5
 } from "node:fs";
-import { homedir as homedir19 } from "node:os";
-import { isAbsolute as isAbsolute5, join as join26, resolve as resolve5 } from "node:path";
+import { homedir as homedir20 } from "node:os";
+import { isAbsolute as isAbsolute5, join as join27, resolve as resolve6 } from "node:path";
 var TEMPLATE_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 var TemplateStoreError = class extends Error {
   constructor(code, message) {
@@ -54502,9 +55335,9 @@ function templateDir(env = process.env) {
         "unsafe-path",
         "APPLE_NOTES_MCP_TEMPLATE_DIR must be an absolute path."
       );
-    return resolve5(override);
+    return resolve6(override);
   }
-  return join26(homedir19(), "Library/Application Support/apple-notes-mcp/templates");
+  return join27(homedir20(), "Library/Application Support/apple-notes-mcp/templates");
 }
 function checkName(name, action) {
   if (isBuiltinTemplate(name) && action !== "read")
@@ -54530,7 +55363,7 @@ var TemplateStore = class {
       stat = lstatSync5(this.dir);
     } catch {
       if (!create) return void 0;
-      mkdirSync7(this.dir, { recursive: true, mode: 448 });
+      mkdirSync8(this.dir, { recursive: true, mode: 448 });
       stat = lstatSync5(this.dir);
     }
     if (!stat.isDirectory())
@@ -54541,7 +55374,7 @@ var TemplateStore = class {
     return this.dir;
   }
   file(name) {
-    return join26(this.dir, `${name}.json`);
+    return join27(this.dir, `${name}.json`);
   }
   /**
    * Read a saved template's text, refusing symlinks and non-regular files.
@@ -54667,7 +55500,7 @@ var TemplateStore = class {
         "template-exists",
         `A template named "${name}" already exists. Pass force: true to replace it.`
       );
-    const temp = join26(this.dir, `.${name}.${randomBytes2(6).toString("hex")}.tmp`);
+    const temp = join27(this.dir, `.${name}.${randomBytes2(6).toString("hex")}.tmp`);
     const fd = openSync8(
       temp,
       constants8.O_WRONLY | constants8.O_CREAT | constants8.O_EXCL | constants8.O_NOFOLLOW,
@@ -54687,7 +55520,7 @@ var TemplateStore = class {
     }
     closeSync8(fd);
     try {
-      if (force) renameSync(temp, path10);
+      if (force) renameSync2(temp, path10);
       else {
         try {
           linkSync2(temp, path10);
@@ -54903,7 +55736,7 @@ function registerMarkdownTemplates(server2, store = () => new TemplateStore()) {
 }
 
 // src/utils/svgAnalyzer.ts
-import { createHash as createHash5 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 
 // src/utils/svgColor.ts
 var NAMED = {
@@ -55114,8 +55947,8 @@ function parsePaint(value) {
   if (/^currentcolor$/i.test(v)) return { kind: "current" };
   const url = /^url\(\s*['"]?([^'")]*)['"]?\s*\)/i.exec(v);
   if (url) return { kind: "url", target: url[1].trim() };
-  const rgba = parseColor(v);
-  return rgba ? { kind: "color", rgba } : { kind: "invalid" };
+  const rgba2 = parseColor(v);
+  return rgba2 ? { kind: "color", rgba: rgba2 } : { kind: "invalid" };
 }
 
 // src/utils/svgGeometry.ts
@@ -55335,7 +56168,7 @@ function parsePathData(d) {
     const rel = command === command.toLowerCase();
     const base = rel ? pen : [0, 0];
     const num2 = () => s.number();
-    const pt = () => {
+    const pt2 = () => {
       const x = num2();
       const y = x === null ? null : num2();
       return x === null || y === null ? null : [x + base[0], y + base[1]];
@@ -55346,7 +56179,7 @@ function parsePathData(d) {
     let quadCtrl = null;
     switch (upper) {
       case "M": {
-        const p = pt();
+        const p = pt2();
         if (!p) return result(true);
         current = { start: p, segments: [], closed: false };
         subpaths.push(current);
@@ -55356,7 +56189,7 @@ function parsePathData(d) {
         break;
       }
       case "L": {
-        const p = pt();
+        const p = pt2();
         if (!p) return result(true);
         lineTo(p);
         break;
@@ -55376,10 +56209,10 @@ function parsePathData(d) {
       case "C":
       case "S": {
         let c1;
-        if (upper === "C") c1 = pt();
+        if (upper === "C") c1 = pt2();
         else c1 = lastCubic ? [2 * pen[0] - lastCubic[0], 2 * pen[1] - lastCubic[1]] : pen;
-        const c2 = c1 ? pt() : null;
-        const to = c2 ? pt() : null;
+        const c2 = c1 ? pt2() : null;
+        const to = c2 ? pt2() : null;
         if (!c1 || !c2 || !to) return result(true);
         current.segments.push({ kind: "C", c1, c2, to });
         cubicCtrl = c2;
@@ -55390,9 +56223,9 @@ function parsePathData(d) {
       case "Q":
       case "T": {
         let q;
-        if (upper === "Q") q = pt();
+        if (upper === "Q") q = pt2();
         else q = lastQuad ? [2 * pen[0] - lastQuad[0], 2 * pen[1] - lastQuad[1]] : pen;
-        const to = q ? pt() : null;
+        const to = q ? pt2() : null;
         if (!q || !to) return result(true);
         current.segments.push({
           kind: "C",
@@ -55411,7 +56244,7 @@ function parsePathData(d) {
         const rot = ry === null ? null : num2();
         const large = rot === null ? null : s.flag();
         const sweep = large === null ? null : s.flag();
-        const to = sweep === null ? null : pt();
+        const to = sweep === null ? null : pt2();
         if (!to) return result(true);
         const segs = arcToCubics(pen, rx, ry, rot, large, sweep, to);
         current.segments.push(...segs);
@@ -55886,7 +56719,7 @@ function parseXml(source, limits) {
       (own ??= /* @__PURE__ */ new Map()).set(prefix, a.value);
     }
     const scope2 = own ? { own, parent: parentScope } : parentScope ?? { own: null, parent: null };
-    const resolve9 = (qualified, isAttribute) => {
+    const resolve10 = (qualified, isAttribute) => {
       const colon = qualified.indexOf(":");
       if (colon < 0)
         return {
@@ -55900,12 +56733,12 @@ function parseXml(source, limits) {
       if (ns === void 0) fail(`Undeclared namespace prefix "${prefix.slice(0, 40)}"`);
       return { local, ns };
     };
-    const resolved = resolve9(name, false);
+    const resolved = resolve10(name, false);
     const element = {
       name,
       local: resolved.local,
       ns: resolved.ns,
-      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve9(a.name, true) })),
+      attributes: rawAttributes.filter((a) => a.name !== "xmlns" && !a.name.startsWith("xmlns:")).map((a) => ({ name: a.name, value: a.value, ...resolve10(a.name, true) })),
       children: [],
       text: "",
       line: tagLine
@@ -56033,7 +56866,7 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 function sha2562(text2) {
-  return createHash5("sha256").update(text2).digest("hex");
+  return createHash6("sha256").update(text2).digest("hex");
 }
 var round = (v, digits) => {
   const r = Number(v.toFixed(digits));
@@ -56055,8 +56888,8 @@ function parseLength(value, percentOf) {
   );
   if (!m) return null;
   const n = Number(m[1]);
-  const unit = (m[2] ?? "").toLowerCase();
-  const px = unit === "%" ? n / 100 * percentOf : n * UNITS[unit];
+  const unit2 = (m[2] ?? "").toLowerCase();
+  const px = unit2 === "%" ? n / 100 * percentOf : n * UNITS[unit2];
   return Number.isFinite(px) ? px : null;
 }
 function parseOpacity(value) {
@@ -56248,7 +57081,7 @@ var Analyzer = class {
     for (const [name, value] of declarations) {
       const keyword = value.toLowerCase();
       if (keyword === "inherit") continue;
-      const invalid2 = () => this.issue(
+      const invalid10 = () => this.issue(
         "invalid_value",
         null,
         ctx.location,
@@ -56257,21 +57090,21 @@ var Analyzer = class {
       switch (name) {
         case "fill":
         case "stroke": {
-          const paint = parsePaint(value);
-          if (paint.kind === "invalid") invalid2();
-          else if (name === "fill") style.fill = paint;
-          else style.stroke = paint;
+          const paint2 = parsePaint(value);
+          if (paint2.kind === "invalid") invalid10();
+          else if (name === "fill") style.fill = paint2;
+          else style.stroke = paint2;
           break;
         }
         case "color": {
           const c = parseColor(value);
           if (c) style.color = c;
-          else invalid2();
+          else invalid10();
           break;
         }
         case "stroke-width": {
           const w = parseLength(value, diag);
-          if (w === null || w < 0) invalid2();
+          if (w === null || w < 0) invalid10();
           else style.strokeWidth = w;
           break;
         }
@@ -56279,7 +57112,7 @@ var Analyzer = class {
         case "fill-opacity":
         case "stroke-opacity": {
           const o = parseOpacity(value);
-          if (o === null) invalid2();
+          if (o === null) invalid10();
           else if (name === "opacity") opacity = o;
           else if (name === "fill-opacity") style.fillOpacity = o;
           else style.strokeOpacity = o;
@@ -56287,7 +57120,7 @@ var Analyzer = class {
         }
         case "fill-rule":
           if (keyword === "evenodd" || keyword === "nonzero") style.evenOdd = keyword === "evenodd";
-          else invalid2();
+          else invalid10();
           break;
         case "visibility":
           style.visible = keyword === "visible";
@@ -56307,14 +57140,14 @@ var Analyzer = class {
             break;
           }
           const list = parseNumberList(value);
-          if (!list || list.some((v) => v < 0)) invalid2();
+          if (!list || list.some((v) => v < 0)) invalid10();
           else
             style.dasharray = list.reduce((s, v) => s + v, 0) > 0 ? list.length % 2 ? [...list, ...list] : list : null;
           break;
         }
         case "stroke-dashoffset": {
           const o = parseLength(value, diag);
-          if (o === null) invalid2();
+          if (o === null) invalid10();
           else style.dashoffset = o;
           break;
         }
@@ -56753,10 +57586,10 @@ var Analyzer = class {
       );
     return parts;
   }
-  paintColor(paint, style) {
-    if (paint.kind === "color") return paint.rgba;
-    if (paint.kind === "current") return style.color;
-    if (paint.kind === "url") return "url";
+  paintColor(paint2, style) {
+    if (paint2.kind === "color") return paint2.rgba;
+    if (paint2.kind === "current") return style.color;
+    if (paint2.kind === "url") return "url";
     return null;
   }
   shape(el, ctx) {
@@ -57524,11 +58357,11 @@ function registerNativeOperations(server2, manager) {
 }
 
 // src/setupShortcuts.ts
-import { spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync13 } from "node:fs";
-import { release as release2 } from "node:os";
-import { dirname as dirname7, resolve as resolve6 } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { existsSync as existsSync14 } from "node:fs";
+import { release as release3 } from "node:os";
+import { dirname as dirname8, resolve as resolve7 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
 var shortcutFiles = [
@@ -57545,16 +58378,16 @@ var shortcutFiles = [
 ];
 function setupShortcuts(checkOnly, dependencies = {}) {
   const status = dependencies.status || nativeTagsStatus;
-  const exists = dependencies.exists || existsSync13;
+  const exists = dependencies.exists || existsSync14;
   const open = dependencies.open || ((path10) => {
-    const result = spawnSync2("/usr/bin/open", [path10], { encoding: "utf8" });
+    const result = spawnSync3("/usr/bin/open", [path10], { encoding: "utf8" });
     return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
   });
-  const baseDirectory = dependencies.baseDirectory || resolve6(dirname7(fileURLToPath(import.meta.url)), "../shortcuts");
-  const osRelease = (dependencies.osRelease || release2)();
+  const baseDirectory = dependencies.baseDirectory || resolve7(dirname8(fileURLToPath2(import.meta.url)), "../shortcuts");
+  const osRelease = (dependencies.osRelease || release3)();
   const darwinMajor = Number.parseInt(osRelease.split(".")[0], 10);
   const items = shortcutFiles.map(({ name, file, optional: optional2 }) => {
-    const path10 = resolve6(baseDirectory, file);
+    const path10 = resolve7(baseDirectory, file);
     let installed = false;
     let identifier;
     let error2;
@@ -57612,709 +58445,6 @@ function formatShortcutSetup(report) {
   return lines.join("\n");
 }
 
-// src/services/publicHelper.ts
-import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { createHash as createHash6 } from "node:crypto";
-import {
-  chmodSync,
-  existsSync as existsSync14,
-  mkdirSync as mkdirSync8,
-  mkdtempSync as mkdtempSync7,
-  readFileSync as readFileSync4,
-  renameSync as renameSync2,
-  rmSync as rmSync7,
-  writeFileSync as writeFileSync6
-} from "node:fs";
-import { homedir as homedir20, release as release3 } from "node:os";
-import { dirname as dirname8, join as join27, resolve as resolve7 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
-var PUBLIC_HELPER_PROTOCOL = 1;
-var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
-var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
-var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
-var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
-var PUBLIC_HELPER_MANIFEST = "manifest.json";
-var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
-var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
-  "hello",
-  "decode_drawing",
-  "transcribe"
-]);
-var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
-var publicManifestSchema = external_exports.object({
-  schemaVersion: external_exports.literal(1),
-  protocolVersion: external_exports.number().int(),
-  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
-  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
-  builtAt: external_exports.string(),
-  osVersion: external_exports.string(),
-  compiler: external_exports.string()
-});
-function packageRoot(fromDir = dirname8(fileURLToPath2(import.meta.url))) {
-  let dir = fromDir;
-  for (; ; ) {
-    const candidate = join27(dir, "package.json");
-    if (existsSync14(candidate)) {
-      try {
-        if (JSON.parse(readFileSync4(candidate, "utf8")).name === "apple-notes-mcp")
-          return dir;
-      } catch {
-      }
-    }
-    const parent = dirname8(dir);
-    if (parent === dir) return resolve7(fromDir, "..");
-    dir = parent;
-  }
-}
-function defaultPublicHelperDeps(overrides = {}) {
-  return {
-    env: process.env,
-    platform: process.platform,
-    sourcePath: join27(packageRoot(), PUBLIC_HELPER_SOURCE),
-    exists: existsSync14,
-    readFile: (path10) => readFileSync4(path10),
-    spawn: spawnSync3,
-    spawnAsync: spawn,
-    ...overrides
-  };
-}
-function publicHelperInstallDir(env = process.env) {
-  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
-  if (override) return override;
-  return join27(homedir20(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
-}
-function sha256Hex(data) {
-  return createHash6("sha256").update(data).digest("hex");
-}
-function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
-  const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join27(installDir, PUBLIC_HELPER_BINARY);
-  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
-  const fail = (reason, detail) => ({
-    ...base,
-    ready: false,
-    reason,
-    detail
-  });
-  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
-  if (!deps.exists(deps.sourcePath))
-    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join27(installDir, PUBLIC_HELPER_MANIFEST);
-  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
-    return fail(
-      "helper_not_installed",
-      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
-    );
-  let manifest;
-  try {
-    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
-  } catch {
-    return fail(
-      "helper_manifest_invalid",
-      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
-    );
-  }
-  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
-    return {
-      ...fail(
-        "helper_stale",
-        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
-      ),
-      manifest
-    };
-  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
-    return {
-      ...fail(
-        "helper_modified",
-        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
-      ),
-      manifest
-    };
-  return { ...base, manifest, ready: true, reason: null, detail: null };
-}
-var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
-  "unsupported_platform",
-  "helper_not_installed",
-  "helper_stale",
-  "helper_modified",
-  "helper_manifest_invalid"
-]);
-var ENVELOPE_CODES2 = {
-  invalid_request: "validation_error",
-  attachment_not_found: "not_found"
-};
-var PublicHelperError = class extends CodedError {
-  constructor(code, message) {
-    super(message, {
-      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES2[code] ?? "operation_failed",
-      helperCode: code
-    });
-    this.code = code;
-    this.name = "PublicHelperError";
-  }
-  code;
-};
-var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
-var publicHelloSchema = external_exports.object({
-  status: external_exports.literal("ok"),
-  protocolVersion: external_exports.number().int(),
-  sourceSha256: external_exports.string(),
-  actions: external_exports.array(external_exports.string())
-}).passthrough();
-function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
-  const result = deps.spawn(binaryPath, [], {
-    input,
-    encoding: "utf8",
-    timeout,
-    killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2
-  });
-  const errno = result.error?.code;
-  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
-    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
-  if (result.error)
-    throw new PublicHelperError(
-      "helper_unreachable",
-      `Could not run the helper: ${result.error.message}`
-    );
-  return parseHelperOutput(result.status, String(result.stdout ?? ""));
-}
-async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
-  const { signal } = options;
-  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
-  if (signal?.aborted) throw aborted2();
-  return new Promise((resolvePromise, reject) => {
-    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
-      stdio: ["pipe", "pipe", "ignore"]
-    });
-    const chunks = [];
-    let size = 0;
-    let failure2 = null;
-    const stop = (error2) => {
-      failure2 ??= error2;
-      child2.kill("SIGKILL");
-    };
-    const timer = setTimeout(
-      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
-      timeout
-    );
-    const onAbort = () => stop(aborted2());
-    signal?.addEventListener("abort", onAbort, { once: true });
-    const settle = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
-    };
-    child2.stdout?.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES2)
-        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
-      else chunks.push(chunk);
-    });
-    child2.on("error", (error2) => {
-      settle();
-      reject(
-        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
-      );
-    });
-    child2.on("close", (status, exitSignal) => {
-      settle();
-      if (failure2) return reject(failure2);
-      if (status === null && exitSignal)
-        return reject(
-          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
-        );
-      try {
-        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
-      } catch (error2) {
-        reject(error2);
-      }
-    });
-    child2.stdin?.on("error", () => {
-    });
-    child2.stdin?.end(input);
-  });
-}
-function prepareCall(action, fields, deps, options) {
-  if (!PUBLIC_HELPER_ACTIONS.has(action))
-    throw new PublicHelperError(
-      "unknown_action",
-      `"${action}" is not an action the server sends to the public helper.`
-    );
-  let binaryPath = options.binaryPath;
-  if (!binaryPath) {
-    const install = inspectPublicHelper(deps);
-    if (!install.ready)
-      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-    binaryPath = install.binaryPath;
-  }
-  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
-  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
-  return { binaryPath, timeout, input };
-}
-function parseHelperOutput(status, stdout) {
-  let parsed;
-  try {
-    parsed = JSON.parse(stdout.trim());
-  } catch {
-    throw new PublicHelperError(
-      "invalid_response",
-      `The helper exited with status ${status} and no JSON response.`
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
-  const object3 = parsed;
-  if (status !== 0 || object3.status !== "ok") {
-    const error2 = errorSchema.safeParse(object3);
-    if (!error2.success)
-      throw new PublicHelperError(
-        "invalid_response",
-        `The helper failed with an unrecognized response (exit ${status}).`
-      );
-    throw new PublicHelperError(error2.data.code, error2.data.message);
-  }
-  return object3;
-}
-function defaultPublicHelperBuildDeps() {
-  return {
-    ...defaultPublicHelperDeps(),
-    osVersion: () => {
-      const r = spawnSync3("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
-      return r.status === 0 ? r.stdout.trim() : `Darwin ${release3()}`;
-    },
-    now: () => /* @__PURE__ */ new Date()
-  };
-}
-function sourceDigestSwift(sourceSha) {
-  return `let helperSourceSHA256 = "${sourceSha}"
-`;
-}
-var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
-function publicHelperInfoPlist() {
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
-    '<plist version="1.0">',
-    "<dict>",
-    "  <key>CFBundleIdentifier</key>",
-    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
-    "  <key>CFBundleName</key>",
-    "  <string>apple-notes-mcp public helper</string>",
-    "  <key>CFBundleInfoDictionaryVersion</key>",
-    "  <string>6.0</string>",
-    "</dict>",
-    "</plist>",
-    ""
-  ].join("\n");
-}
-function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
-  return [
-    "swiftc",
-    "-O",
-    "-parse-as-library",
-    "-framework",
-    "AppKit",
-    "-framework",
-    "PencilKit",
-    "-framework",
-    "AVFoundation",
-    "-framework",
-    "Speech",
-    "-Xlinker",
-    "-sectcreate",
-    "-Xlinker",
-    "__TEXT",
-    "-Xlinker",
-    "__info_plist",
-    "-Xlinker",
-    plistPath,
-    sourcePath,
-    digestPath,
-    "-o",
-    outputPath
-  ];
-}
-function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
-  const steps = [];
-  const done = (ok2) => ({
-    ok: ok2,
-    checkOnly,
-    steps,
-    installation: inspectPublicHelper(deps)
-  });
-  if (checkOnly) {
-    const installation2 = inspectPublicHelper(deps);
-    steps.push({
-      step: "inspect installed helper",
-      ok: installation2.ready,
-      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
-    });
-    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
-  }
-  if (deps.platform !== "darwin") {
-    steps.push({ step: "platform", ok: false, detail: "macOS only" });
-    return done(false);
-  }
-  if (!deps.exists(deps.sourcePath)) {
-    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
-    return done(false);
-  }
-  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
-  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
-  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
-  if (version3.status !== 0) {
-    steps.push({
-      step: "find compiler",
-      ok: false,
-      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
-    });
-    return done(false);
-  }
-  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
-  steps.push({ step: "find compiler", ok: true, detail: compiler });
-  const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync8(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync7(join27(installDir, ".staging-"));
-  try {
-    const stagedBinary = join27(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join27(staging, "source-digest.swift");
-    const plistPath = join27(staging, "Info.plist");
-    writeFileSync6(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
-    writeFileSync6(plistPath, publicHelperInfoPlist(), { mode: 384 });
-    const compile = deps.spawn(
-      "/usr/bin/xcrun",
-      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
-      { encoding: "utf8", timeout: 3e5 }
-    );
-    if (compile.status !== 0) {
-      steps.push({
-        step: "compile",
-        ok: false,
-        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
-      });
-      return done(false);
-    }
-    steps.push({ step: "compile", ok: true });
-    const sign = deps.spawn(
-      "/usr/bin/codesign",
-      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
-      { encoding: "utf8" }
-    );
-    if (sign.status !== 0) {
-      steps.push({
-        step: "ad-hoc sign",
-        ok: false,
-        detail: String(sign.stderr || "codesign failed")
-      });
-      return done(false);
-    }
-    steps.push({ step: "ad-hoc sign", ok: true });
-    let hello;
-    try {
-      hello = publicHelloSchema.parse(
-        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
-      );
-    } catch (error2) {
-      steps.push({
-        step: "handshake",
-        ok: false,
-        detail: error2 instanceof Error ? error2.message : String(error2)
-      });
-      return done(false);
-    }
-    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
-      steps.push({
-        step: "handshake",
-        ok: false,
-        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
-      });
-      return done(false);
-    }
-    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
-    const manifest = {
-      schemaVersion: 1,
-      protocolVersion: hello.protocolVersion,
-      sourceSha256: sourceSha,
-      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
-      builtAt: deps.now().toISOString(),
-      osVersion: deps.osVersion(),
-      compiler
-    };
-    chmodSync(stagedBinary, 448);
-    renameSync2(stagedBinary, join27(installDir, PUBLIC_HELPER_BINARY));
-    writeFileSync6(
-      join27(installDir, PUBLIC_HELPER_MANIFEST),
-      JSON.stringify(manifest, null, 2) + "\n",
-      { mode: 384 }
-    );
-    steps.push({ step: "install", ok: true, detail: installDir });
-  } finally {
-    rmSync7(staging, { recursive: true, force: true });
-  }
-  const installation = inspectPublicHelper(deps);
-  steps.push({
-    step: "verify installation",
-    ok: installation.ready,
-    detail: installation.ready ? void 0 : installation.detail ?? void 0
-  });
-  return { ok: installation.ready, checkOnly, steps, installation };
-}
-function formatPublicHelperBuild(report) {
-  const lines = ["Apple Notes MCP public native helper", ""];
-  for (const step of report.steps)
-    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
-  lines.push("");
-  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
-  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
-  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
-  return lines.join("\n");
-}
-
-// src/utils/noteStoreQuery.ts
-function parseNoteObjectId(noteId3) {
-  const match = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d{1,15})$/.exec(noteId3);
-  if (!match)
-    throw new NoteStoreError(
-      `Invalid note ID format: "${noteId3}". Expected format: x-coredata://UUID/ICNote/pNNN`,
-      "invalid_input"
-    );
-  return { store: match[1], pk: Number(match[2]) };
-}
-function queryNoteScoped(sql, pk, dbPath2 = NOTES_DB_PATH8) {
-  return runReadOnlySql(dbPath2, sql, { pk: { int: pk } }).split("\n");
-}
-var NOTE_STATE_SQL = `SELECT json_object('found', (SELECT count(*) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk AND n.Z_ENT = ${entity("ICNote")}), 'locked', (SELECT COALESCE(n.ZISPASSWORDPROTECTED, 0) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk));`;
-function assertNoteReadable(stateLine, noteId3) {
-  let state;
-  try {
-    state = JSON.parse(stateLine || "{}");
-  } catch {
-    throw new NoteStoreError("Unexpected response from the Notes database.", "query_error");
-  }
-  if (!state.found)
-    throw new CodedError(`No note found in the database for ID "${noteId3}".`, {
-      code: "not_found"
-    });
-  if (state.locked)
-    throw new CodedError(
-      "This note is password-protected; its attachments are encrypted and cannot be read.",
-      { code: "unsupported" }
-    );
-}
-
-// src/utils/noteDrawings.ts
-function drawingRowsSql(columns, dataColumn) {
-  return [
-    NOTE_STATE_SQL,
-    `SELECT json_group_array(json_object('pk', a.Z_PK, 'identifier', a.ZIDENTIFIER, 'uti', a.ZTYPEUTI, 'data', hex(a.${dataColumn}))) FROM (SELECT * FROM ZICCLOUDSYNCINGOBJECT a WHERE a.ZNOTE = @pk AND a.ZTYPEUTI IN ('com.apple.drawing.2', 'com.apple.drawing') AND ${notTombstonedSql(columns, "a")} ORDER BY a.Z_PK) a;`
-  ].join("\n");
-}
-function readDrawingRows2(noteId3, dbPath2 = NOTES_DB_PATH8) {
-  const { store, pk } = parseNoteObjectId(noteId3);
-  const columns = readColumns(dbPath2);
-  const dataColumn = columns.has("ZMERGEABLEDATA1") ? "ZMERGEABLEDATA1" : columns.has("ZMERGEABLEDATA") ? "ZMERGEABLEDATA" : null;
-  if (!dataColumn)
-    throw new NoteStoreError(
-      "This macOS version's Notes database has no drawing data column.",
-      "schema"
-    );
-  const [stateLine, rowsLine] = queryNoteScoped(drawingRowsSql(columns, dataColumn), pk, dbPath2);
-  assertNoteReadable(stateLine, noteId3);
-  const rows = JSON.parse(rowsLine || "[]");
-  return rows.map((row) => ({
-    pk: row.pk,
-    attachmentId: `x-coredata://${store}/ICAttachment/p${row.pk}`,
-    identifier: row.identifier ?? "",
-    typeUti: row.uti,
-    data: row.data ? Buffer.from(row.data, "hex") : null
-  }));
-}
-function svgNumber(value) {
-  if (!Number.isFinite(value)) return "0";
-  const rounded = Math.round(value * 100) / 100;
-  return Object.is(rounded, -0) ? "0" : String(rounded);
-}
-function escapeAttribute2(value) {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-var clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value || 0)));
-var clampUnit = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
-function drawingViewBox(strokes, fallback) {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const stroke of strokes) {
-    const pad = stroke.width / 2;
-    const extend2 = (x, y, r) => {
-      minX = Math.min(minX, x - r);
-      minY = Math.min(minY, y - r);
-      maxX = Math.max(maxX, x + r);
-      maxY = Math.max(maxY, y + r);
-    };
-    if (stroke.points?.length) for (const p of stroke.points) extend2(p.x, p.y, pad);
-    else {
-      extend2(stroke.bounds.x, stroke.bounds.y, 0);
-      extend2(stroke.bounds.x + stroke.bounds.width, stroke.bounds.y + stroke.bounds.height, 0);
-    }
-  }
-  if (minX === Infinity) return fallback ?? { x: 0, y: 0, width: 1, height: 1 };
-  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
-}
-function drawingToSvg(strokes, fallback) {
-  const box = drawingViewBox(strokes, fallback);
-  const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${svgNumber(box.x)} ${svgNumber(box.y)} ${svgNumber(box.width)} ${svgNumber(box.height)}" width="${svgNumber(box.width)}" height="${svgNumber(box.height)}">`
-  ];
-  for (const stroke of strokes) {
-    const points = stroke.points ?? [];
-    if (points.length === 0) continue;
-    const c = stroke.color;
-    const color = `rgb(${clampChannel(c.red)},${clampChannel(c.green)},${clampChannel(c.blue)})`;
-    const shared = `stroke="${color}" stroke-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"`;
-    if (points.length === 1) {
-      parts.push(
-        `<circle cx="${svgNumber(points[0].x)}" cy="${svgNumber(points[0].y)}" r="${svgNumber(stroke.width / 2)}" fill="${color}" fill-opacity="${svgNumber(clampUnit(c.alpha))}" data-ink="${escapeAttribute2(stroke.inkType)}"/>`
-      );
-      continue;
-    }
-    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${svgNumber(p.x)} ${svgNumber(p.y)}`).join(" ");
-    parts.push(
-      `<path d="${d}" fill="none" ${shared} stroke-width="${svgNumber(stroke.width)}" stroke-linecap="round" stroke-linejoin="round"/>`
-    );
-  }
-  parts.push("</svg>");
-  return parts.join("\n");
-}
-
-// src/services/noteDrawings.ts
-var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
-var strokeSchema = external_exports.object({
-  inkType: external_exports.string(),
-  color: external_exports.object({
-    red: external_exports.number(),
-    green: external_exports.number(),
-    blue: external_exports.number(),
-    alpha: external_exports.number()
-  }),
-  width: external_exports.number(),
-  pointCount: external_exports.number().int(),
-  bounds,
-  points: external_exports.array(
-    external_exports.object({
-      x: external_exports.number(),
-      y: external_exports.number(),
-      width: external_exports.number(),
-      opacity: external_exports.number(),
-      force: external_exports.number()
-    })
-  ).optional(),
-  transformApplied: external_exports.boolean().optional(),
-  masked: external_exports.boolean().optional(),
-  pointsTruncated: external_exports.boolean().optional()
-}).strip();
-var decodedDrawingSchema = external_exports.object({
-  status: external_exports.literal("ok"),
-  strokeCount: external_exports.number().int(),
-  strokes: external_exports.array(strokeSchema),
-  truncated: external_exports.boolean(),
-  bounds,
-  hiddenStrokeCount: external_exports.number().int().optional()
-});
-function decodeRow(row, format, includePoints, deps) {
-  const base = {
-    attachmentId: row.attachmentId,
-    identifier: row.identifier,
-    typeUti: row.typeUti,
-    status: "error"
-  };
-  if (!row.data || row.data.length === 0)
-    return { ...base, code: "no_data", message: "This drawing has no stored PencilKit data." };
-  let decoded;
-  try {
-    const needPoints = includePoints || format !== "json";
-    const raw = callPublicHelper(
-      "decode_drawing",
-      { dataBase64: row.data.toString("base64"), includePoints: needPoints },
-      deps
-    );
-    const parsed = decodedDrawingSchema.safeParse(raw);
-    if (!parsed.success)
-      return { ...base, code: "invalid_response", message: "Unexpected helper response." };
-    decoded = parsed.data;
-  } catch (error2) {
-    const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
-    return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
-  }
-  const strokes = decoded.strokes;
-  const result = {
-    ...base,
-    status: "ok",
-    strokeCount: decoded.strokeCount,
-    bounds: decoded.bounds,
-    truncated: decoded.truncated,
-    ...decoded.hiddenStrokeCount ? { hiddenStrokeCount: decoded.hiddenStrokeCount } : {}
-  };
-  if (format !== "json") result.svg = drawingToSvg(strokes, decoded.bounds);
-  if (format !== "svg")
-    result.strokes = includePoints ? strokes : strokes.map(({ points: _points, ...rest }) => rest);
-  return result;
-}
-function getNoteDrawings(noteId3, options = {}) {
-  const format = options.format ?? "json";
-  const includePoints = options.includePoints ?? true;
-  const deps = options.deps ?? defaultPublicHelperDeps();
-  const rows = (options.readRows ?? readDrawingRows2)(noteId3, options.dbPath);
-  if (rows.length === 0) return { id: noteId3, drawingCount: 0, status: "none", drawings: [] };
-  const install = inspectPublicHelper(deps);
-  if (!install.ready)
-    throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-  const drawings = rows.map((row) => decodeRow(row, format, includePoints, deps));
-  const ok2 = drawings.filter((d) => d.status === "ok").length;
-  return {
-    id: noteId3,
-    drawingCount: drawings.length,
-    status: ok2 === drawings.length ? "ok" : ok2 ? "partial" : "error",
-    drawings
-  };
-}
-function fitNoteDrawings(result, maxBytes, measure = (r) => Buffer.byteLength(JSON.stringify(r))) {
-  let next = result;
-  let pointsOmitted = false;
-  let svgOmitted = false;
-  if (measure(next) > maxBytes && next.drawings.some((d) => d.strokes?.some((s) => s.points))) {
-    next = {
-      ...next,
-      drawings: next.drawings.map(
-        (d) => d.strokes ? { ...d, strokes: d.strokes.map(({ points: _points, ...rest }) => rest) } : d
-      )
-    };
-    pointsOmitted = true;
-  }
-  if (measure(next) > maxBytes && next.drawings.some((d) => d.svg !== void 0)) {
-    next = {
-      ...next,
-      drawings: next.drawings.map(({ svg: _svg, ...rest }) => rest)
-    };
-    svgOmitted = true;
-  }
-  return { result: next, pointsOmitted, svgOmitted, oversized: measure(next) > maxBytes };
-}
-function formatNoteDrawings(result) {
-  if (result.drawingCount === 0) return `No classic PencilKit drawings in note ${result.id}.`;
-  const lines = [
-    `${result.drawingCount} classic drawing${result.drawingCount === 1 ? "" : "s"} in note ${result.id} (${result.status}):`
-  ];
-  for (const d of result.drawings)
-    lines.push(
-      d.status === "ok" ? `- ${d.attachmentId}: ${d.strokeCount} stroke${d.strokeCount === 1 ? "" : "s"}${d.hiddenStrokeCount ? ` (${d.hiddenStrokeCount} fully erased)` : ""}${d.truncated ? " (truncated)" : ""}` : `- ${d.attachmentId}: error ${d.code}: ${d.message}`
-    );
-  return lines.join("\n");
-}
-
 // src/utils/noteAudio.ts
 import { readdirSync as readdirSync5, statSync as statSync5 } from "node:fs";
 import { join as join28 } from "node:path";
@@ -58324,12 +58454,12 @@ var EXTRA_AUDIO_UTIS = [
   "public.aifc-audio",
   "com.microsoft.waveform-audio"
 ];
-function audioRowsSql(columns, generationColumn) {
+function audioRowsSql(columns2, generationColumn) {
   const generation = generationColumn ? `m.${generationColumn}` : "NULL";
   const media = (alias) => `json((SELECT json_object('identifier', m.ZIDENTIFIER, 'generation', ${generation}, 'filename', m.ZFILENAME) FROM ZICCLOUDSYNCINGOBJECT m WHERE m.Z_PK = ${alias}.ZMEDIA))`;
-  const live = (alias) => notTombstonedSql(columns, alias);
+  const live = (alias) => notTombstonedSql(columns2, alias);
   const utis = EXTRA_AUDIO_UTIS.map((u) => `'${u}'`).join(", ");
-  const accountCols = [...columns].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
+  const accountCols = [...columns2].filter((c) => /^ZACCOUNT\d*$/.test(c)).sort();
   const account = accountCols.length ? `SELECT (SELECT acc.ZIDENTIFIER FROM ZICCLOUDSYNCINGOBJECT acc WHERE acc.Z_ENT = ${entity("ICAccount")} AND acc.Z_PK IN (${accountCols.map((c) => `n.${c}`).join(", ")}) LIMIT 1) FROM ZICCLOUDSYNCINGOBJECT n WHERE n.Z_PK = @pk;` : "SELECT NULL;";
   return [
     NOTE_STATE_SQL,
@@ -58374,16 +58504,16 @@ var positive = (value) => typeof value === "number" && Number.isFinite(value) &&
 function readAudioAssets(noteId3, options = {}) {
   const { store, pk } = parseNoteId2(noteId3);
   const dbPath2 = options.dbPath ?? NOTES_DB_PATH8;
-  const columns = readColumns(dbPath2);
-  const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns.has(c));
+  const columns2 = readColumns(dbPath2);
+  const missing = ["ZMEDIA", "ZPARENTATTACHMENT", "ZFILENAME"].filter((c) => !columns2.has(c));
   if (missing.length)
     throw new NoteStoreError(
       `This macOS version's Notes database lacks ${missing.join(", ")}; audio files cannot be located.`,
       "schema"
     );
-  const generation = columns.has("ZGENERATION1") ? "ZGENERATION1" : columns.has("ZGENERATION") ? "ZGENERATION" : null;
+  const generation = columns2.has("ZGENERATION1") ? "ZGENERATION1" : columns2.has("ZGENERATION") ? "ZGENERATION" : null;
   const [stateLine, rowsLine, accountLine] = queryNoteScoped(
-    audioRowsSql(columns, generation),
+    audioRowsSql(columns2, generation),
     pk,
     dbPath2
   );
@@ -59169,6 +59299,678 @@ function formatHelperBuild(report) {
   return lines.join("\n");
 }
 
+// src/services/permissions.ts
+import { spawnSync as spawnSync6 } from "node:child_process";
+import { createInterface } from "node:readline";
+var PRIVACY = "System Settings > Privacy & Security";
+var PANE_ANCHORS = {
+  fullDiskAccess: { anchor: "Privacy_AllFiles", label: "Full Disk Access" },
+  automation: { anchor: "Privacy_Automation", label: "Automation" },
+  speechRecognition: { anchor: "Privacy_SpeechRecognition", label: "Speech Recognition" }
+};
+function settingsUrl(pane, macOSVersion) {
+  const legacy = macOSVersion !== null && compareVersions(macOSVersion, "13.0") < 0;
+  const base = legacy ? "x-apple.systempreferences:com.apple.preference.security" : "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension";
+  return `${base}?${PANE_ANCHORS[pane].anchor}`;
+}
+function paneFields(pane, macOSVersion) {
+  return {
+    settingsPane: `${PRIVACY} > ${PANE_ANCHORS[pane].label}`,
+    settingsUrl: settingsUrl(pane, macOSVersion)
+  };
+}
+function checkPermissions(probes = defaultPermissionProbes()) {
+  const macOSVersion = safe(probes.macOSVersion, null);
+  const launchingApp = safe(probes.launchingApp, null);
+  const who = launchingApp ?? "the app that launches the server";
+  const items = [
+    fullDiskAccessItem(probes, macOSVersion),
+    automationItem(probes, macOSVersion, who),
+    shortcutsItem(probes),
+    speechItem(probes, macOSVersion, who)
+  ];
+  return {
+    ready: items.every((item) => !item.required || item.status === "granted"),
+    launchingApp,
+    execPath: probes.execPath,
+    macOSVersion,
+    items
+  };
+}
+function safe(fn, fallback) {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
+function errorText(error2) {
+  return error2 instanceof Error ? error2.message : String(error2);
+}
+function fullDiskAccessItem(probes, macOSVersion) {
+  const base = {
+    id: "fullDiskAccess",
+    title: "Full Disk Access",
+    required: true,
+    ...paneFields("fullDiskAccess", macOSVersion)
+  };
+  let granted;
+  try {
+    granted = probes.fullDiskAccess();
+  } catch (error2) {
+    return {
+      ...base,
+      status: "unknown",
+      detail: `could not probe the Notes database: ${errorText(error2)}`,
+      fix: fdaRemediation(probes.execPath)
+    };
+  }
+  return granted ? {
+    ...base,
+    status: "granted",
+    detail: "the Notes database (NoteStore.sqlite) is readable",
+    fix: null
+  } : {
+    ...base,
+    status: "missing",
+    detail: "the Notes database is not readable, so query-notes, checklist state, note metadata, note links, native objects, exports and the bridges' readback do not work",
+    fix: fdaRemediation(probes.execPath)
+  };
+}
+function automationItem(probes, macOSVersion, who) {
+  const base = {
+    id: "notesAutomation",
+    title: "Automation of Notes.app",
+    required: true,
+    ...paneFields("automation", macOSVersion)
+  };
+  let result;
+  try {
+    result = probes.notesAutomation();
+  } catch (error2) {
+    result = { success: false, error: errorText(error2) };
+  }
+  if (result.success)
+    return {
+      ...base,
+      status: "granted",
+      detail: "Notes.app answered a read-only Apple event",
+      fix: null
+    };
+  if (isPermissionDenied(result.error))
+    return {
+      ...base,
+      status: "missing",
+      detail: "macOS refused the Apple event to Notes.app (Automation denied)",
+      fix: `In ${PRIVACY} > Automation, expand ${who} and turn on Notes. Then fully quit (Cmd+Q) and relaunch that app. If Notes is not listed, run this check again and choose Allow when macOS asks to control Notes.`
+    };
+  return {
+    ...base,
+    status: "unknown",
+    detail: `Notes.app did not answer: ${result.error || "no response"}`,
+    fix: "Open Notes.app once, then run this check again. If macOS asks whether this app may control Notes, choose Allow."
+  };
+}
+function shortcutsItem(probes) {
+  const base = {
+    id: "shortcutBridges",
+    title: "Shortcut bridges",
+    required: false,
+    settingsPane: null,
+    settingsUrl: null
+  };
+  let report;
+  try {
+    report = probes.shortcuts();
+  } catch (error2) {
+    return {
+      ...base,
+      status: "unknown",
+      detail: `could not run the shortcuts command: ${errorText(error2)}`,
+      fix: "Run `apple-notes-mcp setup --check`."
+    };
+  }
+  const required2 = report.items.filter((item) => !item.optional);
+  const failed = required2.filter((item) => item.error && !item.installed);
+  const missing = required2.filter((item) => !item.installed);
+  const consent = "After install or upgrade, run each bridge once in Shortcuts.app and choose Always Allow.";
+  if (missing.length === 0)
+    return {
+      ...base,
+      status: "granted",
+      detail: `both required bridges are installed (${required2.map((item) => item.name).join(", ")}). ${consent}`,
+      fix: null
+    };
+  if (failed.length === missing.length && failed.length > 0)
+    return {
+      ...base,
+      status: "unknown",
+      detail: `could not inspect: ${failed.map((item) => `${item.name}: ${item.error}`).join("; ")}`,
+      fix: "Run `apple-notes-mcp setup --check`."
+    };
+  return {
+    ...base,
+    status: "missing",
+    detail: `not installed: ${missing.map((item) => item.name).join(", ")}. The native-write tools (append-native, checklists, tables, native tags, pinning, note links) need them; everything else works without them`,
+    fix: `Run \`apple-notes-mcp setup\` and approve Add Shortcut in macOS. ${consent}`
+  };
+}
+function speechItem(probes, macOSVersion, who) {
+  const base = {
+    id: "speechRecognition",
+    title: "Speech Recognition",
+    required: false,
+    ...paneFields("speechRecognition", macOSVersion)
+  };
+  let answer;
+  try {
+    answer = probes.speech();
+  } catch (error2) {
+    answer = { ok: false, reason: errorText(error2) };
+  }
+  if (!answer.ok)
+    return {
+      ...base,
+      status: "unknown",
+      detail: `only transcribe-note-audio needs this; could not read the status: ${answer.reason}`,
+      fix: `Build the public native helper with \`${PUBLIC_HELPER_SETUP_COMMAND}\`, then run this check again.`
+    };
+  const state = answer.speechAuthorization;
+  if (state === "authorized")
+    return {
+      ...base,
+      status: "granted",
+      detail: "transcribe-note-audio can use on-device speech recognition",
+      fix: null
+    };
+  if (state === "restricted")
+    return {
+      ...base,
+      status: "missing",
+      detail: "Speech Recognition is restricted on this Mac (for example by a management profile)",
+      fix: "Ask the Mac's administrator; the restriction cannot be lifted in System Settings."
+    };
+  if (state === "denied")
+    return {
+      ...base,
+      status: "missing",
+      detail: "Speech Recognition was denied, so transcribe-note-audio stops with permission_required",
+      fix: `In ${PRIVACY} > Speech Recognition, turn on ${who}, then relaunch it.`
+    };
+  if (!answer.requiresGrant)
+    return {
+      ...base,
+      status: "not_needed",
+      detail: "not granted, and not needed: on macOS 26 and later transcription runs on-device without a Speech Recognition grant",
+      fix: null
+    };
+  return {
+    ...base,
+    status: "missing",
+    detail: `status ${state}. Before macOS 26, transcription needs this grant, and the server never shows the permission prompt`,
+    fix: `In ${PRIVACY} > Speech Recognition, turn on ${who} if it is listed, then relaunch it.`
+  };
+}
+function findLaunchingApp(startPid = process.ppid, readProcess = readProcessEntry) {
+  let pid = startPid;
+  for (let depth = 0; depth < 32 && pid > 1; depth++) {
+    const entry = readProcess(pid);
+    if (!entry) return null;
+    const match = /^(.*?\.app)\//.exec(entry.command);
+    if (match) return match[1];
+    pid = entry.ppid;
+  }
+  return null;
+}
+function readProcessEntry(pid) {
+  const result = spawnSync6("/bin/ps", ["-o", "ppid=", "-o", "comm=", "-p", String(pid)], {
+    encoding: "utf8",
+    timeout: 3e3
+  });
+  const match = /^\s*(\d+)\s+(.+)$/.exec(String(result.stdout ?? "").trim());
+  return match ? { ppid: Number(match[1]), command: match[2] } : null;
+}
+var AUTOMATION_TIMEOUT_MS = 6e4;
+function defaultPermissionProbes() {
+  return {
+    fullDiskAccess: hasFullDiskAccess,
+    notesAutomation: () => {
+      const result = executeAppleScript('tell application "Notes" to get name of account 1', {
+        timeoutMs: AUTOMATION_TIMEOUT_MS,
+        maxRetries: 1
+      });
+      return { success: result.success, error: result.error };
+    },
+    shortcuts: () => setupShortcuts(true),
+    speech: () => {
+      const install = inspectPublicHelper();
+      if (!install.ready)
+        return { ok: false, reason: install.detail ?? "the public native helper is not built" };
+      const answer = callPublicHelper("speech_status");
+      return {
+        ok: true,
+        speechAuthorization: String(answer.speechAuthorization ?? "unknown"),
+        requiresGrant: answer.requiresGrant !== false
+      };
+    },
+    macOSVersion: readMacOSVersion,
+    launchingApp: () => findLaunchingApp(),
+    execPath: process.execPath
+  };
+}
+function openSettingsPane(item, open = openUrl) {
+  if (!item.settingsUrl || !item.settingsUrl.startsWith("x-apple.systempreferences:"))
+    return { ok: false, error: `${item.title} has no System Settings pane` };
+  return open(item.settingsUrl);
+}
+function openUrl(url) {
+  const result = spawnSync6("/usr/bin/open", [url], { encoding: "utf8" });
+  return result.status === 0 ? { ok: true } : { ok: false, error: result.stderr || result.error?.message || "open failed" };
+}
+function pendingItems(report) {
+  return report.items.filter((item) => item.status === "missing" || item.status === "unknown");
+}
+var ICONS = {
+  granted: "\u2713",
+  not_needed: "\u2713",
+  missing: "\u2717",
+  unknown: "?"
+};
+function formatPermissionsReport(report) {
+  const lines = ["Apple Notes MCP permissions", ""];
+  lines.push(
+    report.launchingApp ? `macOS attributes these grants to ${report.launchingApp}, the app that launched this check.` : `No launching app was found above this process, so macOS attributes these grants to ${report.execPath}.`
+  );
+  lines.push(
+    "An MCP host (Claude Desktop, an editor) can hold different grants: run this check from the same app, or use the doctor tool there.",
+    ""
+  );
+  for (const item of report.items) {
+    const tag = item.required ? "" : " (optional)";
+    lines.push(`${ICONS[item.status]} ${item.title}${tag}: ${item.detail}`);
+    if (item.status === "missing" || item.status === "unknown") {
+      if (item.settingsPane) lines.push(`    Pane: ${item.settingsPane}`);
+      if (item.settingsUrl) lines.push(`    URL:  ${item.settingsUrl}`);
+      if (item.fix) lines.push(`    Fix:  ${item.fix}`);
+    }
+  }
+  lines.push("");
+  lines.push(
+    report.ready ? "Every required permission is granted." : "Required permissions are missing; the server works only partly until they are granted."
+  );
+  return lines.join("\n");
+}
+function parsePermissionsArgs(args) {
+  return {
+    open: args.includes("--open"),
+    once: args.includes("--once") || args.includes("--check"),
+    json: args.includes("--json")
+  };
+}
+async function runPermissionsCli(options, deps) {
+  const opened = /* @__PURE__ */ new Set();
+  for (; ; ) {
+    const report = deps.check();
+    deps.write(
+      options.json ? JSON.stringify(report, null, 2) + "\n" : formatPermissionsReport(report) + "\n"
+    );
+    const pending = pendingItems(report);
+    if (options.open) {
+      for (const item of pending) {
+        if (!item.settingsUrl || opened.has(item.id)) continue;
+        opened.add(item.id);
+        const result = deps.open(item);
+        if (!options.json)
+          deps.write(
+            result.ok ? `Opened ${item.settingsPane}.
+` : `Could not open ${item.settingsPane}: ${result.error}
+`
+          );
+      }
+    }
+    if (pending.length === 0 || options.once || !deps.interactive) return report.ready ? 0 : 1;
+    deps.write("\nPress Enter to check again, or type q and press Enter to quit. ");
+    const line = await deps.waitForEnter();
+    if (line === null || line.trim().toLowerCase() === "q") return report.ready ? 0 : 1;
+    deps.write("\n");
+  }
+}
+function defaultPermissionsCliDeps() {
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const rl = interactive ? createInterface({ input: process.stdin }) : null;
+  const lines = [];
+  const waiters = [];
+  let closed = false;
+  rl?.on("line", (line) => {
+    const waiter = waiters.shift();
+    if (waiter) waiter(line);
+    else lines.push(line);
+  });
+  rl?.on("close", () => {
+    closed = true;
+    for (const waiter of waiters.splice(0)) waiter(null);
+  });
+  return {
+    check: () => checkPermissions(),
+    open: (item) => openSettingsPane(item),
+    write: (text2) => process.stdout.write(text2),
+    waitForEnter: () => new Promise((resolveLine) => {
+      if (lines.length) resolveLine(lines.shift());
+      else if (closed || !rl) resolveLine(null);
+      else waiters.push(resolveLine);
+    }),
+    interactive,
+    close: () => rl?.close()
+  };
+}
+
+// src/services/permissionsWindow.ts
+import { spawn as spawn2, spawnSync as spawnSync7 } from "node:child_process";
+import {
+  chmodSync as chmodSync3,
+  existsSync as existsSync17,
+  mkdirSync as mkdirSync10,
+  mkdtempSync as mkdtempSync9,
+  readFileSync as readFileSync6,
+  renameSync as renameSync4,
+  rmSync as rmSync9,
+  writeFileSync as writeFileSync8
+} from "node:fs";
+import { homedir as homedir22 } from "node:os";
+import { join as join31 } from "node:path";
+import { createInterface as createInterface2 } from "node:readline";
+var PERMISSIONS_WINDOW_PROTOCOL = 1;
+var PERMISSIONS_WINDOW_DIR_ENV = "APPLE_NOTES_MCP_PERMISSIONS_WINDOW_DIR";
+var PERMISSIONS_WINDOW_BINARY = "apple-notes-permissions-window";
+var PERMISSIONS_WINDOW_SOURCE = "native/permissions-window/apple-notes-permissions-window.swift";
+var PERMISSIONS_WINDOW_MANIFEST = "manifest.json";
+var PERMISSIONS_WINDOW_SETUP_COMMAND = "apple-notes-mcp setup --permissions-window";
+var PERMISSIONS_WINDOW_BUNDLE_ID = "apple-notes-mcp.permissions-window";
+var windowManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  compiler: external_exports.string()
+});
+function defaultPermissionsWindowDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join31(packageRoot(), PERMISSIONS_WINDOW_SOURCE),
+    exists: existsSync17,
+    readFile: (path10) => readFileSync6(path10),
+    spawn: spawnSync7,
+    now: () => /* @__PURE__ */ new Date(),
+    ...overrides
+  };
+}
+function permissionsWindowInstallDir(env = process.env) {
+  const override = env[PERMISSIONS_WINDOW_DIR_ENV]?.trim();
+  if (override) return override;
+  return join31(homedir22(), "Library", "Application Support", "apple-notes-mcp", "permissions-window");
+}
+function inspectPermissionsWindow(deps = defaultPermissionsWindowDeps()) {
+  const installDir = permissionsWindowInstallDir(deps.env);
+  const binaryPath = join31(installDir, PERMISSIONS_WINDOW_BINARY);
+  const fail = (reason, detail) => ({ ready: false, reason, detail, installDir, binaryPath });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  const rebuild = `Run \`${PERMISSIONS_WINDOW_SETUP_COMMAND}\`.`;
+  if (!deps.exists(deps.sourcePath))
+    return fail("window_not_installed", `Packaged window source is missing: ${deps.sourcePath}`);
+  const manifestPath = join31(installDir, PERMISSIONS_WINDOW_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail("window_not_installed", `The permissions window is not built. ${rebuild}`);
+  let manifest;
+  try {
+    manifest = windowManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail("window_manifest_invalid", `The window manifest is unreadable. ${rebuild}`);
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PERMISSIONS_WINDOW_PROTOCOL)
+    return fail(
+      "window_stale",
+      `The installed window was built from a different source than this version ships. ${rebuild}`
+    );
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return fail(
+      "window_modified",
+      `The window binary no longer matches the checksum recorded when it was built. ${rebuild}`
+    );
+  return { ready: true, reason: null, detail: null, installDir, binaryPath };
+}
+function permissionsWindowInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PERMISSIONS_WINDOW_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>Apple Notes MCP Permissions</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function permissionsWindowCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "SwiftUI",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+var helloSchema2 = external_exports.object({
+  type: external_exports.literal("hello"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string()
+});
+function buildPermissionsWindow(checkOnly, deps = defaultPermissionsWindowDeps()) {
+  const steps = [];
+  const finish = () => {
+    const installation2 = inspectPermissionsWindow(deps);
+    return {
+      ok: installation2.ready && steps.every((s) => s.ok),
+      checkOnly,
+      steps,
+      installation: installation2
+    };
+  };
+  if (checkOnly) {
+    const installation2 = inspectPermissionsWindow(deps);
+    steps.push({
+      step: "inspect installed window",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return finish();
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return finish();
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return finish();
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return finish();
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = permissionsWindowInstallDir(deps.env);
+  mkdirSync10(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync9(join31(installDir, ".staging-"));
+  try {
+    const stagedBinary = join31(staging, PERMISSIONS_WINDOW_BINARY);
+    const digestPath = join31(staging, "source-digest.swift");
+    const plistPath = join31(staging, "Info.plist");
+    writeFileSync8(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync8(plistPath, permissionsWindowInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      permissionsWindowCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return finish();
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PERMISSIONS_WINDOW_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({ step: "ad-hoc sign", ok: false, detail: String(sign.stderr || "failed") });
+      return finish();
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    const hello = deps.spawn(stagedBinary, [], {
+      input: JSON.stringify({ type: "hello" }) + "\n",
+      encoding: "utf8",
+      timeout: 1e4,
+      killSignal: "SIGKILL"
+    });
+    let parsed = null;
+    try {
+      parsed = helloSchema2.parse(JSON.parse(String(hello.stdout ?? "").trim()));
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.protocolVersion !== PERMISSIONS_WINDOW_PROTOCOL || parsed.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: parsed ? `window reported protocol ${parsed.protocolVersion}, source ${parsed.sourceSha256}` : `no valid hello (exit ${hello.status})`
+      });
+      return finish();
+    }
+    steps.push({ step: "handshake", ok: true });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: parsed.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      compiler
+    };
+    chmodSync3(stagedBinary, 448);
+    renameSync4(stagedBinary, join31(installDir, PERMISSIONS_WINDOW_BINARY));
+    writeFileSync8(
+      join31(installDir, PERMISSIONS_WINDOW_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync9(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPermissionsWindow(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return finish();
+}
+function formatPermissionsWindowBuild(report) {
+  const lines = ["Apple Notes MCP permissions window", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok)
+    lines.push(
+      `Installed at ${report.installation.binaryPath}. Open it with \`apple-notes-mcp setup --permissions --window\`.`
+    );
+  else if (report.checkOnly) lines.push(`Run \`${PERMISSIONS_WINDOW_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The window was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+var windowMessageSchema = external_exports.discriminatedUnion("type", [
+  external_exports.object({ type: external_exports.literal("open"), id: external_exports.string().max(64) }),
+  external_exports.object({ type: external_exports.literal("recheck") })
+]);
+function runPermissionsWindow(binaryPath, session) {
+  const launch = session.launch ?? ((path10) => spawn2(path10, [], { stdio: ["pipe", "pipe", "inherit"] }));
+  const log = session.log ?? (() => {
+  });
+  let report = session.check();
+  const child2 = launch(binaryPath);
+  const sendReport = () => {
+    if (child2.stdin && !child2.stdin.destroyed)
+      child2.stdin.write(JSON.stringify({ type: "report", report }) + "\n");
+  };
+  child2.stdin?.on("error", () => {
+  });
+  sendReport();
+  if (child2.stdout) {
+    const lines = createInterface2({ input: child2.stdout });
+    lines.on("line", (line) => {
+      let message;
+      try {
+        message = windowMessageSchema.parse(JSON.parse(line));
+      } catch {
+        return;
+      }
+      if (message.type === "recheck") {
+        report = session.check();
+        sendReport();
+        return;
+      }
+      const item = report.items.find((candidate) => candidate.id === message.id);
+      if (!item) return;
+      const result = session.open(item);
+      log(
+        result.ok ? `Opened ${item.settingsPane}.
+` : `Could not open ${item.settingsPane ?? item.title}: ${result.error}
+`
+      );
+    });
+  }
+  return new Promise((resolveExit) => {
+    child2.on("error", (error2) => {
+      log(`Could not run the permissions window: ${error2.message}
+`);
+      resolveExit(report.ready ? 0 : 1);
+    });
+    child2.on("close", () => resolveExit(report.ready ? 0 : 1));
+  });
+}
+
 // src/tools/privateHelperTools.ts
 var coreDataId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i);
 var notesUuid = external_exports.string().regex(UUID_PATTERN);
@@ -59278,6 +60080,6707 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
   );
 }
 
+// src/services/privateWriterBuild.ts
+import {
+  chmodSync as chmodSync4,
+  existsSync as existsSync18,
+  mkdirSync as mkdirSync11,
+  mkdtempSync as mkdtempSync10,
+  renameSync as renameSync5,
+  rmSync as rmSync10,
+  writeFileSync as writeFileSync9
+} from "node:fs";
+import { join as join33 } from "node:path";
+
+// src/services/privateWriter.ts
+import { extname as extname8, join as join32 } from "node:path";
+
+// src/services/privateWriterScope.ts
+var FOLDER_ID_MESSAGE = "Use an exact folder id from list-folders (x-coredata://\u2026/ICFolder/p\u2026)";
+function writerScopeGuardInput(subject = "note") {
+  const where = subject === "note" ? "the note's folder" : "the smart folder's parent (or destination) folder";
+  return {
+    ifFolderId: exactIdInput("ICFolder", SCOPE_FOLDER_ID, FOLDER_ID_MESSAGE, { maxLength: 256 }).optional().describe(
+      `Precondition: ${where} must be exactly this folder (id from list-folders). The writer checks it in the same transaction, just before the save.`
+    ),
+    ifAncestorFolderId: exactIdInput("ICFolder", SCOPE_FOLDER_ID, FOLDER_ID_MESSAGE, {
+      maxLength: 256
+    }).optional().describe(
+      `Precondition: ${where} must be this folder or one of its subfolders. Checked just before the save.`
+    ),
+    forbiddenAncestorFolderIds: exactIdArrayInput("ICFolder", SCOPE_FOLDER_ID, FOLDER_ID_MESSAGE, {
+      maxLength: 256,
+      maxItems: MAX_FORBIDDEN_FOLDERS
+    }).optional().describe(
+      `Precondition: ${where} must not be any of these folders or inside them${subject === "note" ? "" : ", and none may be the smart folder itself"}. Every id must name an existing folder, or the call is refused. Checked just before the save.`
+    )
+  };
+}
+function scopeGuardFrom(args) {
+  const guard = {
+    ifFolderId: args.ifFolderId,
+    ifAncestorFolderId: args.ifAncestorFolderId,
+    forbiddenAncestorFolderIds: args.forbiddenAncestorFolderIds
+  };
+  return hasScopeGuard(guard) ? guard : void 0;
+}
+function writerScopeFields(guard) {
+  if (!hasScopeGuard(guard)) return {};
+  try {
+    validateScopeGuard(guard);
+  } catch (error2) {
+    throw new PrivateWriteError(
+      "invalid_request",
+      error2 instanceof Error ? error2.message : String(error2),
+      false
+    );
+  }
+  const fields = {};
+  if (guard.ifFolderId) fields.ifFolderId = guard.ifFolderId;
+  if (guard.ifAncestorFolderId) fields.ifAncestorFolderId = guard.ifAncestorFolderId;
+  if (guard.forbiddenAncestorFolderIds?.length)
+    fields.forbiddenAncestorFolderIds = [...guard.forbiddenAncestorFolderIds];
+  return fields;
+}
+
+// src/services/privateWriter.ts
+var PRIVATE_WRITER_PROTOCOL = 1;
+var WRITES_ENV = "APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES";
+var ALLOW_UNVERIFIED_ENV = "APPLE_NOTES_MCP_ALLOW_UNVERIFIED";
+var WRITER_BINARY_NAME = "apple-notes-private-writer";
+var WRITER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-writer.m";
+var WRITER_MANIFEST_NAME = "writer-manifest.json";
+var WRITER_SETUP_COMMAND = "apple-notes-mcp setup --native-writer";
+var DEFAULT_TIMEOUT_MS4 = 2e4;
+var MAX_OUTPUT_BYTES4 = 8 * 1024 * 1024;
+var WRITER_ACTIONS = {
+  hello: "read",
+  probe: "read",
+  read_note_state: "read",
+  append_plain_text: "write",
+  read_sync_state: "read",
+  plan_edit: "read",
+  edit_note: "write",
+  compose_note: "write",
+  read_checklist: "read",
+  set_checklist_item: "write",
+  set_highlight: "write",
+  add_url_card: "write",
+  set_paragraph_id: "write",
+  add_section_link: "write",
+  read_tables: "read",
+  delete_table_row: "write",
+  insert_table_row: "write",
+  set_table_cell: "write",
+  prune_orphan_table: "write",
+  read_smart_folder: "read",
+  create_smart_folder: "write",
+  update_smart_folder: "write",
+  delete_smart_folder: "write",
+  add_paper: "write",
+  repair_purge_flag: "write",
+  read_paper: "read"
+};
+var APPEND_LIVE_VALIDATED = false;
+var PAPER_WRITE_LIVE_VALIDATED = false;
+var EDIT_LIVE_VALIDATED = false;
+var COMPOSE_LIVE_VALIDATED = false;
+var SECTION_LINKS_LIVE_VALIDATED = false;
+var CHECKLIST_TOGGLE_LIVE_VALIDATED = false;
+var HIGHLIGHT_LIVE_VALIDATED = false;
+var LINK_CARD_LIVE_VALIDATED = false;
+var PARAGRAPH_IDS_LIVE_VALIDATED = false;
+var TABLE_WRITES_LIVE_VALIDATED = false;
+var SMART_FOLDERS_LIVE_VALIDATED = false;
+var PURGE_REPAIR_LIVE_VALIDATED = false;
+function defaultWriterDeps(overrides = {}) {
+  return defaultDeps2({ sourcePath: join32(packageRoot2(), WRITER_SOURCE_RELATIVE), ...overrides });
+}
+function privateWritesEnabled(env = process.env) {
+  return privateHelperEnabled(env) && env[WRITES_ENV] === "1";
+}
+function inspectWriterInstallation(deps = defaultWriterDeps()) {
+  const installDir = helperInstallDir(deps.env);
+  const binaryPath = join32(installDir, WRITER_BINARY_NAME);
+  const manifestPath = join32(installDir, WRITER_MANIFEST_NAME);
+  const base = {
+    installDir,
+    binaryPath,
+    manifestPath,
+    sourcePath: deps.sourcePath,
+    expectedSourceSha256: null,
+    manifest: null
+  };
+  const fail = (reason, detail) => ({ ...base, ready: false, reason, detail });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged writer source is missing: ${deps.sourcePath}`);
+  base.expectedSourceSha256 = sha256Hex2(deps.readFile(deps.sourcePath));
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The private writer is not built. Run \`${WRITER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = manifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch (error2) {
+    return fail(
+      "helper_manifest_invalid",
+      `Unreadable writer manifest (${error2 instanceof Error ? error2.message : String(error2)}). Run \`${WRITER_SETUP_COMMAND}\`.`
+    );
+  }
+  base.manifest = manifest;
+  if (manifest.sourceSha256 !== base.expectedSourceSha256 || manifest.protocolVersion !== PRIVATE_WRITER_PROTOCOL)
+    return fail(
+      "helper_stale",
+      `The installed writer was built from a different writer source or protocol than this apple-notes-mcp version ships. Run \`${WRITER_SETUP_COMMAND}\` again.`
+    );
+  if (sha256Hex2(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return fail(
+      "helper_modified",
+      `The writer binary does not match the checksum recorded when it was built. Run \`${WRITER_SETUP_COMMAND}\` to rebuild it.`
+    );
+  return { ...base, ready: true, reason: null, detail: null };
+}
+var PrivateWriteError = class extends PrivateHelperError {
+  constructor(code, message, committed, details = {}) {
+    super(code, message, details);
+    this.committed = committed;
+    this.name = "PrivateWriteError";
+  }
+  committed;
+};
+var errorSchema3 = external_exports.object({
+  status: external_exports.literal("error"),
+  code: external_exports.string(),
+  message: external_exports.string(),
+  committed: external_exports.boolean().optional()
+}).passthrough();
+var featureSchema2 = external_exports.object({
+  available: external_exports.boolean(),
+  reason: external_exports.string().nullable(),
+  missing: external_exports.array(external_exports.string())
+});
+var writerHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  role: external_exports.literal("writer"),
+  readOnly: external_exports.literal(false),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+var writerProbeSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  role: external_exports.literal("writer"),
+  readOnly: external_exports.literal(false),
+  writesEnabled: external_exports.boolean(),
+  os: external_exports.object({ version: external_exports.string(), notesAppVersion: external_exports.string().nullable() }).passthrough(),
+  framework: external_exports.object({ loaded: external_exports.boolean(), error: external_exports.string().nullable() }).passthrough(),
+  store: external_exports.object({
+    kind: external_exports.enum(["live", "copy"]).nullable(),
+    opened: external_exports.boolean(),
+    reason: external_exports.string().nullable(),
+    noteRows: external_exports.number().int().nullable()
+  }).passthrough(),
+  syncHostRunning: external_exports.boolean(),
+  features: external_exports.object({
+    readNoteState: featureSchema2,
+    appendPlainText: featureSchema2,
+    // Optional so a probe without a feature reports it as unavailable
+    // instead of failing the whole status call.
+    planEdit: featureSchema2.optional(),
+    editNote: featureSchema2.optional(),
+    composeNote: featureSchema2.optional(),
+    composeObjects: featureSchema2.optional(),
+    checklistToggle: featureSchema2.optional(),
+    highlight: featureSchema2.optional(),
+    linkCard: featureSchema2.optional(),
+    setParagraphId: featureSchema2.optional(),
+    addSectionLink: featureSchema2.optional(),
+    tables: featureSchema2.optional(),
+    pruneOrphanTable: featureSchema2.optional(),
+    smartFolders: featureSchema2.optional(),
+    addPaper: featureSchema2.extend({ formats: external_exports.array(external_exports.string()) }).optional(),
+    composeAttachments: featureSchema2.optional(),
+    editReplaceFile: featureSchema2.optional(),
+    scopeGuards: featureSchema2.optional(),
+    purgeRepair: featureSchema2.optional(),
+    readPaper: featureSchema2.optional(),
+    readPaperShapes: featureSchema2.optional()
+  }).passthrough()
+}).passthrough();
+var cloudSyncSchema2 = external_exports.object({
+  available: external_exports.boolean(),
+  inICloudAccount: external_exports.boolean(),
+  currentLocalVersion: external_exports.number().int().optional(),
+  latestVersionSyncedToCloud: external_exports.number().int().optional(),
+  uploadPending: external_exports.boolean().optional()
+}).passthrough();
+var writeSyncFields = {
+  cloudSync: cloudSyncSchema2,
+  pushScheduled: external_exports.boolean(),
+  pushState: external_exports.enum(["awaiting_notes_app", "queued_for_next_launch"]),
+  syncHostRunning: external_exports.boolean(),
+  storeKind: external_exports.enum(["live", "copy"])
+};
+var appendResultSchema = external_exports.object({
+  status: external_exports.literal("updated"),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  appendedUTF16: external_exports.number().int(),
+  revisionBefore: external_exports.string(),
+  revisionAfter: external_exports.string(),
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+}).passthrough();
+function callPrivateWriter(action, fields = {}, deps = defaultWriterDeps(), options = {}) {
+  const kind = WRITER_ACTIONS[action];
+  if (!kind)
+    throw new PrivateWriteError(
+      "unknown_action",
+      `"${action}" is not a private writer action.`,
+      void 0
+    );
+  const isWrite = kind === "write" && !options.dryRun;
+  const notCommitted = isWrite ? false : void 0;
+  if (!options.allowDisabled) {
+    if (!privateHelperEnabled(deps.env))
+      throw new PrivateWriteError(
+        "disabled",
+        `The private helper is off. Set ${ENABLE_ENV}=1 and ${WRITES_ENV}=1 to opt in to private writes.`,
+        notCommitted
+      );
+    if (!privateWritesEnabled(deps.env))
+      throw new PrivateWriteError(
+        "writes_disabled",
+        `Private writes are off. Set ${WRITES_ENV}=1 (with ${ENABLE_ENV}=1) to opt in.`,
+        notCommitted
+      );
+  }
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectWriterInstallation(deps);
+    if (!install.ready)
+      throw new PrivateWriteError(
+        install.reason || "helper_not_installed",
+        install.detail || "",
+        notCommitted
+      );
+    binaryPath = install.binaryPath;
+  }
+  const timeout = Number.parseInt(deps.env[TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS4;
+  const result = deps.spawn(binaryPath, [], {
+    input: JSON.stringify({ protocol: PRIVATE_WRITER_PROTOCOL, action, ...fields }),
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES4,
+    env: deps.env
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PrivateWriteError(
+      "timeout",
+      isWrite ? `The writer did not answer within ${timeout} ms. The write is INDETERMINATE: it may have been saved. Read the note state again before retrying.` : `The writer did not answer within ${timeout} ms.`,
+      isWrite ? "unknown" : void 0
+    );
+  if (result.error)
+    throw new PrivateWriteError(
+      "helper_unreachable",
+      `Could not run the writer: ${result.error.message}`,
+      notCommitted
+    );
+  const stdout = String(result.stdout ?? "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new PrivateWriteError(
+      "invalid_response",
+      `The writer exited with status ${result.status} and no JSON response` + (isWrite ? ". The write is INDETERMINATE; read the note state before retrying." : "."),
+      isWrite ? "unknown" : void 0
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new PrivateWriteError(
+      "invalid_response",
+      "The writer response is not a JSON object",
+      isWrite ? "unknown" : void 0
+    );
+  const object3 = parsed;
+  if (result.status !== 0 || object3.status === "error") {
+    const error2 = errorSchema3.safeParse(object3);
+    if (!error2.success)
+      throw new PrivateWriteError(
+        "invalid_response",
+        `The writer failed with an unrecognized error shape (exit ${result.status})`,
+        isWrite ? "unknown" : void 0
+      );
+    const { status: _status, code, message, committed, ...details } = error2.data;
+    void _status;
+    throw new PrivateWriteError(
+      code,
+      message,
+      isWrite ? committed ?? "unknown" : void 0,
+      details
+    );
+  }
+  return object3;
+}
+function parseWriterResult(schema, value, isWrite) {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success)
+    throw new PrivateWriteError(
+      "invalid_response",
+      `Unexpected writer response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`,
+      isWrite ? "unknown" : void 0
+    );
+  return parsed.data;
+}
+function requireLiveValidated(validated, toolName, env) {
+  if (!validated && env[ALLOW_UNVERIFIED_ENV] !== "1")
+    throw new PrivateWriteError(
+      "not_live_validated",
+      `${toolName} has not passed live validation in this build. Set ${ALLOW_UNVERIFIED_ENV}=1 to run it on a disposable note.`,
+      false
+    );
+}
+function assertNoteIdentifier2(identifier) {
+  try {
+    assertNoteIdentifier(identifier);
+  } catch (error2) {
+    throw new PrivateWriteError(
+      "invalid_request",
+      error2 instanceof Error ? error2.message : String(error2),
+      false
+    );
+  }
+}
+function assertRevision(ifRevision3, source = "native-note-state") {
+  if (!/^r1:[a-f0-9]{64}$/.test(ifRevision3))
+    throw new PrivateWriteError(
+      "invalid_request",
+      `ifRevision must be a revision token from ${source}`,
+      false
+    );
+}
+var FORBIDDEN_TEXT = /[\x00-\x08\x0B-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
+function assertAppendText(text2) {
+  if (!text2.length) throw new PrivateWriteError("invalid_request", "text is required", false);
+  if (text2.length > 5e4)
+    throw new PrivateWriteError("invalid_request", "text exceeds 50000 UTF-16 code units", false);
+  if (FORBIDDEN_TEXT.test(text2))
+    throw new PrivateWriteError(
+      "invalid_request",
+      "text may contain only printable characters, tabs and \\n newlines",
+      false
+    );
+}
+function readWriterNoteState(identifier, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(identifier);
+  return parseWriterResult(
+    noteStateSchema,
+    callPrivateWriter("read_note_state", { identifier }, deps),
+    false
+  );
+}
+function probePrivateWriter(deps = defaultWriterDeps()) {
+  return parseWriterResult(writerProbeSchema, callPrivateWriter("probe", {}, deps), false);
+}
+function appendPlainText(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertAppendText(request.text);
+  assertRevision(request.ifRevision);
+  const scope2 = writerScopeFields(request.scope);
+  requireLiveValidated(APPEND_LIVE_VALIDATED, "native-append-plain-text", deps.env);
+  const { identifier, text: text2, ifRevision: ifRevision3 } = request;
+  return parseWriterResult(
+    appendResultSchema,
+    callPrivateWriter("append_plain_text", { identifier, text: text2, ifRevision: ifRevision3, ...scope2 }, deps),
+    true
+  );
+}
+var MAX_EDIT_OPERATIONS = 64;
+var MAX_EDIT_TEXT = 1e4;
+var FORBIDDEN_EDIT_TEXT = /[\x00-\x08\x0A-\x1F\x7F-\x9F\uFFFC\u2028\u2029\uD800-\uDFFF]/u;
+var paragraphText = (min) => external_exports.string().min(min).max(MAX_EDIT_TEXT).refine((text2) => !FORBIDDEN_EDIT_TEXT.test(text2), {
+  message: "must stay inside one paragraph: no line breaks, attachment glyphs, control characters, or unpaired surrogates"
+});
+var EDIT_STYLES = [
+  "title",
+  "heading",
+  "subheading",
+  "body",
+  "monospaced",
+  "bulleted",
+  "dashed",
+  "numbered",
+  "checklist"
+];
+var styleName = external_exports.enum(EDIT_STYLES);
+var count = external_exports.number().int().min(1).max(1e3);
+var operationId = external_exports.string().min(1).max(128).optional();
+var EDIT_HIGHLIGHTS = ["purple", "pink", "orange", "mint", "blue"];
+var EDIT_LINK_SCHEMES = /* @__PURE__ */ new Set(["http:", "https:", "mailto:", "tel:", "notes:", "applenotes:"]);
+var editLink = external_exports.string().min(1).max(4096).refine(
+  (link) => {
+    try {
+      return EDIT_LINK_SCHEMES.has(new URL(link).protocol);
+    } catch {
+      return false;
+    }
+  },
+  { message: "must be an absolute http, https, mailto, tel, notes, or applenotes URL" }
+);
+var runSchema = external_exports.object({
+  text: paragraphText(1),
+  bold: external_exports.boolean().optional(),
+  italic: external_exports.boolean().optional(),
+  underline: external_exports.boolean().optional(),
+  strikethrough: external_exports.boolean().optional(),
+  link: editLink.optional(),
+  highlight: external_exports.enum(EDIT_HIGHLIGHTS).optional(),
+  color: external_exports.string().regex(/^#[0-9A-Fa-f]{6}$/).optional()
+}).strict();
+var runsSchema = external_exports.array(runSchema).min(1).max(200).refine((runs) => runs.reduce((sum, run) => sum + run.text.length, 0) <= MAX_EDIT_TEXT, {
+  message: `runs must hold at most ${MAX_EDIT_TEXT} UTF-16 code units together`
+});
+var MAX_REPLACEMENT_FILE_BYTES = 64 * 1024 * 1024;
+var fileReplacementSchema = external_exports.object({
+  file: external_exports.string().min(1).max(4096),
+  filename: external_exports.string().min(1).max(255).optional()
+}).strict();
+var replacementSchema = external_exports.union([
+  external_exports.object({ text: paragraphText(0) }).strict(),
+  external_exports.object({ runs: runsSchema }).strict(),
+  fileReplacementSchema
+]);
+var textSelector = external_exports.object({
+  kind: external_exports.literal("text").optional(),
+  text: paragraphText(1),
+  scope: external_exports.enum(["body", "title", "all"]).optional(),
+  occurrence: count.optional()
+}).strict();
+var styleSelector = external_exports.object({ kind: external_exports.literal("style"), style: styleName, occurrence: count.optional() }).strict();
+var blankSelector = external_exports.object({
+  kind: external_exports.literal("blank"),
+  style: styleName.exclude(["title", "body"]),
+  occurrence: count.optional()
+}).strict();
+var attachmentCoreDataId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICAttachment\/p\d+$/i);
+var attachmentSelectorFields = {
+  kind: external_exports.literal("attachment"),
+  identifier: external_exports.string().regex(UUID_PATTERN).optional(),
+  id: attachmentCoreDataId2.optional(),
+  ordinal: count.optional(),
+  occurrence: count.optional()
+};
+var oneAttachment = (s) => [s.identifier, s.id, s.ordinal].filter((v) => v !== void 0).length === 1;
+var oneAttachmentMessage = {
+  message: "an attachment selector needs exactly one of identifier, id, or ordinal"
+};
+var attachmentSelector = external_exports.object(attachmentSelectorFields).strict().refine(oneAttachment, oneAttachmentMessage);
+var attachmentReplaceSelector = external_exports.object({ ...attachmentSelectorFields, position: external_exports.enum(["self", "before", "after"]).optional() }).strict().refine(oneAttachment, oneAttachmentMessage);
+var blockSchema = external_exports.object({
+  type: styleName.exclude(["title"]),
+  text: paragraphText(0).optional(),
+  runs: runsSchema.optional(),
+  checked: external_exports.boolean().optional()
+}).strict().refine((b) => b.text === void 0 !== (b.runs === void 0), {
+  message: "each block needs exactly one of text or runs"
+}).refine((b) => b.checked === void 0 || b.type === "checklist", {
+  message: "checked is only valid on checklist blocks"
+}).refine((b) => b.text !== "" || b.type === "body", {
+  message: "only a body block may have empty text"
+});
+var insertSchema = (op) => external_exports.object({
+  op: external_exports.literal(op),
+  id: operationId,
+  anchor: external_exports.union([textSelector, styleSelector, attachmentSelector]),
+  blocks: external_exports.array(blockSchema).min(1).max(200),
+  expectedCount: count.optional()
+}).strict();
+var MAX_TRIM_KEEP = 10;
+var trimSchema = external_exports.object({
+  op: external_exports.literal("trim_blank_lines"),
+  id: operationId,
+  mode: external_exports.enum(["runs", "end", "around"]),
+  keep: external_exports.number().int().min(0).max(MAX_TRIM_KEEP).optional(),
+  anchor: external_exports.union([textSelector, styleSelector]).optional(),
+  side: external_exports.enum(["before", "after", "both"]).optional(),
+  expectedCount: count.optional()
+}).strict();
+var appendToParagraphSchema = external_exports.object({
+  op: external_exports.literal("append_to_paragraph"),
+  id: operationId,
+  anchor: external_exports.union([textSelector, styleSelector, attachmentSelector]),
+  runs: runsSchema,
+  expectedCount: count.optional()
+}).strict();
+var MAX_CHECKLIST_ITEMS = 200;
+var checklistItemSchema = external_exports.object({
+  text: paragraphText(1).optional(),
+  runs: runsSchema.optional(),
+  checked: external_exports.boolean(),
+  indent: external_exports.number().int().min(0).max(8).optional()
+}).strict().refine((item) => item.text === void 0 !== (item.runs === void 0), {
+  message: "each item needs exactly one of text or runs"
+});
+var replaceChecklistSchema = external_exports.object({
+  op: external_exports.literal("replace_checklist"),
+  id: operationId,
+  select: external_exports.enum(["block", "all"]).optional(),
+  containing: paragraphText(1).optional(),
+  occurrence: count.optional(),
+  items: external_exports.array(checklistItemSchema).min(1).max(MAX_CHECKLIST_ITEMS),
+  expectedCount: count.optional()
+}).strict();
+var editOperationUnion = external_exports.discriminatedUnion("op", [
+  external_exports.object({
+    op: external_exports.literal("replace"),
+    id: operationId,
+    selector: external_exports.union([
+      textSelector.extend({ match: external_exports.enum(["substring", "equals"]).optional() }).strict(),
+      attachmentReplaceSelector
+    ]),
+    replacement: replacementSchema,
+    expectedCount: count.optional()
+  }).strict(),
+  external_exports.object({
+    op: external_exports.literal("delete_paragraph"),
+    id: operationId,
+    selector: external_exports.union([textSelector, blankSelector, attachmentSelector]),
+    expectedCount: count.optional()
+  }).strict(),
+  insertSchema("insert_after"),
+  insertSchema("insert_before"),
+  external_exports.object({
+    op: external_exports.literal("set_title"),
+    id: operationId,
+    replacement: external_exports.union([
+      external_exports.object({ text: paragraphText(1) }).strict(),
+      external_exports.object({ runs: runsSchema }).strict()
+    ])
+  }).strict(),
+  trimSchema,
+  appendToParagraphSchema,
+  replaceChecklistSchema
+]);
+var editOperationSchema = editOperationUnion.superRefine((operation, context) => {
+  const issue2 = (path10, message) => context.addIssue({ code: external_exports.ZodIssueCode.custom, path: path10, message });
+  if (operation.op === "replace" || operation.op === "delete_paragraph" || operation.op === "insert_after" || operation.op === "insert_before" || operation.op === "append_to_paragraph") {
+    const expected = operation.expectedCount ?? 1;
+    const picker = "selector" in operation ? { key: "selector", value: operation.selector } : "anchor" in operation && operation.anchor ? { key: "anchor", value: operation.anchor } : null;
+    const occurrence = picker?.value.occurrence;
+    if (occurrence !== void 0 && occurrence > expected)
+      issue2(
+        [picker.key, "occurrence"],
+        `occurrence ${occurrence} exceeds expectedCount ${expected}; the writer would refuse it`
+      );
+  }
+  if (operation.op === "replace") {
+    const selector = operation.selector;
+    const replacement = operation.replacement;
+    const attachment = selector.kind === "attachment";
+    const beside = attachment && selector.position !== void 0 && selector.position !== "self";
+    if (replacement.file !== void 0 && (!attachment || beside))
+      issue2(
+        ["replacement", "file"],
+        "a file replacement needs an attachment selector with position self"
+      );
+    if (beside && replacement.text === "")
+      issue2(["replacement", "text"], "text inserted beside an attachment must not be empty");
+  }
+  if (operation.op === "replace_checklist" && operation.select === "all") {
+    if (operation.containing !== void 0)
+      issue2(["containing"], "containing is only valid with select block");
+    if (operation.occurrence !== void 0)
+      issue2(["occurrence"], "occurrence is only valid with select block");
+  }
+  if (operation.op !== "trim_blank_lines") return;
+  const around = operation.mode === "around";
+  if (around && !operation.anchor) issue2(["anchor"], "mode around needs an anchor");
+  if (!around && (operation.anchor || operation.side))
+    issue2(
+      [operation.anchor ? "anchor" : "side"],
+      "anchor and side are only valid with mode around"
+    );
+});
+var editOperationsSchema = external_exports.array(editOperationSchema).min(1).max(MAX_EDIT_OPERATIONS).superRefine((operations, context) => {
+  const seen = /* @__PURE__ */ new Set();
+  operations.forEach((operation, index) => {
+    if (operation.id === void 0) return;
+    if (seen.has(operation.id))
+      context.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        path: [index, "id"],
+        message: "operation ids must be unique"
+      });
+    seen.add(operation.id);
+  });
+});
+var editTargetSchema = external_exports.object({
+  paragraphIndex: external_exports.number().int(),
+  paragraphStyle: external_exports.string(),
+  location: external_exports.number().int(),
+  length: external_exports.number().int(),
+  newLength: external_exports.number().int(),
+  /** For a trimmed empty paragraph: how many whitespace characters it held. */
+  blankUTF16: external_exports.number().int().optional()
+}).passthrough();
+var editPlanFields = {
+  identifier: external_exports.string(),
+  revisionBefore: external_exports.string().regex(/^r1:[a-f0-9]{64}$/),
+  planDigest: external_exports.string(),
+  operationCount: external_exports.number().int(),
+  targetCount: external_exports.number().int(),
+  operations: external_exports.array(
+    external_exports.object({
+      index: external_exports.number().int(),
+      op: external_exports.string(),
+      matchedCount: external_exports.number().int(),
+      targets: external_exports.array(editTargetSchema)
+    }).passthrough()
+  ),
+  lengthBefore: external_exports.number().int(),
+  lengthAfter: external_exports.number().int(),
+  unchangedUTF16: external_exports.number().int(),
+  wouldChange: external_exports.boolean(),
+  titleChanged: external_exports.boolean(),
+  attachmentGlyphs: external_exports.number().int(),
+  /** Glyphs left in the planned text. */
+  attachmentGlyphsAfter: external_exports.number().int().optional(),
+  /** Identifiers of attachments the plan removes from the body (attachment selectors only). */
+  removedAttachments: external_exports.array(external_exports.string()).optional(),
+  /** Attachments and inline objects in the body, adjacent glyphs of one attachment counted once. */
+  attachmentSpans: external_exports.number().int().optional(),
+  /** Each file that replaces an attachment: name, type, size, and SHA-256 (never its bytes). */
+  replacementFiles: external_exports.array(
+    external_exports.object({
+      operationIndex: external_exports.number().int(),
+      replaces: external_exports.string(),
+      filename: external_exports.string(),
+      uti: external_exports.string(),
+      sizeBytes: external_exports.number().int(),
+      sha256: external_exports.string(),
+      attachmentIdentifier: external_exports.string().optional()
+    }).passthrough()
+  ).optional(),
+  requireNonSystemPaper: external_exports.boolean().optional(),
+  storeKind: external_exports.enum(["live", "copy"])
+};
+var editPlanSchema = external_exports.object({
+  status: external_exports.literal("planned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false),
+  ...editPlanFields
+}).passthrough();
+var preservationSchema = external_exports.object({
+  unchangedUTF16: external_exports.number().int(),
+  formattingOutsideEditsVerified: external_exports.literal(true),
+  attachmentGlyphs: external_exports.number().int(),
+  attachmentGlyphSequenceVerified: external_exports.literal(true),
+  attachmentRows: external_exports.number().int(),
+  attachmentRowsVerified: external_exports.literal(true),
+  /** Attachment rows other than a removed one, proven present with the same stored values. */
+  otherAttachmentRowsUnchanged: external_exports.number().int().optional(),
+  /** What became of each removed attachment's row (Notes may keep it or mark it for deletion). */
+  removedAttachments: external_exports.array(
+    external_exports.object({
+      identifier: external_exports.string(),
+      rowStillInNote: external_exports.boolean(),
+      markedForDeletion: external_exports.boolean().nullable()
+    }).passthrough()
+  ).optional()
+}).passthrough();
+var editResultSchema = external_exports.union([
+  external_exports.object({
+    status: external_exports.literal("updated"),
+    dryRun: external_exports.literal(false),
+    committed: external_exports.literal(true),
+    verified: external_exports.literal(true),
+    revisionAfter: external_exports.string(),
+    modificationDate: external_exports.string().nullable(),
+    preservation: preservationSchema,
+    ...writeSyncFields,
+    ...editPlanFields
+  }).passthrough(),
+  external_exports.object({
+    status: external_exports.literal("unchanged"),
+    dryRun: external_exports.literal(false),
+    committed: external_exports.literal(false),
+    revisionAfter: external_exports.string(),
+    ...editPlanFields
+  }).passthrough()
+]);
+var planDigestToken = external_exports.string().regex(/^p2:[a-f0-9]{64}$/);
+function assertReplacementFiles(operations) {
+  for (const operation of operations) {
+    if (operation.op !== "replace" || !("file" in operation.replacement)) continue;
+    const { file, filename } = operation.replacement;
+    assertAllowedFile(file, MAX_REPLACEMENT_FILE_BYTES, { label: "Replacement file" });
+    if (filename === void 0) continue;
+    if (filename !== filename.trim() || filename.startsWith(".") || Buffer.byteLength(filename, "utf8") > 255 || /[/:\\\p{Cc}]/u.test(filename))
+      throw new Error(
+        "Replacement filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces"
+      );
+    if (!extname8(filename) || extname8(filename).toLowerCase() !== extname8(file).toLowerCase())
+      throw new Error(`Replacement filename must keep the file's extension (${extname8(file)})`);
+  }
+}
+function editNote(request, deps = defaultWriterDeps()) {
+  const notCommitted = request.dryRun ? void 0 : false;
+  const refuse = (message) => new PrivateWriteError("invalid_request", message, notCommitted);
+  try {
+    assertNoteIdentifier(request.identifier);
+  } catch (error2) {
+    throw refuse(error2 instanceof Error ? error2.message : String(error2));
+  }
+  if (!request.operations.length || request.operations.length > MAX_EDIT_OPERATIONS)
+    throw refuse(`operations must hold 1 to ${MAX_EDIT_OPERATIONS} entries`);
+  const operations = editOperationsSchema.safeParse(request.operations);
+  if (!operations.success)
+    throw refuse(
+      `Invalid operations: ${operations.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
+    );
+  try {
+    assertReplacementFiles(operations.data);
+  } catch (error2) {
+    throw refuse(error2 instanceof Error ? error2.message : String(error2));
+  }
+  const fields = {
+    identifier: request.identifier,
+    operations: operations.data
+  };
+  if (request.requireNonSystemPaper !== void 0)
+    fields.requireNonSystemPaper = request.requireNonSystemPaper;
+  Object.assign(fields, writerScopeFields(request.scope));
+  if (request.dryRun) {
+    if (request.ifPlanDigest !== void 0)
+      throw refuse("ifPlanDigest belongs on the apply (dryRun: false), not on the dry run");
+    return parseWriterResult(editPlanSchema, callPrivateWriter("plan_edit", fields, deps), false);
+  }
+  if (!request.ifRevision)
+    throw refuse(
+      "Applying an edit requires ifRevision: run the identical request with dryRun: true first and pass its revisionBefore."
+    );
+  assertRevision(request.ifRevision, "a dry run's revisionBefore");
+  if (request.ifPlanDigest !== void 0) {
+    if (!planDigestToken.safeParse(request.ifPlanDigest).success)
+      throw refuse("ifPlanDigest must be a dry run's planDigest (p2: followed by 64 hex digits)");
+    fields.ifPlanDigest = request.ifPlanDigest;
+  }
+  requireLiveValidated(EDIT_LIVE_VALIDATED, "native-edit-note", deps.env);
+  return parseWriterResult(
+    editResultSchema,
+    callPrivateWriter("edit_note", { ...fields, ifRevision: request.ifRevision }, deps),
+    true
+  );
+}
+var WRITER_FEATURES = [
+  { key: "appendPlainText", probeKey: "appendPlainText", liveValidated: APPEND_LIVE_VALIDATED },
+  { key: "planEdit", probeKey: "planEdit", liveValidated: true },
+  { key: "editNote", probeKey: "editNote", liveValidated: EDIT_LIVE_VALIDATED },
+  { key: "composeNote", probeKey: "composeNote", liveValidated: COMPOSE_LIVE_VALIDATED },
+  { key: "composeObjects", probeKey: "composeObjects", liveValidated: COMPOSE_LIVE_VALIDATED },
+  {
+    key: "checklistToggle",
+    probeKey: "checklistToggle",
+    liveValidated: CHECKLIST_TOGGLE_LIVE_VALIDATED
+  },
+  { key: "highlight", probeKey: "highlight", liveValidated: HIGHLIGHT_LIVE_VALIDATED },
+  { key: "linkCard", probeKey: "linkCard", liveValidated: LINK_CARD_LIVE_VALIDATED },
+  {
+    key: "setParagraphId",
+    probeKey: "setParagraphId",
+    liveValidated: PARAGRAPH_IDS_LIVE_VALIDATED
+  },
+  {
+    key: "addSectionLink",
+    probeKey: "addSectionLink",
+    liveValidated: SECTION_LINKS_LIVE_VALIDATED
+  },
+  { key: "readTables", probeKey: "tables", liveValidated: true },
+  { key: "editTables", probeKey: "tables", liveValidated: TABLE_WRITES_LIVE_VALIDATED },
+  {
+    key: "pruneOrphanTable",
+    probeKey: "pruneOrphanTable",
+    liveValidated: TABLE_WRITES_LIVE_VALIDATED
+  },
+  { key: "readSmartFolders", probeKey: "smartFolders", liveValidated: true },
+  {
+    key: "editSmartFolders",
+    probeKey: "smartFolders",
+    liveValidated: SMART_FOLDERS_LIVE_VALIDATED
+  },
+  { key: "addPaper", probeKey: "addPaper", liveValidated: PAPER_WRITE_LIVE_VALIDATED },
+  {
+    key: "composeAttachments",
+    probeKey: "composeAttachments",
+    liveValidated: COMPOSE_LIVE_VALIDATED
+  },
+  // native-edit-note replacing an attachment with a file (replacement.file).
+  { key: "editReplaceFile", probeKey: "editReplaceFile", liveValidated: EDIT_LIVE_VALIDATED },
+  // Folder scope guards only refuse writes; there is nothing to validate live.
+  { key: "scopeGuards", probeKey: "scopeGuards", liveValidated: true },
+  { key: "purgeRepair", probeKey: "purgeRepair", liveValidated: PURGE_REPAIR_LIVE_VALIDATED },
+  { key: "readPaper", probeKey: "readPaper", liveValidated: true },
+  { key: "readPaperShapes", probeKey: "readPaperShapes", liveValidated: true }
+];
+function privateWriterCapabilities(deps = defaultWriterDeps()) {
+  const enabled = privateHelperEnabled(deps.env);
+  const writesEnabled = privateWritesEnabled(deps.env);
+  const installation = inspectWriterInstallation(deps);
+  const base = { enabled, writesEnabled, installation, probe: null };
+  const every = (status) => Object.fromEntries(WRITER_FEATURES.map((row) => [row.key, status(row)]));
+  const off = (reason, detail) => ({
+    ...base,
+    features: every(() => ({ available: false, reason, detail }))
+  });
+  if (installation.reason === "unsupported_platform") return off("unsupported_platform", null);
+  if (!enabled) return off("disabled", `Set ${ENABLE_ENV}=1 and ${WRITES_ENV}=1 to opt in.`);
+  if (!writesEnabled) return off("writes_disabled", `Set ${WRITES_ENV}=1 to opt in to writes.`);
+  if (!installation.ready)
+    return off(installation.reason || "helper_not_installed", installation.detail);
+  let probe;
+  try {
+    probe = probePrivateWriter(deps);
+  } catch (error2) {
+    return off("helper_unreachable", error2 instanceof Error ? error2.message : String(error2));
+  }
+  const probed = probe.features;
+  const features = every((row) => {
+    const feature = probed[row.probeKey];
+    if (!feature)
+      return {
+        available: false,
+        reason: "private_api_unavailable",
+        detail: `The installed writer does not report ${row.probeKey}`
+      };
+    if (!feature.available) {
+      const reason = feature.reason === "store_unavailable" || feature.reason === "disabled" ? feature.reason : "private_api_unavailable";
+      return {
+        available: false,
+        reason,
+        detail: feature.missing.length ? `missing: ${feature.missing.join(", ")}` : feature.reason
+      };
+    }
+    if (!row.liveValidated && deps.env[ALLOW_UNVERIFIED_ENV] !== "1")
+      return {
+        available: false,
+        reason: "not_live_validated",
+        detail: `Not yet live-validated; ${ALLOW_UNVERIFIED_ENV}=1 enables it for testing.`
+      };
+    return { available: true, reason: null, detail: null };
+  });
+  return { ...base, probe, features };
+}
+
+// src/services/privateWriterBuild.ts
+function writerCompileArguments(sourcePath, outputPath, sourceSha) {
+  const args = compileArguments(sourcePath, outputPath, sourceSha);
+  const appKit = args.indexOf("AppKit");
+  return [...args.slice(0, appKit + 1), "-framework", "PencilKit", ...args.slice(appKit + 1)];
+}
+function defaultWriterBuildDeps() {
+  return { ...defaultBuildDeps(), sourcePath: defaultWriterDeps().sourcePath };
+}
+function buildPrivateWriter(checkOnly, deps = defaultWriterBuildDeps()) {
+  const steps = [];
+  const done = (ok2) => ({
+    ok: ok2,
+    checkOnly,
+    steps,
+    installation: inspectWriterInstallation(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectWriterInstallation(deps);
+    steps.push({
+      step: "inspect installed writer",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail || void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex2(deps.readFile(deps.sourcePath));
+  steps.push({
+    step: "locate source",
+    ok: true,
+    detail: `${deps.sourcePath} (sha256 ${sourceSha})`
+  });
+  const clang = deps.spawn("/usr/bin/xcrun", ["--find", "clang"], { encoding: "utf8" });
+  if (clang.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No clang found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const clangVersion = deps.spawn("/usr/bin/xcrun", ["clang", "--version"], { encoding: "utf8" });
+  const compiler = String(clangVersion.stdout || "").split("\n")[0] || "clang";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = helperInstallDir(deps.env);
+  mkdirSync11(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync10(join33(installDir, ".staging-writer-"));
+  try {
+    const stagedBinary = join33(staging, WRITER_BINARY_NAME);
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      writerCompileArguments(deps.sourcePath, stagedBinary, sourceSha),
+      { encoding: "utf8", timeout: 18e4 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "clang failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", "apple-notes-mcp.private-writer", stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = writerHelloSchema.parse(
+        callPrivateWriter("hello", {}, deps, { allowDisabled: true, binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PRIVATE_WRITER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `writer reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    const known = Object.keys(WRITER_ACTIONS);
+    const unknown2 = hello.actions.filter((action) => !(action in WRITER_ACTIONS));
+    const missing = known.filter((action) => !hello.actions.includes(action));
+    if (unknown2.length || missing.length) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `writer actions differ from the client's table` + (unknown2.length ? `; unknown: ${unknown2.join(", ")}` : "") + (missing.length ? `; missing: ${missing.join(", ")}` : "") + "; refusing to install"
+      });
+      return done(false);
+    }
+    const writes = known.filter((action) => WRITER_ACTIONS[action] === "write");
+    steps.push({
+      step: "handshake",
+      ok: true,
+      detail: `protocol ${hello.protocolVersion}, write actions: ${writes.join(", ")}`
+    });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex2(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync4(stagedBinary, 448);
+    renameSync5(stagedBinary, join33(installDir, WRITER_BINARY_NAME));
+    writeFileSync9(
+      join33(installDir, WRITER_MANIFEST_NAME),
+      JSON.stringify(manifest, null, 2) + "\n",
+      {
+        mode: 384
+      }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    if (existsSync18(staging)) rmSync10(staging, { recursive: true, force: true });
+  }
+  const installation = inspectWriterInstallation(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail || void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatWriterBuild(report) {
+  const lines = ["Apple Notes MCP private writer", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) {
+    lines.push(`Installed at ${report.installation.binaryPath}.`);
+    lines.push(
+      `The writer stays off until you set both APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and ${WRITES_ENV}=1 for the MCP server. Writes that have not passed live validation also need APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1. It uses unsupported private API; try it on disposable notes first.`
+    );
+  } else if (report.checkOnly) {
+    lines.push(`Run \`${WRITER_SETUP_COMMAND}\` to build it.`);
+  } else {
+    lines.push("The writer was not installed. Fix the failed step above and run setup again.");
+  }
+  return lines.join("\n");
+}
+
+// src/services/privateSyncNudge.ts
+import { execFileSync as execFileSync21 } from "node:child_process";
+var UUID3 = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+var NOTE_URI = /^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i;
+var FOLDER_URI = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+var MAX_SYNC_TARGETS = 50;
+var MAX_NUDGE_WAIT_SECONDS = 180;
+var objectSchema = external_exports.object({
+  identifier: external_exports.string(),
+  found: external_exports.boolean(),
+  reason: external_exports.string().optional(),
+  kind: external_exports.enum(["note", "folder"]).optional(),
+  objectURI: external_exports.string().optional(),
+  markedForDeletion: external_exports.boolean().optional(),
+  inICloudAccount: external_exports.boolean().optional(),
+  cloudStateAvailable: external_exports.boolean().optional(),
+  currentLocalVersion: external_exports.number().int().optional(),
+  latestVersionSyncedToCloud: external_exports.number().int().optional(),
+  uploadPending: external_exports.boolean().optional(),
+  folderIdentifier: external_exports.string().nullable().optional(),
+  folderObjectURI: external_exports.string().nullable().optional(),
+  passwordProtected: external_exports.boolean().optional(),
+  deletedOrInTrash: external_exports.boolean().optional(),
+  sharedViaICloud: external_exports.boolean().optional(),
+  revision: external_exports.string().optional()
+}).passthrough();
+var syncStateSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  objects: external_exports.array(objectSchema),
+  pendingUploadCount: external_exports.number().int().nullable(),
+  syncHostRunning: external_exports.boolean()
+}).passthrough();
+function invalid2(message) {
+  return new PrivateWriteError("invalid_request", message, false);
+}
+function syncTargets(identifiers) {
+  const unique = [...new Set(identifiers)];
+  if (!unique.length || unique.length > MAX_SYNC_TARGETS)
+    throw invalid2(`identifiers must list 1-${MAX_SYNC_TARGETS} note or folder UUIDs`);
+  for (const id2 of unique) if (!UUID3.test(id2)) throw invalid2("identifiers must be Notes UUIDs");
+  return unique;
+}
+function readSyncState(identifiers, deps = defaultWriterDeps()) {
+  return parseWriterResult(
+    syncStateSchema,
+    callPrivateWriter("read_sync_state", { identifiers: syncTargets(identifiers) }, deps),
+    false
+  );
+}
+function uploadRecorded(state) {
+  return state.found && state.currentLocalVersion !== void 0 && state.latestVersionSyncedToCloud !== void 0 && state.latestVersionSyncedToCloud >= state.currentLocalVersion;
+}
+function nudgeRefusal(state) {
+  if (!state.found) return state.reason ?? "not_found";
+  if (!state.uploadPending) return "nothing_pending";
+  if (state.kind !== "note") return "folders_need_relaunch";
+  if (!state.inICloudAccount) return "not_icloud";
+  if (state.markedForDeletion || state.deletedOrInTrash) return "deleted";
+  if (state.passwordProtected) return "locked";
+  if (state.sharedViaICloud) return "shared";
+  if (!state.objectURI || !NOTE_URI.test(state.objectURI)) return "no_object_id";
+  if (!state.folderObjectURI || !FOLDER_URI.test(state.folderObjectURI)) return "no_folder";
+  return null;
+}
+function moveInPlaceScript(noteURI, folderURI) {
+  if (!NOTE_URI.test(noteURI) || !FOLDER_URI.test(folderURI))
+    throw invalid2("Refusing to build a move script from an unexpected object id");
+  return [
+    'tell application "Notes"',
+    `  set theNote to note id "${noteURI}"`,
+    "  set theFolder to container of theNote",
+    `  if (id of theFolder) is not "${folderURI}" then error "container changed" number 9901`,
+    "  move theNote to theFolder",
+    '  return "moved"',
+    "end tell"
+  ].join("\n");
+}
+function notesRunningForThisUser(run = execFileSync21, uid = process.getuid?.() ?? -1) {
+  if (uid < 0)
+    throw new Error("Cannot tell whose Notes.app is running: no user id on this platform");
+  try {
+    run("/usr/bin/pgrep", ["-x", "-u", String(uid), "Notes"], {
+      timeout: 5e3,
+      stdio: "ignore"
+    });
+    return true;
+  } catch (error2) {
+    if (error2.status === 1) return false;
+    const reason = error2 instanceof Error ? error2.message : String(error2);
+    throw new Error(`Could not check whether Notes.app is running (pgrep: ${reason})`, {
+      cause: error2
+    });
+  }
+}
+function defaultNudgeDeps(overrides = {}) {
+  return {
+    helper: defaultWriterDeps(),
+    runAppleScript: (script) => executeAppleScript(script, { maxRetries: 1, timeoutMs: 3e4 }),
+    launchNotes: () => {
+      execFileSync21("/usr/bin/open", ["-g", "-a", "Notes"], { timeout: 15e3 });
+    },
+    notesRunning: () => notesRunningForThisUser(),
+    sleep: (ms) => new Promise((resolve10) => setTimeout(resolve10, ms)),
+    now: () => Date.now(),
+    ...overrides
+  };
+}
+function versions(state) {
+  if (!state?.found) return null;
+  return {
+    currentLocalVersion: state.currentLocalVersion,
+    latestVersionSyncedToCloud: state.latestVersionSyncedToCloud
+  };
+}
+async function nudgeInPlace(request, deps = defaultNudgeDeps()) {
+  const identifiers = syncTargets(request.identifiers);
+  const act = request.nudge !== false;
+  const waitSeconds = request.waitSeconds ?? (act ? 30 : 0);
+  if (!Number.isFinite(waitSeconds) || waitSeconds < 0 || waitSeconds > MAX_NUDGE_WAIT_SECONDS)
+    throw invalid2(`waitSeconds must be 0-${MAX_NUDGE_WAIT_SECONDS}`);
+  const before = readSyncState(identifiers, deps.helper);
+  const byId = new Map(before.objects.map((o) => [o.identifier, o]));
+  const results = new Map(
+    identifiers.map((id2) => {
+      const state = byId.get(id2);
+      return [
+        id2,
+        {
+          identifier: id2,
+          kind: state?.kind ?? null,
+          before: versions(state),
+          after: null,
+          uploadPendingBefore: Boolean(state?.uploadPending),
+          uploadRecorded: state ? uploadRecorded(state) : false,
+          action: "none",
+          reason: state?.found ? null : state?.reason ?? "not_found"
+        }
+      ];
+    })
+  );
+  const warnings = [];
+  if (act && !before.syncHostRunning) {
+    warnings.push(
+      "Notes.app is not running, so there is nothing to nudge. Its next launch sweeps every pending change."
+    );
+  } else if (act) {
+    for (const id2 of identifiers) {
+      const state = byId.get(id2);
+      const result = results.get(id2);
+      if (!state) continue;
+      const refusal = nudgeRefusal(state);
+      if (refusal) {
+        if (refusal !== "nothing_pending" && state.found) {
+          result.action = "skipped";
+          result.reason = refusal;
+        }
+        continue;
+      }
+      const run = deps.runAppleScript(moveInPlaceScript(state.objectURI, state.folderObjectURI));
+      if (run.success && run.output.trim() === "moved") {
+        result.action = "moved_in_place";
+      } else {
+        result.action = "failed";
+        result.reason = /9901|container changed/.test(run.error ?? "") ? "container_changed" : `applescript: ${run.error ?? run.output}`.slice(0, 300);
+      }
+    }
+  }
+  const pending = () => [...results.values()].filter((r) => r.reason === null && !r.uploadRecorded);
+  const start = deps.now();
+  const end = start + waitSeconds * 1e3;
+  let after = before;
+  for (let first2 = true; ; first2 = false) {
+    if (!first2 || act) after = readSyncState(identifiers, deps.helper);
+    const now = new Map(after.objects.map((o) => [o.identifier, o]));
+    for (const result of results.values()) {
+      const state = now.get(result.identifier);
+      result.after = versions(state);
+      result.uploadRecorded = state ? uploadRecorded(state) : false;
+      if (result.action === "moved_in_place") {
+        const was = byId.get(result.identifier);
+        result.contentUnchanged = Boolean(was?.revision) && was?.revision === state?.revision && was?.folderIdentifier === state?.folderIdentifier;
+      }
+    }
+    if (!pending().length || deps.now() >= end) break;
+    await deps.sleep(2e3);
+  }
+  const waitedSeconds = Math.round((deps.now() - start) / 1e3);
+  const targets = [...results.values()];
+  const stillPending = targets.filter((r) => r.reason === null && !r.uploadRecorded);
+  for (const r of targets)
+    if (r.action === "moved_in_place" && r.contentUnchanged === false)
+      warnings.push(
+        `${r.identifier}: the note's revision changed while it was nudged; something else edited it at the same time. Read it before relying on its content.`
+      );
+  if (stillPending.length && act)
+    warnings.push(
+      `${stillPending.length} target(s) still show a pending upload after ${waitedSeconds} s. Notes.app uploads on its own schedule; check again later.`
+    );
+  return {
+    syncHostRunning: after.syncHostRunning,
+    waitedSeconds,
+    pendingUploadCountBefore: before.pendingUploadCount,
+    pendingUploadCountAfter: after.pendingUploadCount,
+    allUploadsRecorded: stillPending.length === 0,
+    pushScheduled: false,
+    targets,
+    warnings,
+    before,
+    after
+  };
+}
+var QUIT_SCRIPT = 'tell application "Notes" to quit';
+var QUIT_TIMEOUT_MS = 2e4;
+var RELAUNCH_ADOPTION_WAIT_SECONDS = 20;
+async function waitForQuit(deps, timeoutMs) {
+  const end = deps.now() + timeoutMs;
+  for (; ; ) {
+    let running;
+    try {
+      running = deps.notesRunning();
+    } catch (error2) {
+      throw relaunchFailed(
+        `Notes.app was asked to quit, but ${errorText2(error2)}. Nothing was relaunched; check Notes.app.`
+      );
+    }
+    if (!running) return true;
+    if (deps.now() >= end) return false;
+    await deps.sleep(500);
+  }
+}
+function errorText2(error2) {
+  const text2 = error2 instanceof Error ? error2.message : String(error2);
+  return text2.charAt(0).toLowerCase() + text2.slice(1);
+}
+function relaunchFailed(message, details) {
+  return new PrivateWriteError("relaunch_failed", message, false, details);
+}
+var MAX_ADOPTION_WAIT_SECONDS = 60;
+function folderAdoptionScript(objectURIs) {
+  for (const uri of objectURIs)
+    if (!FOLDER_URI.test(uri))
+      throw invalid2("Refusing to build an adoption script from an unexpected folder id");
+  return [
+    'tell application "Notes"',
+    '  set out to ""',
+    `  repeat with fid in {${objectURIs.map((uri) => `"${uri}"`).join(", ")}}`,
+    "    set fidText to contents of fid",
+    "    try",
+    "      if exists folder id fidText then",
+    '        set out to out & fidText & tab & "1" & tab & (name of folder id fidText) & linefeed',
+    "      else",
+    '        set out to out & fidText & tab & "0" & tab & linefeed',
+    "      end if",
+    "    on error",
+    '      set out to out & fidText & tab & "E" & tab & linefeed',
+    "    end try",
+    "  end repeat",
+    "  return out",
+    "end tell"
+  ].join("\n");
+}
+function parseFolderAdoption(output, objectURIs) {
+  const known = new Set(objectURIs);
+  const found = /* @__PURE__ */ new Map();
+  let last = null;
+  for (const line of output.split(/\r?\n/)) {
+    const [uri, flag3, ...rest] = line.split("	");
+    if (known.has(uri) && (flag3 === "1" || flag3 === "0" || flag3 === "E")) {
+      const visible2 = flag3 === "1" ? true : flag3 === "0" ? false : null;
+      found.set(uri, { visible: visible2, name: visible2 ? rest.join("	") : null });
+      last = visible2 ? uri : null;
+    } else if (last && line.length) {
+      const entry = found.get(last);
+      entry.name = `${entry.name}
+${line}`;
+    }
+  }
+  return found;
+}
+function adoptionOf(target, seen, failure2) {
+  const objectURI = target.objectURI && FOLDER_URI.test(target.objectURI) ? target.objectURI : null;
+  const expected = target.deleted ? "absent" : "visible";
+  const base = { identifier: target.identifier, objectURI, expected };
+  if (!objectURI)
+    return {
+      ...base,
+      visibleInNotesApp: null,
+      nameInNotesApp: null,
+      adoptedByNotesApp: null,
+      reason: "no_object_id"
+    };
+  if (!seen || seen.visible === null)
+    return {
+      ...base,
+      visibleInNotesApp: null,
+      nameInNotesApp: null,
+      adoptedByNotesApp: null,
+      reason: failure2 ?? "applescript: no answer for this folder"
+    };
+  let adopted;
+  let reason = null;
+  if (expected === "absent") {
+    adopted = !seen.visible;
+    if (!adopted) reason = "still_visible";
+  } else if (!seen.visible) {
+    adopted = false;
+    reason = "not_visible";
+  } else if (typeof target.title === "string" && seen.name !== target.title) {
+    adopted = false;
+    reason = "name_mismatch";
+  } else {
+    adopted = true;
+  }
+  return {
+    ...base,
+    visibleInNotesApp: seen.visible,
+    nameInNotesApp: seen.name,
+    adoptedByNotesApp: adopted,
+    reason
+  };
+}
+async function checkFolderAdoption(targets, deps, waitSeconds = 10) {
+  if (!Number.isFinite(waitSeconds) || waitSeconds < 0 || waitSeconds > MAX_ADOPTION_WAIT_SECONDS)
+    throw invalid2(`adoption wait must be 0-${MAX_ADOPTION_WAIT_SECONDS} seconds`);
+  const notChecked = (reason) => ({
+    checked: false,
+    reason,
+    waitedSeconds: 0,
+    allAdopted: false,
+    folders: targets.map((t) => adoptionOf(t, void 0, reason))
+  });
+  if (!targets.length)
+    return {
+      checked: false,
+      reason: "no_folders",
+      waitedSeconds: 0,
+      allAdopted: true,
+      folders: []
+    };
+  let running;
+  try {
+    running = deps.notesRunning();
+  } catch (error2) {
+    return notChecked(errorText2(error2));
+  }
+  if (!running) return notChecked("notes_not_running");
+  const uris = targets.map((t) => t.objectURI).filter((uri) => typeof uri === "string" && FOLDER_URI.test(uri));
+  const start = deps.now();
+  const end = start + waitSeconds * 1e3;
+  let folders = [];
+  for (; ; ) {
+    let seen = /* @__PURE__ */ new Map();
+    let failure2 = null;
+    if (uris.length) {
+      const run = deps.runAppleScript(folderAdoptionScript([...new Set(uris)]));
+      if (run.success) seen = parseFolderAdoption(run.output, uris);
+      else failure2 = `applescript: ${run.error ?? run.output}`.slice(0, 300);
+    }
+    folders = targets.map(
+      (t) => adoptionOf(t, t.objectURI ? seen.get(t.objectURI) : void 0, failure2)
+    );
+    const waiting = folders.some(
+      (f) => f.adoptedByNotesApp === false || f.adoptedByNotesApp === null && f.objectURI
+    );
+    if (!waiting || deps.now() >= end) break;
+    await deps.sleep(1e3);
+  }
+  return {
+    checked: true,
+    reason: null,
+    waitedSeconds: Math.round((deps.now() - start) / 1e3),
+    allAdopted: folders.every((f) => f.adoptedByNotesApp === true),
+    folders
+  };
+}
+function pushReport(method, report, relaunched, runningBefore) {
+  const { before: _before, after: _after, syncHostRunning, ...rest } = report;
+  void _before;
+  void _after;
+  return {
+    method,
+    syncHostRunningBefore: runningBefore,
+    syncHostRunningAfter: syncHostRunning,
+    relaunched,
+    ...rest
+  };
+}
+async function syncPush(request, deps = defaultNudgeDeps()) {
+  const method = request.method ?? "nudge";
+  const identifiers = syncTargets(request.identifiers);
+  const waitSeconds = request.waitSeconds ?? (method === "status" ? 0 : 30);
+  if (!Number.isFinite(waitSeconds) || waitSeconds < 0 || waitSeconds > MAX_NUDGE_WAIT_SECONDS)
+    throw invalid2(`waitSeconds must be 0-${MAX_NUDGE_WAIT_SECONDS}`);
+  if (method !== "relaunch") {
+    const report2 = await nudgeInPlace(
+      { identifiers, waitSeconds, nudge: method === "nudge" },
+      deps
+    );
+    if (method === "nudge" && !report2.before.syncHostRunning)
+      report2.warnings.push("To start Notes.app now, use method relaunch with confirm: true.");
+    return pushReport(method, report2, false, report2.before.syncHostRunning);
+  }
+  if (request.confirm !== true)
+    throw new PrivateWriteError(
+      "confirmation_required",
+      "method relaunch quits and reopens Notes.app, which interrupts anyone using it. Ask the user, then pass confirm: true.",
+      false
+    );
+  const first2 = readSyncState(identifiers, deps.helper);
+  if (first2.syncHostRunning) {
+    const quit = deps.runAppleScript(QUIT_SCRIPT);
+    if (!quit.success)
+      throw relaunchFailed(
+        `Notes.app did not accept quit: ${quit.error ?? "unknown error"}. Nothing was relaunched.`
+      );
+    if (!await waitForQuit(deps, QUIT_TIMEOUT_MS))
+      throw relaunchFailed(
+        `Notes.app is still running ${QUIT_TIMEOUT_MS / 1e3} s after quit (it may be showing a dialog). Nothing was relaunched; check Notes.app.`
+      );
+  }
+  try {
+    deps.launchNotes();
+  } catch (error2) {
+    throw relaunchFailed(
+      `Notes.app ${first2.syncHostRunning ? "was quit but " : ""}could not be opened: ${error2 instanceof Error ? error2.message : String(error2)}. Open Notes.app manually.`
+    );
+  }
+  const restarted = first2.syncHostRunning ? "quit and reopened" : "opened";
+  let report;
+  try {
+    report = await nudgeInPlace({ identifiers, waitSeconds, nudge: false }, deps);
+  } catch (error2) {
+    throw relaunchFailed(
+      `Notes.app was ${restarted}, but reading the sync state afterwards failed: ${errorText2(error2)}. Check again with method status; do not relaunch again.`,
+      { relaunched: true, syncHostRunningBefore: first2.syncHostRunning }
+    );
+  }
+  const firstById = new Map(first2.objects.map((o) => [o.identifier, o]));
+  for (const target of report.targets) {
+    const was = firstById.get(target.identifier);
+    target.before = versions(was);
+    target.uploadPendingBefore = Boolean(was?.uploadPending);
+    if (target.reason === null && target.uploadPendingBefore) target.action = "relaunch";
+  }
+  report.pendingUploadCountBefore = first2.pendingUploadCount;
+  const stillPending = report.targets.filter((r) => r.reason === null && !r.uploadRecorded);
+  if (stillPending.length)
+    report.warnings.push(
+      `${stillPending.length} target(s) still show a pending upload after ${report.waitedSeconds} s. Notes.app uploads on its own schedule; check again later with method status.`
+    );
+  const afterById = new Map(report.after.objects.map((o) => [o.identifier, o]));
+  const folderTargets = report.targets.filter((t) => t.kind === "folder");
+  if (folderTargets.length) {
+    const adoption = await checkFolderAdoption(
+      folderTargets.map((t) => {
+        const state = afterById.get(t.identifier);
+        return {
+          identifier: t.identifier,
+          objectURI: state?.objectURI ?? null,
+          deleted: Boolean(state?.markedForDeletion)
+        };
+      }),
+      deps,
+      RELAUNCH_ADOPTION_WAIT_SECONDS
+    );
+    const byId = new Map(adoption.folders.map((f) => [f.identifier, f]));
+    for (const target of folderTargets) {
+      const folder = byId.get(target.identifier);
+      target.adoption = folder;
+      target.adoptedByNotesApp = folder?.adoptedByNotesApp ?? null;
+    }
+    const notAdopted = folderTargets.filter((t) => t.adoptedByNotesApp !== true);
+    if (notAdopted.length)
+      report.warnings.push(
+        `${notAdopted.length} folder(s) are not confirmed in Notes.app after the relaunch (${notAdopted.map((t) => `${t.identifier}: ${t.adoption?.reason ?? "unknown"}`).join("; ")}).`
+      );
+  }
+  return pushReport(method, report, true, first2.syncHostRunning);
+}
+
+// src/tools/privateWriterTools.ts
+var coreDataId3 = external_exports.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i);
+var notesUuid2 = external_exports.string().regex(UUID_PATTERN);
+var revisionToken = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+function writerEnvelopeCode(helperCode, message) {
+  switch (helperCode) {
+    case "revision_conflict":
+    case "scope_conflict":
+    // the note is no longer where the guard requires
+    case "paragraph_changed":
+    // the selected paragraph moved or changed since it was listed
+    case "attachment_conflict":
+    case "plan_mismatch":
+      return "revision_conflict";
+    case "unsupported_attachment":
+      return "unsupported";
+    case "unsupported_folder":
+    case "query_not_representable":
+      return "unsupported";
+    case "invalid_query":
+      return "validation_error";
+    case "tag_not_found":
+    case "scope_folder_not_found":
+      return "not_found";
+    case "folder_exists":
+      return "validation_error";
+    case "verification_failed":
+      return "verification_failed";
+    case "writes_disabled":
+    case "not_live_validated":
+      return "unsupported";
+    case "ambiguous":
+    case "ambiguous_target":
+    case "ambiguous_paragraph":
+      return "ambiguous";
+    case "confirmation_required":
+    case "match_count_mismatch":
+    case "nothing_to_highlight":
+      return "validation_error";
+    default:
+      if (helperCode.startsWith("svg_")) return "validation_error";
+      return envelopeCode(helperCode, message);
+  }
+}
+function writerErrorResult(error2) {
+  if (!(error2 instanceof PrivateHelperError)) {
+    const message2 = error2 instanceof Error ? error2.message : String(error2);
+    return errorResult(`native writer: ${message2}`, error2);
+  }
+  const committed = error2 instanceof PrivateWriteError ? error2.committed : void 0;
+  const message = `native writer (${error2.code}): ${error2.message}`;
+  const envelope = {
+    ...error2.details,
+    // The read-only helper's mapping calls a timeout operation_failed, since
+    // its actions only read. A writer timeout during a write can leave a save
+    // behind, so it stays timeout_indeterminate.
+    code: error2.code === "timeout" && committed === "unknown" ? "timeout_indeterminate" : writerEnvelopeCode(error2.code, error2.message),
+    helperCode: error2.code
+  };
+  if (committed === "unknown") {
+    envelope.indeterminate = true;
+  } else if (committed !== void 0) {
+    envelope.committed = committed;
+    envelope.indeterminate = committed === true;
+  } else {
+    envelope.committed = false;
+  }
+  return errorResult(message, new CodedError(message, envelope));
+}
+function registerWriterTool(server2, depsFactory, name, description, inputSchema, annotations, handler) {
+  server2.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+      annotations,
+      outputSchema: external_exports.object({ ok: external_exports.boolean().optional() }).passthrough()
+    },
+    (async (args) => {
+      try {
+        const result = { ok: true, ...await handler(args, depsFactory()) };
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result
+        };
+      } catch (error2) {
+        return writerErrorResult(error2);
+      }
+    })
+  );
+}
+function defaultWriterToolDeps() {
+  const writer = defaultWriterDeps();
+  return { writer, nudge: defaultNudgeDeps({ helper: writer }) };
+}
+function registerPrivateWriterTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-writer-status",
+    "Use when: checking whether the opt-in private WRITER is enabled, built, current, and working before any native write tool (native-append-plain-text and the other native-* write tools).\nReturns: enabled and writesEnabled flags, the writer's installation state (path, manifest, stale/modified checks), its live probe, and per-feature availability with a machine reason (disabled, writes_disabled, helper_not_installed, helper_stale, not_live_validated, ...).\nDo not use when: you only need reads (native-helper-status covers the read-only helper).\nSafety: read-only. The probe opens the Notes store read-only, and only when both switches are on and the writer is installed.",
+    {},
+    { readOnlyHint: true, openWorldHint: false },
+    (_args, deps) => {
+      const capabilities = privateWriterCapabilities(deps.writer);
+      return {
+        ...capabilities,
+        ...capabilities.installation.ready ? {} : { setupCommand: WRITER_SETUP_COMMAND }
+      };
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-append-plain-text",
+    "Use when: appending plain text paragraphs to one exact note through Notes' own data model, with a compare-and-swap guard. This is the private-writer path, distinct from append-native (Shortcuts) and append-to-note (AppleScript HTML rewrite).\nReturns: committed/verified flags, revisionBefore/revisionAfter, the new modification date, and sync state: pushScheduled (always false; the writer cannot upload), pushState, cloudSync versions, and with nudge: true a `sync` report of the move-in-place nudge (uploadRecorded per target).\nDo not use when: the note is locked, shared, trashed, or still downloading, or you need formatting (text is appended as plain body paragraphs).\nSafety: writes to the Notes database through unsupported private API. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and a fresh `revision` from native-note-state as ifRevision; refuses on any change since. Verifies by re-reading in a new Core Data stack. A timeout is indeterminate (indeterminate: true): read native-note-state before any retry. Not yet live-validated, so it also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      text: external_exports.string().min(1).max(5e4).describe(
+        "Plain text to append. \\n starts a new paragraph; no \\r or control characters."
+      ),
+      ifRevision: revisionToken.describe(
+        "The `revision` returned by native-note-state for this note"
+      ),
+      ...writerScopeGuardInput(),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified write, ask Notes.app to upload the note by moving it into its own folder (default false)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = appendPlainText(
+        {
+          identifier,
+          text: args.text,
+          ifRevision: args.ifRevision,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge) return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-sync-push",
+    `Use when: a note or folder changed through the private writer earlier (native-append-plain-text and the other native write tools, without nudge or with a nudge that timed out) still shows cloudSync.uploadPending, and you want Notes.app to upload it, or just to check whether it has.
+Returns: per target, Notes' own version counters before and after, uploadRecorded (true only when Notes recorded the current version as synced to iCloud), the action taken, and a skip reason; the library-wide pendingUploadCount before and after; warnings. pushScheduled is always false: only Notes.app uploads.
+Do not use when: the change was made through AppleScript or Shortcuts tools (Notes.app uploads those itself), or right after a native write that already ran with nudge: true and reported uploadRecorded.
+Safety: never writes to the Notes database. method "status" is read-only. "nudge" (default) makes Notes.app save each pending note by moving it into the folder it is already in: no text, title, or modification date changes, and the writer's revision token is compared before and after (contentUnchanged). It skips locked, shared, trashed, and non-iCloud notes, and folders. "relaunch" quits and reopens Notes.app so its launch sweep uploads everything pending, folders included; it interrupts anyone using Notes and requires confirm: true after asking the user. After a relaunch, each folder target reports adoptedByNotesApp: whether the reopened Notes.app shows it (or, for a deleted folder, no longer shows it), read through AppleScript. If reading the state after the relaunch fails, the error says Notes.app was already restarted; check with method status rather than relaunching again. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer (setup --native-writer).`,
+    {
+      identifiers: external_exports.array(notesUuid2).min(1).max(MAX_SYNC_TARGETS).describe("Notes UUIDs of the notes or folders to check (from native-note-state etc.)"),
+      method: external_exports.enum(["status", "nudge", "relaunch"]).optional().describe(
+        "status = read only; nudge (default) = in-place Notes.app save; relaunch = quit and reopen Notes.app"
+      ),
+      confirm: external_exports.boolean().optional().describe("Must be true for relaunch, after the user agreed to Notes.app being quit"),
+      waitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("Seconds to watch the counters afterwards (default 30; 0 for status)")
+    },
+    // destructiveHint: method relaunch quits Notes.app, interrupting whoever uses
+    // it. Annotations are per tool, so the most disruptive mode sets it.
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    async (args, deps) => ({ ...await syncPush(args, deps.nudge) })
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-edit-note",
+    "Use when: changing selected text inside one existing note in place while everything outside the edited ranges (attachments, tables, checklist state, paragraph styles, inline formatting) stays untouched: replace literal text (with expectedCount and occurrence) with plain text or formatted runs (bold, italic, underline, strikethrough, link, highlight, color), insert paragraphs (checklist rows checked or not) before or after a paragraph matched by its exact text, by style and position (for example the 2nd subheading), or by the attachment it holds, add inline runs such as a link at the end of one exact paragraph (append_to_paragraph), replace a note's checklist with new items (replace_checklist), delete a paragraph or list row, retitle, replace, remove, or add text beside one named attachment, or swap it for a new image or PDF file (selector kind 'attachment' with identifier, id, or ordinal from get-note-structure or list-attachments), or trim redundant empty paragraphs (runs of blank lines, trailing blank lines, or blank lines around one paragraph). Always run twice: dryRun: true to get the plan, revisionBefore, and planDigest, then the IDENTICAL request with dryRun: false, ifRevision set to that revisionBefore, and ifPlanDigest set to that planDigest.\nReturns: per-operation matched counts and target ranges (a trim lists every empty paragraph it would remove by paragraphIndex, style, and blankUTF16; replace_checklist lists removedItems with their text and checked state), lengthBefore/lengthAfter, unchangedUTF16, wouldChange, titleChanged, attachmentGlyphs, attachmentSpans, revisionBefore, and planDigest. removedAttachments (identifiers the plan takes out of the body) and replacementFiles (name, type, size, SHA-256 of each file that replaces an attachment). An apply also returns committed/verified, revisionAfter, `preservation` (what the read-back proved: formatting outside the edits, the attachment glyph sequence, every untargeted attachment row unchanged, each replacement file's bytes, and the state of each removed attachment's row), sync state (pushScheduled is always false; pushState, cloudSync), and with nudge: true a `sync` report of the move-in-place nudge.\nDo not use when: replacing a whole note (update-note), appending (native-append-plain-text, append-native), or the note is locked, shared, trashed, or still downloading. Matching is literal and case-sensitive, never crosses a line break, and never splits a character. Only an attachment selector touches an attachment, and only the one it names (all of its glyphs); inline objects (hashtags, mentions, note links) are never selectable.\nSafety: a dry run is read-only and never writes a file. Applying writes through unsupported private API and requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and, until live-validated, APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1. Refuses with a code and commits nothing on: revision_conflict (note changed since the dry run, or plan_mismatch: the request or a replacement file differs from the dry run's planDigest), match_count_mismatch, mixed_formatting (plain text over mixed formatting; pass replacement.runs), conflicting_operations, title_invariant, unsupported_selection, unsupported_attachment, unexpected_side_effect. A failed apply removes any attachment it created. Each apply is verified by re-reading in a new Core Data stack; verification_failed means committed: true and indeterminate. A timeout is indeterminate: read native-note-state before any retry.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      dryRun: external_exports.boolean().describe("true: plan only and return revisionBefore. false: apply; requires ifRevision"),
+      ifRevision: revisionToken.optional().describe("The revisionBefore of an identical dry run (required when dryRun is false)"),
+      ifPlanDigest: planDigestToken.optional().describe(
+        "The planDigest of the identical dry run (recommended on apply; refuses with plan_mismatch if the request or a replacement file changed)"
+      ),
+      requireNonSystemPaper: external_exports.boolean().optional().describe("Refuse Quick Notes; repeat it in both the dry run and the apply"),
+      ...writerScopeGuardInput(),
+      operations: editOperationsSchema.describe(
+        "Applied together against one snapshot. ops: replace {selector:{text, scope?, match?, occurrence?}|{kind:'attachment', identifier|id|ordinal, position?:'self'|'before'|'after'}, replacement:{text}|{runs}|{file, filename?}}, delete_paragraph {selector:{text, scope?, occurrence?}|{kind:'blank', style, occurrence?}|{kind:'attachment', identifier|id|ordinal}}, insert_after/insert_before {anchor:{text, scope?, occurrence?}|{kind:'style', style, occurrence?}|{kind:'attachment', identifier|id|ordinal}, blocks:[{type, text|runs, checked?}]}, append_to_paragraph {anchor (as for inserts), runs}, replace_checklist {select?:'block'|'all', containing?, occurrence?, items:[{text|runs, checked, indent?}], expectedCount?}, set_title {replacement:{text}|{runs}}, trim_blank_lines {mode:'runs'|'end'|'around', keep?, anchor? (around only: {text, scope?, occurrence?}|{kind:'style', style, occurrence?}, must name one paragraph), side?:'before'|'after'|'both', expectedCount?}. A run is {text, bold?, italic?, underline?, strikethrough?, link? (http, https, mailto, tel, notes, applenotes), highlight? (purple, pink, orange, mint, blue), color? (#RRGGBB)}; its formatting replaces the replaced text's inline formatting. An attachment replace with position 'self' and text '' removes that attachment from the body, and with {file, filename?} (an absolute path to an image or PDF of at most 64 MiB in home, temp, or /Volumes) puts a new attachment in its place in the same save; 'before'/'after' insert the text inline beside it. delete_paragraph with an attachment selector removes the attachment's own paragraph, which must hold nothing else; deleting the last paragraph leaves the previous paragraph's line break. ordinal counts the note's attachments in body order. append_to_paragraph adds the runs at the end of the anchor paragraph, on the same line (put a leading space in the first run). replace_checklist replaces one contiguous run of checklist rows (the one holding a row whose text equals containing, the occurrence-th, or the only one) or, with select 'all', every checklist row; all other text and attachments stay. expectedCount (default 1) must equal the full match count; occurrence picks one of them and may not exceed it. For replace_checklist, expectedCount is optional and counts replaced rows. For trim_blank_lines, expectedCount is optional and counts removed paragraphs; only whitespace-only title, heading, subheading, or body paragraphs are removed (never the title paragraph, list, checklist, monospaced, or attachment rows), keep (0 to 10) is how many of each run stay (default 1 for runs, 0 otherwise)."
+      ),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified apply, ask Notes.app to upload the note by moving it into its own folder (default false)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = editNote(
+        {
+          identifier,
+          dryRun: args.dryRun,
+          ifRevision: args.ifRevision,
+          ifPlanDigest: args.ifPlanDigest,
+          requireNonSystemPaper: args.requireNonSystemPaper,
+          operations: args.operations,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge || result.status !== "updated") return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+}
+async function nudgeAfterWrite(identifier, waitSeconds, deps) {
+  const identifiers = Array.isArray(identifier) ? identifier : [identifier];
+  try {
+    const report = await nudgeInPlace({ identifiers, waitSeconds }, deps);
+    const { before: _before, after: _after, ...rest } = report;
+    void _before;
+    void _after;
+    return { ok: true, ...rest };
+  } catch (error2) {
+    return {
+      ok: false,
+      code: error2 instanceof PrivateHelperError ? error2.code : "internal_error",
+      message: error2 instanceof Error ? error2.message : String(error2)
+    };
+  }
+}
+
+// src/tools/composeNoteTool.ts
+import { basename as basename8 } from "node:path";
+
+// src/services/privateCompose.ts
+import { basename as basename7, extname as extname9, isAbsolute as isAbsolute6 } from "node:path";
+var HIGHLIGHTS2 = ["purple", "pink", "orange", "mint", "blue"];
+var MAX_INDENT = 8;
+var MAX_PARAGRAPHS = 2e3;
+var MAX_COMPOSE_UTF16 = 2e5;
+var MAX_COMPOSE_RUNS = 2e4;
+var MAX_WRITER_REQUEST_BYTES = 1024 * 1024;
+var MAX_TABLE_CELL_UTF16 = 1e4;
+var MAX_COMPOSE_ATTACHMENTS = 20;
+var MAX_COMPOSE_FILE_BYTES = 64 * 1024 * 1024;
+var MAX_COMPOSE_FILE_TOTAL = 128 * 1024 * 1024;
+var LINK_SCHEMES2 = /* @__PURE__ */ new Set(["http:", "https:", "mailto:", "tel:", "notes:", "applenotes:"]);
+var isObject4 = (entry) => "kind" in entry;
+var MAX_TABLE_ROWS = 1e3;
+var MAX_TABLE_COLUMNS = 100;
+var MAX_TABLE_CELLS = 1e4;
+var NOTE_UUID = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+var runSchema2 = external_exports.object({
+  text: external_exports.string().min(1),
+  bold: external_exports.boolean().optional(),
+  italic: external_exports.boolean().optional(),
+  underline: external_exports.boolean().optional(),
+  strikethrough: external_exports.boolean().optional(),
+  link: external_exports.string().min(1).max(4096).optional().describe("http(s), mailto, tel, notes, applenotes"),
+  highlight: external_exports.enum(HIGHLIGHTS2).optional(),
+  color: external_exports.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().describe("Text color as #RRGGBB")
+}).strict();
+var indentSchema = external_exports.number().int().min(0).max(MAX_INDENT);
+var inlineShape = {
+  text: external_exports.string().optional().describe("Plain text; each \\n starts a new paragraph"),
+  runs: external_exports.array(runSchema2).min(1).optional().describe("Formatted runs forming one paragraph")
+};
+var textBlock = (type) => external_exports.object({ type: external_exports.literal(type), ...inlineShape }).strict();
+var listItem = external_exports.union([
+  external_exports.string().min(1),
+  external_exports.object({ ...inlineShape, indent: indentSchema.optional() }).strict()
+]);
+var checklistItem = external_exports.union([
+  external_exports.string().min(1),
+  external_exports.object({ ...inlineShape, indent: indentSchema.optional(), checked: external_exports.boolean().optional() }).strict()
+]);
+var listBlock = (type) => external_exports.object({
+  type: external_exports.literal(type),
+  items: external_exports.array(listItem).min(1),
+  indent: indentSchema.optional().describe("Base indent added to every item")
+}).strict();
+var blockSchema2 = external_exports.discriminatedUnion("type", [
+  textBlock("heading"),
+  textBlock("subheading"),
+  textBlock("body"),
+  textBlock("paragraph"),
+  textBlock("quote"),
+  textBlock("code"),
+  textBlock("monospaced"),
+  listBlock("bulleted"),
+  listBlock("dashed"),
+  listBlock("numbered"),
+  external_exports.object({
+    type: external_exports.literal("checklist"),
+    items: external_exports.array(checklistItem).min(1),
+    checked: external_exports.array(external_exports.boolean()).optional().describe("Per-item state, same length as items"),
+    indent: indentSchema.optional()
+  }).strict(),
+  external_exports.object({ type: external_exports.literal("divider") }).strict(),
+  external_exports.object({
+    type: external_exports.literal("table"),
+    rows: external_exports.array(external_exports.array(external_exports.string()).min(1).max(MAX_TABLE_COLUMNS)).min(1).max(MAX_TABLE_ROWS).describe("Rectangular rows of plain-text cells; the first row is not special")
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("noteLink"),
+    identifier: external_exports.string().regex(NOTE_UUID).describe("Notes UUID of the note to link to"),
+    text: external_exports.string().min(1).describe("Link text")
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("file"),
+    path: external_exports.string().min(1).max(4096).describe("Absolute path of a local file to attach"),
+    filename: external_exports.string().min(1).max(255).optional().describe("Name the attachment gets in Notes; must keep the source file's extension")
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("urlCard"),
+    url: external_exports.string().min(1).max(2048).describe("Absolute http(s) URL shown as a rich link card")
+  }).strict()
+]);
+function invalid3(message) {
+  return new PrivateWriteError("invalid_request", message, false);
+}
+var FORBIDDEN = /[\x00-\x08\x0A-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
+function assertLine(text2, where) {
+  if (FORBIDDEN.test(text2))
+    throw invalid3(
+      `${where}: text may contain only printable characters and tabs (no \\r, control characters, or attachment glyphs); a newline is allowed only in a block's \`text\``
+    );
+}
+var URL_CHARACTERS = /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+$/;
+function assertLink(link) {
+  let url;
+  try {
+    url = new URL(link);
+  } catch {
+    throw invalid3(`Run link is not an absolute URL: ${link}`);
+  }
+  if (!LINK_SCHEMES2.has(url.protocol))
+    throw invalid3("Run link must use http, https, mailto, tel, notes, or applenotes");
+  if (!URL_CHARACTERS.test(link))
+    throw invalid3(
+      "Run link must already be a well-formed URL: percent-encode spaces, quotes, and non-ASCII characters"
+    );
+}
+function assertCardUrl(value, where) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw invalid3(`${where}: url is not an absolute URL`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:" || !url.hostname)
+    throw invalid3(`${where}: url must be an absolute http or https URL with a host`);
+  if (!URL_CHARACTERS.test(value))
+    throw invalid3(
+      `${where}: url must already be well-formed (percent-encode spaces, quotes, and non-ASCII characters)`
+    );
+}
+function assertAttachmentName(path10, filename, where) {
+  if (filename === void 0) return;
+  if (Buffer.byteLength(filename, "utf8") > 255 || filename !== filename.trim() || filename.startsWith(".") || /[/:\\\p{Cc}]/u.test(filename) || FORBIDDEN.test(filename))
+    throw invalid3(
+      `${where}: filename must be one path component with no slash, colon, backslash, control character, leading dot, or surrounding spaces`
+    );
+  if (extname9(filename).toLowerCase() !== extname9(basename7(path10)).toLowerCase())
+    throw invalid3(`${where}: filename must keep the source file's extension`);
+}
+function composeFileSize(path10, where = "file", roots) {
+  if (!isAbsolute6(path10) || FORBIDDEN.test(path10))
+    throw invalid3(`${where}: path must be an absolute path`);
+  try {
+    return assertAllowedFile(path10, MAX_COMPOSE_FILE_BYTES, {
+      ...roots ? { roots } : {},
+      label: "File"
+    });
+  } catch (error2) {
+    throw invalid3(`${where}: ${error2.message}`);
+  }
+}
+function wireRun(run, where) {
+  assertLine(run.text, where);
+  if (run.link) assertLink(run.link);
+  const out = { text: run.text };
+  for (const key of ["bold", "italic", "underline", "strikethrough"])
+    if (run[key]) out[key] = true;
+  if (run.link) out.link = run.link;
+  if (run.highlight) out.highlight = run.highlight;
+  if (run.color) out.color = run.color.toUpperCase();
+  return out;
+}
+function inlineLines(value, where, allowNewlines) {
+  if (value.text === void 0 === (value.runs === void 0))
+    throw invalid3(`${where}: give exactly one of text or runs`);
+  if (value.runs) return [value.runs.map((run) => wireRun(run, where))];
+  const text2 = value.text;
+  if (!text2.length) throw invalid3(`${where}: text must not be empty`);
+  const lines = text2.split("\n");
+  if (lines.length > 1 && !allowNewlines)
+    throw invalid3(`${where}: list and checklist items are one line each`);
+  return lines.map((line) => {
+    assertLine(line, where);
+    return line ? [{ text: line }] : [];
+  });
+}
+function itemFields(item, where) {
+  if (typeof item === "string")
+    return { runs: inlineLines({ text: item }, where, false)[0], indent: 0 };
+  return { runs: inlineLines(item, where, false)[0], indent: item.indent ?? 0 };
+}
+var TEXT_STYLES = {
+  heading: { style: "heading" },
+  subheading: { style: "subheading" },
+  body: { style: "body" },
+  paragraph: { style: "body" },
+  quote: { style: "body", blockQuote: true },
+  code: { style: "monospaced" },
+  monospaced: { style: "monospaced" }
+};
+function blocksToParagraphs(input) {
+  const parsed = external_exports.array(blockSchema2).min(1).safeParse(input);
+  if (!parsed.success)
+    throw invalid3(
+      "Invalid blocks: " + parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")
+    );
+  const out = [];
+  parsed.data.forEach((block, index) => {
+    const where = `blocks[${index}] (${block.type})`;
+    if (block.type === "divider") {
+      out.push({ kind: "divider" });
+      return;
+    }
+    if (block.type === "table") {
+      const columns2 = block.rows[0].length;
+      if (block.rows.some((row) => row.length !== columns2))
+        throw invalid3(`${where}: every row needs the same number of cells`);
+      if (block.rows.length * columns2 > MAX_TABLE_CELLS)
+        throw invalid3(`${where}: a table may have at most ${MAX_TABLE_CELLS} cells`);
+      block.rows.forEach(
+        (row, r) => row.forEach((cell, c) => {
+          if (cell.length > MAX_TABLE_CELL_UTF16)
+            throw invalid3(
+              `${where}.rows[${r}][${c}]: a cell may hold at most ${MAX_TABLE_CELL_UTF16} UTF-16 code units`
+            );
+          if (cell) assertLine(cell, `${where}.rows[${r}][${c}]`);
+        })
+      );
+      out.push({ kind: "table", rows: block.rows });
+      return;
+    }
+    if (block.type === "file") {
+      assertAttachmentName(block.path, block.filename, where);
+      composeFileSize(block.path, where);
+      out.push({
+        kind: "file",
+        path: block.path,
+        ...block.filename !== void 0 ? { filename: block.filename } : {}
+      });
+      return;
+    }
+    if (block.type === "urlCard") {
+      assertCardUrl(block.url, where);
+      out.push({ kind: "url", url: block.url });
+      return;
+    }
+    if (block.type === "noteLink") {
+      assertLine(block.text, where);
+      out.push({
+        style: "body",
+        runs: [{ text: block.text, link: noteLinkUrl(block.identifier) }]
+      });
+      return;
+    }
+    if (block.type in TEXT_STYLES) {
+      const { style, blockQuote } = TEXT_STYLES[block.type];
+      const textBlock2 = block;
+      for (const runs of inlineLines(textBlock2, where, true))
+        out.push({ style, ...blockQuote ? { blockQuote } : {}, runs });
+      return;
+    }
+    const list = block;
+    const base = list.indent ?? 0;
+    if (list.type === "checklist") {
+      const perItem = list.items.some((i) => typeof i !== "string" && i.checked !== void 0);
+      if (list.checked && perItem)
+        throw invalid3(`${where}: give checked state per item or as a checked array, not both`);
+      if (list.checked && list.checked.length !== list.items.length)
+        throw invalid3(`${where}: checked must have one boolean per item`);
+      list.items.forEach((item, i) => {
+        const { runs, indent } = itemFields(item, `${where}.items[${i}]`);
+        const checked = typeof item !== "string" && item.checked !== void 0 ? item.checked : list.checked?.[i] ?? false;
+        out.push(paragraph("checklist", runs, base + indent, where, checked));
+      });
+      return;
+    }
+    list.items.forEach((item, i) => {
+      const { runs, indent } = itemFields(item, `${where}.items[${i}]`);
+      out.push(paragraph(list.type, runs, base + indent, where));
+    });
+  });
+  return finalizeParagraphs(out);
+}
+function paragraph(style, runs, indent, where, checked) {
+  if (indent > MAX_INDENT) throw invalid3(`${where}: indent exceeds ${MAX_INDENT}`);
+  return {
+    style,
+    ...indent ? { indent } : {},
+    ...checked !== void 0 ? { checked } : {},
+    runs
+  };
+}
+function noteLinkUrl(identifier) {
+  return `notes://showNote?identifier=${identifier.toUpperCase()}`;
+}
+var isBlank = (entry) => !!entry && !isObject4(entry) && entry.runs.length === 0;
+function entryUTF16(entry) {
+  if (!isObject4(entry)) return entry.runs.reduce((n, r) => n + r.text.length, 0) + 1;
+  if (entry.kind === "table")
+    return 2 + entry.rows.reduce((n, row) => n + row.reduce((m, cell) => m + cell.length, 0), 0);
+  return 2;
+}
+function finalizeParagraphs(paragraphs) {
+  while (isBlank(paragraphs[paragraphs.length - 1])) paragraphs.pop();
+  if (!paragraphs.length) throw invalid3("The composed content is empty");
+  if (paragraphs.length > MAX_PARAGRAPHS)
+    throw invalid3(`The composed content has more than ${MAX_PARAGRAPHS} paragraphs`);
+  const length = paragraphs.reduce((sum, p) => sum + entryUTF16(p), 0);
+  if (length > MAX_COMPOSE_UTF16)
+    throw invalid3(
+      `The composed content (text and table cells) exceeds ${MAX_COMPOSE_UTF16} UTF-16 code units`
+    );
+  const runs = paragraphs.reduce((n, p) => n + (isObject4(p) ? 0 : p.runs.length), 0);
+  if (runs > MAX_COMPOSE_RUNS)
+    throw invalid3(`The composed content has more than ${MAX_COMPOSE_RUNS} runs`);
+  const attachments = paragraphs.filter(
+    (p) => isObject4(p) && (p.kind === "file" || p.kind === "url")
+  );
+  if (attachments.length > MAX_COMPOSE_ATTACHMENTS)
+    throw invalid3(
+      `A compose may hold at most ${MAX_COMPOSE_ATTACHMENTS} file and link-card blocks`
+    );
+  const bytes = attachments.reduce(
+    (n, p) => n + (isObject4(p) && p.kind === "file" ? composeFileSize(p.path) : 0),
+    0
+  );
+  if (bytes > MAX_COMPOSE_FILE_TOTAL)
+    throw invalid3("The files in one compose may total at most 128 MiB");
+  return paragraphs;
+}
+function assertWriterRequestSize(fields) {
+  const bytes = Buffer.byteLength(
+    JSON.stringify({ protocol: 1, action: "compose_note", ...fields }),
+    "utf8"
+  );
+  if (bytes > MAX_WRITER_REQUEST_BYTES)
+    throw invalid3(
+      `The compose request is ${bytes} bytes; the writer accepts at most ${MAX_WRITER_REQUEST_BYTES}. Split it into several appends.`
+    );
+}
+function notesLinkTargets(paragraphs) {
+  const out = [];
+  for (const p of paragraphs) {
+    if (isObject4(p)) continue;
+    for (const run of p.runs) {
+      if (!run.link || !/^(?:apple)?notes:/i.test(run.link)) continue;
+      out.push({ link: run.link, target: parseNotesShowUrl(run.link)?.targetNote ?? null });
+    }
+  }
+  return out;
+}
+var PAIRS = [
+  { open: "**", close: "**", style: { bold: true } },
+  { open: "__", close: "__", style: { bold: true } },
+  { open: "~~", close: "~~", style: { strikethrough: true } },
+  { open: "<u>", close: "</u>", style: { underline: true } },
+  { open: "*", close: "*", style: { italic: true } },
+  { open: "_", close: "_", style: { italic: true } }
+];
+var ESCAPABLE = /[\\`*_{}[\]()#+\-.!~>|<]/;
+var isWord = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch);
+function findClose(src, open, close, from) {
+  const single = open.length === 1;
+  for (let j = from; j < src.length; j++) {
+    if (src[j] === "\\") {
+      j++;
+      continue;
+    }
+    if (single && src.startsWith(open + open, j)) {
+      j++;
+      continue;
+    }
+    if (!src.startsWith(close, j) || j === from || /\s/.test(src[j - 1])) continue;
+    let end = j;
+    if (!single) while (src.startsWith(close, end + 1)) end++;
+    if (open === "_" && isWord(src[end + 1])) continue;
+    return end;
+  }
+  return -1;
+}
+function parseInline(src, base = {}) {
+  const runs = [];
+  let buffer = "";
+  const flush = () => {
+    if (buffer) runs.push({ text: buffer, ...base });
+    buffer = "";
+  };
+  let i = 0;
+  outer: while (i < src.length) {
+    const ch = src[i];
+    if (ch === "\\" && ESCAPABLE.test(src[i + 1] ?? "")) {
+      buffer += src[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === "`") {
+      const end = src.indexOf("`", i + 1);
+      if (end > i + 1) {
+        buffer += src.slice(i + 1, end);
+        i = end + 1;
+        continue;
+      }
+    }
+    if (ch === "[") {
+      const m = /^\[([^\]]+)\]\(\s*<?([^\s)>]+)>?(?:\s+"[^"]*")?\s*\)/.exec(src.slice(i));
+      if (m && safeLink(m[2])) {
+        flush();
+        runs.push(...parseInline(m[1], { ...base, link: m[2] }));
+        i += m[0].length;
+        continue;
+      }
+    }
+    if (ch === "<") {
+      const m = /^<((?:https?|mailto):[^\s>]+)>/.exec(src.slice(i));
+      if (m) {
+        flush();
+        runs.push({ text: m[1], ...base, link: m[1] });
+        i += m[0].length;
+        continue;
+      }
+    }
+    for (const pair of PAIRS) {
+      if (!src.startsWith(pair.open, i)) continue;
+      const from = i + pair.open.length;
+      if (/\s/.test(src[from] ?? " ")) continue;
+      if (pair.open === "_" && isWord(src[i - 1])) continue;
+      const end = findClose(src, pair.open, pair.close, from);
+      if (end < 0) continue;
+      flush();
+      runs.push(...parseInline(src.slice(from, end), { ...base, ...pair.style }));
+      i = end + pair.close.length;
+      continue outer;
+    }
+    buffer += ch;
+    i++;
+  }
+  flush();
+  return mergeRuns(runs);
+}
+function safeLink(link) {
+  try {
+    return LINK_SCHEMES2.has(new URL(link).protocol);
+  } catch {
+    return false;
+  }
+}
+var formatKey = (run) => JSON.stringify({ ...run, text: void 0 });
+function mergeRuns(runs) {
+  const out = [];
+  for (const run of runs) {
+    const last = out[out.length - 1];
+    if (last && formatKey(last) === formatKey(run)) last.text += run.text;
+    else out.push({ ...run });
+  }
+  return out;
+}
+var LIST_ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})[.)])[ \t]+(.*)$/;
+var TASK = /^\[([ xX])\][ \t]+(.*)$/;
+function separatorColumns(line) {
+  if (!line.includes("|")) return 0;
+  const cells = rawCells(line);
+  return cells.length && cells.every((cell) => /^:?-+:?$/.test(cell.trim())) ? cells.length : 0;
+}
+function rawCells(line) {
+  const cells = [];
+  let cell = "";
+  const body = line.trim().replace(/^\|/, "");
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === "\\" && body[i + 1] === "|") {
+      cell += "|";
+      i++;
+    } else if (body[i] === "|") {
+      cells.push(cell);
+      cell = "";
+    } else cell += body[i];
+  }
+  if (cell.trim() || !body.endsWith("|")) cells.push(cell);
+  return cells;
+}
+function tableCells(line) {
+  return rawCells(line).map(
+    (c) => parseInline(c.trim()).map((run) => run.text).join("")
+  );
+}
+function imageBlock(line) {
+  const m = /^[ ]{0,3}!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)[ \t]*$/.exec(
+    line
+  );
+  if (!m) return null;
+  const target = m[1] ?? m[2];
+  if (target.startsWith("/")) return { type: "file", path: target };
+  if (/^https?:\/\//i.test(target)) return { type: "urlCard", url: target };
+  return null;
+}
+function columns(indent) {
+  let width = 0;
+  for (const ch of indent) width += ch === "	" ? 4 - width % 4 : 1;
+  return width;
+}
+function markdownToBlocks(markdown, dropTitle) {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  const blocks = [];
+  const warnings = [];
+  let prose = [];
+  let quote = [];
+  let listStack = [];
+  const pushText = (type, text2) => {
+    const runs = parseInline(text2);
+    if (runs.length) blocks.push({ type, runs });
+  };
+  const flushProse = () => {
+    if (prose.length) pushText("body", prose.join(" "));
+    prose = [];
+  };
+  const flushQuote = () => {
+    if (quote.length) pushText("quote", quote.join(" "));
+    quote = [];
+  };
+  const flushAll = () => {
+    flushProse();
+    flushQuote();
+  };
+  const addItem = (kind, level, text2, checked) => {
+    const runs = parseInline(text2);
+    if (!runs.length) return;
+    const item = kind === "checklist" ? { runs, indent: level, checked } : { runs, indent: level };
+    const last = blocks[blocks.length - 1];
+    if (last && last.type === kind) last.items.push(item);
+    else blocks.push({ type: kind, items: [item] });
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fence = /^[ ]{0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      flushAll();
+      listStack = [];
+      const body = [];
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trimStart().startsWith(fence[1])) body.push(lines[j++]);
+      i = j;
+      while (body.length && !body[body.length - 1].trim()) body.pop();
+      if (body.length) blocks.push({ type: "code", text: body.join("\n") });
+      continue;
+    }
+    if (!line.trim()) {
+      flushAll();
+      continue;
+    }
+    const heading = /^[ ]{0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
+    if (heading) {
+      flushAll();
+      listStack = [];
+      const text2 = heading[2];
+      const isTitle = !blocks.length && heading[1] === "#" && text2.trim() === dropTitle?.trim();
+      if (!isTitle) pushText(heading[1].length <= 2 ? "heading" : "subheading", text2);
+      continue;
+    }
+    if (/^[ ]{0,3}([-*_])([ \t]*\1){2,}[ \t]*$/.test(line)) {
+      flushAll();
+      listStack = [];
+      blocks.push({ type: "divider" });
+      continue;
+    }
+    if (line.includes("|") && separatorColumns(lines[i + 1] ?? "") === rawCells(line).length) {
+      flushAll();
+      listStack = [];
+      const header = tableCells(line);
+      const rows = [header];
+      let j = i + 2;
+      for (; j < lines.length && lines[j].includes("|") && lines[j].trim(); j++) {
+        const all = tableCells(lines[j]);
+        if (all.length > header.length)
+          warnings.push(
+            `line ${j + 1}: table row has ${all.length} cells but the header has ${header.length}; the extra cells were dropped`
+          );
+        const cells = all.slice(0, header.length);
+        rows.push([...cells, ...Array(header.length - cells.length).fill("")]);
+      }
+      i = j - 1;
+      blocks.push({ type: "table", rows });
+      continue;
+    }
+    const image = imageBlock(line);
+    if (image) {
+      flushAll();
+      listStack = [];
+      blocks.push(image);
+      continue;
+    }
+    const quoted2 = /^[ ]{0,3}>[ ]?(.*)$/.exec(line);
+    if (quoted2) {
+      flushProse();
+      listStack = [];
+      if (quoted2[1].trim()) quote.push(quoted2[1].trim());
+      else flushQuote();
+      continue;
+    }
+    const item = LIST_ITEM.exec(line);
+    if (item) {
+      flushAll();
+      const width = columns(item[1]);
+      while (listStack.length && width < listStack[listStack.length - 1]) listStack.pop();
+      if (!listStack.length || width > listStack[listStack.length - 1]) listStack.push(width);
+      const level = Math.min(listStack.length - 1, MAX_INDENT);
+      const task = item[2] ? TASK.exec(item[4]) : null;
+      if (task) addItem("checklist", level, task[2], task[1] !== " ");
+      else addItem(item[2] ? "bulleted" : "numbered", level, item[4], false);
+      continue;
+    }
+    if (/^[ ]{0,3}<\/?[A-Za-z][^>]*>\s*$/.test(line)) {
+      flushAll();
+      warnings.push(`line ${i + 1}: raw HTML block skipped`);
+      continue;
+    }
+    const last = blocks[blocks.length - 1];
+    if (listStack.length && /^[ \t]+\S/.test(line) && last && "items" in last && !prose.length) {
+      const items = last.items;
+      const target = items[items.length - 1];
+      target.runs = mergeRuns([...target.runs, { text: " " }, ...parseInline(line.trim())]);
+      continue;
+    }
+    flushQuote();
+    listStack = [];
+    prose.push(line.trim());
+    if (/( {2}|\\)$/.test(line)) {
+      prose[prose.length - 1] = prose[prose.length - 1].replace(/\\$/, "");
+      flushProse();
+    }
+  }
+  flushAll();
+  return { blocks, warnings };
+}
+var summarySchema = external_exports.array(
+  external_exports.object({
+    style: external_exports.string(),
+    indent: external_exports.number().int(),
+    blockQuote: external_exports.boolean(),
+    checked: external_exports.boolean().optional(),
+    lengthUTF16: external_exports.number().int(),
+    runs: external_exports.array(external_exports.object({ length: external_exports.number().int(), attributes: external_exports.record(external_exports.unknown()) }))
+  }).passthrough()
+);
+var REVISION = /^r1:[a-f0-9]{64}$/;
+var composePlanSchema = external_exports.object({
+  status: external_exports.literal("planned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false),
+  identifier: external_exports.string(),
+  mode: external_exports.enum(["append", "prepend"]),
+  paragraphs: external_exports.number().int(),
+  insertedUTF16: external_exports.number().int(),
+  insertAt: external_exports.number().int(),
+  unitStart: external_exports.number().int(),
+  revisionBefore: external_exports.string().regex(REVISION),
+  plan: summarySchema
+}).passthrough();
+var composeResultSchema = external_exports.object({
+  status: external_exports.literal("updated"),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  placementVerified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  mode: external_exports.enum(["append", "prepend"]),
+  paragraphs: external_exports.number().int(),
+  insertedUTF16: external_exports.number().int(),
+  revisionBefore: external_exports.string().regex(REVISION),
+  revisionAfter: external_exports.string().regex(REVISION),
+  unitStart: external_exports.number().int(),
+  objectURI: external_exports.string(),
+  readBack: summarySchema,
+  objects: external_exports.array(
+    external_exports.object({
+      kind: external_exports.enum(["divider", "table", "file", "url"]),
+      identifier: external_exports.string(),
+      uti: external_exports.string().nullable().optional()
+    }).passthrough()
+  ).optional(),
+  frozenAttachments: external_exports.object({ attachments: external_exports.number().int(), verified: external_exports.literal(true) }).passthrough().optional(),
+  ...writeSyncFields
+}).passthrough();
+var RUN_KEYS = [
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "link",
+  "highlight",
+  "color"
+];
+var OBJECT_UTIS = {
+  divider: "com.apple.notes.inlinetextattachment.dividerline",
+  table: "com.apple.notes.table",
+  url: "public.url"
+};
+function runValues(attributes) {
+  const out = {};
+  for (const key of RUN_KEYS)
+    if (attributes[key] !== void 0 && attributes[key] !== false) out[key] = attributes[key];
+  const attachment = attributes.attachment;
+  if (attachment)
+    out.attachment = {
+      identifier: String(attachment.identifier ?? attachment.id ?? "").toUpperCase(),
+      uti: attachment.uti ?? null
+    };
+  return out;
+}
+function mergeValueRuns(runs) {
+  const out = [];
+  for (const run of runs) {
+    if (!run.length) continue;
+    const last = out[out.length - 1];
+    if (last && JSON.stringify(last.values) === JSON.stringify(run.values))
+      last.length += run.length;
+    else out.push({ length: run.length, values: run.values });
+  }
+  return out;
+}
+function readBackShape(entry) {
+  return {
+    style: entry.style,
+    indent: entry.indent,
+    blockQuote: entry.blockQuote,
+    checked: entry.checked,
+    lengthUTF16: entry.lengthUTF16,
+    runs: mergeValueRuns(
+      entry.runs.map((run) => ({ length: run.length, values: runValues(run.attributes) }))
+    )
+  };
+}
+function compareShapes(where, actual, want, label) {
+  const mismatches = [];
+  for (const key of Object.keys(want))
+    if (JSON.stringify(actual[key]) !== JSON.stringify(want[key]))
+      mismatches.push(
+        `${where} ${key}: ${label[0]} ${JSON.stringify(actual[key])}, ${label[1]} ${JSON.stringify(want[key])}`
+      );
+  return mismatches;
+}
+function entryText(entry) {
+  return isObject4(entry) ? "\uFFFC" : entry.runs.map((run) => run.text).join("");
+}
+function verifyAgainstRequest(paragraphs, result) {
+  const mismatches = [];
+  if (result.readBack.length !== paragraphs.length)
+    return [
+      `the writer read back ${result.readBack.length} paragraphs; ${paragraphs.length} were requested`
+    ];
+  const objects = result.objects ?? [];
+  let next = 0;
+  paragraphs.forEach((entry, i) => {
+    const where = `paragraph ${i}`;
+    let want;
+    if (isObject4(entry)) {
+      const object3 = objects[next++];
+      if (!object3 || object3.kind !== entry.kind) {
+        mismatches.push(`${where}: no created ${entry.kind} object`);
+        return;
+      }
+      const uti = OBJECT_UTIS[entry.kind];
+      if (uti && object3.uti !== uti)
+        mismatches.push(`${where}: the ${entry.kind} has type ${String(object3.uti)}, not ${uti}`);
+      if (entry.kind === "url" && object3.url !== entry.url)
+        mismatches.push(`${where}: the link card URL is ${String(object3.url)}`);
+      if (entry.kind === "file") {
+        const name = entry.filename ?? basename7(entry.path);
+        if (object3.filename !== name)
+          mismatches.push(`${where}: the file attachment is named ${String(object3.filename)}`);
+      }
+      want = {
+        style: "body",
+        indent: 0,
+        blockQuote: false,
+        checked: void 0,
+        lengthUTF16: 1,
+        runs: [
+          {
+            length: 1,
+            values: {
+              attachment: { identifier: object3.identifier.toUpperCase(), uti: object3.uti ?? null }
+            }
+          }
+        ]
+      };
+    } else {
+      want = {
+        style: entry.style,
+        indent: entry.indent ?? 0,
+        blockQuote: entry.blockQuote ?? false,
+        checked: entry.checked,
+        lengthUTF16: entryText(entry).length,
+        runs: mergeValueRuns(
+          entry.runs.map((run) => {
+            const { text: text2, ...attributes } = run;
+            return { length: text2.length, values: runValues(attributes) };
+          })
+        )
+      };
+    }
+    mismatches.push(
+      ...compareShapes(where, readBackShape(result.readBack[i]), want, ["stored", "requested"])
+    );
+  });
+  if (next !== objects.length)
+    mismatches.push(`the writer created ${objects.length} objects; ${next} were requested`);
+  return mismatches;
+}
+function databaseRunValues(run) {
+  const attributes = { ...run };
+  if (run.highlight === "unknown") attributes.highlight = run.highlightValue;
+  return runValues(attributes);
+}
+function crossCheckWithDatabase(result, read = (id2) => readNoteBlocks(id2), requested) {
+  if (result.storeKind !== "live")
+    return { checked: false, reason: "the writer wrote a store copy, not NoteStore.sqlite" };
+  const { objectURI, unitStart } = result;
+  let blocks;
+  try {
+    blocks = read(objectURI).blocks;
+  } catch (error2) {
+    return { checked: false, reason: error2 instanceof Error ? error2.message : String(error2) };
+  }
+  const first2 = blocks.findIndex((block) => block.start === unitStart);
+  if (first2 < 0)
+    return { checked: true, matches: false, mismatches: ["no paragraph starts at unitStart"] };
+  const mismatches = [];
+  result.readBack.forEach((expected, i) => {
+    const block = blocks[first2 + i];
+    const where = `paragraph ${i}`;
+    if (!block) {
+      mismatches.push(`${where}: missing`);
+      return;
+    }
+    const actual = {
+      style: block.style,
+      indent: block.indent,
+      blockQuote: block.blockQuote,
+      checked: block.checklist?.done,
+      lengthUTF16: block.length,
+      runs: mergeValueRuns(
+        block.runs.map((run) => ({ length: run.length, values: databaseRunValues(run) }))
+      )
+    };
+    mismatches.push(
+      ...compareShapes(where, actual, readBackShape(expected), ["database", "writer"])
+    );
+    const entry = requested?.[i];
+    if (entry && block.text !== entryText(entry))
+      mismatches.push(`${where} text: the database text differs from the requested text`);
+  });
+  return {
+    checked: true,
+    matches: mismatches.length === 0,
+    ...mismatches.length ? { mismatches } : {}
+  };
+}
+function assertComposeWritesAllowed(env) {
+  requireLiveValidated(COMPOSE_LIVE_VALIDATED, "compose-note", env);
+}
+function composeNote(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  const dryRun = request.dryRun === true;
+  if (dryRun && request.ifRevision !== void 0)
+    throw invalid3("A dry run does not take ifRevision");
+  if (!dryRun) {
+    if (!request.ifRevision || !REVISION.test(request.ifRevision))
+      throw invalid3("ifRevision (the revisionBefore of a dry run) is required to apply");
+    assertComposeWritesAllowed(deps.env);
+  }
+  if (request.insertBeforeHeading && request.mode !== "append")
+    throw invalid3("insertBeforeHeading is valid only in append mode");
+  if (request.insertBeforeHeading && /[\n\v\f\r\u0085\u2028\u2029]/.test(request.insertBeforeHeading.text))
+    throw invalid3("insertBeforeHeading.text must be one line");
+  const fields = {
+    identifier: request.identifier,
+    mode: request.mode,
+    paragraphs: request.paragraphs
+  };
+  if (dryRun) fields.dryRun = true;
+  else fields.ifRevision = request.ifRevision;
+  if (request.requireNonSystemPaper) fields.requireNonSystemPaper = true;
+  if (request.insertBeforeHeading) fields.insertBeforeHeading = request.insertBeforeHeading;
+  Object.assign(fields, writerScopeFields(request.scope));
+  assertWriterRequestSize(fields);
+  try {
+    const response = callPrivateWriter("compose_note", fields, deps);
+    if (dryRun) return parseWriterResult(composePlanSchema, response, false);
+    const result = parseWriterResult(composeResultSchema, response, true);
+    const mismatches = verifyAgainstRequest(request.paragraphs, result);
+    if (mismatches.length)
+      throw new PrivateWriteError(
+        "verification_failed",
+        "The writer saved the note, but what it stored differs from the request",
+        true,
+        { ...result, indeterminate: true, requestMismatches: mismatches }
+      );
+    return result;
+  } catch (error2) {
+    if (dryRun && error2 instanceof PrivateWriteError && error2.committed !== false)
+      throw new PrivateWriteError(error2.code, error2.message, false, error2.details);
+    throw error2;
+  }
+}
+
+// src/tools/composeNoteTool.ts
+var composeNoteInput = {
+  mode: external_exports.enum(["create", "append", "prepend"]).describe("create a new note, append at the end, or prepend below the title"),
+  identifier: notesUuid2.optional().describe("append/prepend: target Notes UUID"),
+  id: coreDataId3.optional().describe("append/prepend: x-coredata note id, resolved to a UUID"),
+  title: external_exports.string().min(1).max(1e3).optional().describe("create: the new note's title"),
+  folder: external_exports.string().min(1).optional().describe("create: existing folder (nested paths allowed)"),
+  account: external_exports.string().min(1).optional().describe("create: account name"),
+  blocks: external_exports.array(blockSchema2).min(1).max(2e3).optional().describe("Ordered content blocks. Give exactly one of blocks or markdown."),
+  markdown: external_exports.string().min(1).max(2e5).optional().describe(
+    "Markdown to import natively: # and ## headings, ### subheadings, lists, - [ ]/- [x] checklists, > quotes, fenced code, --- dividers, pipe tables, **bold**, *italic*, ~~strike~~, <u>underline</u>, links; an image alone on a line becomes a file (absolute path) or link card (http URL)"
+  ),
+  ifRevision: revisionToken.optional().describe("append/prepend apply: revisionBefore from an identical dry run"),
+  dryRun: external_exports.boolean().optional().describe("Validate and plan without writing"),
+  requireNonSystemPaper: external_exports.boolean().optional().describe("append/prepend: refuse a Quick Note target; repeat in plan and apply"),
+  insertBeforeHeading: external_exports.object({
+    text: external_exports.string().min(1).max(1e3),
+    occurrence: external_exports.number().int().min(1).optional().describe("1-based; default 1"),
+    expectedCount: external_exports.number().int().min(1).optional().describe("Exact number of equal Heading paragraphs; default 1")
+  }).strict().optional().describe("append only: insert before one exact Heading-style paragraph instead of at the end"),
+  // append/prepend only: create picks its folder itself, so a guard there would
+  // only be checked after Notes.app had already made the note.
+  ...writerScopeGuardInput(),
+  nudge: external_exports.boolean().optional().describe(
+    "After a verified write, ask Notes.app to upload the note by moving it into its own folder (default false)"
+  ),
+  nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+};
+function invalid4(message) {
+  return new PrivateWriteError("invalid_request", message, false);
+}
+function contentFor(args) {
+  if (args.blocks === void 0 === (args.markdown === void 0))
+    throw invalid4("Give exactly one of blocks or markdown");
+  if (args.blocks) return { paragraphs: blocksToParagraphs(args.blocks), warnings: [] };
+  const imported = markdownToBlocks(args.markdown, args.title);
+  if (!imported.blocks.length) throw invalid4("The Markdown produced no content");
+  return { paragraphs: blocksToParagraphs(imported.blocks), warnings: imported.warnings };
+}
+function checkModeFields(args) {
+  const present = (keys) => keys.filter((k) => args[k] !== void 0);
+  if (args.dryRun && args.nudge) throw invalid4("A dry run does not take nudge");
+  if (args.mode === "create") {
+    const extra2 = present([
+      "identifier",
+      "id",
+      "ifRevision",
+      "requireNonSystemPaper",
+      "insertBeforeHeading",
+      "ifFolderId",
+      "ifAncestorFolderId",
+      "forbiddenAncestorFolderIds"
+    ]);
+    if (extra2.length) throw invalid4(`create does not take ${extra2.join(", ")}`);
+    if (!args.title?.trim()) throw invalid4("create requires a title");
+    return;
+  }
+  const extra = present(["title", "folder", "account"]);
+  if (extra.length) throw invalid4(`${args.mode} does not take ${extra.join(", ")}`);
+  if (args.insertBeforeHeading && args.mode !== "append")
+    throw invalid4("insertBeforeHeading is valid only in append mode");
+  if (args.dryRun && args.ifRevision) throw invalid4("A dry run does not take ifRevision");
+  if (!args.dryRun && !args.ifRevision)
+    throw invalid4("Applying requires ifRevision: run the identical request with dryRun first");
+}
+var UUID_IN_LINK = /identifier=([0-9A-F-]{36})$/i;
+function assertNoteLinkTargets(paragraphs, deps) {
+  const targets = /* @__PURE__ */ new Set();
+  for (const { link, target } of notesLinkTargets(paragraphs)) {
+    if (!target)
+      throw invalid4(`The Notes link ${link} does not name a note (showNote?identifier=)`);
+    targets.add(target);
+  }
+  for (const target of targets) {
+    let state;
+    try {
+      state = readWriterNoteState(target, deps);
+    } catch (error2) {
+      if (error2 instanceof PrivateWriteError && error2.code === "not_found")
+        throw invalid4(`Link target ${target} is not a note in this library`);
+      throw error2;
+    }
+    if (state.deletedOrInTrash)
+      throw invalid4(`Link target ${target} is in Recently Deleted or marked for deletion`);
+    if (state.passwordProtected) throw invalid4(`Link target ${target} is a locked note`);
+  }
+}
+function withDatabaseCheck(result, paragraphs) {
+  if (result.status !== "updated") return result;
+  return {
+    ...result,
+    databaseReadBack: crossCheckWithDatabase(result, void 0, paragraphs)
+  };
+}
+var PLACEHOLDER_IDENTIFIER = "00000000-0000-0000-0000-000000000000";
+var PLACEHOLDER_REVISION = `r1:${"0".repeat(64)}`;
+function discardCreatedNote(manager, id2, identifier, revision10, deps) {
+  try {
+    if (readWriterNoteState(identifier, deps).revision !== revision10) return "kept";
+    const body = manager.getNoteContentById(id2);
+    return manager.deleteNoteByIdIfUnchanged(id2, body).status === "deleted" ? "moved_to_recently_deleted" : "kept";
+  } catch {
+    return "kept";
+  }
+}
+function poll(attempt, sleep3) {
+  for (let i = 0; i < 5; i++) {
+    const value = attempt();
+    if (value) return value;
+    sleep3(300);
+  }
+  return null;
+}
+function createAndCompose(args, paragraphs, runtime) {
+  const { manager, deps, sleep: sleep3 } = runtime;
+  assertComposeWritesAllowed(deps.env);
+  assertWriterRequestSize({
+    identifier: PLACEHOLDER_IDENTIFIER,
+    mode: "append",
+    paragraphs,
+    ifRevision: PLACEHOLDER_REVISION
+  });
+  const features = privateWriterCapabilities(deps).features;
+  const kinds = new Set(paragraphs.filter(isObject4).map((p) => p.kind));
+  const needed = [features.composeNote];
+  if (kinds.has("divider") || kinds.has("table")) needed.push(features.composeObjects);
+  if (kinds.has("file") || kinds.has("url")) needed.push(features.composeAttachments);
+  for (const capability of needed)
+    if (!capability.available)
+      throw new PrivateWriteError(
+        capability.reason || "private_api_unavailable",
+        capability.detail || "compose is unavailable",
+        false
+      );
+  const note = manager.createNote(
+    args.title,
+    "",
+    [],
+    args.folder,
+    args.account,
+    "plaintext"
+  );
+  if (!note)
+    throw new PrivateWriteError(
+      "create_failed",
+      "Notes.app did not create the note (check that the folder and account exist)",
+      false
+    );
+  const created = { noteCreated: true, id: note.id };
+  const identifier = poll(
+    () => manager.getNoteLinkById(note.id)?.match(UUID_IN_LINK)?.[1] ?? null,
+    sleep3
+  );
+  if (!identifier)
+    throw new PrivateWriteError(
+      "not_found",
+      "The note was created, but its Notes UUID could not be read (needs Full Disk Access). The note holds only its title; delete it or retry with mode append.",
+      false,
+      created
+    );
+  let revision10 = null;
+  try {
+    const state = poll(() => {
+      try {
+        return readWriterNoteState(identifier, deps);
+      } catch (error2) {
+        if (error2 instanceof PrivateWriteError && error2.code === "not_found") return null;
+        throw error2;
+      }
+    }, sleep3);
+    if (!state)
+      throw new PrivateWriteError("not_found", "The writer cannot see the new note yet", false);
+    revision10 = state.revision;
+    const result = composeNote(
+      { identifier, mode: "append", paragraphs, ifRevision: state.revision },
+      deps
+    );
+    return {
+      ...withDatabaseCheck(result, paragraphs),
+      mode: "create",
+      created: true,
+      id: note.id,
+      identifier
+    };
+  } catch (error2) {
+    if (!(error2 instanceof PrivateWriteError)) throw error2;
+    const createdNote = error2.committed === false && revision10 ? discardCreatedNote(manager, note.id, identifier, revision10, deps) : "kept";
+    const outcome = createdNote === "moved_to_recently_deleted" ? `the new note ${note.id} was moved to Recently Deleted` : `the note was created with its title only; id ${note.id}, identifier ${identifier}`;
+    throw new PrivateWriteError(error2.code, `${error2.message} (${outcome})`, error2.committed, {
+      ...error2.details,
+      ...created,
+      identifier,
+      createdNote
+    });
+  }
+}
+function runComposeNote(args, runtime) {
+  checkModeFields(args);
+  const { paragraphs, warnings } = contentFor(args);
+  assertNoteLinkTargets(paragraphs, runtime.deps);
+  const extra = warnings.length ? { warnings } : {};
+  if (args.mode === "create") {
+    if (args.dryRun) {
+      assertWriterRequestSize({
+        identifier: PLACEHOLDER_IDENTIFIER,
+        mode: "append",
+        paragraphs,
+        ifRevision: PLACEHOLDER_REVISION
+      });
+      return {
+        status: "planned",
+        dryRun: true,
+        committed: false,
+        mode: "create",
+        paragraphs: paragraphs.length,
+        plan: paragraphs.map(
+          (p) => isObject4(p) ? {
+            kind: p.kind,
+            ...p.kind === "table" ? { rows: p.rows.length, columns: p.rows[0].length } : {},
+            ...p.kind === "file" ? { path: p.path, filename: p.filename ?? basename8(p.path) } : {},
+            ...p.kind === "url" ? { url: p.url } : {}
+          } : {
+            style: p.style,
+            indent: p.indent ?? 0,
+            blockQuote: p.blockQuote ?? false,
+            ...p.checked !== void 0 ? { checked: p.checked } : {},
+            runs: p.runs.length
+          }
+        ),
+        ...extra
+      };
+    }
+    return { ...createAndCompose(args, paragraphs, runtime), ...extra };
+  }
+  const identifier = resolveIdentifier(runtime.manager, args);
+  const result = composeNote(
+    {
+      identifier,
+      mode: args.mode,
+      paragraphs,
+      ...args.dryRun ? { dryRun: true } : { ifRevision: args.ifRevision },
+      ...args.requireNonSystemPaper ? { requireNonSystemPaper: true } : {},
+      ...args.insertBeforeHeading ? { insertBeforeHeading: args.insertBeforeHeading } : {},
+      scope: scopeGuardFrom(args)
+    },
+    runtime.deps
+  );
+  return {
+    ...withDatabaseCheck(result, paragraphs),
+    ...args.id ? { id: args.id } : {},
+    ...extra
+  };
+}
+var blockingSleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function registerComposeNoteTool(server2, manager, depsFactory = defaultWriterToolDeps, sleep3 = blockingSleep) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "compose-note",
+    "Use when: writing natively formatted content to Apple Notes in one step through the private writer: headings, subheadings, body paragraphs with bold/italic/underline/strikethrough/link/highlight/color runs, bulleted/dashed/numbered lists with indent, checklists with checked state, block quotes, monospaced blocks, native dividers, native tables, local files and rich link cards placed in order, and links to other notes. Modes: create (new note in a folder), append (end of a note, or before one exact heading), prepend (directly below the title). Accepts a block list or Markdown.\nReturns: plan (dryRun) or committed/verified flags, revisionBefore/revisionAfter, unitStart and objectURI (where the written paragraphs begin), readBack (each written paragraph's persisted style, indent, quote, checklist state, and run attributes), databaseReadBack (the same paragraphs decoded independently from NoteStore.sqlite), objects (each created divider, table, file with its size and SHA-256, or link card), frozenAttachments (existing attachments proven unchanged), sync state (pushScheduled is always false; pushState, cloudSync), and with nudge: true a `sync` report.\nDo not use when: the writer is not enabled (check native-writer-status), the target is locked, shared, trashed, still downloading, or has no title line.\nSafety: writes to the Notes database through unsupported private API. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer (setup --native-writer). append/prepend: run with dryRun: true, then send the IDENTICAL request with ifRevision set to the plan's revisionBefore; any change in between refuses with nothing written. Every paragraph, table cell, card URL, and file's bytes is verified in a fresh read and checked against the request; existing attachments are fingerprinted before and after and any change refuses (attachment_drift, nothing written). Files follow add-attachment's rules (absolute path, regular file, at most 64 MiB; at most 20 files and cards). A link to a note must name an existing note that is not locked or in Recently Deleted. A timeout is indeterminate (indeterminate: true): read native-note-state before retrying. create checks every limit first, then makes the note through Notes.app; if the compose then fails with nothing written, the unchanged title-only note is moved to Recently Deleted (createdNote), otherwise the error names it. Not yet live-validated, so writes also require APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1.",
+    composeNoteInput,
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const result = runComposeNote(args, { manager, deps: deps.writer, sleep: sleep3 });
+      if (!args.nudge || result.status !== "updated") return result;
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(String(result.identifier), args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+}
+
+// src/services/privateWriterChecklist.ts
+var TODO_IDENTIFIER = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+var revision4 = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+var checklistItemSchema2 = external_exports.object({
+  todoIdentifier: external_exports.string().regex(/^[0-9a-f]{32}$/),
+  uuid: external_exports.string(),
+  index: external_exports.number().int().nonnegative(),
+  done: external_exports.boolean(),
+  /** The line holding the item's first non-newline character. */
+  text: external_exports.string(),
+  lineStart: external_exports.number().int().nonnegative(),
+  lineLengthUTF16: external_exports.number().int().nonnegative(),
+  /** The exact characters whose style carries this todo (may start with a borrowed newline). */
+  styledStart: external_exports.number().int().nonnegative(),
+  styledLengthUTF16: external_exports.number().int().positive(),
+  /** false when the identifier appears in more than one place; the toggle refuses it. */
+  contiguous: external_exports.boolean(),
+  /** false when the item's runs disagree on the done bit; a toggle rewrites all of them. */
+  consistent: external_exports.boolean()
+}).passthrough();
+var checklistStateSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  identifier: external_exports.string(),
+  revision: revision4,
+  items: external_exports.array(checklistItemSchema2),
+  total: external_exports.number().int().nonnegative(),
+  checked: external_exports.number().int().nonnegative()
+}).passthrough();
+var setChecklistResultSchema = external_exports.object({
+  status: external_exports.enum(["updated", "unchanged"]),
+  committed: external_exports.boolean(),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  todoIdentifier: external_exports.string().regex(/^[0-9a-f]{32}$/),
+  index: external_exports.number().int().nonnegative(),
+  done: external_exports.boolean(),
+  previousDone: external_exports.boolean(),
+  persistedDone: external_exports.boolean(),
+  revisionBefore: revision4,
+  revisionAfter: revision4,
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+}).passthrough();
+function assertTodoIdentifier(todoIdentifier) {
+  if (!TODO_IDENTIFIER.test(todoIdentifier))
+    throw new PrivateWriteError(
+      "invalid_request",
+      "todoIdentifier must be 32 hex digits (get-native-objects checklistItems id) or a UUID",
+      false
+    );
+}
+function readNativeChecklist(identifier, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(identifier);
+  return parseWriterResult(
+    checklistStateSchema,
+    callPrivateWriter("read_checklist", { identifier }, deps),
+    false
+  );
+}
+function setChecklistItem(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertTodoIdentifier(request.todoIdentifier);
+  if (typeof request.done !== "boolean")
+    throw new PrivateWriteError("invalid_request", "done must be true or false", false);
+  assertRevision(request.ifRevision, "native-checklist-state or native-note-state");
+  const scope2 = writerScopeFields(request.scope);
+  requireLiveValidated(CHECKLIST_TOGGLE_LIVE_VALIDATED, "native-set-checklist-item", deps.env);
+  return parseWriterResult(
+    setChecklistResultSchema,
+    callPrivateWriter(
+      "set_checklist_item",
+      {
+        identifier: request.identifier,
+        todoIdentifier: request.todoIdentifier.toLowerCase(),
+        done: request.done,
+        ifRevision: request.ifRevision,
+        ...scope2
+      },
+      deps
+    ),
+    true
+  );
+}
+
+// src/tools/privateWriterChecklistTools.ts
+function registerPrivateWriterChecklistTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-checklist-state",
+    "Use when: you need a note's native checklist items with their stable todo identifiers and done state, and the note's revision token, before native-set-checklist-item.\nReturns: items (todoIdentifier as 32 hex digits, uuid, index, done, text, line and styled-character offsets, contiguous/consistent flags), total, checked, and `revision` (pass it as ifRevision).\nDo not use when: the writer is off; get-checklist-state and get-native-objects read the same state from the database without it.\nSafety: read-only; the writer opens the store with Core Data's read-only option. Runs through the private writer, so it needs APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer (setup --native-writer).",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID (the notes://showNote identifier)"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database")
+    },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readNativeChecklist(resolveIdentifier(manager, args), deps.writer) })
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-set-checklist-item",
+    "Use when: checking or unchecking one existing Apple Notes checklist item, addressed by its todo identifier (native-checklist-state todoIdentifier, or get-native-objects checklistItems id). Shortcuts cannot do this.\nReturns: status (updated, or unchanged when the item already had that state and nothing was written), committed, persistedDone (re-read from a fresh Core Data stack), previousDone, index, revisionBefore/revisionAfter, sync state (pushScheduled is always false), and with nudge: true a `sync` report of the move-in-place nudge.\nDo not use when: adding checklist items (create-checklist-item), or the note is locked, shared, trashed, or still downloading.\nSafety: writes to the Notes database through unsupported private API, changing only that item's done bit. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer, and a fresh `revision` as ifRevision; refuses on any change since, on an identifier that matches no item (not_found), and on one found in two places (ambiguous_target). A timeout is indeterminate (indeterminate: true): read native-checklist-state before any retry. Not yet live-validated, so it also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      todoIdentifier: external_exports.string().regex(TODO_IDENTIFIER).describe("The checklist item's todo identifier: 32 hex digits, or the same UUID dashed"),
+      done: external_exports.boolean().describe("true to check the item, false to uncheck it"),
+      ifRevision: revisionToken.describe(
+        "The `revision` from native-checklist-state or native-note-state for this note"
+      ),
+      ...writerScopeGuardInput(),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified change, ask Notes.app to upload the note by moving it into its own folder (default false; skipped when nothing was written)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = setChecklistItem(
+        {
+          identifier,
+          todoIdentifier: args.todoIdentifier,
+          done: args.done,
+          ifRevision: args.ifRevision,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge || !result.committed) return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+}
+
+// src/services/privateWriterHighlight.ts
+var HIGHLIGHT_COLORS = ["purple", "pink", "orange", "mint", "blue"];
+var MAX_MATCH_UTF16 = 1e3;
+var MAX_HIGHLIGHT_RANGES = 100;
+var HIGHLIGHT_SCOPES = ["text", "note"];
+var revision5 = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+var runSchema3 = external_exports.object({
+  start: external_exports.number().int().nonnegative(),
+  lengthUTF16: external_exports.number().int().positive(),
+  color: external_exports.string().nullable()
+});
+var highlightResultSchema = external_exports.object({
+  status: external_exports.enum(["planned", "unchanged", "updated"]),
+  committed: external_exports.boolean(),
+  dryRun: external_exports.boolean(),
+  identifier: external_exports.string(),
+  scope: external_exports.enum(HIGHLIGHT_SCOPES),
+  color: external_exports.string(),
+  rangeCount: external_exports.number().int().positive(),
+  /** UTF-16 code units across all target ranges. */
+  characterCount: external_exports.number().int().positive(),
+  /** Scope "note" only: what the whole-note scope left out. */
+  skipped: external_exports.object({
+    titleUTF16: external_exports.number().int().nonnegative(),
+    attachmentGlyphs: external_exports.number().int().nonnegative(),
+    highlightedAttachmentGlyphs: external_exports.number().int().nonnegative()
+  }).optional(),
+  revisionBefore: revision5,
+  revisionAfter: revision5,
+  plan: external_exports.array(
+    external_exports.object({
+      start: external_exports.number().int().nonnegative(),
+      lengthUTF16: external_exports.number().int().positive(),
+      currentRuns: external_exports.array(runSchema3),
+      changes: external_exports.boolean()
+    })
+  ).optional(),
+  ranges: external_exports.array(
+    external_exports.object({
+      start: external_exports.number().int().nonnegative(),
+      lengthUTF16: external_exports.number().int().positive(),
+      storedRuns: external_exports.array(runSchema3)
+    })
+  ).optional(),
+  /** Notes' derived "note has a highlight" flag after the call; null when not modeled. */
+  hasEmphasis: external_exports.boolean().nullable(),
+  /** Dry run only: whether this macOS offers the write the plan describes. */
+  writeAvailable: external_exports.boolean().optional(),
+  writeMissing: external_exports.array(external_exports.string()).optional(),
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+}).passthrough();
+var FORBIDDEN_MATCH = /[\x00-\x08\x0A-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
+function assertHighlightMatch(match) {
+  if (!match.length) throw new PrivateWriteError("invalid_request", "match is required", false);
+  if (match.length > MAX_MATCH_UTF16)
+    throw new PrivateWriteError(
+      "invalid_request",
+      `match exceeds ${MAX_MATCH_UTF16} UTF-16 code units`,
+      false
+    );
+  if (FORBIDDEN_MATCH.test(match))
+    throw new PrivateWriteError(
+      "invalid_request",
+      "match must be text within one paragraph (no newlines, attachment glyphs, or control characters)",
+      false
+    );
+}
+function targetFields(target) {
+  if (target.scope === "note") {
+    const extra = target;
+    if (extra.match !== void 0 || extra.expectedCount !== void 0)
+      throw new PrivateWriteError(
+        "invalid_request",
+        'match and expectedCount apply only to scope "text"',
+        false
+      );
+    return { scope: "note" };
+  }
+  if (target.scope !== "text")
+    throw new PrivateWriteError("invalid_request", 'scope must be "text" or "note"', false);
+  assertHighlightMatch(target.match);
+  const expectedCount = target.expectedCount ?? 1;
+  if (!Number.isInteger(expectedCount) || expectedCount < 1 || expectedCount > MAX_HIGHLIGHT_RANGES)
+    throw new PrivateWriteError(
+      "invalid_request",
+      `expectedCount must be an integer from 1 to ${MAX_HIGHLIGHT_RANGES}`,
+      false
+    );
+  return { scope: "text", match: target.match, expectedCount };
+}
+function setHighlight(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  const fields = {
+    identifier: request.identifier,
+    ...targetFields(request.target),
+    ...writerScopeFields(request.scope)
+  };
+  if (request.color !== "none" && !HIGHLIGHT_COLORS.includes(request.color))
+    throw new PrivateWriteError(
+      "invalid_request",
+      "color must be purple, pink, orange, mint, blue, or none",
+      false
+    );
+  fields.color = request.color;
+  const dryRun = request.dryRun === true;
+  if (request.ifRevision !== void 0) {
+    assertRevision(request.ifRevision);
+    fields.ifRevision = request.ifRevision;
+  } else if (!dryRun) {
+    throw new PrivateWriteError(
+      "invalid_request",
+      "ifRevision is required unless dryRun is true",
+      false
+    );
+  }
+  if (dryRun) fields.dryRun = true;
+  else requireLiveValidated(HIGHLIGHT_LIVE_VALIDATED, "native-highlight-text", deps.env);
+  try {
+    return parseWriterResult(
+      highlightResultSchema,
+      // Passing dryRun keeps a dry-run timeout from being described as a
+      // possible save.
+      callPrivateWriter("set_highlight", fields, deps, { dryRun }),
+      !dryRun
+    );
+  } catch (error2) {
+    if (dryRun && error2 instanceof PrivateWriteError && error2.committed !== false)
+      throw new PrivateWriteError(error2.code, error2.message, false, error2.details);
+    throw error2;
+  }
+}
+
+// src/tools/privateWriterHighlightTools.ts
+function highlightTarget(args) {
+  if (args.scope === "note") {
+    if (args.match !== void 0 || args.expectedCount !== void 0)
+      throw new PrivateWriteError(
+        "invalid_request",
+        'match and expectedCount apply only to scope "text"; omit them with scope "note"',
+        false
+      );
+    return { scope: "note" };
+  }
+  if (args.match === void 0)
+    throw new PrivateWriteError("invalid_request", 'match is required with scope "text"', false);
+  return { scope: "text", match: args.match, expectedCount: args.expectedCount };
+}
+function registerPrivateWriterHighlightTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-highlight-text",
+    'Use when: applying or removing Notes\' highlight (the purple, pink, orange, mint, and blue highlight colors) on exact text in one note (scope "text", the default) or on the whole note body after the title (scope "note"). AppleScript and Shortcuts cannot set it.\nReturns: status (planned for a dry run, unchanged when every target range already has that state, updated), rangeCount, characterCount (UTF-16 units targeted), a per-range plan with current runs (dry run or no-op) or the stored runs re-read after the write (`ranges`), for scope note `skipped` (titleUTF16, attachmentGlyphs, highlightedAttachmentGlyphs), hasEmphasis (Notes\' derived flag), revisionBefore/revisionAfter, sync state (pushScheduled is always false), and with nudge: true a `sync` report.\nDo not use when: the text spans paragraphs (use scope note for the whole body), or you need bold, italic, or text color.\nSafety: writes to the Notes database through unsupported private API, changing only the highlight attribute of the target characters. Scope text: `match` is literal and case-sensitive; the call refuses (match_count_mismatch, nothing written) unless it occurs exactly `expectedCount` times. Scope note: takes no match or expectedCount; it covers everything after the title paragraph except attachment glyphs (images, files, tables, drawings, inline tags), whose contents it never changes, and refuses with nothing_to_highlight when nothing is left. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer, and a fresh `revision` from native-note-state as ifRevision (optional for dryRun). Verifies every highlight run in the note by re-reading it in a new Core Data stack. A timeout is indeterminate (indeterminate: true). Writes are not yet live-validated, so they also require APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1; dryRun does not.',
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      scope: external_exports.enum(HIGHLIGHT_SCOPES).optional().describe(
+        "text (default): every occurrence of `match`; note: the whole body after the title, skipping attachments"
+      ),
+      match: external_exports.string().min(1).max(MAX_MATCH_UTF16).optional().describe(
+        "Exact, case-sensitive text to highlight, within one paragraph. Required for scope text; refused for scope note"
+      ),
+      color: external_exports.enum([...HIGHLIGHT_COLORS, "none"]).describe("Highlight color, or none to remove the highlight"),
+      expectedCount: external_exports.number().int().min(1).max(MAX_HIGHLIGHT_RANGES).optional().describe(
+        "Scope text only: how many times `match` must occur (default 1); every occurrence is changed"
+      ),
+      ifRevision: revisionToken.optional().describe("The `revision` from native-note-state; required unless dryRun is true"),
+      dryRun: external_exports.boolean().optional().describe(
+        "Report the target ranges, character count, and current highlight without writing"
+      ),
+      ...writerScopeGuardInput(),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified change, ask Notes.app to upload the note by moving it into its own folder (default false; skipped when nothing was written)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = setHighlight(
+        {
+          identifier,
+          target: highlightTarget(args),
+          color: args.color,
+          ifRevision: args.ifRevision,
+          dryRun: args.dryRun,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge || !result.committed) return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+}
+
+// src/services/privateWriterLinkCard.ts
+var MAX_URL_UTF16 = 2048;
+var MAX_ANCHOR_UTF16 = 2e3;
+var revision6 = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+var urlCardResultSchema = external_exports.object({
+  status: external_exports.enum(["planned", "updated"]),
+  committed: external_exports.boolean(),
+  dryRun: external_exports.boolean(),
+  identifier: external_exports.string(),
+  url: external_exports.string(),
+  placement: external_exports.enum(["end", "afterParagraph"]),
+  insertedAtUTF16: external_exports.number().int().nonnegative(),
+  glyphIndexUTF16: external_exports.number().int().nonnegative(),
+  separatorInserted: external_exports.boolean(),
+  /** A body-style newline after the card, when text follows it. */
+  terminatorInserted: external_exports.boolean().optional(),
+  /** Dry run only: whether this macOS offers the write the plan describes. */
+  writeAvailable: external_exports.boolean().optional(),
+  writeMissing: external_exports.array(external_exports.string()).optional(),
+  revisionBefore: revision6,
+  revisionAfter: revision6,
+  attachment: external_exports.object({
+    attachmentIdentifier: external_exports.string(),
+    typeUTI: external_exports.string().nullable(),
+    urlString: external_exports.string().nullable(),
+    glyphIndexUTF16: external_exports.number().int().nullable(),
+    /** The attachment's own upload counters; it is a separate cloud object. */
+    cloudSync: cloudSyncSchema2.optional()
+  }).passthrough().optional(),
+  previewFetched: external_exports.boolean().optional(),
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+}).passthrough();
+function assertCardUrl2(url) {
+  let parsed = null;
+  try {
+    parsed = new URL(url);
+  } catch {
+    parsed = null;
+  }
+  if (!parsed || url.length > MAX_URL_UTF16 || // eslint-disable-next-line no-control-regex
+  /[\s\x00-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u.test(url) || !["http:", "https:"].includes(parsed.protocol) || !parsed.hostname)
+    throw new PrivateWriteError(
+      "invalid_request",
+      `url must be an absolute http or https URL with a host (at most ${MAX_URL_UTF16} characters)`,
+      false
+    );
+}
+function addUrlCard(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertCardUrl2(request.url);
+  if (request.afterParagraph !== void 0 && (!request.afterParagraph.length || request.afterParagraph.length > MAX_ANCHOR_UTF16 || request.afterParagraph.includes("\n")))
+    throw new PrivateWriteError(
+      "invalid_request",
+      `afterParagraph must be the full text of one paragraph (1 to ${MAX_ANCHOR_UTF16} characters, no newline)`,
+      false
+    );
+  const dryRun = request.dryRun === true;
+  const fields = { identifier: request.identifier, url: request.url };
+  if (request.afterParagraph !== void 0) fields.afterParagraph = request.afterParagraph;
+  Object.assign(fields, writerScopeFields(request.scope));
+  if (request.ifRevision !== void 0) {
+    assertRevision(request.ifRevision);
+    fields.ifRevision = request.ifRevision;
+  } else if (!dryRun) {
+    throw new PrivateWriteError(
+      "invalid_request",
+      "ifRevision is required unless dryRun is true",
+      false
+    );
+  }
+  if (dryRun) fields.dryRun = true;
+  else requireLiveValidated(LINK_CARD_LIVE_VALIDATED, "native-add-url-card", deps.env);
+  try {
+    return parseWriterResult(
+      urlCardResultSchema,
+      // Passing dryRun keeps a dry-run timeout from being described as a
+      // possible save.
+      callPrivateWriter("add_url_card", fields, deps, { dryRun }),
+      !dryRun
+    );
+  } catch (error2) {
+    if (dryRun && error2 instanceof PrivateWriteError && error2.committed !== false)
+      throw new PrivateWriteError(error2.code, error2.message, false, error2.details);
+    throw error2;
+  }
+}
+
+// src/tools/privateWriterLinkCardTools.ts
+function registerPrivateWriterLinkCardTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-add-url-card",
+    "Use when: adding a rich web link card (the preview tile Notes shows for a pasted URL) to one note, at the end or right after one exact paragraph. Neither AppleScript nor Shortcuts can create one.\nReturns: status (planned for a dry run, updated), the attachment identifier, its stored type and URL, its own cloudSync counters, the glyph position re-read from a fresh Core Data stack, revisionBefore/revisionAfter, sync state (pushScheduled is always false), and with nudge: true a `sync` report.\nDo not use when: you want a plain or labeled text link (insert-link or append-native), or a link to another note (insert-note-link).\nSafety: writes to the Notes database through unsupported private API: one new public.url attachment and one attachment glyph on its own line; no other text changes. `url` must be absolute http(s). `afterParagraph` must equal the full text of exactly one paragraph, or nothing is written (match_count_mismatch). The writer makes no network request; Notes fetches the card title and preview image itself later. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer, and a fresh `revision` from native-note-state as ifRevision (optional for dryRun). Not idempotent: a repeat adds a second card, but the replayed revision is refused. A timeout is indeterminate (indeterminate: true): read the note before any retry. Writes are not yet live-validated, so they also require APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1; dryRun does not.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      url: external_exports.string().min(1).max(MAX_URL_UTF16).describe("Absolute http or https URL for the card"),
+      afterParagraph: external_exports.string().min(1).max(MAX_ANCHOR_UTF16).optional().describe(
+        "Full text of the one paragraph the card should follow; omit to append at the end"
+      ),
+      ifRevision: revisionToken.optional().describe("The `revision` from native-note-state; required unless dryRun is true"),
+      dryRun: external_exports.boolean().optional().describe("Report where the card would go without writing"),
+      ...writerScopeGuardInput(),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified write, ask Notes.app to upload the note by moving it into its own folder (default false)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = addUrlCard(
+        {
+          identifier,
+          url: args.url,
+          afterParagraph: args.afterParagraph,
+          ifRevision: args.ifRevision,
+          dryRun: args.dryRun,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge || !result.committed) return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+}
+
+// src/services/privateWriterParagraphs.ts
+var revision7 = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+var PARAGRAPH_URL = /^applenotes:\/\/showNote\?identifier=[0-9A-F-]{36}&paragraphID=[0-9A-F-]{36}$/;
+var setBase = {
+  identifier: external_exports.string(),
+  blockIndex: external_exports.number().int(),
+  styleType: external_exports.number().int(),
+  paragraphId: external_exports.string().regex(UUID_PATTERN),
+  url: external_exports.string().regex(PARAGRAPH_URL),
+  previousParagraphId: external_exports.string().nullable(),
+  previousParagraphIdStatus: external_exports.enum(["unique", "shared", "missing"]),
+  revisionBefore: revision7,
+  revisionAfter: revision7
+};
+var setParagraphIdSchema = external_exports.union([
+  external_exports.object({
+    ...setBase,
+    status: external_exports.literal("unchanged"),
+    changed: external_exports.literal(false),
+    committed: external_exports.literal(false)
+  }).passthrough(),
+  external_exports.object({
+    ...setBase,
+    status: external_exports.literal("updated"),
+    changed: external_exports.literal(true),
+    committed: external_exports.literal(true),
+    verified: external_exports.literal(true),
+    modificationDate: external_exports.string().nullable(),
+    ...writeSyncFields
+  }).passthrough()
+]);
+function invalid5(message) {
+  throw new PrivateWriteError("invalid_request", message, false);
+}
+function setParagraphId(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  if (!Number.isInteger(request.blockIndex) || request.blockIndex < 0)
+    invalid5("blockIndex must be a non-negative integer from list-note-paragraphs");
+  if (!request.expectedText.replace(/\ufffc/g, "").trim())
+    invalid5("expectedText must be the paragraph text from list-note-paragraphs");
+  assertRevision(request.ifRevision);
+  if (request.paragraphId !== void 0 && !UUID_PATTERN.test(request.paragraphId))
+    invalid5("paragraphId must be a UUID");
+  requireLiveValidated(PARAGRAPH_IDS_LIVE_VALIDATED, "native-set-paragraph-id", deps.env);
+  const fields = {
+    identifier: request.identifier,
+    blockIndex: request.blockIndex,
+    expectedText: request.expectedText,
+    ifRevision: request.ifRevision
+  };
+  if (request.paragraphId !== void 0) fields.paragraphId = request.paragraphId.toUpperCase();
+  Object.assign(fields, writerScopeFields(request.scope));
+  return parseWriterResult(
+    setParagraphIdSchema,
+    callPrivateWriter("set_paragraph_id", fields, deps),
+    true
+  );
+}
+
+// src/services/privateWriterSectionLinks.ts
+var revision8 = external_exports.string().regex(/^r1:[a-f0-9]{64}$/);
+var addSectionLinkSchema = external_exports.object({
+  status: external_exports.literal("updated"),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  target: external_exports.string(),
+  selfLink: external_exports.boolean(),
+  section: external_exports.string(),
+  targetStyleType: external_exports.number().int(),
+  paragraphId: external_exports.string().regex(UUID_PATTERN),
+  previousParagraphIdStatus: external_exports.enum(["unique", "shared", "missing"]),
+  paragraphIdMinted: external_exports.boolean(),
+  url: external_exports.string().regex(PARAGRAPH_URL),
+  token: external_exports.string().nullable(),
+  inlineAttachmentIdentifier: external_exports.string().regex(UUID_PATTERN),
+  position: external_exports.enum(["end", "belowTitle"]),
+  clearedSectionLinks: external_exports.number().int().nonnegative(),
+  revisionBefore: revision8,
+  revisionAfter: revision8,
+  modificationDate: external_exports.string().nullable(),
+  targetRevisionBefore: revision8.optional(),
+  targetRevisionAfter: revision8.optional(),
+  targetCloudSync: cloudSyncSchema2.optional(),
+  ...writeSyncFields
+}).passthrough();
+function invalid6(message) {
+  throw new PrivateWriteError("invalid_request", message, false);
+}
+function addSectionLink(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  if (request.target !== void 0) assertNoteIdentifier2(request.target);
+  const selfLink = request.target === void 0 || request.target.toUpperCase() === request.identifier.toUpperCase();
+  assertRevision(request.ifRevision);
+  if (selfLink && request.ifTargetRevision !== void 0)
+    invalid6("ifTargetRevision is only for a link to another note");
+  if (!selfLink) {
+    if (request.ifTargetRevision === void 0)
+      invalid6(
+        "ifTargetRevision (the target note's revision) is required for a link to another note"
+      );
+    assertRevision(request.ifTargetRevision, "native-note-state for the target note");
+  }
+  const selectors = [request.blockIndex, request.paragraphId, request.heading].filter(
+    (value) => value !== void 0
+  ).length;
+  if (selectors > 1) invalid6("pass at most one of blockIndex, paragraphId, heading");
+  if (request.blockIndex !== void 0) {
+    if (!Number.isInteger(request.blockIndex) || request.blockIndex < 0)
+      invalid6("blockIndex must be a non-negative integer from list-note-paragraphs");
+    if (!request.expectedText?.replace(/\ufffc/g, "").trim())
+      invalid6("expectedText (the paragraph text from list-note-paragraphs) goes with blockIndex");
+  } else if (request.expectedText !== void 0) {
+    invalid6("expectedText goes with blockIndex");
+  }
+  if (request.paragraphId !== void 0 && !UUID_PATTERN.test(request.paragraphId))
+    invalid6("paragraphId must be a UUID");
+  if (request.heading !== void 0 && !request.heading.trim()) invalid6("heading is empty");
+  requireLiveValidated(SECTION_LINKS_LIVE_VALIDATED, "native-add-section-link", deps.env);
+  const fields = {
+    identifier: request.identifier,
+    ifRevision: request.ifRevision
+  };
+  if (!selfLink) {
+    fields.target = request.target;
+    fields.ifTargetRevision = request.ifTargetRevision;
+  }
+  if (request.blockIndex !== void 0) {
+    fields.blockIndex = request.blockIndex;
+    fields.expectedText = request.expectedText;
+  }
+  if (request.paragraphId !== void 0) fields.paragraphId = request.paragraphId.toUpperCase();
+  if (request.heading !== void 0) fields.heading = request.heading;
+  if (request.position !== void 0) fields.position = request.position;
+  if (request.clearExistingSectionLinks !== void 0)
+    fields.clearExistingSectionLinks = request.clearExistingSectionLinks;
+  Object.assign(fields, writerScopeFields(request.scope));
+  return parseWriterResult(
+    addSectionLinkSchema,
+    callPrivateWriter("add_section_link", fields, deps),
+    true
+  );
+}
+
+// src/tools/privateWriterParagraphTools.ts
+var nudgeInput = {
+  nudge: external_exports.boolean().optional().describe(
+    "After a verified write, ask Notes.app to upload the changed note(s) by moving each into its own folder (default false)"
+  ),
+  nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+};
+function registerPrivateWriterParagraphTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-set-paragraph-id",
+    "Use when: list-note-paragraphs shows paragraphIdStatus `shared` or `missing` (or get-paragraph-link refuses with paragraph-id-shared / paragraph-id-missing) for a paragraph you need to link to. Gives that paragraph an identifier of its own so its paragraph link opens exactly there.\nReturns: `status` (`updated`, or `unchanged` when the paragraph already had a unique identifier and nothing was written), `paragraphId`, `url` (applenotes://showNote?identifier=\u2026&paragraphID=\u2026), `previousParagraphId`, `previousParagraphIdStatus`, revisionBefore/revisionAfter, sync state (pushScheduled is always false), and with nudge: true a `sync` report.\nDo not use when: the paragraph is already `unique` (use its url from list-note-paragraphs), or the note is locked, shared, trashed, or still downloading.\nSafety: writes to the Notes database through unsupported private API. Needs the paragraph's `blockIndex` and exact `text` (as expectedText) from list-note-paragraphs, and a fresh `revision` from native-note-state as ifRevision; refuses on any change (revision_conflict or paragraph_changed, committed: false). Only the paragraph style's identifier changes: a fresh read-back verifies the text, the paragraph's other attributes, every other paragraph's identifier, and that no other paragraph carries the new one. A timeout is indeterminate (indeterminate: true): read native-note-state before any retry. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 until live-validated.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      blockIndex: external_exports.number().int().min(0).describe("The paragraph's `blockIndex` from list-note-paragraphs"),
+      expectedText: external_exports.string().min(1).max(5e4).describe("The paragraph's `text` from list-note-paragraphs"),
+      ifRevision: revisionToken.describe(
+        "The `revision` returned by native-note-state for this note"
+      ),
+      paragraphId: notesUuid2.optional().describe("Optional UUID to assign; must not be in use in the note. Omit to mint one"),
+      ...writerScopeGuardInput(),
+      ...nudgeInput
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = setParagraphId(
+        {
+          identifier,
+          blockIndex: args.blockIndex,
+          expectedText: args.expectedText,
+          ifRevision: args.ifRevision,
+          paragraphId: args.paragraphId,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge || result.status !== "updated") return { ...result };
+      return {
+        ...result,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-add-section-link",
+    "Use when: inserting a native section-link chip (what Notes' Copy Link to Section pastes) that opens a paragraph or heading in the same note or another note. macOS 27 or later.\nReturns: `url` and `token` (applenotes://showNote?identifier=\u2026&paragraphID=\u2026), the `section` label, `paragraphId`, `paragraphIdMinted` (true when the target paragraph needed an identifier of its own), `inlineAttachmentIdentifier`, `clearedSectionLinks`, revisionBefore/After (plus targetRevisionBefore/After for another note), sync state (pushScheduled is always false), and with nudge: true a `sync` report.\nDo not use when: a link string is enough (get-paragraph-link, or native-set-paragraph-id first when the identifier is shared), or you want a chip to a whole note.\nSafety: writes to the Notes database through unsupported private API. Selects the target paragraph by `blockIndex` + `expectedText` from list-note-paragraphs, by a unique `paragraphId`, by `heading` text (exact, case-insensitive), or defaults to the first heading or subheading; refuses a missing or ambiguous match. Needs `ifRevision` and, for another note, `ifTargetRevision`, both from native-note-state; refuses on any change (committed: false). `clearExistingSectionLinks` removes only chips that are section links; note-link chips stay. Verified by a fresh read-back of both notes and the attachment. A timeout is indeterminate (indeterminate: true). Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 until live-validated.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID of the note that receives the chip"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      target: notesUuid2.optional().describe("Notes UUID of the note the chip opens; omit to link within the same note"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("Target paragraph's `blockIndex` from list-note-paragraphs (with expectedText)"),
+      expectedText: external_exports.string().min(1).max(5e4).optional().describe("With blockIndex: the paragraph's `text` from list-note-paragraphs"),
+      paragraphId: notesUuid2.optional().describe("A paragraph identifier that is unique in the target note"),
+      heading: external_exports.string().min(1).max(1e3).optional().describe("Title, heading, or subheading text to link to (exact, case-insensitive)"),
+      position: external_exports.enum(["end", "belowTitle"]).optional().describe(
+        "end (default) appends; belowTitle inserts after the title and any section chips right below it"
+      ),
+      clearExistingSectionLinks: external_exports.boolean().optional().describe("Remove the note's existing section-link chips first (default false)"),
+      ifRevision: revisionToken.describe(
+        "The `revision` from native-note-state for the note that receives the chip"
+      ),
+      ifTargetRevision: revisionToken.optional().describe("The target note's `revision` from native-note-state; required for another note"),
+      ...writerScopeGuardInput(),
+      ...nudgeInput
+    },
+    // destructiveHint: clearExistingSectionLinks removes chips.
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = addSectionLink(
+        {
+          identifier,
+          target: args.target,
+          blockIndex: args.blockIndex,
+          expectedText: args.expectedText,
+          paragraphId: args.paragraphId,
+          heading: args.heading,
+          position: args.position,
+          clearExistingSectionLinks: args.clearExistingSectionLinks,
+          ifRevision: args.ifRevision,
+          ifTargetRevision: args.ifTargetRevision,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      if (!args.nudge) return { ...result };
+      const changed = !result.selfLink && result.paragraphIdMinted ? [identifier, result.target] : [identifier];
+      return { ...result, sync: await nudgeAfterWrite(changed, args.nudgeWaitSeconds, deps.nudge) };
+    }
+  );
+}
+
+// src/services/privateWriterTables.ts
+var REVISION_TOKEN = /^r1:[a-f0-9]{64}$/;
+var TABLE_DIGEST = /^t1:[a-f0-9]{64}$/;
+var MAX_CELL_TEXT = 1e4;
+var revision9 = external_exports.string().regex(REVISION_TOKEN);
+var tableDigest = external_exports.string().regex(TABLE_DIGEST);
+var tableSchema = external_exports.object({
+  identifier: external_exports.string(),
+  glyphCount: external_exports.number().int(),
+  orphan: external_exports.boolean(),
+  digest: tableDigest,
+  readable: external_exports.boolean(),
+  unreadableReason: external_exports.string().optional(),
+  rowCount: external_exports.number().int().optional(),
+  columnCount: external_exports.number().int().optional(),
+  columnIdentifiers: external_exports.array(external_exports.string()).optional(),
+  rows: external_exports.array(external_exports.object({ identifier: external_exports.string(), cells: external_exports.array(external_exports.string()) })).optional()
+}).passthrough();
+var readTablesSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  identifier: external_exports.string(),
+  revision: revision9,
+  deletedOrInTrash: external_exports.boolean(),
+  sharedViaICloud: external_exports.boolean(),
+  tableCount: external_exports.number().int(),
+  tables: external_exports.array(tableSchema)
+}).passthrough();
+var planBase = {
+  status: external_exports.literal("planned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false),
+  identifier: external_exports.string(),
+  tableIdentifier: external_exports.string(),
+  revision: revision9,
+  tableDigest
+};
+var tableWriteResultSchema = external_exports.object({
+  status: external_exports.literal("updated"),
+  dryRun: external_exports.literal(false),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  tableIdentifier: external_exports.string(),
+  revisionBefore: revision9,
+  revisionAfter: revision9,
+  tableDigestBefore: tableDigest,
+  tableDigestAfter: tableDigest,
+  rowCount: external_exports.number().int(),
+  columnCount: external_exports.number().int(),
+  ...writeSyncFields
+}).passthrough();
+var deleteRowPlanSchema = external_exports.object({
+  ...planBase,
+  rowIdentifier: external_exports.string(),
+  rowIndex: external_exports.number().int(),
+  rowCells: external_exports.array(external_exports.string()),
+  rowCountBefore: external_exports.number().int(),
+  columnCount: external_exports.number().int()
+}).passthrough();
+var prunePlanSchema = external_exports.object({
+  ...planBase,
+  glyphCount: external_exports.literal(0),
+  activeTableCountBefore: external_exports.number().int(),
+  readable: external_exports.boolean()
+}).passthrough();
+var pruneResultSchema = external_exports.object({
+  status: external_exports.literal("updated"),
+  dryRun: external_exports.literal(false),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  tableIdentifier: external_exports.string(),
+  removedTableIdentifier: external_exports.string(),
+  activeTableCountBefore: external_exports.number().int(),
+  activeTableCountAfter: external_exports.number().int(),
+  revisionBefore: revision9,
+  revisionAfter: revision9,
+  ...writeSyncFields
+}).passthrough();
+var FORBIDDEN_CELL_TEXT = /[\x00-\x08\x0B-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
+function invalid7(message) {
+  return new PrivateWriteError("invalid_request", message, false);
+}
+function assertCellText(text2) {
+  if (text2.length > MAX_CELL_TEXT)
+    throw invalid7(`cell text exceeds ${MAX_CELL_TEXT} UTF-16 code units`);
+  if (FORBIDDEN_CELL_TEXT.test(text2))
+    throw invalid7("cell text may contain only printable characters, tabs and \\n newlines");
+}
+function assertUuid(value, field) {
+  if (!UUID_PATTERN.test(value)) throw invalid7(`${field} must be a UUID`);
+}
+function assertGuards(guards) {
+  if (!guards.ifRevision || !REVISION_TOKEN.test(guards.ifRevision))
+    throw invalid7("ifRevision must be the `revision` from native-read-tables or a dry run");
+  if (!guards.ifTableDigest || !TABLE_DIGEST.test(guards.ifTableDigest))
+    throw invalid7(
+      "ifTableDigest must be the table `digest` from native-read-tables or `tableDigest` from a dry run"
+    );
+}
+function modeFields(dryRun, guards) {
+  if (dryRun) {
+    if (guards.ifRevision !== void 0 || guards.ifTableDigest !== void 0)
+      throw invalid7("ifRevision and ifTableDigest are only accepted with dryRun: false");
+    return { dryRun: true };
+  }
+  assertGuards(guards);
+  return { dryRun: false, ifRevision: guards.ifRevision, ifTableDigest: guards.ifTableDigest };
+}
+function readTables(identifier, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(identifier);
+  return parseWriterResult(
+    readTablesSchema,
+    callPrivateWriter("read_tables", { identifier }, deps),
+    false
+  );
+}
+function deleteTableRow(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertUuid(request.tableIdentifier, "tableIdentifier");
+  assertUuid(request.rowIdentifier, "rowIdentifier");
+  const mode = modeFields(request.dryRun, request);
+  if (!request.dryRun)
+    requireLiveValidated(TABLE_WRITES_LIVE_VALIDATED, "native-delete-table-row", deps.env);
+  const fields = {
+    identifier: request.identifier,
+    tableIdentifier: request.tableIdentifier,
+    rowIdentifier: request.rowIdentifier,
+    ...mode,
+    ...writerScopeFields(request.scope)
+  };
+  const response = callPrivateWriter("delete_table_row", fields, deps, {
+    dryRun: request.dryRun
+  });
+  return request.dryRun ? parseWriterResult(deleteRowPlanSchema, response, false) : parseWriterResult(tableWriteResultSchema, response, true);
+}
+function insertTableRow(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertUuid(request.tableIdentifier, "tableIdentifier");
+  if (request.afterRowIdentifier !== void 0)
+    assertUuid(request.afterRowIdentifier, "afterRowIdentifier");
+  (request.cells ?? []).forEach(assertCellText);
+  assertGuards(request);
+  requireLiveValidated(TABLE_WRITES_LIVE_VALIDATED, "native-insert-table-row", deps.env);
+  const fields = {
+    identifier: request.identifier,
+    tableIdentifier: request.tableIdentifier,
+    ifRevision: request.ifRevision,
+    ifTableDigest: request.ifTableDigest
+  };
+  if (request.afterRowIdentifier !== void 0)
+    fields.afterRowIdentifier = request.afterRowIdentifier;
+  if (request.cells !== void 0) fields.cells = request.cells;
+  Object.assign(fields, writerScopeFields(request.scope));
+  return parseWriterResult(
+    tableWriteResultSchema,
+    callPrivateWriter("insert_table_row", fields, deps),
+    true
+  );
+}
+function setTableCell(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertUuid(request.tableIdentifier, "tableIdentifier");
+  assertUuid(request.rowIdentifier, "rowIdentifier");
+  assertUuid(request.columnIdentifier, "columnIdentifier");
+  assertCellText(request.text);
+  assertGuards(request);
+  requireLiveValidated(TABLE_WRITES_LIVE_VALIDATED, "native-set-table-cell", deps.env);
+  return parseWriterResult(
+    tableWriteResultSchema,
+    callPrivateWriter(
+      "set_table_cell",
+      {
+        identifier: request.identifier,
+        tableIdentifier: request.tableIdentifier,
+        rowIdentifier: request.rowIdentifier,
+        columnIdentifier: request.columnIdentifier,
+        text: request.text,
+        ifRevision: request.ifRevision,
+        ifTableDigest: request.ifTableDigest,
+        ...writerScopeFields(request.scope)
+      },
+      deps
+    ),
+    true
+  );
+}
+function pruneOrphanTable(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertUuid(request.tableIdentifier, "tableIdentifier");
+  const mode = modeFields(request.dryRun, request);
+  if (!request.dryRun)
+    requireLiveValidated(TABLE_WRITES_LIVE_VALIDATED, "native-prune-orphan-table", deps.env);
+  const response = callPrivateWriter(
+    "prune_orphan_table",
+    {
+      identifier: request.identifier,
+      tableIdentifier: request.tableIdentifier,
+      ...mode,
+      ...writerScopeFields(request.scope)
+    },
+    deps,
+    { dryRun: request.dryRun }
+  );
+  return request.dryRun ? parseWriterResult(prunePlanSchema, response, false) : parseWriterResult(pruneResultSchema, response, true);
+}
+
+// src/tools/privateWriterTableTools.ts
+var uuid2 = (what) => notesUuid2.describe(what);
+var noteRef = {
+  identifier: notesUuid2.optional().describe("Notes UUID of the note that holds the table"),
+  id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database")
+};
+var ifRevision = revisionToken.describe(
+  "The note `revision` from native-read-tables or the dry run"
+);
+var ifTableDigest = external_exports.string().regex(TABLE_DIGEST).describe("The table `digest` from native-read-tables, or `tableDigest` from the dry run");
+var cellText = external_exports.string().max(MAX_CELL_TEXT);
+var nudgeFields = {
+  nudge: external_exports.boolean().optional().describe(
+    "After a verified apply, ask Notes.app to upload the note by moving it into its own folder (default false; ignored on a dry run)"
+  ),
+  nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+};
+var WRITE = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+};
+var DESTRUCTIVE = { ...WRITE, destructiveHint: true };
+var GATE = "Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer (setup --native-writer); applying (not a dry run) also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 until this path is live-validated. nudge: true runs the move-in-place sync nudge after a verified apply; its uploadRecorded covers the note record, not the table attachment.";
+async function withNudge(result, identifier, args, deps) {
+  if (!args.nudge || result.committed !== true) return { ...result };
+  return { ...result, sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge) };
+}
+function registerPrivateWriterTableTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-read-tables",
+    "Use when: you need a note's native tables with stable row and column identifiers, before native-delete-table-row, native-insert-table-row, native-set-table-cell, or native-prune-orphan-table; or to find orphaned tables (table attachments no body glyph shows).\nReturns: the note `revision`, and per active table its `identifier`, `glyphCount`, `orphan` flag, `digest` (pass as ifTableDigest), `rowCount`, `columnCount`, `columnIdentifiers`, and `rows` ({identifier, cells}). A table too large or without unique identities reports `readable: false`.\nDo not use when: you only want table text as Markdown or a grid (get-note-tables). Row identifiers here are native CRDT identities and are the only ones the native table tools accept.\nSafety: read-only; the writer opens the store with Core Data's read-only option. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer.",
+    noteRef,
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readTables(resolveIdentifier(manager, args), deps.writer) })
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-delete-table-row",
+    "Use when: removing one exact row from a native Notes table, selected by its native row identifier from native-read-tables. Two phases: call with dryRun: true, show the returned row cells to the user, then apply with dryRun: false plus the plan's `revision` as ifRevision and `tableDigest` as ifTableDigest.\nReturns: dry run: the row's index, cells, and the two tokens (nothing written). Apply: committed/verified, revisionBefore/After, tableDigestBefore/After, the new row count, and sync state (pushScheduled is always false).\nDo not use when: the table is not visible in the body (use native-prune-orphan-table for orphans), or it is the table's only row.\nSafety: deletes table content through unsupported private API, attended. Refuses locked, shared, trashed, and still-downloading notes. Refuses on any change to the note or table since the dry run (revision_conflict / attachment_conflict, committed: false). Saves once with optimistic locking and verifies through a fresh Core Data stack that the body is untouched and the table equals the plan. A timeout on apply is indeterminate (indeterminate: true): read the tables again before any retry. " + GATE,
+    {
+      ...noteRef,
+      tableIdentifier: uuid2("Table attachment identifier from native-read-tables"),
+      rowIdentifier: uuid2("Native row identifier from native-read-tables"),
+      dryRun: external_exports.boolean().describe("true = plan only; false = apply the planned deletion"),
+      ifRevision: ifRevision.optional(),
+      ifTableDigest: ifTableDigest.optional(),
+      ...writerScopeGuardInput(),
+      ...nudgeFields
+    },
+    DESTRUCTIVE,
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = deleteTableRow(
+        {
+          identifier,
+          tableIdentifier: args.tableIdentifier,
+          rowIdentifier: args.rowIdentifier,
+          dryRun: args.dryRun,
+          ifRevision: args.ifRevision,
+          ifTableDigest: args.ifTableDigest,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      return withNudge(result, identifier, args, deps);
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-insert-table-row",
+    "Use when: adding one row to a native Notes table, after a given row or at the end, with optional plain-text cells.\nReturns: committed/verified, the new `rowIdentifier` and `rowIndex`, revisionBefore/After, tableDigestBefore/After (chain tableDigestAfter and revisionAfter into the next table write), and sync state.\nDo not use when: creating a new table (create-table) or the table is an orphan.\nSafety: writes through unsupported private API. Needs ifRevision and ifTableDigest from a fresh native-read-tables and refuses on any change since. Cells are plain text (tabs and \\n allowed). Verified by a fresh read-back. A timeout is indeterminate. " + GATE,
+    {
+      ...noteRef,
+      tableIdentifier: uuid2("Table attachment identifier from native-read-tables"),
+      afterRowIdentifier: uuid2("Insert after this row; omit to append at the end").optional(),
+      cells: external_exports.array(cellText).max(1e3).optional().describe("Cell text by column order; missing trailing cells stay empty"),
+      ifRevision,
+      ifTableDigest,
+      ...writerScopeGuardInput(),
+      ...nudgeFields
+    },
+    WRITE,
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = insertTableRow(
+        {
+          identifier,
+          tableIdentifier: args.tableIdentifier,
+          afterRowIdentifier: args.afterRowIdentifier,
+          cells: args.cells,
+          ifRevision: args.ifRevision,
+          ifTableDigest: args.ifTableDigest,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      return withNudge(result, identifier, args, deps);
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-set-table-cell",
+    "Use when: replacing the text of one cell in a native Notes table, addressed by native row and column identifiers.\nReturns: committed/verified, `previousText`, revisionBefore/After, tableDigestBefore/After, and sync state.\nDo not use when: the cell holds formatting you want to keep (the new text is plain), or the table is an orphan.\nSafety: writes through unsupported private API. Needs ifRevision and ifTableDigest from a fresh native-read-tables and refuses on any change since. Verified by a fresh read-back. A timeout is indeterminate. " + GATE,
+    {
+      ...noteRef,
+      tableIdentifier: uuid2("Table attachment identifier from native-read-tables"),
+      rowIdentifier: uuid2("Native row identifier"),
+      columnIdentifier: uuid2("Native column identifier"),
+      text: cellText.describe("New plain text for the cell; may be empty"),
+      ifRevision,
+      ifTableDigest,
+      ...writerScopeGuardInput(),
+      ...nudgeFields
+    },
+    WRITE,
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = setTableCell(
+        {
+          identifier,
+          tableIdentifier: args.tableIdentifier,
+          rowIdentifier: args.rowIdentifier,
+          columnIdentifier: args.columnIdentifier,
+          text: args.text,
+          ifRevision: args.ifRevision,
+          ifTableDigest: args.ifTableDigest,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      return withNudge(result, identifier, args, deps);
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-prune-orphan-table",
+    "Use when: removing one orphaned table from a note: an active table attachment that native-read-tables reports with `orphan: true` (no glyph in the body, so Notes does not show it, but it still syncs). Two phases: dryRun: true, show the plan (row/column counts and first row) to the user, then apply with dryRun: false plus the plan's `revision` and `tableDigest`.\nReturns: dry run: the plan and tokens (nothing written). Apply: committed/verified, `removedTableIdentifier`, active table counts before and after, revisionBefore/After, and sync state.\nDo not use when: the table is visible in the body (the writer refuses), or you want to delete a visible table.\nSafety: tombstones the attachment the way Notes deletes one (it goes away on other devices once Notes uploads); the body is never edited. Attended and guarded like native-delete-table-row; verified by a fresh read-back. The note `revision` does not change, because the body and modification date do not. " + GATE,
+    {
+      ...noteRef,
+      tableIdentifier: uuid2("Orphaned table attachment identifier from native-read-tables"),
+      dryRun: external_exports.boolean().describe("true = plan only; false = apply the planned prune"),
+      ifRevision: ifRevision.optional(),
+      ifTableDigest: ifTableDigest.optional(),
+      ...writerScopeGuardInput(),
+      ...nudgeFields
+    },
+    DESTRUCTIVE,
+    async (args, deps) => {
+      const identifier = resolveIdentifier(manager, args);
+      const result = pruneOrphanTable(
+        {
+          identifier,
+          tableIdentifier: args.tableIdentifier,
+          dryRun: args.dryRun,
+          ifRevision: args.ifRevision,
+          ifTableDigest: args.ifTableDigest,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      return withNudge(result, identifier, args, deps);
+    }
+  );
+}
+
+// src/services/privateWriterSmartFolders.ts
+var FOLDER_REVISION = /^f1:[a-f0-9]{64}$/;
+var FOLDER_IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
+var FOLDER_OBJECT_ID = /^x-coredata:\/\/[0-9A-F-]+\/ICFolder\/p\d+$/i;
+var MAX_QUERY_BYTES = 64 * 1024;
+var CONTROL = /[\x00-\x1F\x7F-\x9F\uFFFC\u2028\u2029]/u;
+var folderCloudSync = external_exports.object({
+  available: external_exports.boolean(),
+  inICloudAccount: external_exports.boolean(),
+  currentLocalVersion: external_exports.number().int().optional(),
+  latestVersionSyncedToCloud: external_exports.number().int().optional(),
+  uploadPending: external_exports.boolean().optional()
+}).passthrough();
+var smartFolderStateSchema = external_exports.object({
+  identifier: external_exports.string(),
+  objectURI: external_exports.string(),
+  title: external_exports.string().nullable(),
+  folderType: external_exports.number().int(),
+  accountIdentifier: external_exports.string().nullable(),
+  parentIdentifier: external_exports.string().nullable(),
+  queryJSON: external_exports.string().nullable(),
+  markedForDeletion: external_exports.boolean(),
+  childFolderCount: external_exports.number().int(),
+  physicalNoteCount: external_exports.number().int(),
+  titleDurability: external_exports.enum(["stamped", "missing"]),
+  parentDurability: external_exports.enum(["stamped", "missing"]).nullable(),
+  revision: external_exports.string().regex(FOLDER_REVISION),
+  cloudSync: folderCloudSync
+}).passthrough();
+var readSmartFolderSchema = smartFolderStateSchema.extend({ status: external_exports.literal("ok"), syncHostRunning: external_exports.boolean() }).passthrough();
+var pushFields = {
+  pushScheduled: external_exports.literal(false),
+  syncHostRunning: external_exports.boolean(),
+  pushState: external_exports.enum(["awaiting_notes_app", "queued_for_next_launch", "not_applicable"]),
+  storeKind: external_exports.enum(["live", "copy"])
+};
+var resolutionFields = {
+  requestedQueryJSON: external_exports.string(),
+  queryJSON: external_exports.string(),
+  queryNormalized: external_exports.boolean(),
+  deletedWrapperAdded: external_exports.boolean(),
+  resolvedTags: external_exports.array(
+    external_exports.object({
+      requested: external_exports.string(),
+      standardizedContent: external_exports.string(),
+      displayText: external_exports.string().nullable(),
+      identifier: external_exports.string().nullable()
+    }).passthrough()
+  ),
+  filterCount: external_exports.number().int(),
+  nativeQueryValidated: external_exports.literal(true),
+  nativeMinimumSupportedVersion: external_exports.number().int()
+};
+var createSmartFolderResultSchema = smartFolderStateSchema.extend({
+  status: external_exports.enum(["created", "ok"]),
+  changed: external_exports.boolean(),
+  existing: external_exports.boolean(),
+  committed: external_exports.boolean(),
+  ...resolutionFields,
+  ...pushFields
+}).passthrough();
+var updateSmartFolderResultSchema = smartFolderStateSchema.extend({
+  status: external_exports.enum(["updated", "ok"]),
+  changed: external_exports.boolean(),
+  committed: external_exports.boolean(),
+  revisionBefore: external_exports.string().regex(FOLDER_REVISION),
+  revisionAfter: external_exports.string().regex(FOLDER_REVISION),
+  /**
+   * Applied updates only: title or parent timestamps the folder already
+   * lacked. The update changes the query alone and does not stamp them.
+   */
+  timestampsMissing: external_exports.array(external_exports.enum(["dateForLastTitleModification", "parentModificationDate"])).optional(),
+  ...resolutionFields,
+  ...pushFields
+}).passthrough();
+var deleteSmartFolderPlanSchema = smartFolderStateSchema.extend({
+  status: external_exports.literal("planned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false)
+}).passthrough();
+var deleteSmartFolderResultSchema = smartFolderStateSchema.extend({
+  status: external_exports.literal("deleted"),
+  dryRun: external_exports.literal(false),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  markedForDeletion: external_exports.literal(true),
+  revisionBefore: external_exports.string().regex(FOLDER_REVISION),
+  revisionAfter: external_exports.string().regex(FOLDER_REVISION),
+  ...pushFields
+}).passthrough();
+function invalid8(message) {
+  return new PrivateWriteError("invalid_request", message, false);
+}
+function queryText(query3, field) {
+  let text2;
+  if (typeof query3 === "string") {
+    let parsed;
+    try {
+      parsed = JSON.parse(query3);
+    } catch {
+      throw invalid8(`${field} is not valid JSON`);
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      throw invalid8(`${field} must be a JSON object`);
+    text2 = query3;
+  } else {
+    text2 = JSON.stringify(query3);
+  }
+  if (Buffer.byteLength(text2, "utf8") > MAX_QUERY_BYTES) throw invalid8(`${field} exceeds 64 KiB`);
+  return text2;
+}
+function assertFolderTitle(title) {
+  if (!title.length || title.length > 256 || title.trim() !== title || CONTROL.test(title))
+    throw invalid8("title must be 1-256 characters with no control characters or edge whitespace");
+}
+function assertFolderReference(value, field) {
+  if (!FOLDER_IDENTIFIER.test(value) && !FOLDER_OBJECT_ID.test(value))
+    throw invalid8(`${field} must be a folder identifier or an x-coredata folder id`);
+}
+function assertSmartFolderIdentifier(identifier) {
+  if (!UUID_PATTERN.test(identifier))
+    throw invalid8("identifier must be a smart folder's identifier (UUID) from list-smart-folders");
+}
+function assertFolderRevision(ifRevision3) {
+  if (!ifRevision3 || !FOLDER_REVISION.test(ifRevision3))
+    throw invalid8("ifRevision must be the `revision` from native-read-smart-folder or a dry run");
+}
+function withDecoded(folder) {
+  return { ...folder, decoded: decodeSmartFolderQuery(folder.queryJSON) };
+}
+function readSmartFolder(identifier, deps = defaultWriterDeps()) {
+  assertSmartFolderIdentifier(identifier);
+  return withDecoded(
+    parseWriterResult(
+      readSmartFolderSchema,
+      callPrivateWriter("read_smart_folder", { identifier }, deps),
+      false
+    )
+  );
+}
+function createSmartFolder(request, deps = defaultWriterDeps()) {
+  assertFolderTitle(request.title);
+  const fields = {
+    title: request.title,
+    queryJSON: queryText(request.query, "query")
+  };
+  if (request.account !== void 0 && request.parentIdentifier !== void 0)
+    throw invalid8("Pass account or parentIdentifier, not both");
+  if (request.account !== void 0) {
+    if (!request.account.trim()) throw invalid8("account must not be empty");
+    fields.account = request.account;
+  }
+  if (request.parentIdentifier !== void 0) {
+    assertFolderReference(request.parentIdentifier, "parentIdentifier");
+    fields.parentIdentifier = request.parentIdentifier;
+  }
+  Object.assign(fields, writerScopeFields(request.scope));
+  requireLiveValidated(SMART_FOLDERS_LIVE_VALIDATED, "native-create-smart-folder", deps.env);
+  return withDecoded(
+    parseWriterResult(
+      createSmartFolderResultSchema,
+      callPrivateWriter("create_smart_folder", fields, deps),
+      true
+    )
+  );
+}
+function updateSmartFolder(request, deps = defaultWriterDeps()) {
+  assertSmartFolderIdentifier(request.identifier);
+  const text2 = queryText(request.query, "query");
+  assertFolderRevision(request.ifRevision);
+  requireLiveValidated(SMART_FOLDERS_LIVE_VALIDATED, "native-update-smart-folder", deps.env);
+  return withDecoded(
+    parseWriterResult(
+      updateSmartFolderResultSchema,
+      callPrivateWriter(
+        "update_smart_folder",
+        {
+          identifier: request.identifier,
+          queryJSON: text2,
+          ifRevision: request.ifRevision,
+          ...writerScopeFields(request.scope)
+        },
+        deps
+      ),
+      true
+    )
+  );
+}
+function deleteSmartFolder(request, deps = defaultWriterDeps()) {
+  assertSmartFolderIdentifier(request.identifier);
+  if (request.dryRun) {
+    if (request.ifRevision !== void 0)
+      throw invalid8("ifRevision is only accepted with dryRun: false");
+    return parseWriterResult(
+      deleteSmartFolderPlanSchema,
+      callPrivateWriter(
+        "delete_smart_folder",
+        { identifier: request.identifier, dryRun: true, ...writerScopeFields(request.scope) },
+        deps,
+        { dryRun: true }
+      ),
+      false
+    );
+  }
+  assertFolderRevision(request.ifRevision);
+  requireLiveValidated(SMART_FOLDERS_LIVE_VALIDATED, "native-delete-smart-folder", deps.env);
+  return parseWriterResult(
+    deleteSmartFolderResultSchema,
+    callPrivateWriter(
+      "delete_smart_folder",
+      {
+        identifier: request.identifier,
+        dryRun: false,
+        ifRevision: request.ifRevision,
+        ...writerScopeFields(request.scope)
+      },
+      deps
+    ),
+    true
+  );
+}
+
+// src/tools/privateWriterSmartFolderTools.ts
+var query2 = external_exports.union([external_exports.string(), external_exports.record(external_exports.string(), external_exports.unknown())]).describe(
+  'Smart-folder query: {"entity":"note","type":{...}} as an object or a JSON string (a rawQuery from list-smart-folders works). Clauses: {"and":[...]}, {"or":[...]}, {"not":{...}}; booleans checklist, checklistInProgress, checklistCompleted, attachment, pinned, systemPaper, passwordProtected, shared, mention, tagged; {"attachmentSection":1-7}; {"tag":"display name"}; {"folder":"<folder identifier or x-coredata id>"}; {"creationDateRelativeRange"|"modificationDateRelativeRange":{"type":0-5} or {"type":6,"customAmount":n,"customUnit":0-4}}; {"creationDateRange"|"modificationDateRange":{"fromDate":s,"toDate":s}} (seconds since 2001-01-01 UTC); {"sharedParticipant"|"mentionParticipant":"<participant id>"}.'
+);
+var smartFolderId = notesUuid2.describe("Smart folder identifier (UUID) from list-smart-folders");
+var ifRevision2 = external_exports.string().regex(FOLDER_REVISION).describe("The folder `revision` from native-read-smart-folder or the dry run");
+var adoptionWaitSeconds = external_exports.number().int().min(0).max(MAX_ADOPTION_WAIT_SECONDS).optional().describe(
+  "After a committed write, how long to wait for Notes.app to show the change (default 10; 0 checks once). Skipped when Notes.app is not running"
+);
+async function withAdoption(result, waitSeconds, deps) {
+  if (result.committed !== true || typeof result.identifier !== "string") return result;
+  const report = await checkFolderAdoption(
+    [
+      {
+        identifier: result.identifier,
+        objectURI: typeof result.objectURI === "string" ? result.objectURI : null,
+        title: typeof result.title === "string" ? result.title : null,
+        deleted: result.markedForDeletion === true
+      }
+    ],
+    deps.nudge,
+    waitSeconds ?? 10
+  );
+  const folder = report.folders[0];
+  return {
+    ...result,
+    adoptedByNotesApp: folder?.adoptedByNotesApp ?? null,
+    adoption: { checked: report.checked, waitedSeconds: report.waitedSeconds, ...folder }
+  };
+}
+var GATE2 = "Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and, until live-validated, APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1. The writer cannot upload; Notes.app uploads the folder (pushScheduled is always false; check cloudSync with native-read-smart-folder). There is no sync nudge for folders. After a committed write, adoptedByNotesApp says whether a running Notes.app shows the change (read-only AppleScript; null when Notes.app is not running or it could not be checked).";
+function registerPrivateWriterSmartFolderTools(server2, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-read-smart-folder",
+    "Use when: you need one smart folder's `revision` before native-update-smart-folder or native-delete-smart-folder, or its writer-side state (canonical queryJSON, child and note counts, cloudSync).\nReturns: identifier, title, accountIdentifier, parentIdentifier (null at an account root), queryJSON (canonical, sorted keys), decoded rules, childFolderCount, physicalNoteCount, `revision`, and cloudSync versions.\nDo not use when: listing or finding smart folders (list-smart-folders returns every smart folder's identifier and rules).\nSafety: read-only; the writer opens the store with Core Data's read-only option. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer.",
+    { identifier: smartFolderId },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readSmartFolder(args.identifier, deps.writer) })
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-create-smart-folder",
+    "Use when: creating a Notes smart folder from a query, at an account root or inside an ordinary folder.\nReturns: status created, or ok when an identical smart folder (same title, destination, and query) already exists and nothing was written; the stored queryJSON Notes regenerated, requestedQueryJSON, resolvedTags, filterCount, decoded rules, the folder identifier and revision, and sync state.\nDo not use when: you want an ordinary folder (create-folder), to change an existing smart folder's query (native-update-smart-folder), or to put notes in it (its query decides membership).\nSafety: writes to the Notes database through unsupported private API. Tag names must resolve to one existing tag in the destination account; folder filters must name ordinary folders there. The query goes through Notes' own parser, and one Notes cannot store without changing its meaning is refused (query_not_representable). A smart folder is never a parent (reason smart_folder_destination), nor Recently Deleted or a shared folder. A folder with the same title in the destination is refused (folder_exists) unless it is an identical smart folder. Verified by a fresh read-back. A timeout is indeterminate: read list-smart-folders before any retry. " + GATE2,
+    {
+      title: external_exports.string().min(1).max(256).describe("Exact smart-folder title"),
+      query: query2,
+      account: external_exports.string().min(1).optional().describe(
+        "Account identifier or exact name for an account-root smart folder (default: Notes' default account)"
+      ),
+      parentIdentifier: external_exports.string().min(1).optional().describe("Ordinary folder (identifier or x-coredata folder id) to create it inside"),
+      ...writerScopeGuardInput("smart folder"),
+      adoptionWaitSeconds
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async (args, deps) => withAdoption(
+      { ...createSmartFolder({ ...args, scope: scopeGuardFrom(args) }, deps.writer) },
+      args.adoptionWaitSeconds,
+      deps
+    )
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-update-smart-folder",
+    "Use when: replacing the query (rules) of one existing smart folder.\nReturns: status updated, or ok when the stored query already equals the request (nothing written); previousQueryJSON, the stored queryJSON, decoded rules, revisionBefore/revisionAfter, and sync state.\nDo not use when: renaming the folder, creating one (native-create-smart-folder), or editing an ordinary folder.\nSafety: writes through unsupported private API. Needs the folder `revision` from a fresh native-read-smart-folder as ifRevision and refuses on any change since (revision_conflict, committed: false). The query is validated exactly as in native-create-smart-folder. Verified by a fresh read-back. A timeout is indeterminate. " + GATE2,
+    {
+      identifier: smartFolderId,
+      query: query2,
+      ifRevision: ifRevision2,
+      ...writerScopeGuardInput("smart folder"),
+      adoptionWaitSeconds
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    async (args, deps) => withAdoption(
+      { ...updateSmartFolder({ ...args, scope: scopeGuardFrom(args) }, deps.writer) },
+      args.adoptionWaitSeconds,
+      deps
+    )
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-delete-smart-folder",
+    "Use when: deleting one exact, empty smart folder. Two phases: dryRun: true, show the plan (title and rules) to the user, then apply with dryRun: false and the plan's `revision` as ifRevision.\nReturns: dry run: status planned with the folder state and revision (nothing written). Apply: status deleted, committed, verified (fresh read-back of the tombstone), revisionBefore/revisionAfter, and sync state.\nDo not use when: deleting an ordinary folder (delete-folder-by-id); this refuses anything that is not a smart folder.\nSafety: marks the folder deleted through unsupported private API, the way Notes deletes one, so the deletion syncs. Refuses folders with child folders or with notes physically stored in them, and any change since the dry run (revision_conflict). A dry run needs only the two switches; the apply is also gated. " + GATE2,
+    {
+      identifier: smartFolderId,
+      dryRun: external_exports.boolean().describe("true = plan only; false = apply the planned deletion"),
+      ifRevision: ifRevision2.optional(),
+      ...writerScopeGuardInput("smart folder"),
+      adoptionWaitSeconds
+    },
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => withAdoption(
+      { ...deleteSmartFolder({ ...args, scope: scopeGuardFrom(args) }, deps.writer) },
+      args.adoptionWaitSeconds,
+      deps
+    )
+  );
+}
+
+// src/services/privatePaperWriter.ts
+var PAPER_FORMATS = ["auto", "paper", "drawing"];
+var rect = external_exports.array(external_exports.number()).length(4);
+var addPaperPlanSchema = external_exports.object({
+  format: external_exports.enum(["paper", "drawing"]),
+  availableFormats: external_exports.array(external_exports.string()),
+  strokeCount: external_exports.number().int().nonnegative(),
+  pointCount: external_exports.number().int().nonnegative(),
+  inks: external_exports.array(external_exports.string()),
+  bounds: rect,
+  revisionBefore: external_exports.string(),
+  storeKind: external_exports.enum(["live", "copy"])
+}).passthrough();
+var addPaperPlannedSchema = addPaperPlanSchema.extend({
+  status: external_exports.literal("planned"),
+  committed: external_exports.literal(false)
+});
+var addPaperCreatedSchema = addPaperPlanSchema.extend({
+  status: external_exports.literal("created"),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  identifier: external_exports.string(),
+  attachmentIdentifier: external_exports.string(),
+  typeUTI: external_exports.string().nullable(),
+  decodedStrokeCount: external_exports.number().int().nonnegative(),
+  decodedPointCount: external_exports.number().int().nonnegative(),
+  glyphInserted: external_exports.boolean(),
+  previewUpdated: external_exports.boolean(),
+  revisionAfter: external_exports.string(),
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+});
+function addPaper(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  assertRevision(request.ifRevision);
+  const dryRun = request.dryRun === true;
+  if (!dryRun) requireLiveValidated(PAPER_WRITE_LIVE_VALIDATED, "native-add-paper", deps.env);
+  const fields = {
+    identifier: request.identifier,
+    ifRevision: request.ifRevision,
+    drawing: request.drawing,
+    format: request.format ?? "auto",
+    ...writerScopeFields(request.scope)
+  };
+  if (dryRun) fields.dryRun = true;
+  if (!dryRun)
+    return parseWriterResult(
+      addPaperCreatedSchema,
+      callPrivateWriter("add_paper", fields, deps),
+      true
+    );
+  try {
+    return parseWriterResult(
+      addPaperPlannedSchema,
+      callPrivateWriter("add_paper", fields, deps, { dryRun: true }),
+      false
+    );
+  } catch (error2) {
+    if (error2 instanceof PrivateWriteError && error2.committed !== false)
+      throw new PrivateWriteError(error2.code, error2.message, false, error2.details);
+    throw error2;
+  }
+}
+var MAX_PAPER_READ_POINTS = 4e4;
+var PAPER_POINT_FIELDS = [
+  "x",
+  "y",
+  "width",
+  "height",
+  "opacity",
+  "force",
+  "azimuth",
+  "altitude",
+  "timeOffset"
+];
+var finite = external_exports.number().finite();
+var rgba = external_exports.tuple([finite, finite, finite, finite]);
+var rectOrNull = external_exports.tuple([finite, finite, finite, finite]).nullable();
+var layerStatus = {
+  available: external_exports.boolean(),
+  reason: external_exports.string().nullable()
+};
+var paperStrokeSchema = external_exports.object({
+  ink: external_exports.string(),
+  inkIdentifier: external_exports.string(),
+  /** sRGB red, green, blue, alpha, each 0..1; null when the ink color has no sRGB form. */
+  color: rgba.nullable(),
+  /** Mean point width. */
+  width: finite,
+  /** [a, b, c, d, tx, ty] from point space to drawing space. */
+  transform: external_exports.tuple([finite, finite, finite, finite, finite, finite]).nullable(),
+  pointCount: external_exports.number().int().nonnegative(),
+  renderBounds: rectOrNull,
+  masked: external_exports.boolean(),
+  points: external_exports.array(external_exports.array(finite).length(PAPER_POINT_FIELDS.length)).optional(),
+  pointsOmitted: external_exports.literal(true).optional()
+}).passthrough();
+var paperShapeSchema = external_exports.object({
+  /** Position in PaperKit's element order (drawing order, back to front). */
+  index: external_exports.number().int().nonnegative(),
+  kind: external_exports.string(),
+  /** [x, y, width, height] before rotation. */
+  frame: rectOrNull,
+  /** Bounds of everything the shape paints, stroke included. */
+  renderFrame: rectOrNull,
+  /** Radians about the frame's center. */
+  rotation: finite.nullable(),
+  lineWidth: finite.nullable(),
+  opacity: finite.nullable(),
+  fillColor: rgba.nullable(),
+  strokeColor: rgba.nullable(),
+  startLineMarker: external_exports.string().nullable(),
+  endLineMarker: external_exports.string().nullable(),
+  /** SVG path data in drawing coordinates, frame and rotation applied. */
+  path: external_exports.string().nullable(),
+  pathBounds: rectOrNull,
+  /** Text inside the shape (a text box is a rectangle with text). */
+  text: external_exports.string().nullable()
+}).passthrough();
+var paperFallbackPathSchema = external_exports.object({
+  page: external_exports.number().int().nonnegative(),
+  paint: external_exports.enum(["stroke", "fill", "fillStroke"]),
+  kind: external_exports.enum(["path", "rectangle"]),
+  /** SVG path data in PDF page space (points, origin at the bottom left). */
+  d: external_exports.string(),
+  bounds: rectOrNull,
+  fillRule: external_exports.enum(["nonzero", "evenodd"]).optional(),
+  fillColor: external_exports.array(finite.nullable()).length(4).optional(),
+  strokeColor: external_exports.array(finite.nullable()).length(4).optional(),
+  lineWidth: finite.nullable().optional()
+}).passthrough();
+var paperReadSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  storeKind: external_exports.enum(["live", "copy"]),
+  identifier: external_exports.string(),
+  revision: external_exports.string(),
+  attachmentIdentifier: external_exports.string(),
+  typeUTI: external_exports.string(),
+  drawingCount: external_exports.number().int().nonnegative(),
+  strokeCount: external_exports.number().int().nonnegative(),
+  returnedStrokeCount: external_exports.number().int().nonnegative(),
+  pointCount: external_exports.number().int().nonnegative(),
+  bounds: rectOrNull,
+  inks: external_exports.array(external_exports.string()),
+  pointFields: external_exports.array(external_exports.string()),
+  strokes: external_exports.array(paperStrokeSchema),
+  shapeDecode: external_exports.object({
+    ...layerStatus,
+    missing: external_exports.array(external_exports.string()),
+    elementCount: external_exports.number().int().nonnegative().nullable(),
+    elementKinds: external_exports.record(external_exports.string(), external_exports.number().int().nonnegative()).nullable()
+  }).passthrough(),
+  shapes: external_exports.array(paperShapeSchema),
+  fallbackGeometry: external_exports.object({
+    ...layerStatus,
+    generation: external_exports.string().optional(),
+    pageCount: external_exports.number().int().nonnegative().optional(),
+    paths: external_exports.array(paperFallbackPathSchema).optional(),
+    skipped: external_exports.record(external_exports.string(), external_exports.number().int().nonnegative()).optional(),
+    truncated: external_exports.boolean().optional()
+  }).passthrough(),
+  truncated: external_exports.boolean(),
+  warnings: external_exports.array(external_exports.string())
+}).passthrough();
+function readPaper(request, deps = defaultWriterDeps()) {
+  assertNoteIdentifier2(request.identifier);
+  const fields = { identifier: request.identifier };
+  if (request.attachmentIdentifier !== void 0) {
+    try {
+      assertNoteIdentifier2(request.attachmentIdentifier);
+    } catch {
+      throw new PrivateWriteError("invalid_request", "attachmentIdentifier must be a UUID", false);
+    }
+    fields.attachmentIdentifier = request.attachmentIdentifier;
+  }
+  if (request.maxPoints !== void 0 && (!Number.isInteger(request.maxPoints) || request.maxPoints < 1 || request.maxPoints > MAX_PAPER_READ_POINTS))
+    throw new PrivateWriteError(
+      "invalid_request",
+      `maxPoints must be an integer from 1 to ${MAX_PAPER_READ_POINTS}`,
+      false
+    );
+  if (request.includePoints !== void 0) fields.includePoints = request.includePoints;
+  if (request.maxPoints !== void 0) fields.maxPoints = request.maxPoints;
+  if (request.includeShapes !== void 0) fields.includeShapes = request.includeShapes;
+  return parseWriterResult(paperReadSchema, callPrivateWriter("read_paper", fields, deps), false);
+}
+
+// src/utils/paperAuthoring.ts
+var AUTHOR_INKS = [
+  "pen",
+  "pencil",
+  "marker",
+  "fountainpen",
+  "watercolor",
+  "crayon"
+];
+var PaperAuthoringError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "PaperAuthoringError";
+  }
+  code;
+};
+var DEFAULT_COLOR = [0, 0, 0, 1];
+var DEFAULT_WIDTH = 2;
+var ELLIPSE_SEGMENTS = 72;
+function paint(input, width) {
+  return {
+    ink: input.ink ?? "pen",
+    color: input.color ?? DEFAULT_COLOR,
+    width: width ?? DEFAULT_WIDTH
+  };
+}
+var round2 = (v) => Math.round(v * 1e3) / 1e3 || 0;
+var pt = (x, y) => [round2(x), round2(y)];
+function arc(cx, cy, rx, ry, start, end) {
+  const steps = Math.max(2, Math.ceil(ELLIPSE_SEGMENTS * Math.abs(end - start) / (2 * Math.PI)));
+  const out = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = start + (end - start) * i / steps;
+    out.push(pt(cx + rx * Math.cos(t), cy + ry * Math.sin(t)));
+  }
+  return out;
+}
+function regular(cx, cy, radii, count2, rotation = 0) {
+  const out = [];
+  const n = count2 * radii.length;
+  const start = -Math.PI / 2 + rotation * Math.PI / 180;
+  for (let i = 0; i < n; i++) {
+    const t = start + 2 * Math.PI * i / n;
+    const r = radii[i % radii.length];
+    out.push(pt(cx + r * Math.cos(t), cy + r * Math.sin(t)));
+  }
+  out.push(out[0]);
+  return out;
+}
+function roundedRect(x, y, w, h, radius) {
+  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  if (r === 0) return [pt(x, y), pt(x + w, y), pt(x + w, y + h), pt(x, y + h), pt(x, y)];
+  const h2 = Math.PI / 2;
+  return [
+    ...arc(x + w - r, y + r, r, r, -h2, 0),
+    ...arc(x + w - r, y + h - r, r, r, 0, h2),
+    ...arc(x + r, y + h - r, r, r, h2, Math.PI),
+    ...arc(x + r, y + r, r, r, Math.PI, 3 * h2),
+    pt(x + w - r, y)
+  ];
+}
+function arrowHead(from, tip, length) {
+  const angle = Math.atan2(tip[1] - from[1], tip[0] - from[0]);
+  const wing = (a) => pt(tip[0] - length * Math.cos(a), tip[1] - length * Math.sin(a));
+  return [wing(angle + Math.PI / 6), pt(tip[0], tip[1]), wing(angle - Math.PI / 6)];
+}
+function blockArrow(from, to, head, shaft) {
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  if (len === 0)
+    throw new PaperAuthoringError("invalid_request", "An arrow needs two distinct points");
+  const ux = (to[0] - from[0]) / len;
+  const uy = (to[1] - from[1]) / len;
+  const nx = -uy;
+  const ny = ux;
+  const headLen = Math.min(head, len);
+  const base = [to[0] - ux * headLen, to[1] - uy * headLen];
+  const s = shaft / 2;
+  const h = Math.max(head / 2, s * 2);
+  const at = (p, k) => pt(p[0] + nx * k, p[1] + ny * k);
+  return [
+    at(from, s),
+    at(base, s),
+    at(base, h),
+    pt(to[0], to[1]),
+    at(base, -h),
+    at(base, -s),
+    at(from, -s),
+    at(from, s)
+  ];
+}
+function positive2(value, what) {
+  if (!(value > 0)) throw new PaperAuthoringError("invalid_request", `${what} must be positive`);
+}
+function shapeToStrokes(shape) {
+  const p = paint(shape, shape.strokeWidth);
+  const one = (points) => [{ ...p, points }];
+  switch (shape.kind) {
+    case "rectangle":
+      positive2(shape.width, "Rectangle width");
+      positive2(shape.height, "Rectangle height");
+      return one(roundedRect(shape.x, shape.y, shape.width, shape.height, shape.cornerRadius ?? 0));
+    case "ellipse":
+      positive2(shape.rx, "Ellipse rx");
+      positive2(shape.ry, "Ellipse ry");
+      return one(arc(shape.cx, shape.cy, shape.rx, shape.ry, 0, 2 * Math.PI));
+    case "line": {
+      const head = Math.max(8, p.width * 4);
+      const strokes = one([pt(...shape.from), pt(...shape.to)]);
+      if (shape.arrowEnd) strokes.push({ ...p, points: arrowHead(shape.from, shape.to, head) });
+      if (shape.arrowStart) strokes.push({ ...p, points: arrowHead(shape.to, shape.from, head) });
+      return strokes;
+    }
+    case "arrow":
+      return one(blockArrow(shape.from, shape.to, shape.headLength ?? 24, shape.shaftWidth ?? 8));
+    case "polygon":
+      positive2(shape.radius, "Polygon radius");
+      if (!Number.isInteger(shape.sides) || shape.sides < 3 || shape.sides > 512)
+        throw new PaperAuthoringError("invalid_request", "Polygon sides must be 3 to 512");
+      return one(regular(shape.cx, shape.cy, [shape.radius], shape.sides, shape.rotation));
+    case "star":
+      positive2(shape.outerRadius, "Star outerRadius");
+      positive2(shape.innerRadius, "Star innerRadius");
+      if (!Number.isInteger(shape.points) || shape.points < 3 || shape.points > 512)
+        throw new PaperAuthoringError("invalid_request", "Star points must be 3 to 512");
+      return one(
+        regular(
+          shape.cx,
+          shape.cy,
+          [shape.outerRadius, shape.innerRadius],
+          shape.points,
+          shape.rotation
+        )
+      );
+    case "chatBubble": {
+      positive2(shape.width, "Chat bubble width");
+      positive2(shape.height, "Chat bubble height");
+      const r = Math.min(shape.width, shape.height) / 4;
+      const body = roundedRect(shape.x, shape.y, shape.width, shape.height, r);
+      const baseX = shape.tail[0] < shape.x + shape.width / 2 ? shape.x + r * 1.5 : shape.x + shape.width - r * 1.5;
+      const bottom = shape.y + shape.height;
+      const tail = [pt(baseX - r / 2, bottom), pt(...shape.tail), pt(baseX + r / 2, bottom)];
+      return [
+        { ...p, points: body },
+        { ...p, points: tail }
+      ];
+    }
+    case "polyline": {
+      if (shape.points.length < 2)
+        throw new PaperAuthoringError("invalid_request", "A polyline needs at least two points");
+      const points = shape.points.map((q) => pt(q[0], q[1]));
+      if (shape.closed) points.push(points[0]);
+      return one(points);
+    }
+  }
+}
+function drawingFromInput(input) {
+  const strokes = (input.strokes ?? []).map((s) => {
+    if (!s.points.length)
+      throw new PaperAuthoringError("invalid_request", "Every stroke needs at least one point");
+    return {
+      ...paint(s, s.width),
+      // Decoded points carry up to nine values; x, y and width are what a stroke keeps.
+      points: s.points.map((q) => {
+        if (q.length < 2)
+          throw new PaperAuthoringError("invalid_request", "Each point needs at least x and y");
+        return q.length >= 3 ? [q[0], q[1], q[2]] : [q[0], q[1]];
+      })
+    };
+  });
+  const shapes = input.shapes ?? [];
+  for (const shape of shapes) strokes.push(...shapeToStrokes(shape));
+  if (!strokes.length)
+    throw new PaperAuthoringError("invalid_request", "The drawing has no strokes or shapes");
+  return {
+    drawing: { strokes },
+    inputStrokeCount: input.strokes?.length ?? 0,
+    shapeCount: shapes.length,
+    shapePersistence: shapes.length ? "stroke-fallback" : "none"
+  };
+}
+function drawingFromSvg(drawing) {
+  return {
+    strokes: drawing.strokes.map((s) => ({
+      ink: "pen",
+      color: s.color,
+      width: s.width,
+      points: s.points.map(([x, y]) => [x, y])
+    }))
+  };
+}
+function authorizeSvgDrawing(result, options) {
+  const { analysis } = result;
+  const allow = [...new Set(options.allowSvgLosses ?? [])];
+  if (allow.length && options.ifSvgAnalysis === void 0)
+    throw new PaperAuthoringError(
+      "svg_analysis_required",
+      "Accepting an SVG loss requires ifSvgAnalysis with the exact analysisDigest"
+    );
+  if (options.ifSvgAnalysis !== void 0 && options.ifSvgAnalysis !== analysis.analysisDigest)
+    throw new PaperAuthoringError(
+      "svg_analysis_conflict",
+      "The SVG or its normalized drawing changed since it was analyzed; run analyze-svg again"
+    );
+  if (!analysis.importable)
+    throw new PaperAuthoringError("svg_not_importable", "The SVG has no drawable content");
+  if (analysis.requiredLosses.length && options.ifSvgAnalysis === void 0)
+    throw new PaperAuthoringError(
+      "svg_analysis_required",
+      `This SVG needs ${analysis.requiredLosses.join(", ")}; pass ifSvgAnalysis and allowSvgLosses`
+    );
+  const required2 = analysis.requiredLosses;
+  const missing = required2.filter((l) => !allow.includes(l));
+  const extra = allow.filter((l) => !required2.includes(l));
+  if (missing.length || extra.length)
+    throw new PaperAuthoringError(
+      "svg_lossy_import_refused",
+      "allowSvgLosses must list exactly the required losses" + (missing.length ? `; missing ${missing.join(", ")}` : "") + (extra.length ? `; not required ${extra.join(", ")}` : "")
+    );
+  return result.drawing;
+}
+
+// src/tools/privatePaperWriterTools.ts
+var unit = () => external_exports.number().min(0).max(1);
+var coordinate = () => external_exports.number().finite().min(-1e6).max(1e6);
+var xy = () => external_exports.array(coordinate()).length(2);
+var paintFields = () => ({
+  ink: external_exports.enum(AUTHOR_INKS).optional().describe("PencilKit ink (default pen)"),
+  color: external_exports.array(unit()).length(4).optional().describe("sRGB [r, g, b, a], each 0..1 (default opaque black)")
+});
+var strokeWidth = () => external_exports.number().positive().max(8192).optional().describe("Stroke width (default 2)");
+var positive3 = () => external_exports.number().positive().max(1e6);
+var shapeSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("rectangle"),
+    x: coordinate(),
+    y: coordinate(),
+    width: positive3(),
+    height: positive3(),
+    cornerRadius: external_exports.number().min(0).optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("ellipse"),
+    cx: coordinate(),
+    cy: coordinate(),
+    rx: positive3(),
+    ry: positive3(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("line"),
+    from: xy(),
+    to: xy(),
+    arrowStart: external_exports.boolean().optional(),
+    arrowEnd: external_exports.boolean().optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("arrow"),
+    from: xy(),
+    to: xy(),
+    headLength: positive3().optional(),
+    shaftWidth: positive3().optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("polygon"),
+    cx: coordinate(),
+    cy: coordinate(),
+    radius: positive3(),
+    sides: external_exports.number().int().min(3).max(512),
+    rotation: external_exports.number().finite().optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("star"),
+    cx: coordinate(),
+    cy: coordinate(),
+    outerRadius: positive3(),
+    innerRadius: positive3(),
+    points: external_exports.number().int().min(3).max(512),
+    rotation: external_exports.number().finite().optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("chatBubble"),
+    x: coordinate(),
+    y: coordinate(),
+    width: positive3(),
+    height: positive3(),
+    tail: xy(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("polyline"),
+    points: external_exports.array(xy()).min(2).max(1e5),
+    closed: external_exports.boolean().optional(),
+    ...paintFields(),
+    strokeWidth: strokeWidth()
+  })
+]);
+var drawingSchema = external_exports.object({
+  strokes: external_exports.array(
+    external_exports.object({
+      ...paintFields(),
+      width: strokeWidth(),
+      points: external_exports.array(external_exports.array(coordinate()).min(2).max(9)).min(1).max(1e5).describe(
+        "[x, y] or [x, y, width] per point; longer rows (up to 9 values) use their first three"
+      )
+    })
+  ).max(4096).optional(),
+  shapes: external_exports.array(shapeSchema).max(1e3).optional().describe(
+    "rectangle, ellipse, line, arrow, polygon, star, chatBubble, polyline; each is written as strokes tracing it"
+  )
+});
+function asWriteError(error2) {
+  if (error2 instanceof PaperAuthoringError)
+    return new PrivateWriteError(error2.code, error2.message, false);
+  if (error2 instanceof SvgError)
+    return new PrivateWriteError(error2.code, error2.message, false, {
+      svgCode: error2.code,
+      ...error2.location ? { location: error2.location } : {}
+    });
+  return error2;
+}
+function prepareDrawing(args, roots) {
+  if (args.drawing === void 0 === (args.svgPath === void 0))
+    throw new PrivateWriteError("invalid_request", "Pass exactly one of drawing or svgPath", false);
+  if (args.drawing && (args.ifSvgAnalysis !== void 0 || args.allowSvgLosses !== void 0))
+    throw new PrivateWriteError(
+      "invalid_request",
+      "ifSvgAnalysis and allowSvgLosses apply to svgPath only",
+      false
+    );
+  try {
+    if (args.svgPath !== void 0) {
+      let source;
+      try {
+        source = readAllowedFile(args.svgPath, SVG_LIMITS.maxSourceBytes, {
+          roots,
+          label: "SVG file"
+        });
+      } catch (error2) {
+        throw new PrivateWriteError("svg_file_invalid", error2.message, false, {
+          svgCode: "svg_file_invalid"
+        });
+      }
+      const analyzed = analyzeSvgBuffer(source);
+      const drawing = drawingFromSvg(
+        authorizeSvgDrawing(analyzed, {
+          ifSvgAnalysis: args.ifSvgAnalysis,
+          allowSvgLosses: args.allowSvgLosses
+        })
+      );
+      return {
+        drawing,
+        source: {
+          source: "svg",
+          svgAnalysis: {
+            analysisDigest: analyzed.analysis.analysisDigest,
+            classification: analyzed.analysis.classification,
+            requiredLosses: analyzed.analysis.requiredLosses,
+            acceptedLosses: [...new Set(args.allowSvgLosses ?? [])]
+          }
+        }
+      };
+    }
+    const converted = drawingFromInput(args.drawing);
+    return {
+      drawing: converted.drawing,
+      source: {
+        source: "json",
+        inputStrokeCount: converted.inputStrokeCount,
+        shapeCount: converted.shapeCount,
+        shapePersistence: converted.shapePersistence
+      }
+    };
+  } catch (error2) {
+    throw asWriteError(error2);
+  }
+}
+function registerPrivatePaperWriterTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-add-paper",
+    "Use when: adding a hand-drawn-style drawing to the end of one exact note as editable ink, from stroke and shape JSON or from an SVG file, through the opt-in private writer.\nReturns: status (planned or created), the attachment format (paper or drawing) and typeUTI, stroke and point counts, decodedStrokeCount/decodedPointCount from the verifying read-back, attachmentIdentifier, revisionBefore/revisionAfter, and sync state: pushScheduled (always false; the writer cannot upload), pushState, cloudSync versions, and with nudge: true a `sync` report. For an SVG, svgAnalysis names the digest and the losses accepted; for JSON, shapeCount and shapePersistence (shapes are written as strokes tracing them).\nDo not use when: you want a picture of the SVG exactly as it looks (attach a PNG with add-attachment instead), or the note is locked, shared, trashed, or still downloading.\nSafety: writes to the Notes database through unsupported private API. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer (setup --native-writer), and a fresh `revision` from native-note-state as ifRevision; refuses on any change since. An SVG is re-analyzed at write time: a lossy one needs ifSvgAnalysis equal to analyze-svg's analysisDigest and allowSvgLosses equal to its requiredLosses. Verifies by decoding the saved drawing in a new Core Data stack. A timeout is indeterminate (indeterminate: true): read native-note-state before any retry. Not yet live-validated, so a write also requires APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1; dryRun does not.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      ifRevision: revisionToken.describe(
+        "The `revision` returned by native-note-state for this note"
+      ),
+      drawing: drawingSchema.optional().describe("Strokes and shapes to draw; pass this or svgPath, not both"),
+      svgPath: external_exports.string().min(1).max(4096).optional().describe(
+        "Absolute path of an SVG file to convert with the analyze-svg analyzer, read under analyze-svg's rules (home, temp, or /Volumes; not a hidden path or ~/Library outside iCloud Drive and CloudStorage; not a symbolic link)"
+      ),
+      ifSvgAnalysis: external_exports.string().regex(/^sha256:[a-f0-9]{64}$/).optional().describe("The analysisDigest from analyze-svg; required when the SVG needs any loss"),
+      allowSvgLosses: external_exports.array(external_exports.enum(SVG_LOSSES)).max(3).optional().describe("Exactly the requiredLosses analyze-svg reported for this digest"),
+      format: external_exports.enum(PAPER_FORMATS).optional().describe(
+        "auto (default): Paper when this macOS can create it, else a classic drawing; paper or drawing to insist"
+      ),
+      dryRun: external_exports.boolean().optional().describe("Validate and plan without writing"),
+      ...writerScopeGuardInput(),
+      nudge: external_exports.boolean().optional().describe(
+        "After a verified write, ask Notes.app to upload the note by moving it into its own folder (default false)"
+      ),
+      nudgeWaitSeconds: external_exports.number().int().min(0).max(MAX_NUDGE_WAIT_SECONDS).optional().describe("With nudge: how long to watch Notes' upload counters (default 30)")
+    },
+    { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    async (args, deps) => {
+      const { drawing, source } = prepareDrawing(args);
+      const identifier = resolveIdentifier(manager, args);
+      const result = addPaper(
+        {
+          identifier,
+          ifRevision: args.ifRevision,
+          drawing,
+          format: args.format,
+          dryRun: args.dryRun,
+          scope: scopeGuardFrom(args)
+        },
+        deps.writer
+      );
+      const payload = { ...source, ...result };
+      if (!args.nudge || result.status !== "created") return payload;
+      return {
+        ...payload,
+        sync: await nudgeAfterWrite(identifier, args.nudgeWaitSeconds, deps.nudge)
+      };
+    }
+  );
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-read-paper",
+    "Use when: you need the vector content of one Paper drawing (com.apple.paper) in a note: its pen strokes, its typed shapes (rectangles, ellipses, lines and arrows, stars, polygons, speech bubbles, text boxes), and the painted geometry of the fallback PDF Notes keeps for older devices.\nReturns: `strokes` (ink, sRGB color, width, transform, pointCount, renderBounds, and compact `points` in `pointFields` order until `maxPoints` is used up); `shapes` (kind, frame, rotation in radians, lineWidth, opacity, fillColor, strokeColor, line markers, `path` as SVG path data in drawing coordinates, pathBounds, and `text`) with `shapeDecode` saying whether that layer ran and why not; `fallbackGeometry` (each painted path as SVG path data in PDF page space, with paint, fill rule, colors, and line width) or its `reason` (usually no_fallback_pdf); the note `revision`; `truncated` and `warnings`.\nDo not use when: you only need a picture (export-paper-image), the drawing is a classic drawing (get-note-drawings), or you want to change the drawing (native-add-paper adds a new one).\nSafety: read-only. The writer opens the store with Core Data's read-only option and decodes a private copy of the drawing's bundle, never the live one. Typed shapes come from PaperKit through internal entry points and are offered only on macOS 27 or later (shapeDecode.reason requires_macos_27 or private_api_unavailable elsewhere). Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, and a built writer (setup --native-writer).",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID of the note that holds the drawing"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      attachmentIdentifier: notesUuid2.optional().describe("The drawing's attachment UUID; required when the note has more than one"),
+      includePoints: external_exports.boolean().optional().describe("Include each stroke's points (default true)"),
+      maxPoints: external_exports.number().int().min(1).max(MAX_PAPER_READ_POINTS).optional().describe("Most points to return across all strokes (default 20000)"),
+      includeShapes: external_exports.boolean().optional().describe("Decode typed shapes through PaperKit (default true; macOS 27 or later)")
+    },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({
+      ...readPaper(
+        {
+          identifier: resolveIdentifier(manager, args),
+          attachmentIdentifier: args.attachmentIdentifier,
+          includePoints: args.includePoints,
+          maxPoints: args.maxPoints,
+          includeShapes: args.includeShapes
+        },
+        deps.writer
+      )
+    })
+  );
+}
+
+// src/services/privateWriterPurgeRepair.ts
+var DELETION_STATES = [
+  "active",
+  "in_recently_deleted",
+  "purging_from_recently_deleted",
+  "purge_flag_outside_recently_deleted",
+  "purge_flag_without_folder",
+  "folderless"
+];
+var planFields = {
+  identifier: external_exports.string().nullable(),
+  objectURI: external_exports.string(),
+  title: external_exports.string().nullable(),
+  state: external_exports.enum(DELETION_STATES),
+  repairable: external_exports.boolean(),
+  blockers: external_exports.array(external_exports.string()),
+  folderIdentifier: external_exports.string().nullable(),
+  folderObjectURI: external_exports.string().nullable(),
+  folderMarkedForDeletion: external_exports.boolean(),
+  recentlyDeletedFolderIdentifier: external_exports.string().nullable(),
+  attachmentCount: external_exports.number().int(),
+  attachmentsMarkedForDeletion: external_exports.number().int(),
+  revision: external_exports.string(),
+  cloudSync: cloudSyncSchema2
+};
+var purgeScanSchema = external_exports.object({
+  status: external_exports.literal("scanned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false),
+  markedForDeletionCount: external_exports.number().int(),
+  candidateCount: external_exports.number().int(),
+  truncated: external_exports.boolean(),
+  candidates: external_exports.array(external_exports.object(planFields).passthrough())
+}).passthrough();
+var purgePlanSchema = external_exports.object({
+  status: external_exports.literal("planned"),
+  dryRun: external_exports.literal(true),
+  committed: external_exports.literal(false),
+  ...planFields
+}).passthrough();
+var purgeRepairResultSchema = external_exports.object({
+  status: external_exports.literal("repaired"),
+  dryRun: external_exports.literal(false),
+  committed: external_exports.literal(true),
+  verified: external_exports.literal(true),
+  repairedPurgeFlag: external_exports.literal(true),
+  identifier: external_exports.string(),
+  previousState: external_exports.literal("purge_flag_outside_recently_deleted"),
+  state: external_exports.literal("in_recently_deleted"),
+  fromFolderIdentifier: external_exports.string().nullable(),
+  recentlyDeletedFolderIdentifier: external_exports.string().nullable(),
+  folderIdentifier: external_exports.string().nullable(),
+  revisionBefore: external_exports.string(),
+  revisionAfter: external_exports.string(),
+  modificationDate: external_exports.string().nullable(),
+  ...writeSyncFields
+}).passthrough();
+function invalid9(message, committed) {
+  return new PrivateWriteError("invalid_request", message, committed);
+}
+function repairPurgeFlag(request, deps = defaultWriterDeps()) {
+  const dryRun = request.dryRun !== false;
+  const notCommitted = dryRun ? void 0 : false;
+  if (request.identifier !== void 0) assertNoteIdentifier2(request.identifier);
+  const scope2 = writerScopeFields(request.scope);
+  if (dryRun) {
+    if (request.ifRevision !== void 0 || request.confirm !== void 0)
+      throw invalid9("ifRevision and confirm are only accepted with dryRun: false", notCommitted);
+    if (request.identifier === void 0 && Object.keys(scope2).length)
+      throw invalid9("Folder scope guards need an identifier; a scan takes none", notCommitted);
+    const fields = { dryRun: true, ...scope2 };
+    if (request.identifier !== void 0) fields.identifier = request.identifier;
+    const response = callPrivateWriter("repair_purge_flag", fields, deps, { dryRun: true });
+    return request.identifier === void 0 ? parseWriterResult(purgeScanSchema, response, false) : parseWriterResult(purgePlanSchema, response, false);
+  }
+  if (request.identifier === void 0) throw invalid9("identifier is required to apply", false);
+  if (request.ifRevision === void 0)
+    throw invalid9("ifRevision (the revision from a dry run) is required to apply", false);
+  assertRevision(request.ifRevision, "a dry run of native-repair-purge-flag");
+  if (request.confirm !== true)
+    throw new PrivateWriteError(
+      "confirmation_required",
+      "The repair moves the note to Recently Deleted, where it syncs to every device. Show the user the plan, then pass confirm: true.",
+      false
+    );
+  requireLiveValidated(PURGE_REPAIR_LIVE_VALIDATED, "native-repair-purge-flag", deps.env);
+  return parseWriterResult(
+    purgeRepairResultSchema,
+    callPrivateWriter(
+      "repair_purge_flag",
+      {
+        identifier: request.identifier,
+        dryRun: false,
+        ifRevision: request.ifRevision,
+        confirm: true,
+        ...scope2
+      },
+      deps
+    ),
+    true
+  );
+}
+
+// src/tools/privateWriterPurgeRepairTools.ts
+function registerPrivateWriterPurgeRepairTools(server2, manager, depsFactory = defaultWriterToolDeps) {
+  registerWriterTool(
+    server2,
+    depsFactory,
+    "native-repair-purge-flag",
+    "Use when: a note vanished from Notes without passing through Recently Deleted, or you want to check for notes that carry Notes' permanent-deletion (purge) flag while still in an ordinary folder. That state is corrupt: Notes hides the note and will purge it, and the user cannot recover it. The repair finishes an ordinary delete: it clears the flag and moves the note to Recently Deleted.\nReturns: without identifier (scan): candidateCount, truncated, and up to 50 candidates. With identifier and dryRun (default): the note's state (active, in_recently_deleted, purging_from_recently_deleted, purge_flag_outside_recently_deleted, purge_flag_without_folder, folderless), repairable, blockers, its folder and the account's Recently Deleted folder, attachment counts, and `revision`. Apply: status repaired, state in_recently_deleted, revisionBefore/revisionAfter, and sync state (pushScheduled is always false). The move-in-place nudge skips trashed notes, so to upload the move now use native-sync-push with method relaunch.\nDo not use when: deleting an ordinary note (delete-note), restoring a note from Recently Deleted (move-note), or the plan lists blockers (locked, shared, downloading, attachments_marked_for_deletion, no_recently_deleted_folder).\nSafety: scan and plan are read-only. The apply writes through unsupported private API and never purges: it clears the note's flag, moves it to its account's Recently Deleted folder, stamps the folder time (which starts Notes' 30-day clock), and verifies all of it plus an unchanged body in a fresh Core Data stack. It needs the plan's `revision` as ifRevision and confirm: true after the user agreed. A flag Notes set on purpose (a permanent delete on another device that has not finished syncing) looks the same, and repairing it brings that note back into Recently Deleted on every device; only repair a note the user recognizes. Requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1, a built writer, and, until live-validated, APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1 for the apply. A timeout is indeterminate: plan again before any retry.",
+    {
+      identifier: notesUuid2.optional().describe("Notes UUID; omit (with dryRun) to scan for every note in the purge-flag state"),
+      id: coreDataId3.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+      dryRun: external_exports.boolean().optional().describe("true (default): scan or plan only. false: apply; needs ifRevision and confirm"),
+      ifRevision: revisionToken.optional().describe("The `revision` from the dry run of the same note (required to apply)"),
+      confirm: external_exports.boolean().optional().describe("Must be true to apply, after the user agreed to the move to Recently Deleted"),
+      ...writerScopeGuardInput()
+    },
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    (args, deps) => {
+      const identifier = args.identifier === void 0 && args.id === void 0 ? void 0 : resolveIdentifier(manager, args);
+      return {
+        ...repairPurgeFlag(
+          {
+            identifier,
+            dryRun: args.dryRun,
+            ifRevision: args.ifRevision,
+            confirm: args.confirm,
+            scope: scopeGuardFrom(args)
+          },
+          deps.writer
+        )
+      };
+    }
+  );
+}
+
+// src/utils/paragraphAnchors.ts
+import { createHash as createHash8 } from "node:crypto";
+var ANCHOR_ID_PATTERN = /^pa_[0-9a-f]{24}$/;
+var DEFAULT_MIN_CONFIDENCE = 0.6;
+var textFingerprint = (normalized2) => createHash8("sha256").update(normalized2, "utf8").digest("hex").slice(0, 32);
+function textSimilarity(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const size = Math.min(a.length, b.length) < 3 ? 2 : 3;
+  const grams = (s) => {
+    const out = /* @__PURE__ */ new Map();
+    const padded = ` ${s} `;
+    for (let i = 0; i + size <= padded.length; i++) {
+      const g = padded.slice(i, i + size);
+      out.set(g, (out.get(g) ?? 0) + 1);
+    }
+    return out;
+  };
+  const ga = grams(a);
+  const gb = grams(b);
+  let shared = 0;
+  let total = 0;
+  for (const count2 of ga.values()) total += count2;
+  for (const [g, count2] of gb) {
+    total += count2;
+    shared += Math.min(count2, ga.get(g) ?? 0);
+  }
+  return total ? 2 * shared / total : 0;
+}
+var round3 = (value) => Math.round(value * 100) / 100;
+function anchorFor(note, paragraph2, { anchorId, now }) {
+  if (!note.identifier)
+    throw new CodedError("The note has no stored identifier, so no anchor can be recorded", {
+      code: "unsupported"
+    });
+  const i = note.paragraphs.indexOf(paragraph2);
+  if (i < 0) throw new Error("The paragraph does not belong to this note");
+  const fp = (p) => p ? textFingerprint(normalizeParagraphText(p.text)) : null;
+  const text2 = normalizeParagraphText(paragraph2.text);
+  return {
+    anchorId,
+    noteIdentifier: note.identifier.toUpperCase(),
+    noteId: note.id,
+    paragraphId: paragraph2.paragraphId,
+    paragraphIdStatus: paragraph2.paragraphIdStatus,
+    text: text2,
+    fingerprint: textFingerprint(text2),
+    prevFingerprint: fp(note.paragraphs[i - 1]),
+    nextFingerprint: fp(note.paragraphs[i + 1]),
+    blockIndex: paragraph2.blockIndex,
+    style: paragraph2.style,
+    createdAt: now.toISOString()
+  };
+}
+function matchAnchor(anchor, paragraphs, { minConfidence = DEFAULT_MIN_CONFIDENCE } = {}) {
+  const result = findAnchor(anchor, paragraphs);
+  return result.status === "matched" && result.confidence < minConfidence ? { ...result, status: "low-confidence" } : result;
+}
+function findAnchor(anchor, paragraphs) {
+  const normalized2 = paragraphs.map((p) => normalizeParagraphText(p.text));
+  const fps = normalized2.map(textFingerprint);
+  const neighbours = (i) => Number((fps[i - 1] ?? null) === anchor.prevFingerprint) + Number((fps[i + 1] ?? null) === anchor.nextFingerprint);
+  const all = paragraphs.map((_, i) => i);
+  const byNeighbours = (candidates) => {
+    const scored2 = candidates.map((i) => ({ i, n: neighbours(i) }));
+    const best = Math.max(...scored2.map((s) => s.n));
+    const top = scored2.filter((s) => s.n === best);
+    return best > 0 && top.length === 1 ? top[0] : void 0;
+  };
+  if (anchor.paragraphId) {
+    const owners = all.filter((i) => paragraphs[i].paragraphId === anchor.paragraphId);
+    if (owners.length === 1 && paragraphs[owners[0]].paragraphIdStatus === "unique") {
+      const i = owners[0];
+      const same = fps[i] === anchor.fingerprint;
+      const confidence = same ? 1 : 0.8 + 0.15 * Math.max(textSimilarity(anchor.text, normalized2[i]), neighbours(i) / 2);
+      return { status: "matched", index: i, method: "paragraph-id", confidence: round3(confidence) };
+    }
+    const exact2 = owners.filter((i) => fps[i] === anchor.fingerprint);
+    if (exact2.length === 1)
+      return { status: "matched", index: exact2[0], method: "paragraph-id", confidence: 0.95 };
+    if (exact2.length > 1) {
+      const pick2 = byNeighbours(exact2);
+      if (pick2)
+        return { status: "matched", index: pick2.i, method: "paragraph-id", confidence: 0.9 };
+    }
+  }
+  const exact = all.filter((i) => fps[i] === anchor.fingerprint);
+  if (exact.length === 1) {
+    const confidence = neighbours(exact[0]) > 0 ? 0.95 : 0.85;
+    return { status: "matched", index: exact[0], method: "exact-text", confidence };
+  }
+  if (exact.length > 1) {
+    const pick2 = byNeighbours(exact);
+    if (pick2) return { status: "matched", index: pick2.i, method: "exact-text", confidence: 0.8 };
+    return { status: "ambiguous", confidence: 0, candidates: exact.length };
+  }
+  const scored = all.map((i) => ({ i, sim: textSimilarity(anchor.text, normalized2[i]), n: neighbours(i) })).filter(({ sim, n }) => n === 2 && sim >= 0.5 || n === 1 && sim >= 0.8).map((s) => ({ ...s, score: 0.4 * s.sim + 0.2 * s.n })).sort((a, b) => b.score - a.score);
+  if (!scored.length) return { status: "not-found", confidence: 0 };
+  if (scored.length > 1 && scored[0].score - scored[1].score < 0.1)
+    return {
+      status: "ambiguous",
+      confidence: 0,
+      candidates: scored.filter((s) => scored[0].score - s.score < 0.1).length
+    };
+  return {
+    status: "matched",
+    index: scored[0].i,
+    method: "text-and-neighbours",
+    confidence: round3(scored[0].score)
+  };
+}
+function resolutionFor(anchor, note, options = {}) {
+  const base = {
+    anchorId: anchor.anchorId,
+    noteId: note.id,
+    needsReminting: false,
+    resolved: false
+  };
+  const result = matchAnchor(anchor, note.paragraphs, options);
+  if (result.status === "ambiguous")
+    return {
+      ...base,
+      status: "ambiguous",
+      confidence: 0,
+      candidates: result.candidates,
+      message: `${result.candidates} paragraphs match the anchor equally well; refusing to guess`
+    };
+  if (result.status === "not-found")
+    return {
+      ...base,
+      status: "not-found",
+      confidence: 0,
+      message: "The anchored paragraph is no longer in the note (deleted, or edited beyond recognition)"
+    };
+  const p = note.paragraphs[result.index];
+  const match = {
+    blockIndex: p.blockIndex,
+    text: p.text,
+    paragraphId: p.paragraphId,
+    paragraphIdStatus: p.paragraphIdStatus,
+    ...p.sharedWith !== void 0 ? { sharedWith: p.sharedWith } : {}
+  };
+  const changes = {
+    textChanged: textFingerprint(normalizeParagraphText(p.text)) !== anchor.fingerprint,
+    blockIndexChanged: p.blockIndex !== anchor.blockIndex,
+    paragraphIdChanged: p.paragraphId !== anchor.paragraphId
+  };
+  const found = { ...base, method: result.method, confidence: result.confidence, match, changes };
+  if (result.status === "low-confidence")
+    return {
+      ...found,
+      status: "low-confidence",
+      message: `The best candidate scored ${result.confidence}, below the minimum; refusing to link it`
+    };
+  if (p.paragraphIdStatus === "unique" && note.identifier)
+    return {
+      ...found,
+      status: "resolved",
+      resolved: true,
+      url: paragraphUrl(note.identifier, p.paragraphId),
+      message: `Resolved by ${result.method} (confidence ${result.confidence})`
+    };
+  return {
+    ...found,
+    status: "needs-reminting",
+    needsReminting: true,
+    message: p.paragraphIdStatus === "shared" ? `Found the paragraph by ${result.method}, but its ID is shared with ${p.sharedWith} other paragraph(s); it needs a new paragraph ID before it can be linked` : `Found the paragraph by ${result.method}, but it has no paragraph ID; it needs one before it can be linked`
+  };
+}
+function noteByIdentifierSql(columns2) {
+  return `SELECT json_object('pk', n.Z_PK, 'active', CASE WHEN ${activeNoteSql(columns2, "n", "f")} THEN 1 ELSE 0 END, 'store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1)) FROM ZICCLOUDSYNCINGOBJECT n LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = n.ZFOLDER WHERE n.Z_ENT = ${entity("ICNote")} AND n.ZIDENTIFIER IN (CAST(@upper AS TEXT), CAST(@lower AS TEXT)) ORDER BY n.Z_PK;`;
+}
+function resolveAnchorDetailed(anchor, { dbPath: dbPath2 = NOTES_DB_PATH8, minConfidence } = {}) {
+  const none = { anchorId: anchor.anchorId, resolved: false, needsReminting: false, confidence: 0 };
+  const columns2 = readColumns(dbPath2);
+  const rows = parseJsonLines(
+    runReadOnlySql(dbPath2, noteByIdentifierSql(columns2), {
+      upper: { blob: Buffer.from(anchor.noteIdentifier.toUpperCase(), "utf8") },
+      lower: { blob: Buffer.from(anchor.noteIdentifier.toLowerCase(), "utf8") }
+    })
+  );
+  if (!rows.length || !rows[0].store)
+    return {
+      resolution: {
+        ...none,
+        status: "note-not-found",
+        message: `No note with identifier ${anchor.noteIdentifier} is in the Notes database`
+      }
+    };
+  if (rows.length > 1)
+    return {
+      resolution: {
+        ...none,
+        status: "ambiguous",
+        candidates: rows.length,
+        message: `${rows.length} notes carry identifier ${anchor.noteIdentifier}; refusing to guess`
+      }
+    };
+  const noteId3 = noteIdFor(rows[0].store, rows[0].pk);
+  if (!rows[0].active)
+    return {
+      resolution: {
+        ...none,
+        noteId: noteId3,
+        status: "note-deleted",
+        message: "The note is in Recently Deleted or awaiting deletion"
+      }
+    };
+  let note;
+  try {
+    note = readNoteParagraphs({ id: noteId3 }, { dbPath: dbPath2 });
+  } catch (error2) {
+    if (error2 instanceof ParagraphLinkError)
+      return {
+        resolution: {
+          ...none,
+          noteId: noteId3,
+          status: error2.reason === "not-found" ? "note-not-found" : "note-unreadable",
+          message: error2.message
+        }
+      };
+    throw error2;
+  }
+  return { resolution: resolutionFor(anchor, note, { minConfidence }), note };
+}
+var reminter;
+function setParagraphIdReminter(fn) {
+  reminter = fn;
+}
+function paragraphIdReminter() {
+  return reminter;
+}
+
+// src/services/privateWriterReminter.ts
+function writerParagraphIdReminter(depsFactory = () => defaultWriterDeps()) {
+  return async (request) => {
+    const deps = depsFactory();
+    if (!privateWritesEnabled(deps.env))
+      throw new PrivateWriteError(
+        "disabled",
+        "Re-minting needs APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1",
+        false
+      );
+    const state = readWriterNoteState(request.noteIdentifier, deps);
+    const result = setParagraphId(
+      {
+        identifier: request.noteIdentifier,
+        blockIndex: request.blockIndex,
+        expectedText: request.expectedText,
+        ifRevision: state.revision
+      },
+      deps
+    );
+    return { paragraphId: result.paragraphId };
+  };
+}
+function installWriterParagraphIdReminter(env = process.env, depsFactory) {
+  if (!privateWritesEnabled(env)) {
+    setParagraphIdReminter(void 0);
+    return false;
+  }
+  setParagraphIdReminter(writerParagraphIdReminter(depsFactory));
+  return true;
+}
+
+// src/utils/localServer.ts
+import { randomBytes as randomBytes3, timingSafeEqual } from "node:crypto";
+import { networkInterfaces } from "node:os";
+function isTailnetIPv4(address) {
+  const match = /^100\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address);
+  if (!match) return false;
+  const [second, third, fourth] = match.slice(1).map(Number);
+  return second >= 64 && second <= 127 && third <= 255 && fourth <= 255;
+}
+function findTailnetAddress(interfaces = networkInterfaces()) {
+  const candidates = [];
+  for (const [name, infos] of Object.entries(interfaces)) {
+    for (const info of infos ?? []) {
+      if (info.family === "IPv4" && !info.internal && isTailnetIPv4(info.address))
+        candidates.push({ address: info.address, interface: name });
+    }
+  }
+  return candidates.find((c) => c.interface.startsWith("utun")) ?? candidates[0];
+}
+function newServerToken() {
+  return randomBytes3(32).toString("hex");
+}
+function bearerToken(req) {
+  const auth = req.headers.authorization;
+  return auth?.startsWith("Bearer ") ? auth.slice(7) : void 0;
+}
+function tokenMatches(given, token) {
+  if (!given) return false;
+  const a = Buffer.from(given, "utf8");
+  const b = Buffer.from(token, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+function hostAuthority(host, port) {
+  return host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`;
+}
+function crossOriginRefusal(req, origin, requireOrigin = false) {
+  const site = req.headers["sec-fetch-site"];
+  if (site && site !== "same-origin" && site !== "none") return "cross-site";
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin !== void 0 && requestOrigin !== origin) return "foreign-origin";
+  if (requireOrigin && requestOrigin !== origin) return "missing-origin";
+  return void 0;
+}
+
+// src/services/templateEditor.ts
+import { randomBytes as randomBytes4 } from "node:crypto";
+import { createServer } from "node:http";
+
+// src/utils/templateSamples.ts
+function sampleBlock(text2, style = "body", extra = {}, runs = [{ text: text2 }]) {
+  return {
+    index: 0,
+    start: 0,
+    length: runs.reduce((sum, run) => sum + run.text.length, 0),
+    text: runs.map((run) => run.text).join(""),
+    style,
+    styleType: null,
+    indent: 0,
+    alignment: "left",
+    blockQuote: false,
+    ...extra,
+    runs: runs.map((run) => ({ start: 0, length: run.text.length, ...run })),
+    attachments: []
+  };
+}
+var sampleAttachmentRun = (id2, uti) => ({
+  text: "\uFFFC",
+  attachment: { id: id2, uti }
+});
+function sampleAttachment(id2, uti, extra = {}) {
+  return { id: id2, pk: 0, uti, kind: classifyUti(uti), children: [], ...extra };
+}
+function sampleNote(pk, blocks, attachments = []) {
+  let offset = 0;
+  const indexed = blocks.map((b, index) => {
+    const start = offset;
+    offset += b.length + 1;
+    let at = start;
+    const runs = b.runs.map((run) => {
+      const shifted = { ...run, start: at };
+      at += run.length;
+      return shifted;
+    });
+    const markers2 = runs.flatMap(
+      (run) => run.attachment ? [{ ...run.attachment, start: run.start, blockIndex: index }] : []
+    );
+    return { ...b, index, start, runs, attachments: markers2 };
+  });
+  const markers = indexed.flatMap((b) => b.attachments);
+  return {
+    id: `x-coredata://SAMPLE/ICNote/p${pk}`,
+    title: indexed[0]?.text ?? "",
+    doc: {
+      text: indexed.map((b) => b.text).join("\n"),
+      textLength: offset,
+      blocks: indexed,
+      attachments: markers,
+      undecodedFields: { attributeRun: {}, paragraphStyle: {} },
+      summary: summarize(indexed, markers)
+    },
+    attachments: new Map(attachments.map((a) => [a.id, a])),
+    ordered: attachments.map((a, i) => ({ ...a, pk: i + 1 }))
+  };
+}
+function sampleMeta(uuid3) {
+  return {
+    uuid: uuid3,
+    created: "2026-01-05T14:30:00.000Z",
+    modified: "2026-02-10T09:15:00.000Z",
+    folder: "Sample Folder",
+    account: "iCloud"
+  };
+}
+function templateSamples() {
+  return [
+    {
+      id: "structure",
+      label: "Headings, lists and checklists",
+      meta: sampleMeta("00000000-0000-4000-8000-000000000001"),
+      note: sampleNote(1, [
+        sampleBlock("Weekly Plan", "title"),
+        sampleBlock("Goals", "heading"),
+        sampleBlock("Details", "subheading"),
+        sampleBlock("A plain paragraph with *characters* that need escaping."),
+        sampleBlock("First step", "numbered"),
+        sampleBlock("Second step", "numbered"),
+        sampleBlock("Nested step", "numbered", { indent: 1 }),
+        sampleBlock("A bullet", "bulleted"),
+        sampleBlock("A dash", "dashed"),
+        sampleBlock("Nested bullet", "bulleted", { indent: 1 }),
+        sampleBlock("Done task", "checklist", { checklist: { id: "sample-a", done: true } }),
+        sampleBlock("Open task", "checklist", { checklist: { id: "sample-b", done: false } }),
+        sampleBlock("A quoted line", "body", { blockQuote: true }),
+        sampleBlock("const answer = 42;", "monospaced"),
+        sampleBlock('console.log("sample");', "monospaced")
+      ])
+    },
+    {
+      id: "inline",
+      label: "Inline formatting and links",
+      meta: sampleMeta("00000000-0000-4000-8000-000000000002"),
+      note: sampleNote(2, [
+        sampleBlock("Formatting Sample", "title"),
+        sampleBlock("", "body", {}, [
+          { text: "Bold", bold: true },
+          { text: ", " },
+          { text: "italic", italic: true },
+          { text: ", " },
+          { text: "both", bold: true, italic: true },
+          { text: ", " },
+          { text: "struck", strikethrough: true },
+          { text: ", " },
+          { text: "underlined", underline: true },
+          { text: "." }
+        ]),
+        sampleBlock("", "body", {}, [
+          { text: "Highlighted", highlight: "purple" },
+          { text: ", x" },
+          { text: "2", superscript: true },
+          { text: ", H" },
+          { text: "2", subscript: true },
+          { text: "O, and " },
+          { text: "red text", color: "#FF3B30" },
+          { text: "." }
+        ]),
+        sampleBlock("", "body", {}, [
+          { text: "A " },
+          { text: "web link", link: "https://example.com/page", linkSafe: true },
+          { text: " and a " },
+          { text: "bold link", link: "https://example.com/bold", linkSafe: true, bold: true },
+          { text: "." }
+        ])
+      ])
+    },
+    {
+      id: "attachments",
+      label: "Attachments and tags",
+      meta: sampleMeta("00000000-0000-4000-8000-000000000003"),
+      note: sampleNote(
+        3,
+        [
+          sampleBlock("Trip Notes", "title"),
+          sampleBlock("", "body", {}, [
+            { text: "Tagged " },
+            sampleAttachmentRun("SAMPLE-TAG", "com.apple.notes.inlinetextattachment.hashtag"),
+            { text: " for later." }
+          ]),
+          sampleBlock("", "body", {}, [sampleAttachmentRun("SAMPLE-IMG", "public.jpeg")]),
+          sampleBlock("", "body", {}, [sampleAttachmentRun("SAMPLE-PDF", "com.adobe.pdf")]),
+          sampleBlock("", "body", {}, [
+            sampleAttachmentRun("SAMPLE-DIV", "com.apple.notes.inlinetextattachment.dividerline")
+          ]),
+          sampleBlock("", "body", {}, [sampleAttachmentRun("SAMPLE-URL", "public.url")]),
+          sampleBlock("", "body", {}, [sampleAttachmentRun("SAMPLE-IMGURL", "public.url")])
+        ],
+        [
+          sampleAttachment("SAMPLE-TAG", "com.apple.notes.inlinetextattachment.hashtag", {
+            altText: "#travel"
+          }),
+          sampleAttachment("SAMPLE-IMG", "public.jpeg", { title: "harbor.jpg" }),
+          sampleAttachment("SAMPLE-PDF", "com.adobe.pdf", { title: "itinerary.pdf" }),
+          sampleAttachment("SAMPLE-DIV", "com.apple.notes.inlinetextattachment.dividerline"),
+          sampleAttachment("SAMPLE-URL", "public.url", {
+            title: "Example Domain",
+            url: "https://example.com/"
+          }),
+          sampleAttachment("SAMPLE-IMGURL", "public.url", {
+            title: "Harbor at dusk",
+            url: "https://example.com/photos/harbor.jpg"
+          })
+        ]
+      )
+    }
+  ];
+}
+
+// src/services/templateEditorPage.ts
+var EDITOR_STYLE = `
+:root { color-scheme: light dark; --bg: #fafafa; --fg: #1d1d1f; --muted: #6e6e73;
+  --panel: #ffffff; --border: #d2d2d7; --accent: #0a66d8; --bad: #c1272d; --ok: #1f7a3a; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1c1c1e; --fg: #f2f2f7; --muted: #a1a1a6;
+  --panel: #2c2c2e; --border: #3a3a3c; --accent: #4c9bff; --bad: #ff6b6b; --ok: #4cd07d; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  background: var(--bg); color: var(--fg); }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: var(--panel); }
+header h1 { font-size: 15px; margin: 0 12px 0 0; }
+label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+select, input, button, textarea { font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 16px;
+  height: calc(100vh - 110px); min-height: 360px; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } }
+section { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+h2 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+textarea { flex: 1; min-height: 300px; width: 100%; resize: none;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { flex: 1; margin: 0; overflow: auto; padding: 8px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px; min-height: 300px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+ul { margin: 6px 0 0; padding-left: 18px; max-height: 120px; overflow: auto; }
+.bad { color: var(--bad); } .ok { color: var(--ok); } .muted { color: var(--muted); }
+footer { padding: 0 16px 12px; }
+`;
+var EDITOR_SCRIPT = `
+"use strict";
+const token = new URLSearchParams(location.search).get("token") || "";
+const $ = (id) => document.getElementById(id);
+const api = async (path, body) => {
+  const res = await fetch(path, body === undefined
+    ? { headers: { Authorization: "Bearer " + token } }
+    : { method: "POST", headers: { Authorization: "Bearer " + token,
+        "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error((data.error && data.error.message) || res.statusText);
+    e.detail = data.error; throw e; }
+  return data;
+};
+const setText = (id, text, cls) => { const el = $(id); el.textContent = text;
+  el.className = cls || ""; };
+const list = (id, items) => { const ul = $(id); ul.replaceChildren();
+  for (const item of items) { const li = document.createElement("li");
+    li.textContent = item; ul.append(li); } };
+let timer;
+async function refresh() {
+  try {
+    const out = await api("/api/preview", { template: $("json").value, sample: $("sample").value });
+    if (out.valid) setText("status", "Valid template.", "ok");
+    else setText("status", out.errors.length + " problem(s):", "bad");
+    list("errors", out.errors.map((e) => e.path + ": " + e.message));
+    list("warnings", out.warnings.map((w) => w.code + (w.attachmentId ? " (" + w.attachmentId + ")" : "")));
+    $("preview").textContent = out.valid ? out.markdown : "";
+  } catch (e) { setText("status", "Preview failed: " + e.message, "bad"); }
+}
+const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 250); };
+async function load(name) {
+  try {
+    const out = await api("/api/template?name=" + encodeURIComponent(name));
+    $("json").value = JSON.stringify(out.template, null, 2) + "\\n";
+    $("name").value = out.source === "saved" ? out.name : "";
+    refresh();
+  } catch (e) { setText("status", "Could not open " + name + ": " + e.message, "bad"); }
+}
+async function save() {
+  try {
+    const out = await api("/api/save", { name: $("name").value.trim(),
+      template: $("json").value, force: $("force").checked });
+    setText("saved", (out.replaced ? "Replaced " : "Saved ") + out.name + " at " + out.path, "ok");
+    $("force").checked = false;
+    await fillPicker(out.name);
+  } catch (e) {
+    const errors = (e.detail && e.detail.errors) || [];
+    setText("saved", e.message + (errors.length ? " " + errors.map((x) => x.path + ": " + x.message).join("; ") : ""), "bad");
+  }
+}
+async function fillPicker(selected) {
+  const state = await api("/api/state");
+  const picker = $("picker"); picker.replaceChildren();
+  const group = (label, names) => { const g = document.createElement("optgroup");
+    g.label = label; for (const n of names) { const o = document.createElement("option");
+      o.value = n; o.textContent = n; g.append(o); } picker.append(g); };
+  group("Built-in", state.builtins);
+  if (state.saved.length) group("Saved", state.saved);
+  picker.value = selected;
+  setText("dir", "Library: " + state.dir, "muted");
+  return state;
+}
+(async () => {
+  try {
+    const state = await fillPicker("");
+    const sample = $("sample");
+    for (const s of state.samples) { const o = document.createElement("option");
+      o.value = s.id; o.textContent = s.label; sample.append(o); }
+    $("picker").value = state.initial.name;
+    $("json").value = JSON.stringify(state.initial.template, null, 2) + "\\n";
+    $("name").value = state.initial.source === "saved" ? state.initial.name : "";
+    $("json").addEventListener("input", schedule);
+    sample.addEventListener("change", refresh);
+    $("picker").addEventListener("change", () => load($("picker").value));
+    $("save").addEventListener("click", save);
+    refresh();
+  } catch (e) { setText("status", "Could not start: " + e.message, "bad"); }
+})();
+`;
+var EDITOR_BODY = `
+<header>
+  <h1>Markdown template editor</h1>
+  <label>Open <select id="picker"></select></label>
+  <label>Preview <select id="sample"></select></label>
+  <span id="dir" class="muted"></span>
+</header>
+<main>
+  <section>
+    <h2>Template JSON</h2>
+    <textarea id="json" spellcheck="false" aria-label="Template JSON"></textarea>
+    <div id="status" role="status"></div>
+    <ul id="errors" class="bad"></ul>
+  </section>
+  <section>
+    <h2>Markdown preview</h2>
+    <pre id="preview" aria-label="Markdown preview"></pre>
+    <ul id="warnings" class="muted" aria-label="Warnings"></ul>
+  </section>
+</main>
+<footer>
+  <label>Save as <input id="name" placeholder="my-template" maxlength="64" autocomplete="off"></label>
+  <label><input id="force" type="checkbox"> Replace an existing template</label>
+  <button id="save" type="button">Save</button>
+  <span id="saved" role="status"></span>
+</footer>
+`;
+function templateEditorPage(nonce) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Template Editor</title><style nonce="${nonce}">${EDITOR_STYLE}</style></head><body>${EDITOR_BODY}<script nonce="${nonce}">${EDITOR_SCRIPT}</script></body></html>`;
+}
+
+// src/services/templateEditor.ts
+var DEFAULT_EDITOR_IDLE_MS = 30 * 60 * 1e3;
+var MAX_EDITOR_BODY_BYTES = MAX_TEMPLATE_BYTES * 2 + 4096;
+var EditorHttpError = class extends Error {
+  constructor(status, code, message, errors) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.errors = errors;
+  }
+  status;
+  code;
+  errors;
+};
+function editorPresentedToken(req, url) {
+  return bearerToken(req)?.trim() ?? url.searchParams.get("token") ?? void 0;
+}
+var CROSS_ORIGIN_MESSAGE = {
+  "cross-site": "Cross-site requests are refused.",
+  "foreign-origin": "Cross-origin requests are refused.",
+  "missing-origin": "POST requires the editor's own Origin."
+};
+async function readEditorJson(req) {
+  const type = req.headers["content-type"] ?? "";
+  if (!/^application\/json(?:\s*;|$)/i.test(type))
+    throw new EditorHttpError(415, "unsupported-media-type", "Send JSON (application/json).");
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_EDITOR_BODY_BYTES)
+      throw new EditorHttpError(413, "too-large", "Request body too large.");
+    chunks.push(chunk);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new EditorHttpError(400, "bad-request", "Request body is not valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new EditorHttpError(400, "bad-request", "Request body must be a JSON object.");
+  return parsed;
+}
+var editorStringField = (body, key) => {
+  const value = body[key];
+  if (typeof value !== "string")
+    throw new EditorHttpError(400, "bad-request", `"${key}" must be a string.`);
+  return value;
+};
+async function startTemplateEditor(options = {}) {
+  const host = options.host ?? "127.0.0.1";
+  const idleMs = options.idleMs ?? DEFAULT_EDITOR_IDLE_MS;
+  const store = options.store ?? new TemplateStore();
+  const token = options.token ?? newServerToken();
+  const samples = templateSamples();
+  const initialName = options.name ?? "standard-markdown";
+  const initial = isBuiltinTemplate(initialName) ? builtinTemplate(initialName) : store.get(initialName);
+  const initialSource = isBuiltinTemplate(initialName) ? "builtin" : "saved";
+  let origin = "";
+  let hostHeader = "";
+  let idleTimer;
+  let closeReason = "closed";
+  const sockets = /* @__PURE__ */ new Set();
+  const loadTemplate = (name) => {
+    if (isBuiltinTemplate(name))
+      return { name, source: "builtin", template: builtinTemplate(name) };
+    return { name, source: "saved", template: store.get(name) };
+  };
+  const state = () => {
+    const listing = store.list();
+    return {
+      builtins: BUILTIN_TEMPLATE_NAMES,
+      saved: listing.templates.map((t) => t.name),
+      dir: listing.dir,
+      samples: [
+        ...samples.map((s) => ({ id: s.id, label: s.label })),
+        ...options.note ? [{ id: "note", label: `Note: ${options.note.note.title}` }] : []
+      ],
+      initial: { name: initialName, source: initialSource, template: initial }
+    };
+  };
+  const preview = (body) => {
+    const text2 = editorStringField(body, "template");
+    const sampleId = typeof body.sample === "string" ? body.sample : samples[0].id;
+    const source = sampleId === "note" && options.note ? options.note : samples.find((s) => s.id === sampleId);
+    if (!source) throw new EditorHttpError(400, "bad-request", `Unknown sample "${sampleId}".`);
+    let portable;
+    try {
+      portable = parseTemplate(text2);
+    } catch (error2) {
+      if (error2 instanceof TemplateValidationError)
+        return { valid: false, errors: error2.errors, markdown: "", warnings: [] };
+      throw error2;
+    }
+    const result = renderNotesWithTemplate(
+      [source.note],
+      { stats: emptyStats() },
+      {
+        template: resolveTemplate(portable),
+        exportStem: "preview",
+        metaFor: () => source.meta
+      }
+    );
+    return { valid: true, errors: [], markdown: result.markdown, warnings: result.warnings };
+  };
+  const save = (body) => {
+    const name = editorStringField(body, "name");
+    const text2 = editorStringField(body, "template");
+    const force = body.force === true;
+    try {
+      const saved = store.save(name, text2, { force });
+      return { name, path: saved.path, bytes: saved.bytes, replaced: saved.replaced };
+    } catch (error2) {
+      if (error2 instanceof TemplateValidationError)
+        throw new EditorHttpError(
+          422,
+          "invalid-template",
+          "The template is invalid.",
+          error2.errors
+        );
+      if (error2 instanceof TemplateStoreError && error2.code === "template-exists")
+        throw new EditorHttpError(
+          409,
+          error2.code,
+          `A template named "${name}" already exists. Tick "Replace an existing template" to replace it.`
+        );
+      if (error2 instanceof TemplateStoreError)
+        throw new EditorHttpError(400, error2.code, error2.message);
+      throw error2;
+    }
+  };
+  const send = (res, status, type, body, extra = {}) => {
+    res.writeHead(status, {
+      "Content-Type": type,
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      ...extra
+    });
+    res.end(body);
+  };
+  const sendJson = (res, status, value) => send(res, status, "application/json; charset=utf-8", JSON.stringify(value));
+  const touch = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (idleMs > 0)
+      idleTimer = setTimeout(() => {
+        closeReason = "idle";
+        void close();
+      }, idleMs);
+  };
+  const handle = async (req, res) => {
+    if (req.headers.host !== hostHeader)
+      throw new EditorHttpError(421, "wrong-host", "Unexpected Host header.");
+    const url = new URL(req.url ?? "/", origin);
+    if (!tokenMatches(editorPresentedToken(req, url), token))
+      throw new EditorHttpError(401, "unauthorized", "Missing or wrong token.");
+    const refusal = crossOriginRefusal(req, origin, req.method === "POST");
+    if (refusal) throw new EditorHttpError(403, "cross-origin", CROSS_ORIGIN_MESSAGE[refusal]);
+    touch();
+    const route = `${req.method} ${url.pathname}`;
+    switch (route) {
+      case "GET /": {
+        const nonce = randomBytes4(16).toString("base64");
+        return send(res, 200, "text/html; charset=utf-8", templateEditorPage(nonce), {
+          "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+        });
+      }
+      case "GET /api/state":
+        return sendJson(res, 200, state());
+      case "GET /api/template": {
+        const name = url.searchParams.get("name") ?? "";
+        try {
+          return sendJson(res, 200, loadTemplate(name));
+        } catch (error2) {
+          if (error2 instanceof TemplateStoreError)
+            throw new EditorHttpError(404, error2.code, error2.message);
+          if (error2 instanceof TemplateValidationError)
+            throw new EditorHttpError(
+              422,
+              "invalid-template",
+              "The saved template is invalid.",
+              error2.errors
+            );
+          throw error2;
+        }
+      }
+      case "POST /api/preview":
+        return sendJson(res, 200, preview(await readEditorJson(req)));
+      case "POST /api/save":
+        return sendJson(res, 200, save(await readEditorJson(req)));
+      default:
+        throw new EditorHttpError(404, "not-found", "Not found.");
+    }
+  };
+  const server2 = createServer((req, res) => {
+    handle(req, res).catch((error2) => {
+      const http = error2 instanceof EditorHttpError ? error2 : new EditorHttpError(
+        500,
+        "internal-error",
+        "The editor could not complete the request."
+      );
+      if (!res.headersSent)
+        sendJson(res, http.status, {
+          error: {
+            code: http.code,
+            message: http.message,
+            ...http.errors ? { errors: http.errors } : {}
+          }
+        });
+      else res.end();
+    });
+  });
+  server2.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
+  let resolveClosed;
+  const closed = new Promise((resolve10) => resolveClosed = resolve10);
+  let closing;
+  const close = () => {
+    closing ??= new Promise((resolve10) => {
+      if (idleTimer) clearTimeout(idleTimer);
+      server2.close(() => {
+        resolveClosed(closeReason);
+        resolve10();
+      });
+      for (const socket of sockets) socket.destroy();
+    });
+    return closing;
+  };
+  await new Promise((resolve10, reject) => {
+    server2.once("error", reject);
+    server2.listen({ host, port: options.port ?? 0, exclusive: true }, () => {
+      server2.off("error", reject);
+      resolve10();
+    });
+  });
+  const port = server2.address().port;
+  const authority = hostAuthority(host, port);
+  origin = `http://${authority}`;
+  hostHeader = authority;
+  touch();
+  return { url: `${origin}/?token=${token}`, host, port, token, closed, close };
+}
+
+// src/services/templateEditorCli.ts
+var TEMPLATES_USAGE = `Usage: apple-notes-mcp templates edit [name] [options]
+
+Open a local web editor for Markdown export templates. The editor validates
+and previews as you type, against built-in sample notes, and saves into the
+template library (create-only unless you tick "replace").
+
+  name                 Template to open: standard-markdown, obsidian, or a saved name
+  --port N             Port to listen on (default: a free port)
+  --idle-minutes N     Stop after N minutes without a request (default 30; 0: never)
+  --note ID            Also preview one real note (x-coredata://.../ICNote/pN), read-only
+  --tailnet            Listen on this Mac's Tailscale address instead of 127.0.0.1,
+                       so other devices on your tailnet can open the editor.
+                       Anyone on the tailnet who has the printed URL can save templates.
+
+Every request needs the per-run token in the printed URL. Press Ctrl-C to stop.
+`;
+function parseTemplatesArgs(argv) {
+  if (argv.length === 0 || argv.includes("--help") || argv.includes("-h")) return "help";
+  const [command, ...rest] = argv;
+  if (command !== "edit") throw new Error(`Unknown templates command "${command}".`);
+  const args = {
+    idleMinutes: DEFAULT_EDITOR_IDLE_MS / 6e4,
+    tailnet: false
+  };
+  const number3 = (flag3, value, max) => {
+    if (value === void 0 || !/^\d+$/.test(value) || Number(value) > max)
+      throw new Error(`${flag3} needs a whole number from 0 to ${max}.`);
+    return Number(value);
+  };
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i];
+    if (arg === "--port") args.port = number3(arg, rest[++i], 65535);
+    else if (arg === "--idle-minutes") args.idleMinutes = number3(arg, rest[++i], 24 * 60);
+    else if (arg === "--note") {
+      const id2 = rest[++i];
+      if (!id2 || !/^x-coredata:\/\/[^/\s]+\/ICNote\/p[0-9]{1,18}$/.test(id2))
+        throw new Error("--note needs a note id such as x-coredata://\u2026/ICNote/p123.");
+      args.noteId = id2;
+    } else if (arg === "--tailnet") args.tailnet = true;
+    else if (arg.startsWith("-")) throw new Error(`Unknown option ${arg}.`);
+    else if (args.name === void 0) args.name = arg;
+    else throw new Error(`Unexpected argument "${arg}".`);
+  }
+  return args;
+}
+var editorSignals = (stop) => {
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  return () => {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
+  };
+};
+async function runTemplatesCommand(argv, deps = {}) {
+  const out = deps.out ?? ((text2) => process.stdout.write(text2));
+  const err = deps.err ?? ((text2) => process.stderr.write(text2));
+  let args;
+  try {
+    args = parseTemplatesArgs(argv);
+  } catch (error2) {
+    err(`${error2.message}
+
+${TEMPLATES_USAGE}`);
+    return 2;
+  }
+  if (args === "help") {
+    out(TEMPLATES_USAGE);
+    return 0;
+  }
+  let host = "127.0.0.1";
+  if (args.tailnet) {
+    const found = (deps.tailnetAddress ?? findTailnetAddress)();
+    if (!found) {
+      err(
+        "No Tailscale address found (no 100.64.0.0/10 IPv4 address on this Mac). Connect Tailscale first, or run without --tailnet.\n"
+      );
+      return 1;
+    }
+    host = found.address;
+  }
+  let handle;
+  try {
+    const note = args.noteId ? (deps.readNote ?? ((id2) => ({ note: readExportNote(id2), meta: readExportNoteMeta(id2) })))(args.noteId) : void 0;
+    handle = await (deps.start ?? startTemplateEditor)({
+      host,
+      port: args.port,
+      idleMs: args.idleMinutes * 6e4,
+      name: args.name,
+      note
+    });
+  } catch (error2) {
+    err(`Could not start the template editor: ${error2.message}
+`);
+    return 1;
+  }
+  out(`Template editor: ${handle.url}
+`);
+  if (args.tailnet)
+    err(
+      `Listening on the tailnet address ${handle.host}. Any device on your tailnet that has this URL can read and save templates. Keep the URL private.
+`
+    );
+  err(
+    args.idleMinutes > 0 ? `Press Ctrl-C to stop. Stops by itself after ${args.idleMinutes} idle minute(s).
+` : "Press Ctrl-C to stop.\n"
+  );
+  const unregister = (deps.onSignal ?? editorSignals)(() => void handle.close());
+  const reason = await handle.closed;
+  unregister();
+  err(
+    reason === "idle" ? "Template editor stopped after the idle timeout.\n" : "Template editor stopped.\n"
+  );
+  return 0;
+}
+
+// src/services/anchorServer.ts
+import { createServer as createServer2 } from "node:http";
+var MIN_TOKEN_LENGTH = 32;
+var STATUS_CODE = {
+  resolved: 302,
+  "needs-reminting": 409,
+  ambiguous: 409,
+  "low-confidence": 409,
+  "not-found": 404,
+  "note-not-found": 404,
+  "note-deleted": 404,
+  "note-unreadable": 409
+};
+function createAnchorServer(options) {
+  if (options.token.length < MIN_TOKEN_LENGTH)
+    throw new Error(`The resolver token must be at least ${MIN_TOKEN_LENGTH} characters`);
+  const log = options.log ?? ((line) => process.stderr.write(line + "\n"));
+  const maxFailures = options.maxAuthFailures ?? 20;
+  let failures = [];
+  const server2 = createServer2((req, res) => {
+    const send = (status, body, headers = {}) => {
+      res.writeHead(status, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+        ...headers
+      });
+      res.end(req.method === "HEAD" ? void 0 : body + "\n");
+      const path10 = (req.url ?? "").split("?")[0].slice(0, 64);
+      log(`${req.method} ${path10} ${status}`);
+    };
+    const now = Date.now();
+    failures = failures.filter((t) => now - t < 6e4);
+    if (failures.length >= maxFailures)
+      return send(429, "Too many failed requests; wait a minute.");
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return send(405, "Method not allowed.", { Allow: "GET, HEAD" });
+    const address = server2.address();
+    const port = address && typeof address === "object" ? address.port : options.port;
+    const hosts = /* @__PURE__ */ new Set([hostAuthority(options.host, port)]);
+    if (options.host === "127.0.0.1") hosts.add(`localhost:${port}`);
+    if (!hosts.has((req.headers.host ?? "").toLowerCase()))
+      return send(403, "Unexpected Host header.");
+    let url;
+    try {
+      url = new URL(req.url ?? "/", "http://resolver.invalid");
+    } catch {
+      return send(400, "Bad request.");
+    }
+    if (!tokenMatches(url.searchParams.get("token") ?? bearerToken(req), options.token)) {
+      failures.push(now);
+      return send(401, "Missing or wrong token.");
+    }
+    const match = /^\/a\/([^/]+)$/.exec(url.pathname);
+    if (!match || !ANCHOR_ID_PATTERN.test(match[1])) return send(404, "Not found.");
+    let resolution;
+    try {
+      resolution = options.resolve(match[1]);
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : String(error2);
+      return send(503, `Could not read the Notes database: ${message}`);
+    }
+    if (!resolution) return send(404, "No such anchor.");
+    if (resolution.status === "resolved" && resolution.url)
+      return send(302, `Redirecting to ${resolution.url}`, { Location: resolution.url });
+    return send(STATUS_CODE[resolution.status], `${resolution.status}: ${resolution.message}`);
+  });
+  server2.requestTimeout = 3e4;
+  server2.headersTimeout = 1e4;
+  return server2;
+}
+function startAnchorServer(options) {
+  const server2 = createAnchorServer(options);
+  return new Promise((resolve10, reject) => {
+    server2.once("error", reject);
+    server2.listen(options.port, options.host, () => {
+      server2.off("error", reject);
+      const address = server2.address();
+      const port = address && typeof address === "object" ? address.port : options.port;
+      resolve10({
+        server: server2,
+        baseUrl: `http://${hostAuthority(options.host, port)}`,
+        close: () => new Promise((done) => {
+          server2.closeAllConnections();
+          server2.close(() => done());
+        })
+      });
+    });
+  });
+}
+var ANCHORS_USAGE = `Usage: apple-notes-mcp anchors serve [--port N] [--tailnet]
+
+Serves GET /a/<anchor-id>?token=<token>, redirecting to the paragraph's
+current applenotes:// link. Binds 127.0.0.1 unless --tailnet is given, in
+which case it binds this Mac's Tailscale address (it never changes Tailscale
+or firewall settings). The token is APPLE_NOTES_MCP_ANCHORS_TOKEN (at least
+${MIN_TOKEN_LENGTH} characters) or a random one printed at startup. The process
+that runs it needs Full Disk Access. Stop it with Ctrl-C.`;
+function parseAnchorsArgs(argv) {
+  const args = { port: 0, tailnet: false, help: false };
+  if (!argv.length || argv[0] === "--help" || argv[0] === "-h") return { ...args, help: true };
+  if (argv[0] !== "serve") throw new Error(`Unknown anchors command "${argv[0]}"`);
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--tailnet") args.tailnet = true;
+    else if (arg === "--help" || arg === "-h") args.help = true;
+    else if (arg === "--port") {
+      const value = argv[++i];
+      if (!value || !/^\d{1,5}$/.test(value) || Number(value) > 65535)
+        throw new Error("--port needs a number from 0 to 65535");
+      args.port = Number(value);
+    } else throw new Error(`Unknown option "${arg}"`);
+  }
+  return args;
+}
+async function runAnchorsCli(argv, {
+  env = process.env,
+  resolve: resolve10,
+  out = (text2) => process.stdout.write(text2),
+  interfaces,
+  signals = process
+}) {
+  let args;
+  try {
+    args = parseAnchorsArgs(argv);
+  } catch (error2) {
+    out(`${error2.message}
+
+${ANCHORS_USAGE}
+`);
+    return 2;
+  }
+  if (args.help) {
+    out(ANCHORS_USAGE + "\n");
+    return 0;
+  }
+  const host = args.tailnet ? findTailnetAddress(interfaces)?.address : "127.0.0.1";
+  if (!host) {
+    out("No Tailscale address (100.64.0.0/10) found on this Mac; is Tailscale connected?\n");
+    return 1;
+  }
+  const fromEnv = env.APPLE_NOTES_MCP_ANCHORS_TOKEN?.trim();
+  if (fromEnv !== void 0 && fromEnv !== "" && fromEnv.length < MIN_TOKEN_LENGTH) {
+    out(`APPLE_NOTES_MCP_ANCHORS_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters.
+`);
+    return 1;
+  }
+  const token = fromEnv || newServerToken();
+  let started;
+  try {
+    started = await startAnchorServer({ host, port: args.port, token, resolve: resolve10 });
+  } catch (error2) {
+    out(`Could not listen on ${host}:${args.port}: ${error2.message}
+`);
+    return 1;
+  }
+  out(
+    `Paragraph anchor resolver listening on ${started.baseUrl}
+Links: ${started.baseUrl}/a/<anchor-id>?token=<token>
+` + (fromEnv ? "Token: from APPLE_NOTES_MCP_ANCHORS_TOKEN\n" : `Token (this run only): ${token}
+`) + "Press Ctrl-C to stop.\n"
+  );
+  await new Promise((done) => {
+    signals.once("SIGINT", () => done());
+    signals.once("SIGTERM", () => done());
+  });
+  await started.close();
+  return 0;
+}
+
+// src/services/anchorRegistry.ts
+import { randomBytes as randomBytes5 } from "node:crypto";
+import {
+  closeSync as closeSync9,
+  constants as constants9,
+  fstatSync as fstatSync9,
+  fsyncSync,
+  lstatSync as lstatSync6,
+  mkdirSync as mkdirSync12,
+  openSync as openSync9,
+  readSync as readSync7,
+  renameSync as renameSync6,
+  statSync as statSync6,
+  unlinkSync as unlinkSync5,
+  writeSync as writeSync6
+} from "node:fs";
+import { homedir as homedir23 } from "node:os";
+import { dirname as dirname10, isAbsolute as isAbsolute7, join as join34, resolve as resolve9 } from "node:path";
+var MAX_ANCHORS = 2e4;
+var MAX_REGISTRY_BYTES = 32 * 1024 * 1024;
+var LOCK_WAIT_MS = 3e3;
+var LOCK_STALE_MS = 3e4;
+var ENVELOPE = {
+  "unsafe-path": "validation_error",
+  "corrupt-registry": "operation_failed",
+  "registry-full": "validation_error",
+  "registry-busy": "operation_failed",
+  "anchor-not-found": "not_found",
+  "invalid-anchor-id": "validation_error"
+};
+var AnchorRegistryError = class extends CodedError {
+  constructor(reason, message) {
+    super(message, { code: ENVELOPE[reason], reason });
+    this.reason = reason;
+    this.name = "AnchorRegistryError";
+  }
+  reason;
+};
+function anchorRegistryPath(env = process.env) {
+  const override = env.APPLE_NOTES_MCP_ANCHOR_FILE?.trim();
+  if (override) {
+    if (!isAbsolute7(override))
+      throw new AnchorRegistryError(
+        "unsafe-path",
+        "APPLE_NOTES_MCP_ANCHOR_FILE must be an absolute path."
+      );
+    return resolve9(override);
+  }
+  return join34(homedir23(), "Library/Application Support/apple-notes-mcp/paragraph-anchors.json");
+}
+var STRING_OR_NULL = (v) => v === null || typeof v === "string";
+function isAnchor(v) {
+  if (!v || typeof v !== "object") return false;
+  const a = v;
+  return typeof a.anchorId === "string" && ANCHOR_ID_PATTERN.test(a.anchorId) && typeof a.noteIdentifier === "string" && STRING_OR_NULL(a.noteId) && STRING_OR_NULL(a.paragraphId) && ["unique", "shared", "missing"].includes(a.paragraphIdStatus) && typeof a.text === "string" && typeof a.fingerprint === "string" && STRING_OR_NULL(a.prevFingerprint) && STRING_OR_NULL(a.nextFingerprint) && Number.isInteger(a.blockIndex) && typeof a.style === "string" && typeof a.createdAt === "string" && (a.updatedAt === void 0 || typeof a.updatedAt === "string");
+}
+var sleep2 = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+var AnchorRegistry = class _AnchorRegistry {
+  constructor(path10 = anchorRegistryPath(), lockWaitMs = LOCK_WAIT_MS) {
+    this.path = path10;
+    this.lockWaitMs = lockWaitMs;
+  }
+  path;
+  lockWaitMs;
+  /** A new random anchor id. */
+  static newId() {
+    return `pa_${randomBytes5(12).toString("hex")}`;
+  }
+  ensureDir() {
+    const dir = dirname10(this.path);
+    try {
+      if (!lstatSync6(dir).isDirectory())
+        throw new AnchorRegistryError(
+          "unsafe-path",
+          `${dir} is not a directory (symlinks are refused).`
+        );
+    } catch (error2) {
+      if (error2 instanceof AnchorRegistryError) throw error2;
+      mkdirSync12(dir, { recursive: true, mode: 448 });
+    }
+  }
+  /** Every anchor in the file, in the order recorded. A missing file is an empty registry. */
+  load() {
+    let fd;
+    try {
+      fd = openSync9(this.path, constants9.O_RDONLY | constants9.O_NOFOLLOW);
+    } catch (error2) {
+      if (error2.code === "ENOENT") return [];
+      throw new AnchorRegistryError(
+        "unsafe-path",
+        `Refusing to read ${this.path}: not a regular file.`
+      );
+    }
+    let text2;
+    try {
+      const stat = fstatSync9(fd);
+      if (!stat.isFile())
+        throw new AnchorRegistryError(
+          "unsafe-path",
+          `Refusing to read ${this.path}: not a regular file.`
+        );
+      if (stat.size > MAX_REGISTRY_BYTES)
+        throw new AnchorRegistryError(
+          "corrupt-registry",
+          `${this.path} is ${stat.size} bytes; the limit is ${MAX_REGISTRY_BYTES}.`
+        );
+      const data = Buffer.alloc(stat.size);
+      let read = 0;
+      while (read < stat.size) {
+        const n = readSync7(fd, data, read, stat.size - read, read);
+        if (n <= 0) break;
+        read += n;
+      }
+      text2 = data.subarray(0, read).toString("utf8");
+    } finally {
+      closeSync9(fd);
+    }
+    if (text2.trim() === "") return [];
+    let parsed;
+    try {
+      parsed = JSON.parse(text2);
+    } catch {
+      throw new AnchorRegistryError(
+        "corrupt-registry",
+        `${this.path} is not valid JSON; it was left unchanged. Move it aside to start a new registry.`
+      );
+    }
+    const anchors = parsed?.anchors;
+    if (parsed?.version !== 1 || !Array.isArray(anchors) || !anchors.every(isAnchor))
+      throw new AnchorRegistryError(
+        "corrupt-registry",
+        `${this.path} is not a version 1 anchor registry; it was left unchanged.`
+      );
+    return anchors;
+  }
+  /** One anchor, or an `anchor-not-found` error. */
+  get(anchorId) {
+    if (!ANCHOR_ID_PATTERN.test(anchorId))
+      throw new AnchorRegistryError(
+        "invalid-anchor-id",
+        `Invalid anchor id "${anchorId}": expected pa_ and 24 hex digits.`
+      );
+    const anchor = this.load().find((a) => a.anchorId === anchorId);
+    if (!anchor) throw new AnchorRegistryError("anchor-not-found", `No anchor ${anchorId}.`);
+    return anchor;
+  }
+  /**
+   * Apply `change` to the current anchors under the lock and save the result.
+   * Returns what `change` returns.
+   */
+  update(change) {
+    this.ensureDir();
+    const release5 = this.lock();
+    try {
+      const { anchors, result } = change(this.load());
+      if (anchors.length > MAX_ANCHORS)
+        throw new AnchorRegistryError(
+          "registry-full",
+          `The registry holds at most ${MAX_ANCHORS} anchors; prune stale anchors first.`
+        );
+      this.write(anchors);
+      return result;
+    } finally {
+      release5();
+    }
+  }
+  write(anchors) {
+    try {
+      if (!lstatSync6(this.path).isFile())
+        throw new AnchorRegistryError(
+          "unsafe-path",
+          `Refusing to replace ${this.path}: it is not a regular file.`
+        );
+    } catch (error2) {
+      if (error2 instanceof AnchorRegistryError) throw error2;
+    }
+    const temp = join34(
+      dirname10(this.path),
+      `.paragraph-anchors.${randomBytes5(6).toString("hex")}.tmp`
+    );
+    const fd = openSync9(
+      temp,
+      constants9.O_WRONLY | constants9.O_CREAT | constants9.O_EXCL | constants9.O_NOFOLLOW,
+      384
+    );
+    try {
+      const data = Buffer.from(JSON.stringify({ version: 1, anchors }, null, 1) + "\n", "utf8");
+      let written = 0;
+      while (written < data.length) written += writeSync6(fd, data, written);
+      fsyncSync(fd);
+    } catch (error2) {
+      closeSync9(fd);
+      unlinkSync5(temp);
+      throw error2;
+    }
+    closeSync9(fd);
+    try {
+      renameSync6(temp, this.path);
+    } catch (error2) {
+      unlinkSync5(temp);
+      throw error2;
+    }
+  }
+  /** Take the lock file, waiting briefly; a lock older than 30 s is treated as abandoned. */
+  lock() {
+    const lockPath = `${this.path}.lock`;
+    const deadline = Date.now() + this.lockWaitMs;
+    for (; ; ) {
+      try {
+        const fd = openSync9(
+          lockPath,
+          constants9.O_WRONLY | constants9.O_CREAT | constants9.O_EXCL | constants9.O_NOFOLLOW,
+          384
+        );
+        writeSync6(fd, String(process.pid));
+        closeSync9(fd);
+        return () => {
+          try {
+            unlinkSync5(lockPath);
+          } catch {
+          }
+        };
+      } catch (error2) {
+        if (error2.code !== "EEXIST") throw error2;
+      }
+      try {
+        if (Date.now() - statSync6(lockPath).mtimeMs > LOCK_STALE_MS) {
+          unlinkSync5(lockPath);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() > deadline)
+        throw new AnchorRegistryError(
+          "registry-busy",
+          `Another process holds ${lockPath}; try again shortly.`
+        );
+      sleep2(25);
+    }
+  }
+  /**
+   * Record anchors, reusing an existing anchor for the same note, paragraph ID,
+   * text and block index. Each new anchor gets a fresh id (a candidate's own
+   * anchorId is ignored). Returns each anchor with whether it was new.
+   */
+  record(candidates) {
+    return this.update((anchors) => {
+      const out = [];
+      const next = [...anchors];
+      for (const candidate of candidates) {
+        const existing = next.find(
+          (a) => a.noteIdentifier === candidate.noteIdentifier && a.paragraphId === candidate.paragraphId && a.fingerprint === candidate.fingerprint && a.blockIndex === candidate.blockIndex
+        );
+        if (existing) {
+          out.push({ anchor: existing, created: false });
+          continue;
+        }
+        const anchor = { ...candidate, anchorId: _AnchorRegistry.newId() };
+        next.push(anchor);
+        out.push({ anchor, created: true });
+      }
+      return { anchors: next, result: out };
+    });
+  }
+  /** Replace one anchor's fields (not its id or creation time). */
+  replace(anchor) {
+    return this.update((anchors) => {
+      const i = anchors.findIndex((a) => a.anchorId === anchor.anchorId);
+      if (i < 0) throw new AnchorRegistryError("anchor-not-found", `No anchor ${anchor.anchorId}.`);
+      const saved = { ...anchor, createdAt: anchors[i].createdAt };
+      const next = [...anchors];
+      next[i] = saved;
+      return { anchors: next, result: saved };
+    });
+  }
+  /** Remove anchors by id; returns the ids that were present. */
+  remove(anchorIds) {
+    const wanted = new Set(anchorIds);
+    return this.update((anchors) => ({
+      anchors: anchors.filter((a) => !wanted.has(a.anchorId)),
+      result: anchors.filter((a) => wanted.has(a.anchorId)).map((a) => a.anchorId)
+    }));
+  }
+};
+
+// src/services/paragraphAnchorOps.ts
+var MAX_ANCHORS_PER_CALL = 500;
+function recordParagraphAnchors(note, paragraphs, registry2 = new AnchorRegistry(), now = /* @__PURE__ */ new Date()) {
+  const candidates = paragraphs.slice(0, MAX_ANCHORS_PER_CALL).map((p) => anchorFor(note, p, { anchorId: "", now }));
+  return candidates.length ? registry2.record(candidates) : [];
+}
+var REFRESH_MIN_CONFIDENCE = 0.8;
+async function resolveStoredAnchor(anchorId, {
+  registry: registry2 = new AnchorRegistry(),
+  dbPath: dbPath2,
+  minConfidence,
+  refresh = false,
+  remint = false,
+  now = () => /* @__PURE__ */ new Date()
+} = {}) {
+  const anchor = registry2.get(anchorId);
+  let { resolution, note } = resolveAnchorDetailed(anchor, { dbPath: dbPath2, minConfidence });
+  const out = { ...resolution };
+  if (remint) {
+    const writer = paragraphIdReminter();
+    if (resolution.status !== "needs-reminting")
+      out.remint = { attempted: false, reason: "not-needed" };
+    else if (!writer)
+      out.remint = {
+        attempted: false,
+        reason: "writer-unavailable",
+        message: "Re-minting a paragraph ID needs a writer that can set it; none is installed in this server"
+      };
+    else {
+      try {
+        const { paragraphId } = await writer({
+          anchorId,
+          noteId: resolution.noteId,
+          noteIdentifier: anchor.noteIdentifier,
+          blockIndex: resolution.match.blockIndex,
+          expectedText: resolution.match.text,
+          currentParagraphId: resolution.match.paragraphId
+        });
+        ({ resolution, note } = resolveAnchorDetailed(anchor, { dbPath: dbPath2, minConfidence }));
+        Object.assign(out, resolution, { remint: { attempted: true, paragraphId } });
+      } catch (error2) {
+        const committed = error2?.committed;
+        out.remint = {
+          attempted: true,
+          reason: "writer-failed",
+          message: error2 instanceof Error ? error2.message : String(error2),
+          ...typeof committed === "boolean" || committed === "unknown" ? { committed } : {}
+        };
+      }
+    }
+  }
+  if (refresh) {
+    if (!out.match || !note || !["resolved", "needs-reminting"].includes(out.status))
+      out.refreshSkipped = "nothing was matched";
+    else if (out.confidence < REFRESH_MIN_CONFIDENCE)
+      out.refreshSkipped = `confidence ${out.confidence} is below ${REFRESH_MIN_CONFIDENCE}`;
+    else {
+      const paragraph2 = note.paragraphs.find((p) => p.blockIndex === out.match.blockIndex);
+      const fresh = anchorFor(note, paragraph2, { anchorId, now: now() });
+      registry2.replace({ ...fresh, updatedAt: fresh.createdAt });
+      out.refreshed = true;
+    }
+  }
+  return out;
+}
+var DEFAULT_PRUNE_STATUSES = ["not-found", "note-not-found"];
+function pruneParagraphAnchors({
+  registry: registry2 = new AnchorRegistry(),
+  dbPath: dbPath2,
+  anchorIds,
+  noteIdentifier,
+  statuses = DEFAULT_PRUNE_STATUSES,
+  dryRun = true
+} = {}) {
+  let anchors = registry2.load();
+  if (noteIdentifier)
+    anchors = anchors.filter((a) => a.noteIdentifier === noteIdentifier.toUpperCase());
+  let stale;
+  if (anchorIds) {
+    const wanted = new Set(anchorIds);
+    stale = anchors.filter((a) => wanted.has(a.anchorId)).map((a) => ({ anchorId: a.anchorId, status: "listed", message: "Listed by id" }));
+  } else {
+    const wanted = new Set(statuses);
+    stale = [];
+    for (const anchor of anchors) {
+      const r = resolveAnchorDetailed(anchor, { dbPath: dbPath2 }).resolution;
+      if (wanted.has(r.status))
+        stale.push({ anchorId: anchor.anchorId, status: r.status, message: r.message });
+    }
+  }
+  const removed = dryRun || !stale.length ? [] : registry2.remove(stale.map((s) => s.anchorId));
+  return { dryRun, examined: anchorIds ? stale.length : anchors.length, stale, removed };
+}
+function registryLookup(registry2 = new AnchorRegistry(), dbPath2) {
+  return (anchorId) => {
+    const anchor = registry2.load().find((a) => a.anchorId === anchorId);
+    return anchor ? resolveAnchorDetailed(anchor, { dbPath: dbPath2 }).resolution : void 0;
+  };
+}
+
 // src/index.ts
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
@@ -59292,10 +66795,48 @@ if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-help
   process.stdout.write(formatHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-writer")) {
+  const report = buildPrivateWriter(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatWriterBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions-window")) {
+  const report = buildPermissionsWindow(process.argv.slice(3).includes("--check"));
+  process.stdout.write(formatPermissionsWindowBuild(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions")) {
+  const args = process.argv.slice(3);
+  const cli = defaultPermissionsCliDeps();
+  let code;
+  const window2 = args.includes("--window") ? inspectPermissionsWindow() : null;
+  if (window2?.ready) {
+    code = await runPermissionsWindow(window2.binaryPath, {
+      check: cli.check,
+      open: (item) => openSettingsPane(item),
+      log: cli.write
+    });
+  } else {
+    if (window2) cli.write(`${window2.detail} Showing the checklist here instead.
+
+`);
+    code = await runPermissionsCli(parsePermissionsArgs(args), cli);
+  }
+  cli.close();
+  process.exit(code);
+}
 if (process.argv[2] === "setup") {
   const report = setupShortcuts(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatShortcutSetup(report) + "\n");
   process.exit(report.ready || !report.checkOnly ? 0 : 1);
+}
+if (process.argv[2] === "templates") {
+  process.exit(await runTemplatesCommand(process.argv.slice(3)));
+}
+if (process.argv[2] === "anchors") {
+  process.exit(
+    await runAnchorsCli(process.argv.slice(3), { resolve: registryLookup(new AnchorRegistry()) })
+  );
 }
 var server = new McpServer({
   name: "apple-notes",
@@ -59311,6 +66852,17 @@ registerSvgAnalysis(server);
 registerNativeTagsBridge(server, notesManager);
 registerNativeOperations(server, notesManager);
 registerPrivateHelperTools(server, notesManager);
+registerPrivateWriterTools(server, notesManager);
+registerComposeNoteTool(server, notesManager);
+registerPrivateWriterChecklistTools(server, notesManager);
+registerPrivateWriterHighlightTools(server, notesManager);
+registerPrivateWriterLinkCardTools(server, notesManager);
+registerPrivateWriterParagraphTools(server, notesManager);
+registerPrivateWriterTableTools(server, notesManager);
+registerPrivateWriterSmartFolderTools(server);
+registerPrivatePaperWriterTools(server, notesManager);
+registerPrivateWriterPurgeRepairTools(server, notesManager);
+installWriterParagraphIdReminter();
 function successResponse(message, structured) {
   const res = { content: [{ type: "text", text: message }] };
   if (structured) res.structuredContent = structured;
@@ -59719,7 +67271,7 @@ registerTool(
     }
   },
   withErrorHandling(
-    ({ query: query2, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
+    ({ query: query3, searchContent = false, account, folder, modifiedSince, limit, includeWordCount }) => {
       const effectiveLimit = resolveSearchLimit(limit);
       const limitWasDefault = limit === void 0;
       let source;
@@ -59729,7 +67281,7 @@ registerTool(
         if (searchContent) {
           try {
             const db = searchContentViaDatabase({
-              query: query2,
+              query: query3,
               account: notesManager.searchAccountScope(account),
               folder,
               modifiedSince,
@@ -59747,7 +67299,7 @@ registerTool(
         }
         try {
           return notesManager.searchNotes(
-            query2,
+            query3,
             searchContent,
             account,
             folder,
@@ -59767,7 +67319,7 @@ registerTool(
       let notes = found;
       let wordCountUnavailable;
       if (includeWordCount && source !== "database" && found.length > 0) {
-        const enriched = addWordCountsFromDatabase(found, query2);
+        const enriched = addWordCountsFromDatabase(found, query3);
         notes = enriched.notes;
         wordCountUnavailable = enriched.unavailable;
       }
@@ -59799,7 +67351,7 @@ ${syncWarnings.join(" ")}` : "";
       if (notes.length === 0) {
         const scopeHint = describeSearchScope(searchContent, notes.length);
         return successResponse(
-          `No notes found matching "${query2}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
+          `No notes found matching "${query3}" in ${searchType}${folderInfo}${dateInfo}${scopeHint}${scanNote}${syncNote}`,
           { notes: [], count: 0, ...sourceFields, ...scanFields }
         );
       }
@@ -59830,7 +67382,7 @@ ${noteList}${truncationNote}${scanNote}${wordCountNote}${syncNote}`,
 registerTool(
   "query-notes",
   {
-    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|tag; checklist:open|done; flags pinned, locked, shared (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates (including negated ones such as -body:x) never match them.',
+    description: 'Use when: finding notes with a boolean expression over text and metadata \u2014 e.g. `folder:Work has:checklist -checklist:done`, `(title:invoice OR tag:finance) modified:>=2026-07-01`, `pinned words:>250`. Reads the Notes database directly, so it is fast and can match title OR body in one call.\nSyntax: bare words and "quoted phrases" match title or body (case-insensitive substring); fields title:, body:, text:, folder:, account:, tag: (values may be quoted, e.g. folder:"Work Projects"); facets has:link|attachment|checklist|drawing|image|video|audio|pdf|table|scan|url|map|tag (has:url = a link preview card, has:map = a map); checklist:open|done; flags pinned, locked, shared, quicknote (or is:pinned); words:>250 and created:/modified: with =, >, >=, <, <= and YYYY-MM-DD local dates. AND is implicit; OR, NOT, leading -, and parentheses are supported; operators are case-insensitive and a quoted "and" searches the literal word.\nReturns: matching notes (most recently modified first) with id, title, folder, account, modified date, snippet, and matchedIn (where the positive text terms occur: title, body, or both; absent when the body is unreadable or the query has no text term), plus scan/match counts; includeWordCount adds wordCount. Ids work with get-note-content and every other id-based tool.\nDo not use when: Full Disk Access is unavailable (use search-notes). Scans the most recent scanLimit notes (default 500, max 10000); raise it for older notes.\nSafety: read-only; never writes the database. Excludes Recently Deleted and folderless notes unless includeDeleted is true. Locked notes match on title and metadata only; body predicates (including negated ones such as -body:x) never match them.',
     inputSchema: {
       query: external_exports.string().min(1, "A query expression is required").max(MAX.QUERY).describe(
         'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
@@ -59862,10 +67414,10 @@ registerTool(
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ query: query2, limit, scanLimit, includeDeleted, includeWordCount }) => {
+  withErrorHandling(({ query: query3, limit, scanLimit, includeDeleted, includeWordCount }) => {
     let result;
     try {
-      result = queryNotes(query2, { limit, scanLimit, includeDeleted, includeWordCount });
+      result = queryNotes(query3, { limit, scanLimit, includeDeleted, includeWordCount });
     } catch (error2) {
       if (error2 instanceof NoteQueryError || error2 instanceof NoteQueryStoreError) {
         return errorResponse(
@@ -60350,14 +67902,14 @@ registerTool(
       );
     }
     const result = notesManager.getNoteTablesById(id2);
-    const count = result.tables.length;
-    const summary = count === 0 ? "This note has no native tables." : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:
+    const count2 = result.tables.length;
+    const summary = count2 === 0 ? "This note has no native tables." : `${count2} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:
 
 ${result.markdown}`;
     return successResponse(summary, {
       id: id2,
       tables: result.tables,
-      tableCount: count,
+      tableCount: count2,
       tableCellsComplete: result.tableCellsComplete,
       markdown: result.markdown
     });
@@ -60395,12 +67947,15 @@ registerTool(
       );
     }
     const { summary } = page;
-    const styles = Object.entries(summary.styles).map(([style, count]) => `${style} ${count}`).join(", ");
+    const styles = Object.entries(summary.styles).map(([style, count2]) => `${style} ${count2}`).join(", ");
     return successResponse(
       `Decoded ${summary.blocks} blocks (${styles || "none"}); returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more available at offset ${page.page.nextOffset}` : "") + ".",
       { id: id2, ...page }
     );
   }, "Error reading note blocks")
+);
+var recordAnchorsInput = external_exports.boolean().optional().describe(
+  "Also record a paragraph anchor for each returned paragraph (at most 500 per call) so resolve-paragraph-anchor can find it after edits; each row gains anchorId (default false; writes only the local anchor registry)"
 );
 var paragraphNoteSelector = {
   id: noteIdInput.optional().describe(`Exact note ID (${NOTE_ID_FORMS}); give id or title`),
@@ -60415,29 +67970,45 @@ registerTool(
       ...paragraphNoteSelector,
       linkableOnly: external_exports.boolean().optional().describe("Return only paragraphs that have a direct url (default false)"),
       offset: external_exports.number().int().min(0).optional().describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
-      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)")
+      limit: external_exports.number().int().min(1).max(5e3).optional().describe("Maximum paragraphs to return (default 500, max 5000)"),
+      recordAnchors: recordAnchorsInput
     },
     outputSchema: {
       id: external_exports.string().optional(),
       identifier: external_exports.string().nullable().optional(),
       counts: external_exports.record(external_exports.unknown()).optional(),
       paragraphs: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
-      page: external_exports.record(external_exports.unknown()).optional()
+      page: external_exports.record(external_exports.unknown()).optional(),
+      anchorsRecorded: external_exports.number().optional()
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ id: id2, title, folder, linkableOnly, offset, limit }) => {
+  withErrorHandling(({ id: id2, title, folder, linkableOnly, offset, limit, recordAnchors }) => {
     const note = readNoteParagraphs({ id: id2, title, folder });
     const page = pageParagraphs(note.paragraphs, {
       offset,
-      limit,
+      limit: recordAnchors ? Math.min(limit ?? 500, MAX_ANCHORS_PER_CALL) : limit,
       linkableOnly,
       maxBytes: blocksMaxResponseBytes()
     });
+    let anchorsRecorded;
+    let paragraphs = page.paragraphs;
+    if (recordAnchors) {
+      const recorded = recordParagraphAnchors(note, page.paragraphs);
+      anchorsRecorded = recorded.filter((r) => r.created).length;
+      paragraphs = page.paragraphs.map((p, i) => ({ ...p, anchorId: recorded[i].anchor.anchorId }));
+    }
     const { unique, shared, missing } = note.counts;
     return successResponse(
-      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + ".",
-      { id: note.id, identifier: note.identifier, counts: note.counts, ...page }
+      `${note.paragraphs.length} paragraphs: ${unique} linkable, ${shared} with a shared ID, ${missing} without an ID; returned ${page.page.returned} from offset ${page.page.offset}` + (page.page.hasMore ? `; more at offset ${page.page.nextOffset}` : "") + (anchorsRecorded !== void 0 ? `; ${anchorsRecorded} new anchor(s) recorded` : "") + ".",
+      {
+        id: note.id,
+        identifier: note.identifier,
+        counts: note.counts,
+        paragraphs,
+        page: page.page,
+        ...anchorsRecorded !== void 0 ? { anchorsRecorded } : {}
+      }
     );
   }, "Error listing paragraphs")
 );
@@ -60452,26 +68023,205 @@ registerTool(
       ),
       match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text, compared the same way"),
       blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
-      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs"),
+      recordAnchor: external_exports.boolean().optional().describe(
+        "Also record a paragraph anchor for the linked paragraph so resolve-paragraph-anchor can find it after edits (default false; writes only the local anchor registry)"
+      )
     },
     outputSchema: {
       url: external_exports.string().optional(),
       id: external_exports.string().optional(),
       identifier: external_exports.string().nullable().optional(),
-      paragraph: external_exports.record(external_exports.unknown()).optional()
+      paragraph: external_exports.record(external_exports.unknown()).optional(),
+      anchorId: external_exports.string().optional()
     },
     annotations: { readOnlyHint: true }
   },
+  withErrorHandling(
+    ({ id: id2, title, folder, contains, match, blockIndex, occurrence, recordAnchor }) => {
+      const note = readNoteParagraphs({ id: id2, title, folder });
+      const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
+      const anchorId = recordAnchor ? recordParagraphAnchors(note, [result.paragraph])[0].anchor.anchorId : void 0;
+      return successResponse(
+        `Paragraph link: ${result.url}` + (anchorId ? `
+Anchor: ${anchorId}` : ""),
+        {
+          url: result.url,
+          id: note.id,
+          identifier: note.identifier,
+          paragraph: { ...result.paragraph },
+          ...anchorId ? { anchorId } : {}
+        }
+      );
+    },
+    "No paragraph link"
+  )
+);
+var anchorIdInput = external_exports.string().regex(ANCHOR_ID_PATTERN, "Expected an anchor id: pa_ and 24 hex digits").describe(
+  "Anchor id (pa_ and 24 hex digits) from create-paragraph-anchor or list-paragraph-anchors"
+);
+var noteIdentifierInput = external_exports.string().regex(/^[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$/, "Expected a Notes UUID").optional();
+registerTool(
+  "create-paragraph-anchor",
+  {
+    description: "Use when: you want a reference to one paragraph that can be found again after the note is edited, for example before sharing a paragraph link that should keep working.\nReturns: the anchor (anchorId, note identifier, paragraph ID and its status, normalized text, fingerprints of the paragraph and its neighbours, block index, created time), whether it is new, and the paragraph's current direct url when its ID is unique.\nDo not use when: you only need a link right now (get-paragraph-link).\nSafety: reads the NoteStore database (Full Disk Access) and never changes Notes. Writes one local file, the anchor registry (APPLE_NOTES_MCP_ANCHOR_FILE, default ~/Library/Application Support/apple-notes-mcp/paragraph-anchors.json, mode 0600), which stores the paragraph's text. Unlike get-paragraph-link, a paragraph with a shared or missing ID can be anchored. Recording the same paragraph again returns the existing anchor.",
+    inputSchema: {
+      ...paragraphNoteSelector,
+      contains: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("Snippet of the paragraph; give one of contains, match, blockIndex"),
+      match: external_exports.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text"),
+      blockIndex: external_exports.number().int().min(0).optional().describe("The paragraph's blockIndex from list-note-paragraphs"),
+      occurrence: external_exports.number().int().min(1).optional().describe("Which match to use (1-based) when contains or match hits several paragraphs")
+    },
+    outputSchema: {
+      anchor: external_exports.record(external_exports.unknown()).optional(),
+      created: external_exports.boolean().optional(),
+      url: external_exports.string().optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+  },
   withErrorHandling(({ id: id2, title, folder, contains, match, blockIndex, occurrence }) => {
     const note = readNoteParagraphs({ id: id2, title, folder });
-    const result = paragraphLink(note, { contains, match, blockIndex, occurrence });
-    return successResponse(`Paragraph link: ${result.url}`, {
-      url: result.url,
-      id: note.id,
-      identifier: note.identifier,
-      paragraph: { ...result.paragraph }
+    const paragraph2 = selectParagraph(note.paragraphs, { contains, match, blockIndex, occurrence });
+    const [{ anchor, created }] = recordParagraphAnchors(note, [paragraph2]);
+    return successResponse(
+      `${created ? "Recorded" : "Reusing"} anchor ${anchor.anchorId} for block ${anchor.blockIndex} (paragraph ID ${paragraph2.paragraphIdStatus}).`,
+      { anchor: { ...anchor }, created, ...paragraph2.url ? { url: paragraph2.url } : {} }
+    );
+  }, "Error recording paragraph anchor")
+);
+registerTool(
+  "resolve-paragraph-anchor",
+  {
+    description: "Use when: you have an anchorId and need the paragraph's current link, or want to check that an anchored paragraph still exists after edits.\nReturns: status (resolved, needs-reminting, ambiguous, low-confidence, not-found, note-not-found, note-deleted, note-unreadable), method (paragraph-id, exact-text, text-and-neighbours), confidence from 0 to 1, the matched block (blockIndex, text, paragraphId, paragraphIdStatus) and what changed. url is present only when status is resolved.\nDo not use when: you have no anchor yet (create-paragraph-anchor, or get-paragraph-link with recordAnchor).\nSafety: reads the NoteStore database (Full Disk Access); changes Notes only with remint and the opt-in private writer. Fails closed: equally good candidates give ambiguous and no url. needs-reminting means the paragraph was found but its stored ID is shared or missing, so no safe link exists until the paragraph gets a new ID. remint: true then calls the private writer's native-set-paragraph-id on the matched block (with a fresh revision, refusing if the paragraph changed) and resolves again; it runs only when APPLE_NOTES_MCP_ENABLE_PRIVATE=1 and APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES=1 (and, until live-validated, APPLE_NOTES_MCP_ALLOW_UNVERIFIED=1), and otherwise reports writer-unavailable. refresh rewrites the stored anchor (local registry only) after a match with confidence 0.8 or more.",
+    inputSchema: {
+      anchorId: anchorIdInput,
+      minConfidence: external_exports.number().min(0).max(1).optional().describe(`Lowest confidence accepted as a match (default ${DEFAULT_MIN_CONFIDENCE})`),
+      refresh: external_exports.boolean().optional().describe(
+        "Update the stored anchor to the matched paragraph as it is now (default false; only at confidence 0.8 or more)"
+      ),
+      remint: external_exports.boolean().optional().describe(
+        "On needs-reminting, give the paragraph a new ID through the private writer and resolve again (default false; reports writer-unavailable unless both writer switches are on)"
+      )
+    },
+    outputSchema: {
+      anchorId: external_exports.string().optional(),
+      status: external_exports.string().optional(),
+      resolved: external_exports.boolean().optional(),
+      url: external_exports.string().optional(),
+      needsReminting: external_exports.boolean().optional(),
+      method: external_exports.string().optional(),
+      confidence: external_exports.number().optional(),
+      match: external_exports.record(external_exports.unknown()).optional(),
+      changes: external_exports.record(external_exports.unknown()).optional(),
+      candidates: external_exports.number().optional(),
+      noteId: external_exports.string().optional(),
+      message: external_exports.string().optional(),
+      refreshed: external_exports.boolean().optional(),
+      refreshSkipped: external_exports.string().optional(),
+      remint: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false }
+  },
+  withAsyncErrorHandling(async ({ anchorId, minConfidence, refresh, remint }) => {
+    const result = await resolveStoredAnchor(anchorId, { minConfidence, refresh, remint });
+    return successResponse(
+      `${result.status}: ${result.message}` + (result.url ? `
+Link: ${result.url}` : ""),
+      { ...result }
+    );
+  }, "Error resolving paragraph anchor")
+);
+registerTool(
+  "list-paragraph-anchors",
+  {
+    description: "Use when: you need the recorded paragraph anchors, all of them or those of one note.\nReturns: one page of anchors in the order recorded (anchorId, noteIdentifier, paragraphId, text, blockIndex, created time), the total, and the registry path.\nDo not use when: you need an anchor's current location (resolve-paragraph-anchor).\nSafety: read-only; reads only the local anchor registry, never Notes.",
+    inputSchema: {
+      noteIdentifier: noteIdentifierInput.describe(
+        "Only anchors in the note with this Notes UUID (its identifier)"
+      ),
+      offset: external_exports.number().int().min(0).optional().describe("First anchor to return (default 0)"),
+      limit: external_exports.number().int().min(1).max(1e3).optional().describe("Maximum anchors to return (default 100, max 1000)")
+    },
+    outputSchema: {
+      anchors: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      total: external_exports.number().optional(),
+      registry: external_exports.string().optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
+    },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ noteIdentifier, offset = 0, limit = 100 }) => {
+    const registry2 = new AnchorRegistry();
+    let anchors = registry2.load();
+    if (noteIdentifier)
+      anchors = anchors.filter((a) => a.noteIdentifier === noteIdentifier.toUpperCase());
+    const slice = anchors.slice(offset, offset + limit);
+    const next = offset + slice.length;
+    return successResponse(`${anchors.length} anchor(s); returned ${slice.length}.`, {
+      anchors: slice.map((a) => ({ ...a })),
+      total: anchors.length,
+      registry: registry2.path,
+      page: {
+        offset,
+        returned: slice.length,
+        hasMore: next < anchors.length,
+        ...next < anchors.length ? { nextOffset: next } : {}
+      }
     });
-  }, "No paragraph link")
+  }, "Error listing paragraph anchors")
+);
+registerTool(
+  "get-paragraph-anchor",
+  {
+    description: "Use when: inspecting one recorded anchor as stored.\nReturns: the stored anchor record.\nDo not use when: you need the paragraph's current location or link (resolve-paragraph-anchor).\nSafety: read-only; reads only the local anchor registry, never Notes.",
+    inputSchema: { anchorId: anchorIdInput },
+    outputSchema: { anchor: external_exports.record(external_exports.unknown()).optional() },
+    annotations: { readOnlyHint: true }
+  },
+  withErrorHandling(({ anchorId }) => {
+    const anchor = new AnchorRegistry().get(anchorId);
+    return successResponse(
+      `Anchor ${anchor.anchorId}: note ${anchor.noteIdentifier}, block ${anchor.blockIndex}, recorded ${anchor.createdAt}.`,
+      { anchor: { ...anchor } }
+    );
+  }, "Error reading paragraph anchor")
+);
+registerTool(
+  "prune-paragraph-anchors",
+  {
+    description: "Use when: cleaning up anchors that no longer resolve, or removing specific anchors.\nReturns: the stale anchors found (anchorId, status, message), how many were examined, and the ids removed (none on a dry run).\nDo not use when: an anchor is only ambiguous or needs reminting; it still points at something.\nSafety: dryRun defaults to true, so nothing is removed until you call again with dryRun false. Removes entries from the local anchor registry only; never changes Notes. Without anchorIds it resolves every anchor in scope (Full Disk Access) and treats not-found and note-not-found as stale unless statuses says otherwise. A note in Recently Deleted gives note-deleted, which is not pruned by default because the note can be restored.",
+    inputSchema: {
+      anchorIds: external_exports.array(anchorIdInput).min(1).max(1e3).optional().describe("Remove exactly these anchors instead of resolving to find stale ones"),
+      noteIdentifier: noteIdentifierInput.describe("Only anchors in the note with this Notes UUID"),
+      statuses: external_exports.array(
+        external_exports.enum([
+          "not-found",
+          "note-not-found",
+          "note-deleted",
+          "note-unreadable",
+          "ambiguous",
+          "low-confidence"
+        ])
+      ).min(1).optional().describe(
+        `Resolution statuses treated as stale (default ${DEFAULT_PRUNE_STATUSES.join(", ")})`
+      ),
+      dryRun: external_exports.boolean().optional().describe("Report without removing (default true)")
+    },
+    outputSchema: {
+      dryRun: external_exports.boolean().optional(),
+      examined: external_exports.number().optional(),
+      stale: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
+      removed: external_exports.array(external_exports.string()).optional()
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true }
+  },
+  withErrorHandling(({ anchorIds, noteIdentifier, statuses, dryRun }) => {
+    const result = pruneParagraphAnchors({ anchorIds, noteIdentifier, statuses, dryRun });
+    return successResponse(
+      result.dryRun ? `Dry run: ${result.stale.length} of ${result.examined} anchor(s) would be removed.` : `Removed ${result.removed.length} of ${result.examined} anchor(s).`,
+      { ...result }
+    );
+  }, "Error pruning paragraph anchors")
 );
 registerTool(
   "get-note-structure",
@@ -62235,7 +69985,7 @@ registerTool(
 registerTool(
   "export-notes-html",
   {
-    description: "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.",
+    description: "Use when: exporting one note (by exact id) or a folder's notes as one standalone HTML file rendered from the decoded note body, with semantic tables and images, drawings, scans, audio, files and link cards in body order.\nReturns: a receipt {format, count, bytes, output} plus embedded or sidecar asset counts, attachment counts and skipped notes. The HTML itself is never returned inline.\nDo not use when: you want Markdown (export-notes-markdown) or a restorable backup (export-notes-json). A folder document is a presentation format, not something to import back.\nSafety: read-only against Notes; requires Full Disk Access. outputPath is required and create-only ([output_exists] if it exists). Assets are embedded as data URLs (each up to 10 MiB) unless embedAssets is false, which copies them to a sidecar directory (assetsDir, default <output stem>.assets) with relative URLs and never replaces existing files. No file: URLs or Notes library paths are written; missing assets show a visible unavailable marker.\nDrawings: classic PencilKit drawings are rendered as SVG through the public native helper (setup --public-helper) instead of Notes' PNG; Paper drawings keep the PNG. A drawing that cannot be decoded falls back to the PNG and is counted in vectorDrawings.fallbackReasons; it never fails the export. vectorDrawings false keeps every PNG.",
     inputSchema: {
       id: noteIdInput.optional(),
       folder: external_exports.string().min(1).max(MAX.FOLDER).optional().describe("Folder path to export instead of one note (nested paths use '/')"),
@@ -62249,6 +69999,9 @@ registerTool(
       embedAssets: external_exports.boolean().optional().describe("Embed assets as data URLs (default true). False writes a sidecar directory"),
       assetsDir: exportPathInput(
         "Sidecar directory when embedAssets is false (default <stem>.assets)"
+      ),
+      vectorDrawings: external_exports.boolean().optional().describe(
+        "Render classic PencilKit drawings as SVG via the public native helper (default true). False keeps Notes' PNG rendering"
       )
     },
     outputSchema: {
@@ -62259,6 +70012,11 @@ registerTool(
       output: external_exports.string().optional(),
       assets: external_exports.object({ dir: external_exports.string(), files: external_exports.number() }).optional(),
       embedded: external_exports.number().optional(),
+      vectorDrawings: external_exports.object({
+        rendered: external_exports.number(),
+        fallback: external_exports.number(),
+        fallbackReasons: external_exports.record(external_exports.string(), external_exports.number()).optional()
+      }).optional(),
       stats: exportStatsSchema.optional(),
       skipped: external_exports.array(external_exports.object({ id: external_exports.string(), code: external_exports.string() })).optional()
     },
@@ -62278,8 +70036,10 @@ registerTool(
     }
     const assets = receipt.assets ? `; copied ${receipt.assets.files} asset file(s) to ${receipt.assets.dir}` : `; embedded ${receipt.embedded ?? 0} asset(s)`;
     const skipped = (receipt.skipped.length ? `; skipped ${receipt.skipped.length}` : "") + (receipt.truncated ? "; the folder has more notes than limit, pass a higher limit" : "");
+    const vector = receipt.vectorDrawings;
+    const drawings = vector ? `; ${vector.rendered} drawing(s) as SVG` + (vector.fallback ? `, ${vector.fallback} as PNG (${Object.entries(vector.fallbackReasons ?? {}).map(([code, n]) => `${code}: ${n}`).join(", ")})` : "") : "";
     return successResponse(
-      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${skipped}.`,
+      `Wrote ${receipt.count} note(s) as HTML (${receipt.bytes} bytes) to ${receipt.output}${assets}${drawings}${skipped}.`,
       { ...receipt }
     );
   }, "Error exporting HTML")
