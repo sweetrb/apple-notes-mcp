@@ -416,6 +416,18 @@ describe("executeAppleScript", () => {
   });
 
   describe("execution options", () => {
+    // executeAppleScript derives each attempt's process timeout from a
+    // deadline (`deadline - Date.now()`), so a millisecond that ticks between
+    // computing the deadline and the attempt makes an exact assertion read
+    // 29999. Freeze the clock so these tests check the configured value.
+    let dateNow: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      dateNow = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    });
+    afterEach(() => {
+      dateNow.mockRestore();
+    });
+
     it("uses default 30 second timeout", () => {
       mockExecFileSync.mockReturnValue("ok");
 
