@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [2.9.30] - 2026-09-25
+
+2.9.29 was never published: a timing flake failed CI on main after it merged,
+so the publish step did not run. 2.9.30 is the first release that includes
+2.9.29's fix (#261), described below.
+
+### Fixed
+
+- The `execution options` tests for `executeAppleScript` asserted an exact
+  process timeout, but each attempt's timeout is computed as
+  `deadline - Date.now()`, so a millisecond ticking between the two calls read
+  29999 instead of 30000 and failed CI. They now freeze `Date.now`, so they
+  check the configured value deterministically. Test-only change.
+
 ## [2.9.29] - 2026-09-25
 
 ### Fixed
