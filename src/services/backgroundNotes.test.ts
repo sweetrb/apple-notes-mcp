@@ -266,6 +266,23 @@ describe("background note mutation boundaries", () => {
       )
     ).toThrow(/only in the note's title line/);
     expect(f.deps.run).not.toHaveBeenCalled();
+    let thrown: unknown;
+    try {
+      mutateBackground(
+        { ...request, scopeText: "Garden planning ideas" },
+        "set-pinned",
+        {},
+        pinVerify,
+        f.deps
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as { envelope?: unknown }).envelope).toEqual({
+      code: "validation_error",
+      committed: false,
+      indeterminate: false,
+    });
   });
   it("finds the scope below the title line", () => {
     expect(textBelowTitle("Title here\nBody words", "Title here")).toBe("Body words");

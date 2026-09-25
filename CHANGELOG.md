@@ -12,7 +12,8 @@
   such a request was always refused by the Shortcut. On macOS 27.2 a title
   phrase was refused on every try while a phrase from below the title worked
   seconds later on the same note (#248). The error says to pass a phrase from
-  below the title, and nothing is written.
+  below the title, and nothing is written; the error result carries
+  `code: "validation_error"`, `committed: false`, `indeterminate: false`.
 
 ## [2.9.28] - 2026-09-24
 

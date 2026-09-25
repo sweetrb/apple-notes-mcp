@@ -48738,8 +48738,9 @@ function mutateBackground(request, operation, data, verify, deps) {
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
   if (!textBelowTitle(before.rich.text, before.title).includes(request.scopeText))
-    throw new Error(
-      "scopeText appears only in the note's title line. The bridge's Find Notes step matches it against the body below the title, so it would refuse; pass a phrase from below the title. Nothing changed"
+    throw new CodedError(
+      "scopeText appears only in the note's title line. The bridge's Find Notes step matches it against the body below the title, so it would refuse; pass a phrase from below the title. Nothing changed",
+      { code: "validation_error", committed: false, indeterminate: false }
     );
   const candidates = deps.candidates(before.title, request.scopeText);
   if (candidates.length !== 1 || candidates[0] !== request.id)
