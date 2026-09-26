@@ -53486,6 +53486,85 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
   return { ...receipt, markdown };
 }
 
+// src/utils/structuredText.ts
+import { isDeepStrictEqual } from "node:util";
+var STRUCTURED_TEXT_PREFIX = "structuredContent: ";
+var SHOWN_ABOVE = "[shown in full above]";
+var MIN_ELIDED_CHARS = 64;
+var MAX_MIRROR_CHARS = 16384;
+var MAX_FIELD_CHARS = 1024;
+function textOf(content) {
+  return content.map(
+    (item) => item && typeof item === "object" && item.type === "text" ? String(item.text ?? "") : ""
+  ).join("\n");
+}
+function elide(value, text2) {
+  if (typeof value === "string") {
+    return value.length >= MIN_ELIDED_CHARS && text2.includes(value) ? SHOWN_ABOVE : value;
+  }
+  if (Array.isArray(value)) return value.map((item) => elide(item, text2));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item !== void 0) out[key] = elide(item, text2);
+    }
+    return out;
+  }
+  return value;
+}
+function textIsTheJson(content, structured) {
+  const plain = JSON.parse(JSON.stringify(structured));
+  return content.some((item) => {
+    const text2 = item?.text;
+    if (item?.type !== "text" || typeof text2 !== "string") return false;
+    const trimmed = text2.trim();
+    if (!trimmed.startsWith("{")) return false;
+    try {
+      return isDeepStrictEqual(JSON.parse(trimmed), plain);
+    } catch {
+      return false;
+    }
+  });
+}
+function structuredTextLine(structured, text2) {
+  const elided = elide(structured, text2);
+  let json2 = JSON.stringify(elided);
+  if (json2.length > MAX_MIRROR_CHARS) {
+    const kept = {};
+    const omitted = [];
+    for (const [key, value] of Object.entries(elided)) {
+      if (JSON.stringify(value).length > MAX_FIELD_CHARS) omitted.push(key);
+      else kept[key] = value;
+    }
+    json2 = JSON.stringify({ ...kept, _omitted: omitted });
+  }
+  return STRUCTURED_TEXT_PREFIX + json2;
+}
+function withStructuredText(result) {
+  const r = result;
+  if (!r || typeof r !== "object") return result;
+  const structured = r.structuredContent;
+  if (!structured || typeof structured !== "object" || Array.isArray(structured)) return result;
+  const content = Array.isArray(r.content) ? r.content : [];
+  if (textIsTheJson(content, structured)) return result;
+  const line = structuredTextLine(structured, textOf(content));
+  return { ...r, content: [...content, { type: "text", text: line }] };
+}
+function installStructuredText(server2) {
+  const target = server2;
+  const register = target.registerTool;
+  if (typeof register === "function") {
+    target.registerTool = function(name, config2, cb) {
+      const wrapped = typeof cb === "function" ? async (...args) => withStructuredText(await cb(...args)) : cb;
+      return register.call(this, name, config2, wrapped);
+    };
+  }
+  const createError = target.createToolError;
+  if (typeof createError === "function") {
+    target.createToolError = (message) => withStructuredText(createError.call(target, message));
+  }
+}
+
 // src/tools/directOperations.ts
 import { createHash as createHash3 } from "node:crypto";
 import {
@@ -59303,6 +59382,7 @@ var server = new McpServer({
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes"
 });
 installSdkErrorCodes(server);
+installStructuredText(server);
 var notesManager = new AppleNotesManager();
 registerDirectOperations(server, notesManager);
 registerFolderDelete(server, notesManager);

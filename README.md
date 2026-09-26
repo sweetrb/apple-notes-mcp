@@ -198,6 +198,24 @@ The server is a standard MCP server over stdio, so any client that can launch a 
 
 Read/list/get tools also return **structured JSON** (`structuredContent`) alongside the text, so agents can consume results without parsing prose.
 
+Some clients (Claude Desktop among them) pass the model only a result's text
+and drop `structuredContent`. So every result that has `structuredContent` also
+ends with one more text block holding the same data as a single JSON line:
+
+```
+structuredContent: {"id":"x-coredata://…/ICNote/p123","contentHash":"sha256:…","writable":true,…}
+```
+
+That line carries every token a follow-up call needs: the `contentHash`
+revision token for `expectedContentHash`, new ids, `nativeTags`, `writable`,
+`page.nextOffset`, and an error's `code`, `committed` and `indeterminate`. A
+long value the text above already shows in full, such as the body from
+`get-note-content`, appears as `"[shown in full above]"` instead of twice. If
+the line would still exceed 16 KB, fields larger than 1 KB (usually a list
+already printed above) are left out and named in `_omitted`. Tools whose text
+already is that JSON get no extra block. `structuredContent` itself is
+unchanged.
+
 ### MCP resources & prompts
 
 Resources expose read-only context the client can attach without a tool call:
@@ -238,7 +256,9 @@ When Full Disk Access is granted, list and read tools also return stable identif
 ### Error results
 
 A failed call returns `isError: true` with the same human-readable text as
-before, plus `structuredContent` carrying a stable machine-readable `code`.
+before, plus `structuredContent` carrying a stable machine-readable `code`
+(also repeated in the trailing `structuredContent:` text line, for clients
+that drop `structuredContent`).
 Branch on `code`, not on the prose, which may be reworded.
 
 | `code` | Meaning |

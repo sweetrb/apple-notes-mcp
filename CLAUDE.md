@@ -438,6 +438,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections carry `validation_error` with `committed: false`; a Notes UUID or numeric key that could not be resolved carries `not_found` or `full_disk_access_missing` instead.
 
+Every result that has `structuredContent` also ends with a text block `structuredContent: {…}` holding the same JSON on one line (#264), because some clients (Claude Desktop) give the model only text. Read `contentHash`, ids, `code`/`committed`/`indeterminate` and `page.nextOffset` from there when `structuredContent` is not visible. A value the text already shows in full is `"[shown in full above]"`; fields dropped for size are named in `_omitted`. The wrapper is `src/utils/structuredText.ts`, installed on the server before any tool registers, so new tools get it automatically.
+
 ## Recurring macOS permission prompts → offer the official-Node fix
 
 If a user reports being **repeatedly** prompted for Full Disk Access or

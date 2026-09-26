@@ -1,5 +1,35 @@
 ## [Unreleased]
 
+## [2.9.31] - 2026-09-26
+
+### Fixed
+
+- Clients that pass the model only a tool result's text, such as Claude
+  Desktop, can now complete guarded writes (#264, reported by @aaronaccessvr).
+  The `contentHash` revision token that `update-note`, `append-to-note`,
+  `delete-note`, `add-native-tags`, `add-attachment` and the other guarded
+  writes require as `expectedContentHash` was returned only in
+  `structuredContent`, which those clients drop, so every guarded write failed
+  with a revision conflict. Every result that has `structuredContent` now ends
+  with one more text block, `structuredContent: {...}`, holding the same data
+  as a single JSON line, as the MCP spec recommends for backward
+  compatibility. An audit found the gap across most tools registered in
+  `src/index.ts`: `get-note-content` (`contentHash`, `writable`,
+  `nativeTags`, `links`), `get-native-objects` (`contentHash`, `nativeTags`,
+  object and checklist ids; its text was only "Native objects read from the
+  exact note"), `create-note`, `update-note` and `append-to-note` (the new
+  `contentHash`), `delete-note` (`guardContentHash`), `list-native-tags` for a
+  folder, stable `identifier` UUIDs on list and read tools, and the `code`,
+  `committed` and `indeterminate` of every error result, including the SDK's
+  input-validation errors. Tools whose text already is that JSON (the native
+  and direct-operation tools, `get-note-by-id`, `get-note-details`,
+  `export-notes-json`) get no extra block. A long value the text already
+  shows, such as the note body, appears as `"[shown in full above]"` rather
+  than twice; if the line would still exceed 16 KB, fields over 1 KB are left
+  out and named in `_omitted`. `structuredContent` itself is unchanged. The
+  wrapper is installed on the server before any tool registers, so tools
+  added later get it too.
+
 ## [2.9.30] - 2026-09-25
 
 2.9.29 was never published: a timing flake failed CI on main after it merged,

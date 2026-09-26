@@ -147,6 +147,7 @@ import {
   NotesExportError,
 } from "@/services/notesExport.js";
 import { BUILTIN_TEMPLATE_NAMES } from "@/utils/markdownTemplate.js";
+import { installStructuredText } from "@/utils/structuredText.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
 import { registerMarkdownTemplates } from "@/tools/markdownTemplates.js";
@@ -222,6 +223,9 @@ const server = new McpServer({
 // Input-schema rejections, including a Notes UUID or numeric key that could
 // not be resolved, get a code like every other failed call.
 installSdkErrorCodes(server);
+// Clients that pass the model only text content (Claude Desktop) still see
+// every structuredContent field, including the revision tokens (#264).
+installStructuredText(server);
 
 /**
  * Singleton instance of the Apple Notes manager.
