@@ -51,6 +51,11 @@ type Response = {
 };
 const call = (name: string, args: Record<string, unknown>) =>
   registered.get(name)!(args) as Promise<Response>;
+/** The text blocks of an error result: its own text, then the mirrored envelope (#264). */
+const errorText = (text: string, envelope: Record<string, unknown>) => [
+  { type: "text", text },
+  { type: "text", text: `structuredContent: ${JSON.stringify(envelope)}` },
+];
 const ID = "x-coredata://ABCDEF01-2345-6789-ABCD-EF0123456789/ICNote/p999999";
 
 beforeAll(async () => {
@@ -68,7 +73,7 @@ describe("error codes through tool wrappers", () => {
     manager.getNoteById.mockReturnValue(null);
     const r = await call("get-note-content", { id: ID });
     expect(r).toEqual({
-      content: [{ type: "text", text: `Note with ID "${ID}" not found` }],
+      content: errorText(`Note with ID "${ID}" not found`, { code: "not_found" }),
       structuredContent: { code: "not_found" },
       isError: true,
     });
@@ -96,7 +101,7 @@ describe("error codes through tool wrappers", () => {
       tags: ["alpha"],
     });
     expect(r).toEqual({
-      content: [{ type: "text", text: "Note not found" }],
+      content: errorText("Note not found", { code: "not_found" }),
       structuredContent: { code: "not_found" },
       isError: true,
     });
@@ -110,7 +115,7 @@ describe("error codes through tool wrappers", () => {
       id: "x-coredata://ABCDEF01-2345-6789-ABCD-EF0123456789/ICFolder/p1",
     });
     expect(r).toEqual({
-      content: [{ type: "text", text: "Folder not found" }],
+      content: errorText("Folder not found", { code: "not_found" }),
       structuredContent: { code: "not_found" },
       isError: true,
     });
@@ -120,7 +125,10 @@ describe("error codes through tool wrappers", () => {
     // The selector is checked before the Notes database is opened.
     const r = await call("get-paragraph-link", { id: ID, title: "Synthetic", contains: "x" });
     expect(r).toEqual({
-      content: [{ type: "text", text: "No paragraph link: Choose exactly one of id or title" }],
+      content: errorText("No paragraph link: Choose exactly one of id or title", {
+        code: "validation_error",
+        reason: "invalid-argument",
+      }),
       structuredContent: { code: "validation_error", reason: "invalid-argument" },
       isError: true,
     });

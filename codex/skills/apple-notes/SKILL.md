@@ -437,6 +437,8 @@ Plain text cannot confirm structure. It carries no list markers, so it cannot sh
 
 Every error result carries `structuredContent.code` (`not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, `operation_failed`). Branch on the code rather than the wording. If `indeterminate` is `true`, the write may have landed: read the exact note before deciding whether to retry. `committed: false` means nothing was written.
 
+If your client shows only text, not `structuredContent`, every result that has it ends with a `structuredContent: {…}` line holding the same JSON. Take `contentHash` (for `expectedContentHash`), ids, and the error `code` from that line.
+
 - **"Note not found"**: Use search-notes to find similar titles
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
