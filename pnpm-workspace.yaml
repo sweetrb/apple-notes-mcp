@@ -60,13 +60,21 @@ overrides:
   # malformed IPv6 normalization), GHSA-5jgf-p345-68v8 (host confusion via
   # skipped IDN canonicalization). Do not float to 4.x (latest on npm) without
   # confirming ajv's fast-uri range accepts it.
-  fast-uri: ">=3.1.6 <4"
+  #
+  # Raised from >=3.1.6 <4 to >=3.1.7 <4 on 2026-09-29 for GHSA-58mr-gqgx-xq4g
+  # (high), fixed in 3.1.7. Still two-sided, still capped below 4.x.
+  fast-uri: ">=3.1.7 <4"
   # GHSA-mwp4-54f8-5fhr (high, leading-zero octets decoded as decimal -> SSRF /
   # trust-boundary bypass) plus GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg.
   # Reached via @modelcontextprotocol/sdk -> express-rate-limit, which caps
   # ip-address at 10.2.0. Not in the shipped bundle (0 references in
   # build/index.js), but floored anyway so the SDK cannot reintroduce it.
-  ip-address: ^10.3.1
+  #
+  # Raised from ^10.3.1 to >=10.5.1 <11 on 2026-09-29 for GHSA-2vr4-cq9g-pvrc
+  # (medium), fixed in 10.5.1 -- the lockfile had settled on 10.4.0, still
+  # vulnerable under the old caret floor. Two-sided range, never an exact pin,
+  # for the reason recorded on fast-uri above.
+  ip-address: ">=10.5.1 <11"
   # GHSA-fxqj-rqcc-2cmp (moderate): incomplete fix of GHSA-6g55-p6wh-862q.
   # Dev-only (vitest -> vite -> postcss); not in the shipped bundle.
   postcss: ^8.5.23
