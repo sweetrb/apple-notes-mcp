@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.9.32] - 2026-09-29
+
+### Security
+
+- Raised the `fast-uri` override floor to `>=3.1.7 <4` (GHSA-58mr-gqgx-xq4g,
+  high). `fast-uri` is in the shipped bundle (via
+  `@modelcontextprotocol/sdk` -> `ajv`).
+- Raised the `ip-address` override floor to `>=10.5.1 <11`
+  (GHSA-2vr4-cq9g-pvrc, medium). Not in the shipped bundle (reached via
+  `@modelcontextprotocol/sdk` -> `express-rate-limit`, dev/transitive only).
+
 ## [2.9.31] - 2026-09-26
 
 ### Fixed
