@@ -40,9 +40,9 @@ overrides:
   # The bounds must be two-sided. A bare "<5.0.9" also matches 1.1.18 and
   # 2.1.4 under semver, and would force minimatch 3's CommonJS path onto the
   # v5 ESM API ("expand is not a function").
-  "brace-expansion@>=1.0.0 <1.1.18": 1.1.18
+  "brace-expansion@>=1.0.0 <1.1.21": 1.1.21
   "brace-expansion@>=2.0.0 <2.1.4": 2.1.4
-  "brace-expansion@>=5.0.0 <5.0.9": 5.0.9
+  "brace-expansion@>=5.0.0 <5.0.12": 5.0.12
   # ⚠️ These are FLOORS, not pins. `fast-uri: 3.1.4` (exact) was written here as a
   # security floor and then became a CEILING: when GHSA-7p8r-x3mc-p8w7 (high, host
   # confusion via a backslash authority introducer) landed with a 3.1.5 fix, the
