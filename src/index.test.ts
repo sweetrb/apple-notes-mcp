@@ -758,3 +758,81 @@ describe("append-to-note HTML preservation", () => {
     });
   });
 });
+
+// Only initialize/tools-list requests are sent: this never invokes a Notes tool.
+describe("writer tool registration over MCP", () => {
+  async function toolNames(writes: string | undefined): Promise<string[]> {
+    const { spawnSync } = await import("node:child_process");
+    const { resolve } = await import("node:path");
+    const env = { ...process.env, APPLE_NOTES_MCP_ENABLE_PRIVATE: "0" };
+    if (writes === undefined) delete env.APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES;
+    else env.APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES = writes;
+    const input =
+      [
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "writer-registration-test", version: "0" },
+          },
+        },
+        { jsonrpc: "2.0", method: "notifications/initialized" },
+        { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+      ]
+        .map((message) => JSON.stringify(message))
+        .join("\n") + "\n";
+    const result = spawnSync(process.execPath, [resolve(__dirname, "../build/index.js")], {
+      input,
+      env,
+      encoding: "utf8",
+      timeout: 20_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const list = result.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((message) => message.id === 2);
+    expect(list?.result?.tools).toBeInstanceOf(Array);
+    return list.result.tools.map((tool: { name: string }) => tool.name).sort();
+  }
+
+  it("registers the writer suite only for an exact write opt-in", async () => {
+    const off = await toolNames(undefined);
+    const enabled = await toolNames("1");
+    const writerTools = [
+      "compose-note",
+      "native-writer-status",
+      "native-append-plain-text",
+      "native-sync-push",
+      "native-edit-note",
+      "native-checklist-state",
+      "native-set-checklist-item",
+      "native-highlight-text",
+      "native-add-url-card",
+      "native-set-paragraph-id",
+      "native-add-section-link",
+      "native-read-tables",
+      "native-delete-table-row",
+      "native-insert-table-row",
+      "native-set-table-cell",
+      "native-prune-orphan-table",
+      "native-read-smart-folder",
+      "native-create-smart-folder",
+      "native-update-smart-folder",
+      "native-delete-smart-folder",
+      "native-add-paper",
+      "native-read-paper",
+      "native-repair-purge-flag",
+    ].sort();
+    expect(enabled.filter((tool) => !off.includes(tool))).toEqual(writerTools);
+    expect(off).toContain("native-helper-status");
+    expect(off).toContain("native-note-state");
+    expect(await toolNames("0")).toEqual(off);
+    expect(await toolNames("true")).toEqual(off);
+  }, 90_000);
+});

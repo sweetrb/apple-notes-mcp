@@ -18,9 +18,10 @@ import {
   contentSearchFailureHint,
   describeContentScan,
   describeMatchDetails,
+  SEARCH_CONTENT_SCAN_LIMIT,
   searchContentViaDatabase,
 } from "./searchContentDb.js";
-import { NoteQueryStoreError } from "./noteQueryStore.js";
+import { NoteQueryStoreError, QUERY_SCAN } from "./noteQueryStore.js";
 
 // Minimal protobuf encoding of a Notes document: Document.2 → Version.3 → String{2: text}.
 const varint = (value: number): number[] => {
@@ -163,6 +164,13 @@ const search = (options: Partial<Parameters<typeof searchContentViaDatabase>[0]>
   searchContentViaDatabase({ query: "the", limit: 50, dbPath: db, ...options });
 const pks = (options: Partial<Parameters<typeof searchContentViaDatabase>[0]> = {}) =>
   search(options).notes.map((n) => Number(n.id.split("/p")[1]));
+
+describe("SEARCH_CONTENT_SCAN_LIMIT", () => {
+  it("keeps search-notes' body scan at 5000, below query-notes' ceiling", () => {
+    expect(SEARCH_CONTENT_SCAN_LIMIT).toBe(5000);
+    expect(QUERY_SCAN.MAX).toBe(10000);
+  });
+});
 
 describe("buildSearchContentQuery", () => {
   it("keeps the caller's text as one literal term, never parsed as query syntax", () => {

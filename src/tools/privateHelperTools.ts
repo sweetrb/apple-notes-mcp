@@ -30,7 +30,7 @@ const coreDataId = z.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i
 const notesUuid = z.string().regex(UUID_PATTERN);
 
 /** Resolve the Notes UUID from either an explicit identifier or an x-coredata id. */
-function resolveIdentifier(
+export function resolveIdentifier(
   manager: AppleNotesManager,
   args: { identifier?: string; id?: string }
 ): string {

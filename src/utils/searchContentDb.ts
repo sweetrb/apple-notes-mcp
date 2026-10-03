@@ -19,7 +19,6 @@ import {
   countWords,
   NOTE_TEXT_BATCH_MAX,
   NoteQueryStoreError,
-  QUERY_SCAN,
   readNoteTexts,
   runNoteQuery,
 } from "@/utils/noteQueryStore.js";
@@ -51,6 +50,13 @@ export interface SearchContentDbResult {
   scan: Pick<QueryNotesResult, "scanned" | "eligible" | "scanTruncated" | "matched">;
 }
 
+/**
+ * How many of the most recently modified notes a search-notes body search
+ * examines. Fixed below query-notes' own ceiling: search-notes has no scan
+ * parameter, so every body search pays this cost.
+ */
+export const SEARCH_CONTENT_SCAN_LIMIT = 5000;
+
 /** Builds the AST for one search-notes body search. Exported for tests. */
 export function buildSearchContentQuery(
   options: Pick<SearchContentDbOptions, "query" | "account" | "folder" | "modifiedSince">
@@ -78,7 +84,7 @@ export function buildSearchContentQuery(
 
 /**
  * Runs a search-notes body search against the NoteStore, scanning up to
- * {@link QUERY_SCAN.MAX} of the most recently modified notes.
+ * {@link SEARCH_CONTENT_SCAN_LIMIT} of the most recently modified notes.
  *
  * Recently Deleted and folderless notes are excluded, as in query-notes and
  * list-notes.
@@ -89,7 +95,7 @@ export function buildSearchContentQuery(
 export function searchContentViaDatabase(options: SearchContentDbOptions): SearchContentDbResult {
   const result = runNoteQuery(buildSearchContentQuery(options), {
     limit: options.limit,
-    scanLimit: QUERY_SCAN.MAX,
+    scanLimit: SEARCH_CONTENT_SCAN_LIMIT,
     includeWordCount: options.includeWordCount,
     dbPath: options.dbPath,
   });

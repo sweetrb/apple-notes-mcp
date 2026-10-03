@@ -32,6 +32,7 @@ import {
 } from "../utils/exportAssets.js";
 import { emptyStats, type ExportContext } from "../utils/exportRender.js";
 import { renderNotesHtml } from "../utils/htmlExport.js";
+import { prepareVectorDrawings, type ReadNoteDrawings } from "./exportVectorDrawings.js";
 import { renderNotesMarkdown } from "../utils/markdownExport.js";
 import { NoteBlocksError } from "../utils/noteBlocks.js";
 import {
@@ -113,6 +114,8 @@ export interface NotesExportDeps {
   readMeta?: (id: string) => ExportNoteMeta;
   /** Looks up a saved (non-built-in) template by name. */
   findTemplate?: (name: string) => PortableTemplate | undefined;
+  /** HTML only. Defaults to get-note-drawings' SVG decode through the public helper. */
+  readDrawings?: ReadNoteDrawings;
 }
 
 /** A template chosen for an export, with where it came from. */
@@ -337,6 +340,11 @@ export function defaultSidecarDir(output: string): string {
  * are embedded as data URLs by default (each up to 10 MiB) or, with
  * `embedAssets: false`, copied to a sidecar directory (`assetsDir`, default
  * `<stem>.assets`) and linked by relative URL.
+ *
+ * Classic PencilKit drawings are placed as SVG, decoded through the public
+ * native helper, unless `vectorDrawings` is false. Any drawing that cannot be
+ * decoded or placed falls back to Notes' raster rendering; it never fails the
+ * export.
  */
 export function exportNotesHtml(
   request: NotesExportRequest,
@@ -366,10 +374,15 @@ export function exportNotesHtml(
   const writer: SidecarWriter | DataUrlWriter = assetsDir
     ? new SidecarWriter(assetsDir, dirname(output))
     : new DataUrlWriter();
+  const vector =
+    request.vectorDrawings === false
+      ? undefined
+      : prepareVectorDrawings(notes, writer, deps.readDrawings);
   const ctx: ExportContext = {
     stats: emptyStats(),
     writer,
     locator: deps.locator ?? new AssetLocator(),
+    ...(vector ? { vectorDrawing: vector.vectorDrawing } : {}),
   };
   const title = request.id ? notes[0]?.title || "Note" : request.folder!;
   const html = renderInto(
@@ -389,6 +402,9 @@ export function exportNotesHtml(
     ...(assetsDir
       ? { assets: { dir: assetsDir, files: writer.count } }
       : { embedded: writer.count }),
+    ...(vector && vector.stats.rendered + vector.stats.fallback > 0
+      ? { vectorDrawings: vector.stats }
+      : {}),
   };
 }
 

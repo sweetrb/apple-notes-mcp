@@ -1,0 +1,1055 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-replica-identity-result",
+  "capturedAt": "2026-10-03T01:05:37.394Z",
+  "osVersion": "27.2",
+  "writerSourceSha256": "3fff29256539f7a7751db82298c956c8a54f260a28cb5bffc27ef397576f38cb",
+  "builds": [
+    {
+      "buildId": "build-A",
+      "sourceSha256": "3fff29256539f7a7751db82298c956c8a54f260a28cb5bffc27ef397576f38cb",
+      "binarySha256": "730c042110fa0cf858ab0d117243e67e86772a758e070e0ec0db174bdd6a0f85"
+    },
+    {
+      "buildId": "build-B",
+      "sourceSha256": "3fff29256539f7a7751db82298c956c8a54f260a28cb5bffc27ef397576f38cb",
+      "binarySha256": "bbe8a6cd85cb5437b6801ce9fdc565eb13ecc81731fbcecd7f07d11f3787f2f5"
+    }
+  ],
+  "scope": "The isolated arm performed twelve writes only in a dedicated synthetic store using the actual Notes model, with no live Notes writes or real preference access. The separate normal-preferences comparison performed two authorized live appends to the same disposable synthetic note; it made no explicit preference changes.",
+  "fixtureConditions": {
+    "accountReplicaMapConstructed": true,
+    "productionAccountMapInspected": false
+  },
+  "notesAppBaselineVerified": true,
+  "decoderChecksPassed": true,
+  "exactPlaintextChecksPassed": true,
+  "notesAppControl": {
+    "source": "notes-app-controlled-gui-insertion",
+    "appendedUTF16": 34,
+    "activeOwnerReplicas": [
+      {
+        "replica": "R1",
+        "liveDelta": 34,
+        "clockDelta": 34
+      }
+    ],
+    "beforeSnapshotBoundToNoteAndTime": true,
+    "persistedReadAfterCloseVerified": true
+  },
+  "steps": [
+    {
+      "id": "baseline",
+      "phase": "baseline",
+      "processOrdinal": null,
+      "buildId": null,
+      "replicaCount": 1,
+      "textUtf16": 184,
+      "ownerReplicas": [],
+      "deltas": [],
+      "replicas": [
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "A1",
+      "phase": "A",
+      "processOrdinal": 1,
+      "buildId": "build-A",
+      "replicaCount": 2,
+      "textUtf16": 215,
+      "ownerReplicas": [
+        "R2"
+      ],
+      "deltas": [
+        {
+          "replica": "R2",
+          "newReplica": true,
+          "liveDelta": 31,
+          "clockDelta": 215
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "phase": "A",
+      "processOrdinal": 2,
+      "buildId": "build-A",
+      "replicaCount": 3,
+      "textUtf16": 247,
+      "ownerReplicas": [
+        "R3"
+      ],
+      "deltas": [
+        {
+          "replica": "R3",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 246
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "phase": "A",
+      "processOrdinal": 3,
+      "buildId": "build-A",
+      "replicaCount": 4,
+      "textUtf16": 279,
+      "ownerReplicas": [
+        "R4"
+      ],
+      "deltas": [
+        {
+          "replica": "R4",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 278
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "phase": "A",
+      "processOrdinal": 4,
+      "buildId": "build-A",
+      "replicaCount": 5,
+      "textUtf16": 311,
+      "ownerReplicas": [
+        "R5"
+      ],
+      "deltas": [
+        {
+          "replica": "R5",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 309
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "A5",
+      "phase": "A",
+      "processOrdinal": 5,
+      "buildId": "build-A",
+      "replicaCount": 6,
+      "textUtf16": 343,
+      "ownerReplicas": [
+        "R6"
+      ],
+      "deltas": [
+        {
+          "replica": "R6",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 340
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "B1",
+      "phase": "B",
+      "processOrdinal": 6,
+      "buildId": "build-B",
+      "replicaCount": 7,
+      "textUtf16": 375,
+      "ownerReplicas": [
+        "R7"
+      ],
+      "deltas": [
+        {
+          "replica": "R7",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 372
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "B2",
+      "phase": "B",
+      "processOrdinal": 7,
+      "buildId": "build-B",
+      "replicaCount": 8,
+      "textUtf16": 407,
+      "ownerReplicas": [
+        "R8"
+      ],
+      "deltas": [
+        {
+          "replica": "R8",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 403
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        }
+      ]
+    },
+    {
+      "id": "B3",
+      "phase": "B",
+      "processOrdinal": 8,
+      "buildId": "build-B",
+      "replicaCount": 9,
+      "textUtf16": 439,
+      "ownerReplicas": [
+        "R9"
+      ],
+      "deltas": [
+        {
+          "replica": "R9",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 434
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        },
+        {
+          "replica": "R9",
+          "clock": 434,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        }
+      ]
+    },
+    {
+      "id": "B4",
+      "phase": "B",
+      "processOrdinal": 9,
+      "buildId": "build-B",
+      "replicaCount": 10,
+      "textUtf16": 471,
+      "ownerReplicas": [
+        "R10"
+      ],
+      "deltas": [
+        {
+          "replica": "R10",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 466
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R10",
+          "clock": 466,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        },
+        {
+          "replica": "R9",
+          "clock": 434,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        }
+      ]
+    },
+    {
+      "id": "B5",
+      "phase": "B",
+      "processOrdinal": 10,
+      "buildId": "build-B",
+      "replicaCount": 11,
+      "textUtf16": 503,
+      "ownerReplicas": [
+        "R11"
+      ],
+      "deltas": [
+        {
+          "replica": "R11",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 498
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R11",
+          "clock": 498,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R10",
+          "clock": 466,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        },
+        {
+          "replica": "R9",
+          "clock": 434,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "phase": "C",
+      "processOrdinal": 11,
+      "buildId": "build-A",
+      "replicaCount": 12,
+      "textUtf16": 535,
+      "ownerReplicas": [
+        "R12"
+      ],
+      "deltas": [
+        {
+          "replica": "R12",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 529
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R11",
+          "clock": 498,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R10",
+          "clock": 466,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R12",
+          "clock": 529,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        },
+        {
+          "replica": "R9",
+          "clock": 434,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "phase": "C",
+      "processOrdinal": 12,
+      "buildId": "build-A",
+      "replicaCount": 13,
+      "textUtf16": 567,
+      "ownerReplicas": [
+        "R13"
+      ],
+      "deltas": [
+        {
+          "replica": "R13",
+          "newReplica": true,
+          "liveDelta": 32,
+          "clockDelta": 561
+        }
+      ],
+      "replicas": [
+        {
+          "replica": "R11",
+          "clock": 498,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R4",
+          "clock": 278,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R10",
+          "clock": 466,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R5",
+          "clock": 309,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R7",
+          "clock": 372,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R13",
+          "clock": 561,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R6",
+          "clock": 340,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R8",
+          "clock": 403,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R2",
+          "clock": 215,
+          "chars": 31,
+          "liveChars": 31,
+          "substrings": 1
+        },
+        {
+          "replica": "R12",
+          "clock": 529,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R3",
+          "clock": 246,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        },
+        {
+          "replica": "R1",
+          "clock": 184,
+          "chars": 184,
+          "liveChars": 184,
+          "substrings": 6
+        },
+        {
+          "replica": "R9",
+          "clock": 434,
+          "chars": 32,
+          "liveChars": 32,
+          "substrings": 1
+        }
+      ]
+    }
+  ],
+  "observations": {
+    "writerOwnerReplicas": [
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8",
+      "R9",
+      "R10",
+      "R11",
+      "R12",
+      "R13"
+    ],
+    "phaseAOwners": [
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6"
+    ],
+    "phaseBOwners": [
+      "R7",
+      "R8",
+      "R9",
+      "R10",
+      "R11"
+    ],
+    "phaseCOwners": [
+      "R12",
+      "R13"
+    ],
+    "writerOwnersPresentInNotesAppBaseline": [],
+    "writerOwnersMatchingControlledNotesAppOwner": [],
+    "preferenceResetRemovedExistingPlist": false,
+    "newOwnerInPhaseC": true,
+    "preferenceResetComparison": "no-existing-domain"
+  },
+  "limitations": [
+    "The fixture account replica map is constructed metadata; the production account map was not inspected.",
+    "The isolated writer preference domain was absent; reset was a no-op, so deletion of an existing preference plist was not tested.",
+    "All cfprefsd IPC was denied to protect real preferences. Replica behavior in this experiment may differ from a production process with preferences available; an isolated result alone cannot establish production identity or preference-reset effects."
+  ],
+  "liveValidated": false,
+  "productionNormalPreferencesComparison": {
+    "schemaVersion": 1,
+    "kind": "synthetic-note-production-normal-preferences-comparison",
+    "writerSourceSha256": "3fff29256539f7a7751db82298c956c8a54f260a28cb5bffc27ef397576f38cb",
+    "writerBinarySha256": "03c36e7cb067e100066fc2e42a6f2d12e6699f325ec20a38717ca630694347d5",
+    "normalPreferences": true,
+    "explicitPreferenceChanges": false,
+    "notesAppOwner": "R1",
+    "controlledGuiAppendUTF16": 34,
+    "baselineReplicaCount": 1,
+    "steps": [
+      {
+        "id": "P1",
+        "owner": "R14",
+        "replicaCount": 2,
+        "appendedUTF16": 40,
+        "matchesNotesAppOwner": false,
+        "committed": true,
+        "verified": true,
+        "readAt": "2026-10-03T00:23:17.370072+00:00",
+        "processOrdinal": 1
+      },
+      {
+        "id": "P2",
+        "owner": "R15",
+        "replicaCount": 3,
+        "appendedUTF16": 41,
+        "matchesNotesAppOwner": false,
+        "committed": true,
+        "verified": true,
+        "readAt": "2026-10-03T00:23:17.667371+00:00",
+        "processOrdinal": 2
+      }
+    ],
+    "conclusion": "Two fresh production writer processes created distinct replica owners, each different from the controlled Notes.app owner and all twelve isolated writer owners. This agrees with the isolated experiment\u2019s per-process identity behavior on this host.",
+    "limitations": [
+      "Two normal-preferences saves on one disposable note and one OS build.",
+      "No preference-file deletion or recreation tested in normal preferences.",
+      "Does not establish dirty-editor merge safety or independent-device sync."
+    ],
+    "liveValidated": false,
+    "independentPayloadReview": "All three retained production payloads independently decoded and matched against private text, ownership, hashes, original native responses, revisions, timestamps, and distinct PIDs.",
+    "replicaLabelScope": "Uses the report-wide replica pseudonyms; labels are not restarted for this arm."
+  },
+  "independentPayloadRecheck": {
+    "snapshots": 13,
+    "exactDecodedText": true,
+    "sha256": true,
+    "replicaTables": true
+  },
+  "conclusion": "All twelve isolated saves used fresh replica owners distinct from the controlled Notes.app owner. The two authorized normal-preferences live appends also used distinct owners, different from every isolated writer owner. This establishes observed per-process identity on this host, not stable ownership across processes or safe concurrent editing.",
+  "remainingBlocker": "A populated preference-domain deletion/recreation experiment remains untested: the sandbox denied cfprefsd and no isolated preference plist existed, so phase C reset was a no-op.",
+  "replicaLabelScope": "One shared pseudonym mapping across both arms, derived from exact private replica UUID equality. R1 is the same controlled Notes.app owner in both arms; different labels denote different UUIDs.",
+  "crossArmIdentityComparison": [
+    {
+      "productionStep": "P1",
+      "owner": "R14",
+      "matchesNotesAppOwner": false,
+      "matchingIsolatedWriterOwners": []
+    },
+    {
+      "productionStep": "P2",
+      "owner": "R15",
+      "matchesNotesAppOwner": false,
+      "matchingIsolatedWriterOwners": []
+    }
+  ]
+}

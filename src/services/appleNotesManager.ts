@@ -3641,7 +3641,7 @@ export class AppleNotesManager {
   /**
    * Lists attachments for a note by its ID.
    *
-   * Returns metadata about each attachment including name and content type.
+   * Returns metadata about each attachment including name and content identifier.
    * Note: The position within the note cannot be determined via AppleScript.
    *
    * @param id - CoreData URL identifier for the note
@@ -3652,7 +3652,7 @@ export class AppleNotesManager {
    * @example
    * ```typescript
    * const attachments = manager.listAttachmentsById("x-coredata://ABC/ICNote/p123");
-   * attachments.forEach(a => console.log(`${a.name}: ${a.contentType}`));
+   * attachments.forEach(a => console.log(`${a.name}: ${a.contentId}`));
    * ```
    */
   listAttachmentsById(id: string): Attachment[] {

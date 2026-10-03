@@ -1,195 +1,169 @@
 # Apple Notes MCP - Improvement Roadmap
 
-*As of v2.6.12. Completion status updated 2026-08-03; see the Status line under each item.*
+_Reviewed 2026-10-02 against upstream 2.9.34 and the open contribution branches._
 
-Based on technical research into Apple Notes internals, the current
-AppleScript dictionary, Notes App Intents metadata, and analysis of other
-implementations, here are remaining improvements.
+This is a status map, not a promise to implement every candidate. Shipped public
+features, work awaiting review, and possible future work are listed separately.
+See [README.md](./README.md) for tool contracts and
+[TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md) for implementation limits.
 
-## Future Considerations
+## Open issues and contributions
 
-### AppleScript Surface Gaps
-**Problem**: A few low-risk Notes AppleScript capabilities are exposed by
-`Notes.sdef` but are not wrapped as MCP tools yet.
+### Native writer evidence and review
 
-**Candidate tools**:
-- Show or reveal a note, folder, account, or attachment in Notes.app
-- Return the currently selected note IDs
-- Return the default account and default folder
-- Include account IDs, account upgrade status, folder IDs, and folder shared state
-- Include richer attachment metadata: content identifier, URL, created/modified
-  dates, and shared state
+[Issue #181](https://github.com/sweetrb/apple-notes-mcp/issues/181) tracks the
+roadmap. Its read-only database/protobuf and Shortcuts/public-helper groups have
+merged. The read-only private helper shipped in
+[#204](https://github.com/sweetrb/apple-notes-mcp/pull/204); private writes remain
+under review in draft [#262](https://github.com/sweetrb/apple-notes-mcp/pull/262).
 
-**Complexity**: Low to medium - AppleScript only, no private database parsing
+The writer branch implements in-place edits, compose, checklists, highlights,
+link cards, paragraph links, tables, smart folders, Paper drawings and guarded
+repair operations. That is implementation progress, not release validation.
+Remaining requirements are:
 
-**Status: Complete.** Every candidate shipped. Reveal a note (`show-note`, #41) and folder, account, or attachment (`show-folder` / `show-account` / `show-attachment`, #44); selected note IDs (`get-selected-notes`, #41); default account and folder (`get-default-location`, #41); account and folder IDs, upgrade, and shared state (#41); and richer attachment metadata (#41). Bonus: `get-note-plaintext` (#46) wraps the sdef `plaintext` property.
+- Dirty-editor trials with a running Notes.app (Q1).
+- Full CRDT replica-identity experiments across helper processes and builds (Q2).
+- Upload timing verified on a second device, not only local version counters.
+- A sanitized, quiescent NoteStore fixture for repeatable copy-store checks,
+  including successful prune/purge cases that meet the cloud-state guards.
+- Restaging the writer into the maintainer's requested review sequence after
+  the evidence is available.
 
----
+The [disposable-fixture smoke record](./docs/private-writer-validation/fixture-smoke-2026-10-02.md)
+does not satisfy Q1, Q2 or second-device validation. Feature validation records
+remain unset. Attachment removal and replacement are refused until safe
+tombstoning and its validation are implemented. The writer's registration and
+per-feature opt-ins are documented in README; a blanket unverified switch does
+not enable private writes.
 
-### App Intents Bridge
-**Problem**: AppleScript cannot create or update several modern Notes features,
-but Notes ships App Intents for many of them. The `shortcuts` CLI can run named
-shortcuts but does not directly invoke arbitrary App Intents, so the MCP server
-needs a reliable bridge before these can become tools.
+Other open contributions have been separated for review:
 
-**Candidate features**:
-- Append or prepend to a note without replacing the full body — *partly shipped:
-  `append-to-note` (2.6.0) does append and prepend over plain AppleScript
-  (`position: "after" | "before"`), but by reading the body, concatenating, and
-  writing the whole thing back. A true in-place edit that cannot disturb
-  embedded attachments is still unbuilt.*
-- Interpret appended content as Markdown
-- Create real checklist items and check/uncheck/toggle existing checklist items
-- Create, add, remove, open, and delete real Notes tags
-- Pin and unpin notes
-- Insert note-to-note links and list linked notes
-- Add file attachments and URL/link attachments
-- Add tables from CSV and delete/reveal tables
-- Rename folders and move notes with native App Intents
-- Open Quick Notes, Shared, Math Notes, and Call Recordings views
-- Start audio recording in Notes.app
+| Contribution                           | PR                                                          | Remaining review or validation                      |
+| -------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| PDF attachment verification follow-up  | [#270](https://github.com/sweetrb/apple-notes-mcp/pull/270) | Review and merge                                    |
+| Additional query facets                | [#271](https://github.com/sweetrb/apple-notes-mcp/pull/271) | Review and merge                                    |
+| SVG drawings in HTML export            | [#272](https://github.com/sweetrb/apple-notes-mcp/pull/272) | Review; vector output defaults off                  |
+| Template editor                        | [#273](https://github.com/sweetrb/apple-notes-mcp/pull/273) | Review; tailnet behavior has not been tested live   |
+| Permissions dashboard                  | [#274](https://github.com/sweetrb/apple-notes-mcp/pull/274) | Review; visually verify the optional Swift window   |
+| Paragraph anchor registry and resolver | [#275](https://github.com/sweetrb/apple-notes-mcp/pull/275) | Review; resolver server still needs live validation |
 
-**Possible approaches**:
-- Native Swift helper that invokes App Intents directly
-- Generated or bundled Shortcuts used as a stable runner
-- Hybrid approach: keep AppleScript for existing CRUD, use App Intents only for
-  capabilities AppleScript cannot express
+Version numbers must be reconciled as these PRs merge. Their presence in a
+contribution branch does not mean they have shipped upstream.
 
-**Complexity**: High - requires feature detection, macOS-version gating,
-permission handling, packaging, and integration tests
+### Full Disk Access under Claude Desktop
 
-**Feasibility (researched 2026-06, verified against macOS 27 + Apple docs; see [TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md#app-intents-and-the-shortcuts-bridge))**:
-- The "native Swift helper that invokes App Intents directly" approach is not
-  possible. App Intents are system-invoked and app-local; there is no public API to
-  `perform()` another app's intents. A helper could only fall back to AppleScript.
-- The only working route is a user-installed wrapper Shortcut run via
-  `shortcuts run "<name>"`. It needs an active GUI login session (no SSH or launchd),
-  a one-time manual install, and is plain-text only. This is a BETA, opt-in path.
-- Reachable through that bridge: pin / unpin, add / remove / create / delete tags,
-  move to folder, append checklist item, append plain text, attach a file.
-- Still GUI-only under every approach (drop from scope): Markdown body writes,
-  checklist toggle, tables, note-to-note links, URL attachments.
+[Issue #220](https://github.com/sweetrb/apple-notes-mcp/issues/220) remains open
+for reports not covered by the current guidance. The reporter confirmed a fix,
+and [#227](https://github.com/sweetrb/apple-notes-mcp/pull/227) shipped the doctor
+and documentation corrections: Claude Desktop's responsibility disclaimer can
+make the Node binary require its own Full Disk Access grant. The guide names the
+exact Node path and explains version-manager changes and restart behavior.
 
-**Status: Researched, deferred (2026-06); partly overtaken (2026-07).** The bridge
-only adds pin/unpin and tag writes, and it requires an active GUI session plus a
-one-time manual Shortcut install, so it was deferred rather than built. Revisit if
-pin and tag writes become worth that setup cost. Two items have since been
-delivered without any bridge: **prepend** shipped in 2.6.0 as `append-to-note`
-with `position: "before"`, over ordinary AppleScript (it rewrites the full body,
-so it is not the in-place edit App Intents would give), and a **note-to-note
-link** can at least be *produced* — `get-note-link` (2.6.0) returns the
-`notes://showNote?identifier=<uuid>` deep link, though inserting one into a body
-is still GUI-only.
+A direct-node versus `npx` comparison is optional diagnostic evidence, not a
+confirmed outstanding server defect. See the
+[Full Disk Access guide](./docs/FULL-DISK-ACCESS.md). Do not reset permissions or
+add grants merely to reconcile this roadmap.
 
----
+## Shipped capabilities
 
-### Hybrid SQLite + AppleScript Approach
-**Problem**: AppleScript is slow and limited; direct SQLite is read-only.
+### AppleScript surfaces and body safety
 
-**Solution**:
-- Use SQLite for fast read operations (search, list, get content)
-- Use AppleScript only for write operations (create, update, delete)
-- Requires copying database for reads (safety)
-- Significant performance improvement for large note collections
+The earlier AppleScript surface checklist is complete: reveal notes, folders,
+accounts and attachments; read selected notes and default locations; return
+account/folder identifiers and richer attachment metadata; and read native
+plaintext ([#41](https://github.com/sweetrb/apple-notes-mcp/pull/41),
+[#44](https://github.com/sweetrb/apple-notes-mcp/pull/44),
+[#46](https://github.com/sweetrb/apple-notes-mcp/pull/46)).
 
-**Complexity**: High - requires protobuf parsing
-**Dependencies**: `better-sqlite3`, `protobufjs`
+Safe HTML guidance, body-replacement warnings and Notes-normalized regression
+fixtures also shipped. `update-note` replaces the body; attachment-bearing notes
+need the documented guarded native append or attachment operations. Do not
+write a lossy body returned by a read back into the note.
 
----
+### Shortcuts and public-framework helpers
 
-### Read-Only SQLite Metadata Expansion
-**Problem**: The server already reads checklist state from the Notes database,
-but many useful read-only metadata fields are still unavailable through
-AppleScript.
+The Shortcuts bridge is implemented, not deferred. Public background operations
+include native append, Markdown import, real checklist creation, table creation,
+note-link insertion, pin changes and supported tag operations. Supported actions
+are listed in [get-capabilities](./README.md#get-capabilities) and
+[`nativeOperations.ts`](./src/tools/nativeOperations.ts); setup and macOS
+requirements still apply.
 
-**Candidate metadata**:
-- Pinned state
-- Smart folder query JSON
-- Trash/recovery state
-- Checklist-present and checklist-in-progress flags
-- OCR, handwriting, image-classification, and summary text
-- Attachment dimensions, type UTI, URL string, preview dates, and file size
-- Location coordinates for attachments with location metadata
-- Participants, invitations, and share URLs
-- Audio transcription availability and temporary transcript data
-- Thumbnail and fallback image/PDF generation status
+Markdown task/block import shipped in
+[#199](https://github.com/sweetrb/apple-notes-mcp/pull/199). Native append avoids
+full-body replacement for its supported subset. Creating checklist items is
+distinct from toggling existing items: the latter has no supported public
+background action and remains part of the private-writer review. Table creation
+does not imply arbitrary cell editing or row deletion.
 
-**Safety rule**: SQLite work must stay read-only. Copy the database, WAL, and SHM
-files before reading; never write to the live Notes store.
+Classic PencilKit drawing decoding and SVG export shipped in
+[#230](https://github.com/sweetrb/apple-notes-mcp/pull/230); Notes-rendered raster
+exports are available separately. On-device audio transcription shipped in
+[#231](https://github.com/sweetrb/apple-notes-mcp/pull/231), using a locally built
+public helper and the documented Speech permission. A Swift helper does not
+provide a general API for invoking another app's App Intents.
 
-**Complexity**: Medium to high - schema differs across macOS releases and some
-fields require protobuf or archived-data parsing
+### Read-only database, structure and exports
 
-**Verified (2026-06, macOS 27 / Notes 4.13; see [TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md#read-only-metadata-columns-verified-macos-27--notes-413))**:
-The highest-value fields are plain scalar columns on `ZICCLOUDSYNCINGOBJECT` and need no
-protobuf decoding: `ZISPINNED` (pinned), `ZHASCHECKLIST` / `ZHASCHECKLISTINPROGRESS`,
-`ZISRECOVERINGFROMTRASH` (trash state), `ZSMARTFOLDERQUERYJSON` (smart-folder query),
-`ZSNIPPET` / `ZWIDGETSNIPPET`, and `ZPASSWORDHINT`. These are the low-risk first
-increment; the existing checklist reader already supplies the copy-DB and Full Disk
-Access scaffolding. The protobuf or archived-data fields (OCR, summary text, attachment
-dimensions, participants, transcripts) remain the harder, later tier. `ZISPINNED` also
-closes the read half of the "pinned notes" known limitation; the write half needs the
-Shortcuts bridge above.
+The hybrid read path is implemented. Database reads use `sqlite3 -readonly`,
+with schema detection and bounded decoding; the project does not require
+`better-sqlite3` or `protobufjs`. Reads do not all copy the store first. Preserve
+the actual read-only and consistency contracts in each reader; never replace
+them with direct SQL writes to the live store.
 
-**Status: Partially shipped (#48, BETA).** `get-note-metadata` reads the scalar columns above (pinned, checklist flags, trash and recovery, smart-folder query, snippets, password hint), read-only via `sqlite3 -readonly` with column feature-detection. The protobuf and archived-data tier (OCR, summary text, attachment dimensions, participants, transcripts) is still open.
+Shipped features include boolean query search
+([#182](https://github.com/sweetrb/apple-notes-mcp/pull/182)), typed note structure,
+links, tables, smart-folder reads, ordered HTML export with assets
+([#210](https://github.com/sweetrb/apple-notes-mcp/pull/210)), and Markdown export
+templates and their local library
+([#234](https://github.com/sweetrb/apple-notes-mcp/pull/234),
+[#235](https://github.com/sweetrb/apple-notes-mcp/pull/235)). Extra query facets
+and vector drawings in HTML exports remain in the open PRs listed above.
 
----
+The metadata roadmap is partly complete:
 
-### Formatting and Note-Body Safety
-**Problem**: Apple Notes normalizes HTML on save, and full-body updates can
-overwrite embedded objects if callers treat updates like append operations.
+- `get-note-metadata` exposes scalar pinned, checklist, trash/recovery, snippet,
+  password and smart-folder fields with column detection.
+- Attachment tools expose stored UTI, kind, body order, files and previews;
+  drawing tools report validated raster dimensions and stored handwriting text.
+- `get-audio-transcripts` reads stored word-level transcripts, speakers and
+  recording summaries ([#194](https://github.com/sweetrb/apple-notes-mcp/pull/194)).
 
-**Improvements**:
-- Document HTML patterns that render well in Notes: `<div>`, `<h2>/<h3>`,
-  `<ul>/<ol>/<li>`, `<tt>`, inline emphasis, and explicit blank spacer divs
-- Warn that `create-note` already prepends the title as `<h1>`
-- Warn that `update-note` replaces the entire body and ignores `newTitle` in
-  HTML mode
-- Encourage `list-attachments` before updating notes that may contain files,
-  images, scans, PDFs, or audio
-- Add regression fixtures for Notes-normalized HTML so agents do not rewrite
-  safe normalized output unnecessarily
+These specific fields do not amount to a general OCR, classification, location,
+sharing-participant or arbitrary archived-metadata API.
 
-**Complexity**: Low - documentation, tests, and tool-description improvements
+## Possible future work
 
-**Status: Complete.** Safe-HTML patterns and attachment-safe-update guidance shipped in the bundled skill (#42). The `list-attachments`-before-replace warning is wired into the `update-note` description and README, and Notes-normalized-HTML regression fixtures were added (#45). The `create-note` h1 and `update-note` full-body-replace warnings were already in place.
+These are proposals or known platform limits, not unfinished implementations
+promised for the current PRs:
 
----
+- **Signed permission broker:** unimplemented. The permissions dashboard and
+  locally built helper tools do not supply one. Distribution, signing,
+  permission ownership and maintenance need a separate design decision.
+- **Additional metadata:** general OCR/image classification, attachment location,
+  sharing participants/invitations and other archived fields need schema
+  research, a defined output contract and sanitized fixtures. Stored audio
+  transcripts and drawing handwriting summaries should not be rebuilt.
+- **Foreground-only actions:** recording audio, locks, sharing invitations,
+  scanning/markup and unsupported checklist/table edits require a supported
+  interface or an explicit product decision. They are not enabled by the
+  existing public Shortcuts bridge.
+- **New macOS APIs:** reassess Notes' dictionary and App Intents on major macOS
+  releases. Do not infer a public cross-app API from the presence of an intent.
 
-### Watch for macOS API Changes
-- Apple may deprecate AppleScript entirely
-- Monitor for new Notes.app APIs and App Intents in future macOS versions
-- Re-run `sdef /System/Applications/Notes.app` and inspect bundled App Intents
-  metadata during each major macOS release
-- Consider Shortcuts or a native helper as a future App Intents bridge
+## Validation and compatibility
 
----
+- Keep unit coverage for parsers, feature detection, guards and error outcomes.
+  Prefer synthetic or sanitized database fixtures for repeatable read tests.
+- Record the exact macOS/helper build and test scope for native behavior. Mock
+  tests, protocol tests and a successful write on one note do not prove editor
+  concurrency, CRDT identity or iCloud arrival.
+- Live integration runs need bounded, explicitly authorized fixtures. Record
+  skipped scenarios instead of treating them as passed.
+- Preserve existing public fields and compatibility contracts. New draft writer
+  safeguards may intentionally tighten apply requirements before release.
+- Report partial database coverage and truncation. Measure performance against a
+  stated library size and environment before setting latency guarantees.
 
-## Implementation Notes
-
-### Testing Strategy
-- Unit tests with mocked AppleScript responses (existing)
-- Integration tests against real Notes.app (manual, documented)
-- Test matrix: macOS versions (Sonoma, Sequoia), note types (simple, attachments, locked)
-- Feature-detection tests for optional App Intents-backed tools
-- SQLite parser fixtures copied from sanitized note databases where possible
-- Safety tests that prove private SQLite code opens read-only copies, not the
-  live database
-
-### Backwards Compatibility
-- All new parameters should be optional
-- Existing tool signatures must not change
-- Use feature detection for new capabilities
-- Prefer adding new tools over changing semantics of existing tools
-- Gate GUI-opening or app-activating features clearly in tool descriptions
-
-### Performance Targets
-- Simple operations (get, create): < 500ms
-- Search operations: < 2s for 1000 notes
-- Batch operations: Linear scaling with count
-- SQLite-backed read operations should report partial coverage when a database
-  copy, WAL read, or parser step fails
-
-*Created: December 2025*
-*Last reviewed: June 2026*
-*Based on research in [TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md)*
+_Created: December 2025. Last reconciled: October 2026._

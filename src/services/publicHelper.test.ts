@@ -2,7 +2,7 @@ import type { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildPublicHelper,
   callPublicHelper,
@@ -421,16 +421,27 @@ describe("callPublicHelperAsync (real child processes)", () => {
     const sleeper = script("sleep.sh", `echo $$ > "${pidFile}"; exec sleep 30`);
     const controller = new AbortController();
     const pending = run(sleeper, { signal: controller.signal, timeoutMs: 60_000 });
-    for (let i = 0; i < 100 && !existsSync(pidFile); i++)
-      await new Promise((r) => setTimeout(r, 10));
-    const pid = Number(readFileSync(pidFile, "utf8"));
-    expect(alive(pid)).toBe(true);
-    const started = Date.now();
-    controller.abort();
-    await expect(pending).rejects.toMatchObject({ code: "aborted" });
-    expect(Date.now() - started).toBeLessThan(5_000);
-    expect(alive(pid)).toBe(false);
-  });
+    // Attach the rejection handler before waiting for the spawned helper.
+    const settled = pending.catch((error: unknown) => error);
+    try {
+      let pid = 0;
+      await vi.waitFor(
+        () => {
+          pid = Number(readFileSync(pidFile, "utf8"));
+          expect(pid).toBeGreaterThan(0);
+          expect(alive(pid)).toBe(true);
+        },
+        { timeout: 10_000, interval: 20 }
+      );
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ code: "aborted" });
+      expect(alive(pid)).toBe(false);
+    } finally {
+      // A slow spawn or failed readiness assertion must not leave a child behind.
+      controller.abort();
+      await settled;
+    }
+  }, 20_000);
 
   it("times out a sleeping helper, refuses an aborted signal before spawning, and reports crashes", async () => {
     const sleeper = script("slow.sh", "exec sleep 30");

@@ -42,7 +42,11 @@ describe("outputSchema contract (real server over stdio)", () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [SERVER],
-      env: { ...process.env } as Record<string, string>,
+      env: {
+        ...process.env,
+        APPLE_NOTES_MCP_ENABLE_PRIVATE: "0",
+        APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES: "1",
+      } as Record<string, string>,
     });
     client = new Client({ name: "outputschema-contract-test", version: "0.0.0" });
     await client.connect(transport);
@@ -109,8 +113,7 @@ describe("outputSchema contract (real server over stdio)", () => {
 
     for (const name of ["update-note", "append-to-note", "delete-note"]) {
       const schema = byName.get(name)?.inputSchema as
-        | { required?: string[]; properties?: Record<string, unknown> }
-        | undefined;
+        { required?: string[]; properties?: Record<string, unknown> } | undefined;
       expect(schema, `${name} must be registered`).toBeDefined();
       expect(schema?.required).toContain("id");
       expect(schema?.required).toContain("expectedContentHash");
@@ -119,14 +122,12 @@ describe("outputSchema contract (real server over stdio)", () => {
     }
 
     const move = byName.get("move-note")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(move?.required).toContain("id");
     expect(move?.properties).not.toHaveProperty("title");
 
     const batchDelete = byName.get("batch-delete-notes")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(batchDelete?.required).toContain("notes");
     expect(batchDelete?.properties).not.toHaveProperty("ids");
   });

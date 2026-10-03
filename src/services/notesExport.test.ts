@@ -26,6 +26,8 @@ import { NoteBlocksError } from "../utils/noteBlocks.js";
 import { NOTES_CONTAINER, type AssetLocator } from "../utils/exportAssets.js";
 import { attachment, attachmentRun, block, exportNote } from "../utils/fixtures/exportNote.js";
 import type { ExportNote } from "../utils/noteExportData.js";
+import type { NoteDrawing, NoteDrawingsResult } from "../types.js";
+import { PublicHelperError } from "./publicHelper.js";
 
 const ID = (n: number) => `x-coredata://FIXTURE/ICNote/p${n}`;
 let dir: string;
@@ -66,6 +68,48 @@ beforeAll(() => {
   );
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+/** A note with one classic drawing (DRW<n>) and one Paper drawing (PAP<n>). */
+function drawingNote(n: number): ExportNote {
+  return {
+    ...exportNote(
+      [
+        block(`Sketch ${n}`, "title"),
+        block("\ufffc\ufffc", "body", {}, [
+          attachmentRun(`DRW${n}`, "com.apple.drawing.2"),
+          attachmentRun(`PAP${n}`, "com.apple.paper"),
+        ]),
+      ],
+      [attachment(`DRW${n}`, "com.apple.drawing.2"), attachment(`PAP${n}`, "com.apple.paper")]
+    ),
+    id: ID(n),
+  };
+}
+
+const SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 10"/></svg>';
+
+const drawings = (noteId: string, ...list: Partial<NoteDrawing>[]): NoteDrawingsResult => ({
+  id: noteId,
+  drawingCount: list.length,
+  status: "ok",
+  drawings: list.map((d) => ({
+    attachmentId: "x-coredata://FIXTURE/ICAttachment/p9",
+    identifier: `DRW${noteId.split("/p")[1]}`,
+    typeUti: "com.apple.drawing.2",
+    status: "ok",
+    svg: SVG,
+    truncated: false,
+    ...d,
+  })),
+});
+
+const drawingDeps = (readDrawings: NotesExportDeps["readDrawings"]) =>
+  deps({
+    listNoteRefs: () => [ID(4), ID(5)].map((id) => ({ id, title: "t" })),
+    readNote: (id) => drawingNote(Number(id.split("/p")[1])),
+    readDrawings,
+  });
 
 describe("exportNotesMarkdown", () => {
   it("returns one note inline with placeholders when no assetsDir is given", () => {
@@ -323,6 +367,127 @@ describe("exportNotesHtml", () => {
     const html = readFileSync(output, "utf8");
     expect(html).toContain("<title>Work/Plans</title>");
     expect(html.match(/<hr class="note-separator">/g)).toHaveLength(1);
+  });
+
+  it("embeds classic drawings as SVG and keeps Notes' PNG for Paper", () => {
+    const output = join(dir, "html", "vector.html");
+    const read = vi.fn((id: string) => drawings(id, {}));
+    const receipt = exportNotesHtml({ id: ID(4), outputPath: output }, drawingDeps(read));
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(ID(4));
+    expect(receipt).toMatchObject({ embedded: 2, vectorDrawings: { rendered: 1, fallback: 0 } });
+    expect(receipt.stats).toMatchObject({ attachments: 2, placed: 2 });
+    const html = readFileSync(output, "utf8");
+    expect(html).toContain(
+      `<figure class="attachment attachment-image attachment-vector"><img src="data:image/svg+xml;base64,${Buffer.from(SVG).toString("base64")}"`
+    );
+    expect(html.match(/src="data:image\/png;base64,/g)).toHaveLength(1);
+  });
+
+  it("writes drawing SVG files to the sidecar directory", () => {
+    const output = join(dir, "html", "vector-side.html");
+    const receipt = exportNotesHtml(
+      { id: ID(4), outputPath: output, embedAssets: false },
+      drawingDeps((id) => drawings(id, {}))
+    );
+    expect(receipt).toMatchObject({ assets: { files: 2 }, vectorDrawings: { rendered: 1 } });
+    expect(readFileSync(join(dir, "html", "vector-side.assets", "Drawing.svg"), "utf8")).toBe(SVG);
+    expect(readFileSync(output, "utf8")).toContain('src="vector-side.assets/Drawing.svg"');
+  });
+
+  it("keeps every PNG when vectorDrawings is false", () => {
+    const output = join(dir, "html", "raster.html");
+    const read = vi.fn((id: string) => drawings(id, {}));
+    const receipt = exportNotesHtml(
+      { id: ID(4), outputPath: output, vectorDrawings: false },
+      drawingDeps(read)
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(receipt.vectorDrawings).toBeUndefined();
+    expect(readFileSync(output, "utf8")).not.toContain("image/svg+xml");
+  });
+
+  it("omits the vector summary when no note has a classic drawing", () => {
+    const read = vi.fn((id: string) => drawings(id, {}));
+    const receipt = exportNotesHtml(
+      { id: ID(3), outputPath: join(dir, "html", "no-drawing.html") },
+      deps({ readDrawings: read })
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(receipt.vectorDrawings).toBeUndefined();
+  });
+
+  it("falls back to the PNG, and stops decoding, when the helper is unavailable", () => {
+    const output = join(dir, "html", "no-helper.html");
+    const read = vi.fn((): NoteDrawingsResult => {
+      throw new PublicHelperError("helper_not_installed", "not built");
+    });
+    const receipt = exportNotesHtml({ folder: "Sketches", outputPath: output }, drawingDeps(read));
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(receipt).toMatchObject({
+      count: 2,
+      embedded: 1,
+      vectorDrawings: { rendered: 0, fallback: 2, fallbackReasons: { helper_not_installed: 2 } },
+    });
+    expect(receipt.stats).toMatchObject({ placed: 4, unavailable: 0 });
+    expect(readFileSync(output, "utf8")).not.toContain("image/svg+xml");
+  });
+
+  it("falls back per drawing on decode errors, truncation and note-level failures", () => {
+    const output = join(dir, "html", "partial.html");
+    const read = vi.fn((id: string) => {
+      if (id === ID(4))
+        return drawings(id, { status: "error", code: "undecodable", svg: undefined });
+      throw Object.assign(new Error("schema"), { kind: "schema" });
+    });
+    const receipt = exportNotesHtml({ folder: "Sketches", outputPath: output }, drawingDeps(read));
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(receipt.vectorDrawings).toEqual({
+      rendered: 0,
+      fallback: 2,
+      fallbackReasons: { undecodable: 1, schema: 1 },
+    });
+    const truncated = exportNotesHtml(
+      { id: ID(4), outputPath: join(dir, "html", "truncated.html") },
+      drawingDeps((id) => drawings(id, { truncated: true }))
+    );
+    expect(truncated.vectorDrawings).toEqual({
+      rendered: 0,
+      fallback: 1,
+      fallbackReasons: { truncated: 1 },
+    });
+    const missing = exportNotesHtml(
+      { id: ID(4), outputPath: join(dir, "html", "missing.html") },
+      drawingDeps((id) => ({ id, drawingCount: 0, status: "none", drawings: [] }))
+    );
+    expect(missing.vectorDrawings?.fallbackReasons).toEqual({ not_decoded: 1 });
+  });
+
+  it("stops decoding after a helper timeout", () => {
+    const read = vi.fn((id: string) =>
+      drawings(id, { status: "error", code: "timeout", svg: undefined })
+    );
+    const receipt = exportNotesHtml(
+      { folder: "Sketches", outputPath: join(dir, "html", "timeout.html") },
+      drawingDeps(read)
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(receipt.vectorDrawings?.fallbackReasons).toEqual({ timeout: 2 });
+  });
+
+  it("falls back when the SVG is over the embedded-asset limit", () => {
+    const huge = `<svg xmlns="http://www.w3.org/2000/svg">${" ".repeat(10 * 1024 * 1024)}</svg>`;
+    const receipt = exportNotesHtml(
+      { id: ID(4), outputPath: join(dir, "html", "huge.html") },
+      drawingDeps((id) => drawings(id, { svg: huge }))
+    );
+    expect(receipt.vectorDrawings?.fallbackReasons).toEqual({ "too-large": 1 });
+  });
+
+  it("never decodes drawings for a Markdown export", () => {
+    const read = vi.fn((id: string) => drawings(id, {}));
+    exportNotesMarkdown({ id: ID(4) }, drawingDeps(read));
+    expect(read).not.toHaveBeenCalled();
   });
 
   it("uses a generic title when a single note cannot be named", () => {

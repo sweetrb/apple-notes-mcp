@@ -135,6 +135,7 @@ const FULL_COLUMNS = [
   "ZTYPEUTI1 TEXT",
   "ZALTTEXT TEXT",
   "ZNOTE1 INTEGER",
+  "ZISSYSTEMPAPER INTEGER",
 ];
 const MINIMAL_COLUMNS = FULL_COLUMNS.slice(0, 5);
 
@@ -182,6 +183,7 @@ const invoice = segments([
   " ",
   { text: OBJ, attachment: { id: "IMG1", type: "public.jpeg" } },
   { text: OBJ, attachment: { id: "PDF1", type: "com.adobe.pdf" } },
+  { text: OBJ, attachment: { id: "URL1", type: "public.url" } },
 ]);
 const trip = segments([
   "Trip\n",
@@ -190,6 +192,7 @@ const trip = segments([
   { text: OBJ, attachment: { id: "A1", type: "com.apple.m4a-audio" } },
   { text: OBJ, attachment: { id: "V1", type: "com.apple.quicktime-movie" } },
   { text: OBJ, attachment: { id: "D1", type: "com.apple.paper" } },
+  { text: OBJ, attachment: { id: "M1", type: "com.apple.mapkit.map" } },
   "\n",
   { text: "Pack\n", checklist: { id: "bb01", done: true } },
 ]);
@@ -276,6 +279,7 @@ const OBJECTS: Array<Record<string, unknown>> = [
     ZTITLE1: "Long essay",
     ZFOLDER: 14,
     ZMODIFICATIONDATE1: cd(2026, 9, 1, 9),
+    ZISSYSTEMPAPER: 1,
   },
   {
     Z_PK: 107,
@@ -403,7 +407,11 @@ describe("queryNotes against a fixture NoteStore", () => {
   });
 
   it("derives facets from the body's attachment runs", () => {
-    expect(pks("has:link")).toEqual([100]);
+    // An inline link (100) and a URL preview card (101) are both links; only
+    // the card is has:url.
+    expect(pks("has:link")).toEqual([100, 101]);
+    expect(pks("has:url")).toEqual([101]);
+    expect(pks("has:map")).toEqual([102]);
     expect(pks("has:image")).toEqual([101]);
     expect(pks("has:pdf")).toEqual([101]);
     expect(pks("has:attachment")).toEqual([101, 102]);
@@ -425,6 +433,9 @@ describe("queryNotes against a fixture NoteStore", () => {
     expect(pks("locked")).toEqual([103]);
     expect(pks("shared")).toEqual([102]);
     expect(pks("-shared -locked -pinned")).toEqual([106, 101, 107]);
+    expect(pks("quicknote")).toEqual([106]);
+    expect(pks("is:quicknote")).toEqual([106]);
+    expect(pks("-quicknote folder:work")).toEqual([103, 100, 107]);
   });
 
   it("compares word counts and dates", () => {
@@ -475,7 +486,9 @@ describe("queryNotes against a fixture NoteStore", () => {
     // and without ZISPASSWORDPROTECTED the encrypted body is simply unreadable.
     expect(result.notes.map((n) => Number(n.id.split("/p")[1]))).toEqual([104, 108, 103, 100]);
     expect(result.notes[0]).not.toHaveProperty("account");
-    expect(queryNotes("pinned OR shared OR tag:finance", { dbPath: minimal }).count).toBe(0);
+    expect(
+      queryNotes("pinned OR shared OR quicknote OR tag:finance", { dbPath: minimal }).count
+    ).toBe(0);
   });
 
   it("rejects a malformed query before touching the database", () => {
@@ -729,8 +742,8 @@ describe("decodeNoteBody", () => {
   it("reads text, links, attachment facets, and inline object ids", () => {
     const body = decode(noteDocument(invoice.text, invoice.runs))!;
     expect(body.text).toBe(invoice.text);
-    expect([...body.facets].sort()).toEqual(["attachment", "image", "pdf"]);
-    expect([...body.objectIds].sort()).toEqual(["IMG1", "PDF1", "TAG1"]);
+    expect([...body.facets].sort()).toEqual(["attachment", "image", "link", "pdf", "url"]);
+    expect([...body.objectIds].sort()).toEqual(["IMG1", "PDF1", "TAG1", "URL1"]);
   });
 
   it("counts a checklist item once even when several runs style it", () => {
@@ -761,7 +774,8 @@ describe("facetsForAttachmentType", () => {
     ["public.jpeg", ["attachment", "image"]],
     ["public.heic", ["attachment", "image"]],
     ["com.adobe.raw-image", ["attachment", "image"]],
-    ["public.url", ["attachment", "link"]],
+    ["public.url", ["attachment", "link", "url"]],
+    ["com.apple.mapkit.map", ["attachment", "map"]],
     ["com.adobe.pdf", ["attachment", "pdf"]],
     ["com.apple.paper.doc.pdf", ["attachment", "pdf"]],
     ["com.apple.paper.doc.scan", ["attachment", "scan"]],

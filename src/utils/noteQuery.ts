@@ -41,12 +41,17 @@ export const FACETS = [
   "pdf",
   "table",
   "scan",
+  "url",
+  "map",
   "tag",
 ] as const;
 export type Facet = (typeof FACETS)[number];
 
-/** Metadata flags accepted bare (`pinned`) or as `is:pinned`. */
-export const FLAGS = ["pinned", "locked", "shared"] as const;
+/**
+ * Metadata flags accepted bare (`pinned`) or as `is:pinned`. `quicknote` is a
+ * note Notes created as a Quick Note (the database's system-paper flag).
+ */
+export const FLAGS = ["pinned", "locked", "shared", "quicknote"] as const;
 export type Flag = (typeof FLAGS)[number];
 
 export type CompareOp = "=" | ">" | ">=" | "<" | "<=";
@@ -438,6 +443,8 @@ export interface QueryableNote {
   pinned: boolean;
   locked: boolean;
   shared: boolean;
+  /** The note was created as a Quick Note. */
+  quicknote: boolean;
   created?: number;
   modified?: number;
   /** Lazily decoded content; returns null when the body cannot be read. */

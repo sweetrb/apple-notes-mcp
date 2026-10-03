@@ -1,0 +1,53 @@
+name: Private writer synthetic store
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "native/private-helper/apple-notes-private-writer.m"
+      - "test/native/synthetic-notes-store.m"
+      - "scripts/test-private-writer-synthetic-store.mjs"
+      - "scripts/test-private-writer-replica-identity-synthetic.mjs"
+      - "scripts/test-private-writer-replica-identity-copy-store.sh"
+      - "scripts/prepare-replica-notes-app-control.mjs"
+      - "scripts/lib/synthetic-note-payload*"
+      - "scripts/lib/synthetic-fixture-files*"
+      - "scripts/lib/replica-isolation-probe.m"
+      - "scripts/lib/replica-identity-evidence*"
+      - "src/utils/noteReplicaTable*"
+      - "src/utils/noteQueryStore*"
+      - "src/utils/noteBlocks*"
+      - "src/utils/protobuf*"
+      - "src/utils/checklistRuns*"
+      - "src/utils/errorCodes*"
+      - ".github/workflows/private-writer-synthetic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-store:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Check evidence entrypoint syntax
+        run: |
+          node --check scripts/test-private-writer-synthetic-store.mjs
+          node --check scripts/test-private-writer-replica-identity-synthetic.mjs
+          node --check scripts/prepare-replica-notes-app-control.mjs
+          bash -n scripts/test-private-writer-replica-identity-copy-store.sh
+      - name: Check pure fixture construction and replica evidence rules
+        run: node --test scripts/lib/synthetic-note-payload.test.mjs scripts/lib/replica-identity-evidence.test.mjs scripts/lib/synthetic-fixture-files.test.mjs
+      - name: Test actual native writer with generated data in a denying sandbox
+        run: node scripts/test-private-writer-synthetic-store.mjs
+      # Never upload the generated DB, preferences or native reserialized data.
+      # Public source contains literal test identities only; runtime artifacts
+      # stay private until independently reviewed.

@@ -212,6 +212,12 @@ describe("Guard B — the README Tool Reference matches the advertised tool surf
 
     const proc = spawnSync(process.execPath, [SERVER], {
       input: request,
+      // Document the complete opt-in surface without enabling private helper calls.
+      env: {
+        ...process.env,
+        APPLE_NOTES_MCP_ENABLE_PRIVATE: "0",
+        APPLE_NOTES_MCP_ENABLE_PRIVATE_WRITES: "1",
+      },
       encoding: "utf8",
       timeout: 60_000,
       maxBuffer: 64 * 1024 * 1024,

@@ -84,6 +84,11 @@ export interface ExportContext {
   /** Absent: attachments render as labeled placeholders. */
   writer?: AssetWriter;
   stats: ExportStats;
+  /**
+   * Places a vector rendering of a classic drawing, or returns undefined to
+   * fall back to Notes' own raster rendering. HTML export only.
+   */
+  vectorDrawing?: (attachment: ExportAttachment) => { url: string; mime: string } | undefined;
 }
 
 /** Same scheme allowlist the decoder uses for `linkSafe`. */
@@ -231,6 +236,18 @@ export function planAttachment(
       if (!ctx.writer) {
         ctx.stats.placeholders++;
         return { type: "placeholder", label, ...(name ? { name } : {}) };
+      }
+      const vector = attachment.kind === "drawing" ? ctx.vectorDrawing?.(attachment) : undefined;
+      if (vector) {
+        ctx.stats.placed++;
+        return {
+          type: "asset",
+          label,
+          ...(name ? { name } : {}),
+          display: "image",
+          url: vector.url,
+          mime: vector.mime,
+        };
       }
       const files = ctx.locator?.locate(attachment) ?? {};
       const primary = place(ctx, files.primary);

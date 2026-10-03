@@ -246,3 +246,80 @@ export:
 
 Each warning carries `noteId` and, when known, `attachmentId`. At most 200
 are listed; `warningsOmitted` counts the rest.
+
+## Editing in a browser
+
+`apple-notes-mcp templates edit` starts a small local web editor for
+templates. It is a command-line tool, not an MCP tool, and it runs only while
+you leave it running.
+
+```bash
+npx apple-notes-mcp templates edit               # start from standard-markdown
+npx apple-notes-mcp templates edit obsidian      # open a built-in or saved template
+npx apple-notes-mcp templates edit --note "x-coredata://…/ICNote/p123"
+```
+
+It prints one address, such as
+`http://127.0.0.1:52817/?token=3f9c…`. Open it in a browser. The page shows
+the template JSON on the left and the rendered Markdown on the right. Each
+edit is checked by the same validator as `validate-markdown-template`, and
+problems are listed with their JSON paths. The preview uses the same renderer
+as `export-notes-markdown`, against three built-in sample notes (headings and
+lists, inline formatting and links, attachments and tags). Attachments render
+as placeholders; the preview never copies files.
+
+Real notes are not read unless you pass `--note` with one note id. That note
+is read once, read-only, from the Notes database when the editor starts, so
+it needs the same Full Disk Access as `export-notes-markdown`. It appears as
+an extra preview choice.
+
+**Save** writes the template to the library through the same path as
+`save-markdown-template`: it validates first, is create-only, and replaces an
+existing template only when you tick "Replace an existing template". The
+editor never writes to Notes.
+
+| Option | Meaning |
+| --- | --- |
+| `name` | Template to open first (default `standard-markdown`) |
+| `--port N` | Port to listen on (default: any free port) |
+| `--idle-minutes N` | Stop after N minutes with no requests (default 30; `0` turns it off) |
+| `--note ID` | Also preview one real note, read-only |
+| `--tailnet` | Listen on this Mac's Tailscale address instead of `127.0.0.1` (see below) |
+
+Press Ctrl-C to stop the editor. It also stops by itself after the idle
+period.
+
+### What the editor exposes
+
+- It listens on `127.0.0.1` only, unless you pass `--tailnet`.
+- Every request must carry the random token from the printed address, either
+  as `?token=` or as an `Authorization: Bearer` header. A new token is made
+  each run, and the editor never logs it. Anyone who has the address can
+  read and save templates until the editor stops, so treat it like a
+  password.
+- Requests whose `Host` header is not the editor's own address are refused,
+  which blocks DNS rebinding. Requests from another origin are refused, and
+  saves must come from the editor's own page with a JSON body, so another web
+  page cannot drive it.
+- The page loads nothing from the network. Its script and style carry a
+  per-page nonce under a strict Content-Security-Policy, and responses send
+  `Referrer-Policy: no-referrer` so the token does not leak in a referrer.
+
+### On your tailnet
+
+`--tailnet` binds the editor to this Mac's [Tailscale](https://tailscale.com)
+IPv4 address (the `100.64.0.0/10` address on its `utun` interface) so you
+can edit from an iPad or another computer on your tailnet. It is off unless
+you pass the flag, and it refuses to start when this Mac has no Tailscale
+address.
+
+The editor finds the address by reading the network interfaces. It does not
+run the `tailscale` command, and it never changes Tailscale settings, Serve
+or Funnel, ACLs, or the macOS firewall. Whether other devices can reach the
+port is decided by your tailnet's access rules. The traffic is carried inside
+Tailscale's encrypted tunnel, but the editor itself speaks plain HTTP.
+
+With `--tailnet`, every device on your tailnet that is allowed to reach this
+Mac can connect to the port, and any of them that has the printed address can
+read and save templates. Share the address only with yourself, and stop the
+editor when you are done.
