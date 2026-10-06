@@ -1,0 +1,22 @@
+# Apple Notes MCP Server
+
+> A Model Context Protocol server that enables AI assistants to read, search, create, edit, and export Apple Notes on macOS.
+
+Runs locally on macOS using AppleScript and Apple Shortcuts. Install via npx or as a plugin for Claude Code and Codex. Provides tools for note management, folder organization, and exporting to Markdown, HTML, or JSON.
+
+## Docs
+
+- [Apple Notes MCP Server](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/README.md): Overview, quick start, features, tool reference, installation, configuration, security, and troubleshooting for the Apple Notes MCP server.
+- [Apple Notes Technical Documentation](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/TECHNICAL_NOTES.md): Research on Apple Notes data storage, AppleScript API, database access, protobuf formats, and known limitations for project improvement.
+- [Apple Notes MCP - Improvement Roadmap](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/TODO.md): Improvement roadmap tracking completed AppleScript surface gaps, new tool implementations, and future considerations for the Apple Notes MCP server.
+- [AppleScript Limitations](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/APPLESCRIPT-LIMITATIONS.md): Investigation of features missing from the AppleScript dictionary, verification methods, and workarounds using the private NoteStore database.
+- [Full Disk Access](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/FULL-DISK-ACCESS.md): Tools requiring Full Disk Access, why it is needed for reading the SQLite store, and which operations work without it.
+- [JXA (JavaScript for Automation) Research](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/JXA_RESEARCH.md): Research comparing JXA and AppleScript performance, string escaping, and Unicode handling for Apple Notes automation tasks.
+- [Markdown export templates](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/markdown-templates.md): How to create, manage, and apply portable JSON templates for customizing Markdown note exports.
+- [Node runtime & TCC permission stability](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md): Why macOS repeatedly requests TCC permissions after Node updates, and how ad-hoc signing affects code identity.
+- [apple-notes-mcp — Stability & Performance Audit](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/docs/STABILITY-PERF-AUDIT-2026-06-19.md): A historical audit of stability and performance issues in version 1.4.4, with all findings now resolved.
+
+## Optional
+
+- [Changelog](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/CHANGELOG.md): Release notes detailing paragraph anchor tools, the opt-in anchor resolver, and recent version changes.
+- [Contributing to Apple Notes MCP Server](https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/CONTRIBUTING.md): Guidelines for development setup, code style, testing, and the pull request process, including version bump requirements.
