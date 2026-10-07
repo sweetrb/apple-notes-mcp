@@ -151,19 +151,26 @@ jobs:
         # does not satisfy.
         #
         # Tolerate the publish race: the concurrency group serializes runs,
-        # but npm's registry read lags the write, so a later run's existence
-        # check can miss the version a concurrent run just pushed, attempt to
-        # publish, and get a 403 or a 409 ("Cannot publish over previously
-        # staged version"). The version can stay invisible to `npm view` for a
-        # while after that 409 -- on 2026-10-07 an immediate single re-check
-        # still saw nothing and failed a run whose version was in fact live --
-        # so poll for up to ~90s before treating it as a real failure.
+        # but npm's registry read lags the write by minutes, so a later run's
+        # existence check can miss the version an earlier run just pushed,
+        # attempt to publish, and be refused with a 403 "cannot publish over
+        # existing version" or a 409 "Cannot publish over previously staged
+        # version". That refusal IS npm saying the version exists, so it is
+        # success. On 2026-10-07 the second of two runs ~7 min apart got the
+        # 409 while `npm view pkg@version` still returned nothing for the
+        # version the first run had published; a single re-check then failed a
+        # healthy release. Any other failure gets a bounded `npm view` poll
+        # before it is called real.
         run: |
-          if pnpm publish --provenance --no-git-checks; then
+          set -o pipefail
+          PKG="${{ steps.check.outputs.pkg }}"
+          LOCAL="${{ steps.check.outputs.local }}"
+          LOG=$(mktemp)
+          if pnpm publish --provenance --no-git-checks 2>&1 | tee "$LOG"; then
             echo "Published."
+          elif grep -qiE 'cannot publish over (the )?(previously|existing)' "$LOG"; then
+            echo "npm refused because ${PKG}@${LOCAL} already exists (published or staged by an earlier run); treating as success."
           else
-            PKG="${{ steps.check.outputs.pkg }}"
-            LOCAL="${{ steps.check.outputs.local }}"
             NOW_EXISTS=""
             for _ in 1 2 3 4 5 6; do
               NOW_EXISTS=$(npm view "${PKG}@${LOCAL}" version 2>/dev/null || echo "")
