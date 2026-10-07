@@ -78,6 +78,15 @@ overrides:
   # GHSA-fxqj-rqcc-2cmp (moderate): incomplete fix of GHSA-6g55-p6wh-862q.
   # Dev-only (vitest -> vite -> postcss); not in the shipped bundle.
   postcss: ^8.5.23
+  # GHSA-68fv-2mgg-jv7q (event-loop denial of service from indexed source-map
+  # offsets), fixed in 1.2.2 (published 2026-09-30T14:08Z; the 7-day
+  # minimumReleaseAge soak cleared 2026-10-07T14:08Z). Reported in #278.
+  # Dev-only: reached as vitest -> vite -> postcss and @vitest/coverage-v8 ->
+  # magicast; not in the shipped build/index.js bundle (0 references). The
+  # parents' ranges (^1.2.1) already admit 1.2.2 -- this floor stops the
+  # lockfile settling back on 1.2.1. Two-sided range, never an exact pin, for
+  # the reason recorded on fast-uri above.
+  source-map-js: ">=1.2.2 <2"
   # GHSA-8j4g-w8fx-2239 (ReDoS in Hono's CORS middleware). Deferred on 2026-08-03
   # because 4.12.34 was still inside the 24h minimumReleaseAge gate — it missed by
   # 2m36s. It matured at 2026-08-04T02:36:40Z and is floored here now, with no

@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.14.1] - 2026-10-07
+
+### Security
+
+- Raised `@modelcontextprotocol/sdk` to `^1.31.0` (resolves 1.31.0) for
+  GHSA-6qxp-vccf-f47h, an OAuth client credential disclosure to a
+  server-selected authorization server. Not reachable here: the SDK's OAuth
+  client lives in its `client/auth` module, and this stdio server bundles
+  only the SDK's server, stdio and shared protocol modules — `build/index.js`
+  contains none of the OAuth client code before or after the bump. The
+  bundle's code is unchanged apart from the SDK version in its module path
+  comments. Reported by @oliverames in #278.
+- Floored `source-map-js` at `>=1.2.2 <2` in `pnpm-workspace.yaml` for
+  GHSA-68fv-2mgg-jv7q (event-loop denial of service from indexed source-map
+  offsets). Development scope only (vitest → vite → postcss, and
+  `@vitest/coverage-v8` → magicast); it is not in the shipped bundle.
+  Reported by @oliverames in #278.
+
 ## [2.14.0] - 2026-10-03
 
 Split out of #262 per review: paragraph anchors and the opt-in anchor
