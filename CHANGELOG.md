@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [2.14.2] - 2026-10-07
+
+### Fixed
+
+- `append-to-note` (and `update-note`) no longer report a complete HTML write
+  as unverified when the HTML uses named character references such as
+  `&mdash;`, `&rarr;`, `&hellip;`, `&rsquo;` or `&ldquo;`. Notes decodes those
+  on import and reads them back as the bare characters ("—", "→", "…"), but
+  the visible-text verifier decoded only `amp`/`lt`/`gt`/`quot`/`nbsp`/`apos`,
+  so the requested text kept `&mdash;` literal and the readback could never
+  contain it: the native append returned `verification_failed` /
+  `indeterminate: true` ("Appended text not verified") and the AppleScript
+  append "visible text did not match", although the note held the full
+  append. Reproduced live on macOS 27.0.1 through the AppleScript append path,
+  which shares the verifier. The verifier now decodes all 252 HTML 4 names
+  plus `apos` (at their HTML5 code points), and numeric references the way an
+  HTML parser does (C1 controls as their Windows-1252 characters; zero,
+  surrogates and out-of-range values as U+FFFD). A link label written with a
+  named reference is compared as its character too. A name outside that set
+  stays literal, so an append whose text is missing, changed or undecodable
+  is still reported as indeterminate, and the ID, revision, prior-body, link,
+  checklist and native-object guards are unchanged. Reported by @oliverames
+  in #283.
+
 ## [2.14.1] - 2026-10-07
 
 ### Security
