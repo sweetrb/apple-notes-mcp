@@ -172,6 +172,71 @@ describe("native append and tags", () => {
     expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
   });
 
+  describe("HTML append readback with named character references (#283)", () => {
+    // A note shaped like the report: a heading, paragraphs, a list and a
+    // monospaced line, with a unique body phrase as scope. The appended HTML
+    // uses named references; Notes reads them back as bare characters, in the
+    // AppleScript HTML forms observed live (semicolonless &lt/&amp/&quot,
+    // <font face="Courier"><tt> for monospace, <b><span> for a heading).
+    const priorHtml =
+      `<div><b><span style="font-size: 24px">Ideas</span></b><br></div>\n` +
+      `<div>${scopeText}</div>\n<ul>\n<li>seed item</li>\n</ul>\n` +
+      `<div><font face="Courier"><tt>git -C /tmp status</tt></font></div>`;
+    const priorText = `Ideas\n${scopeText}\nseed item\ngit -C /tmp status`;
+    const content =
+      "<h2>Next steps &mdash; review</h2>" +
+      "<ul><li>Ship it&hellip; then &ldquo;verify&rdquo;</li><li>a &rarr; b &amp; c &lt;d&gt;</li></ul>" +
+      "<div><tt>pnpm run build &amp;&amp; echo &quot;ok&quot;</tt></div>";
+    const appendedHtml =
+      `<div><br></div>\n<div><b><span style="font-size: 18px">Next steps — review</span></b><br></div>\n` +
+      `<ul>\n<li>Ship it… then “verify”</li>\n<li>a → b &amp c &ltd&gt</li>\n</ul>\n` +
+      `<div><font face="Courier"><tt>pnpm run build &amp&amp echo &quotok&quot</tt></font></div>`;
+    const appendedText =
+      '\nNext steps — review\nShip it… then “verify”\na → b & c <d>\npnpm run build && echo "ok"';
+    const before = snapshot({
+      html: priorHtml,
+      rich: { ...snapshot().rich, text: priorText },
+    });
+
+    it("verifies a complete append instead of reporting it indeterminate", () => {
+      const after = snapshot({
+        hash: "h2",
+        html: priorHtml + "\n" + appendedHtml,
+        rich: { ...before.rich, text: priorText + "\n" + appendedText, revision: "r2" },
+      });
+      expect(
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toMatchObject({ ok: true, contentHash: "h2" });
+    });
+
+    it("still reports an append missing part of the requested text as indeterminate", () => {
+      const partialHtml = appendedHtml.replace("\n<li>a → b &amp c &ltd&gt</li>", "");
+      const after = snapshot({
+        hash: "h2",
+        html: priorHtml + "\n" + partialHtml,
+        rich: {
+          ...before.rich,
+          text: priorText + "\n" + appendedText.replace("\na → b & c <d>", ""),
+          revision: "r2",
+        },
+      });
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Appended text not verified/);
+    });
+
+    it("still reports a changed prior body as indeterminate", () => {
+      const after = snapshot({
+        hash: "h2",
+        html: priorHtml.replace("seed item", "seed ITEM") + "\n" + appendedHtml,
+        rich: { ...before.rich, text: priorText + "\n" + appendedText, revision: "r2" },
+      });
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Appended text not verified/);
+    });
+  });
+
   it("converts bounded Markdown to semantic HTML and rejects HTML tables", () => {
     const before = snapshot();
     const after = snapshot({

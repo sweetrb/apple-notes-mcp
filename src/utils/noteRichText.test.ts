@@ -288,6 +288,15 @@ describe("Notes rich text", () => {
       assertLinkedWrite({ ...current, writable: false }, "<div>New content</div>", "html", true)
     ).toThrow();
   });
+  it("compares an appended link label written with a named reference as its character (#283)", () => {
+    // Notes stores `&mdash;` in a link label as "—"; the verifier must too.
+    const stored = [{ text: "Plan — v2", url: "https://example.com/" }];
+    expect(linkSignature(htmlLinks('<a href="https://example.com/">Plan &mdash; v2</a>'))).toBe(
+      linkSignature(stored)
+    );
+    // An unknown name stays literal text instead of throwing.
+    expect(htmlLinks('<a href="https://example.com/">a &check; b</a>')[0].text).toBe("a&check;b");
+  });
   it("handles semicolonless entities emitted by Apple Notes and literal ampersands", () => {
     const text = "A & B & C";
     const note = rich(text, 0, text.length);

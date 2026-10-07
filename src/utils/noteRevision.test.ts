@@ -69,6 +69,21 @@ describe("comparableVisibleText", () => {
     expect(comparableVisibleText("<div>caf&#xE9; &#x2014; ok</div>")).toBe("café — ok");
   });
 
+  it("decodes named references Notes stores as bare characters (#283)", () => {
+    // Observed live 2026-10-07 (macOS 27.0.1): appending this HTML, Notes'
+    // AppleScript body read the paragraph back with the bare characters. The
+    // written side kept `&mdash;` literal, so the append reported
+    // verification_failed / indeterminate although the write was complete.
+    const written =
+      "<div>Entity probe: alpha &mdash; beta &rarr; gamma&hellip; it&rsquo;s &ldquo;quoted&rdquo; &copy; 2026</div>";
+    const readback = "<div>Entity probe: alpha — beta → gamma… it’s “quoted” © 2026</div>";
+    expect(comparableVisibleText(written)).toBe(comparableVisibleText(readback));
+    // A name outside the table stays literal, so a mismatch still fails closed.
+    expect(comparableVisibleText("<div>&check;</div>")).not.toBe(
+      comparableVisibleText("<div>✓</div>")
+    );
+  });
+
   it("does not invent a space at an inline-tag boundary (#145)", () => {
     // Notes.app MERGES adjacent same-style inline runs on save — verified
     // against Notes.app 2026-09-10, where `<b>merge</b><b>me</b>` read back as

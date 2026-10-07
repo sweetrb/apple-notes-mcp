@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { checklistRunLineStart } from "./checklistRuns.js";
 import { uniqueById } from "./uniqueById.js";
+import { namedReferenceText } from "./htmlEntities.js";
 import {
   decodeMessage,
   decodeVarint,
@@ -315,15 +316,16 @@ export function readRichNote(id: string, options: RichNoteReadOptions = {}): Ric
   return rich;
 }
 
+/** amp/lt/gt/quot/nbsp: the references Notes' AppleScript HTML writes without a semicolon. */
+const LEGACY_NAMED: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  nbsp: " ",
+};
+
 function decodeEntity(value: string): string {
-  const named: Record<string, string> = {
-    amp: "&",
-    lt: "<",
-    gt: ">",
-    quot: '"',
-    apos: "'",
-    nbsp: " ",
-  };
   if (!value.startsWith("&") || value === "&") return value;
   const name = value.slice(1).replace(/;$/, "");
   if (name.startsWith("#")) {
@@ -334,8 +336,14 @@ function decodeEntity(value: string): string {
     if (!Number.isInteger(cp) || cp < 0 || cp > 0x10ffff) throw new Error("Invalid HTML entity");
     return String.fromCodePoint(cp);
   }
-  if (!(name in named)) throw new Error("Unsupported HTML entity");
-  return named[name];
+  const legacy = name.toLowerCase();
+  if (Object.hasOwn(LEGACY_NAMED, legacy)) return LEGACY_NAMED[legacy];
+  // Any other HTML 4 name (`&mdash;`, `&rarr;`) is decoded the way Notes'
+  // HTML importer decodes it, so an appended link label written with one is
+  // compared as the character Notes stores (#283).
+  const named = value.endsWith(";") ? namedReferenceText(name) : undefined;
+  if (named === undefined) throw new Error("Unsupported HTML entity");
+  return named;
 }
 
 interface Character {
@@ -358,20 +366,23 @@ function visibleCharacters(html: string): Character[] {
     // semicolon, immediately followed by a letter, in AppleScript HTML — the
     // old code declined to decode that case, desyncing this text stream from
     // the rich-text one and blocking every full-body edit (#166). apos is not
-    // a legacy reference and always requires the semicolon.
+    // a legacy reference and always requires the semicolon. Other names need
+    // the semicolon too; one outside the HTML 4 set stays literal text, one
+    // visible character per source character, as before (#283).
     for (const item of part[0].matchAll(
-      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?|apos;)|[\s\S]/gi
+      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?)|&(?<name>[a-z][a-z0-9]*);|[\s\S]/gi
     )) {
-      const value = decodeEntity(item[0]);
-      for (let i = 0; i < value.length; i++) {
-        if (/\s/u.test(value[i])) continue;
-        chars.push({
-          value: value[i],
-          start: part.index! + item.index!,
-          end: part.index! + item.index! + item[0].length,
-          token,
-        });
-      }
+      const start = part.index! + item.index!;
+      const name = item.groups?.name;
+      const pieces =
+        name !== undefined && namedReferenceText(name) === undefined
+          ? [...item[0]].map((value, i) => ({ value, start: start + i, end: start + i + 1 }))
+          : [{ value: decodeEntity(item[0]), start, end: start + item[0].length }];
+      for (const piece of pieces)
+        for (let i = 0; i < piece.value.length; i++) {
+          if (/\s/u.test(piece.value[i])) continue;
+          chars.push({ value: piece.value[i], start: piece.start, end: piece.end, token });
+        }
     }
   }
   return chars;

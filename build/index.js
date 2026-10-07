@@ -40014,6 +40014,316 @@ function uniqueById(items) {
   return result;
 }
 
+// src/utils/htmlEntities.ts
+var NAMED_CHARACTER_REFERENCES = {
+  Aacute: 193,
+  aacute: 225,
+  Acirc: 194,
+  acirc: 226,
+  acute: 180,
+  AElig: 198,
+  aelig: 230,
+  Agrave: 192,
+  agrave: 224,
+  alefsym: 8501,
+  Alpha: 913,
+  alpha: 945,
+  amp: 38,
+  and: 8743,
+  ang: 8736,
+  apos: 39,
+  Aring: 197,
+  aring: 229,
+  asymp: 8776,
+  Atilde: 195,
+  atilde: 227,
+  Auml: 196,
+  auml: 228,
+  bdquo: 8222,
+  Beta: 914,
+  beta: 946,
+  brvbar: 166,
+  bull: 8226,
+  cap: 8745,
+  Ccedil: 199,
+  ccedil: 231,
+  cedil: 184,
+  cent: 162,
+  Chi: 935,
+  chi: 967,
+  circ: 710,
+  clubs: 9827,
+  cong: 8773,
+  copy: 169,
+  crarr: 8629,
+  cup: 8746,
+  curren: 164,
+  Dagger: 8225,
+  dagger: 8224,
+  dArr: 8659,
+  darr: 8595,
+  deg: 176,
+  Delta: 916,
+  delta: 948,
+  diams: 9830,
+  divide: 247,
+  Eacute: 201,
+  eacute: 233,
+  Ecirc: 202,
+  ecirc: 234,
+  Egrave: 200,
+  egrave: 232,
+  empty: 8709,
+  emsp: 8195,
+  ensp: 8194,
+  Epsilon: 917,
+  epsilon: 949,
+  equiv: 8801,
+  Eta: 919,
+  eta: 951,
+  ETH: 208,
+  eth: 240,
+  Euml: 203,
+  euml: 235,
+  euro: 8364,
+  exist: 8707,
+  fnof: 402,
+  forall: 8704,
+  frac12: 189,
+  frac14: 188,
+  frac34: 190,
+  frasl: 8260,
+  Gamma: 915,
+  gamma: 947,
+  ge: 8805,
+  gt: 62,
+  hArr: 8660,
+  harr: 8596,
+  hearts: 9829,
+  hellip: 8230,
+  Iacute: 205,
+  iacute: 237,
+  Icirc: 206,
+  icirc: 238,
+  iexcl: 161,
+  Igrave: 204,
+  igrave: 236,
+  image: 8465,
+  infin: 8734,
+  int: 8747,
+  Iota: 921,
+  iota: 953,
+  iquest: 191,
+  isin: 8712,
+  Iuml: 207,
+  iuml: 239,
+  Kappa: 922,
+  kappa: 954,
+  Lambda: 923,
+  lambda: 955,
+  lang: 10216,
+  laquo: 171,
+  lArr: 8656,
+  larr: 8592,
+  lceil: 8968,
+  ldquo: 8220,
+  le: 8804,
+  lfloor: 8970,
+  lowast: 8727,
+  loz: 9674,
+  lrm: 8206,
+  lsaquo: 8249,
+  lsquo: 8216,
+  lt: 60,
+  macr: 175,
+  mdash: 8212,
+  micro: 181,
+  middot: 183,
+  minus: 8722,
+  Mu: 924,
+  mu: 956,
+  nabla: 8711,
+  nbsp: 160,
+  ndash: 8211,
+  ne: 8800,
+  ni: 8715,
+  not: 172,
+  notin: 8713,
+  nsub: 8836,
+  Ntilde: 209,
+  ntilde: 241,
+  Nu: 925,
+  nu: 957,
+  Oacute: 211,
+  oacute: 243,
+  Ocirc: 212,
+  ocirc: 244,
+  OElig: 338,
+  oelig: 339,
+  Ograve: 210,
+  ograve: 242,
+  oline: 8254,
+  Omega: 937,
+  omega: 969,
+  Omicron: 927,
+  omicron: 959,
+  oplus: 8853,
+  or: 8744,
+  ordf: 170,
+  ordm: 186,
+  Oslash: 216,
+  oslash: 248,
+  Otilde: 213,
+  otilde: 245,
+  otimes: 8855,
+  Ouml: 214,
+  ouml: 246,
+  para: 182,
+  part: 8706,
+  permil: 8240,
+  perp: 8869,
+  Phi: 934,
+  phi: 966,
+  Pi: 928,
+  pi: 960,
+  piv: 982,
+  plusmn: 177,
+  pound: 163,
+  Prime: 8243,
+  prime: 8242,
+  prod: 8719,
+  prop: 8733,
+  Psi: 936,
+  psi: 968,
+  quot: 34,
+  radic: 8730,
+  rang: 10217,
+  raquo: 187,
+  rArr: 8658,
+  rarr: 8594,
+  rceil: 8969,
+  rdquo: 8221,
+  real: 8476,
+  reg: 174,
+  rfloor: 8971,
+  Rho: 929,
+  rho: 961,
+  rlm: 8207,
+  rsaquo: 8250,
+  rsquo: 8217,
+  sbquo: 8218,
+  Scaron: 352,
+  scaron: 353,
+  sdot: 8901,
+  sect: 167,
+  shy: 173,
+  Sigma: 931,
+  sigma: 963,
+  sigmaf: 962,
+  sim: 8764,
+  spades: 9824,
+  sub: 8834,
+  sube: 8838,
+  sum: 8721,
+  sup: 8835,
+  sup1: 185,
+  sup2: 178,
+  sup3: 179,
+  supe: 8839,
+  szlig: 223,
+  Tau: 932,
+  tau: 964,
+  there4: 8756,
+  Theta: 920,
+  theta: 952,
+  thetasym: 977,
+  thinsp: 8201,
+  THORN: 222,
+  thorn: 254,
+  tilde: 732,
+  times: 215,
+  trade: 8482,
+  Uacute: 218,
+  uacute: 250,
+  uArr: 8657,
+  uarr: 8593,
+  Ucirc: 219,
+  ucirc: 251,
+  Ugrave: 217,
+  ugrave: 249,
+  uml: 168,
+  upsih: 978,
+  Upsilon: 933,
+  upsilon: 965,
+  Uuml: 220,
+  uuml: 252,
+  weierp: 8472,
+  Xi: 926,
+  xi: 958,
+  Yacute: 221,
+  yacute: 253,
+  yen: 165,
+  Yuml: 376,
+  yuml: 255,
+  Zeta: 918,
+  zeta: 950,
+  zwj: 8205,
+  zwnj: 8204
+};
+var LEGACY = { amp: "&", lt: "<", gt: ">", quot: '"', nbsp: "\xA0" };
+var C1_REPLACEMENTS = {
+  128: 8364,
+  130: 8218,
+  131: 402,
+  132: 8222,
+  133: 8230,
+  134: 8224,
+  135: 8225,
+  136: 710,
+  137: 8240,
+  138: 352,
+  139: 8249,
+  140: 338,
+  142: 381,
+  145: 8216,
+  146: 8217,
+  147: 8220,
+  148: 8221,
+  149: 8226,
+  150: 8211,
+  151: 8212,
+  152: 732,
+  153: 8482,
+  154: 353,
+  155: 8250,
+  156: 339,
+  158: 382,
+  159: 376
+};
+function numericReferenceText(value) {
+  if (!Number.isSafeInteger(value) || value === 0 || value > 1114111) return "\uFFFD";
+  if (value >= 55296 && value <= 57343) return "\uFFFD";
+  return String.fromCodePoint(C1_REPLACEMENTS[value] ?? value);
+}
+function namedReferenceText(name) {
+  return Object.hasOwn(NAMED_CHARACTER_REFERENCES, name) ? String.fromCodePoint(NAMED_CHARACTER_REFERENCES[name]) : void 0;
+}
+function decodeHtmlEntities(text2) {
+  return text2.replace(
+    /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z][A-Za-z0-9]*)(;?))/g,
+    (match, dec, hex3, name, semicolon) => {
+      if (dec !== void 0) return numericReferenceText(Number(dec));
+      if (hex3 !== void 0) return numericReferenceText(Number.parseInt(hex3, 16));
+      const named = semicolon ? namedReferenceText(name) : void 0;
+      if (named !== void 0) return named;
+      const legacy = /^(?:amp|lt|gt|quot|nbsp)/i.exec(name);
+      if (!legacy) return match;
+      const rest = name.slice(legacy[0].length);
+      return LEGACY[legacy[0].toLowerCase()] + rest + (rest ? semicolon : "");
+    }
+  );
+}
+
 // src/utils/noteRichText.ts
 var HTML_LOSSY_ORDER = [
   "superscript",
@@ -40191,15 +40501,14 @@ function readRichNote(id2, options = {}) {
   ];
   return rich;
 }
+var LEGACY_NAMED = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  nbsp: " "
+};
 function decodeEntity(value) {
-  const named = {
-    amp: "&",
-    lt: "<",
-    gt: ">",
-    quot: '"',
-    apos: "'",
-    nbsp: " "
-  };
   if (!value.startsWith("&") || value === "&") return value;
   const name = value.slice(1).replace(/;$/, "");
   if (name.startsWith("#")) {
@@ -40207,8 +40516,11 @@ function decodeEntity(value) {
     if (!Number.isInteger(cp) || cp < 0 || cp > 1114111) throw new Error("Invalid HTML entity");
     return String.fromCodePoint(cp);
   }
-  if (!(name in named)) throw new Error("Unsupported HTML entity");
-  return named[name];
+  const legacy = name.toLowerCase();
+  if (Object.hasOwn(LEGACY_NAMED, legacy)) return LEGACY_NAMED[legacy];
+  const named = value.endsWith(";") ? namedReferenceText(name) : void 0;
+  if (named === void 0) throw new Error("Unsupported HTML entity");
+  return named;
 }
 function visibleCharacters(html) {
   const chars = [];
@@ -40217,18 +40529,16 @@ function visibleCharacters(html) {
     token++;
     if (part[0].startsWith("<")) continue;
     for (const item of part[0].matchAll(
-      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?|apos;)|[\s\S]/gi
+      /&(?:#[0-9]+;?|#x[0-9a-f]+;?|(?:amp|lt|gt|quot|nbsp);?)|&(?<name>[a-z][a-z0-9]*);|[\s\S]/gi
     )) {
-      const value = decodeEntity(item[0]);
-      for (let i = 0; i < value.length; i++) {
-        if (/\s/u.test(value[i])) continue;
-        chars.push({
-          value: value[i],
-          start: part.index + item.index,
-          end: part.index + item.index + item[0].length,
-          token
-        });
-      }
+      const start = part.index + item.index;
+      const name = item.groups?.name;
+      const pieces = name !== void 0 && namedReferenceText(name) === void 0 ? [...item[0]].map((value, i) => ({ value, start: start + i, end: start + i + 1 })) : [{ value: decodeEntity(item[0]), start, end: start + item[0].length }];
+      for (const piece of pieces)
+        for (let i = 0; i < piece.value.length; i++) {
+          if (/\s/u.test(piece.value[i])) continue;
+          chars.push({ value: piece.value[i], start: piece.start, end: piece.end, token });
+        }
     }
   }
   return chars;
@@ -47091,7 +47401,7 @@ var BLOCK_END_RE = /<\/(?:div|h[1-6]|p|li)>/gi;
 var BREAK_RE = /<br\s*\/?\s*>/gi;
 var TAG_RE = /<[^>]*>/g;
 var NON_RENDERED_BLOCK_RE = /<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi;
-function decodeHtmlEntities(text2) {
+function decodeHtmlEntities2(text2) {
   const decodeCodePoint = (match, value, radix) => {
     const codePoint = Number.parseInt(value, radix);
     if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 1114111 || codePoint >= 55296 && codePoint <= 57343) {
@@ -47113,7 +47423,7 @@ function firstVisibleHtmlLine(html) {
     previous = text2;
     text2 = text2.replace(TAG_RE, "");
   } while (text2 !== previous);
-  return decodeHtmlEntities(text2).split(/[\r\n\u2028\u2029]+/).map((line) => line.replace(/\s+/g, " ").trim()).find(Boolean);
+  return decodeHtmlEntities2(text2).split(/[\r\n\u2028\u2029]+/).map((line) => line.replace(/\s+/g, " ").trim()).find(Boolean);
 }
 function resolveUpdateResponseTitle(currentTitle, newTitle, format, newContent) {
   if (format === "html") return firstVisibleHtmlLine(newContent) ?? currentTitle;
@@ -48479,25 +48789,9 @@ function appendMarkdownHtml(markdown, options = {}) {
 
 // src/utils/noteRevision.ts
 var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
-var LEGACY_ENTITIES = {
-  nbsp: " ",
-  quot: '"',
-  lt: "<",
-  gt: ">",
-  amp: "&"
-};
-function codePointText(value) {
-  return Number.isSafeInteger(value) && value <= 1114111 ? String.fromCodePoint(value) : "\uFFFD";
-}
 function comparableVisibleText(html) {
-  return html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ").replace(
-    /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
-    (_match, legacy, dec, hex3) => {
-      if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
-      if (dec) return codePointText(Number(dec));
-      if (hex3) return codePointText(Number.parseInt(hex3, 16));
-      return "'";
-    }
+  return decodeHtmlEntities(
+    html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ")
   ).replace(/\s+/g, " ").trim();
 }
 

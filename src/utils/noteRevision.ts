@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { decodeHtmlEntities } from "./htmlEntities.js";
 
 /**
  * Produces the opaque revision token exposed by exact-ID note reads.
@@ -16,24 +17,6 @@ export function hashNoteContent(content: string): string {
 const INLINE_TAG =
   /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
 
-/** Legacy named references (decoded with or without a trailing semicolon). */
-const LEGACY_ENTITIES: Record<string, string> = {
-  nbsp: " ",
-  quot: '"',
-  lt: "<",
-  gt: ">",
-  amp: "&",
-};
-
-/**
- * A numeric character reference as text. Past U+10FFFF there is no character,
- * and String.fromCodePoint would throw, turning a committed write into an
- * error at verification; HTML decodes such a reference as U+FFFD, so do that.
- */
-function codePointText(value: number): string {
-  return Number.isSafeInteger(value) && value <= 0x10ffff ? String.fromCodePoint(value) : "\ufffd";
-}
-
 /**
  * Reduce Notes HTML to the visible text that a person sees.
  *
@@ -42,7 +25,15 @@ function codePointText(value: number): string {
  * saved. This intentionally ignores formatting while preserving visible text.
  */
 export function comparableVisibleText(html: string): string {
-  return (
+  // One decoding pass, so `&amp;lt;` stays the literal text `&lt;`.
+  // amp/lt/gt/quot/nbsp are HTML "legacy" references that decode with or
+  // without the semicolon. Notes relies on that: its AppleScript HTML writes
+  // `a=1&ampb=2` (no semicolon) for the text `a=1&b=2` inside a link, so
+  // requiring `;` here reported a correct write as a mismatch. Every other
+  // HTML 4 name decodes too: Notes saves `&mdash;` as "—" and reads it back
+  // that way, so leaving it literal on the written side reported a complete
+  // write as unverified (#283).
+  return decodeHtmlEntities(
     html
       .replace(/<br\s*\/?\s*>/gi, " ")
       // ONE tag-stripping pass, with the replacement chosen per tag.
@@ -67,21 +58,7 @@ export function comparableVisibleText(html: string): string {
       // ever compared against another normalised string, never rendered, never
       // written back to a note. One pass keeps that unambiguous.
       .replace(/<[^>]*>/g, (tag) => (INLINE_TAG.test(tag) ? "" : " "))
-      // One decoding pass, so `&amp;lt;` stays the literal text `&lt;`.
-      // amp/lt/gt/quot/nbsp are HTML "legacy" references that decode with or
-      // without the semicolon. Notes relies on that: its AppleScript HTML
-      // writes `a=1&ampb=2` (no semicolon) for the text `a=1&b=2` inside a
-      // link, so requiring `;` here reported a correct write as a mismatch.
-      .replace(
-        /&(?:(nbsp|quot|lt|gt|amp);?|apos;|#(\d+);|#x([0-9a-f]+);)/gi,
-        (_match, legacy: string | undefined, dec: string | undefined, hex: string | undefined) => {
-          if (legacy) return LEGACY_ENTITIES[legacy.toLowerCase()];
-          if (dec) return codePointText(Number(dec));
-          if (hex) return codePointText(Number.parseInt(hex, 16));
-          return "'";
-        }
-      )
-      .replace(/\s+/g, " ")
-      .trim()
-  );
+  )
+    .replace(/\s+/g, " ")
+    .trim();
 }
