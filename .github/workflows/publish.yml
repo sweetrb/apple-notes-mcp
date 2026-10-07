@@ -153,14 +153,23 @@ jobs:
         # Tolerate the publish race: the concurrency group serializes runs,
         # but npm's registry read lags the write, so a later run's existence
         # check can miss the version a concurrent run just pushed, attempt to
-        # publish, and get a 403. Re-check and treat that case as success.
+        # publish, and get a 403 or a 409 ("Cannot publish over previously
+        # staged version"). The version can stay invisible to `npm view` for a
+        # while after that 409 -- on 2026-10-07 an immediate single re-check
+        # still saw nothing and failed a run whose version was in fact live --
+        # so poll for up to ~90s before treating it as a real failure.
         run: |
           if pnpm publish --provenance --no-git-checks; then
             echo "Published."
           else
             PKG="${{ steps.check.outputs.pkg }}"
             LOCAL="${{ steps.check.outputs.local }}"
-            NOW_EXISTS=$(npm view "${PKG}@${LOCAL}" version 2>/dev/null || echo "")
+            NOW_EXISTS=""
+            for _ in 1 2 3 4 5 6; do
+              NOW_EXISTS=$(npm view "${PKG}@${LOCAL}" version 2>/dev/null || echo "")
+              [ -n "$NOW_EXISTS" ] && break
+              sleep 15
+            done
             if [ -n "$NOW_EXISTS" ]; then
               echo "${PKG}@${LOCAL} is already on npm (published by a concurrent run); treating as success."
             else
