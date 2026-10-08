@@ -45,6 +45,7 @@ export const READ_ONLY_ACTIONS: ReadonlySet<string> = new Set([
   "hello",
   "probe",
   "read_note_state",
+  "read_checklist",
 ]);
 
 export const HELPER_BINARY_NAME = "apple-notes-private-helper";
@@ -225,6 +226,18 @@ export class PrivateHelperError extends Error {
   }
 }
 
+/** Check the opt-in and installed hashes before resolving a note from the database. */
+export function assertPrivateHelperReady(deps: PrivateHelperDeps = defaultDeps()): void {
+  if (!privateHelperEnabled(deps.env))
+    throw new PrivateHelperError(
+      "disabled",
+      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`
+    );
+  const install = inspectInstallation(deps);
+  if (!install.ready)
+    throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
+}
+
 const errorSchema = z
   .object({
     status: z.literal("error"),
@@ -265,7 +278,9 @@ export const probeSchema = z
       })
       .passthrough(),
     syncHostRunning: z.boolean(),
-    features: z.object({ readNoteState: featureSchema }).passthrough(),
+    features: z
+      .object({ readNoteState: featureSchema, readChecklist: featureSchema })
+      .passthrough(),
   })
   .passthrough();
 export type PrivateProbe = z.infer<typeof probeSchema>;
@@ -299,6 +314,56 @@ export const noteStateSchema = z
   .passthrough();
 export type PrivateNoteState = z.infer<typeof noteStateSchema>;
 
+export const checklistItemSchema = z.object({
+  todoIdentifier: z.string().regex(/^[a-f0-9]{32}$/),
+  uuid: z.string().uuid(),
+  index: z.number().int().nonnegative(),
+  done: z.boolean(),
+  text: z.string(),
+  lineStart: z.number().int().nonnegative(),
+  lineLengthUTF16: z.number().int().nonnegative(),
+  styledStart: z.number().int().nonnegative(),
+  styledLengthUTF16: z.number().int().positive(),
+  contiguous: z.boolean(),
+  consistent: z.boolean(),
+  spansLines: z.boolean(),
+});
+
+export const checklistStateSchema = z
+  .object({
+    status: z.literal("ok"),
+    identifier: z.string().uuid(),
+    revision: z.string().regex(/^r1:[a-f0-9]{64}$/),
+    items: z.array(checklistItemSchema),
+    total: z.number().int().nonnegative(),
+    checked: z.number().int().nonnegative(),
+    syncHostRunning: z.boolean(),
+  })
+  .passthrough()
+  .superRefine((state, ctx) => {
+    const identities = new Set<string>();
+    if (
+      state.total !== state.items.length ||
+      state.checked !== state.items.filter((item) => item.done).length
+    )
+      ctx.addIssue({ code: "custom", message: "Checklist totals disagree with items" });
+    state.items.forEach((item, index) => {
+      if (
+        item.index !== index ||
+        identities.has(item.todoIdentifier) ||
+        item.uuid.replaceAll("-", "").toLowerCase() !== item.todoIdentifier ||
+        item.text.length !== item.lineLengthUTF16
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["items", index],
+          message: "Invalid checklist identity or line",
+        });
+      identities.add(item.todoIdentifier);
+    });
+  });
+export type PrivateChecklistState = z.infer<typeof checklistStateSchema>;
+
 export interface CallOptions {
   /** Skip the opt-in check. Only `hello` during setup uses this. */
   allowDisabled?: boolean;
@@ -321,6 +386,11 @@ export function callPrivateHelper(
     throw new PrivateHelperError(
       "unknown_action",
       `The private helper is read-only; "${action}" is not a supported action.`
+    );
+  if (Object.hasOwn(fields, "action") || Object.hasOwn(fields, "protocol"))
+    throw new PrivateHelperError(
+      "invalid_request",
+      "Request fields cannot override action or protocol"
     );
   if (!options.allowDisabled && !privateHelperEnabled(deps.env))
     throw new PrivateHelperError(
@@ -420,6 +490,24 @@ export function readNoteState(
   return parseOrThrow(noteStateSchema, callPrivateHelper("read_note_state", { identifier }, deps));
 }
 
+/** Read native todo identities and state without inferring items from text. */
+export function readChecklistState(
+  identifier: string,
+  deps: PrivateHelperDeps = defaultDeps()
+): PrivateChecklistState {
+  assertNoteIdentifier(identifier);
+  const state = parseOrThrow(
+    checklistStateSchema,
+    callPrivateHelper("read_checklist", { identifier }, deps)
+  );
+  if (state.identifier.toLowerCase() !== identifier.toLowerCase())
+    throw new PrivateHelperError(
+      "invalid_response",
+      "The helper returned a different note identifier"
+    );
+  return state;
+}
+
 export interface PrivateFeatureStatus {
   available: boolean;
   reason: PrivateUnavailableReason | null;
@@ -434,6 +522,7 @@ export interface PrivateCapabilities {
   readOnly: true;
   features: {
     readNoteState: PrivateFeatureStatus;
+    readChecklist: PrivateFeatureStatus;
   };
 }
 
@@ -468,7 +557,7 @@ export function privateHelperCapabilities(
     reason,
     detail,
   });
-  const both = (status: PrivateFeatureStatus) => ({ readNoteState: status });
+  const both = (status: PrivateFeatureStatus) => ({ readNoteState: status, readChecklist: status });
   if (installation.reason === "unsupported_platform")
     return {
       enabled,
@@ -511,6 +600,9 @@ export function privateHelperCapabilities(
     readOnly: true,
     installation,
     probe,
-    features: { readNoteState: featureFromProbe(probe.features.readNoteState) },
+    features: {
+      readNoteState: featureFromProbe(probe.features.readNoteState),
+      readChecklist: featureFromProbe(probe.features.readChecklist),
+    },
   };
 }

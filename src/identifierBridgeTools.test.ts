@@ -1,8 +1,9 @@
 /**
  * The identifier bridge as src/index.ts and the src/tools modules register it:
- * every note-id and folder-id input accepts a Notes UUID or numeric key and
- * hands the handler the x-coredata id, and list/read tools add stable
- * identifier fields when the database is readable.
+ * standard note-id and folder-id inputs accept a Notes UUID or numeric key and
+ * hand the handler the x-coredata id, and list/read tools add stable
+ * identifier fields when the database is readable. Private helper tools
+ * instead expose UUIDs in `identifier` and canonical x-coredata ids in `id`.
  *
  * The NoteStore query is answered by a stubbed sqlite3 (the real SQL is
  * exercised against a fixture store in utils/noteIdentifiers.test.ts), so no
@@ -27,6 +28,11 @@ const manager = vi.hoisted(() => ({
   listNoteRefsDetailed: vi.fn(),
   listFolders: vi.fn(),
   listAccounts: vi.fn(),
+}));
+const privateReads = vi.hoisted(() => ({
+  ready: vi.fn(),
+  note: vi.fn(),
+  checklist: vi.fn(),
 }));
 
 const STORE = "11111111-2222-3333-4444-555555555555";
@@ -99,6 +105,12 @@ vi.mock(import("@/services/appleNotesManager.js"), async (importOriginal) => ({
   AppleNotesManager: vi.fn().mockImplementation(function () {
     return manager;
   }) as never,
+}));
+vi.mock(import("@/services/privateHelper.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  assertPrivateHelperReady: privateReads.ready,
+  readNoteState: privateReads.note,
+  readChecklistState: privateReads.checklist,
 }));
 
 beforeAll(async () => {
@@ -178,6 +190,11 @@ const FOLDER_ID_FIELDS: Array<[string, string]> = [
   ["rename-folder", "expectedParentId"],
   ["delete-folder-by-id", "id"],
   ["delete-folder-by-id", "expectedParentId"],
+];
+/** Private readers have a separate UUID field; their id schema is x-coredata only. */
+const PRIVATE_NOTE_ID: Array<[string, string]> = [
+  ["native-note-state", "id"],
+  ["native-checklist-state", "id"],
 ];
 
 describe("id inputs accept Notes UUIDs and numeric keys", () => {
@@ -267,14 +284,14 @@ describe("id inputs accept Notes UUIDs and numeric keys", () => {
 
   it("covers every registered note or folder id field", () => {
     const covered = new Set(
-      [...STRICT_NOTE_ID, ...LOOSE_NOTE_ID, ...FOLDER_ID_FIELDS].map(([t, f]) => `${t}.${f}`)
+      [...STRICT_NOTE_ID, ...LOOSE_NOTE_ID, ...FOLDER_ID_FIELDS, ...PRIVATE_NOTE_ID].map(
+        ([t, f]) => `${t}.${f}`
+      )
     );
     covered.add("batch-delete-notes.notes").add("batch-move-notes.ids");
     covered.add("replace-native-tag.notes");
     // show-account takes an account id, which the bridge does not resolve.
-    // The private-helper tools take a Notes UUID in their own `identifier`
-    // field, so their `id` field is x-coredata only and needs no bridge.
-    const exempt = new Set(["show-account.id", "native-note-state.id"]);
+    const exempt = new Set(["show-account.id"]);
     const idFields: string[] = [];
     for (const [tool, { config }] of registered) {
       for (const name of Object.keys(config.inputSchema ?? {})) {
@@ -284,6 +301,57 @@ describe("id inputs accept Notes UUIDs and numeric keys", () => {
     expect(idFields.length).toBeGreaterThan(25);
     expect(idFields.filter((f) => !covered.has(f) && !exempt.has(f))).toEqual([]);
   });
+});
+
+describe("private helper references keep their separate UUID and x-coredata contract", () => {
+  it.each(PRIVATE_NOTE_ID)("%s.%s accepts only a note x-coredata id", (tool, name) => {
+    const schema = field(tool, name);
+    expect(schema.parse(NOTE_ID)).toBe(NOTE_ID);
+    for (const value of [NOTE_UUID, "42", "Meeting notes", FOLDER_ID])
+      expect(schema.safeParse(value).success).toBe(false);
+    expect(sqlite.calls).toEqual([]);
+  });
+
+  it.each(PRIVATE_NOTE_ID)(
+    "%s.identifier accepts a UUID without schema database access",
+    (tool) => {
+      const schema = field(tool, "identifier");
+      expect(schema.parse(NOTE_UUID)).toBe(NOTE_UUID);
+      expect(schema.parse(NOTE_UUID.toLowerCase())).toBe(NOTE_UUID.toLowerCase());
+      for (const value of [NOTE_ID, "42", "Meeting notes"])
+        expect(schema.safeParse(value).success).toBe(false);
+      expect(sqlite.calls).toEqual([]);
+    }
+  );
+
+  it.each(PRIVATE_NOTE_ID)(
+    "%s resolves an exact local note id with the read-only database bridge",
+    async (tool) => {
+      const reader = tool === "native-note-state" ? privateReads.note : privateReads.checklist;
+      reader.mockReturnValueOnce({ identifier: NOTE_UUID });
+      const response = await registered.get(tool)!.cb({ id: NOTE_ID });
+      expect(response.structuredContent).toMatchObject({ ok: true, identifier: NOTE_UUID });
+      expect(privateReads.ready).toHaveBeenCalledOnce();
+      expect(reader).toHaveBeenCalledWith(NOTE_UUID, expect.any(Object));
+      expect(sqlite.calls).toHaveLength(1);
+      expect(sqlite.calls[0]).toContain("Z_NAME = 'ICNote'");
+      expect(manager.getNoteById).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(PRIVATE_NOTE_ID)(
+    "%s refuses a note id from another store before reading native state",
+    async (tool) => {
+      const otherStoreId = NOTE_ID.replace(STORE, "99999999-2222-3333-4444-555555555555");
+      const response = await registered.get(tool)!.cb({ id: otherStoreId });
+      expect(response.isError).toBe(true);
+      expect(response.structuredContent).toMatchObject({ code: "not_found", committed: false });
+      expect(privateReads.ready).toHaveBeenCalledOnce();
+      expect(privateReads.note).not.toHaveBeenCalled();
+      expect(privateReads.checklist).not.toHaveBeenCalled();
+      expect(manager.getNoteById).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe("list and read tools add stable identifiers", () => {

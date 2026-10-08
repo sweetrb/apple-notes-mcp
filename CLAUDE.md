@@ -416,8 +416,9 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 - Use `includeText: false` when only statuses and word counts are needed.
 
 ### Private helper tools (opt-in)
-- `native-helper-status` and `native-note-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).
+- `native-helper-status`, `native-note-state`, and `native-checklist-state` use Apple's private NotesShared framework through a **read-only** helper the user builds with `apple-notes-mcp setup --native-helper`. They are off unless `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`; each refusal carries the shared error `code` plus a `helperCode` (`disabled`, `helper_not_installed`, `helper_stale`, `helper_modified`, `private_api_unavailable`, `store_unavailable`).
 - Always call `native-helper-status` first. Do not suggest enabling the helper unprompted: it is unsupported API and can break on any macOS update.
+- `native-checklist-state` returns exact native todo UUIDs/state, not checkbox-like text. Check `readChecklist` availability and the item flags: `contiguous: false` means separated style runs share an identity, `consistent: false` means their done bits disagree, and `spansLines: true` means the identity's styled envelope spans multiple lines. Counts are by native identity; the revision is informational and no write tool accepts it.
 - The helper cannot write. Write support was deliberately deferred by the maintainer (#204): a second writer beside a running Notes.app, CRDT replica identity, and the iCloud upload lag are unresolved. Use the AppleScript or Shortcuts-bridge tools for edits. `cloudSync.uploadPending` in `native-note-state` shows whether Notes has an upload queued.
 
 ### Multi-account

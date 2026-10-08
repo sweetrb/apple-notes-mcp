@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-08
+
+### Added
+
+- `native-checklist-state` reads exact native todo identifiers and checked state
+  through the existing opt-in read-only helper, with contiguous, consistent,
+  and multi-line flags for ambiguous runs. The helper's `read_checklist` action
+  preserves read-only stores and disabled migration. Private note reads resolve
+  exact Core Data IDs directly from the database after helper readiness checks,
+  without an AppleScript fallback.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed

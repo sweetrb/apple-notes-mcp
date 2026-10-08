@@ -139,13 +139,15 @@ To edit a template visually, the user can run `apple-notes-mcp templates edit [n
 
 Off unless the user built it (`apple-notes-mcp setup --native-helper`) and set
 `APPLE_NOTES_MCP_ENABLE_PRIVATE=1`. Call `native-helper-status` first; use
-`native-note-state` only when it reports the feature `available`. The helper is
+`native-note-state` or `native-checklist-state` only when the corresponding
+`readNoteState` or `readChecklist` feature is `available`. The helper is
 read-only: write support was deliberately deferred by the maintainer.
 
 | Tool                   | Purpose                                                                   |
 | ---------------------- | ------------------------------------------------------------------------- |
 | `native-helper-status` | Report opt-in, build, and live-probe state with a reason code (read-only) |
 | `native-note-state`    | Read a note's native state and `revision` change token (read-only)        |
+| `native-checklist-state` | Read exact native todo identities/state and `contiguous`, `consistent`, `spansLines` ambiguity flags (read-only) |
 
 ## Usage Patterns
 

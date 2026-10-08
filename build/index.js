@@ -59178,7 +59178,8 @@ var TIMEOUT_ENV = "APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS";
 var READ_ONLY_ACTIONS = /* @__PURE__ */ new Set([
   "hello",
   "probe",
-  "read_note_state"
+  "read_note_state",
+  "read_checklist"
 ]);
 var HELPER_BINARY_NAME = "apple-notes-private-helper";
 var HELPER_SOURCE_RELATIVE = "native/private-helper/apple-notes-private-helper.m";
@@ -59294,6 +59295,16 @@ var PrivateHelperError = class extends Error {
   code;
   details;
 };
+function assertPrivateHelperReady(deps = defaultDeps2()) {
+  if (!privateHelperEnabled(deps.env))
+    throw new PrivateHelperError(
+      "disabled",
+      `The private helper is off. Set ${ENABLE_ENV}=1 to opt in.`
+    );
+  const install = inspectInstallation(deps);
+  if (!install.ready)
+    throw new PrivateHelperError(install.reason || "helper_not_installed", install.detail || "");
+}
 var errorSchema2 = external_exports.object({
   status: external_exports.literal("error"),
   code: external_exports.string(),
@@ -59324,7 +59335,7 @@ var probeSchema = external_exports.object({
     noteRows: external_exports.number().int().nullable()
   }).passthrough(),
   syncHostRunning: external_exports.boolean(),
-  features: external_exports.object({ readNoteState: featureSchema }).passthrough()
+  features: external_exports.object({ readNoteState: featureSchema, readChecklist: featureSchema }).passthrough()
 }).passthrough();
 var cloudSyncSchema = external_exports.object({
   available: external_exports.boolean(),
@@ -59348,11 +59359,52 @@ var noteStateSchema = external_exports.object({
   cloudSync: cloudSyncSchema,
   syncHostRunning: external_exports.boolean()
 }).passthrough();
+var checklistItemSchema = external_exports.object({
+  todoIdentifier: external_exports.string().regex(/^[a-f0-9]{32}$/),
+  uuid: external_exports.string().uuid(),
+  index: external_exports.number().int().nonnegative(),
+  done: external_exports.boolean(),
+  text: external_exports.string(),
+  lineStart: external_exports.number().int().nonnegative(),
+  lineLengthUTF16: external_exports.number().int().nonnegative(),
+  styledStart: external_exports.number().int().nonnegative(),
+  styledLengthUTF16: external_exports.number().int().positive(),
+  contiguous: external_exports.boolean(),
+  consistent: external_exports.boolean(),
+  spansLines: external_exports.boolean()
+});
+var checklistStateSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  identifier: external_exports.string().uuid(),
+  revision: external_exports.string().regex(/^r1:[a-f0-9]{64}$/),
+  items: external_exports.array(checklistItemSchema),
+  total: external_exports.number().int().nonnegative(),
+  checked: external_exports.number().int().nonnegative(),
+  syncHostRunning: external_exports.boolean()
+}).passthrough().superRefine((state, ctx) => {
+  const identities = /* @__PURE__ */ new Set();
+  if (state.total !== state.items.length || state.checked !== state.items.filter((item) => item.done).length)
+    ctx.addIssue({ code: "custom", message: "Checklist totals disagree with items" });
+  state.items.forEach((item, index) => {
+    if (item.index !== index || identities.has(item.todoIdentifier) || item.uuid.replaceAll("-", "").toLowerCase() !== item.todoIdentifier || item.text.length !== item.lineLengthUTF16)
+      ctx.addIssue({
+        code: "custom",
+        path: ["items", index],
+        message: "Invalid checklist identity or line"
+      });
+    identities.add(item.todoIdentifier);
+  });
+});
 function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options = {}) {
   if (!READ_ONLY_ACTIONS.has(action))
     throw new PrivateHelperError(
       "unknown_action",
       `The private helper is read-only; "${action}" is not a supported action.`
+    );
+  if (Object.hasOwn(fields, "action") || Object.hasOwn(fields, "protocol"))
+    throw new PrivateHelperError(
+      "invalid_request",
+      "Request fields cannot override action or protocol"
     );
   if (!options.allowDisabled && !privateHelperEnabled(deps.env))
     throw new PrivateHelperError(
@@ -59440,6 +59492,19 @@ function readNoteState(identifier, deps = defaultDeps2()) {
   assertNoteIdentifier(identifier);
   return parseOrThrow(noteStateSchema, callPrivateHelper("read_note_state", { identifier }, deps));
 }
+function readChecklistState(identifier, deps = defaultDeps2()) {
+  assertNoteIdentifier(identifier);
+  const state = parseOrThrow(
+    checklistStateSchema,
+    callPrivateHelper("read_checklist", { identifier }, deps)
+  );
+  if (state.identifier.toLowerCase() !== identifier.toLowerCase())
+    throw new PrivateHelperError(
+      "invalid_response",
+      "The helper returned a different note identifier"
+    );
+  return state;
+}
 function featureFromProbe(feature) {
   if (!feature) return { available: false, reason: "private_api_unavailable", detail: null };
   if (feature.available) return { available: true, reason: null, detail: null };
@@ -59458,7 +59523,7 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
     reason,
     detail
   });
-  const both = (status) => ({ readNoteState: status });
+  const both = (status) => ({ readNoteState: status, readChecklist: status });
   if (installation.reason === "unsupported_platform")
     return {
       enabled,
@@ -59501,7 +59566,10 @@ function privateHelperCapabilities(deps = defaultDeps2()) {
     readOnly: true,
     installation,
     probe,
-    features: { readNoteState: featureFromProbe(probe.features.readNoteState) }
+    features: {
+      readNoteState: featureFromProbe(probe.features.readNoteState),
+      readChecklist: featureFromProbe(probe.features.readChecklist)
+    }
   };
 }
 
@@ -60401,19 +60469,19 @@ function runPermissionsWindow(binaryPath, session) {
 // src/tools/privateHelperTools.ts
 var coreDataId2 = external_exports.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i);
 var notesUuid = external_exports.string().regex(UUID_PATTERN);
-function resolveIdentifier(manager, args) {
+function resolveIdentifier(deps, args) {
   if (args.identifier && args.id)
     throw new PrivateHelperError("invalid_request", "Pass identifier or id, not both");
   if (args.identifier) return args.identifier;
   if (!args.id) throw new PrivateHelperError("invalid_request", "identifier or id is required");
-  const link = manager.getNoteLinkById(args.id);
-  const match = link?.match(/identifier=([0-9A-F-]{36})$/i);
-  if (!match)
+  assertPrivateHelperReady(deps);
+  const identifier = lookupStableIdentifiers([args.id], "ICNote").get(args.id)?.identifier;
+  if (!identifier || !UUID_PATTERN.test(identifier))
     throw new PrivateHelperError(
       "not_found",
       "Could not resolve that id to a Notes UUID (needs Full Disk Access); pass identifier instead"
     );
-  return match[1];
+  return identifier;
 }
 function envelopeCode(helperCode, message) {
   switch (helperCode) {
@@ -60459,7 +60527,7 @@ function helperErrorResult(error2) {
     })
   );
 }
-function registerPrivateHelperTools(server2, manager, depsFactory = () => defaultDeps2()) {
+function registerPrivateHelperTools(server2, _manager, depsFactory = () => defaultDeps2()) {
   function tool(name, description, inputSchema, annotations, handler) {
     server2.registerTool(
       name,
@@ -60484,7 +60552,7 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
   }
   tool(
     "native-helper-status",
-    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state.\nReturns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\nDo not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\nSafety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
+    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state or native-checklist-state.\nReturns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\nDo not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\nSafety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
     {},
     { readOnlyHint: true, openWorldHint: false },
     (_args, deps) => {
@@ -60503,7 +60571,17 @@ function registerPrivateHelperTools(server2, manager, depsFactory = () => defaul
       id: coreDataId2.optional().describe("x-coredata note id; resolved to a UUID via the database")
     },
     { readOnlyHint: true, openWorldHint: false },
-    (args, deps) => ({ ...readNoteState(resolveIdentifier(manager, args), deps) })
+    (args, deps) => ({ ...readNoteState(resolveIdentifier(deps, args), deps) })
+  );
+  tool(
+    "native-checklist-state",
+    "Use when: reading a note's exact native checklist todo identifiers and done state, including ambiguous style runs.\nReturns: identifier, revision change token, items in first native-style occurrence order, total, checked, and syncHostRunning. Each item has todoIdentifier (32 lowercase hex digits), uuid, index, text and done; line and styled offsets use UTF-16. contiguous=false means the styled envelope includes gaps, consistent=false means runs disagree on done, and spansLines=true means the identity spans multiple lines.\nDo not use when: reading ordinary checkbox-like text (get-note-content) or changing checklist items. Flags describe native identity ambiguity; text is the first visible styled character's line.\nSafety: read-only; requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, Full Disk Access, and a current built helper. Locked or unavailable native bodies are refused. The helper has no write action.",
+    {
+      identifier: notesUuid.optional().describe("Notes UUID (the notes://showNote identifier)"),
+      id: coreDataId2.optional().describe("x-coredata note id; resolved to a UUID via the database")
+    },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readChecklistState(resolveIdentifier(deps, args), deps) })
   );
 }
 

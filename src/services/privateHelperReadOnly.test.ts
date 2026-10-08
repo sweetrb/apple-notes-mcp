@@ -56,11 +56,25 @@ describe("native helper source is read-only", () => {
     const table = SOURCE.slice(SOURCE.indexOf("kActions[] = {"));
     const rows = table.slice(0, table.indexOf("};"));
     const names = [...rows.matchAll(/\{"([a-z_]+)",/g)].map((m) => m[1]);
-    expect(names).toEqual(["hello", "probe", "read_note_state"]);
+    expect(names).toEqual(["hello", "probe", "read_note_state", "read_checklist"]);
     expect(new Set(names)).toEqual(new Set(READ_ONLY_ACTIONS));
   });
 
   it("advertises readOnly in hello and probe", () => {
     expect(SOURCE.match(/@"readOnly" : @YES/g)).toHaveLength(2);
+  });
+
+  it("probes only getters for checklist reads and uses the read-only opener", () => {
+    const table = SOURCE.slice(SOURCE.indexOf("kChecklistReadAPI[] = {"));
+    const rows = table.slice(0, table.indexOf("};"));
+    expect([...rows.matchAll(/\{"[^"]+", "([^"]+)", NO\}/g)].map((m) => m[1])).toEqual([
+      "style",
+      "todo",
+      "uuid",
+      "done",
+    ]);
+    const handler = SOURCE.slice(SOURCE.lastIndexOf("static NSDictionary *HandleReadChecklist("));
+    expect(handler).toMatch(/OpenReadOnlyContext\(ResolveStore\(\)\)/);
+    expect(handler).toMatch(/RequireFeature\(FeatureChecklistRead\)/);
   });
 });

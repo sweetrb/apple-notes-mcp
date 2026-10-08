@@ -2807,6 +2807,35 @@ title, modification date, folder identifier, lock/trash/shared/editable
 flags, iCloud version counters, and a `revision` change token (compare two
 reads to detect a change). Opens the store with Core Data's read-only option.
 
+#### `native-checklist-state`
+
+Reads one note's native checklist by Notes UUID (`identifier`) or x-coredata
+`id`; pass exactly one. The `id` is resolved through an exact read-only database
+lookup after checking the opt-in and installed hashes. Requires the same opt-in, current helper, and Full Disk
+Access as `native-note-state`. Check `native-helper-status`'s `readChecklist`
+feature first: its probe checks the checklist getters separately. Locked notes
+or unavailable native bodies are refused. Ordinary `☐` glyphs and Markdown
+task text do not count as native checklist items.
+
+Returns `identifier`, `revision`, `items`, `total`, `checked`, and
+`syncHostRunning`. Each item has its exact native `todoIdentifier` (32 lowercase
+hex digits), `uuid`, `index`, `done`, and `text`. Items follow the first occurrence
+of each native todo identity, which can cover multiple style runs. `text` is the
+line containing its first visible styled character, or the first styled line
+when it has only line terminators. `lineStart`, `lineLengthUTF16`, `styledStart`,
+and `styledLengthUTF16` are UTF-16 offsets and lengths; line text excludes the
+terminator. The styled range is an envelope, including intervening characters
+when the identity occurs in separated runs.
+
+Read the ambiguity flags before treating an entry as a single checklist row:
+`contiguous: false` means separated runs share the identity; `consistent: false`
+means their done bits disagree; `spansLines: true` means its styled envelope
+contains multiple lines after leading/trailing terminators are removed. `done`
+comes from the first visible styled character, falling back to the first run.
+Totals count native identities, including ambiguous ones. The `revision` is an
+informational change token. This tool opens the store read-only and cannot
+toggle, create, or repair checklist items.
+
 ## Usage Patterns
 
 ### Basic Workflow
@@ -2987,7 +3016,7 @@ MCP stores no secrets, but as a general rule keep only non-secret config here.
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `query-notes`, `get-native-objects`, `get-note-tables`, `list-smart-folders`, `delete-folder-by-id`, `get-note-drawings`, `transcribe-note-audio`, `native-note-state`, `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-paragraphs`, `get-paragraph-link`, `get-note-structure`, `list-note-links`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `query-notes`, `get-native-objects`, `get-note-tables`, `list-smart-folders`, `delete-folder-by-id`, `get-note-drawings`, `transcribe-note-audio`, `native-note-state`, `native-checklist-state`, `get-checklist-state`, `get-note-metadata`, `get-note-blocks`, `list-note-paragraphs`, `get-paragraph-link`, `get-note-structure`, `list-note-links`, `export-notes-markdown`, `export-notes-html`, `get-audio-transcripts`, `list-special-notes`, `list-native-tags`, `list-recent-notes`, `list-folder-tree`, `get-note-link`, the checklist annotations in `get-note-markdown`, `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, and the database half of `get-sync-status`.
 
 > 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
