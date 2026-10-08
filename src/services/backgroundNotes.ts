@@ -97,6 +97,14 @@ export function readBackgroundSnapshot(manager: AppleNotesManager, id: string): 
  * and commands, and `span` is how Notes stores its own headings — reading a
  * heading back and appending it verbatim used to be rejected (#164). Everything
  * here survives `comparableVisibleText`, which is what verifies the readback.
+ *
+ * Deliberately excludes `table`/`tbody`/`thead`/`tr`/`td`/`th`: a native table
+ * is never spliced in by this path (below, and in `validateAppendContent`'s
+ * HTML-element check) — a rectangular table needs its own verified identity
+ * and decoded-cell readback, which only `create-table` does. Listing them here
+ * previously made this constant — and the two tool descriptions built from it
+ * — advertise `<table>` as accepted append markup while the runtime always
+ * rejected it (#286).
  */
 export const NATIVE_APPEND_ELEMENTS = [
   "a",
@@ -116,12 +124,6 @@ export const NATIVE_APPEND_ELEMENTS = [
   "s",
   "span",
   "strong",
-  "table",
-  "tbody",
-  "td",
-  "th",
-  "thead",
-  "tr",
   "tt",
   "u",
   "ul",
@@ -138,7 +140,7 @@ const NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*
 export const NATIVE_APPEND_HTML_SUBSET =
   `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, ` +
   `with href on <a> and a font-size style on <span> as the only attributes; ` +
-  `everything else needs update-note.`;
+  `a native table is refused here — use create-table; everything else needs update-note.`;
 
 /**
  * Markdown that `appendMarkdownHtml` passes through as literal text but Notes'
@@ -573,9 +575,13 @@ export function appendNative(
   manager: AppleNotesManager,
   request: BackgroundInput & { content: string; format: "plaintext" | "html" | "markdown" }
 ): ReturnType<typeof mutateBackground> {
-  validateAppendContent(request.content, request.format);
-  if (request.format === "html" && /<table\b/i.test(request.content))
+  // Checked before validateAppendContent (and not just the general unsupported-
+  // element error that would now fire there, since table elements were removed
+  // from NATIVE_APPEND_ELEMENTS) so a table or a bare table fragment gets this
+  // specific redirect instead of a generic "unsupported element" message (#286).
+  if (request.format === "html" && /<\/?\s*(?:table|thead|tbody|tr|td|th)\b/i.test(request.content))
     throw new Error("Use create-table for verified native table insertion");
+  validateAppendContent(request.content, request.format);
   // Markdown is sent to the bridge's dedicated "append-markdown" branch, which
   // runs Shortcuts' native Markdown-to-rich-text action, instead of being
   // converted to our own HTML subset and routed through "append-html" first.

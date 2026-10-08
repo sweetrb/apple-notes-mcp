@@ -48843,18 +48843,12 @@ var NATIVE_APPEND_ELEMENTS = [
   "s",
   "span",
   "strong",
-  "table",
-  "tbody",
-  "td",
-  "th",
-  "thead",
-  "tr",
   "tt",
   "u",
   "ul"
 ];
 var NATIVE_APPEND_SPAN_STYLE = /^font-size\s*:\s*\d{1,3}(?:\.\d+)?(?:px|pt)\s*;?$/i;
-var NATIVE_APPEND_HTML_SUBSET = `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, with href on <a> and a font-size style on <span> as the only attributes; everything else needs update-note.`;
+var NATIVE_APPEND_HTML_SUBSET = `Native append accepts ${NATIVE_APPEND_ELEMENTS.map((e) => `<${e}>`).join(" ")}, with href on <a> and a font-size style on <span> as the only attributes; a native table is refused here \u2014 use create-table; everything else needs update-note.`;
 var UNDERSCORES_OUTSIDE_A_WORD = "underscores outside a word";
 var UNMODELED_MARKDOWN = [
   [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/mu, UNDERSCORES_OUTSIDE_A_WORD],
@@ -49125,9 +49119,9 @@ function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
   if (!suffix || !suffix.includes(wanted)) throw new Error("Appended text not verified");
 }
 function appendNative(manager, request) {
-  validateAppendContent(request.content, request.format);
-  if (request.format === "html" && /<table\b/i.test(request.content))
+  if (request.format === "html" && /<\/?\s*(?:table|thead|tbody|tr|td|th)\b/i.test(request.content))
     throw new Error("Use create-table for verified native table insertion");
+  validateAppendContent(request.content, request.format);
   const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
   const op = request.format === "plaintext" ? "append-text" : request.format === "markdown" ? "append-markdown" : "append-html";
   const text2 = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;

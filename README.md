@@ -1331,9 +1331,9 @@ fixed HTML subset rather than anything Notes.app can render:
 
 | | Native append |
 |---|---|
-| Elements | `<a>` `<b>` `<br>` `<code>` `<del>` `<div>` `<em>` `<h1>` `<h2>` `<h3>` `<i>` `<li>` `<ol>` `<p>` `<s>` `<span>` `<strong>` `<table>` `<tbody>` `<td>` `<th>` `<thead>` `<tr>` `<tt>` `<u>` `<ul>` |
+| Elements | `<a>` `<b>` `<br>` `<code>` `<del>` `<div>` `<em>` `<h1>` `<h2>` `<h3>` `<i>` `<li>` `<ol>` `<p>` `<s>` `<span>` `<strong>` `<tt>` `<u>` `<ul>` |
 | Attributes | `href` on `<a>` (`https:`, `http:`, `notes:`, `applenotes:`, `mailto:` only) and a `font-size` style on `<span>`, e.g. `<span style="font-size: 18px">` — the form Notes itself stores a heading as |
-| Refused | every other element and attribute, by name, naming the accepted subset; `<table>` here (use [`create-table`](#create-table)); comments, doctype and processing instructions |
+| Refused | every other element and attribute, by name, naming the accepted subset; a table, in whole or in part (`<table>` `<thead>` `<tbody>` `<tr>` `<td>` `<th>`) — use [`create-table`](#create-table) instead; comments, doctype and processing instructions |
 
 Ordinary notes take the guarded HTML path and are not restricted to that subset.
 

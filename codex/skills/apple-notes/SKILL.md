@@ -263,10 +263,10 @@ instead. That path additionally needs `scopeText` (a unique existing phrase
 from below the title line; a title-only phrase is refused),
 keeps the default blank-line `separator` and `position: "after"`, and accepts a
 fixed HTML subset: `<a> <b> <br> <code> <del> <div> <em> <h1> <h2> <h3> <i> <li>
-<ol> <p> <s> <span> <strong> <table> <tbody> <td> <th> <thead> <tr> <tt> <u>
-<ul>`, with `href` on `<a>` and a `font-size` style on `<span>` as the only
-attributes. Anything outside that subset is refused by name — rewrite the whole
-body with `update-note` instead.
+<ol> <p> <s> <span> <strong> <tt> <u> <ul>`, with `href` on `<a>` and a
+`font-size` style on `<span>` as the only attributes. A table, whole or in
+part, is refused here — use `create-table` instead. Anything else outside that
+subset is refused by name — rewrite the whole body with `update-note` instead.
 
 **Adding a web link — use `insert-link`.** Pass `url` and either `mode: "raw"`
 (the URL is its own clickable text) or `mode: "hyperlink"` with a `label`.

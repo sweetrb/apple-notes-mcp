@@ -13,6 +13,8 @@ import {
   mutateBackground,
   validateAppendContent,
   textBelowTitle,
+  NATIVE_APPEND_ELEMENTS,
+  NATIVE_APPEND_HTML_SUBSET,
   type BackgroundSnapshot,
 } from "./backgroundNotes.js";
 const noteId = "x-coredata://ABC/ICNote/p1";
@@ -525,6 +527,30 @@ describe("rich append input", () => {
     expect(() => validateAppendContent('<tt class="x">y</tt>', "html")).toThrow(
       /Unsupported HTML attributes on <tt>/
     ));
+  // #286 — the advertised subset (NATIVE_APPEND_HTML_SUBSET, baked into both
+  // append-to-note's and append-native's tool descriptions) must list exactly
+  // what validateAppendContent accepts. A tag added to NATIVE_APPEND_ELEMENTS
+  // without actually being accepted — or an accepted tag missing from the
+  // list — would have let this drift back in silently.
+  it("accepts every element the advertised subset lists", () => {
+    for (const el of NATIVE_APPEND_ELEMENTS) {
+      const html = el === "br" ? "<div><br></div>" : `<div><${el}>x</${el}></div>`;
+      expect(() => validateAppendContent(html, "html"), html).not.toThrow();
+    }
+  });
+  it("never advertises table markup, which is always rejected", () => {
+    const tableTags = ["table", "thead", "tbody", "tr", "td", "th"];
+    for (const tag of tableTags) {
+      expect(NATIVE_APPEND_ELEMENTS, tag).not.toContain(tag);
+      expect(NATIVE_APPEND_HTML_SUBSET).not.toContain(`<${tag}>`);
+      // Without the dedicated table redirect in appendNative, a bare
+      // fragment like <tr> or <td> is unsupported for the same reason: the
+      // generic element check must reject it now that it is not advertised.
+      expect(() => validateAppendContent(`<${tag}></${tag}>`, "html")).toThrow(
+        new RegExp(`Unsupported HTML element: <${tag}>`)
+      );
+    }
+  });
   it("refuses Markdown that Notes' importer rewrites, and allows what it keeps literal", () => {
     for (const content of [
       "_note_ this",

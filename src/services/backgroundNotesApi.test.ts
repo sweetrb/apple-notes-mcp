@@ -258,6 +258,22 @@ describe("native append and tags", () => {
         format: "html",
       })
     ).toThrow(/create-table/);
+    // #286 — a bare table fragment (no outer <table>) used to slip past this
+    // check and into validateAppendContent's now-corrected element list, so
+    // it must get the same specific redirect, not a generic rejection or a
+    // silent accept. Confirmed without touching the manager: the content is
+    // rejected before the note is ever read.
+    for (const fragment of [
+      "<tbody><tr><td>x</td></tr></tbody>",
+      "<tr><td>x</td></tr>",
+      "<td>x</td>",
+    ]) {
+      const manager = managerFor([before]);
+      expect(() =>
+        appendNative(manager, { ...request, content: fragment, format: "html" })
+      ).toThrow(/create-table/);
+      expect(manager.getNoteById).not.toHaveBeenCalled();
+    }
   });
 
   it("sends Markdown to the bridge's native Markdown import, not converted HTML (#172)", () => {
