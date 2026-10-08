@@ -4,9 +4,12 @@ This file provides guidance for AI agents (Claude, etc.) when using this MCP ser
 
 ## Overview
 
-This MCP server enables AI assistants to interact with Apple Notes on macOS via AppleScript. All operations are local - no data leaves the user's machine.
+This MCP server lets AI assistants work with Apple Notes on macOS through AppleScript, signed Shortcuts, and read-only database access. Notes operations run locally; the MCP client receives their results and applies its own data handling. Optional speech-model downloads are separate from on-device transcription.
 
 ## Related Documentation
+
+- **[Setup on your Mac](README.md#setup-on-your-mac)** - Client registration, release-matched setup, Shortcuts, helpers, and local versus remote execution
+- **[Full Disk Access and related permissions](docs/FULL-DISK-ACCESS.md)** - Which operations and safety checks need protected data, and how to verify the actual client context
 
 - **[TECHNICAL_NOTES.md](./TECHNICAL_NOTES.md)** - Deep technical research on Apple Notes internals, database structure, protobuf format, and alternative access methods
 - **[TODO.md](./TODO.md)** - Prioritized improvement roadmap with stability fixes and new features
@@ -61,38 +64,31 @@ content: "cp ~/Library/Mobile\ Documents/file.txt ~/dest/"
 
 ## Tool Usage Tips
 
-### Using IDs for Reliability (Recommended)
+### Exact IDs and fresh revisions for writes
 
-All note operations support an optional `id` parameter. **Using IDs is more reliable than titles** because:
-- IDs are unique across all accounts
-- Titles can be duplicated
-- No issues with special characters
+Use titles for discovery, then retain the exact note ID. Update, append, delete, and move require an exact ID; update, append, and delete also require the `contentHash` returned by a fresh `get-note-content` call. Titles are not unique. Do not reuse a hash after the note has changed.
 
-**Recommended workflow:**
-1. Use `search-notes` or `create-note` to get the note's ID
-2. Use the ID for subsequent operations (`get-note-content`, `update-note`, `delete-note`, `move-note`)
-
-```
-# Search returns IDs
+```text
+# Discover and read the exact note
 search-notes query="Meeting"
-→ "Meeting Notes (Work) [id: x-coredata://ABC/ICNote/p123]"
-
-# Use ID for reliable operations
 get-note-content id="x-coredata://ABC/ICNote/p123"
-update-note id="x-coredata://ABC/ICNote/p123" newContent="Updated"
-delete-note id="x-coredata://ABC/ICNote/p123"
+
+# If the user requested a replacement, use the contentHash from that read
+update-note id="x-coredata://ABC/ICNote/p123" expectedContentHash="<contentHash from read>" newContent="Updated"
 ```
+
+If the user later requests deletion, read the note again and pass that new hash to `delete-note`. Keep any requested folder scope guards. A revision conflict means the note changed; inspect it before planning another mutation.
 
 **Other id forms.** Anywhere a note id is accepted, you may also pass the note's Notes UUID (the `identifier` field that list and read tools return, and the value in `notes://showNote?identifier=` links) or its numeric Core Data key (the digits after `p`). The server resolves either to the `x-coredata` id before the tool runs. Both need Full Disk Access; without it they fail with an error naming it, and `x-coredata` ids keep working. A numeric key resolves only to a note, never a folder or attachment. Folder-id tools (`show-folder`, `get-folder-by-id`, `rename-folder`) accept a folder's UUID or numeric key the same way. Prefer `identifier` when you need to store a reference outside this session: it is stable across devices, while `x-coredata` ids are local to this Mac's database.
 
 ### create-note / update-note / append-to-note
 - Always escape backslashes in content (see above)
 - Newlines can be sent as `\n` (this is a valid JSON escape)
-- **Title handling:** The `title` parameter is automatically prepended as `<h1>` in the note body. Do NOT include the title in the `content` parameter, or it will appear twice.
-- **HTML format:** When using `format: "html"`, do NOT include a `<h1>` tag in `content` — the title is prepended automatically as `<h1>`.
+- **Creation title:** `create-note` prepends its `title` as `<h1>`; do not repeat that title in HTML `content`.
+- **Replacement title:** `update-note` replaces the whole body. With `format: "html"`, `newTitle` is ignored and the first element of `newContent` becomes the visible title, so include the intended title line in the replacement HTML.
 - `create-note` returns the new note's ID for subsequent operations
 - **`create-note`'s `folder` must already exist.** It does not create the folder — call `create-folder` first (it is idempotent, so calling it unconditionally is fine). Passing a folder Notes doesn't have fails with a generic "check that Notes.app is configured and accessible" message, which is misleading: Notes.app is fine, the folder isn't there. The same applies to a misspelled `account`.
-- **To add to a note, use `append-to-note`, not `update-note`.** `update-note` replaces the whole body; `append-to-note` takes `content` plus `position` (`"after"` default / `"before"` to insert directly below the title line), `separator`, and `format`, does the read-and-concatenate itself, and always round-trips the body as HTML so existing rich formatting survives.
+- **To add text, use `append-to-note`.** It takes `content`, a fresh `expectedContentHash`, and optional `position`, `separator`, and `format`. On a safely rewritable note it splices the stored HTML. When native objects or unsupported formatting prevent that route, it uses native end-append, which needs a distinctive existing `scopeText`, the default blank-line separator, `position: "after"`, and the supported native HTML subset. Inspect the returned requirements instead of attempting a full-body replacement.
 - **Body from a file:** `create-note` takes `contentPath` (an absolute path to a UTF-8 file of at most 1 MiB in home, temp, or `/Volumes`; hidden paths such as `~/.ssh` or `~/.config` and anything in `~/Library` other than iCloud Drive (`~/Library/Mobile Documents`) and `~/Library/CloudStorage` are refused unless the server sets `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1`) instead of `content`. Pass exactly one of the two.
 - **Markdown title line:** with `format: "markdown"`, a first line that is exactly `# <title>` is removed (plus one blank line), since `title` is supplied separately. A different first heading is kept.
 - **`markdownRoute: "html"`** imports Markdown through AppleScript HTML instead of the Shortcut: any account, tags allowed, no real Heading styles. Task items (`- [ ]`, `- [x]`) become list rows starting with a visible ☐ / ☑ character. Those are text, not checkable checklist items; tell the user so. Block quotes, fenced code and inline code are refused on this route, and a `---` line stays literal text; only the Shortcut route imports these natively.
@@ -102,7 +98,8 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - **`delete-note` and `batch-delete-notes` refuse a note already in Recently Deleted**, where a delete is permanent. The folder is read live from Notes.app; the database only identifies which folder is Recently Deleted.
 - **Copy-then-retire with `delete-note`:** after copying note A to note B and verifying B, read both with `get-note-content`, then call `delete-note` on A with `guardNoteId` = B and `expectedGuardContentHash` = B's `contentHash`. The delete stops if B changed, was locked, moved to Recently Deleted, or is a Quick Note. It needs Full Disk Access (the Quick Note flag is only in the database); a B the database has not saved yet still passes on Notes.app's live checks. It is a guard, not a transaction. `requireActiveNoteId` only requires the other note to stay active; it does not fingerprint its content.
 - **Do not hand-roll read-modify-write from `get-note-content`.** That body is lossy for image-heavy notes: inline base64 images over `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default 256 KB) come back as `[inline image omitted: …]` placeholders, flagged as `strippedImages` / `truncated` in `structuredContent`. Writing it back with `update-note` replaces the real images with that text.
-- Both `append-to-note` and `update-note` rewrite the full body, so run `list-attachments` first when a note may hold embedded files.
+- **Honor `writable: false`.** `update-note` refuses attachments, tables, checklists, native tags, and formatting that AppleScript HTML cannot preserve. Use native append to add supported content, `add-attachment` to attach a file, or Notes.app for other edits. `list-attachments` alone does not establish that a body rewrite is safe.
+- **Preserve stored links.** On linked notes, `update-note` needs HTML retaining every existing link's text and URL. Use `allowLinkChanges: true` only when the user asked to change or remove links; it is not a general preservation override.
 
 ### insert-link
 - Adds one URL to an exact note as its own paragraph: `mode: "raw"` (default) shows the URL, `mode: "hyperlink"` shows `label`. `position` is `"end"` (default) or `"after-title"`; `blankLine` (default `true`) controls the blank line before it.
@@ -111,31 +108,17 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 - A bare URL written as plain text is not linked by Notes. `linked: false` writes it that way on purpose and reports `linkStored: false`.
 - Rich URL preview cards cannot be created, and a link cannot be placed inside an existing paragraph. For a link to another note by id, use `insert-note-link`.
 
-### Checklist Creation Is Not Supported
+### Creating native checklists
 
-**You cannot create an Apple Notes checklist (the interactive ☐ / ☑ items) via this MCP server.** This is an Apple Notes limitation, not a server bug.
+Check `get-capabilities` for the route you need:
 
-The exception is the Background Operations Shortcut bridge: when `get-capabilities` reports `create-checklist-item` available, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends several in order (1–20, one bridge run of a few seconds each; a client-side timeout does not stop the server, so read the note before any retry). If `create-checklist-items` returns `ok: false` (an error result with a `code`), only the items in `landed` are verified; read the note before retrying, and retry only items that are not present.
+- On an existing note, `create-checklist-item` appends one real unchecked item and `create-checklist-items` appends 1–20 in order through the Background Operations bridge. They do not toggle an existing item. If a batch returns `ok: false`, only `landed` entries are verified; read the note before retrying and retry only absent items. A client timeout does not prove the bridge stopped.
+- For a new iCloud note on macOS 26+, `create-note` with `format: "markdown"` uses the optional Create Markdown Note bridge. Notes' importer maps `- [ ]` and `- [x]` to native checklist items with that done state. Check `create-note-markdown-blocks` availability and complete Shortcut setup first.
+- Without an available native route, explain the limitation. The user can convert a normal list in Notes.app with **⇧⌘L** or **Format → Checklist**.
 
-When you send checklist HTML or markdown to `create-note` or `update-note`:
+AppleScript HTML cannot create interactive checklist items: `<input type="checkbox">` is stripped and checklist CSS classes are ignored. Plaintext `- [ ]` stays literal text. `markdownRoute: "html"` renders task items as visible ☐ / ☑ glyphs, not checkable items. Do not describe glyphs as native checklists or try alternate HTML attributes to bypass the limitation.
 
-| You send | What Notes.app renders |
-|----------|------------------------|
-| `<input type="checkbox"> Buy milk` | `Buy milk` (the `<input>` is stripped) |
-| `<ul class="checklist"><li>Buy milk</li></ul>` | A plain bulleted list (the class is dropped) |
-| `- [ ] Buy milk` in `plaintext` mode | Literal text `- [ ] Buy milk` |
-
-Apple Notes stores checklists as a paragraph style inside a gzipped protobuf blob. AppleScript's `body` interface does not expose paragraph styles, so there is no HTML or markdown input that produces a real checklist.
-
-**What to do when a user asks for a checklist note:**
-
-1. Create the note with `<ul><li>…</li></ul>` items (HTML) or `- ` bullet lines (plaintext) — the list structure is preserved.
-2. Tell the user to open the note in Notes.app, select the list items, and press **⇧⌘L** (or **Format → Checklist**) to convert them.
-3. Once converted, `get-checklist-state` and `get-note-markdown` can read the done/undone state correctly.
-
-Do not try alternative HTML class names, data attributes, or Unicode characters like `☐` — none of them produce a real checklist. The interface to set paragraph styles simply isn't exposed.
-
-**Exception — Notes' own Markdown importer.** `create-note` with `format: "markdown"` runs the Create Markdown Note Shortcut, and Notes' importer turns `- [ ] item` / `- [x] item` into real checklist items with that done state, `> text` into a block quote, a bare ```` ``` ```` fence into Monospaced paragraphs, a `---` line (after a blank line) into a divider, and `` `inline code` `` into highlighted text (not monospace). The server verifies each construct by exact-ID readback. These constructs are gated separately as `create-note-markdown-blocks` in `get-capabilities`. `append-native`'s Markdown refuses them, because its converter flattens them to plain text. `markdownRoute: "html"` does not map them either: it renders `- [ ]`/`- [x]` as ☐ / ☑ glyph rows, keeps `---` as literal text, and refuses the rest.
+The native Markdown creation route also maps `> text` to a block quote, a bare code fence to Monospaced paragraphs, `---` after a blank line to a divider, and inline code to highlighted text. `append-native`'s Markdown converter refuses these block constructs rather than preserving them. See [Markdown notes](README.md#markdown-notes) for the supported subset and [Creating Checklists](README.md#creating-checklists) for the route comparison.
 
 ### Whitespace Accumulation on Iterative Updates
 
@@ -148,11 +131,7 @@ Do not try alternative HTML class names, data attributes, or Unicode characters 
 
 **Cause:** Apple Notes' internal HTML processing preserves empty divs from previous edits. Each update can leave behind formatting artifacts.
 
-**Solution:** If a note has accumulated unwanted whitespace:
-1. Delete the note with `delete-note`
-2. Create a fresh note with `create-note`
-
-This is more reliable than trying to fix the whitespace through updates, as the artifacts are baked into the note's internal representation.
+Keep the original note while assessing a repair. Read its structure and native objects; a plaintext reread cannot verify rich-content preservation. For a note the server cannot safely rewrite, edit the spacing in Notes.app. If the user wants a separate clean replacement, create and verify it before considering retirement of the original, and delete only with explicit deletion intent and fresh guards. Whitespace alone is not authorization to delete and recreate a note.
 
 ### Folder Paths (Nested Folder Support)
 
@@ -337,7 +316,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 ### get-capabilities / doctor feature matrix
 - Both return `runtimeOS` and a `features` object keyed by feature group (`applescriptCore`, `fullDiskAccessReads`, `backgroundOperationsBridge`, `nativeTagsBridge`, `markdownNoteBridge`, ...). Check a feature's `available` before relying on it, and branch on its machine `reason` (`full_disk_access_missing`, `shortcut_not_installed`, `requires_macos_26`, `not_implemented`, ...) rather than on prose.
-- `unverified: ["notes_automation"]` means the probe did not contact Notes.app, not that Automation is denied. Run `doctor` to confirm it.
+- `get-capabilities` does not contact Notes.app or run a bridge. `unverified: ["notes_automation"]` means Automation was not probed, not denied. `doctor` sends read-only Apple events and may trigger a permission prompt, so run it when the user can answer that prompt. Installed Shortcuts are not proof of first-run consent, and optional feature availability does not determine `doctor.healthy`.
 - Placeholder features (`checklistToggle`, and `smartFolders` for creating or editing smart folders) always report `not_implemented`; do not attempt them through other tools. `paragraphLinks` and `audioTranscription` are real features gated on Full Disk Access.
 
 ### export-notes-markdown
@@ -447,7 +426,7 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 | Silent failure | Backslash not escaped in content |
 | "Permission denied" | macOS automation permission needed |
 | "iCloud sync in progress" | Wait and retry - results may be incomplete |
-| "No checklist items found" | Note has no checklists, or Full Disk Access not granted |
+| "No checklist items found" | The read succeeded and found no checklist items; missing FDA is reported separately |
 
 Every error result (`isError: true`) also carries `structuredContent.code`: `not_found`, `ambiguous`, `permission_denied`, `full_disk_access_missing`, `shortcut_not_installed`, `timeout_indeterminate`, `verification_failed`, `revision_conflict`, `validation_error`, `unsupported`, `notes_unavailable`, or `operation_failed`. Prefer it over matching message text. When `indeterminate` is `true`, the write may or may not have happened: read the note by exact id before any retry. `committed: false` means nothing was written, so re-reading and retrying is safe. Input-schema rejections carry `validation_error` with `committed: false`; a Notes UUID or numeric key that could not be resolved carries `not_found` or `full_disk_access_missing` instead.
 
@@ -455,7 +434,7 @@ Every result that has `structuredContent` also ends with a text block `structure
 
 ## Guided permissions check (CLI, for the user)
 
-When a user is setting up the server or reports permission errors, you can suggest they run `apple-notes-mcp setup --permissions` in their terminal. It reports Full Disk Access, Automation of Notes.app, the Shortcut bridges, and Speech Recognition for the app that launched it, names the System Settings pane for each missing grant, opens panes only with `--open`, and re-checks when they press Enter. It sends no Apple event unless they add `--probe-automation` (never under `--check` or over SSH), so Automation reads `unknown` until then. `setup --permissions --window` shows the same checklist in a small window, once built with `setup --permissions-window`. It is a user-run command, not an MCP tool: the grants it sees belong to the app it runs in, which may differ from your MCP host. Inside the host, use `doctor`. Never tell the user a grant was changed; only they can change it in System Settings.
+When a user is setting up the server or reports permission errors, you can suggest they run `apple-notes-mcp setup --permissions` in their terminal. It reports Full Disk Access, Automation of Notes.app, the Shortcut bridges, and Speech Recognition for the app that launched it, names the System Settings pane for each missing grant, opens panes only with `--open`, and re-checks when they press Enter. It sends no Apple event unless they add `--probe-automation` (never under `--check` or over SSH), so Automation reads `unknown` until then. `setup --permissions --window` shows the same checklist in a small window, once built with `setup --permissions-window`. It is a user-run command, not an MCP tool: the grants it sees belong to the app it runs in, which may differ from your MCP host. Inside the host, start with `get-capabilities`; use `doctor` when the user can answer its possible Automation prompt. A successful terminal check does not prove another host has permission, and `ready: true` can leave Automation unprobed. Use setup commands matching the running package version in the [setup guide](README.md#setup-on-your-mac). Never claim the check changed a grant; macOS requires the user to grant access.
 
 ## Recurring macOS permission prompts → offer the official-Node fix
 
