@@ -19,6 +19,10 @@ import {
   getCapabilityMatrix,
   type CapabilityMatrix,
 } from "@/services/capabilityMatrix.js";
+import {
+  unprobedPublicHelperStatus,
+  type PublicHelperStatus,
+} from "@/services/publicHelperStatus.js";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 export interface DoctorCheck {
@@ -32,6 +36,7 @@ export interface DoctorReport {
   /** OS-version-aware feature matrix; absent only if probing it threw. */
   runtimeOS?: CapabilityMatrix["runtimeOS"];
   features?: CapabilityMatrix["features"];
+  publicHelper?: PublicHelperStatus;
 }
 
 export function runDoctor(
@@ -69,21 +74,19 @@ export function runDoctor(
     });
   }
 
-  // 3. Full Disk Access — required by every tool that reads NoteStore.sqlite:
-  // get-checklist-state, get-note-markdown's checklist annotations,
-  // get-note-metadata, get-note-link's primary path, and get-sync-status'
-  // database half. Enumerate them so a user who doesn't use checklists doesn't
-  // read the warning as irrelevant and skip the grant.
+  // 3. Full Disk Access also underpins guarded writes and native readback.
+  // Do not promise that every AppleScript mutation works without database access.
   const fda = hasFullDiskAccess();
   checks.push({
     name: "Full Disk Access",
     status: fda ? "ok" : "warn",
     detail: fda
-      ? "granted — the Notes database is readable (checklist state, note metadata, note links, sync detail)"
-      : "not granted — get-checklist-state, get-note-metadata, and the checklist annotations in " +
-        "get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to " +
-        "AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else " +
-        "is pure AppleScript and is unaffected. " +
+      ? "granted — the Notes database is readable (queries, native structure, exports, mutation guards, and sync detail)"
+      : "not granted — database-backed queries, native structure and checklist state, media and " +
+        "portable exports, and database-backed mutation guards/readback are unavailable. Whole-body updates cannot " +
+        "proceed when their safety metadata is unreadable. Basic AppleScript read/create paths may " +
+        "still work with Automation permission. get-note-link fails on macOS 26+ (macOS 12-15 has " +
+        "an AppleScript fallback); get-sync-status cannot verify pending uploads or active sync. " +
         fdaRemediation(),
   });
 
@@ -124,17 +127,37 @@ export function runDoctor(
   checks.push(checkNodeRuntimeSignature());
 
   const healthy = !checks.some((c) => c.status === "fail");
-  // 6. Feature matrix. Informational: an unavailable optional feature is not a
-  // setup failure, so it never changes `healthy` or adds a check.
+  // 6. Optional helper and feature diagnostics never make core setup unhealthy.
   let matrix: CapabilityMatrix | undefined;
   try {
     matrix = capabilityMatrix();
   } catch {
     matrix = undefined;
   }
+  const publicHelper = matrix?.publicHelper ?? unprobedPublicHelperStatus();
+  checks.push({
+    name: "Public native helper",
+    status: publicHelper.ready ? "ok" : "warn",
+    detail: publicHelper.ready
+      ? (publicHelper.detail ?? "Installed helper handshake verified.")
+      : `${publicHelper.reason ?? "unknown"}: ${publicHelper.detail ?? "Could not verify helper readiness."} ` +
+        "Classic drawing decode and on-device transcription need a current public helper; run apple-notes-mcp setup --public-helper --check.",
+  });
+  if (publicHelper.ready) {
+    const audio = matrix?.features.audioTranscription;
+    checks.push({
+      name: "On-device transcription",
+      status: audio?.available ? "ok" : "warn",
+      detail: audio
+        ? `${audio.available ? "Prerequisites available" : (audio.reason ?? "unverified")}. ` +
+          `Unverified: ${audio.unverified.join(", ") || "none"}. ` +
+          (publicHelper.speech.detail ?? "")
+        : "Transcription prerequisites were not verified.",
+    });
+  }
   return matrix
-    ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features }
-    : { healthy, checks };
+    ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features, publicHelper }
+    : { healthy, checks, publicHelper };
 }
 
 /**

@@ -2,9 +2,20 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
 vi.mock("node:child_process", () => ({ execFileSync: vi.fn() }));
 vi.mock("../utils/checklistParser.js", () => ({ hasFullDiskAccess: vi.fn(() => true) }));
+vi.mock("./publicHelperStatus.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./publicHelperStatus.js")>()),
+  probePublicHelperStatus: vi.fn(() => ({
+    ready: false,
+    reason: "helper_not_installed",
+    detail: "Not installed",
+    actions: [],
+    speech: { verified: false, authorization: null, requiresGrant: null, detail: "Not probed" },
+  })),
+}));
 
 import { execFileSync } from "node:child_process";
 import { hasFullDiskAccess } from "../utils/checklistParser.js";
+import { probePublicHelperStatus, type PublicHelperStatus } from "./publicHelperStatus.js";
 import {
   FEATURES,
   compareVersions,
@@ -24,6 +35,18 @@ const BG = "Apple Notes MCP - Background Operations v5";
 const TAGS = "Apple Notes MCP - Native Tags";
 const MD = "Apple Notes MCP - Create Markdown Note";
 const line = (name: string, n: number) => `${name} (00000000-0000-0000-0000-00000000000${n})`;
+const readyHelper = (): PublicHelperStatus => ({
+  ready: true,
+  reason: null,
+  detail: "Verified",
+  actions: ["decode_drawing", "transcribe", "speech_status"],
+  speech: {
+    verified: true,
+    authorization: "notDetermined",
+    requiresGrant: false,
+    detail: "Locale/model unverified",
+  },
+});
 
 function env(over: Partial<CapabilityEnvironment> = {}): CapabilityEnvironment {
   return {
@@ -32,6 +55,7 @@ function env(over: Partial<CapabilityEnvironment> = {}): CapabilityEnvironment {
     darwinRelease: "25.1.0",
     fullDiskAccess: true,
     shortcutLines: [line(BG, 1), line(TAGS, 2), line(MD, 3), "Unrelated (not-a-uuid)"],
+    publicHelper: readyHelper(),
     ...over,
   };
 }
@@ -43,6 +67,7 @@ const feature = (name: string) => {
 
 beforeEach(() => {
   mockExec.mockReset();
+  vi.mocked(probePublicHelperStatus).mockClear();
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -61,6 +86,8 @@ describe("FEATURES registry", () => {
         "checklistToggle",
         "smartFolders",
         "paragraphLinks",
+        "storedAudioTranscripts",
+        "classicDrawingDecode",
         "audioTranscription",
       ])
     );
@@ -110,6 +137,22 @@ describe("evaluateFeature", () => {
     expect(s.requirements).toEqual(["notes_automation"]);
   });
 
+  it("keeps installed bridge readiness separate from unknown first-run consent", () => {
+    for (const name of ["backgroundOperationsBridge", "nativeTagsBridge", "markdownNoteBridge"]) {
+      expect(evaluateFeature(feature(name), env())).toMatchObject({
+        available: true,
+        reason: null,
+        missing: [],
+        unverified: ["notes_automation", "shortcut_consent"],
+      });
+      expect(evaluateFeature(feature(name), env({ shortcutLines: [] }))).toMatchObject({
+        available: false,
+        reason: "shortcut_not_installed",
+        unverified: ["notes_automation", "shortcut_consent"],
+      });
+    }
+  });
+
   it("reports placeholders as not_implemented", () => {
     for (const name of ["checklistToggle", "smartFolders"])
       expect(evaluateFeature(feature(name), env())).toMatchObject({
@@ -120,14 +163,11 @@ describe("evaluateFeature", () => {
       });
   });
 
-  it("reports paragraph links and audio transcription as shipped database reads", () => {
+  it("keeps stored transcript reads independent of the speech helper", () => {
     expect(feature("paragraphLinks").tools).toEqual(["list-note-paragraphs", "get-paragraph-link"]);
-    expect(feature("audioTranscription").tools).toEqual([
-      "get-audio-transcripts",
-      "transcribe-note-audio",
-    ]);
-    for (const name of ["paragraphLinks", "audioTranscription"]) {
-      expect(evaluateFeature(feature(name), env())).toMatchObject({
+    expect(feature("storedAudioTranscripts").tools).toEqual(["get-audio-transcripts"]);
+    for (const name of ["paragraphLinks", "storedAudioTranscripts"]) {
+      expect(evaluateFeature(feature(name), env({ publicHelper: undefined }))).toMatchObject({
         available: true,
         reason: null,
         requirements: ["full_disk_access"],
@@ -137,6 +177,62 @@ describe("evaluateFeature", () => {
         reason: "full_disk_access_missing",
       });
     }
+  });
+
+  it("requires a verified helper for live transcription and drawing decode", () => {
+    const absent = { ...readyHelper(), ready: false, reason: "helper_not_installed" };
+    for (const name of ["audioTranscription", "classicDrawingDecode"]) {
+      expect(evaluateFeature(feature(name), env({ publicHelper: absent }))).toMatchObject({
+        available: false,
+        reason: "public_helper_unavailable",
+        missing: ["public_native_helper"],
+      });
+      expect(evaluateFeature(feature(name), env({ publicHelper: undefined }))).toMatchObject({
+        available: false,
+        reason: "public_helper_unverified",
+      });
+    }
+  });
+
+  it("requires speech authorization on older macOS and respects explicit refusals on every route", () => {
+    for (const authorization of ["denied", "restricted", "notDetermined"] as const) {
+      const helper = readyHelper();
+      helper.speech = { ...helper.speech, authorization, requiresGrant: true };
+      expect(
+        evaluateFeature(
+          feature("audioTranscription"),
+          env({ macOSVersion: "15.6", publicHelper: helper })
+        )
+      ).toMatchObject({
+        available: false,
+        reason: "speech_permission_required",
+        missing: ["speech_recognition"],
+      });
+      helper.speech.requiresGrant = false;
+      expect(
+        evaluateFeature(feature("audioTranscription"), env({ publicHelper: helper })).available
+      ).toBe(authorization === "notDetermined");
+    }
+  });
+
+  it("leaves unknown speech unavailable and locale/model readiness explicitly unverified", () => {
+    const helper = readyHelper();
+    helper.speech.verified = false;
+    expect(
+      evaluateFeature(feature("audioTranscription"), env({ publicHelper: helper }))
+    ).toMatchObject({
+      available: false,
+      reason: "speech_status_unverified",
+      unverified: ["speech_recognition", "speech_locale_and_assets"],
+    });
+    expect(evaluateFeature(feature("audioTranscription"), env())).toMatchObject({
+      available: true,
+      reason: null,
+      unverified: ["speech_locale_and_assets"],
+    });
+    expect(
+      evaluateFeature(feature("classicDrawingDecode"), env({ publicHelper: helper })).available
+    ).toBe(true);
   });
 
   it("keeps write-dependent features not_implemented even with the read-only helper enabled", () => {
@@ -286,6 +382,7 @@ describe("probeCapabilityEnvironment", () => {
     ]);
     // Never osascript, open, or `shortcuts run`.
     expect(JSON.stringify(commands)).not.toMatch(/osascript|"run"|\/open/);
+    expect(probePublicHelperStatus).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
 
@@ -311,6 +408,7 @@ describe("probeCapabilityEnvironment", () => {
       fullDiskAccess: false,
     });
     expect(mockExec).not.toHaveBeenCalled();
+    expect(probePublicHelperStatus).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });
 

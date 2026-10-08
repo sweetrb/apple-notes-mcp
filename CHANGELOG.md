@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-08
+
+### Fixed
+
+- Validate command-line arguments before loading configuration or initializing
+  the MCP runtime. Unknown commands and setup flags fail with usage instead of
+  importing Shortcuts; help and version commands exit without setup side effects.
+- Capability and doctor reports now distinguish stored transcripts from new
+  transcription and classic drawing decode, verify public-helper integrity and
+  status with bounded non-prompting calls, and retain unknown Shortcut consent
+  and language/model readiness as unverified requirements. Full Disk Access
+  guidance includes native verification and guarded mutations.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed

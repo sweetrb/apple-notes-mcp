@@ -71,6 +71,11 @@ import {
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { nativeTagsStatus } from "@/services/nativeTags.js";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
+import { evaluateFeatures } from "@/services/capabilityMatrix.js";
+import {
+  unprobedPublicHelperStatus,
+  type PublicHelperStatus,
+} from "@/services/publicHelperStatus.js";
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -83,6 +88,32 @@ function fakeMgr(over: Partial<AppleNotesManager> = {}): AppleNotesManager {
     listAccounts: () => [{ name: "iCloud" }, { name: "Gmail" }],
     ...over,
   } as unknown as AppleNotesManager;
+}
+
+function helperMatrix(publicHelper: PublicHelperStatus) {
+  return evaluateFeatures({
+    platform: "darwin",
+    macOSVersion: "26.1",
+    darwinRelease: "25.1.0",
+    fullDiskAccess: true,
+    shortcutLines: null,
+    publicHelper,
+  });
+}
+
+function readyHelper(): PublicHelperStatus {
+  return {
+    ready: true,
+    reason: null,
+    detail: "Installed digests and handshake verified.",
+    actions: ["decode_drawing", "transcribe", "speech_status"],
+    speech: {
+      verified: true,
+      authorization: "notDetermined",
+      requiresGrant: false,
+      detail: "Permission status only; locale and model availability are checked per request.",
+    },
+  };
 }
 
 describe("runDoctor (#22)", () => {
@@ -102,8 +133,54 @@ describe("runDoctor (#22)", () => {
     expect(fda?.detail).toMatch(/Full Disk Access/);
     // #220: names the Node binary, not just the launching app.
     expect(fda?.detail).toContain(process.execPath);
+    expect(fda?.detail).toMatch(/mutation guards\/readback.*Whole-body updates cannot proceed/);
+    expect(fda?.detail).not.toMatch(/Everything else.*unaffected/);
     expect(r.healthy).toBe(true);
   });
+
+  it.each(["helper_not_installed", "helper_stale", "helper_modified", "not_probed"])(
+    "keeps core setup healthy with an optional helper warning: %s",
+    (reason) => {
+      const helper = { ...unprobedPublicHelperStatus(), reason };
+      const report = runDoctor(fakeMgr(), () => helperMatrix(helper));
+      expect(report.healthy).toBe(true);
+      expect(report.publicHelper).toEqual(helper);
+      const check = report.checks.find((item) => item.name === "Public native helper");
+      expect(check).toMatchObject({ status: "warn" });
+      expect(check?.detail).toContain(reason);
+      expect(check?.detail).toContain("setup --public-helper --check");
+      expect(report.checks.some((item) => item.name === "On-device transcription")).toBe(false);
+    }
+  );
+
+  it("reports a ready helper while leaving per-language speech assets unverified", () => {
+    const helper = readyHelper();
+    const report = runDoctor(fakeMgr(), () => helperMatrix(helper));
+    expect(report.healthy).toBe(true);
+    expect(report.checks.find((item) => item.name === "Public native helper")).toMatchObject({
+      status: "ok",
+    });
+    const speech = report.checks.find((item) => item.name === "On-device transcription");
+    expect(speech).toMatchObject({ status: "ok" });
+    expect(speech?.detail).toContain("Unverified: speech_locale_and_assets");
+    expect(speech?.detail).toContain("checked per request");
+  });
+
+  it.each(["denied", "restricted", null] as const)(
+    "warns for speech status %s without disabling drawing decode or core setup",
+    (authorization) => {
+      const helper = readyHelper();
+      helper.speech = { ...helper.speech, authorization, verified: authorization !== null };
+      const report = runDoctor(fakeMgr(), () => helperMatrix(helper));
+      expect(report.healthy).toBe(true);
+      expect(report.features?.classicDrawingDecode.available).toBe(true);
+      const speech = report.checks.find((item) => item.name === "On-device transcription");
+      expect(speech).toMatchObject({ status: "warn" });
+      expect(speech?.detail).toContain(
+        authorization === null ? "speech_status_unverified" : "speech_permission_required"
+      );
+    }
+  );
 
   it("fdaRemediation says Claude Desktop needs the Node binary itself (#220)", () => {
     const msg = fdaRemediation("/opt/node/bin/node");
