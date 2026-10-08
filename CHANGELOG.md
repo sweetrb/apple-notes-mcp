@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [2.14.3] - 2026-10-08
+
+### Fixed
+
+- `append-to-note` and `append-native` no longer advertise `<table>`
+  `<tbody>` `<tr>` `<td>` `<th>` `<thead>` as accepted native-append HTML.
+  `appendNative()` has always rejected table markup before any mutation
+  ("Use create-table for verified native table insertion"), but those
+  elements were still listed in `NATIVE_APPEND_ELEMENTS`, which both tool
+  descriptions and the README/skill docs build their advertised HTML subset
+  from — a guarded append built from the advertised description was a
+  guaranteed failure. The table redirect now also catches a bare fragment
+  (`<tr>`/`<td>`/... without an outer `<table>`), which previously slipped
+  past it and into the general element check (#286).
+
 ## [2.14.2] - 2026-10-07
 
 ### Fixed
