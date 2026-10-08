@@ -4,7 +4,12 @@ import { exactIdInput, NOTE_ID_MESSAGE } from "../utils/noteIdentifiers.js";
 import { errorResult } from "../utils/errorCodes.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { addNativeTags, nativeTagsStatus, runNativeTagsShortcut } from "../services/nativeTags.js";
-import { enrichNoteRead, readRichNote, richContentHash } from "../utils/noteRichText.js";
+import {
+  enrichNoteRead,
+  readRichNote,
+  restoreNoteLinks,
+  richContentHash,
+} from "../utils/noteRichText.js";
 
 // Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
 // Core Data key, resolved to the x-coredata id before the handler runs.
@@ -52,8 +57,13 @@ export function registerNativeTagsBridge(server: McpServer, manager: AppleNotesM
     if (!body) throw new Error("Note content is unavailable");
     const enriched = enrichNoteRead(id, body);
     const rich = readRichNote(id);
-    if (!enriched.complete || enriched.revision !== rich.revision)
+    if (enriched.revision !== rich.revision)
       throw new Error("Native metadata changed during read; read the note again");
+    // `complete` means the HTML has no native objects/checklists to lose in a
+    // full-body rewrite, not that the read succeeded. Native tag writes retain
+    // those objects. Validate the HTML against the strict snapshot explicitly:
+    // enrichNoteRead can catch a mismatch and still return its revision.
+    restoreNoteLinks(body, rich);
     return {
       contentHash: richContentHash(body, enriched),
       title: note.title,

@@ -1,11 +1,14 @@
 /**
- * Compatibility lock for the legacy rich-text reader.
+ * Compatibility lock for rich-text revisions, decoded content and preservation signatures.
  *
  * `parseRichNote`'s `revision` and `styleRuns` feed the write guards
  * (revision tokens, background-edit style comparison). The block model in
- * noteBlocks.ts is additive and must never change them. These golden values
- * were captured from the unmodified reader; if one changes, a write guard's
- * behavior changed with it, and that needs its own review.
+ * noteBlocks.ts is additive and must never change them. Native tag preservation
+ * intentionally strengthened the internal signature from known-field pairs to
+ * lossless [field, wire type, raw value] triples, retaining unknown attributes
+ * and full-width varints. The revision goldens remain the original reader's;
+ * signature/all goldens record that reviewed contract change. Further changes
+ * still require review of their effect on write guards and decoded content.
  */
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
@@ -75,14 +78,14 @@ const digest = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
 
 describe("parseRichNote compatibility", () => {
-  it("keeps revision and styleRuns byte-for-byte identical on the synthetic corpus", () => {
+  it("keeps raw revision goldens and locks the reviewed lossless style contract on the synthetic corpus", () => {
     const outputs = Object.fromEntries(
       Object.entries(corpus).map(([name, bytes]) => {
         const rich = parseRichNote(bytes);
-        // The guards read only each run's start, length and signature. The
-        // decoded paragraphStyle / blockQuote / highlight fields are additive
-        // (derived from bytes the signature already covers), so they are
-        // projected out and the golden values stay the unmodified reader's.
+        // Keep the comparison fields in this lock. Additive decoded fields and
+        // nativeSemantics accounting are covered by the decoder/tag tests;
+        // projecting them out keeps this corpus focused on the original content
+        // metadata plus the deliberately strengthened comparison signature.
         const guardRuns = rich.styleRuns?.map(({ start, length, signature }) => ({
           start,
           length,
@@ -104,29 +107,29 @@ describe("parseRichNote compatibility", () => {
     expect(outputs).toMatchInlineSnapshot(`
       {
         "attachment": {
-          "all": "68c93448d0a8f421",
+          "all": "271c0869e0ad718d",
           "revision": "0172244437dac006",
-          "styleRuns": "15ad826700c52155",
+          "styleRuns": "ab1d4b148b0347e9",
         },
         "inline": {
-          "all": "79d9925bb7e40e16",
+          "all": "e4223db4b19c3c4a",
           "revision": "acdacdb4d8d6255b",
-          "styleRuns": "4e74169d08c1aa8b",
+          "styleRuns": "a0d6ded732195417",
         },
         "layout": {
-          "all": "649def3fc599ba0e",
+          "all": "dd9da8e60d4809a6",
           "revision": "9ae6df604478d681",
-          "styleRuns": "357cc067afb44593",
+          "styleRuns": "0a33fa1d18d3a7f2",
         },
         "links": {
-          "all": "89fb2d1b891309e1",
+          "all": "ab2f03b26ff9ff57",
           "revision": "4d101388ceef0c93",
-          "styleRuns": "d8357532f31e3a4a",
+          "styleRuns": "408ea07b72517b77",
         },
         "lists": {
-          "all": "a155ea63f91caa96",
+          "all": "ebf0b3cdae780bad",
           "revision": "e4ef8809b1abe44d",
-          "styleRuns": "1b5a3234ad066e68",
+          "styleRuns": "7e6fd7475519bdbd",
         },
         "plain": {
           "all": "0102ee67d40836c2",
@@ -134,14 +137,14 @@ describe("parseRichNote compatibility", () => {
           "styleRuns": "b26a2e89be52ade5",
         },
         "styled": {
-          "all": "4e33b7014cbcfa67",
+          "all": "e2e690131812f708",
           "revision": "8cb704a6afe5852e",
-          "styleRuns": "d46cdfcc4e4aca1b",
+          "styleRuns": "17b87bca46486a8b",
         },
         "unknownFields": {
-          "all": "6d66f3796a052d84",
+          "all": "c75cfec4ad89656d",
           "revision": "7748358aad30865b",
-          "styleRuns": "d37a7b0b29a53843",
+          "styleRuns": "8653abe0a1239f01",
         },
       }
     `);
@@ -151,9 +154,26 @@ describe("parseRichNote compatibility", () => {
     const bytes = doc("x", [run(1, n(8, -1))]);
     const rich = parseRichNote(bytes);
     expect(rich.text).toBe("x");
-    expect(rich.styleRuns?.[0].signature).toBe("[[8,-1]]");
+    expect(rich.styleRuns?.[0].signature).toBe('[[8,0,"18446744073709551615"]]');
+    // The signature preserves unsigned wire bits; decoding still reads signed -1.
+    const [[field, wire, raw]] = JSON.parse(rich.styleRuns![0].signature) as Array<
+      [number, number, string]
+    >;
+    expect([field, wire, BigInt.asIntN(64, BigInt(raw))]).toEqual([8, 0, -1n]);
     expect(rich.htmlLossyFormatting).toEqual(["subscript"]);
     expect(decodeNoteBlocks(bytes).blocks[0].runs[0].subscript).toBe(true);
+  });
+
+  it("keeps unknown and fixed-width wire values in the strengthened internal comparison", () => {
+    expect(parseRichNote(corpus.unknownFields).styleRuns?.map((r) => r.signature)).toEqual([
+      '[[13,0,"1700000000"]]',
+      '[[15,2,"7a"]]',
+    ]);
+    const before = doc("x", [run(1, f32(15, 1))]);
+    const after = doc("x", [run(1, f32(15, 2))]);
+    expect(parseRichNote(before).styleRuns?.[0].signature).toBe('[[15,5,"0000803f"]]');
+    expect(parseRichNote(after).styleRuns?.[0].signature).toBe('[[15,5,"00000040"]]');
+    expect(parseRichNote(before).text).toBe(parseRichNote(after).text);
   });
 
   it("flags superscript, alignment and highlight, ignoring newline-only runs (#189)", () => {

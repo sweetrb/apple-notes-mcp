@@ -40364,6 +40364,87 @@ function styleValue(field) {
   }
   return Buffer.from(field.value).toString("hex");
 }
+function storedStyleSignature(data) {
+  return JSON.stringify(
+    decodeWireFields(data).filter((field) => field.fieldNumber !== 1).map((field) => [
+      field.fieldNumber,
+      field.wireType,
+      field.bytes ? styleValue({
+        fieldNumber: field.fieldNumber,
+        wireType: field.wireType,
+        value: field.bytes
+      }) : field.varint.toString()
+    ])
+  );
+}
+function nativeRunSemantics(data) {
+  const result = {
+    complete: true,
+    unknown: false,
+    structuredParagraph: false,
+    links: false,
+    objects: []
+  };
+  const check2 = (fields, schema) => {
+    const seen = /* @__PURE__ */ new Set();
+    for (const field of fields) {
+      if (!Object.hasOwn(schema, field.fieldNumber)) result.unknown = true;
+      else if (seen.has(field.fieldNumber) || field.wireType !== schema[field.fieldNumber])
+        result.complete = false;
+      seen.add(field.fieldNumber);
+    }
+  };
+  const nested = (field) => {
+    if (field.wireType !== 2 || !field.bytes) {
+      result.complete = false;
+      return [];
+    }
+    return decodeWireFields(field.bytes);
+  };
+  try {
+    const fields = decodeWireFields(data);
+    check2(fields, { 1: 0, 2: 2, 3: 2, 5: 0, 6: 0, 7: 0, 8: 0, 9: 2, 10: 2, 12: 2, 14: 0 });
+    if (fields.filter((f) => f.fieldNumber === 1).length !== 1) result.complete = false;
+    result.links = fields.some((f) => f.fieldNumber === 9);
+    for (const field of fields) {
+      if (field.fieldNumber === 2) {
+        const paragraph = nested(field);
+        check2(paragraph, { 1: 0, 2: 0, 4: 0, 5: 2, 8: 0, 9: 2 });
+        for (const style of paragraph.filter((f) => f.fieldNumber === 1)) {
+          const type = style.varint === void 0 ? void 0 : Number(BigInt.asIntN(64, style.varint));
+          if (type !== void 0 && type >= 100 && type <= 103) result.structuredParagraph = true;
+          else if (type === void 0 || ![-1, 0, 1, 2, 3, 4].includes(type)) result.unknown = true;
+        }
+        for (const uuid2 of paragraph.filter((f) => f.fieldNumber === 9))
+          if (uuid2.bytes?.length !== 16) result.complete = false;
+        for (const todo of paragraph.filter((f) => f.fieldNumber === 5)) {
+          result.structuredParagraph = true;
+          const item = nested(todo);
+          check2(item, { 1: 2, 2: 0 });
+          const id2 = item.filter((f) => f.fieldNumber === 1);
+          if (id2.length !== 1 || id2[0].bytes?.length !== 16) result.complete = false;
+        }
+      } else if (field.fieldNumber === 3) check2(nested(field), { 1: 2, 2: 5, 3: 0 });
+      else if (field.fieldNumber === 10) check2(nested(field), { 1: 5, 2: 5, 3: 5, 4: 5 });
+      else if (field.fieldNumber === 12) {
+        const attachment = nested(field);
+        check2(attachment, { 1: 2, 2: 2 });
+        const ids = attachment.filter((f) => f.fieldNumber === 1), types = attachment.filter((f) => f.fieldNumber === 2);
+        if (ids.length !== 1 || types.length !== 1 || !ids[0].bytes || !types[0].bytes) {
+          result.complete = false;
+          continue;
+        }
+        const utf82 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+        const id2 = utf82.decode(ids[0].bytes), type = utf82.decode(types[0].bytes);
+        if (!id2 || !type) result.complete = false;
+        result.objects.push({ id: id2, type });
+      }
+    }
+  } catch {
+    result.complete = false;
+  }
+  return result;
+}
 function parseRichNote(data, nativeTags = [], options = {}) {
   const doc = decodeMessage(data);
   const wrapper = embeddedMessage(getField(doc, 2));
@@ -40392,9 +40473,8 @@ function parseRichNote(data, nativeTags = [], options = {}) {
       highlight: Boolean(varintValue(getField(fields, 14))),
       start: position,
       length,
-      signature: JSON.stringify(
-        fields.filter((f) => f.fieldNumber >= 2 && f.fieldNumber <= 12 || f.fieldNumber === 14).map((f) => [f.fieldNumber, styleValue(f)])
-      )
+      signature: storedStyleSignature(run.value),
+      nativeSemantics: nativeRunSemantics(run.value)
     });
     if (/[^\s\ufffc]/u.test(text2.slice(position, position + length))) {
       const baseline = varintValue(getField(fields, 8)) ?? 0;
@@ -40462,7 +40542,7 @@ function parseRichNote(data, nativeTags = [], options = {}) {
 function readRichNote(id2, options = {}) {
   const pk = /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p([0-9]+)$/i.exec(id2)?.[1];
   if (!pk) throw new Error("Invalid exact note ID");
-  const sql = `BEGIN; SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE=${pk}; SELECT json_group_object(ZIDENTIFIER,ZALTTEXT) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} AND ZTYPEUTI1='com.apple.notes.inlinetextattachment.hashtag'; SELECT json_group_array(json_object('id',ZIDENTIFIER,'pk',Z_PK,'type',COALESCE(ZTYPEUTI1,ZTYPEUTI),'mergeable',hex(COALESCE(ZMERGEABLEDATA1,ZMERGEABLEDATA)),'view',ZATTACHMENTVIEWTYPE)) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} OR ZNOTE=${pk}; COMMIT;`;
+  const sql = `BEGIN; SELECT hex(ZDATA) FROM ZICNOTEDATA WHERE ZNOTE=${pk}; SELECT json_group_object(ZIDENTIFIER,ZALTTEXT) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} AND ZTYPEUTI1='com.apple.notes.inlinetextattachment.hashtag'; SELECT json_group_array(json_object('id',ZIDENTIFIER,'pk',Z_PK,'type',COALESCE(ZTYPEUTI1,ZTYPEUTI),'mergeable',hex(COALESCE(ZMERGEABLEDATA1,ZMERGEABLEDATA)),'view',ZATTACHMENTVIEWTYPE,'altText',ZALTTEXT)) FROM ZICCLOUDSYNCINGOBJECT WHERE ZNOTE1=${pk} OR ZNOTE=${pk}; COMMIT;`;
   const rows = execFileSync4("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
     encoding: "utf8",
     timeout: 5e3,
@@ -40481,14 +40561,21 @@ function readRichNote(id2, options = {}) {
   const tagMap = tags;
   const objectData = JSON.parse(rows[2] || "[]");
   if (!Array.isArray(objectData) || objectData.some(
-    (row) => !row || typeof row.id !== "string" || !Number.isInteger(row.pk) || typeof row.mergeable !== "string" || !/^[0-9a-f]*$/i.test(row.mergeable)
+    (row) => !row || typeof row.id !== "string" || !Number.isInteger(row.pk) || typeof row.mergeable !== "string" || !/^[0-9a-f]*$/i.test(row.mergeable) || row.altText !== void 0 && row.altText !== null && typeof row.altText !== "string"
   ))
     throw new Error("Invalid native object metadata");
   rich.objectData = uniqueById(
     objectData.filter((row) => rich.nativeObjectIds.includes(row.id)).sort((a, b) => a.id.localeCompare(b.id))
   );
-  rich.revision = createHash("sha256").update(rich.revision).update(JSON.stringify(rich.objectData)).digest("hex");
-  rich.nativeTagObjectIds = {};
+  const selectedRows = new Map(rich.objectData.map((row) => [row.id, row]));
+  rich.nativeObjectDataComplete = objectData.every((candidate) => {
+    const row = selectedRows.get(candidate.id);
+    return !row || ["pk", "type", "mergeable", "view", "altText"].every(
+      (key) => candidate[key] === row[key]
+    );
+  });
+  rich.revision = createHash("sha256").update(rich.revision).update(JSON.stringify(rich.objectData)).update(JSON.stringify(rich.nativeObjectDataComplete)).digest("hex");
+  rich.nativeTagObjectIds = /* @__PURE__ */ Object.create(null);
   for (const id3 of rich.nativeObjectIds)
     if (tagMap[id3]) {
       const tag = tagMap[id3].replace(/^#/, "");
@@ -48496,6 +48583,176 @@ function normalizeNativeTags(tags) {
     )
   ];
 }
+var TAG_OBJECT_TYPE = "com.apple.notes.inlinetextattachment.hashtag";
+function requirePreservationMetadata(rich) {
+  const unavailable = () => {
+    throw new Error("Native object, checklist or formatting preservation metadata is unavailable");
+  };
+  const { objects, objectData, checklistItems, styleRuns, nativeTagObjectIds } = rich;
+  if (!objects || !objectData || !checklistItems || !styleRuns || !nativeTagObjectIds || rich.nativeObjectDataComplete !== true)
+    return unavailable();
+  const ids = new Set(rich.nativeObjectIds);
+  if (ids.size !== rich.nativeObjectIds.length || objects.length !== ids.size || objectData.length !== ids.size || new Set(objects.map((o) => o.id)).size !== ids.size || new Set(objectData.map((o) => o.id)).size !== ids.size || rich.hasNativeObjects !== Boolean(ids.size) || rich.hasChecklist !== Boolean(checklistItems.length))
+    return unavailable();
+  let objectEnd = 0;
+  for (const object3 of objects) {
+    const data = objectData.find((row) => row.id === object3.id);
+    if (!ids.has(object3.id) || !Number.isInteger(object3.start) || !Number.isInteger(object3.length) || object3.start < objectEnd || object3.length < 1 || object3.start + object3.length > rich.text.length || !data || data.type !== object3.type || !Number.isInteger(data.pk) || !/^[0-9a-f]*$/iu.test(data.mergeable) || data.view !== null && !Number.isInteger(data.view) || !Object.hasOwn(data, "altText") || data.altText !== null && typeof data.altText !== "string")
+      return unavailable();
+    objectEnd = object3.start + object3.length;
+  }
+  const mappedIds = /* @__PURE__ */ new Set();
+  if (new Set(rich.nativeTags).size !== rich.nativeTags.length || Object.keys(nativeTagObjectIds).length !== rich.nativeTags.length)
+    return unavailable();
+  for (const [tag, tagIds] of Object.entries(nativeTagObjectIds)) {
+    if (!rich.nativeTags.includes(tag) || !tagIds.length) return unavailable();
+    for (const id2 of tagIds) {
+      if (mappedIds.has(id2) || !objects.some((o) => o.id === id2 && o.type === TAG_OBJECT_TYPE) || objectData.find((o) => o.id === id2)?.altText?.replace(/^#/, "") !== tag)
+        return unavailable();
+      mappedIds.add(id2);
+    }
+  }
+  if (objects.some((o) => o.type === TAG_OBJECT_TYPE && !mappedIds.has(o.id))) return unavailable();
+  if (new Set(checklistItems.map((item) => item.id)).size !== checklistItems.length)
+    return unavailable();
+  for (const item of checklistItems) {
+    const end = item.start + item.text.length;
+    if (!item.id || !Number.isInteger(item.start) || item.start < 0 || end > rich.text.length || rich.text.slice(item.start, end) !== item.text || end < rich.text.length && rich.text[end] !== "\n")
+      return unavailable();
+  }
+  let position = 0;
+  for (const run of styleRuns) {
+    if (run.start !== position || !Number.isInteger(run.length) || run.length < 0 || typeof run.signature !== "string" || run.nativeSemantics?.complete !== true || run.length === 0 && (run.nativeSemantics.unknown || run.nativeSemantics.structuredParagraph || run.nativeSemantics.links || run.nativeSemantics.objects.length > 0))
+      return unavailable();
+    position += run.length;
+  }
+  if (position !== rich.text.length) return unavailable();
+  for (const link of rich.links)
+    if (!Number.isInteger(link.start) || !Number.isInteger(link.length) || link.start < 0 || link.length < 1 || link.start + link.length > rich.text.length || rich.text.slice(link.start, link.start + link.length) !== link.text)
+      return unavailable();
+}
+function plainNativeRange(rich, start, length) {
+  return rich.styleRuns.every((run) => {
+    if (run.start >= start + length || run.start + run.length <= start) return true;
+    const metadata = run.nativeSemantics;
+    return metadata.complete && !metadata.unknown && !metadata.structuredParagraph && !metadata.links && !metadata.objects.length;
+  });
+}
+function preservedTextSpans(before, after, missing) {
+  const oldIds = new Set(before.nativeObjectIds);
+  const added = after.objects.filter((o) => !oldIds.has(o.id));
+  const tagsById = new Map(
+    Object.entries(after.nativeTagObjectIds).flatMap(
+      ([tag, ids]) => ids.map((id2) => [id2, tag])
+    )
+  );
+  if (!added.length || added.some((o) => o.type !== TAG_OBJECT_TYPE || !missing.includes(tagsById.get(o.id))) || missing.some((tag) => !added.some((o) => tagsById.get(o.id) === tag)))
+    return void 0;
+  const spans = [];
+  let oldPosition = 0, newPosition = 0, appended = false;
+  for (const object3 of added) {
+    const prefix = after.text.slice(newPosition, object3.start);
+    const remaining2 = before.text.slice(oldPosition);
+    const length = Math.min(prefix.length, remaining2.length);
+    if (prefix.slice(0, length) !== remaining2.slice(0, length) || prefix.length > length && !/^[ \n]*$/u.test(prefix.slice(length)))
+      return void 0;
+    if (length) spans.push({ before: oldPosition, after: newPosition, length });
+    oldPosition += length;
+    const literal2 = `#${tagsById.get(object3.id)}`;
+    const rendered = after.text.slice(object3.start, object3.start + object3.length);
+    if (rendered !== "\uFFFC" && rendered !== literal2) return void 0;
+    const previous = [...before.text.slice(Math.max(0, oldPosition - 2), oldPosition)].at(-1) || "";
+    const next = String.fromCodePoint(before.text.codePointAt(oldPosition + literal2.length) ?? 0);
+    if (oldPosition === before.text.length) appended = true;
+    else if (before.text.startsWith(literal2, oldPosition) && !/[\p{L}\p{M}\p{N}_#-]/u.test(previous) && !/[\p{L}\p{M}\p{N}_-]/u.test(next) && plainNativeRange(before, oldPosition, literal2.length))
+      oldPosition += literal2.length;
+    else return void 0;
+    newPosition = object3.start + object3.length;
+  }
+  const remaining = before.text.slice(oldPosition);
+  const suffix = after.text.slice(newPosition);
+  if (suffix !== remaining && !(appended && !remaining && /^[ \n]*$/u.test(suffix)))
+    return void 0;
+  if (remaining.length)
+    spans.push({ before: oldPosition, after: newPosition, length: remaining.length });
+  return spans;
+}
+function preservesAddedSemantics(before, after, spans) {
+  const oldIds = new Set(before.nativeObjectIds);
+  const added = after.objects.filter((o) => !oldIds.has(o.id));
+  const changed = [];
+  let end = 0;
+  for (const span of spans) {
+    if (end < span.after) changed.push({ start: end, end: span.after });
+    end = span.after + span.length;
+  }
+  if (end < after.text.length) changed.push({ start: end, end: after.text.length });
+  for (const run of after.styleRuns) {
+    if (!changed.some((range) => run.start < range.end && run.start + run.length > range.start))
+      continue;
+    const metadata = run.nativeSemantics;
+    if (!metadata.complete || metadata.unknown || metadata.structuredParagraph || metadata.links)
+      return false;
+    const object3 = added.find((o) => run.start === o.start && run.length === o.length);
+    if (object3) {
+      if (metadata.objects.length !== 1 || metadata.objects[0].id !== object3.id || metadata.objects[0].type !== object3.type)
+        return false;
+    } else if (metadata.objects.length || added.some((o) => run.start < o.start + o.length && run.start + run.length > o.start))
+      return false;
+  }
+  return true;
+}
+function preservesNativeContent(before, after, spans) {
+  const rangeStart = (start, length) => {
+    const span = spans.find((s) => start >= s.before && start + length <= s.before + s.length);
+    return span && span.after + start - span.before;
+  };
+  for (const object3 of before.objects) {
+    const actual = after.objects.find((o) => o.id === object3.id);
+    if (!actual || actual.type !== object3.type || actual.length !== object3.length || actual.start !== rangeStart(object3.start, object3.length))
+      return false;
+  }
+  for (const object3 of before.objectData) {
+    const actual = after.objectData.find((o) => o.id === object3.id);
+    if (!actual || actual.pk !== object3.pk || actual.type !== object3.type || actual.mergeable !== object3.mergeable || actual.view !== object3.view || actual.altText !== object3.altText)
+      return false;
+  }
+  for (const tag of before.nativeTags)
+    if (JSON.stringify(before.nativeTagObjectIds[tag]) !== JSON.stringify(after.nativeTagObjectIds[tag]))
+      return false;
+  if (before.checklistItems.length !== after.checklistItems.length) return false;
+  for (const [index, item] of before.checklistItems.entries()) {
+    const actual = after.checklistItems[index];
+    if (actual.id !== item.id || actual.text !== item.text || actual.done !== item.done || actual.start !== rangeStart(item.start, item.text.length))
+      return false;
+  }
+  if (before.links.length !== after.links.length) return false;
+  for (const [index, link] of before.links.entries()) {
+    const actual = after.links[index];
+    if (actual.text !== link.text || actual.url !== link.url || actual.length !== link.length || actual.start !== rangeStart(link.start, link.length))
+      return false;
+  }
+  let oldIndex = 0, newIndex = 0;
+  for (const span of spans) {
+    let offset = 0;
+    while (offset < span.length) {
+      const oldPosition = span.before + offset, newPosition = span.after + offset;
+      while (before.styleRuns[oldIndex].start + before.styleRuns[oldIndex].length <= oldPosition)
+        oldIndex++;
+      while (after.styleRuns[newIndex].start + after.styleRuns[newIndex].length <= newPosition)
+        newIndex++;
+      const oldRun = before.styleRuns[oldIndex], newRun = after.styleRuns[newIndex];
+      if (oldRun.signature !== newRun.signature || oldRun.paragraphStyle !== newRun.paragraphStyle || oldRun.blockQuote !== newRun.blockQuote || oldRun.highlight !== newRun.highlight)
+        return false;
+      offset += Math.min(
+        span.length - offset,
+        oldRun.start + oldRun.length - oldPosition,
+        newRun.start + newRun.length - newPosition
+      );
+    }
+  }
+  return true;
+}
 function addNativeTags(request, deps) {
   if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(request.id))
     throw new Error("An exact CoreData note ID is required");
@@ -48510,32 +48767,37 @@ function addNativeTags(request, deps) {
   const missing = tags.filter((tag) => !before.rich.nativeTags.includes(tag));
   if (!missing.length)
     return { nativeTags: before.rich.nativeTags, added: [], contentHash: before.contentHash };
+  requirePreservationMetadata(before.rich);
   const candidates = deps.candidates(request.title, request.scopeText);
   if (candidates.length !== 1 || candidates[0] !== request.id)
     throw new Error(
       "Shortcuts selection is ambiguous or points to a different note; nothing was changed"
     );
-  if (deps.read(request.id).contentHash !== request.expectedContentHash)
+  const current = deps.read(request.id);
+  if (current.contentHash !== request.expectedContentHash)
     throw new Error("Note revision changed during preflight; nothing was changed");
+  requirePreservationMetadata(current.rich);
   let transportWarning;
   try {
     deps.run({ title: request.title, scopeText: request.scopeText, tags: missing });
   } catch (error2) {
     transportWarning = error2 instanceof Error ? error2.message : "Shortcuts completion was uncertain";
   }
-  const after = deps.read(request.id);
+  const verificationFailure = (detail) => new CodedError(
+    (transportWarning ? "Shortcuts did not complete cleanly, and exact-ID tags/text/links/native-content readback was not verified." : "Shortcuts ran, but exact-ID tags/text/links/native-content readback was not verified.") + " Read the note before any retry." + (detail ? ` ${detail}` : "") + (transportWarning ? ` ${transportWarning}` : ""),
+    { code: "verification_failed", indeterminate: true }
+  );
+  let after;
+  try {
+    after = deps.read(request.id);
+    requirePreservationMetadata(after.rich);
+  } catch (error2) {
+    throw verificationFailure(error2 instanceof Error ? error2.message : String(error2));
+  }
   const allTags = [.../* @__PURE__ */ new Set([...before.rich.nativeTags, ...tags])];
-  const textWithoutTags = (text2) => {
-    for (const tag of [...allTags].sort((a, b) => b.length - a.length)) {
-      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      text2 = text2.replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "");
-    }
-    return text2.replace(/[\s\ufffc]/gu, "");
-  };
-  if (after.title !== before.title || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || textWithoutTags(before.rich.text) !== textWithoutTags(after.rich.text) || linkSignature(before.rich.links) !== linkSignature(after.rich.links) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist) {
-    throw new Error(
-      transportWarning ? `Shortcuts did not complete cleanly, and exact-ID tags/text/links readback was not verified. Read the note before any retry. ${transportWarning}` : "Shortcuts ran, but exact-ID tags/text/links readback was not verified. Read the note before any retry"
-    );
+  const spans = preservedTextSpans(before.rich, after.rich, missing);
+  if (after.title !== before.title || after.rich.nativeTags.length !== allTags.length || allTags.some((tag) => !after.rich.nativeTags.includes(tag)) || before.rich.nativeObjectIds.some((id2) => !after.rich.nativeObjectIds.includes(id2)) || before.rich.hasChecklist !== after.rich.hasChecklist || !spans || !preservesAddedSemantics(before.rich, after.rich, spans) || !preservesNativeContent(before.rich, after.rich, spans)) {
+    throw verificationFailure();
   }
   return {
     nativeTags: after.rich.nativeTags,
@@ -58260,8 +58522,9 @@ function registerNativeTagsBridge(server2, manager) {
     if (!body) throw new Error("Note content is unavailable");
     const enriched = enrichNoteRead(id2, body);
     const rich = readRichNote(id2);
-    if (!enriched.complete || enriched.revision !== rich.revision)
+    if (enriched.revision !== rich.revision)
       throw new Error("Native metadata changed during read; read the note again");
+    restoreNoteLinks(body, rich);
     return {
       contentHash: richContentHash(body, enriched),
       title: note.title,

@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-08
+
+### Fixed
+
+- Native tag readback accepts revision-consistent rich metadata even when the
+  note cannot be represented completely as AppleScript HTML. Missing or
+  inconsistent preservation metadata still refuses the write.
+- Native tag verification now preserves retained text and whitespace, links,
+  formatting, checklist identities/state/ranges, native object payloads and
+  existing tag labels around only proven new tag additions. Ambiguous objects
+  or unsupported conversion ranges fail closed. A post-dispatch read failure
+  reports `verification_failed` with an indeterminate outcome and keeps the
+  Shortcut diagnosis, so callers read before retrying.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed
