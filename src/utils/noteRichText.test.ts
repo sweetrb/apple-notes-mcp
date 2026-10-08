@@ -109,6 +109,62 @@ describe("Notes rich text", () => {
     );
     expect(style(Buffer.from([0x4a, 16, 1]))).not.toEqual(style(Buffer.from([0x4a, 16, 2])));
   });
+  it("retains unknown and fixed-width run attributes in style signatures", () => {
+    const style = (attribute: Buffer) =>
+      parseRichNote(document("A", [Buffer.concat([run(1), attribute])])).styleRuns;
+    expect(style(n(15, 1))).not.toEqual(style(n(15, 2)));
+    expect(style(b(13, "unknown"))).not.toEqual(style(b(13, "changed")));
+    expect(style(Buffer.from([0x7d, 1, 0, 0, 0]))).not.toEqual(
+      style(Buffer.from([0x7d, 2, 0, 0, 0]))
+    );
+    expect(style(Buffer.from([0x79, 1, 0, 0, 0, 0, 0, 0, 0]))).not.toEqual(
+      style(Buffer.from([0x79, 2, 0, 0, 0, 0, 0, 0, 0]))
+    );
+    expect(() => style(Buffer.from([0x7d, 1]))).toThrow(/Truncated/);
+    expect(() => style(Buffer.from([0x7b]))).toThrow(/Unsupported wire/);
+  });
+  it.each([
+    ["duplicate run length", n(1, 0)],
+    ["wrong run-length wire", b(1, "hidden")],
+    ["duplicate paragraph", Buffer.concat([b(2, n(1, 3)), b(2, n(1, 103))])],
+    [
+      "duplicate paragraph UUID",
+      b(2, Buffer.concat([b(9, Buffer.alloc(16, 1)), b(9, Buffer.alloc(16, 2))])),
+    ],
+    [
+      "duplicate attachment ID",
+      b(12, Buffer.concat([b(1, "tag"), b(1, "other"), b(2, "hashtag")])),
+    ],
+    [
+      "duplicate attachment UTI",
+      b(12, Buffer.concat([b(1, "tag"), b(2, "hashtag"), b(2, "table")])),
+    ],
+  ] as const)(
+    "keeps ambiguous metadata readable and flags it incomplete: %s",
+    (_name, attributes) => {
+      const rich = parseRichNote(document("A", [Buffer.concat([run(1), attributes])]));
+      expect(rich.text).toBe("A");
+      expect(rich.styleRuns![0].nativeSemantics!.complete).toBe(false);
+    }
+  );
+  it("flags unknown native semantics without hiding their stored style bytes", () => {
+    const rich = parseRichNote(document("A", [Buffer.concat([run(1), b(99, "opaque")])]));
+    expect(rich.styleRuns![0].nativeSemantics).toMatchObject({ complete: true, unknown: true });
+    expect(rich.styleRuns![0].signature).toContain(Buffer.from("opaque").toString("hex"));
+  });
+  it.each(["constructor", "toString", "__proto__"])(
+    "reads a valid tag whose name is an inherited object property: %s",
+    (tag) => {
+      const attachment = Buffer.concat([run(1), b(12, b(1, "tag"))]);
+      const blob = gzipSync(document("\ufffc", [attachment])).toString("hex");
+      vi.mocked(execFileSync).mockReturnValue(
+        blob + "\n" + JSON.stringify({ tag: `#${tag}` }) + "\n"
+      );
+      const rich = readRichNote("x-coredata://ABCDEF/ICNote/p12");
+      expect(rich.nativeTags).toEqual([tag]);
+      expect(rich.nativeTagObjectIds![tag]).toEqual(["tag"]);
+    }
+  );
   it("reads only the requested note read-only and ignores stale native tag rows", () => {
     const attachment = Buffer.concat([run(1), b(12, b(1, "active-tag"))]);
     const blob = gzipSync(document("\ufffc", [attachment])).toString("hex");
@@ -140,6 +196,39 @@ describe("Notes rich text", () => {
       { id: "object-b", pk: 2, type: "table", mergeable: "BB", view: 1 },
     ]);
   });
+  it("retains raw native tag labels in the object payload and rich revision", () => {
+    const attachment = Buffer.concat([
+      run(1),
+      b(12, Buffer.concat([b(1, "tag"), b(2, "com.apple.notes.inlinetextattachment.hashtag")])),
+    ]);
+    const blob = gzipSync(document("\ufffc", [attachment])).toString("hex");
+    const readLabel = (altText: string) => {
+      vi.mocked(execFileSync).mockReturnValue(
+        blob +
+          '\n{"tag":"#project"}\n' +
+          JSON.stringify([
+            {
+              id: "tag",
+              pk: 1,
+              type: "com.apple.notes.inlinetextattachment.hashtag",
+              mergeable: "",
+              view: null,
+              altText,
+            },
+          ])
+      );
+      return readRichNote("x-coredata://ABCDEF/ICNote/p12");
+    };
+    const before = readLabel("#project"),
+      after = readLabel("project");
+    expect(before.nativeTags).toEqual(after.nativeTags);
+    expect(before.objectData![0].altText).toBe("#project");
+    expect(after.objectData![0].altText).toBe("project");
+    expect(before.revision).not.toBe(after.revision);
+    expect(vi.mocked(execFileSync).mock.lastCall?.[1]).toEqual(
+      expect.arrayContaining([expect.stringContaining("'altText',ZALTTEXT")])
+    );
+  });
   it("reports a native object referenced twice once, at its first position (#197)", () => {
     const ref = (id: string) => Buffer.concat([run(1), b(12, b(1, id))]);
     const blob = gzipSync(
@@ -165,6 +254,16 @@ describe("Notes rich text", () => {
       { id: "object-a", pk: 1, type: "attachment", mergeable: "AA", view: 0 },
       { id: "object-b", pk: 2, type: "attachment", mergeable: "B1", view: 1 },
     ]);
+    expect(result.nativeObjectDataComplete).toBe(false);
+  });
+  it("accepts identical duplicate native object rows as complete metadata", () => {
+    const attachment = Buffer.concat([run(1), b(12, b(1, "object"))]);
+    const blob = gzipSync(document("\ufffc", [attachment])).toString("hex");
+    const row = { id: "object", pk: 1, type: "table", mergeable: "AA", view: 1, altText: null };
+    vi.mocked(execFileSync).mockReturnValue(blob + "\n{}\n" + JSON.stringify([row, row]));
+    const result = readRichNote("x-coredata://ABCDEF/ICNote/p12");
+    expect(result.objectData).toEqual([row]);
+    expect(result.nativeObjectDataComplete).toBe(true);
   });
   it("deduplicates native checklist runs by their stable item ID", () => {
     const item = (id: number, done: number) =>

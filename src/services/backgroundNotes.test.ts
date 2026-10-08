@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { renderMarkdown } from "../utils/appendMarkdown.js";
 import type { RichNote } from "../utils/noteRichText.js";
 import type { CodedError } from "../utils/errorCodes.js";
+import { classifyError } from "../utils/errorCodes.js";
+import { plainRichNote, plainSemantics } from "../utils/__fixtures__/retainedRichNote.js";
 import {
   assertPreserved,
   assertAppendedHtmlLinks,
@@ -26,15 +28,7 @@ function snapshot(): BackgroundSnapshot {
     html: "<div>Unique project marker</div>",
     pinned: false,
     checklist: [],
-    rich: {
-      text: "Unique project marker",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "r1",
-    },
+    rich: plainRichNote("Unique project marker"),
   };
 }
 const request = { id: noteId, expectedContentHash: "h1", scopeText: "Unique project marker" };
@@ -58,6 +52,29 @@ const pinVerify = (before: BackgroundSnapshot, after: BackgroundSnapshot) => {
   if (!after.pinned) throw new Error("pin missing");
 };
 describe("background note mutation boundaries", () => {
+  it("refuses missing preservation evidence before calling the bridge", () => {
+    const f = fixture();
+    delete f.before.rich.styleRuns;
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
+      /metadata/
+    );
+    expect(f.deps.run).not.toHaveBeenCalled();
+  });
+  it("retains readback uncertainty when preservation evidence disappears after dispatch", () => {
+    const f = fixture();
+    delete f.after.rich.styleRuns;
+    let failure: unknown;
+    try {
+      mutateBackground(request, "set-pinned", {}, pinVerify, f.deps);
+    } catch (error) {
+      failure = error;
+    }
+    expect(f.deps.run).toHaveBeenCalledTimes(1);
+    expect(classifyError((failure as Error).message, failure)).toMatchObject({
+      code: "verification_failed",
+      indeterminate: true,
+    });
+  });
   it("verifies appended text from Notes HTML when native tags replace rich-text ranges", () => {
     expect(() =>
       assertAppendedVisibleText(
@@ -257,7 +274,7 @@ describe("background note mutation boundaries", () => {
   it("rejects a scope marker found only in the title line (#248)", () => {
     const f = fixture();
     f.before.title = "Garden planning ideas";
-    f.before.rich.text = "Garden planning ideas\nUnique project marker";
+    f.before.rich = plainRichNote("Garden planning ideas\nUnique project marker");
     expect(() =>
       mutateBackground(
         { ...request, scopeText: "Garden planning ideas" },
@@ -413,25 +430,34 @@ describe("heading readback", () => {
 });
 
 describe("preservation verification", () => {
-  it("allows Notes to normalize formatting of an object placeholder without changing visible text styles", () => {
+  it("rejects retained object-placeholder formatting normalization as unverified", () => {
     const before = snapshot(),
       after = snapshot();
-    before.rich.text = after.rich.text = "Text\n\ufffc";
+    before.rich = plainRichNote("Text\n\ufffc");
+    after.rich = plainRichNote("Text\n\ufffc");
     before.rich.styleRuns = [
-      { start: 0, length: 4, signature: "bold" },
-      { start: 4, length: 2, signature: "old object paragraph" },
+      { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
+      { start: 4, length: 2, signature: "old object paragraph", nativeSemantics: plainSemantics() },
     ];
     after.rich.styleRuns = [
-      { start: 0, length: 4, signature: "bold" },
-      { start: 4, length: 2, signature: "normalized object paragraph" },
+      { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
+      {
+        start: 4,
+        length: 2,
+        signature: "normalized object paragraph",
+        nativeSemantics: plainSemantics(),
+      },
     ];
-    expect(() => assertPreserved(before, after, { append: true })).not.toThrow();
+    expect(() => assertPreserved(before, after, { append: true })).toThrow(/formatting/);
     after.rich.styleRuns[0].signature = "plain";
     expect(() => assertPreserved(before, after, { append: true })).toThrow(/formatting/);
   });
   it("rejects a checklist recreated with identical text but a different native ID", () => {
     const before = snapshot(),
       after = snapshot();
+    before.rich = plainRichNote("Item");
+    after.rich = plainRichNote("Item");
+    before.rich.hasChecklist = after.rich.hasChecklist = true;
     before.rich.checklistItems = [{ id: "original", text: "Item", done: false, start: 0 }];
     after.rich.checklistItems = [{ id: "replacement", text: "Item", done: false, start: 0 }];
     expect(() => assertPreserved(before, after, { append: true })).toThrow(/identity/);
@@ -439,14 +465,14 @@ describe("preservation verification", () => {
   it("rejects text edits hidden behind a successful pin or append", () => {
     const a = snapshot(),
       b = snapshot();
-    b.rich.text = "Changed project marker";
+    b.rich = plainRichNote("Changed project marker");
     expect(() => assertPreserved(a, b, { append: true })).toThrow(/text/);
   });
   it("rejects loss of existing native objects", () => {
     const a = snapshot(),
       b = snapshot();
     a.rich.nativeObjectIds = ["table-id"];
-    expect(() => assertPreserved(a, b, { append: true })).toThrow(/object/);
+    expect(() => assertPreserved(a, b, { append: true })).toThrow(/object|metadata/);
   });
   it("rejects a changed checklist state with identical visible text", () => {
     const a = snapshot(),
@@ -465,17 +491,23 @@ describe("preservation verification", () => {
   it("rejects rich formatting changes even when text and links are unchanged", () => {
     const a = snapshot(),
       b = snapshot();
-    a.rich.styleRuns = [{ start: 0, length: 21, signature: "bold" }];
-    b.rich.styleRuns = [{ start: 0, length: 21, signature: "plain" }];
+    a.rich.styleRuns = [
+      { start: 0, length: 21, signature: "bold", nativeSemantics: plainSemantics() },
+    ];
+    b.rich.styleRuns = [
+      { start: 0, length: 21, signature: "plain", nativeSemantics: plainSemantics() },
+    ];
     expect(() => assertPreserved(a, b, { append: true })).toThrow(/formatting/);
   });
   it("accepts equivalent split attribute runs", () => {
     const a = snapshot(),
       b = snapshot();
-    a.rich.styleRuns = [{ start: 0, length: 21, signature: "bold" }];
+    a.rich.styleRuns = [
+      { start: 0, length: 21, signature: "bold", nativeSemantics: plainSemantics() },
+    ];
     b.rich.styleRuns = [
-      { start: 0, length: 6, signature: "bold" },
-      { start: 6, length: 15, signature: "bold" },
+      { start: 0, length: 6, signature: "bold", nativeSemantics: plainSemantics() },
+      { start: 6, length: 15, signature: "bold", nativeSemantics: plainSemantics() },
     ];
     expect(() => assertPreserved(a, b, { append: true })).not.toThrow();
   });

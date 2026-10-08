@@ -30,7 +30,6 @@ import {
 } from "../utils/attachmentAssets.js";
 import {
   enrichNoteRead,
-  linkSignature,
   readRichNote,
   richContentHash,
   type RichNote,
@@ -41,6 +40,10 @@ import {
   pasteboardFilename,
 } from "../utils/pasteboardFreeze.js";
 import type { PasteboardAttachmentSource } from "../types.js";
+import {
+  assertRetainedRichContent,
+  requirePreservationMetadata,
+} from "../utils/richContentPreservation.js";
 
 // Accepts the x-coredata id as before, plus the note's Notes UUID or numeric
 // Core Data key, resolved to the x-coredata id before the handler runs.
@@ -76,34 +79,14 @@ function readSnapshot(manager: AppleNotesManager, id: string): Snapshot {
   // background writes do; assertExistingContentPreserved checks the objects.
   if (enriched.revision !== rich.revision)
     throw new Error("Native metadata changed during read; read the note again");
+  requirePreservationMetadata(rich);
   return { id, title: note.title, body, rich, hash: richContentHash(body, enriched) };
 }
 
 function assertExistingContentPreserved(before: Snapshot, after: Snapshot) {
   if (before.id !== after.id || before.title !== after.title)
     throw new Error("Note identity changed");
-  const tidy = (text: string) => text.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
-  if (!tidy(after.rich.text).startsWith(tidy(before.rich.text)))
-    throw new Error("Existing note text was not preserved");
-  if (
-    linkSignature(before.rich.links) !==
-    linkSignature(after.rich.links.slice(0, before.rich.links.length))
-  )
-    throw new Error("Existing links were not preserved");
-  if (before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)))
-    throw new Error("Existing native object was lost");
-  if (before.rich.nativeTags.some((tag) => !after.rich.nativeTags.includes(tag)))
-    throw new Error("Existing native tag was lost");
-  for (const item of before.rich.checklistItems || []) {
-    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
-    if (!actual || actual.text !== item.text || actual.done !== item.done)
-      throw new Error("Existing checklist item identity or state changed");
-  }
-  for (const object of before.rich.objectData || []) {
-    const actual = after.rich.objectData?.find((current) => current.id === object.id);
-    if (!actual || actual.mergeable !== object.mergeable || actual.view !== object.view)
-      throw new Error("Existing native object content or presentation changed");
-  }
+  assertRetainedRichContent(before.rich, after.rich, { kind: "append" });
 }
 
 function localAttachment(path: string): Buffer {
@@ -647,7 +630,20 @@ function attachFile(
           }
         : {}),
     };
+  } catch (error) {
+    if (progress.insertionStarted)
+      throw new CodedError(
+        `Attachment outcome uncertain; read the exact note before any retry: ${error instanceof Error ? error.message : String(error)}`,
+        { code: "verification_failed", indeterminate: true }
+      );
+    throw error;
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    try {
+      rmSync(directory, { recursive: true, force: true });
+    } catch {
+      // A cleanup failure cannot turn a verified write or an indeterminate
+      // insertion into a pre-dispatch error that suggests a safe retry.
+      console.error("Could not remove private temporary attachment files");
+    }
   }
 }

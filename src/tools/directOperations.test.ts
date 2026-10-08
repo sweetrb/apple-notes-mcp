@@ -19,6 +19,7 @@ vi.mock("../utils/pasteboardFreeze.js", async (original) => ({
   freezePasteboard: pasteboard.freeze,
 }));
 import { registerDirectOperations } from "./directOperations.js";
+import { plainRichNote } from "../utils/__fixtures__/retainedRichNote.js";
 import { PasteboardError } from "../utils/pasteboardFreeze.js";
 
 const directories: string[] = [];
@@ -45,19 +46,7 @@ describe("direct Notes operations", () => {
     symlinkSync(target, path);
 
     rich.enrich.mockReturnValue({ complete: true, revision: "rich-before" });
-    rich.read.mockReturnValue({
-      text: "existing",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "rich-before",
-      objects: [],
-      checklistItems: [],
-      styleRuns: [],
-      objectData: [],
-    });
+    rich.read.mockReturnValue({ ...plainRichNote("existing"), revision: "rich-before" });
     rich.hash.mockReturnValue("revision");
     const manager = {
       getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
@@ -86,24 +75,18 @@ describe("direct Notes operations", () => {
     directories.push(directory);
     const path = join(directory, "example.txt");
     writeFileSync(path, bytes);
-    const before = {
-      text: "existing",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "rich-before",
-      objects: [],
-      checklistItems: [],
-      styleRuns: [],
-      objectData: [],
-    };
+    const before = { ...plainRichNote("existing"), revision: "rich-before" };
     const after = {
       ...before,
       revision: "rich-after",
+      text: "existing\ufffc",
       nativeObjectIds: ["new-object"],
-      objectData: [{ id: "new-object", pk: 3, type: "file", mergeable: "", view: null }],
+      hasNativeObjects: true,
+      objects: [{ id: "new-object", type: "file", start: 8, length: 1 }],
+      styleRuns: [{ ...before.styleRuns![0], length: 9 }],
+      objectData: [
+        { id: "new-object", pk: 3, type: "file", mergeable: "", view: null, altText: null },
+      ],
     };
     rich.enrich
       .mockReturnValueOnce({ complete: true, revision: "rich-before" })
@@ -146,19 +129,7 @@ describe("direct Notes operations", () => {
     const path = join(directory, "large.png");
     writeFileSync(path, bytes);
     rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
-    rich.read.mockReturnValue({
-      text: "existing",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "rich",
-      objects: [],
-      checklistItems: [],
-      styleRuns: [],
-      objectData: [],
-    });
+    rich.read.mockReturnValue({ ...plainRichNote("existing"), revision: "rich" });
     rich.hash.mockReturnValue("revision");
     const manager = {
       getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
@@ -196,19 +167,7 @@ describe("direct Notes operations", () => {
     const path = join(directory, "large.png");
     writeFileSync(path, bytes);
     rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
-    rich.read.mockReturnValue({
-      text: "existing",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "rich",
-      objects: [],
-      checklistItems: [],
-      styleRuns: [],
-      objectData: [],
-    });
+    rich.read.mockReturnValue({ ...plainRichNote("existing"), revision: "rich" });
     rich.hash.mockReturnValue("revision");
     const manager = {
       getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
@@ -235,19 +194,7 @@ describe("attachment filename override and create-then-attach", () => {
   const id = "x-coredata://ABC/ICNote/p1";
   const attachmentId = "x-coredata://ABC/ICAttachment/p3";
   const bytes = Buffer.from("synthetic bytes");
-  const richBase = {
-    text: "existing",
-    links: [],
-    nativeTags: [],
-    nativeObjectIds: [],
-    hasNativeObjects: false,
-    hasChecklist: false,
-    revision: "rich",
-    objects: [],
-    checklistItems: [],
-    styleRuns: [],
-    objectData: [],
-  };
+  const richBase = { ...plainRichNote("existing"), revision: "rich" };
   const source = () => {
     const directory = mkdtempSync(join(tmpdir(), "direct-operation-name-test-"));
     directories.push(directory);
@@ -283,6 +230,52 @@ describe("attachment filename override and create-then-attach", () => {
       }>;
     return { manager, handler };
   };
+
+  it.each(["format", "metadata", "revision", "read"])(
+    "keeps attachment %s readback failure indeterminate after dispatch",
+    async (failure) => {
+      const { manager, handler } = setup("source.txt");
+      const before = { ...plainRichNote("existing"), revision: "rich" };
+      const after = structuredClone(before);
+      if (failure === "format") after.styleRuns![0].signature = "changed";
+      if (failure === "metadata") delete after.styleRuns;
+      if (failure === "revision") after.revision = "raced";
+      rich.read
+        .mockReturnValueOnce(before)
+        .mockReturnValueOnce(before)
+        .mockImplementationOnce(() => {
+          if (failure === "read") throw new Error("Locked notes are unavailable during readback");
+          return after;
+        });
+      const result = await handler("add-attachment")({
+        id,
+        expectedContentHash: "revision",
+        path: source(),
+      });
+      expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        isError: true,
+        structuredContent: { code: "verification_failed", indeterminate: true },
+      });
+      expect(result.structuredContent).not.toHaveProperty("committed", false);
+      expect(result.content[0].text).toMatch(/read the exact note before any retry/);
+    }
+  );
+  it("refuses unavailable attachment preservation metadata before dispatch", async () => {
+    const { manager, handler } = setup("source.txt");
+    rich.read.mockReturnValue({
+      ...plainRichNote("existing"),
+      revision: "rich",
+      styleRuns: undefined,
+    });
+    const result = await handler("add-attachment")({
+      id,
+      expectedContentHash: "revision",
+      path: source(),
+    });
+    expect(result.isError).toBe(true);
+    expect(manager.addAttachmentById).not.toHaveBeenCalled();
+  });
 
   /** A frozen pasteboard copy named like the real one would be. */
   const frozen = (name: string, kind: "data" | "file" = "data", type = "public.png") => {
@@ -756,19 +749,7 @@ describe("attachment filename override and create-then-attach", () => {
 describe("add-attachment verifies through NoteStore when AppleScript lists nothing (#236)", () => {
   const id = "x-coredata://ABC/ICNote/p1";
   const bytes = Buffer.from("%PDF-1.7 synthetic");
-  const richBase = {
-    text: "existing",
-    links: [],
-    nativeTags: [],
-    nativeObjectIds: [],
-    hasNativeObjects: false,
-    hasChecklist: false,
-    revision: "rich",
-    objects: [],
-    checklistItems: [],
-    styleRuns: [],
-    objectData: [],
-  };
+  const richBase = { ...plainRichNote("existing"), revision: "rich" };
   const row = (
     pk: number,
     identifier: string,

@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-08
+
+### Fixed
+
+- Attachment and background write verification now requires complete native preservation metadata and checks retained text and whitespace, formatting, link ranges, checklist identities/state/ranges, and native object payloads and placement. End-appends and removal of mapped native tag pills have explicit allowed changes; known paragraph UUID regeneration retains the existing decoder policy.
+- Attachment readback failures after insertion starts now remain explicitly indeterminate, including read races and missing preservation metadata. Temporary-file cleanup cannot override that outcome or a verified receipt. Native tag additions also preserve retained zero-length formatting metadata.
+
+- Native tag readback accepts revision-consistent rich metadata even when the
+  note cannot be represented completely as AppleScript HTML. Missing or
+  inconsistent preservation metadata still refuses the write.
+- Native tag verification now preserves retained text and whitespace, links,
+  formatting, checklist identities/state/ranges, native object payloads and
+  existing tag labels around only proven new tag additions. Ambiguous objects
+  or unsupported conversion ranges fail closed. A post-dispatch read failure
+  reports `verification_failed` with an indeterminate outcome and keeps the
+  Shortcut diagnosis, so callers read before retrying.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed
@@ -232,7 +249,9 @@ Split out of #262 per the maintainer's review.
 - **`brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12, clearing GHSA-q2hr-2g5m-vwhr (medium) — dev toolchain only, not in the shipped bundle.** A further incomplete-fix variant of the same unbounded-expansion class as GHSA-mh99-v99m-4gvg. Per the advisory's reported ranges, only the 1.x and 5.x lines were vulnerable; the 2.x floor (2.1.4) is untouched. Reached via eslint → minimatch on both lines, so development scope only. `pnpm-workspace.yaml`'s two-sided override ranges are raised accordingly. Clears Dependabot alerts #33 and #32.
 
 ## [2.9.33] - 2026-09-30
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.9.32] - 2026-09-29

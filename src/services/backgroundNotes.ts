@@ -3,7 +3,16 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AppleNotesManager, buildFolderReference, splitFolderPath } from "./appleNotesManager.js";
-import { nativeTagsStatus, normalizeNativeTags, runNativeTagsShortcut } from "./nativeTags.js";
+import {
+  nativeTagsStatus,
+  normalizeNativeTags,
+  runNativeTagsShortcut,
+  nativeTagAdditionPreserved,
+} from "./nativeTags.js";
+import {
+  assertRetainedRichContent,
+  requirePreservationMetadata,
+} from "../utils/richContentPreservation.js";
 import { shortcutConsentHint } from "./shortcutConsent.js";
 import {
   enrichNoteRead,
@@ -331,79 +340,31 @@ export function backgroundDependencies(manager: AppleNotesManager): BackgroundDe
 export function assertPreserved(
   before: BackgroundSnapshot,
   after: BackgroundSnapshot,
-  options: { append?: boolean; tagChange?: string } = {}
+  options: { append?: boolean; tagChange?: string; removeTag?: boolean } = {}
 ) {
   if (before.id !== after.id || before.title !== after.title)
     throw new Error("Note identity changed");
-  const tidy = (s: string) => s.replace(/\r\n/g, "\n").replace(/[\s\ufffc]+$/gu, "");
-  let oldText = tidy(before.rich.text),
-    newText = tidy(after.rich.text);
-  if (options.tagChange) {
-    const escaped = options.tagChange.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const strip = (s: string) =>
-      s
-        .replace(new RegExp(`#${escaped}(?![\\p{L}\\p{N}_-])`, "gu"), "")
-        .replace(/[\s\ufffc]/gu, "");
-    oldText = strip(oldText);
-    newText = strip(newText);
-  }
-  if (options.append ? !newText.startsWith(oldText) : newText !== oldText)
-    throw new Error("Existing note text was not preserved");
-  const links = options.append
-    ? after.rich.links.slice(0, before.rich.links.length)
-    : after.rich.links;
-  if (linkSignature(before.rich.links) !== linkSignature(links))
-    throw new Error("Existing links were not preserved");
-  if (
-    !options.tagChange &&
-    before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id))
-  )
-    throw new Error("Existing native object was lost");
-  if (
-    JSON.stringify(before.checklist) !==
-    JSON.stringify(
-      options.append ? after.checklist.slice(0, before.checklist.length) : after.checklist
+  if (options.tagChange && !options.removeTag) {
+    if (!nativeTagAdditionPreserved(before.rich, after.rich, [options.tagChange]))
+      throw new Error("Native tag addition or retained content was not verified");
+  } else
+    assertRetainedRichContent(
+      before.rich,
+      after.rich,
+      options.tagChange
+        ? { kind: "remove-tag", tag: options.tagChange }
+        : options.append
+          ? { kind: "append" }
+          : { kind: "unchanged" }
+    );
+  // The independent checklist reader must agree with the rich native snapshot.
+  // Tag removal can shorten item text only through the explicitly mapped pill.
+  for (const snapshot of [before, after])
+    if (
+      JSON.stringify(snapshot.checklist) !==
+      JSON.stringify(snapshot.rich.checklistItems!.map(({ text, done }) => ({ text, done })))
     )
-  )
-    throw new Error("Existing checklist items changed");
-  for (const item of before.rich.checklistItems || []) {
-    const actual = after.rich.checklistItems?.find((current) => current.id === item.id);
-    if (!actual || actual.text !== item.text || actual.done !== item.done)
-      throw new Error("Existing checklist item identity or state changed");
-  }
-  if (
-    before.rich.nativeTags
-      .filter((t) => t !== options.tagChange)
-      .some((t) => !after.rich.nativeTags.includes(t))
-  )
-    throw new Error("Existing native tag was lost");
-  const allowedRemoved = options.tagChange
-    ? before.rich.nativeTagObjectIds?.[options.tagChange] || []
-    : [];
-  for (const object of before.rich.objectData || []) {
-    if (allowedRemoved.includes(object.id)) continue;
-    const actual = after.rich.objectData?.find((o) => o.id === object.id);
-    if (!actual || actual.mergeable !== object.mergeable || actual.view !== object.view)
-      throw new Error("Existing native object content or presentation changed");
-  }
-  if (!options.tagChange && before.rich.styleRuns && after.rich.styleRuns) {
-    const end = before.rich.text.trimEnd().length;
-    for (const oldRun of before.rich.styleRuns)
-      for (const newRun of after.rich.styleRuns) {
-        const overlapStart = Math.max(oldRun.start, newRun.start);
-        const overlapEnd = Math.min(
-          end,
-          oldRun.start + oldRun.length,
-          newRun.start + newRun.length
-        );
-        if (
-          overlapStart < overlapEnd &&
-          /[^\s\ufffc]/u.test(before.rich.text.slice(overlapStart, overlapEnd)) &&
-          oldRun.signature !== newRun.signature
-        )
-          throw new Error("Existing rich formatting changed");
-      }
-  }
+      throw new Error("Native checklist readers disagree about item text or state");
 }
 
 /** Describe a failed or stalled bridge run for an uncertain-outcome message. */
@@ -453,6 +414,7 @@ export function mutateBackground(
   const before = deps.read(request.id);
   if (before.hash !== request.expectedContentHash)
     throw new Error("Note revision changed; read it again");
+  requirePreservationMetadata(before.rich);
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
   // The bridge's Find Notes step matches scopeText against the note's Body,
@@ -466,8 +428,9 @@ export function mutateBackground(
   const candidates = deps.candidates(before.title, request.scopeText);
   if (candidates.length !== 1 || candidates[0] !== request.id)
     throw new Error("Ambiguous note selection; nothing changed");
-  if (deps.read(request.id).hash !== before.hash)
-    throw new Error("Note revision changed during preflight");
+  const current = deps.read(request.id);
+  if (current.hash !== before.hash) throw new Error("Note revision changed during preflight");
+  requirePreservationMetadata(current.rich);
   let transportUncertain = false;
   let transportMessage = "";
   let transportError:
@@ -639,7 +602,7 @@ export function setNativeTag(
     request.present ? "add-tag" : "remove-tag",
     { tag },
     (before, after) => {
-      assertPreserved(before, after, { tagChange: tag });
+      assertPreserved(before, after, { tagChange: tag, removeTag: !request.present });
       if (after.rich.nativeTags.includes(tag) !== request.present)
         throw new Error("Native tag state not verified");
       // Other native objects must be retained; only this tag's attachment may disappear.
