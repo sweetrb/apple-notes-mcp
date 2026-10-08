@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-08
+
+### Fixed
+
+- Native HTML append verification now treats `<del>` as inline text. Notes
+  rewrites `one<del>two</del>three` as `one<strike>two</strike>three`, but the
+  verifier inserted spaces around `<del>` and reported the complete append
+  as indeterminate. Reproduced through Background Operations v5 on macOS
+  27.2. The shared comparator now agrees with that readback without changing
+  revision, identity, link, native object, checklist or formatting guards.
+  This fixes a demonstrated trigger related to #283; the trigger in the
+  original private-note reports has not been established.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed

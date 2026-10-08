@@ -48788,7 +48788,7 @@ function appendMarkdownHtml(markdown, options = {}) {
 }
 
 // src/utils/noteRevision.ts
-var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+var INLINE_TAG = /^<\/?(?:b|i|u|s|strike|del|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
 function comparableVisibleText(html) {
   return decodeHtmlEntities(
     html.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]*>/g, (tag) => INLINE_TAG.test(tag) ? "" : " ")
