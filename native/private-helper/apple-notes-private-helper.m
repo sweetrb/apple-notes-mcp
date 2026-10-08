@@ -134,6 +134,14 @@ static const APIRequirement kReadAPI[] = {
     {"ICTTMergeableString", "attributedString", NO},
 };
 
+// Checklist inspection needs only getters; no editing or todo constructors.
+static const APIRequirement kChecklistReadAPI[] = {
+    {"ICTTParagraphStyle", "style", NO},
+    {"ICTTParagraphStyle", "todo", NO},
+    {"ICTTTodo", "uuid", NO},
+    {"ICTTTodo", "done", NO},
+};
+
 // Core Data properties are @dynamic: their accessors do not exist until Core
 // Data generates them, so they are checked against the managed object model
 // (entity name, then property names) rather than with respondsToSelector:.
@@ -207,7 +215,7 @@ static NSArray<NSString *> *MissingModelProperties(void) {
   return missing;
 }
 
-typedef NS_ENUM(NSInteger, Feature) { FeatureModel, FeatureRead };
+typedef NS_ENUM(NSInteger, Feature) { FeatureModel, FeatureRead, FeatureChecklistRead };
 
 static NSArray<NSString *> *MissingForFeature(Feature feature) {
   LoadFramework();
@@ -219,6 +227,8 @@ static NSArray<NSString *> *MissingForFeature(Feature feature) {
     [missing addObjectsFromArray:MissingModelProperties()];
     [missing addObjectsFromArray:MissingAPI(kReadAPI, COUNT(kReadAPI))];
   }
+  if (feature == FeatureChecklistRead)
+    [missing addObjectsFromArray:MissingAPI(kChecklistReadAPI, COUNT(kChecklistReadAPI))];
   return missing;
 }
 
@@ -401,6 +411,97 @@ static NSString *BodyText(id mergeableString) {
   return [attributed isKindOfClass:[NSAttributedString class]] ? [attributed string] : nil;
 }
 
+// TTStyle runs can include the previous line's terminator. Group by native
+// todo identity, not by a visible line or a checkbox-like text prefix.
+// This operates only on an attributed-string snapshot, never the store.
+static NSArray<NSDictionary *> *ChecklistItems(NSAttributedString *body) {
+  NSString *text = body.string;
+  NSCharacterSet *newlines = NSCharacterSet.newlineCharacterSet;
+  NSMutableArray<NSString *> *order = [NSMutableArray array];
+  NSMutableDictionary<NSString *, NSMutableDictionary *> *groups = [NSMutableDictionary dictionary];
+  [body enumerateAttribute:@"TTStyle"
+                   inRange:NSMakeRange(0, body.length)
+                   options:0
+                usingBlock:^(id style, NSRange run, BOOL *stop) {
+                  (void)stop;
+                  if (!style) return;
+                  if (![style respondsToSelector:sel_registerName("style")])
+                    Fail(@"private_api_unavailable", @"A native paragraph style has no style getter", nil);
+                  unsigned int kind =
+                      ((unsigned int (*)(id, SEL))objc_msgSend)(style, sel_registerName("style"));
+                  if (kind != 103) return; // Notes' native checklist paragraph style.
+                  if (![style respondsToSelector:sel_registerName("todo")])
+                    Fail(@"private_api_unavailable", @"A native checklist style has no todo getter", nil);
+                  id todo = Send(style, "todo");
+                  if (!todo || ![todo respondsToSelector:sel_registerName("uuid")] ||
+                      ![todo respondsToSelector:sel_registerName("done")])
+                    Fail(@"private_api_unavailable", @"A native checklist todo cannot be read", nil);
+                  id uuid = Send(todo, "uuid");
+                  if (![uuid isKindOfClass:[NSUUID class]])
+                    Fail(@"unsupported_note", @"A native checklist todo has no valid UUID", nil);
+                  NSString *hex = [[[uuid UUIDString] stringByReplacingOccurrencesOfString:@"-"
+                                                                                withString:@""] lowercaseString];
+                  NSMutableDictionary *group = groups[hex];
+                  if (!group) {
+                    group = [@{@"uuid" : [uuid UUIDString],
+                               @"ranges" : [NSMutableArray array],
+                               @"states" : [NSMutableSet set]} mutableCopy];
+                    groups[hex] = group;
+                    [order addObject:hex];
+                  }
+                  NSNumber *done = @(SendBool(todo, "done"));
+                  [group[@"ranges"] addObject:[NSValue valueWithRange:run]];
+                  [group[@"states"] addObject:done];
+                  if (!group[@"fallbackDone"]) group[@"fallbackDone"] = done;
+                  // Prefer the first styled visible character over a leading
+                  // newline, whose done bit can differ in malformed content.
+                  for (NSUInteger i = run.location; i < NSMaxRange(run); i++) {
+                    if (![newlines characterIsMember:[text characterAtIndex:i]]) {
+                      if (!group[@"anchor"]) {
+                        group[@"anchor"] = @(i);
+                        group[@"done"] = done;
+                      }
+                      break;
+                    }
+                  }
+                }];
+  NSMutableArray *items = [NSMutableArray array];
+  for (NSString *hex in order) {
+    NSDictionary *group = groups[hex];
+    NSArray<NSValue *> *ranges = group[@"ranges"];
+    NSRange first = ranges.firstObject.rangeValue, last = ranges.lastObject.rangeValue;
+    NSUInteger start = first.location, end = NSMaxRange(last), covered = 0;
+    for (NSValue *range in ranges) covered += range.rangeValue.length;
+    NSUInteger anchor = group[@"anchor"] ? [group[@"anchor"] unsignedIntegerValue] : start;
+    NSUInteger lineStart = 0, lineEnd = 0;
+    [text getLineStart:&lineStart end:NULL contentsEnd:&lineEnd forRange:NSMakeRange(anchor, 0)];
+    NSUInteger visibleStart = start, visibleEnd = end;
+    while (visibleStart < visibleEnd && [newlines characterIsMember:[text characterAtIndex:visibleStart]])
+      visibleStart++;
+    while (visibleEnd > visibleStart && [newlines characterIsMember:[text characterAtIndex:visibleEnd - 1]])
+      visibleEnd--;
+    BOOL spansLines = [text rangeOfCharacterFromSet:newlines
+                                           options:0
+                                             range:NSMakeRange(visibleStart, visibleEnd - visibleStart)].location != NSNotFound;
+    [items addObject:@{
+      @"todoIdentifier" : hex,
+      @"uuid" : group[@"uuid"],
+      @"index" : @(items.count),
+      @"done" : group[@"done"] ?: group[@"fallbackDone"],
+      @"text" : [text substringWithRange:NSMakeRange(lineStart, lineEnd - lineStart)],
+      @"lineStart" : @(lineStart),
+      @"lineLengthUTF16" : @(lineEnd - lineStart),
+      // The envelope includes gaps when contiguous is false.
+      @"styledStart" : @(start),
+      @"styledLengthUTF16" : @(end - start),
+      @"contiguous" : @((BOOL)(covered == end - start)),
+      @"consistent" : @((BOOL)([group[@"states"] count] == 1)),
+      @"spansLines" : @(spansLines),
+    }];
+  }
+  return items;
+}
+
 static BOOL NotesAppRunning(void) {
   return [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.Notes"].count > 0;
 }
@@ -472,6 +573,7 @@ static NSString *RequireIdentifier(NSDictionary *request) {
 static NSDictionary *HandleHello(NSDictionary *request);
 static NSDictionary *HandleProbe(NSDictionary *request);
 static NSDictionary *HandleReadNoteState(NSDictionary *request);
+static NSDictionary *HandleReadChecklist(NSDictionary *request);
 
 typedef struct {
   const char *name;
@@ -485,6 +587,7 @@ static const ActionSpec kActions[] = {
     {"hello", "", HandleHello},
     {"probe", "", HandleProbe},
     {"read_note_state", "identifier", HandleReadNoteState},
+    {"read_checklist", "identifier", HandleReadChecklist},
 };
 
 static NSArray<NSString *> *ActionNames(void) {
@@ -562,6 +665,7 @@ static NSDictionary *HandleProbe(NSDictionary *request) {
     @"syncHostRunning" : @(NotesAppRunning()),
     @"features" : @{
       @"readNoteState" : FeatureReport(FeatureRead, contextOK, contextReason),
+      @"readChecklist" : FeatureReport(FeatureChecklistRead, contextOK, contextReason),
     },
   };
 }
@@ -575,6 +679,33 @@ static NSDictionary *HandleReadNoteState(NSDictionary *request) {
   result[@"status"] = @"ok";
   result[@"syncHostRunning"] = @(NotesAppRunning());
   return result;
+}
+
+static NSDictionary *HandleReadChecklist(NSDictionary *request) {
+  NSString *identifier = RequireIdentifier(request);
+  RequireFeature(FeatureChecklistRead);
+  NSManagedObjectContext *context = OpenReadOnlyContext(ResolveStore());
+  NSManagedObject *note = FetchNote(context, identifier);
+  if (SendBool(note, "isPasswordProtected"))
+    Fail(@"unsupported_note", @"Locked notes are not supported", nil);
+  id mergeable = Send(note, "mergeableString");
+  if (!mergeable || ![mergeable respondsToSelector:sel_registerName("attributedString")])
+    Fail(@"unsupported_note", @"The note's native body is unavailable", nil);
+  id body = Send(mergeable, "attributedString");
+  if (![body isKindOfClass:[NSAttributedString class]])
+    Fail(@"unsupported_note", @"The note's native body is unavailable", nil);
+  NSArray<NSDictionary *> *items = ChecklistItems(body);
+  NSUInteger checked = 0;
+  for (NSDictionary *item in items) if ([item[@"done"] boolValue]) checked++;
+  return @{
+    @"status" : @"ok",
+    @"identifier" : identifier,
+    @"revision" : RevisionToken(note),
+    @"items" : items,
+    @"total" : @(items.count),
+    @"checked" : @(checked),
+    @"syncHostRunning" : @(NotesAppRunning()),
+  };
 }
 
 #pragma mark - Main

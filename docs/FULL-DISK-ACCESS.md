@@ -23,7 +23,7 @@ These groups use protected Notes data:
 | Portable exports | `export-notes-markdown`, `export-notes-html`, and attachment/media exports that read the Notes store |
 | Attachments and drawings | `list-attachments` with `includePaths` or `firstImage`, `export-attachments`, `list-paper-attachments`, `export-paper-image`, `get-note-drawings`, and `transcribe-note-audio` |
 | Guarded operations and identifiers | `delete-folder-by-id`; database-backed copy/active-note deletion guards; UUID or numeric note/folder selectors; native preservation/readback and Smart Folder destination detection |
-| Optional private helper | `native-note-state`; the helper is read-only and requires its separate opt-in and build |
+| Optional private helper | `native-note-state`, `native-checklist-state`; the helper is read-only and requires its separate opt-in and build |
 
 `get-note-link` needs FDA on macOS 26 and later. On macOS 12–15 it can fall back to Notes' AppleScript link property. `get-note-markdown` can still return Markdown without FDA, but native checklist done/undone annotations are unavailable.
 

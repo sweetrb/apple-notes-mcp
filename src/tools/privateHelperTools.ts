@@ -3,9 +3,10 @@
  *
  * - `native-helper-status`: install state, opt-in state, and the live probe.
  * - `native-note-state`: read one note's native state and change token.
+ * - `native-checklist-state`: read native todo identities and done state.
  *
- * Both are READ-ONLY. The helper has no write action: write support was
- * deliberately deferred by the maintainer (#181, #204). Both tools are always
+ * All are READ-ONLY. The helper has no write action: write support was
+ * deliberately deferred by the maintainer (#181, #204). These tools are always
  * registered so the tool list does not change with the environment, and each
  * refuses with a machine-readable `code` when the helper is off, missing,
  * stale, or unsupported on this macOS.
@@ -19,33 +20,35 @@ import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import { CodedError, errorResult, type ErrorCode } from "../utils/errorCodes.js";
 import {
   PrivateHelperError,
+  assertPrivateHelperReady,
   defaultDeps,
   privateHelperCapabilities,
+  readChecklistState,
   readNoteState,
   type PrivateHelperDeps,
 } from "../services/privateHelper.js";
-import { UUID_PATTERN } from "../utils/noteIdentifiers.js";
+import { UUID_PATTERN, lookupStableIdentifiers } from "../utils/noteIdentifiers.js";
 
 const coreDataId = z.string().regex(/^x-coredata:\/\/[0-9A-F-]+\/ICNote\/p\d+$/i);
 const notesUuid = z.string().regex(UUID_PATTERN);
 
 /** Resolve the Notes UUID from either an explicit identifier or an x-coredata id. */
 function resolveIdentifier(
-  manager: AppleNotesManager,
+  deps: PrivateHelperDeps,
   args: { identifier?: string; id?: string }
 ): string {
   if (args.identifier && args.id)
     throw new PrivateHelperError("invalid_request", "Pass identifier or id, not both");
   if (args.identifier) return args.identifier;
   if (!args.id) throw new PrivateHelperError("invalid_request", "identifier or id is required");
-  const link = manager.getNoteLinkById(args.id);
-  const match = link?.match(/identifier=([0-9A-F-]{36})$/i);
-  if (!match)
+  assertPrivateHelperReady(deps);
+  const identifier = lookupStableIdentifiers([args.id], "ICNote").get(args.id)?.identifier;
+  if (!identifier || !UUID_PATTERN.test(identifier))
     throw new PrivateHelperError(
       "not_found",
       "Could not resolve that id to a Notes UUID (needs Full Disk Access); pass identifier instead"
     );
-  return match[1];
+  return identifier;
 }
 
 /** Map a helper code onto the server-wide error vocabulary (#185). */
@@ -104,7 +107,7 @@ function helperErrorResult(error: unknown) {
 
 export function registerPrivateHelperTools(
   server: McpServer,
-  manager: AppleNotesManager,
+  _manager: AppleNotesManager,
   depsFactory: () => PrivateHelperDeps = () => defaultDeps()
 ) {
   function tool<S extends z.ZodRawShape>(
@@ -138,7 +141,7 @@ export function registerPrivateHelperTools(
 
   tool(
     "native-helper-status",
-    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state.\n" +
+    "Use when: checking whether the opt-in, read-only native private helper is enabled, built, current, and working on this macOS before calling native-note-state or native-checklist-state.\n" +
       "Returns: enabled flag, installation state (path, manifest, stale/modified checks), the live probe (macOS and Notes versions, framework, store access), and per-feature availability with a machine reason.\n" +
       "Do not use when: checking the Shortcuts bridges (native-tags-status, get-capabilities).\n" +
       "Safety: read-only. The helper is read-only by design (write support was deliberately deferred by the maintainer); the probe opens the Notes store read-only and only when the helper is enabled and installed.",
@@ -166,6 +169,20 @@ export function registerPrivateHelperTools(
       id: coreDataId.optional().describe("x-coredata note id; resolved to a UUID via the database"),
     },
     { readOnlyHint: true, openWorldHint: false },
-    (args, deps) => ({ ...readNoteState(resolveIdentifier(manager, args), deps) })
+    (args, deps) => ({ ...readNoteState(resolveIdentifier(deps, args), deps) })
+  );
+
+  tool(
+    "native-checklist-state",
+    "Use when: reading a note's exact native checklist todo identifiers and done state, including ambiguous style runs.\n" +
+      "Returns: identifier, revision change token, items in first native-style occurrence order, total, checked, and syncHostRunning. Each item has todoIdentifier (32 lowercase hex digits), uuid, index, text and done; line and styled offsets use UTF-16. contiguous=false means the styled envelope includes gaps, consistent=false means runs disagree on done, and spansLines=true means the identity spans multiple lines.\n" +
+      "Do not use when: reading ordinary checkbox-like text (get-note-content) or changing checklist items. Flags describe native identity ambiguity; text is the first visible styled character's line.\n" +
+      "Safety: read-only; requires APPLE_NOTES_MCP_ENABLE_PRIVATE=1, Full Disk Access, and a current built helper. Locked or unavailable native bodies are refused. The helper has no write action.",
+    {
+      identifier: notesUuid.optional().describe("Notes UUID (the notes://showNote identifier)"),
+      id: coreDataId.optional().describe("x-coredata note id; resolved to a UUID via the database"),
+    },
+    { readOnlyHint: true, openWorldHint: false },
+    (args, deps) => ({ ...readChecklistState(resolveIdentifier(deps, args), deps) })
   );
 }

@@ -3,7 +3,7 @@
  * helper binary, so these tests exercise the real spawn, timeout, checksum,
  * and response-validation paths without NotesShared or the Notes store.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,7 @@ import {
   PrivateHelperError,
   READ_ONLY_ACTIONS,
   assertNoteIdentifier,
+  assertPrivateHelperReady,
   callPrivateHelper,
   defaultDeps,
   helperInstallDir,
@@ -23,6 +24,7 @@ import {
   privateHelperCapabilities,
   privateHelperEnabled,
   probePrivateHelper,
+  readChecklistState,
   readNoteState,
   sha256Hex,
   type PrivateHelperDeps,
@@ -48,6 +50,7 @@ process.stdin.on("end", () => {
   if (mode === "not-found") out({ status: "error", code: "not_found", message: "No note has that identifier", hint: "x" }, 1);
   if (mode === "malformed") out({ status: "ok" });
   const feature = (name) => {
+    if (mode === "missing-checklist-api" && name === "checklist") return { available: false, reason: "private_api_unavailable", missing: ["-[ICTTTodo done]"] };
     if (mode === "missing-api") return { available: false, reason: "private_api_unavailable", missing: ["-[ICNote mergeableString]"] };
     if (mode === "missing-api-empty") return { available: false, reason: "private_api_unavailable", missing: [] };
     if (mode === "no-store") return { available: false, reason: "store_unavailable", missing: [] };
@@ -56,11 +59,22 @@ process.stdin.on("end", () => {
   const cloudSync = { available: true, inICloudAccount: true, currentLocalVersion: 4, latestVersionSyncedToCloud: 1, uploadPending: true };
   switch (req.action) {
     case "hello":
-      out({ status: "ok", protocolVersion: Number(process.env.FAKE_PROTOCOL || 1), sourceSha256: process.env.FAKE_SOURCE_SHA || "dev", readOnly: true, actions: ["hello", "probe", "read_note_state"] });
+      out({ status: "ok", protocolVersion: Number(process.env.FAKE_PROTOCOL || 1), sourceSha256: process.env.FAKE_SOURCE_SHA || "dev", readOnly: true, actions: ["hello", "probe", "read_note_state", "read_checklist"] });
     case "probe":
-      out({ status: "ok", protocolVersion: 1, readOnly: true, os: { version: "27.2.0", notesAppVersion: "4.13" }, framework: { loaded: true, error: null }, store: { kind: "live", opened: mode === "ok", reason: null, noteRows: 3 }, syncHostRunning: true, features: { readNoteState: feature("read") } });
+      out({ status: "ok", protocolVersion: 1, readOnly: true, os: { version: "27.2.0", notesAppVersion: "4.13" }, framework: { loaded: true, error: null }, store: { kind: "live", opened: mode === "ok", reason: null, noteRows: 3 }, syncHostRunning: true, features: { readNoteState: feature("read"), readChecklist: feature("checklist") } });
     case "read_note_state":
       out({ status: "ok", identifier: req.identifier, objectURI: "x-coredata://S/ICNote/p1", title: "t", modificationDate: "2026-09-23T00:00:00.000Z", folderIdentifier: "F", passwordProtected: false, deletedOrInTrash: false, sharedViaICloud: false, editable: true, revision: "r1:" + "b".repeat(64), cloudSync, syncHostRunning: true, echo: req });
+    case "read_checklist": {
+      if (mode === "locked") out({ status: "error", code: "unsupported_note", message: "Locked notes are not supported" }, 1);
+      const item = { todoIdentifier: "aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa", uuid: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", index: 0, done: false, text: "Milk", lineStart: 6, lineLengthUTF16: 4, styledStart: 5, styledLengthUTF16: 5, contiguous: true, consistent: true, spansLines: false };
+      if (mode === "ambiguous") Object.assign(item, { contiguous: false, consistent: false, spansLines: true, styledLengthUTF16: 20 });
+      if (mode === "bad-identity") item.todoIdentifier = "b".repeat(32);
+      if (mode === "bad-index") item.index = 1;
+      if (mode === "bad-line") item.lineLengthUTF16 = 3;
+      if (mode === "bad-range") item.styledStart = -1;
+      const items = mode === "empty-checklist" ? [] : mode === "duplicate-identity" ? [item, { ...item, index: 1 }] : [item];
+      out({ status: "ok", identifier: mode === "wrong-note" ? "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB" : req.identifier, revision: "r1:" + "b".repeat(64), items, total: mode === "bad-total" ? 0 : items.length, checked: mode === "bad-checked" ? 1 : 0, syncHostRunning: true, echo: req });
+    }
     case "spawned-marker":
       out({ status: "ok", spawned: true });
     default:
@@ -235,12 +249,38 @@ describe("callPrivateHelper", SPAWN_TIMEOUT, () => {
 
   it("is read-only: refuses any action outside the whitelist before spawning", () => {
     fx.install();
-    expect([...READ_ONLY_ACTIONS].sort()).toEqual(["hello", "probe", "read_note_state"]);
-    for (const action of ["append_plain_text", "spawned-marker", "save", "write"]) {
-      const e = caught(() => callPrivateHelper(action, { identifier: NOTE }, fx.deps(ON)));
+    expect([...READ_ONLY_ACTIONS].sort()).toEqual([
+      "hello",
+      "probe",
+      "read_checklist",
+      "read_note_state",
+    ]);
+    const spawn = vi.fn() as unknown as PrivateHelperDeps["spawn"];
+    for (const action of [
+      "append_plain_text",
+      "set_checklist_item",
+      "spawned-marker",
+      "save",
+      "write",
+    ]) {
+      const e = caught(() =>
+        callPrivateHelper(action, { identifier: NOTE }, { ...fx.deps(ON), spawn })
+      );
       expect(e.code).toBe("unknown_action");
       expect(e.message).toMatch(/read-only/);
     }
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("refuses reserved protocol fields before spawning", () => {
+    const spawn = vi.fn() as unknown as PrivateHelperDeps["spawn"];
+    for (const fields of [{ action: "set_checklist_item" }, { protocol: 2 }]) {
+      const e = caught(() =>
+        callPrivateHelper("read_checklist", fields, { ...fx.deps(ON), spawn })
+      );
+      expect(e.code).toBe("invalid_request");
+    }
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("refuses a missing or stale helper even when enabled", () => {
@@ -382,7 +422,7 @@ describe("typed actions", SPAWN_TIMEOUT, () => {
     const probe = probePrivateHelper(fx.deps(ON));
     expect(probe.readOnly).toBe(true);
     expect(probe.features.readNoteState.available).toBe(true);
-    expect(Object.keys(probe.features)).toEqual(["readNoteState"]);
+    expect(Object.keys(probe.features)).toEqual(["readNoteState", "readChecklist"]);
     expect(probe.os.version).toBe("27.2.0");
   });
 
@@ -405,6 +445,83 @@ describe("identifier rules", () => {
   it("requires a UUID-shaped identifier", () => {
     expect(() => assertNoteIdentifier(NOTE.toLowerCase())).not.toThrow();
     expect(() => assertNoteIdentifier("x-coredata://A/ICNote/p1")).toThrow(/UUID/);
+  });
+});
+
+describe("readChecklistState", SPAWN_TIMEOUT, () => {
+  it("checks opt-in and installation before database identity resolution", () => {
+    expect(caught(() => assertPrivateHelperReady(fx.deps())).code).toBe("disabled");
+    expect(caught(() => assertPrivateHelperReady(fx.deps(ON))).code).toBe("helper_not_installed");
+    fx.install({ sourceSha256: "1".repeat(64) });
+    expect(caught(() => assertPrivateHelperReady(fx.deps(ON))).code).toBe("helper_stale");
+    fx.install();
+    expect(() => assertPrivateHelperReady(fx.deps(ON))).not.toThrow();
+  });
+
+  it("returns exact native identity and read-only protocol fields", () => {
+    fx.install();
+    const state = readChecklistState(NOTE, fx.deps(ON));
+    expect(state.echo).toEqual({ protocol: 1, action: "read_checklist", identifier: NOTE });
+    expect(state.items[0]).toMatchObject({
+      todoIdentifier: "aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa",
+      done: false,
+      contiguous: true,
+      consistent: true,
+      spansLines: false,
+    });
+    expect(state).toMatchObject({ total: 1, checked: 0 });
+  });
+
+  it("preserves ambiguity flags and accepts an empty native checklist", () => {
+    fx.install();
+    const ambiguous = readChecklistState(NOTE, fx.deps({ ...ON, FAKE_MODE: "ambiguous" }));
+    expect(ambiguous.items[0]).toMatchObject({
+      contiguous: false,
+      consistent: false,
+      spansLines: true,
+    });
+    const empty = readChecklistState(NOTE, fx.deps({ ...ON, FAKE_MODE: "empty-checklist" }));
+    expect(empty).toMatchObject({ items: [], total: 0, checked: 0 });
+  });
+
+  it("refuses disabled, missing, stale or modified installations before spawning", () => {
+    const spawn = vi.fn() as unknown as PrivateHelperDeps["spawn"];
+    const deps = () => ({ ...fx.deps(ON), spawn });
+    expect(caught(() => readChecklistState(NOTE, { ...fx.deps(), spawn })).code).toBe("disabled");
+    expect(caught(() => readChecklistState(NOTE, deps())).code).toBe("helper_not_installed");
+    fx.install({ sourceSha256: "1".repeat(64) });
+    expect(caught(() => readChecklistState(NOTE, deps())).code).toBe("helper_stale");
+    fx.install();
+    writeFileSync(fx.binaryPath, "modified");
+    expect(caught(() => readChecklistState(NOTE, deps())).code).toBe("helper_modified");
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "malformed",
+    "bad-identity",
+    "bad-index",
+    "bad-line",
+    "bad-range",
+    "duplicate-identity",
+    "bad-total",
+    "bad-checked",
+    "wrong-note",
+  ])("refuses %s native responses", (mode) => {
+    fx.install();
+    expect(caught(() => readChecklistState(NOTE, fx.deps({ ...ON, FAKE_MODE: mode }))).code).toBe(
+      "invalid_response"
+    );
+  });
+
+  it("refuses invalid identifiers and propagates locked-note refusal", () => {
+    fx.install();
+    expect(caught(() => readChecklistState("not-a-uuid", fx.deps(ON))).code).toBe(
+      "invalid_request"
+    );
+    expect(
+      caught(() => readChecklistState(NOTE, fx.deps({ ...ON, FAKE_MODE: "locked" }))).code
+    ).toBe("unsupported_note");
   });
 });
 
@@ -458,11 +575,23 @@ describe("privateHelperCapabilities never throws", SPAWN_TIMEOUT, () => {
     expect(c.features.readNoteState.reason).toBe("store_unavailable");
   });
 
-  it("reports only the read feature, and is available when the probe says so", () => {
+  it("reports both read features when the probe says they are available", () => {
     fx.install();
     const c = privateHelperCapabilities(fx.deps(ON));
     expect(c.readOnly).toBe(true);
-    expect(Object.keys(c.features)).toEqual(["readNoteState"]);
+    expect(Object.keys(c.features)).toEqual(["readNoteState", "readChecklist"]);
     expect(c.features.readNoteState.available).toBe(true);
+    expect(c.features.readChecklist.available).toBe(true);
+  });
+
+  it("reports checklist getters separately from ordinary note reads", () => {
+    fx.install();
+    const c = privateHelperCapabilities(fx.deps({ ...ON, FAKE_MODE: "missing-checklist-api" }));
+    expect(c.features.readNoteState.available).toBe(true);
+    expect(c.features.readChecklist).toMatchObject({
+      available: false,
+      reason: "private_api_unavailable",
+      detail: "missing: -[ICTTTodo done]",
+    });
   });
 });

@@ -878,10 +878,19 @@ One JSON object on stdin (1 MiB cap), one on stdout, exit 0 on success and 1
 on error with `{status:"error", code, message}`. Every request carries
 `protocol: 1`; a mismatch is `protocol_mismatch`. Unknown actions and unknown
 request fields are refused. Actions: `hello` (context-free handshake,
-reports the source SHA-256 compiled in and `readOnly: true`), `probe`, and
-`read_note_state`. There is no write action; `append_plain_text` or any other
+reports the source SHA-256 compiled in and `readOnly: true`), `probe`,
+`read_note_state`, and `read_checklist`. The checklist read probes only
+`ICTTParagraphStyle`'s `style`/`todo` and `ICTTTodo`'s `uuid`/`done` getters,
+separately from ordinary note-state reads. It groups `TTStyle` runs by native
+todo UUID and reports `contiguous`, `consistent`, and `spansLines` ambiguity
+flags; it does not infer native items from visible checkbox text. The native
+synthetic harness (`node scripts/test-private-checklist.mjs`) exercises this
+snapshot parser and context-free dispatcher without NotesShared or any store.
+There is no write action; `append_plain_text` or any other
 name is `unknown_action`, and the TypeScript client refuses anything outside
-its read-only whitelist before spawning. Error codes: `input_too_large`,
+its read-only whitelist before spawning. Caller fields cannot override the
+protocol or action. x-coredata identifiers are resolved by exact read-only
+database lookup, after opt-in and installed-hash checks. Error codes: `input_too_large`,
 `invalid_json`, `protocol_mismatch`, `unknown_action`, `invalid_request`,
 `disabled`, `store_unavailable`, `read_only_violation`,
 `private_api_unavailable`, `not_found`, `unsupported_note`, `internal_error`.

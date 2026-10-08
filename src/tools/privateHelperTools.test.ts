@@ -6,12 +6,21 @@ vi.mock(import("../services/privateHelper.js"), async (importOriginal) => ({
   ...(await importOriginal()),
   privateHelperCapabilities: vi.fn(),
   readNoteState: vi.fn(),
+  readChecklistState: vi.fn(),
+  assertPrivateHelperReady: vi.fn(),
+}));
+vi.mock(import("../utils/noteIdentifiers.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  lookupStableIdentifiers: vi.fn(),
 }));
 import {
   PrivateHelperError,
+  assertPrivateHelperReady,
   privateHelperCapabilities,
   readNoteState,
+  readChecklistState,
 } from "../services/privateHelper.js";
+import { lookupStableIdentifiers } from "../utils/noteIdentifiers.js";
 import { ERROR_CODES } from "../utils/errorCodes.js";
 import { envelopeCode, registerPrivateHelperTools } from "./privateHelperTools.js";
 
@@ -20,6 +29,9 @@ const REV = `r1:${"a".repeat(64)}`;
 const CD = "x-coredata://8FA9FE0E-3B93-4057-AD95-A0EB6D4B5F06/ICNote/p11331";
 
 function fixture(link: string | null = `notes://showNote?identifier=${NOTE}`) {
+  vi.mocked(lookupStableIdentifiers).mockReturnValue(
+    new Map(link ? [[CD, { identifier: NOTE }]] : [])
+  );
   const registerTool = vi.fn();
   const manager = { getNoteLinkById: vi.fn(() => link) } as unknown as AppleNotesManager;
   registerPrivateHelperTools(
@@ -37,18 +49,26 @@ function fixture(link: string | null = `notes://showNote?identifier=${NOTE}`) {
   return { call, config, manager, names };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(assertPrivateHelperReady).mockReset();
+});
 
 describe("private helper tools", () => {
-  it("registers only the two read-only tools, and says so", () => {
+  it("registers only the three read-only tools, and says so", () => {
     const { config, names } = fixture();
-    expect(names()).toEqual(["native-helper-status", "native-note-state"]);
+    expect(names()).toEqual([
+      "native-helper-status",
+      "native-note-state",
+      "native-checklist-state",
+    ]);
     for (const name of names()) {
       expect(config(name).annotations.readOnlyHint).toBe(true);
       expect(config(name).description).toMatch(/Safety: read-only/);
     }
     expect(config("native-helper-status").description).toMatch(/deliberately deferred/);
     expect(names()).not.toContain("native-append-plain-text");
+    expect(names()).not.toContain("native-set-checklist-item");
   });
 
   it("status adds the setup command while the helper is not installed", async () => {
@@ -82,8 +102,71 @@ describe("private helper tools", () => {
     await call("native-note-state", { identifier: NOTE });
     expect(readNoteState).toHaveBeenLastCalledWith(NOTE, {});
     await call("native-note-state", { id: CD });
-    expect(manager.getNoteLinkById).toHaveBeenCalledWith(CD);
+    expect(lookupStableIdentifiers).toHaveBeenCalledWith([CD], "ICNote");
+    expect(manager.getNoteLinkById).not.toHaveBeenCalled();
     expect(readNoteState).toHaveBeenLastCalledWith(NOTE, {});
+  });
+
+  it("reads native checklist state by identifier or exact x-coredata id", async () => {
+    vi.mocked(readChecklistState).mockReturnValue({
+      identifier: NOTE,
+      revision: REV,
+      total: 1,
+      checked: 0,
+      items: [
+        { todoIdentifier: "a".repeat(32), contiguous: false, consistent: false, spansLines: true },
+      ],
+    } as never);
+    const { call, manager } = fixture();
+    const result = await call("native-checklist-state", { identifier: NOTE });
+    expect(readChecklistState).toHaveBeenLastCalledWith(NOTE, {});
+    expect(result.structuredContent).toMatchObject({
+      ok: true,
+      revision: REV,
+      items: [{ contiguous: false, consistent: false, spansLines: true }],
+    });
+    await call("native-checklist-state", { id: CD });
+    expect(lookupStableIdentifiers).toHaveBeenCalledWith([CD], "ICNote");
+    expect(manager.getNoteLinkById).not.toHaveBeenCalled();
+    expect(readChecklistState).toHaveBeenLastCalledWith(NOTE, {});
+  });
+
+  it("refuses ambiguous, missing and unresolvable checklist note references before reading", async () => {
+    const both = await fixture().call("native-checklist-state", { identifier: NOTE, id: CD });
+    expect(both.structuredContent).toMatchObject({
+      code: "validation_error",
+      helperCode: "invalid_request",
+      committed: false,
+    });
+    const none = await fixture().call("native-checklist-state", {});
+    expect(none.structuredContent).toMatchObject({ code: "validation_error", committed: false });
+    const missing = await fixture(null).call("native-checklist-state", { id: CD });
+    expect(missing.structuredContent).toMatchObject({
+      code: "not_found",
+      helperCode: "not_found",
+      committed: false,
+    });
+    expect(readChecklistState).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "disabled",
+    "helper_not_installed",
+    "helper_stale",
+    "helper_modified",
+    "private_api_unavailable",
+    "unsupported_note",
+  ])("reports checklist %s refusals as uncommitted reads", async (code) => {
+    vi.mocked(readChecklistState).mockImplementationOnce(() => {
+      throw new PrivateHelperError(code, "refused");
+    });
+    const result = await fixture().call("native-checklist-state", { identifier: NOTE });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      code: "unsupported",
+      helperCode: code,
+      committed: false,
+    });
   });
 
   it("refuses ambiguous, missing, or unresolvable note references", async () => {
@@ -155,11 +238,31 @@ describe("private helper tools", () => {
     expect(envelopeCode("store_unavailable", "Grant Full Disk Access")).toBe(
       "full_disk_access_missing"
     );
+
     expect(envelopeCode("store_unavailable", "open failed")).toBe("operation_failed");
     // A read-only helper timeout wrote nothing, so it is not indeterminate (#204).
     expect(envelopeCode("timeout", "")).toBe("operation_failed");
     expect(envelopeCode("helper_crashed", "")).toBe("operation_failed");
   });
+
+  it.each(["disabled", "helper_not_installed", "helper_stale"])(
+    "refuses %s before resolving an x-coredata id or reading Notes",
+    async (code) => {
+      vi.mocked(assertPrivateHelperReady).mockImplementationOnce(() => {
+        throw new PrivateHelperError(code, "refused");
+      });
+      const { call, manager } = fixture();
+      const result = await call("native-checklist-state", { id: CD });
+      expect(result.structuredContent).toEqual({
+        code: "unsupported",
+        helperCode: code,
+        committed: false,
+      });
+      expect(lookupStableIdentifiers).not.toHaveBeenCalled();
+      expect(readChecklistState).not.toHaveBeenCalled();
+      expect(manager.getNoteLinkById).not.toHaveBeenCalled();
+    }
+  );
 
   it("uses the real dependencies when none are injected", async () => {
     vi.mocked(privateHelperCapabilities).mockReturnValueOnce({
@@ -178,9 +281,11 @@ describe("private helper tools", () => {
   });
 
   it("validates tool input with the declared schemas", () => {
-    const schema = fixture().config("native-note-state").inputSchema;
-    expect(schema.identifier.safeParse("nope").success).toBe(false);
-    expect(schema.identifier.safeParse(NOTE).success).toBe(true);
-    expect(schema.id.safeParse(CD).success).toBe(true);
+    for (const tool of ["native-note-state", "native-checklist-state"]) {
+      const schema = fixture().config(tool).inputSchema;
+      expect(schema.identifier.safeParse("nope").success).toBe(false);
+      expect(schema.identifier.safeParse(NOTE).success).toBe(true);
+      expect(schema.id.safeParse(CD).success).toBe(true);
+    }
   });
 });
