@@ -131,6 +131,55 @@ Two more hosts can run the same `apple-notes` MCP server (`npx -y apple-notes-mc
   Restart your Hermes session afterward so the tools load.
 - **[Antigravity](https://antigravity.google/)** (Google) — add the server entry from [`.antigravity-plugin/mcp_config.json`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.antigravity-plugin/mcp_config.json) to `~/.gemini/config/mcp_config.json` (or via Antigravity's MCP settings).
 
+### Using Gemini Spark on macOS (Local MCP)
+
+In Gemini macOS builds that offer **Local MCP**, open **Connected Apps**, click
+**+ Custom**, and select **Local MCP** in “Set up a custom connected app”. Fill
+in the form with:
+
+| Field | Value |
+|-------|-------|
+| Server Name | Apple Notes |
+| Description | Read, search, create, edit, organize, and export Apple Notes on this Mac. |
+| Command | `npx -y apple-notes-mcp` |
+
+You can print these instructions from the installed server:
+
+```bash
+npx -y apple-notes-mcp setup --gemini-spark
+```
+
+The command only prints the guide. It exits before loading server configuration,
+checking Notes, or running the other setup commands, and it doesn't register the
+app or change permissions. Exit 0 means the guide was printed, not that Gemini
+connected. Run it by itself; combining it with other setup options exits 2.
+
+Keep **Sandbox settings** at **Default** initially, then click **Next** and
+review the discovered tools and permission requests before connecting. If Gemini
+can't launch the server, inspect **Show Logs** and check whether `npx` is available
+to the app. For a stable local installation, `npm install -g apple-notes-mcp`
+provides the `apple-notes-mcp` command; you can also use absolute paths to your
+Node executable and the installed `build/index.js` if the app can't find them.
+Keep that installation available, and update the command if you move it or replace
+Node.
+
+Gemini's sandbox and macOS permissions are separate. Review any additional
+filesystem access the launcher needs; **Full Access** isn't a required setup
+step. Automation of Notes.app enables the AppleScript tools, while database tools
+need the runtime's [Full Disk Access](#full-disk-access). Shortcut operations need
+the [packaged bridge setup](#using-the-plugin-marketplace). After connecting, ask
+Gemini to run `get-capabilities` for tool availability, then `doctor` for Notes
+access diagnostics before attempting a write. A successful terminal check doesn't
+verify the permissions of Gemini's process.
+
+This integration uses the Mac app's Local MCP command interface and the server's
+existing stdio transport. Availability depends on your Gemini build. Google's
+[custom apps documentation](https://support.google.com/gemini/answer/17209137)
+currently describes URL-based setup in the web app; it doesn't document this
+local form. **Cloud MCP**, Gemini web/mobile, and a hosted HTTP endpoint aren't
+supported by this server. These instructions apply to Gemini Spark, separately
+from Gemini CLI and Antigravity.
+
 ### Using Claude Desktop
 
 **1. Install the server:**

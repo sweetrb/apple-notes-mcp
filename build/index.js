@@ -58840,6 +58840,50 @@ function formatShortcutSetup(report) {
   return lines.join("\n");
 }
 
+// src/setupGeminiSpark.ts
+var GEMINI_SPARK_LOCAL_MCP = {
+  serverName: "Apple Notes",
+  description: "Read, search, create, edit, organize, and export Apple Notes on this Mac.",
+  command: "npx -y apple-notes-mcp"
+};
+var GEMINI_SPARK_SETUP_USAGE = "Usage: apple-notes-mcp setup --gemini-spark [--help]";
+function formatGeminiSparkSetup() {
+  return [
+    "Gemini Spark on macOS: Local MCP",
+    "Requires a Gemini macOS build with Local MCP in Connected Apps > + Custom.",
+    "Select Local MCP and enter:",
+    "",
+    `Server Name: ${GEMINI_SPARK_LOCAL_MCP.serverName}`,
+    `Description: ${GEMINI_SPARK_LOCAL_MCP.description}`,
+    `Command: ${GEMINI_SPARK_LOCAL_MCP.command}`,
+    "",
+    "Keep Sandbox settings at Default initially. If startup fails, inspect Show Logs",
+    "and review the specific launcher or filesystem access it needs.",
+    "Sandbox access and macOS Automation / Full Disk Access are separate permissions.",
+    "Click Next, review the tools and permissions, and complete the connection yourself.",
+    "Verify tool discovery with get-capabilities in Gemini; use doctor for Notes diagnostics.",
+    "",
+    "This command only prints instructions; a successful exit does not verify a connection.",
+    "Cloud MCP needs a hosted MCP URL. This server provides local stdio only."
+  ].join("\n");
+}
+function runGeminiSparkSetup(args, output = {
+  out: (text2) => process.stdout.write(text2),
+  err: (text2) => process.stderr.write(text2)
+}) {
+  if (args.filter((arg) => arg === "--gemini-spark").length !== 1 || args.some((arg) => arg !== "--gemini-spark" && arg !== "--help") || args.filter((arg) => arg === "--help").length > 1) {
+    output.err(
+      `${GEMINI_SPARK_SETUP_USAGE}
+This print-only guide cannot be combined with other setup options.
+`
+    );
+    return 2;
+  }
+  output.out(`${formatGeminiSparkSetup()}
+`);
+  return 0;
+}
+
 // src/utils/noteAudio.ts
 import { readdirSync as readdirSync5, statSync as statSync5 } from "node:fs";
 import { join as join28 } from "node:path";
@@ -61996,6 +62040,9 @@ function registryLookup(registry2 = new AnchorRegistry(), dbPath2) {
 }
 
 // src/index.ts
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--gemini-spark")) {
+  process.exit(runGeminiSparkSetup(process.argv.slice(3)));
+}
 loadFileConfig();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");

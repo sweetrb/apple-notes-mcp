@@ -178,6 +178,7 @@ import {
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
+import { runGeminiSparkSetup } from "@/setupGeminiSpark.js";
 import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
 import { fitNoteDrawings, formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
 import {
@@ -212,6 +213,11 @@ import {
   resolveStoredAnchor,
 } from "@/services/paragraphAnchorOps.js";
 import { ANCHOR_ID_PATTERN, DEFAULT_MIN_CONFIDENCE } from "@/utils/paragraphAnchors.js";
+
+// Gemini Spark setup is a print-only guide, before config loading or setup effects.
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--gemini-spark")) {
+  process.exit(runGeminiSparkSetup(process.argv.slice(3)));
+}
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.

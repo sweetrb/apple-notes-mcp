@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-09
+
+### Added
+
+- `setup --gemini-spark` prints the Server Name, Description, and Command for
+  Gemini Spark macOS builds offering Local MCP. The guide exits before server
+  configuration loading or effectful setup, rejects mixed setup options, and
+  leaves client registration and permissions to the user. README instructions
+  cover sandbox and runtime permission diagnostics and distinguish the local
+  stdio integration from URL-based Cloud MCP. Gemini tool execution has not
+  been verified end to end.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed
