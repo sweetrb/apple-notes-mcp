@@ -27,7 +27,7 @@ import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { executeAppleScript, isPermissionDenied } from "@/utils/applescript.js";
-import { fdaRemediation } from "@/tools/doctor.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { setupShortcuts, type ShortcutSetupReport } from "@/setupShortcuts.js";
 import { compareVersions, readMacOSVersion } from "@/services/capabilityMatrix.js";
 import {
@@ -172,7 +172,7 @@ export function checkPermissions(
   const launchingApp = safe(probes.launchingApp, null);
   const who = launchingApp ?? "the app that launches the server";
   const items = [
-    fullDiskAccessItem(probes, macOSVersion),
+    fullDiskAccessItem(probes, macOSVersion, options.env),
     automationItem(probes, macOSVersion, who, automationSkipReason(options)),
     shortcutsItem(probes),
     speechItem(probes, macOSVersion, who),
@@ -198,7 +198,11 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function fullDiskAccessItem(probes: PermissionProbes, macOSVersion: string | null): PermissionItem {
+function fullDiskAccessItem(
+  probes: PermissionProbes,
+  macOSVersion: string | null,
+  env: NodeJS.ProcessEnv
+): PermissionItem {
   const base = {
     id: "fullDiskAccess" as const,
     title: "Full Disk Access",
@@ -213,7 +217,7 @@ function fullDiskAccessItem(probes: PermissionProbes, macOSVersion: string | nul
       ...base,
       status: "unknown",
       detail: `could not probe the Notes database: ${errorText(error)}`,
-      fix: fdaRemediation(probes.execPath),
+      fix: fdaRemediation(probes.execPath, env),
     };
   }
   return granted
@@ -229,7 +233,7 @@ function fullDiskAccessItem(probes: PermissionProbes, macOSVersion: string | nul
         detail:
           "the Notes database is not readable, so query-notes, checklist state, note metadata, " +
           "note links, native objects, exports and the bridges' readback do not work",
-        fix: fdaRemediation(probes.execPath),
+        fix: fdaRemediation(probes.execPath, env),
       };
 }
 

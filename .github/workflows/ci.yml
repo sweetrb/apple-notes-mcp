@@ -67,6 +67,34 @@ jobs:
       - name: Run tests with coverage
         run: pnpm run test:coverage
 
+      - name: Test broker host classification and fixture evidence
+        if: matrix.node-version == 22
+        run: node --test scripts/broker-host-capability.test.mjs scripts/broker-fixture-files.test.mjs
+
+      - name: Test native broker CI result validation
+        if: matrix.node-version == 22
+        run: node --test scripts/check-broker-security-result.test.mjs
+
+      # Only the native command can supply this status. Exit 2 requires a
+      # validated evidence report; every real or inconclusive failure is fatal.
+      - name: Verify native broker security boundaries
+        if: matrix.node-version == 22
+        run: |
+          broker_report="$RUNNER_TEMP/broker-security.json"
+          rm -f "$broker_report"
+          broker_status=0
+          node scripts/test-broker-security.mjs --report "$broker_report" || broker_status=$?
+          node scripts/check-broker-security-result.mjs --exit-code "$broker_status" --report "$broker_report"
+
+      - name: Preserve native broker security evidence
+        if: always() && matrix.node-version == 22
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: broker-security-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/broker-security.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload coverage reports
         if: matrix.node-version == 22
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1

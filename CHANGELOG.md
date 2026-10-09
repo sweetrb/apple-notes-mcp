@@ -1,5 +1,65 @@
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-09
+
+### Added
+
+- Opt-in permission broker (#220). `apple-notes-mcp setup --broker` builds
+  `~/Applications/Apple Notes MCP Broker.app` and installs the per-user
+  LaunchAgent `apple-notes-mcp.broker`. MCP clients relay stdio to a server
+  spawned by the broker, so Full Disk Access and Notes Automation belong to
+  that signed app. `--check` reports its state, `--uninstall` removes it, and
+  `--sign-identity` selects an existing signing identity. Multiple qualifying
+  identities require an explicit choice; ad-hoc signing warns that grants
+  must be renewed after rebuilding.
+- `doctor` and `get-capabilities` report whether the broker is in use and why
+  an installed broker was bypassed. Doctor names the broker app when advising
+  a brokered client about Full Disk Access. Per-tool permission failures also
+  identify the broker app when the request runs in a brokered session.
+- Native security regression harness (`pnpm run test:broker-security`) tests
+  direct socket requests and signed fixture bundles without accessing Notes
+  or granting permissions. CI runs it on macOS.
+
+### Security
+
+- Socket configuration accepts only an explicit list of numeric resource and
+  timing limits. Helper/code paths, shortcuts, private-content access,
+  unverified writes, unknown settings and loader variables cannot be selected
+  by a client. Brokered children skip user JSON configuration and cannot run
+  the separately installed public or private helpers.
+- The server entry and runtime configuration are sealed inside the signed app.
+  The broker validates its signature and hardened runtime at startup and
+  before each spawn, pins a canonical Node runtime by SHA-256, and refuses
+  changed code. Setup requires a standalone Node runtime with only system
+  dynamic-library dependencies. Clients match both the package version and
+  entry digest, so another installation cannot silently serve stale code.
+- Broker signing enables the hardened runtime without library-validation or
+  DYLD-injection exceptions. Node and server paths are no longer accepted in
+  LaunchAgent arguments. Child stderr travels back to its own client's stderr
+  over the existing socket, separate from MCP stdout; no caller-selected log
+  path is opened under the broker's permissions.
+- Documented the same-user trust boundary: the owner-only socket excludes
+  other users, but every process running as its owner can use the server's
+  Notes capabilities with the broker's grants. It does not authenticate MCP
+  hosts or isolate them from other applications owned by the same user.
+
+### Changed
+
+- Reinstall and uninstall confirm that launchd has removed the old service
+  before replacing or deleting installed files. Stop and cleanup failures are
+  reported; uninstall removes the legacy log and empty state directory while
+  preserving unrelated files.
+- Broker protocol 3 carries separate stdout, stderr and exit status with bounded
+  frames and backpressure. Broker diagnostics use macOS unified logging instead
+  of an unbounded shared file; child diagnostics return to the originating MCP
+  client.
+- Nothing changes unless `setup --broker` is run. Without an available,
+  matching broker the server runs in-process. `APPLE_NOTES_MCP_BROKER=off`
+  bypasses it for one client; uninstall stops the service for all clients.
+- Integration tests disable broker routing. Setting
+  `APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE=1` additionally skips Apple events and
+  note-creation fixtures while preserving pure path and MCP schema checks.
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed

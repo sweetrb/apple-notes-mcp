@@ -25,18 +25,14 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import type { SmartFolder, SmartFolderFilter, SmartFolderMatch } from "@/types.js";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 
 const NOTES_DB_PATH = path.join(
   os.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 
-const FDA_MESSAGE =
-  "Full Disk Access is required to read smart folders. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
-  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
-  `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
+const FDA_MESSAGE = "Full Disk Access is required to read smart folders.";
 
 /** Seconds between the Unix epoch and the Cocoa reference date (2001-01-01). */
 const COCOA_EPOCH_OFFSET = 978307200;
@@ -523,7 +519,8 @@ function runSqlite(dbPath: string, sql: string): string {
  * @param dbPath - Database to read (defaults to the live NoteStore; tests pass a fixture)
  */
 export function readSmartFolders(dbPath: string = NOTES_DB_PATH): SmartFoldersResult {
-  if (!fs.existsSync(dbPath)) return { folders: null, error: "no_fda", message: FDA_MESSAGE };
+  if (!fs.existsSync(dbPath))
+    return { folders: null, error: "no_fda", message: `${FDA_MESSAGE} ${fdaRemediation()}` };
   try {
     const columns = new Set(
       runSqlite(dbPath, "SELECT name FROM pragma_table_info('ZICCLOUDSYNCINGOBJECT');")
@@ -542,7 +539,7 @@ export function readSmartFolders(dbPath: string = NOTES_DB_PATH): SmartFoldersRe
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      return { folders: null, error: "no_fda", message: FDA_MESSAGE };
+      return { folders: null, error: "no_fda", message: `${FDA_MESSAGE} ${fdaRemediation()}` };
     }
     console.error(`Failed to read smart folders: ${message}`);
     return { folders: null, error: "query_error", message: "Failed to read smart folders." };

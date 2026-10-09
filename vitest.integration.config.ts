@@ -9,6 +9,8 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["test/**/*.test.ts"],
+    // Integration clients must never connect to a developer's installed broker.
+    env: { APPLE_NOTES_MCP_BROKER: "off" },
     testTimeout: 120_000,
     // vitest 3 enforces a separate hookTimeout (default 10s). The integration
     // suite's beforeAll probes Notes.app via AppleScript, which hangs ~25s on a

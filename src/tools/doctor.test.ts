@@ -62,13 +62,9 @@ vi.mock("child_process", () => ({
 }));
 
 import { spawnSync } from "child_process";
-import {
-  runDoctor,
-  formatDoctorReport,
-  checkNodeRuntimeSignature,
-  fdaRemediation,
-} from "@/tools/doctor.js";
+import { runDoctor, formatDoctorReport, checkNodeRuntimeSignature } from "@/tools/doctor.js";
 import { hasFullDiskAccess } from "@/utils/checklistParser.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { nativeTagsStatus } from "@/services/nativeTags.js";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
 
@@ -116,6 +112,18 @@ describe("runDoctor (#22)", () => {
   it("fdaRemediation warns that a version-manager Node path changes per version (#220)", () => {
     const msg = fdaRemediation("/Users/x/.nvm/versions/node/v24.11.1/bin/node");
     expect(msg).toMatch(/version manager/);
+  });
+
+  it("fdaRemediation points at the broker app under the permission broker (#220)", () => {
+    const msg = fdaRemediation("/opt/node/bin/node", {
+      APPLE_NOTES_MCP_BROKERED: "1",
+      APPLE_NOTES_MCP_BROKER_APP: "/Users/x/Applications/Apple Notes MCP Broker.app",
+    });
+    expect(msg).toContain("/Users/x/Applications/Apple Notes MCP Broker.app");
+    expect(msg).not.toContain("/opt/node/bin/node");
+    expect(fdaRemediation("/n", { APPLE_NOTES_MCP_BROKERED: "1" })).toContain(
+      "Apple Notes MCP Broker.app"
+    );
   });
 
   it("is unhealthy when a Notes.app check fails", () => {

@@ -27,11 +27,15 @@ export function fileConfigPath(env: NodeJS.ProcessEnv = process.env): string {
 /**
  * Merge a JSON config file's string values into `env` for keys not already set.
  * Returns the keys applied. Tolerates a missing/corrupt file.
+ * Brokered children use only the broker's controlled environment: loading a
+ * mutable config here could restore a helper path or safety override that
+ * was deliberately rejected at the socket boundary.
  */
 export function loadFileConfig(
   env: NodeJS.ProcessEnv = process.env,
   path: string = fileConfigPath(env)
 ): string[] {
+  if (env.APPLE_NOTES_MCP_BROKERED === "1") return [];
   const applied: string[] = [];
   try {
     if (!existsSync(path)) return applied;

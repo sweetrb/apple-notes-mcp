@@ -1,3 +1,4 @@
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { createHash } from "node:crypto";
 import {
   closeSync,
@@ -604,7 +605,7 @@ function attachFile(
       if (!stored)
         throw new Error(
           inserted.length === 0 && !beforeStored
-            ? `${UNCERTAIN}. Notes' AppleScript does not list some attachments (PDFs on macOS 27); grant Full Disk Access so the server can verify through the Notes database`
+            ? `${UNCERTAIN}. Notes' AppleScript does not list some attachments (PDFs on macOS 27); Full Disk Access is required to verify through the Notes database. ${fdaRemediation()}`
             : UNCERTAIN
         );
       attachmentId = stored.attachmentId;

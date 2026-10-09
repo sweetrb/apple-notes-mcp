@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.14.3",
+  "version": "2.15.0",
   "packageManager": "pnpm@11.9.0",
   "description": "MCP server for Apple Notes - read, search, create, edit, organize, and export notes on macOS via Claude and other AI assistants",
   "type": "module",
@@ -26,6 +26,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:broker-security": "node --test scripts/broker-host-capability.test.mjs scripts/broker-fixture-files.test.mjs scripts/check-broker-security-result.test.mjs && node scripts/test-broker-security.mjs",
     "test:all": "vitest run && vitest run --config vitest.integration.config.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",

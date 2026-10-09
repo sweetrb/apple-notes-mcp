@@ -109,8 +109,7 @@ describe("outputSchema contract (real server over stdio)", () => {
 
     for (const name of ["update-note", "append-to-note", "delete-note"]) {
       const schema = byName.get(name)?.inputSchema as
-        | { required?: string[]; properties?: Record<string, unknown> }
-        | undefined;
+        { required?: string[]; properties?: Record<string, unknown> } | undefined;
       expect(schema, `${name} must be registered`).toBeDefined();
       expect(schema?.required).toContain("id");
       expect(schema?.required).toContain("expectedContentHash");
@@ -119,14 +118,12 @@ describe("outputSchema contract (real server over stdio)", () => {
     }
 
     const move = byName.get("move-note")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(move?.required).toContain("id");
     expect(move?.properties).not.toHaveProperty("title");
 
     const batchDelete = byName.get("batch-delete-notes")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(batchDelete?.required).toContain("notes");
     expect(batchDelete?.properties).not.toHaveProperty("ids");
   });
@@ -265,7 +262,8 @@ describe("outputSchema contract (real server over stdio)", () => {
     ).toEqual([]);
   });
 
-  it("diagnostic tools' real output validates against their outputSchema (when reachable)", async () => {
+  it("diagnostic tools' real output validates against their outputSchema (when reachable)", async (ctx) => {
+    if (process.env.APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE === "1") ctx.skip();
     // The SDK throws an "Output validation error" McpError when a success
     // result's structuredContent is missing or fails its schema — the only
     // failure we treat as a bug. A slow or unavailable backend (e.g. AppleScript

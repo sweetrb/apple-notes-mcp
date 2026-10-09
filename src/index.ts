@@ -85,8 +85,8 @@ import {
   queryNotes,
 } from "@/utils/noteQueryStore.js";
 import type { QueryNotesResult } from "@/types.js";
-import { runDoctor, formatDoctorReport, fdaRemediation } from "@/tools/doctor.js";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
@@ -199,6 +199,13 @@ import {
   inspectPermissionsWindow,
   runPermissionsWindow,
 } from "@/services/permissionsWindow.js";
+import {
+  brokerStatus,
+  formatBrokerSetup,
+  parseBrokerArgs,
+  setupBroker,
+} from "@/services/broker.js";
+import { startBrokerProxy } from "@/services/brokerProxy.js";
 import { registerPrivateHelperTools } from "@/tools/privateHelperTools.js";
 import { runTemplatesCommand } from "@/services/templateEditorCli.js";
 import { runAnchorsCli } from "@/services/anchorServer.js";
@@ -259,6 +266,12 @@ if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions
   cli.close();
   process.exit(code);
 }
+if (process.argv[2] === "setup" && process.argv.slice(3).includes("--broker")) {
+  // Opt-in permission broker (#220): a signed LaunchAgent app that owns the grants.
+  const report = await setupBroker(parseBrokerArgs(process.argv.slice(3)));
+  process.stdout.write(formatBrokerSetup(report) + "\n");
+  process.exit(report.ok ? 0 : 1);
+}
 if (process.argv[2] === "setup") {
   const report = setupShortcuts(process.argv.slice(3).includes("--check"));
   process.stdout.write(formatShortcutSetup(report) + "\n");
@@ -273,6 +286,11 @@ if (process.argv[2] === "anchors") {
   process.exit(
     await runAnchorsCli(process.argv.slice(3), { resolve: registryLookup(new AnchorRegistry()) })
   );
+}
+// With an installed, answering permission broker (#220), this process only
+// relays stdio to a server the broker starts, and never initializes its own.
+if (await startBrokerProxy()) {
+  await new Promise<never>(() => {});
 }
 // =============================================================================
 // Server Initialization
@@ -1648,7 +1666,7 @@ registerTool(
   "get-note-link",
   {
     description:
-      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the Node binary running this server; macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
+      "Use when: you need the notes:// deep-link URL for a note so it can be stored in a Reminders task, shared, or opened directly.\nReturns: a notes://showNote?identifier=<uuid> URL that opens the note in Notes.app on iOS and macOS.\nDo not use when: you only need the note's CoreData id (get-note-by-id) or want to reveal the note on screen (show-note).\nNote: the primary path reads the note's identifier from the Notes database, so it needs Full Disk Access for the responsible process (run doctor to identify it); macOS 12-15 can fall back to the AppleScript 'note link' property, which macOS 26+ no longer exposes. Password-protected notes cannot be linked.",
     inputSchema: {
       id: looseNoteId(z.string())
         .optional()
@@ -1684,7 +1702,7 @@ registerTool(
       const url = notesManager.getNoteLinkById(id);
       if (!url) {
         return errorResponse(
-          `Failed to get note link for "${note.title}". The Notes database may not be accessible — grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+          `Failed to get note link for "${note.title}". The Notes database may not be accessible. ${fdaRemediation()} (On macOS 12–15 this also falls back to the AppleScript note link property.)`
         );
       }
       return successResponse(`Note link: ${url}`, { id, title: note.title, url });
@@ -1706,7 +1724,7 @@ registerTool(
     const url = notesManager.getNoteLink(title, account);
     if (!url) {
       return errorResponse(
-        `Failed to get note link for "${title}". The Notes database may not be accessible — grant Full Disk Access to the Node binary running the server (or the terminal that launches it), fully quit and relaunch, then run the doctor tool. See: ${FULL_DISK_ACCESS_GUIDE_URL}. (On macOS 12–15 this also falls back to the AppleScript note link property.)`
+        `Failed to get note link for "${title}". The Notes database may not be accessible. ${fdaRemediation()} (On macOS 12–15 this also falls back to the AppleScript note link property.)`
       );
     }
     return successResponse(`Note link: ${url}`, { title, url });
@@ -1923,10 +1941,7 @@ registerTool(
       page = pageNoteBlocks(readNoteBlocks(id), { offset, limit });
     } catch (error) {
       if (!(error instanceof NoteBlocksError)) throw error;
-      const hint =
-        error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
-          : "";
+      const hint = error.code === "no-full-disk-access" ? ` ${fdaRemediation()}` : "";
       return errorResponse(
         `Error reading note blocks [${error.code}]: ${error.message}${hint}`,
         error
@@ -3755,13 +3770,18 @@ registerTool(
       checks: z.array(z.object({}).passthrough()).optional(),
       runtimeOS: z.object({}).passthrough().optional(),
       features: z.record(z.string(), z.object({}).passthrough()).optional(),
+      broker: z.object({}).passthrough().optional(),
     },
   },
   withErrorHandling(() => {
     // Richer than health-check: Notes.app permission, account state, and Full
     // Disk Access with actionable messages + structuredContent (#22).
     const report = runDoctor(notesManager);
-    return successResponse(formatDoctorReport(report), { ...report });
+    const broker = brokerStatus();
+    return successResponse(`${formatDoctorReport(report)}\n\nPermission broker: ${broker.detail}`, {
+      ...report,
+      broker,
+    });
   }, "Error running doctor")
 );
 
@@ -4678,10 +4698,7 @@ registerTool(
       });
     } catch (error) {
       if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
-      const hint =
-        error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
-          : "";
+      const hint = error.code === "no-full-disk-access" ? ` ${fdaRemediation()}` : "";
       if (error instanceof NotesExportError && error.details)
         return errorResponse(
           `Error exporting Markdown [${error.code}]: the template is invalid:\n` +
@@ -4792,10 +4809,7 @@ registerTool(
       });
     } catch (error) {
       if (!(error instanceof NotesExportError || error instanceof NoteBlocksError)) throw error;
-      const hint =
-        error.code === "no-full-disk-access"
-          ? ` Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path): ${FULL_DISK_ACCESS_GUIDE_URL}`
-          : "";
+      const hint = error.code === "no-full-disk-access" ? ` ${fdaRemediation()}` : "";
       return errorResponse(`Error exporting HTML [${error.code}]: ${error.message}${hint}`, error);
     }
     const assets = receipt.assets

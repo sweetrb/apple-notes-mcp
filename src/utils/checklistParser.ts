@@ -38,7 +38,7 @@ import {
   stringValue,
   embeddedMessage,
 } from "@/utils/protobuf.js";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { checklistRunLineStart } from "@/utils/checklistRuns.js";
 
 /** Style type value for checklist items in Apple Notes protobuf format. */
@@ -276,11 +276,7 @@ export function getChecklistItems(noteId: string): ChecklistResult {
     return {
       items: null,
       error: "no_fda",
-      message:
-        "Full Disk Access is required to read checklist state. " +
-        "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
-        "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
-        `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`,
+      message: `Full Disk Access is required to read checklist state. ${fdaRemediation()}`,
     };
   }
 

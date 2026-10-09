@@ -35,7 +35,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { z } from "zod";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 
 /** Live NoteStore location. Tests pass a fixture path instead. */
 export const NOTES_DB_PATH = path.join(
@@ -92,10 +92,8 @@ const ENTITY_LABEL: Record<IdentifierEntity, string> = {
 };
 
 const NO_FDA_MESSAGE =
-  "Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access " +
-  "for the Node binary running this server, or the terminal that launches it (System Settings > Privacy & Security > Full Disk Access, " +
-  "then fully quit and relaunch it). x-coredata ids from search-notes, list-notes, or list-folders " +
-  `work without it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
+  "Resolving a Notes UUID or numeric key reads the Notes database, which needs Full Disk Access. " +
+  "x-coredata ids from search-notes, list-notes, or list-folders work without it.";
 
 /**
  * The identifier failure an input-validation message reports, if any.
@@ -218,7 +216,8 @@ interface QueryResult<Row> {
 
 /** Runs one read-only query and parses its single JSON line. */
 function runJsonQuery<Row>(sql: string, dbPath: string): QueryResult<Row> {
-  if (!fs.existsSync(dbPath)) throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+  if (!fs.existsSync(dbPath))
+    throw new IdentifierResolutionError("no_fda", `${NO_FDA_MESSAGE} ${fdaRemediation()}`);
   let out: string;
   try {
     out = execFileSync("sqlite3", ["-readonly", dbPath, sql], {
@@ -232,7 +231,7 @@ function runJsonQuery<Row>(sql: string, dbPath: string): QueryResult<Row> {
         ? `${error.message} ${String((error as { stderr?: unknown }).stderr ?? "")}`
         : String(error);
     if (detail.includes("authorization denied") || detail.includes("unable to open database")) {
-      throw new IdentifierResolutionError("no_fda", NO_FDA_MESSAGE);
+      throw new IdentifierResolutionError("no_fda", `${NO_FDA_MESSAGE} ${fdaRemediation()}`);
     }
     console.error(`Identifier query failed: ${detail}`);
     throw new IdentifierResolutionError("query_error", "Failed to read the Notes database.");

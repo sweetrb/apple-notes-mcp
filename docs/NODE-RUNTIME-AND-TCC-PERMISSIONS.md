@@ -1,10 +1,10 @@
 # Node runtime & TCC permission stability
 
 macOS gates this MCP server's access to your data behind **TCC** permissions —
-**Full Disk Access** (to read app data such as Mail, Notes, or Photos) and
-**Automation / Apple Events** (to drive an app like Mail.app or Notes.app via
-AppleScript). See this repo's Full Disk Access / Automation notes for *which*
-operations need which permission.
+**Full Disk Access** (to read the Notes database) and **Automation / Apple
+Events** (to drive Notes.app via AppleScript). See the
+[Full Disk Access guide](FULL-DISK-ACCESS.md) for which operations need which
+permission.
 
 This page is about a **separate, recurring annoyance**: being asked to approve
 those permissions **over and over**, often right after a routine `brew upgrade`.
@@ -13,19 +13,24 @@ those permissions **over and over**, often right after a routine `brew upgrade`.
 
 - You granted Full Disk Access (and/or Automation) to "node", but days later
   macOS prompts again — `"node" wants access to ...` or `"node" wants to control
-  "Mail"`.
+  "Notes"`.
 - System Settings → Privacy & Security → Full Disk Access shows **several
   identical "node" rows**, usually only one enabled.
 - It tends to happen immediately after you update Node.
 
 ## Cause
 
-TCC binds a permission grant to the **code identity of the binary that performs
-the access** — here, the `node` executable that launches the MCP server. For a
-binary that is only **ad-hoc signed** (no Developer ID / Team ID), TCC keys the
-grant to the binary's **cdhash**, a hash of its contents.
+TCC checks the **responsible process** for an access. Under Claude Desktop
+without the broker, that is the `node` executable running the server; under a
+terminal host it can be the terminal app. With the broker, it is
+`~/Applications/Apple Notes MCP Broker.app`.
 
-Homebrew's `node` formula is ad-hoc signed:
+An **ad-hoc-signed** binary has no certificate-backed signing identity. Its
+**cdhash** changes when its code changes, so a grant to one build may not apply
+after an update. Moving the executable, including changing the resolved path
+behind a version-manager symlink, can also require a new grant.
+
+Check the Node binary you actually use. An ad-hoc signature looks like this:
 
 ```bash
 $ codesign -dvvv "$(which node)" 2>&1 | grep -E 'Signature|TeamIdentifier'
@@ -33,21 +38,86 @@ Signature=adhoc
 TeamIdentifier=not set
 ```
 
-Every Node update **replaces the binary**, which **changes the cdhash**, so TCC
-no longer recognizes it as the thing you approved — and re-prompts. The extra
-"node" rows are stale cdhashes from previous versions.
+The `doctor` tool reports the runtime path and warns about ad-hoc signing.
+Duplicate "node" rows in System Settings can be entries for previous binaries.
 
-By contrast, properly signed apps (Chrome, Slack, …) keep their permissions
-across auto-updates because TCC matches them on a stable **Designated
-Requirement** derived from their Developer ID, not on the cdhash.
+Certificate-signed code has a **designated requirement** that can identify it
+across builds. Apple's documented Apple Development requirement includes the
+leaf certificate's Common Name, while its Developer ID example uses certificate
+type and Team ID constraints. A matching bundle identifier and Team ID alone
+are therefore not a promise of permission continuity. See Apple's
+[TN3127: Inside Code Signing: Requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 
-## Fix: run the MCP under the official, Developer-ID-signed Node
+## Option 1: opt in to the permission broker
+
+The broker puts the grants on a signed app at a fixed path and runs a bundled
+copy of the MCP server for connected clients. Run setup using a standalone Node
+runtime whose dynamic library dependencies are all under `/usr/lib/` or
+`/System/Library/`. Other dependencies, including the non-system libraries used
+by common Homebrew Node builds, are rejected: pinning the Node executable alone
+would not protect those libraries. The download steps under Option 2 below show
+how to install an official Node runtime at a fixed path.
+
+```bash
+apple-notes-mcp setup --broker
+apple-notes-mcp setup --broker --check
+# Or explicitly select your standalone runtime for setup:
+/path/to/node /path/to/apple-notes-mcp/build/index.js setup --broker
+```
+
+Add `~/Applications/Apple Notes MCP Broker.app` in **System Settings → Privacy
+& Security → Full Disk Access**, and allow it to control Notes when prompted.
+Restart your MCP client and run `doctor` to confirm that it is using the broker.
+
+**Review the trust trade-off before installing:** every process running as your
+macOS user can use the broker's Notes capabilities under its Full Disk Access
+and Notes Automation grants. The socket's same-UID check excludes other users,
+but does not authenticate same-user apps. This is comparable trust exposure to
+granting Full Disk Access to a general-purpose Node binary. Socket requests
+cannot select executable paths or safety overrides; this does not identify a
+trusted MCP client. Brokered servers skip local JSON configuration files, and
+external native helpers are unavailable in broker sessions.
+See the [broker security design](../README.md#permission-broker-opt-in).
+
+The signature and hash checks reject modifications detected at startup or
+before spawn. They do not make later filesystem reads atomic or provide OS
+isolation against a hostile, unsandboxed same-user process modifying the
+user-writable bundle or runtime after validation. Installed Shortcuts remain
+user-managed trusted integrations; the broker does not authenticate their
+contents.
+
+Setup automatically selects an identity only when exactly one Developer ID
+Application or Apple Development identity qualifies. If more than one qualifies
+across those types, specify `--sign-identity`. If none qualify, it signs ad hoc
+and warns about re-granting permissions.
+Keeping a compatible designated requirement can help preserve grants across
+rebuilds, but **Apple Development signing is not a guarantee of continuity across
+certificate renewal or signing identity changes**. Ad-hoc rebuilds may require
+new grants. Always check `doctor` after reinstalling.
+
+The signed configuration pins the Node executable's canonical path and digest.
+After a package update, or after replacing or moving that runtime, run
+`apple-notes-mcp setup --broker` again to refresh the bundled server and pin,
+then restart your clients. A stale or unavailable broker causes clients to run
+in-process with their own permissions; `doctor` reports that fallback.
+
+Set `APPLE_NOTES_MCP_BROKER=off` to bypass it for one client. The broker continues
+running and remains reachable by other same-user processes. To remove that
+access, run `apple-notes-mcp setup --broker --uninstall` and restart your clients;
+you can also revoke the broker's grants in System Settings.
+
+## Option 2: run in-process under Developer-ID-signed Node
 
 Node binaries distributed from **nodejs.org** are signed with a real Developer
 ID (`Node.js Foundation`, Team `HX7739G8FX`), notarized, and self-contained.
-Pointing the MCP server at one gives TCC a **stable** identity to match, so a
-permission you grant **persists across future Node updates**. It also decouples
-the MCP runtime from your Homebrew/dev Node, which can keep updating freely.
+Keeping the executable at a stable path avoids the path changes of version
+managers and the code-identity changes of ad-hoc rebuilds. Permission continuity
+still depends on the designated requirement and macOS permission state. This
+also decouples the MCP runtime from your Homebrew/dev Node.
+
+If you installed the broker, set `APPLE_NOTES_MCP_BROKER=off` in this client's
+environment or uninstall it before using this option. Otherwise the client
+will hand off to the broker when it is available.
 
 ### Steps (Apple Silicon shown; use `darwin-x64` on Intel)
 
@@ -92,19 +162,18 @@ the MCP runtime from your Homebrew/dev Node, which can keep updating freely.
 
 4. **Restart your MCP client** so the server relaunches under the new Node.
 
-5. **Grant the permissions once** to the new binary:
+5. **Grant the permissions** to the new binary:
    - *Full Disk Access*: System Settings → Privacy & Security → Full Disk Access
      → **+** → ⌘⇧G → paste `~/mcp-runtime/node-current/bin/node`.
-   - *Automation*: the first time the server drives an app you'll get a one-time
+   - *Automation*: the first time the server drives an app you'll get a
      `"node" wants to control "<App>"` prompt — click **Allow**.
 
    ⚠️ **A TCC grant is keyed to the binary's resolved *path*, not only to its
    signature.** Because the steps above unpack Node into a fixed directory
    (`~/mcp-runtime/node-current`) rather than a versioned one, that path never
-   moves and the grants survive Node updates — see "Updating" below. If you
+   moves — see "Updating" below. If you
    instead point `node-current` at a `node-vX.Y.Z-…` directory, every update
-   changes the resolved path, presents a brand-new ungranted identity, and you
-   will be re-prompted for all of it.
+   changes the resolved path and may require you to grant permissions again.
 
    You can delete any stale "node" rows from the Full Disk Access list.
 
@@ -123,11 +192,12 @@ rm -rf node-current && mkdir -p node-current
 tar -xzf node-$VER-$ARCH.tar.gz --strip-components=1 -C node-current
 ```
 
-The path is unchanged and the official builds are Developer-ID signed with a
-requirement that pins identifier + Team ID (no cdhash), so **both** halves of
-the grant still match: existing grants carry over with no re-approval.
+The path stays unchanged. Check the replacement binary's signature as above,
+then run `doctor` in your MCP client to verify that macOS retained its grants.
+Do not assume a new signing identity or a changed designated requirement will
+match an earlier grant.
 
 ⚠️ **Restart your MCP client afterwards.** Replacing the binary unlinks the one
-any already-running server is executing; macOS then cannot validate that path,
-so those processes fail with *"Permission denied"* until they are restarted.
-Nothing is wrong with your grants — a freshly launched server works fine.
+any already-running server is executing; those processes can fail with
+*"Permission denied"* until restarted. Recheck permissions from a fresh session
+before changing grants.
