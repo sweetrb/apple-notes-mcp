@@ -203,9 +203,11 @@ describe("write paths refuse a smart-folder destination", () => {
     exec.mockReturnValueOnce({ success: false, output: "", error: refusal });
     expect(() => manager.batchMoveNotes([NOTE], "Receipts")).toThrow(/is a smart folder/);
     const script = exec.mock.calls[0][0];
-    expect(script.indexOf(SMART_FOLDER_DESTINATION)).toBeLessThan(
-      script.indexOf("move noteRef to destFolder")
-    );
+    // The handler is declared before the main tell block. The decisive
+    // destination refusal must precede its call, which performs the move.
+    const moveCall = script.indexOf("my moveBatchNote(");
+    expect(moveCall).toBeGreaterThan(-1);
+    expect(script.indexOf(SMART_FOLDER_DESTINATION)).toBeLessThan(moveCall);
     compiles(script);
   });
 

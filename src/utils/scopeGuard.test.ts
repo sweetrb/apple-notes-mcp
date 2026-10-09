@@ -131,5 +131,7 @@ describe("scope guard", () => {
     );
     expect(parseScopeFailure("SAFETY_UPDATED")).toBeNull();
     expect(scopeConflictMessage("x")).toMatch(/^Scope guard failed: x\. Nothing was changed/);
+    expect(scopeConflictMessage("x", "batch-move")).toContain("This note's move was refused");
+    expect(scopeConflictMessage("x", "batch-move")).not.toContain("Nothing was changed");
   });
 });

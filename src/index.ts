@@ -92,6 +92,7 @@ import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
 import {
   CodedError,
+  classifyError,
   errorResult,
   installSdkErrorCodes,
   unavailableWriteEnvelope,
@@ -506,7 +507,7 @@ const scopeFolderIdInput = exactIdInput("ICFolder", SCOPE_FOLDER_ID, SCOPE_FOLDE
 
 /**
  * Optional folder preconditions shared by update-note, append-to-note,
- * delete-note, and move-note. They are re-checked inside the write's own
+ * delete-note, move-note, and batch-move-notes. They are re-checked inside the write's own
  * AppleScript, immediately before the write.
  */
 const scopeGuardInputs = {
@@ -531,7 +532,7 @@ const scopeGuardInputs = {
   )
     .optional()
     .describe(
-      "Precondition: the note must not be inside any of these folders or their subfolders (for move-note, neither may the destination). Re-checked immediately before the write."
+      "Precondition: the note must not be inside any of these folders or their subfolders (for move-note and batch-move-notes, neither may the destination). Re-checked immediately before the write."
     ),
 };
 
@@ -4062,8 +4063,9 @@ registerTool(
   "batch-move-notes",
   {
     description:
-      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
+      "Use when: moving multiple notes by id into one destination folder.\nReturns: per-id success/failure counts after destination-folder verification.\nDo not use when: moving a single note (move-note).\nSafety: optional folder preconditions apply independently to every note, checked live immediately before its move in the same AppleScript; a scope mismatch leaves that note unchanged and other items continue. Each moved note's actual container ID is compared with the destination folder ID before success is reported. The destination folder must already exist (create-folder); a smart folder is refused for the whole call (code unsupported) before any note moves.",
     inputSchema: {
+      ...scopeGuardInputs,
       ids: noteIdArrayInput.describe(
         `Array of note IDs to move (max ${MAX.BATCH_IDS} per request)`
       ),
@@ -4089,12 +4091,13 @@ registerTool(
       results: z.array(z.object({}).passthrough()).optional(),
     },
   },
-  withErrorHandling(({ ids, folder, account }) => {
+  withErrorHandling((args) => {
+    const { ids, folder, account } = args;
     if (ids.length === 0) {
       return errorResponse("No note IDs provided");
     }
 
-    const results = notesManager.batchMoveNotes(ids, folder, account);
+    const results = notesManager.batchMoveNotes(ids, folder, account, scopeFrom(args));
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
 
@@ -4107,15 +4110,28 @@ registerTool(
       }
     }
 
-    return succeeded > 0
-      ? successResponse(lines.join("\n"), {
-          ok: failed === 0,
-          folder,
-          succeeded,
-          failed,
-          results,
-        })
-      : errorResponse(lines.join("\n"));
+    if (succeeded > 0)
+      return successResponse(lines.join("\n"), {
+        ok: failed === 0,
+        folder,
+        succeeded,
+        failed,
+        results,
+      });
+
+    // Certainty belongs to the entire batch, not whichever row's prose the
+    // classifier matches first. Unknown or post-dispatch failures may follow
+    // a move even when a different item was refused by a scope guard.
+    const allRefusedBeforeMove =
+      results.length === ids.length &&
+      results.every((result) => result.committed === false && result.indeterminate === false);
+    if (!allRefusedBeforeMove)
+      lines.push("\nBatch move outcome is uncertain; read each exact note ID before retrying.");
+    const message = lines.join("\n");
+    const envelope: ErrorEnvelope = allRefusedBeforeMove
+      ? { ...classifyError(message), committed: false, indeterminate: false }
+      : { code: "verification_failed", indeterminate: true };
+    return errorResponse(message, new CodedError(message, envelope));
   }, "Error performing batch move")
 );
 
