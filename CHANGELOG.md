@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-09
+
+### Fixed
+
+- `get-note-tables` pages whole tables under a configurable UTF-8 response
+  budget that includes the structured-content text mirror and repeated
+  Markdown. Oversized individual tables return explicit metadata-only
+  entries, and paging advances without dropping or truncating table rows.
+  The default budget is 4 MiB and the maximum is 8 MiB (#193).
+
 ## [2.14.3] - 2026-10-08
 
 ### Fixed

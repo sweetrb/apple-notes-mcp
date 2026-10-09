@@ -652,7 +652,7 @@ Disk Access.
 
 #### `get-note-tables`
 
-Reads every native table in one exact note, in body order, from the NoteStore
+Reads a page of native tables in one exact note, in body order, from the NoteStore
 database. Each table is returned as GitHub-flavored Markdown and as JSON `rows`
 with stable `rowIds` and `columnIds`. Notes tables have no header row, so the
 Markdown uses the first row as the header. Pipes are escaped as `\|`,
@@ -661,8 +661,26 @@ backslashes are doubled, and line breaks inside a cell become `<br>`.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Exact note ID (`x-coredata://…/ICNote/pNNN`) |
+| `offset` | integer | No | Zero-based position of the first table (default 0); use `page.nextOffset` |
+| `limit` | integer | No | Maximum tables per page (default and maximum 500) |
+| `maxBytes` | integer | No | Full serialized response budget in UTF-8 bytes (default 4 MiB, minimum 1024 bytes, maximum 8 MiB) |
 
-`tableCellsComplete` is false when any table or cell could not be decoded. A
+The byte budget includes both the text response and structured data, including
+repeated Markdown and JSON escaping. Tables are returned whole. `tableCount`
+and `page.totalAvailable` count all tables in the note; `page.returned` counts
+the entries in this response. While `page.hasMore` is true, call again with
+`offset: page.nextOffset` and the same `limit` and `maxBytes`. Each call reads
+the note again, so finish paging before editing it.
+
+If one table exceeds an otherwise empty page, its entry contains identifying
+metadata, `complete: false`, `contentOmitted: true`, and a `reason`, without
+partial rows or row/column IDs. The next offset advances past that entry. To
+retrieve its content, retry that offset with a larger `maxBytes`, or export the
+note to a file. If even the metadata exceeds the budget, the tool returns a
+validation error. `page.stoppedAtSizeLimit` reports a byte-budget stop.
+
+`tableCellsComplete` is false when any table or cell could not be decoded, or
+when the current page omits a table's content for its byte budget. A
 cell holding an embedded object is `null` in `rows`, listed in
 `incompleteCells`, and shown as `[undecoded cell]` in Markdown. A table whose
 data cannot be decoded at all has `complete: false`, a `reason`, and no rows.

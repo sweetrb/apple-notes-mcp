@@ -27763,8 +27763,8 @@ var ZodSet = class _ZodSet extends ZodType {
       maxSize: { value: maxSize, message: errorUtil.toString(message) }
     });
   }
-  size(size, message) {
-    return this.min(size, message).max(size, message);
+  size(size2, message) {
+    return this.min(size2, message).max(size2, message);
   }
   nonempty(message) {
     return this.min(1, message);
@@ -36429,7 +36429,7 @@ var Protocol = class {
       if (abortController.signal.aborted) {
         return;
       }
-      const response = {
+      const response2 = {
         result,
         jsonrpc: "2.0",
         id: request.id
@@ -36437,11 +36437,11 @@ var Protocol = class {
       if (relatedTaskId && this._taskMessageQueue) {
         await this._enqueueTaskMessage(relatedTaskId, {
           type: "response",
-          message: response,
+          message: response2,
           timestamp: Date.now()
         }, capturedTransport?.sessionId);
       } else {
-        await capturedTransport?.send(response);
+        await capturedTransport?.send(response2);
       }
     }, async (error2) => {
       if (abortController.signal.aborted) {
@@ -36494,29 +36494,29 @@ var Protocol = class {
     }
     handler(params);
   }
-  _onresponse(response) {
-    const messageId = Number(response.id);
+  _onresponse(response2) {
+    const messageId = Number(response2.id);
     const resolver = this._requestResolvers.get(messageId);
     if (resolver) {
       this._requestResolvers.delete(messageId);
-      if (isJSONRPCResultResponse(response)) {
-        resolver(response);
+      if (isJSONRPCResultResponse(response2)) {
+        resolver(response2);
       } else {
-        const error2 = new McpError(response.error.code, response.error.message, response.error.data);
+        const error2 = new McpError(response2.error.code, response2.error.message, response2.error.data);
         resolver(error2);
       }
       return;
     }
     const handler = this._responseHandlers.get(messageId);
     if (handler === void 0) {
-      this._onerror(new Error(`Received a response for an unknown message ID: ${JSON.stringify(response)}`));
+      this._onerror(new Error(`Received a response for an unknown message ID: ${JSON.stringify(response2)}`));
       return;
     }
     this._responseHandlers.delete(messageId);
     this._cleanupTimeout(messageId);
     let isTaskResponse = false;
-    if (isJSONRPCResultResponse(response) && response.result && typeof response.result === "object") {
-      const result = response.result;
+    if (isJSONRPCResultResponse(response2) && response2.result && typeof response2.result === "object") {
+      const result = response2.result;
       if (result.task && typeof result.task === "object") {
         const task = result.task;
         if (typeof task.taskId === "string") {
@@ -36528,10 +36528,10 @@ var Protocol = class {
     if (!isTaskResponse) {
       this._progressHandlers.delete(messageId);
     }
-    if (isJSONRPCResultResponse(response)) {
-      handler(response);
+    if (isJSONRPCResultResponse(response2)) {
+      handler(response2);
     } else {
-      const error2 = McpError.fromError(response.error.code, response.error.message, response.error.data);
+      const error2 = McpError.fromError(response2.error.code, response2.error.message, response2.error.data);
       handler(error2);
     }
   }
@@ -36703,15 +36703,15 @@ var Protocol = class {
         const error2 = reason instanceof McpError ? reason : new McpError(ErrorCode.RequestTimeout, String(reason));
         reject(error2);
       };
-      this._responseHandlers.set(messageId, (response) => {
+      this._responseHandlers.set(messageId, (response2) => {
         if (options?.signal?.aborted) {
           return;
         }
-        if (response instanceof Error) {
-          return reject(response);
+        if (response2 instanceof Error) {
+          return reject(response2);
         }
         try {
-          const parseResult = safeParse2(resultSchema, response.result);
+          const parseResult = safeParse2(resultSchema, response2.result);
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
@@ -36729,10 +36729,10 @@ var Protocol = class {
       this._setupTimeout(messageId, timeout, options?.maxTotalTimeout, timeoutHandler, options?.resetTimeoutOnProgress ?? false);
       const relatedTaskId = relatedTask?.taskId;
       if (relatedTaskId) {
-        const responseResolver = (response) => {
+        const responseResolver = (response2) => {
           const handler = this._responseHandlers.get(messageId);
           if (handler) {
-            handler(response);
+            handler(response2);
           } else {
             this._onerror(new Error(`Response handler missing for side-channeled request ${messageId}`));
           }
@@ -41755,10 +41755,10 @@ function readFileBase64(p) {
   return readFileSync(p).toString("base64");
 }
 function readFileBase64Capped(p, maxBytes = maxAttachmentBytes()) {
-  const size = fileSize(p);
-  if (size > maxBytes) {
+  const size2 = fileSize(p);
+  if (size2 > maxBytes) {
     throw new Error(
-      `Attachment is ${size} bytes, exceeding the ${maxBytes}-byte fetch limit (APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES). Use save-attachment to export it to disk instead.`
+      `Attachment is ${size2} bytes, exceeding the ${maxBytes}-byte fetch limit (APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES). Use save-attachment to export it to disk instead.`
     );
   }
   return readFileBase64(p);
@@ -46800,11 +46800,11 @@ function decodeInline(fields) {
   }
   if (font) {
     const name = stringOf(font, 1);
-    const size = fixed32Float(first(font, 2));
-    if (name || size !== void 0)
+    const size2 = fixed32Float(first(font, 2));
+    if (name || size2 !== void 0)
       inline.font = {
         ...name ? { name } : {},
-        ...size !== void 0 && Number.isFinite(size) ? { size } : {}
+        ...size2 !== void 0 && Number.isFinite(size2) ? { size: size2 } : {}
       };
   }
   const attachment = sub3(fields, 12);
@@ -46997,8 +46997,8 @@ function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResp
   let bytes = 0;
   for (let i = start; i < total && blocks.length < limit; i++) {
     let block = doc.blocks[i];
-    let size = Buffer.byteLength(JSON.stringify(block));
-    if (bytes + size > maxBytes) {
+    let size2 = Buffer.byteLength(JSON.stringify(block));
+    if (bytes + size2 > maxBytes) {
       if (blocks.length) break;
       block = {
         ...block,
@@ -47006,10 +47006,10 @@ function pageNoteBlocks(doc, { offset = 0, limit = 500, maxBytes = blocksMaxResp
         textOmitted: true,
         runs: block.runs.map((run) => ({ ...run, text: "" }))
       };
-      size = Buffer.byteLength(JSON.stringify(block));
+      size2 = Buffer.byteLength(JSON.stringify(block));
     }
     blocks.push(block);
-    bytes += size;
+    bytes += size2;
   }
   const next = start + blocks.length;
   return {
@@ -50016,6 +50016,199 @@ function createShutdown(stream, exit, timeoutMs = SHUTDOWN_DRAIN_TIMEOUT_MS, pen
   };
 }
 
+// src/utils/structuredText.ts
+import { isDeepStrictEqual } from "node:util";
+var STRUCTURED_TEXT_PREFIX = "structuredContent: ";
+var SHOWN_ABOVE = "[shown in full above]";
+var MIN_ELIDED_CHARS = 64;
+var MAX_MIRROR_CHARS = 16384;
+var MAX_FIELD_CHARS = 1024;
+function textOf(content) {
+  return content.map(
+    (item) => item && typeof item === "object" && item.type === "text" ? String(item.text ?? "") : ""
+  ).join("\n");
+}
+function elide(value, text2) {
+  if (typeof value === "string") {
+    return value.length >= MIN_ELIDED_CHARS && text2.includes(value) ? SHOWN_ABOVE : value;
+  }
+  if (Array.isArray(value)) return value.map((item) => elide(item, text2));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item !== void 0) out[key] = elide(item, text2);
+    }
+    return out;
+  }
+  return value;
+}
+function textIsTheJson(content, structured) {
+  const plain = JSON.parse(JSON.stringify(structured));
+  return content.some((item) => {
+    const text2 = item?.text;
+    if (item?.type !== "text" || typeof text2 !== "string") return false;
+    const trimmed = text2.trim();
+    if (!trimmed.startsWith("{")) return false;
+    try {
+      return isDeepStrictEqual(JSON.parse(trimmed), plain);
+    } catch {
+      return false;
+    }
+  });
+}
+function structuredTextLine(structured, text2) {
+  const elided = elide(structured, text2);
+  let json2 = JSON.stringify(elided);
+  if (json2.length > MAX_MIRROR_CHARS) {
+    const kept = {};
+    const omitted = [];
+    for (const [key, value] of Object.entries(elided)) {
+      if (JSON.stringify(value).length > MAX_FIELD_CHARS) omitted.push(key);
+      else kept[key] = value;
+    }
+    json2 = JSON.stringify({ ...kept, _omitted: omitted });
+  }
+  return STRUCTURED_TEXT_PREFIX + json2;
+}
+function withStructuredText(result) {
+  const r = result;
+  if (!r || typeof r !== "object") return result;
+  const structured = r.structuredContent;
+  if (!structured || typeof structured !== "object" || Array.isArray(structured)) return result;
+  const content = Array.isArray(r.content) ? r.content : [];
+  if (textIsTheJson(content, structured)) return result;
+  const line = structuredTextLine(structured, textOf(content));
+  return { ...r, content: [...content, { type: "text", text: line }] };
+}
+function installStructuredText(server2) {
+  const target = server2;
+  const register = target.registerTool;
+  if (typeof register === "function") {
+    target.registerTool = function(name, config2, cb) {
+      const wrapped = typeof cb === "function" ? async (...args) => withStructuredText(await cb(...args)) : cb;
+      return register.call(this, name, config2, wrapped);
+    };
+  }
+  const createError = target.createToolError;
+  if (typeof createError === "function") {
+    target.createToolError = (message) => withStructuredText(createError.call(target, message));
+  }
+}
+
+// src/services/tableResponse.ts
+var DEFAULT_TABLE_RESPONSE_BYTES = 4 * 1024 * 1024;
+var MAX_TABLE_RESPONSE_BYTES = 8 * 1024 * 1024;
+var MAX_TABLES_PER_PAGE = 500;
+var MIN_TABLE_RESPONSE_BYTES = 1024;
+function validateTablePageOptions(options) {
+  const {
+    offset = 0,
+    limit = MAX_TABLES_PER_PAGE,
+    maxBytes = DEFAULT_TABLE_RESPONSE_BYTES
+  } = options;
+  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > MAX_TABLES_PER_PAGE || !Number.isSafeInteger(maxBytes) || maxBytes < MIN_TABLE_RESPONSE_BYTES || maxBytes > MAX_TABLE_RESPONSE_BYTES) {
+    throw new CodedError("Invalid table page offset, limit or maxBytes.", {
+      code: "validation_error"
+    });
+  }
+  return { offset, limit, maxBytes };
+}
+function response(id2, result, tables, options, stoppedAtSizeLimit) {
+  const tableCount = result.tables.length;
+  const next = options.offset + tables.length;
+  const hasMore = next < tableCount;
+  const complete = result.tableCellsComplete && tables.every((table) => table.complete);
+  const markdown = tables.map(
+    (table) => table.markdown ?? `[table ${table.index} could not be ${table.contentOmitted ? "returned" : "decoded"}: ${table.reason}]`
+  ).join("\n\n");
+  let summary = tableCount === 0 ? "This note has no native tables." : `${tables.length === tableCount ? tableCount : `${tables.length} of ${tableCount}`} table(s)${complete ? "" : " (some content could not be returned; see tables[].reason)"}:
+
+${markdown}`;
+  if (hasMore)
+    summary += `
+
+More tables remain: call get-note-tables with offset ${next} and the same limit and maxBytes.`;
+  return {
+    content: [{ type: "text", text: summary }],
+    structuredContent: {
+      id: id2,
+      tables,
+      tableCount,
+      tableCellsComplete: complete,
+      markdown,
+      page: {
+        ...options,
+        totalAvailable: tableCount,
+        returned: tables.length,
+        ...hasMore ? { nextOffset: next } : {},
+        hasMore,
+        stoppedAtSizeLimit
+      }
+    }
+  };
+}
+var size = (value) => Buffer.byteLength(JSON.stringify(withStructuredText(value)));
+function tablePageResponse(id2, result, request = {}) {
+  const options = validateTablePageOptions(request);
+  const available = Math.max(0, Math.min(options.limit, result.tables.length - options.offset));
+  const fits = (count) => {
+    const candidate = result.tables.slice(options.offset, options.offset + count);
+    const couldStopLater = count < available;
+    const candidateBytes = Math.max(
+      size(response(id2, result, candidate, options, false)),
+      couldStopLater ? size(response(id2, result, candidate, options, true)) : 0
+    );
+    return candidateBytes <= options.maxBytes;
+  };
+  let accepted = 0;
+  let trial = 1;
+  while (trial <= available) {
+    if (fits(trial)) {
+      accepted = trial;
+      if (trial === available) break;
+      trial = Math.min(available, trial * 2);
+      continue;
+    }
+    let low = accepted + 1;
+    let high = trial - 1;
+    while (low <= high) {
+      const middle = Math.floor((low + high) / 2);
+      if (fits(middle)) {
+        accepted = middle;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    break;
+  }
+  let tables = result.tables.slice(options.offset, options.offset + accepted);
+  const stoppedAtSizeLimit = accepted < available;
+  if (stoppedAtSizeLimit && accepted === 0) {
+    const table = result.tables[options.offset];
+    tables = [
+      {
+        index: table.index,
+        id: table.id,
+        ...table.attachmentId !== void 0 ? { attachmentId: table.attachmentId } : {},
+        ...table.rowCount !== void 0 ? { rowCount: table.rowCount } : {},
+        ...table.columnCount !== void 0 ? { columnCount: table.columnCount } : {},
+        complete: false,
+        contentOmitted: true,
+        reason: "Table content exceeds this response size limit. Increase maxBytes or export the note to a file."
+      }
+    ];
+  }
+  const output = response(id2, result, tables, options, stoppedAtSizeLimit);
+  if (size(output) > options.maxBytes) {
+    throw new CodedError(
+      "Table metadata is too large for this response limit; increase maxBytes.",
+      { code: "validation_error" }
+    );
+  }
+  return output;
+}
+
 // src/utils/noteParagraphs.ts
 import { gunzipSync as gunzipSync9 } from "node:zlib";
 var ENVELOPE_CODE = {
@@ -50227,10 +50420,10 @@ function pageParagraphs(paragraphs, { offset = 0, limit = 500, maxBytes = 4 * 10
   const out = [];
   let bytes = 0;
   for (let i = start; i < list.length && out.length < limit; i++) {
-    const size = Buffer.byteLength(JSON.stringify(list[i]));
-    if (out.length && bytes + size > maxBytes) break;
+    const size2 = Buffer.byteLength(JSON.stringify(list[i]));
+    if (out.length && bytes + size2 > maxBytes) break;
     out.push(list[i]);
-    bytes += size;
+    bytes += size2;
   }
   const next = start + out.length;
   return {
@@ -50766,10 +50959,10 @@ function listNoteLinks(options = {}) {
   const page = [];
   let bytes = 0;
   for (let i = start; i < links.length && page.length < limit; i++) {
-    const size = Buffer.byteLength(JSON.stringify(links[i]));
-    if (page.length && bytes + size > maxBytes) break;
+    const size2 = Buffer.byteLength(JSON.stringify(links[i]));
+    if (page.length && bytes + size2 > maxBytes) break;
     page.push(links[i]);
-    bytes += size;
+    bytes += size2;
   }
   const next = start + page.length;
   return {
@@ -51380,8 +51573,8 @@ var DataUrlWriter = class {
     if (!this.fits(data.length)) return { error: "too-large" };
     return this.embed(`generated:${key}`, data, mime);
   }
-  fits(size) {
-    return size <= this.maxBytes && this.embeddedBytes + size <= this.totalBytes;
+  fits(size2) {
+    return size2 <= this.maxBytes && this.embeddedBytes + size2 <= this.totalBytes;
   }
   embed(key, data, mime) {
     const result = { url: `data:${mime};base64,${data.toString("base64")}`, mime };
@@ -52156,7 +52349,7 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
       stdio: ["pipe", "pipe", "ignore"]
     });
     const chunks = [];
-    let size = 0;
+    let size2 = 0;
     let failure2 = null;
     const stop = (error2) => {
       failure2 ??= error2;
@@ -52173,8 +52366,8 @@ async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHe
       signal?.removeEventListener("abort", onAbort);
     };
     child2.stdout?.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES2)
+      size2 += chunk.length;
+      if (size2 > MAX_OUTPUT_BYTES2)
         stop(new PublicHelperError("invalid_response", "The helper response is too large."));
       else chunks.push(chunk);
     });
@@ -54604,85 +54797,6 @@ function exportWithTemplate(request, deps, chosen, notes, skipped, { output, ass
   return { ...receipt, markdown };
 }
 
-// src/utils/structuredText.ts
-import { isDeepStrictEqual } from "node:util";
-var STRUCTURED_TEXT_PREFIX = "structuredContent: ";
-var SHOWN_ABOVE = "[shown in full above]";
-var MIN_ELIDED_CHARS = 64;
-var MAX_MIRROR_CHARS = 16384;
-var MAX_FIELD_CHARS = 1024;
-function textOf(content) {
-  return content.map(
-    (item) => item && typeof item === "object" && item.type === "text" ? String(item.text ?? "") : ""
-  ).join("\n");
-}
-function elide(value, text2) {
-  if (typeof value === "string") {
-    return value.length >= MIN_ELIDED_CHARS && text2.includes(value) ? SHOWN_ABOVE : value;
-  }
-  if (Array.isArray(value)) return value.map((item) => elide(item, text2));
-  if (value && typeof value === "object") {
-    const out = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (item !== void 0) out[key] = elide(item, text2);
-    }
-    return out;
-  }
-  return value;
-}
-function textIsTheJson(content, structured) {
-  const plain = JSON.parse(JSON.stringify(structured));
-  return content.some((item) => {
-    const text2 = item?.text;
-    if (item?.type !== "text" || typeof text2 !== "string") return false;
-    const trimmed = text2.trim();
-    if (!trimmed.startsWith("{")) return false;
-    try {
-      return isDeepStrictEqual(JSON.parse(trimmed), plain);
-    } catch {
-      return false;
-    }
-  });
-}
-function structuredTextLine(structured, text2) {
-  const elided = elide(structured, text2);
-  let json2 = JSON.stringify(elided);
-  if (json2.length > MAX_MIRROR_CHARS) {
-    const kept = {};
-    const omitted = [];
-    for (const [key, value] of Object.entries(elided)) {
-      if (JSON.stringify(value).length > MAX_FIELD_CHARS) omitted.push(key);
-      else kept[key] = value;
-    }
-    json2 = JSON.stringify({ ...kept, _omitted: omitted });
-  }
-  return STRUCTURED_TEXT_PREFIX + json2;
-}
-function withStructuredText(result) {
-  const r = result;
-  if (!r || typeof r !== "object") return result;
-  const structured = r.structuredContent;
-  if (!structured || typeof structured !== "object" || Array.isArray(structured)) return result;
-  const content = Array.isArray(r.content) ? r.content : [];
-  if (textIsTheJson(content, structured)) return result;
-  const line = structuredTextLine(structured, textOf(content));
-  return { ...r, content: [...content, { type: "text", text: line }] };
-}
-function installStructuredText(server2) {
-  const target = server2;
-  const register = target.registerTool;
-  if (typeof register === "function") {
-    target.registerTool = function(name, config2, cb) {
-      const wrapped = typeof cb === "function" ? async (...args) => withStructuredText(await cb(...args)) : cb;
-      return register.call(this, name, config2, wrapped);
-    };
-  }
-  const createError = target.createToolError;
-  if (typeof createError === "function") {
-    target.createToolError = (message) => withStructuredText(createError.call(target, message));
-  }
-}
-
 // src/tools/directOperations.ts
 import { createHash as createHash4 } from "node:crypto";
 import {
@@ -54991,12 +55105,12 @@ function localAttachment(path10) {
   }
 }
 var MAX_ADD_ATTACHMENT_BYTES = 64 * 1024 * 1024;
-function fileMatches(path10, size, expected) {
+function fileMatches(path10, size2, expected) {
   let descriptor;
   try {
     descriptor = openSync7(path10, constants7.O_RDONLY | constants7.O_NOFOLLOW);
     const stat = fstatSync7(descriptor);
-    if (!stat.isFile() || stat.size !== size) return false;
+    if (!stat.isFile() || stat.size !== size2) return false;
     const hash = createHash4("sha256");
     const chunk = Buffer.allocUnsafe(1024 * 1024);
     let total = 0;
@@ -55004,10 +55118,10 @@ function fileMatches(path10, size, expected) {
       const read = readSync5(descriptor, chunk, 0, chunk.length, null);
       if (read === 0) break;
       total += read;
-      if (total > size) return false;
+      if (total > size2) return false;
       hash.update(chunk.subarray(0, read));
     }
-    return total === size && hash.digest("hex") === expected;
+    return total === size2 && hash.digest("hex") === expected;
   } catch {
     return false;
   } finally {
@@ -60891,10 +61005,10 @@ async function readEditorJson(req) {
   if (!/^application\/json(?:\s*;|$)/i.test(type))
     throw new EditorHttpError(415, "unsupported-media-type", "Send JSON (application/json).");
   const chunks = [];
-  let size = 0;
+  let size2 = 0;
   for await (const chunk of req) {
-    size += chunk.length;
-    if (size > MAX_EDITOR_BODY_BYTES)
+    size2 += chunk.length;
+    if (size2 > MAX_EDITOR_BODY_BYTES)
       throw new EditorHttpError(413, "too-large", "Request body too large.");
     chunks.push(chunk);
   }
@@ -61245,12 +61359,12 @@ var textFingerprint = (normalized2) => createHash8("sha256").update(normalized2,
 function textSimilarity(a, b) {
   if (a === b) return 1;
   if (!a || !b) return 0;
-  const size = Math.min(a.length, b.length) < 3 ? 2 : 3;
+  const size2 = Math.min(a.length, b.length) < 3 ? 2 : 3;
   const grams = (s) => {
     const out = /* @__PURE__ */ new Map();
     const padded = ` ${s} `;
-    for (let i = 0; i + size <= padded.length; i++) {
-      const g = padded.slice(i, i + size);
+    for (let i = 0; i + size2 <= padded.length; i++) {
+      const g = padded.slice(i, i + size2);
       out.set(g, (out.get(g) ?? 0) + 1);
     }
     return out;
@@ -63082,18 +63196,27 @@ registerTool(
 registerTool(
   "get-note-tables",
   {
-    description: "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: every table in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, and tableCellsComplete.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. Cell text only: links and styling inside cells are not rendered.",
-    inputSchema: { id: noteIdInput },
+    description: "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: one page of whole tables in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, tableCellsComplete, and page info. Default limit 500 and maxBytes 4 MiB; while page.hasMore is true, call again with offset set to page.nextOffset. The byte budget includes the full serialized tool response, including repeated Markdown.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. A table larger than an empty page returns metadata only with complete: false and contentOmitted: true; increase maxBytes (max 8 MiB) or export the note to a file. Cell text only: links and styling inside cells are not rendered.",
+    inputSchema: {
+      id: noteIdInput,
+      offset: external_exports.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional().describe("Zero-based position of the first table (default 0); use page.nextOffset"),
+      limit: external_exports.number().int().min(1).max(MAX_TABLES_PER_PAGE).optional().describe(`Maximum tables to return (default and max ${MAX_TABLES_PER_PAGE})`),
+      maxBytes: external_exports.number().int().min(MIN_TABLE_RESPONSE_BYTES).max(MAX_TABLE_RESPONSE_BYTES).optional().describe(
+        `Maximum UTF-8 bytes of the serialized tool response (default ${DEFAULT_TABLE_RESPONSE_BYTES}, max ${MAX_TABLE_RESPONSE_BYTES})`
+      )
+    },
     outputSchema: {
       id: external_exports.string().optional(),
       tables: external_exports.array(external_exports.record(external_exports.unknown())).optional(),
       tableCount: external_exports.number().optional(),
       tableCellsComplete: external_exports.boolean().optional(),
-      markdown: external_exports.string().optional()
+      markdown: external_exports.string().optional(),
+      page: external_exports.record(external_exports.unknown()).optional()
     },
     annotations: { readOnlyHint: true }
   },
-  withErrorHandling(({ id: id2 }) => {
+  withErrorHandling(({ id: id2, offset, limit, maxBytes }) => {
+    const options = validateTablePageOptions({ offset, limit, maxBytes });
     const { metadata, message } = getNoteMetadata(id2);
     if (!metadata) return errorResponse(message || `Failed to read note "${id2}"`);
     if (metadata.passwordProtected) {
@@ -63102,17 +63225,7 @@ registerTool(
       );
     }
     const result = notesManager.getNoteTablesById(id2);
-    const count = result.tables.length;
-    const summary = count === 0 ? "This note has no native tables." : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:
-
-${result.markdown}`;
-    return successResponse(summary, {
-      id: id2,
-      tables: result.tables,
-      tableCount: count,
-      tableCellsComplete: result.tableCellsComplete,
-      markdown: result.markdown
-    });
+    return tablePageResponse(id2, result, options);
   }, "Error reading note tables")
 );
 registerTool(
@@ -63891,7 +64004,7 @@ registerTool(
         readLinks: (noteId3) => readRichNote(noteId3).links,
         append: (request) => {
           let route = "applescript";
-          const response = guardedAppend(
+          const response2 = guardedAppend(
             {
               ...request,
               format: "html",
@@ -63899,11 +64012,11 @@ registerTool(
             },
             (r) => route = r
           );
-          if (response.isError) {
-            const envelope = response.structuredContent;
-            throw envelope?.code ? new CodedError(response.content[0].text, envelope) : new Error(response.content[0].text);
+          if (response2.isError) {
+            const envelope = response2.structuredContent;
+            throw envelope?.code ? new CodedError(response2.content[0].text, envelope) : new Error(response2.content[0].text);
           }
-          return { route, contentHash: String(response.structuredContent?.contentHash ?? "") };
+          return { route, contentHash: String(response2.structuredContent?.contentHash ?? "") };
         }
       }
     );
@@ -65036,7 +65149,7 @@ registerTool(
         `Too large to return whole, so oversized inline images were replaced (strippedImages) or the body was left out (contentOmitted): ${degraded.map((n) => n.id).join(", ")}. Read these with get-note-content, and their files with list-attachments and save-attachment.`
       );
     }
-    const response = {
+    const response2 = {
       content: [
         {
           type: "text",
@@ -65051,13 +65164,13 @@ Full JSON export:`
       ],
       structuredContent: { ...exportData }
     };
-    const responseBytes = Buffer.byteLength(JSON.stringify(response));
+    const responseBytes = Buffer.byteLength(JSON.stringify(response2));
     if (responseBytes > maxResponseBytes) {
       return errorResponse(
         `Error exporting notes: this page is ${formatMegabytes(responseBytes)}, over the ${formatMegabytes(maxResponseBytes)} response limit, so it was not sent. Call export-notes-json again with offset ${page.offset} and a smaller limit (for example ${Math.max(1, Math.floor(page.returned / 2))}), or raise APPLE_NOTES_MCP_EXPORT_MAX_BYTES if your MCP client accepts larger messages.`
       );
     }
-    return response;
+    return response2;
   }, "Error exporting notes")
 );
 registerTool(

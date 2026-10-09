@@ -117,6 +117,14 @@ import {
   readRichNote,
 } from "@/utils/noteRichText.js";
 import { parseNoteTable } from "@/utils/noteTables.js";
+import {
+  DEFAULT_TABLE_RESPONSE_BYTES,
+  MAX_TABLE_RESPONSE_BYTES,
+  MAX_TABLES_PER_PAGE,
+  MIN_TABLE_RESPONSE_BYTES,
+  tablePageResponse,
+  validateTablePageOptions,
+} from "@/services/tableResponse.js";
 import type { DrawingAttachment } from "@/types.js";
 import { attachmentCoreDataId, selectFirstImage } from "@/utils/attachmentAssets.js";
 import type { AttachmentAssetRecord, FirstImage, NoteAttachmentAssets } from "@/types.js";
@@ -1847,18 +1855,45 @@ registerTool(
   "get-note-tables",
   {
     description:
-      "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: every table in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, and tableCellsComplete.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. Cell text only: links and styling inside cells are not rendered.",
-    inputSchema: { id: noteIdInput },
+      "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: one page of whole tables in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, tableCellsComplete, and page info. Default limit 500 and maxBytes 4 MiB; while page.hasMore is true, call again with offset set to page.nextOffset. The byte budget includes the full serialized tool response, including repeated Markdown.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. A table larger than an empty page returns metadata only with complete: false and contentOmitted: true; increase maxBytes (max 8 MiB) or export the note to a file. Cell text only: links and styling inside cells are not rendered.",
+    inputSchema: {
+      id: noteIdInput,
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe("Zero-based position of the first table (default 0); use page.nextOffset"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_TABLES_PER_PAGE)
+        .optional()
+        .describe(`Maximum tables to return (default and max ${MAX_TABLES_PER_PAGE})`),
+      maxBytes: z
+        .number()
+        .int()
+        .min(MIN_TABLE_RESPONSE_BYTES)
+        .max(MAX_TABLE_RESPONSE_BYTES)
+        .optional()
+        .describe(
+          `Maximum UTF-8 bytes of the serialized tool response (default ${DEFAULT_TABLE_RESPONSE_BYTES}, max ${MAX_TABLE_RESPONSE_BYTES})`
+        ),
+    },
     outputSchema: {
       id: z.string().optional(),
       tables: z.array(z.record(z.unknown())).optional(),
       tableCount: z.number().optional(),
       tableCellsComplete: z.boolean().optional(),
       markdown: z.string().optional(),
+      page: z.record(z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
-  withErrorHandling(({ id }) => {
+  withErrorHandling(({ id, offset, limit, maxBytes }) => {
+    const options = validateTablePageOptions({ offset, limit, maxBytes });
     // Database-only path: the metadata read classifies missing notes and
     // Full Disk Access failures before the rich-text read is attempted.
     const { metadata, message } = getNoteMetadata(id);
@@ -1869,18 +1904,7 @@ registerTool(
       );
     }
     const result = notesManager.getNoteTablesById(id);
-    const count = result.tables.length;
-    const summary =
-      count === 0
-        ? "This note has no native tables."
-        : `${count} table(s)${result.tableCellsComplete ? "" : " (some content could not be decoded; see tables[].reason)"}:\n\n${result.markdown}`;
-    return successResponse(summary, {
-      id,
-      tables: result.tables as unknown as Array<Record<string, unknown>>,
-      tableCount: count,
-      tableCellsComplete: result.tableCellsComplete,
-      markdown: result.markdown,
-    });
+    return tablePageResponse(id, result, options);
   }, "Error reading note tables")
 );
 
