@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const guard = join(dirname(fileURLToPath(import.meta.url)), "version-guard.sh");
-const packageJson = { name: "release-guard-fixture", version: "2.14.3", dependencies: {} };
-const changelog = "## [Unreleased]\n\n## [2.14.3] - 2026-10-08\n\n### Fixed\n\n- Fixture.\n";
+const packageJson = { name: "release-guard-fixture", version: "2.15.1", dependencies: {} };
+const changelog = "## [Unreleased]\n\n## [2.15.1] - 2026-10-12\n\n### Fixed\n\n- Fixture.\n";
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "release-guard-"));
@@ -44,8 +44,11 @@ function fixture(t) {
   write("native/private-helper/helper.m");
   write("native/public-helper/helper.swift");
   write("native/private-helper/helper.h");
+  write("native/broker/apple-notes-mcp-broker.swift");
   write("shortcuts/Existing signed.shortcut");
   write("shortcuts/Existing unsigned.unsigned.shortcut");
+  write("shortcuts/Apple Notes MCP - Background Operations v5.shortcut");
+  write("shortcuts/Apple Notes MCP - Background Operations v5.unsigned.shortcut");
   write("native/README.md");
   write("shortcuts/README.md");
   const commit = () => {
@@ -60,7 +63,7 @@ function fixture(t) {
   const npm = join(bin, "npm");
   writeFileSync(npm, "#!/bin/sh\nexit 0\n");
   chmodSync(npm, 0o755);
-  const run = () =>
+  const run = (env = {}) =>
     spawnSync("bash", [guard], {
       cwd: root,
       encoding: "utf8",
@@ -70,9 +73,10 @@ function fixture(t) {
         BASE_SHA: base,
         HEAD_SHA: commit(),
         PATH: bin + ":" + process.env.PATH,
+        ...env,
       },
     });
-  return { root, write, run, npm };
+  return { root, write, run, npm, git };
 }
 
 function assertOutcome(result, status, message) {
@@ -85,13 +89,18 @@ for (const path of [
   "native/private-helper/helper.m",
   "native/public-helper/helper.swift",
   "native/private-helper/helper.h",
+  "native/broker/apple-notes-mcp-broker.swift",
   "native/helper/new.hpp",
   "native/helper/runtime.json",
   "shortcuts/Existing signed.shortcut",
   "shortcuts/Existing unsigned.unsigned.shortcut",
   "shortcuts/New shortcut.shortcut",
+  "shortcuts/Apple Notes MCP - Background Operations v5.shortcut",
+  "shortcuts/Apple Notes MCP - Background Operations v5.unsigned.shortcut",
   "native/helper/new\nline.h",
   "build/index.js",
+  "build/__tests__/runtime.js",
+  "build/__mocks__/runtime.js",
   "requirements.txt",
   "src/sidecar.py",
   "src/new.sidecar",
@@ -128,12 +137,27 @@ for (const path of [
 for (const path of [
   "native/private-helper/helper.m",
   "native/private-helper/helper.h",
+  "native/broker/apple-notes-mcp-broker.swift",
   "shortcuts/Existing signed.shortcut",
 ]) {
   test("rejects deletion of an unbumped runtime file: " + path, (t) => {
     const f = fixture(t);
     rmSync(join(f.root, path));
     assertOutcome(f.run(), 1, /Shipped bytes changed.*version is unchanged/);
+  });
+}
+
+for (const base of ["", undefined]) {
+  test("checks the fetched main diff when BASE_SHA is " + JSON.stringify(base), (t) => {
+    const f = fixture(t);
+    f.git("switch", "--quiet", "-c", "candidate");
+    f.git("remote", "add", "origin", f.root);
+    f.write("native/broker/apple-notes-mcp-broker.swift", "changed\n");
+    assertOutcome(
+      f.run({ BASE_SHA: base, HEAD_SHA: undefined }),
+      1,
+      /Shipped bytes changed.*version is unchanged/
+    );
   });
 }
 
@@ -176,13 +200,13 @@ test("accepts a devDependency-only change with an unchanged bundle", (t) => {
   assertOutcome(f.run(), 0, /No shipped-byte changes/);
 });
 
-function bump(f, version = "2.14.4") {
+function bump(f, version = "2.15.2") {
   f.write("package.json", JSON.stringify({ ...packageJson, version }));
   f.write(
     "CHANGELOG.md",
     changelog.replace(
-      "## [2.14.3]",
-      "## [" + version + "] - 2026-10-08\n\n### Fixed\n\n- New fixture.\n\n## [2.14.3]"
+      "## [2.15.1]",
+      "## [" + version + "] - 2026-10-12\n\n### Fixed\n\n- New fixture.\n\n## [2.15.1]"
     )
   );
 }
@@ -202,13 +226,13 @@ test("rejects an erased published changelog heading even for exempt changes", (t
 
 test("rejects a version downgrade", (t) => {
   const f = fixture(t);
-  bump(f, "2.14.2");
+  bump(f, "2.15.0");
   assertOutcome(f.run(), 1, /not an increase/);
 });
 
 test("rejects a bump without its changelog heading", (t) => {
   const f = fixture(t);
-  f.write("package.json", JSON.stringify({ ...packageJson, version: "2.14.4" }));
+  f.write("package.json", JSON.stringify({ ...packageJson, version: "2.15.2" }));
   assertOutcome(f.run(), 1, /CHANGELOG.md has no/);
 });
 
@@ -228,6 +252,6 @@ test("rejects a bump with populated Unreleased notes", (t) => {
 test("rejects a version already published according to npm", (t) => {
   const f = fixture(t);
   bump(f);
-  writeFileSync(f.npm, "#!/bin/sh\nprintf '%s\\n' '2.14.4'\n");
+  writeFileSync(f.npm, "#!/bin/sh\nprintf '%s\\n' '2.15.2'\n");
   assertOutcome(f.run(), 1, /already published on npm/);
 });

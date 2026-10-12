@@ -6,7 +6,7 @@ set -euo pipefail
 # fork point from origin/main (same semantics as the PR's triple-dot
 # diff). Fetch main explicitly so merge-base cannot depend on
 # checkout side effects.
-if [ -z "${BASE_SHA}" ]; then
+if [ -z "${BASE_SHA:-}" ]; then
   git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
   BASE_SHA="$(git merge-base origin/main HEAD)"
   HEAD_SHA="$(git rev-parse HEAD)"
