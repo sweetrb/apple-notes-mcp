@@ -22,7 +22,7 @@ describe("CLI routing before effects", () => {
     });
   });
 
-  it.each(["--broker", "--publc-helper", "--uninstall", "--sign-identity", "something"])(
+  it.each(["--publc-helper", "something"])(
     "rejects setup %s instead of importing Shortcuts",
     (arg) => {
       expect(() => parseCliArgs(["setup", arg])).toThrow("Unknown setup option");
@@ -41,7 +41,7 @@ describe("CLI routing before effects", () => {
     );
   });
 
-  it.each(["public-helper", "native-helper", "permissions-window", "permissions"])(
+  it.each(["public-helper", "native-helper", "permissions-window", "permissions", "broker"])(
     "preserves the %s target and read-only check flag",
     (target) => {
       expect(parseCliArgs(["setup", `--${target}`, "--check"])).toMatchObject({
@@ -76,6 +76,43 @@ describe("CLI routing before effects", () => {
     });
   });
 
+  it("preserves broker options and requires their target and identity value", () => {
+    const args = [
+      "--broker",
+      "--sign-identity",
+      "Developer ID Application: Test (TEAM)",
+      "--check",
+    ];
+    expect(parseCliArgs(["setup", ...args])).toEqual({
+      kind: "setup",
+      target: "broker",
+      args,
+      checkOnly: true,
+    });
+    expect(parseCliArgs(["setup", "--broker", "--uninstall"])).toMatchObject({ target: "broker" });
+    for (const args of [
+      ["--uninstall"],
+      ["--sign-identity", "Test"],
+      ["--public-helper", "--uninstall"],
+    ])
+      expect(() => parseCliArgs(["setup", ...args])).toThrow("require setup --broker");
+    for (const value of [undefined, "", "--check"])
+      expect(() =>
+        parseCliArgs([
+          "setup",
+          "--broker",
+          "--sign-identity",
+          ...(value === undefined ? [] : [value]),
+        ])
+      ).toThrow("requires a signing identity");
+    expect(() => parseCliArgs(["setup", "--broker", "--public-helper"])).toThrow(
+      "one setup target"
+    );
+    expect(() => parseCliArgs(["setup", "--broker", "--open"])).toThrow(
+      "requires setup --permissions"
+    );
+  });
+
   it.each(["templates", "anchors"])("preserves the %s parser's complete arguments", (kind) => {
     expect(parseCliArgs([kind, "edit", "name", "--port", "8080"])).toEqual({
       kind,
@@ -88,9 +125,10 @@ describe("CLI routing before effects", () => {
     expect(() => parseCliArgs(["--help", "--broker"])).toThrow("Unexpected argument");
   });
 
-  it("documents the supported routes without advertising an unreleased broker", () => {
+  it("documents the supported setup routes", () => {
     expect(CLI_USAGE).toContain("stdio");
     expect(SETUP_USAGE).toContain("--probe-automation");
-    expect(SETUP_USAGE).not.toContain("--broker");
+    expect(SETUP_USAGE).toContain("--broker");
+    expect(SETUP_USAGE).toContain("--sign-identity <id>");
   });
 });

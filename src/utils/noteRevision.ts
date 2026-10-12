@@ -15,7 +15,7 @@ export function hashNoteContent(content: string): string {
 /** Tags that produce no visible separation, so they collapse to nothing rather
  *  than to a space when reducing markup to comparable visible text (#145). */
 const INLINE_TAG =
-  /^<\/?(?:b|i|u|s|strike|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
+  /^<\/?(?:b|i|u|s|strike|del|em|strong|span|a|font|sub|sup|code|tt|small|big|mark)\b/i;
 
 /**
  * Reduce Notes HTML to the visible text that a person sees.

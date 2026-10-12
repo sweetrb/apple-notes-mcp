@@ -4,7 +4,7 @@
  * a helper, open System Settings, or connect an MCP transport.
  */
 export type SetupTarget =
-  "shortcuts" | "public-helper" | "native-helper" | "permissions-window" | "permissions";
+  "shortcuts" | "public-helper" | "native-helper" | "permissions-window" | "permissions" | "broker";
 
 export type CliCommand =
   | { kind: "mcp" }
@@ -34,6 +34,7 @@ Targets (choose at most one; default: packaged Shortcuts):
   --native-helper       Build and install the opt-in read-only private helper
   --permissions-window Build and install the optional permission checklist window
   --permissions         Check permissions; does not grant them
+  --broker              Build and install the opt-in permission broker
 
 Options for every target:
   --check               Inspect only; do not install or import anything
@@ -46,6 +47,10 @@ Options only with --permissions:
   --window              Show the checklist in the installed optional window
   --probe-automation    Send a read-only Apple event (may show a consent prompt)
 
+Options only with --broker:
+  --uninstall           Remove the installed broker and LaunchAgent
+  --sign-identity <id>   Select an existing signing identity
+
 --check and SSH sessions suppress the Automation probe. Without an explicit
 --probe-automation, Automation is unverified. Helper installation requires
 Apple developer tools; setup never silently grants macOS permissions.
@@ -56,6 +61,7 @@ const SETUP_TARGETS = new Map<string, SetupTarget>([
   ["--native-helper", "native-helper"],
   ["--permissions-window", "permissions-window"],
   ["--permissions", "permissions"],
+  ["--broker", "broker"],
 ]);
 const PERMISSION_OPTIONS = new Set([
   "--once",
@@ -69,17 +75,30 @@ const PERMISSION_OPTIONS = new Set([
 export function parseSetupArgs(args: readonly string[]): CliCommand {
   let target: SetupTarget = "shortcuts";
   let selected = false;
-  for (const arg of args) {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--sign-identity") {
+      const identity = args[++index];
+      if (!identity?.trim() || identity.startsWith("-"))
+        throw new Error("--sign-identity requires a signing identity.");
+      continue;
+    }
     const next = SETUP_TARGETS.get(arg);
     if (next) {
       if (selected && target !== next)
         throw new Error("Choose only one setup target. Run each target separately.");
       target = next;
       selected = true;
-    } else if (!["--check", "--help", "-h"].includes(arg) && !PERMISSION_OPTIONS.has(arg)) {
+    } else if (
+      !["--check", "--help", "-h"].includes(arg) &&
+      !PERMISSION_OPTIONS.has(arg) &&
+      arg !== "--uninstall"
+    ) {
       throw new Error(`Unknown setup option "${arg}".`);
     }
   }
+  if (args.some((arg) => arg === "--uninstall" || arg === "--sign-identity") && target !== "broker")
+    throw new Error("--uninstall and --sign-identity require setup --broker.");
   for (const arg of args) {
     if (PERMISSION_OPTIONS.has(arg) && target !== "permissions")
       throw new Error(`${arg} requires setup --permissions.`);

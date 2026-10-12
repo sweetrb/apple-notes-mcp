@@ -67,6 +67,8 @@ describe("bundled CLI exits before runtime initialization", () => {
     ["-h"],
     ["help"],
     ["setup", "--help"],
+    ["setup", "--broker", "--help"],
+    ["setup", "--broker", "--sign-identity", "Test", "--help"],
     ["setup", "--public-helper", "--check", "--help"],
     ["setup", "--permissions", "--probe-automation", "--open", "-h"],
   ])("prints help without evaluating runtime modules: %j", (...args) => {
@@ -85,8 +87,9 @@ describe("bundled CLI exits before runtime initialization", () => {
   });
 
   it.each([
-    ["setup", "--broker"],
-    ["setup", "--broker", "--help"],
+    ["setup", "--broker", "--sign-identity"],
+    ["setup", "--broker", "--permissions"],
+    ["setup", "--uninstall"],
     ["setup", "--public-helper", "--native-helper"],
     ["setup", "--open"],
     ["setpu"],
@@ -108,6 +111,8 @@ describe("bundled CLI exits before runtime initialization", () => {
     ["setup", "--native-helper", "--check"],
     ["setup", "--permissions-window", "--check"],
     ["setup", "--permissions", "--check"],
+    ["setup", "--broker", "--check"],
+    ["setup", "--broker", "--uninstall"],
     ["templates", "--help"],
     ["anchors", "--help"],
   ])("preserves valid runtime routes: %j", (...args) => {

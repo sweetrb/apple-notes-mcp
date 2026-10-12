@@ -98,6 +98,25 @@ describe("comparableVisibleText", () => {
     expect(comparableVisibleText(written)).toBe(comparableVisibleText(readback));
   });
 
+  it("does not invent spaces when Notes rewrites inline del as strike (#283)", () => {
+    // Observed through Background Operations v5 on macOS 27.2: Notes
+    // stores <del> as <strike>, preserving the adjacent text without spaces.
+    const written = "<div>one<del>two</del>three</div>";
+    const readback = "<div>one<strike>two</strike>three</div>";
+
+    expect(comparableVisibleText(written)).toBe("onetwothree");
+    expect(comparableVisibleText(written)).toBe(comparableVisibleText(readback));
+  });
+
+  it("preserves actual spaces and text inside del", () => {
+    const written = "<div>one <del>two</del> three</div>";
+    expect(comparableVisibleText(written)).toBe("one two three");
+    expect(comparableVisibleText(written)).not.toBe(comparableVisibleText("<div>one three</div>"));
+    expect(comparableVisibleText(written)).not.toBe(
+      comparableVisibleText("<div>one <strike>Two</strike> three</div>")
+    );
+  });
+
   it("keeps inline runs of DIFFERENT styles equivalent across normalisation", () => {
     // Notes leaves these unmerged, so both sides must agree either way.
     expect(comparableVisibleText("<div><b>alpha</b><i>beta</i></div>")).toBe("alphabeta");
