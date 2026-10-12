@@ -117,6 +117,31 @@ describe("checkPermissions", () => {
     expect(fda.fix).toContain("/usr/local/bin/node");
   });
 
+  it.each([false, "throws"] as const)(
+    "uses the supplied broker environment when the FDA probe returns %s",
+    (result) => {
+      const report = checkPermissions(
+        probes({
+          fullDiskAccess: () => {
+            if (result === "throws") throw new Error("probe unavailable");
+            return false;
+          },
+        }),
+        {
+          ...probing,
+          env: {
+            APPLE_NOTES_MCP_BROKERED: "1",
+            APPLE_NOTES_MCP_BROKER_APP: "/Applications/Test Broker.app",
+          },
+        }
+      );
+      const fda = item(report, "fullDiskAccess");
+      expect(fda.status).toBe(result === "throws" ? "unknown" : "missing");
+      expect(fda.fix).toContain("/Applications/Test Broker.app");
+      expect(fda.fix).not.toContain("/usr/local/bin/node");
+    }
+  );
+
   it("reports a thrown Full Disk Access probe as unknown", () => {
     const report = withProbe(
       probes({

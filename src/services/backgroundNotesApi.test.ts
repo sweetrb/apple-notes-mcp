@@ -172,6 +172,51 @@ describe("native append and tags", () => {
     expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
   });
 
+  describe("HTML append readback with adjacent del text (#283)", () => {
+    const content = "<div>one<del>two</del>three</div>";
+    const before = snapshot({
+      rich: {
+        ...snapshot().rich,
+        htmlLossyFormatting: ["highlight"],
+        styleRuns: [{ start: 0, length: scopeText.length, signature: "highlight" }],
+      },
+    });
+    const appended = (html: string, text: string) =>
+      snapshot({
+        hash: "h2",
+        html: before.html + "<div><br></div>" + html,
+        rich: { ...before.rich, text: scopeText + "\n\n" + text, revision: "r2" },
+      });
+
+    it("verifies the complete append while preserving the existing protected formatting", () => {
+      const after = appended("<div>one<strike>two</strike>three</div>", "onetwothree");
+      expect(
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toMatchObject({ ok: true, contentHash: "h2" });
+      expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["missing struck text", "<div>onethree</div>", "onethree"],
+      ["changed struck text", "<div>one<strike>Two</strike>three</div>", "oneTwothree"],
+    ])("reports %s as indeterminate", (_label, html, text) => {
+      const after = appended(html, text);
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Appended text not verified/);
+      expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reports a changed prior body as indeterminate", () => {
+      const after = appended("<div>one<strike>two</strike>three</div>", "onetwothree");
+      after.html = after.html.replace(scopeText, "Changed project marker");
+      after.rich.text = after.rich.text.replace(scopeText, "Changed project marker");
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Existing note text was not preserved/);
+    });
+  });
+
   describe("HTML append readback with named character references (#283)", () => {
     // A note shaped like the report: a heading, paragraphs, a list and a
     // monospaced line, with a unique body phrase as scope. The appended HTML

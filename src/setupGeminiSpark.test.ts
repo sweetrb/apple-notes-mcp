@@ -2,22 +2,14 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  formatGeminiSparkSetup,
-  GEMINI_SPARK_LOCAL_MCP,
-  runGeminiSparkSetup,
-} from "./setupGeminiSpark.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { formatGeminiSparkSetup, GEMINI_SPARK_LOCAL_MCP } from "./setupGeminiSpark.js";
 
 const server = resolve(__dirname, "../build/index.js");
 const temporaryDirectories: string[] = [];
 afterEach(() => {
   for (const dir of temporaryDirectories.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
-
-function output() {
-  return { out: vi.fn(), err: vi.fn() };
-}
 
 function runBuiltGuide(args: string[]) {
   const dir = mkdtempSync(join(tmpdir(), "gemini-spark-setup-"));
@@ -32,34 +24,6 @@ function runBuiltGuide(args: string[]) {
 }
 
 describe("Gemini Spark Local MCP setup guide", () => {
-  it.each([["--gemini-spark"], ["--gemini-spark", "--help"]])(
-    "prints the guide for %j without checking readiness",
-    (...args) => {
-      const io = output();
-      expect(runGeminiSparkSetup(args, io)).toBe(0);
-      expect(io.out).toHaveBeenCalledWith(`${formatGeminiSparkSetup()}\n`);
-      expect(io.err).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    [],
-    ["--gemini-spark", "--gemini-spark"],
-    ["--gemini-spark", "--help", "--help"],
-    ["--gemini-spark", "--check"],
-    ["--gemini-spark", "--open"],
-    ["--gemini-spark", "--public-helper"],
-    ["--gemini-spark", "--native-helper"],
-    ["--gemini-spark", "--permissions"],
-    ["--gemini-spark", "--permissions-window"],
-    ["--gemini-spark", "--unknown"],
-  ])("rejects unsupported or mixed options %j", (...args) => {
-    const io = output();
-    expect(runGeminiSparkSetup(args, io)).toBe(2);
-    expect(io.out).not.toHaveBeenCalled();
-    expect(io.err).toHaveBeenCalledWith(expect.stringContaining("cannot be combined"));
-  });
-
   it("keeps the README's exact form fields and command aligned with the guide", () => {
     const readme = readFileSync(resolve(__dirname, "../README.md"), "utf8");
     const section = readme
@@ -74,15 +38,20 @@ describe("Gemini Spark Local MCP setup guide", () => {
     expect(formatGeminiSparkSetup()).toContain("does not verify a connection");
   });
 
-  it("the built command prints the guide and exits before reading server configuration", () => {
-    const result = runBuiltGuide(["--gemini-spark"]);
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`${formatGeminiSparkSetup()}\n`);
-    expect(result.stderr).toBe("");
-  });
+  it.each([["--gemini-spark"], ["--gemini-spark", "--help"], ["--gemini-spark", "-h"]])(
+    "the built command prints %j before reading server configuration",
+    (...args) => {
+      const result = runBuiltGuide(args);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe(`${formatGeminiSparkSetup()}\n`);
+      expect(result.stderr).toBe("");
+    }
+  );
 
   it.each([
+    "--broker",
+    "--uninstall",
     "--public-helper",
     "--native-helper",
     "--permissions-window",
@@ -96,7 +65,7 @@ describe("Gemini Spark Local MCP setup guide", () => {
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(2);
       expect(result.stdout).toBe("");
-      expect(result.stderr).toContain("cannot be combined");
+      expect(result.stderr).toMatch(/one setup target|cannot be combined/);
       expect(result.stderr).not.toContain("Failed to load");
     }
   );
