@@ -886,6 +886,16 @@ todo UUID and reports `contiguous`, `consistent`, and `spansLines` ambiguity
 flags; it does not infer native items from visible checkbox text. The native
 synthetic harness (`node scripts/test-private-checklist.mjs`) exercises this
 snapshot parser and context-free dispatcher without NotesShared or any store.
+CI runs it on macOS. A separate, authorized read-only trial on 2026-10-12 used
+a temporary current-source helper on macOS 27.2 / Notes 4.13 and one newly
+created native checklist fixture. The probe reported the checklist getters
+available; two exact-ID reads returned the expected two unchecked rows with
+distinct native identities and unambiguous flags. Note revisions and
+modification time stayed unchanged across before/after reads, and the captured
+responses passed the current client schemas. This establishes that reader path
+on the tested host. Checked=true and malformed/ambiguous native runs remain
+synthetic coverage; it does not establish compatibility on other macOS releases
+or validate any write path.
 There is no write action; `append_plain_text` or any other
 name is `unknown_action`, and the TypeScript client refuses anything outside
 its read-only whitelist before spawning. Caller fields cannot override the
