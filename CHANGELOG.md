@@ -16,6 +16,10 @@
 
 ### Fixed
 
+- Preserve initial exact-ID note metadata read errors in `get-note-content`.
+  Automation refusals, timeouts and malformed metadata are reported with their
+  diagnostics instead of being collapsed into a missing-note result. The
+  legacy nullable metadata getter and title-based lookup retain their behavior.
 - Validate command-line arguments before loading configuration or initializing
   the MCP runtime. Unknown commands and setup flags fail with usage instead of
   importing Shortcuts; help and version commands exit without setup side effects.

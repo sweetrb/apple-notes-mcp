@@ -39262,6 +39262,7 @@ function sleep(ms) {
 }
 var PERMISSION_DENIED_PATTERN = /not author(?:i[sz])ed|not permitted|access.*denied|\(-1743\)/i;
 var PERMISSION_DENIED_MESSAGE = `Permission denied. ${AUTOMATION_REMEDIATION}`;
+var NOTE_ID_NOT_FOUND_MESSAGE = "Note not found. The note may have been deleted or the ID is invalid.";
 function isPermissionDenied(error2) {
   if (!error2) return false;
   return PERMISSION_DENIED_PATTERN.test(error2) || error2.includes(PERMISSION_DENIED_MESSAGE);
@@ -39294,7 +39295,7 @@ var ERROR_MAPPINGS = [
   // Note not found by ID
   {
     pattern: /can't get note id/i,
-    message: "Note not found. The note may have been deleted or the ID is invalid."
+    message: NOTE_ID_NOT_FOUND_MESSAGE
   },
   // Folder not found
   {
@@ -43955,9 +43956,20 @@ var AppleNotesManager = class {
    * This method fetches the note and its metadata using this ID.
    *
    * @param id - CoreData URL identifier for the note
-   * @returns Note object with metadata, or null if not found
+   * @returns Note object with metadata, or null if the lookup fails
    */
   getNoteById(id2) {
+    return this.readNoteById(id2).note;
+  }
+  /**
+   * Reads exact-ID metadata while retaining the executor or parser failure.
+   * Unlike the legacy nullable getter, callers can distinguish a missing note
+   * from denied Automation, a timeout, or an unreadable metadata response.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The note, or the diagnostic that prevented its metadata read
+   */
+  readNoteById(id2) {
     const safeId = sanitizeId(id2);
     const getCommand = `
       set n to note id "${safeId}"
@@ -43971,22 +43983,27 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script);
     if (!result.success) {
       console.error(`Failed to get note with ID "${id2}":`, result.error);
-      return null;
+      return {
+        note: null,
+        error: result.error?.trim() ? result.error : "AppleScript note metadata read failed"
+      };
     }
     const parsed2 = parseNotePropertiesOutput(result.output);
     if (!parsed2) {
-      return null;
+      return { note: null, error: "Unexpected note metadata response" };
     }
     return {
-      id: parsed2.id,
-      title: parsed2.title,
-      content: "",
-      // Not fetched to keep response small
-      tags: [],
-      created: parsed2.created,
-      modified: parsed2.modified,
-      shared: parsed2.shared,
-      passwordProtected: parsed2.passwordProtected
+      note: {
+        id: parsed2.id,
+        title: parsed2.title,
+        content: "",
+        // Not fetched to keep response small
+        tags: [],
+        created: parsed2.created,
+        modified: parsed2.modified,
+        shared: parsed2.shared,
+        passwordProtected: parsed2.passwordProtected
+      }
     };
   }
   /**
@@ -64194,9 +64211,10 @@ registerTool(
   },
   withErrorHandling(({ id: id2, title, account }) => {
     if (id2) {
-      const note2 = notesManager.getNoteById(id2);
+      const { note: note2, error: metadataError } = notesManager.readNoteById(id2);
       if (!note2) {
-        return notFoundResponse(`Note with ID "${id2}" not found`);
+        const message = `Failed to read metadata of note with ID "${id2}": ${metadataError}`;
+        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE ? notFoundResponse(message) : errorResponse(message);
       }
       if (note2.passwordProtected) {
         return errorResponse(

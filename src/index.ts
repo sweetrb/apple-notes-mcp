@@ -37,6 +37,7 @@ import {
   exportMaxResponseBytes,
 } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
+import { NOTE_ID_NOT_FOUND_MESSAGE } from "@/utils/applescript.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
 import {
@@ -1379,9 +1380,14 @@ registerTool(
     // Prefer ID-based lookup if provided
     if (id) {
       // Check for password protection first for better error message
-      const note = notesManager.getNoteById(id);
+      const { note, error: metadataError } = notesManager.readNoteById(id);
       if (!note) {
-        return notFoundResponse(`Note with ID "${id}" not found`);
+        const message = `Failed to read metadata of note with ID "${id}": ${metadataError}`;
+        // The executor's exact missing-ID diagnostic contains "may have been",
+        // which otherwise matches the shared uncertain-write classification.
+        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE
+          ? notFoundResponse(message)
+          : errorResponse(message);
       }
       if (note.passwordProtected) {
         return errorResponse(
