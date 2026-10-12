@@ -4130,21 +4130,25 @@ export class AppleNotesManager {
 
     // The public builder returns on a failed precondition. Keep those returns
     // inside a per-note handler so refusing one item never exits the batch.
+    // A script object also keeps the handler valid inside the executor's
+    // enclosing timeout block; bare handler declarations cannot appear there.
     const scopeChecks = buildScopeGuardScript("noteRef", scope, "destFolder");
     const moveHandler = `
-      on moveBatchNote(noteRef, destFolder, theId)
-        tell application "Notes"
-          ${scopeChecks}
-          move noteRef to destFolder
-          set movedNoteRef to note id theId
-          set actualFolder to container of movedNoteRef
-          if (id of actualFolder) is (id of destFolder) then
-            return "ok"
-          else
-            return "wrongfolder"
-          end if
-        end tell
-      end moveBatchNote
+      script batchMoveWorker
+        on moveBatchNote(noteRef, destFolder, theId)
+          tell application "Notes"
+            ${scopeChecks}
+            move noteRef to destFolder
+            set movedNoteRef to note id theId
+            set actualFolder to container of movedNoteRef
+            if (id of actualFolder) is (id of destFolder) then
+              return "ok"
+            else
+              return "wrongfolder"
+            end if
+          end tell
+        end moveBatchNote
+      end script
     `;
 
     // Collapse the whole batch into ONE osascript spawn (#26). The old path
@@ -4201,7 +4205,7 @@ export class AppleNotesManager {
               set out to out & "pw" & ${AS_RECORD_SEP}
             else
               try
-                set itemStatus to my moveBatchNote(noteRef, destFolder, theId)
+                set itemStatus to batchMoveWorker's moveBatchNote(noteRef, destFolder, theId)
                 set out to out & itemStatus & ${AS_RECORD_SEP}
               on error
                 set out to out & "fail" & ${AS_RECORD_SEP}

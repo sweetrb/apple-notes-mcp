@@ -70,7 +70,9 @@ describe("batch moves check each note's live scope in its own handler", () => {
     expect(handler).toContain("set movedNoteRef to note id theId");
     expect(handler).toContain("id of actualFolder) is (id of destFolder");
     expect(loop).toContain("repeat with rawId");
-    expect(loop).toContain("set itemStatus to my moveBatchNote(noteRef, destFolder, theId)");
+    expect(loop).toContain(
+      "set itemStatus to batchMoveWorker's moveBatchNote(noteRef, destFolder, theId)"
+    );
     expect(loop).toContain("set out to out & itemStatus & (character id 30)");
     expect(loop).not.toContain("SAFETY_SCOPE");
     expect(loop).toContain('set out to out & "fail"');

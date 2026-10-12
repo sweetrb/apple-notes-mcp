@@ -14,7 +14,9 @@
   refusal cannot make a separate move/readback failure claim no writes.
   Unknown outcomes remain indeterminate and require exact-ID readback
   before retrying. Empty status slots retain their exact note position rather
-  than borrowing a later note's success or refusal.
+  than borrowing a later note's success or refusal. The per-note handler is
+  declared in a script object so the generated batch remains valid inside
+  the executor's bounded timeout block.
 
 ## [2.15.1] - 2026-10-12
 
