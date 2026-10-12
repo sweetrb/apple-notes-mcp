@@ -26,8 +26,8 @@ const nativeDocumentation = /\.(md|mdx|rst)$/i;
 const nativeTestFile = /\.(test|spec)\.[^/]+$/;
 
 const shipped = changed.filter((path) => {
-  if (testDirectory.test(path)) return false;
   if (path.startsWith("build/") || path === "requirements.txt") return true;
+  if (testDirectory.test(path)) return false;
   // Preserve the existing fail-safe rule for future non-TypeScript sidecars.
   if (path.startsWith("src/")) return !path.endsWith(".ts");
   // Native sources, headers and runtime resources are shipped and used directly.
