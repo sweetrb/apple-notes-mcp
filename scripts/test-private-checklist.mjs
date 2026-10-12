@@ -28,15 +28,32 @@ try {
   assert.equal(summary.frameworkLoaded, false);
   const dispatch = (request) => {
     const result = run(binary, ["--dispatch"], { input: JSON.stringify({ protocol: 1, ...request }) });
-    return { status: result.status, ...JSON.parse(result.stdout) };
+    return { exitCode: result.status, ...JSON.parse(result.stdout) };
   };
   const hello = dispatch({ action: "hello" });
+  assert.equal(hello.exitCode, 0);
+  assert.equal(hello.status, "ok");
+  assert.equal(hello.protocolVersion, 1);
   assert.equal(hello.readOnly, true);
   assert.deepEqual(hello.actions, ["hello", "probe", "read_note_state", "read_checklist"]);
-  for (const action of ["write", "set_checklist_item", "append_plain_text"])
-    assert.equal(dispatch({ action }).code, "unknown_action");
-  assert.equal(dispatch({ action: "read_checklist", identifier: "irrelevant", done: true }).code, "invalid_request");
-  console.log(`ok: ${summary.tests} synthetic checklist assertions; hello/whitelist/key refusals; no NotesShared or store access`);
+  for (const action of ["write", "set_checklist_item", "append_plain_text"]) {
+    const refusal = dispatch({ action });
+    assert.equal(refusal.exitCode, 1);
+    assert.equal(refusal.status, "error");
+    assert.equal(refusal.code, "unknown_action");
+  }
+  for (const request of [
+    { action: "read_checklist", identifier: "irrelevant", done: true },
+    { action: "read_checklist" },
+    { action: "read_checklist", identifier: "not-a-uuid" },
+    { action: "read_checklist", identifier: 7 },
+  ]) {
+    const refusal = dispatch(request);
+    assert.equal(refusal.exitCode, 1);
+    assert.equal(refusal.status, "error");
+    assert.equal(refusal.code, "invalid_request");
+  }
+  console.log(`ok: ${summary.tests} synthetic checklist assertions; hello/whitelist/key/identifier refusals; no NotesShared or store access`);
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }

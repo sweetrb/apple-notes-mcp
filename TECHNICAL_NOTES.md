@@ -886,6 +886,10 @@ todo UUID and reports `contiguous`, `consistent`, and `spansLines` ambiguity
 flags; it does not infer native items from visible checkbox text. The native
 synthetic harness (`node scripts/test-private-checklist.mjs`) exercises this
 snapshot parser and context-free dispatcher without NotesShared or any store.
+CI runs it on macOS. This does not establish live `read_checklist` compatibility:
+that requires a current helper's probe and exact-ID reads of a selected native
+checklist fixture, with its expected checked and unchecked rows. No such live
+checklist evidence is included in this change.
 There is no write action; `append_plain_text` or any other
 name is `unknown_action`, and the TypeScript client refuses anything outside
 its read-only whitelist before spawning. Caller fields cannot override the

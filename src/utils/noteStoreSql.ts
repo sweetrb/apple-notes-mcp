@@ -20,7 +20,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { escapeFolderName } from "@/services/appleNotesManager.js";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 
 /** Default location of the live NoteStore database. */
 export const NOTES_DB_PATH = path.join(
@@ -31,11 +31,7 @@ export const NOTES_DB_PATH = path.join(
 /** Core Data stores dates as seconds since 2001-01-01T00:00:00Z. */
 export const CORE_DATA_EPOCH_MS = Date.UTC(2001, 0, 1);
 
-export const STORE_FDA_MESSAGE =
-  "Full Disk Access is required to read the Notes database. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
-  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
-  `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
+export const STORE_FDA_MESSAGE = "Full Disk Access is required to read the Notes database.";
 
 /** Raised for conditions a tool reports verbatim. */
 export class NoteStoreError extends Error {
@@ -93,7 +89,8 @@ export function runReadOnlySql(
   sql: string,
   params: Record<string, BoundValue> = {}
 ): string {
-  if (!fs.existsSync(dbPath)) throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+  if (!fs.existsSync(dbPath))
+    throw new NoteStoreError(`${STORE_FDA_MESSAGE} ${fdaRemediation()}`, "no_fda");
   const args = ["-readonly"];
   const names = Object.keys(params);
   if (names.length) args.push("-cmd", ".parameter init");
@@ -114,7 +111,7 @@ export function runReadOnlySql(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/authorization denied|unable to open database/i.test(message)) {
-      throw new NoteStoreError(STORE_FDA_MESSAGE, "no_fda");
+      throw new NoteStoreError(`${STORE_FDA_MESSAGE} ${fdaRemediation()}`, "no_fda");
     }
     console.error(`Notes database query failed: ${message}`);
     throw new NoteStoreError("Failed to query the Notes database.", "query_error");
