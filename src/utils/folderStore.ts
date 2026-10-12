@@ -21,6 +21,7 @@
  * @module utils/folderStore
  */
 
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { execFileSync } from "child_process";
 import * as os from "os";
 import * as path from "path";
@@ -141,7 +142,7 @@ function classify(error: unknown): FolderStoreError {
   const message = error instanceof Error ? error.message : String(error);
   if (/authorization denied|unable to open database|not authorized/i.test(message)) {
     return new FolderStoreError(
-      "Full Disk Access is required to verify folder type and contents before deleting. Grant it to the Node binary running this server (or the terminal that launches it), then relaunch it.",
+      `Full Disk Access is required to verify folder type and contents before deleting. ${fdaRemediation()}`,
       "no_fda"
     );
   }
