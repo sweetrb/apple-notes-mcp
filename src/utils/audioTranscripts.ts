@@ -42,7 +42,7 @@ import {
   varintValue,
   type ProtoField,
 } from "./protobuf.js";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "./docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import type {
   AudioTranscript,
   AudioTranscriptOptions,
@@ -375,8 +375,7 @@ export function readAudioTranscripts(
     if (/authorization denied|unable to open database/i.test(message))
       throw new AudioTranscriptError(
         "no_fda",
-        "Full Disk Access is required to read stored transcripts. Grant it to the Node binary " +
-          `running this server (or the terminal that launches it), then fully quit and relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`
+        `Full Disk Access is required to read stored transcripts. ${fdaRemediation()}`
       );
     throw new AudioTranscriptError("query_error", "Failed to read the Notes database.");
   }
