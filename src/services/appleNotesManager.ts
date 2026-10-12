@@ -4233,10 +4233,9 @@ export class AppleNotesManager {
           );
         }
       } else {
-        const statuses = res.output
-          .split(RECORD_SEP)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
+        // Empty statuses still occupy a note's position; dropping one would
+        // attribute later successes or refusals to the wrong note ID.
+        const statuses = res.output.split(RECORD_SEP).map((s) => s.trim());
         runnable.forEach((r, k) => {
           results[r.index] = this.mapBatchStatus(ids[r.index], statuses[k], "move");
         });

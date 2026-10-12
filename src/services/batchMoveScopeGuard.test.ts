@@ -233,4 +233,56 @@ describe("batch moves check each note's live scope in its own handler", () => {
       indeterminate: true,
     });
   });
+
+  it("keeps an empty leading status uncertain without shifting later outcomes", () => {
+    const reason = "the note is not in the expected folder";
+    exec.mockReturnValue({
+      success: true,
+      output: `${R}ok${R}SAFETY_SCOPE:${reason}${R}`,
+    });
+    expect(manager.batchMoveNotes([ID1, ID2, ID3], "Archive")).toEqual([
+      { id: ID1, success: false, error: "Unknown error", indeterminate: true },
+      { id: ID2, success: true },
+      {
+        id: ID3,
+        success: false,
+        error: scopeConflictMessage(reason, "batch-move"),
+        committed: false,
+        indeterminate: false,
+      },
+    ]);
+  });
+
+  it("keeps an empty middle status on its exact ID instead of borrowing the next success", () => {
+    exec.mockReturnValue({ success: true, output: `missing${R}${R}ok${R}` });
+    expect(manager.batchMoveNotes([ID1, ID2, ID3], "Archive")).toEqual([
+      { id: ID1, success: false, error: "Note not found", committed: false, indeterminate: false },
+      { id: ID2, success: false, error: "Unknown error", indeterminate: true },
+      { id: ID3, success: true },
+    ]);
+  });
+
+  it("preserves whitespace-only slots across invalid original IDs without retrying", () => {
+    const invalidId = `${STORE}/ICFolder/p8`;
+    exec.mockReturnValue({ success: true, output: `ok${R} \n ${R}missing${R}` });
+    const results = manager.batchMoveNotes([ID1, invalidId, ID2, ID3], "Archive");
+    expect(results.map((result) => result.id)).toEqual([ID1, invalidId, ID2, ID3]);
+    expect(results[0]).toEqual({ id: ID1, success: true });
+    expect(results[1]).toMatchObject({ success: false, committed: false, indeterminate: false });
+    expect(results[2]).toEqual({
+      id: ID2,
+      success: false,
+      error: "Unknown error",
+      indeterminate: true,
+    });
+    expect(results[3]).toEqual({
+      id: ID3,
+      success: false,
+      error: "Note not found",
+      committed: false,
+      indeterminate: false,
+    });
+    expect(exec).toHaveBeenCalledTimes(1);
+    expect(exec.mock.calls[0][1]).toEqual({ maxRetries: 1 });
+  });
 });
