@@ -49411,6 +49411,19 @@ function textBelowTitle(text2, title) {
   if (firstLine.trim() !== title.trim()) return text2;
   return lineEnd < 0 ? "" : text2.slice(lineEnd + 1);
 }
+function assertChecklistEndAppendAvailable(rich) {
+  requirePreservationMetadata(rich);
+  const items = [...rich.checklistItems].sort((a, b) => a.start - b.start);
+  if (!items.length) return;
+  const last = items.at(-1);
+  if (items.some(
+    (item, index) => item.start > 0 && rich.text[item.start - 1] !== "\n" || index > 0 && item.start !== items[index - 1].start + items[index - 1].text.length + 1
+  ) || !/^\n?$/u.test(rich.text.slice(last.start + last.text.length)))
+    throw new CodedError(
+      "Checklist end-append requires one existing checklist group at the end of the note. Notes may insert into an earlier group when text or native objects follow it, or when groups are separate. Nothing changed",
+      { code: "validation_error", committed: false, indeterminate: false }
+    );
+}
 function mutateBackground(request, operation, data, verify, deps) {
   if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
     throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
@@ -49431,6 +49444,7 @@ function mutateBackground(request, operation, data, verify, deps) {
   const current = deps.read(request.id);
   if (current.hash !== before.hash) throw new Error("Note revision changed during preflight");
   requirePreservationMetadata(current.rich);
+  if (operation === "create-checklist-item") assertChecklistEndAppendAvailable(current.rich);
   let transportUncertain = false;
   let transportMessage = "";
   let transportError;
@@ -59808,7 +59822,7 @@ function registerNativeOperations(server2, manager) {
   );
   tool(
     "create-checklist-item",
-    "Use when: appending one real unchecked Notes checklist item.\nReturns: the created checklist identity after exact-note readback.\nDo not use when: plain text is sufficient or more than one item is requested.\nSafety: preserves existing text, links, native objects, checklist identities, and formatting.",
+    "Use when: appending one real unchecked Notes checklist item.\nReturns: the created checklist identity after exact-note readback.\nDo not use when: plain text is sufficient or more than one item is requested.\nSafety: preserves existing text, links, native objects, checklist identities, and formatting. If a checklist already exists, requires one contiguous group at the end of the note; otherwise refuses before running the bridge.",
     {
       ...common,
       text: external_exports.string().min(1).max(1e4).refine((s) => !/[\r\n\0]/u.test(s), "One line per checklist item")
@@ -59832,7 +59846,7 @@ function registerNativeOperations(server2, manager) {
   );
   tool(
     "create-checklist-items",
-    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; requires any existing checklist to be one contiguous group at the end of the note before dispatch. Checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
     {
       ...common,
       items: external_exports.array(

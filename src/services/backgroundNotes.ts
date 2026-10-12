@@ -408,6 +408,26 @@ export function textBelowTitle(text: string, title: string): string {
   return lineEnd < 0 ? "" : text.slice(lineEnd + 1);
 }
 
+/** Notes adds to an existing checklist group; only one terminal group is an end-append. */
+export function assertChecklistEndAppendAvailable(rich: RichNote) {
+  requirePreservationMetadata(rich);
+  const items = [...rich.checklistItems!].sort((a, b) => a.start - b.start);
+  if (!items.length) return;
+  const last = items.at(-1)!;
+  if (
+    items.some(
+      (item, index) =>
+        (item.start > 0 && rich.text[item.start - 1] !== "\n") ||
+        (index > 0 && item.start !== items[index - 1].start + items[index - 1].text.length + 1)
+    ) ||
+    !/^\n?$/u.test(rich.text.slice(last.start + last.text.length))
+  )
+    throw new CodedError(
+      "Checklist end-append requires one existing checklist group at the end of the note. Notes may insert into an earlier group when text or native objects follow it, or when groups are separate. Nothing changed",
+      { code: "validation_error", committed: false, indeterminate: false }
+    );
+}
+
 /** Run one guarded native mutation and verify its outcome by exact-ID readback. */
 export function mutateBackground(
   request: BackgroundInput,
@@ -442,6 +462,7 @@ export function mutateBackground(
   const current = deps.read(request.id);
   if (current.hash !== before.hash) throw new Error("Note revision changed during preflight");
   requirePreservationMetadata(current.rich);
+  if (operation === "create-checklist-item") assertChecklistEndAppendAvailable(current.rich);
   let transportUncertain = false;
   let transportMessage = "";
   let transportError:

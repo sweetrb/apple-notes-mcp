@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Checklist appends now refuse before dispatch when existing items are followed by text or native objects, or form separate groups. Notes can insert into the earlier group rather than append to the note; the strict retained-content end-append check remains unchanged.
 - Attachment and background write verification now requires complete native preservation metadata and checks retained text and whitespace, formatting, link ranges, checklist identities/state/ranges, and native object payloads and placement. End-appends and removal of mapped native tag pills have explicit allowed changes; known paragraph UUID regeneration retains the existing decoder policy.
 - Attachment readback failures after insertion starts now remain explicitly indeterminate, including read races and missing preservation metadata. Temporary-file cleanup cannot override that outcome or a verified receipt. Native tag additions also preserve retained zero-length formatting metadata.
 
