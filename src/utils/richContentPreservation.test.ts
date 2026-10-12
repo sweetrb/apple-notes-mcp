@@ -33,6 +33,73 @@ describe("retained native content, using generated public-decoder snapshots", ()
     const { before, after } = fixture();
     expect(() => assertRetainedRichContent(before, after)).not.toThrow();
   });
+  it("refuses an unbacked object replacement character even with otherwise complete metadata", () => {
+    const rich = plainRichNote("Title\n\ufffc");
+    expect(rich.nativeObjectDataComplete).toBe(true);
+    expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+  });
+  it("refuses an orphan placeholder after a backed native object", () => {
+    const rich = syntheticRichNote("Title\n\ufffc\n\ufffc", {
+      objects: [{ id: "table", type: "com.apple.notes.table", start: 6, length: 1 }],
+    });
+    expect(rich.nativeObjectDataComplete).toBe(true);
+    expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+  });
+  it.each([1, 2])("accepts repeated attachment references with later run length %s", (length) => {
+    const rich = syntheticRichNote("Image\ufffc" + "\ufffc".repeat(length), {
+      objects: [
+        { id: "png", type: "public.png", start: 5, length: 1 },
+        { id: "png", type: "public.png", start: 6, length },
+      ],
+    });
+    // The public decoder deduplicates the identity; the native store has one row.
+    rich.objectData = rich.objectData!.slice(0, 1);
+    expect(rich.objects).toHaveLength(1);
+    expect(rich.styleRuns!.slice(-2).map((run) => run.nativeSemantics!.objects[0].id)).toEqual([
+      "png",
+      "png",
+    ]);
+    expect(() => requirePreservationMetadata(rich)).not.toThrow();
+  });
+  it.each(["earlier", "later", "length"] as const)(
+    "refuses a summary that differs from its first native reference: %s",
+    (change) => {
+      const rich = syntheticRichNote("Image\ufffc\ufffc", {
+        objects: [5, 6].map((start) => ({ id: "png", type: "public.png", start, length: 1 })),
+      });
+      rich.objectData = rich.objectData!.slice(0, 1);
+      if (change === "earlier") rich.objects![0].start--;
+      if (change === "later") rich.objects![0].start++;
+      if (change === "length") rich.objects![0].length++;
+      expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+    }
+  );
+  it("accepts an inline tag backed by its textual range", () => {
+    const rich = syntheticRichNote("#alpha", {
+      objects: [{ id: "tag", type: TAG, tag: "alpha", start: 0, length: 6 }],
+    });
+    expect(() => requirePreservationMetadata(rich)).not.toThrow();
+  });
+  it.each(["id", "type"] as const)("refuses placeholder backing with the wrong %s", (key) => {
+    const rich = syntheticRichNote("\ufffc", {
+      objects: [{ id: "table", type: "com.apple.notes.table", start: 0, length: 1 }],
+    });
+    rich.styleRuns![0].nativeSemantics!.objects[0][key] = "different";
+    expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+  });
+  it.each(["id", "type"] as const)("refuses contradictory later attachment %s backing", (key) => {
+    const rich = syntheticRichNote("Image\ufffc\ufffc", {
+      objects: [5, 6].map((start) => ({ id: "png", type: "public.png", start, length: 1 })),
+    });
+    rich.objectData = rich.objectData!.slice(0, 1);
+    rich.styleRuns!.at(-1)!.nativeSemantics!.objects[0][key] = "different";
+    expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+  });
+  it("refuses a semantic reference missing from the native summary and payload sets", () => {
+    const rich = plainRichNote("ordinary text");
+    rich.styleRuns![0].nativeSemantics!.objects = [{ id: "unexpected", type: "file" }];
+    expect(() => requirePreservationMetadata(rich)).toThrow(/placement preservation metadata/);
+  });
   it.each([
     [
       "a style signature",
@@ -161,11 +228,16 @@ describe("retained native content, using generated public-decoder snapshots", ()
     expect(() => assertRetainedRichContent(before, after)).toThrow(/text/);
   });
   it("refuses new semantic objects inside retained text", () => {
-    const before = plainRichNote("Text\ufffc\n");
+    const retained = { id: "retained", type: "file", start: 4, length: 1 };
+    const before = syntheticRichNote("Text\ufffc\n", { objects: [retained] });
     const after = syntheticRichNote(before.text, {
-      objects: [{ id: "unexpected", type: "file", start: 4, length: 1 }],
+      objects: [{ id: "unexpected", type: "file", start: 0, length: 1 }, retained],
     });
-    expect(() => assertRetainedRichContent(before, after, { kind: "append" })).toThrow(/placement/);
+    expect(() => requirePreservationMetadata(before)).not.toThrow();
+    expect(() => requirePreservationMetadata(after)).not.toThrow();
+    expect(() => assertRetainedRichContent(before, after, { kind: "append" })).toThrow(
+      /identity or placement/
+    );
   });
   it("allows only exact mapped tag removal, preserving later object coordinates and row identity", () => {
     const { before } = fixture();

@@ -19,7 +19,7 @@ vi.mock("../utils/pasteboardFreeze.js", async (original) => ({
   freezePasteboard: pasteboard.freeze,
 }));
 import { registerDirectOperations } from "./directOperations.js";
-import { plainRichNote } from "../utils/__fixtures__/retainedRichNote.js";
+import { plainRichNote, syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
 import { PasteboardError } from "../utils/pasteboardFreeze.js";
 
 const directories: string[] = [];
@@ -77,13 +77,10 @@ describe("direct Notes operations", () => {
     writeFileSync(path, bytes);
     const before = { ...plainRichNote("existing"), revision: "rich-before" };
     const after = {
-      ...before,
+      ...syntheticRichNote("existing\ufffc", {
+        objects: [{ id: "new-object", type: "file", start: 8, length: 1 }],
+      }),
       revision: "rich-after",
-      text: "existing\ufffc",
-      nativeObjectIds: ["new-object"],
-      hasNativeObjects: true,
-      objects: [{ id: "new-object", type: "file", start: 8, length: 1 }],
-      styleRuns: [{ ...before.styleRuns![0], length: 9 }],
       objectData: [
         { id: "new-object", pk: 3, type: "file", mergeable: "", view: null, altText: null },
       ],

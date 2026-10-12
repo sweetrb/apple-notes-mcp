@@ -48577,8 +48577,8 @@ import { join as join17 } from "node:path";
 // src/utils/richContentPreservation.ts
 var TAG_OBJECT_TYPE = "com.apple.notes.inlinetextattachment.hashtag";
 function requirePreservationMetadata(rich) {
-  const unavailable = () => {
-    throw new Error("Native object, checklist or formatting preservation metadata is unavailable");
+  const unavailable = (message = "Native object, checklist or formatting preservation metadata is unavailable") => {
+    throw new Error(message);
   };
   const { objects, objectData, checklistItems, styleRuns, nativeTagObjectIds } = rich;
   if (!objects || !objectData || !checklistItems || !styleRuns || !nativeTagObjectIds || rich.nativeObjectDataComplete !== true)
@@ -48613,12 +48613,31 @@ function requirePreservationMetadata(rich) {
       return unavailable();
   }
   let position = 0;
+  const firstReferences = /* @__PURE__ */ new Map();
   for (const run of styleRuns) {
     if (run.start !== position || !Number.isInteger(run.length) || run.length < 0 || typeof run.signature !== "string" || run.nativeSemantics?.complete !== true || run.length === 0 && (run.nativeSemantics.unknown || run.nativeSemantics.structuredParagraph || run.nativeSemantics.links || run.nativeSemantics.objects.length > 0))
       return unavailable();
+    const references = run.nativeSemantics.objects;
+    if (references.length > 1 || rich.text.slice(run.start, run.start + run.length).includes("\uFFFC") && references.length !== 1)
+      return unavailable("Native object placement preservation metadata is unavailable");
+    for (const reference of references) {
+      if (!objectData.some((data) => data.id === reference.id && data.type === reference.type))
+        return unavailable("Native object placement preservation metadata is unavailable");
+      if (!firstReferences.has(reference.id))
+        firstReferences.set(reference.id, {
+          start: run.start,
+          length: run.length,
+          type: reference.type
+        });
+    }
     position += run.length;
   }
   if (position !== rich.text.length) return unavailable();
+  if (objects.some((object3) => {
+    const reference = firstReferences.get(object3.id);
+    return !reference || reference.start !== object3.start || reference.length !== object3.length || reference.type !== object3.type;
+  }))
+    return unavailable("Native object placement preservation metadata is unavailable");
   for (const link of rich.links)
     if (!Number.isInteger(link.start) || !Number.isInteger(link.length) || link.start < 0 || link.length < 1 || link.start + link.length > rich.text.length || rich.text.slice(link.start, link.start + link.length) !== link.text)
       return unavailable();
@@ -49424,13 +49443,24 @@ function assertChecklistEndAppendAvailable(rich) {
       { code: "validation_error", committed: false, indeterminate: false }
     );
 }
+function requireBackgroundPreflightMetadata(rich) {
+  try {
+    requirePreservationMetadata(rich);
+  } catch (error2) {
+    throw new CodedError(error2 instanceof Error ? error2.message : String(error2), {
+      code: "validation_error",
+      committed: false,
+      indeterminate: false
+    });
+  }
+}
 function mutateBackground(request, operation, data, verify, deps) {
   if (request.scopeText.length < 12 || request.scopeText.length > 500 || /[\r\n\0]/u.test(request.scopeText))
     throw new Error("Use a distinctive existing single-line scope of 12\u2013500 characters");
   const before = deps.read(request.id);
   if (before.hash !== request.expectedContentHash)
     throw new Error("Note revision changed; read it again");
-  requirePreservationMetadata(before.rich);
+  requireBackgroundPreflightMetadata(before.rich);
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
   if (!textBelowTitle(before.rich.text, before.title).includes(request.scopeText))
@@ -49443,7 +49473,7 @@ function mutateBackground(request, operation, data, verify, deps) {
     throw new Error("Ambiguous note selection; nothing changed");
   const current = deps.read(request.id);
   if (current.hash !== before.hash) throw new Error("Note revision changed during preflight");
-  requirePreservationMetadata(current.rich);
+  requireBackgroundPreflightMetadata(current.rich);
   if (operation === "create-checklist-item") assertChecklistEndAppendAvailable(current.rich);
   let transportUncertain = false;
   let transportMessage = "";

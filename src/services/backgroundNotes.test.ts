@@ -193,6 +193,26 @@ describe("background note mutation boundaries", () => {
       indeterminate: true,
     });
   });
+  it("keeps an orphan placeholder discovered after dispatch indeterminate", () => {
+    const f = fixture();
+    f.after.rich = plainRichNote(f.before.rich.text + "\n\ufffc");
+    let failure: unknown;
+    try {
+      mutateBackground(
+        request,
+        "append-html",
+        {},
+        (before, after) => assertPreserved(before, after, { append: true }),
+        f.deps
+      );
+    } catch (error) {
+      failure = error;
+    }
+    const outcome = classifyError((failure as Error).message, failure);
+    expect(f.deps.run).toHaveBeenCalledOnce();
+    expect(outcome).toMatchObject({ code: "verification_failed", indeterminate: true });
+    expect(outcome).not.toHaveProperty("committed", false);
+  });
   it("verifies appended text from Notes HTML when native tags replace rich-text ranges", () => {
     expect(() =>
       assertAppendedVisibleText(
@@ -551,11 +571,21 @@ describe("preservation verification", () => {
   it("rejects retained object-placeholder formatting normalization as unverified", () => {
     const before = snapshot(),
       after = snapshot();
-    before.rich = plainRichNote("Text\n\ufffc");
-    after.rich = plainRichNote("Text\n\ufffc");
+    const object = { id: "retained", type: "file", start: 4, length: 2 };
+    const objectSemantics = () => ({
+      ...plainSemantics(),
+      objects: [{ id: object.id, type: object.type }],
+    });
+    before.rich = syntheticRichNote("Text\n\ufffc", { objects: [object] });
+    after.rich = syntheticRichNote("Text\n\ufffc", { objects: [object] });
     before.rich.styleRuns = [
       { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
-      { start: 4, length: 2, signature: "old object paragraph", nativeSemantics: plainSemantics() },
+      {
+        start: 4,
+        length: 2,
+        signature: "old object paragraph",
+        nativeSemantics: objectSemantics(),
+      },
     ];
     after.rich.styleRuns = [
       { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
@@ -563,7 +593,7 @@ describe("preservation verification", () => {
         start: 4,
         length: 2,
         signature: "normalized object paragraph",
-        nativeSemantics: plainSemantics(),
+        nativeSemantics: objectSemantics(),
       },
     ];
     expect(() => assertPreserved(before, after, { append: true })).toThrow(/formatting/);

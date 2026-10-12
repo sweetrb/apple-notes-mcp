@@ -4,8 +4,10 @@ const TAG_OBJECT_TYPE = "com.apple.notes.inlinetextattachment.hashtag";
 
 /** Refuse a write when the decoder cannot account for every native range and style. */
 export function requirePreservationMetadata(rich: RichNote) {
-  const unavailable = () => {
-    throw new Error("Native object, checklist or formatting preservation metadata is unavailable");
+  const unavailable = (
+    message = "Native object, checklist or formatting preservation metadata is unavailable"
+  ) => {
+    throw new Error(message);
   };
   const { objects, objectData, checklistItems, styleRuns, nativeTagObjectIds } = rich;
   if (
@@ -83,6 +85,7 @@ export function requirePreservationMetadata(rich: RichNote) {
       return unavailable();
   }
   let position = 0;
+  const firstReferences = new Map<string, { start: number; length: number; type: string }>();
   for (const run of styleRuns) {
     if (
       run.start !== position ||
@@ -97,9 +100,38 @@ export function requirePreservationMetadata(rich: RichNote) {
           run.nativeSemantics.objects.length > 0))
     )
       return unavailable();
+    const references = run.nativeSemantics.objects;
+    if (
+      references.length > 1 ||
+      (rich.text.slice(run.start, run.start + run.length).includes("\ufffc") &&
+        references.length !== 1)
+    )
+      return unavailable("Native object placement preservation metadata is unavailable");
+    for (const reference of references) {
+      if (!objectData.some((data) => data.id === reference.id && data.type === reference.type))
+        return unavailable("Native object placement preservation metadata is unavailable");
+      if (!firstReferences.has(reference.id))
+        firstReferences.set(reference.id, {
+          start: run.start,
+          length: run.length,
+          type: reference.type,
+        });
+    }
     position += run.length;
   }
   if (position !== rich.text.length) return unavailable();
+  if (
+    objects.some((object) => {
+      const reference = firstReferences.get(object.id);
+      return (
+        !reference ||
+        reference.start !== object.start ||
+        reference.length !== object.length ||
+        reference.type !== object.type
+      );
+    })
+  )
+    return unavailable("Native object placement preservation metadata is unavailable");
   for (const link of rich.links)
     if (
       !Number.isInteger(link.start) ||

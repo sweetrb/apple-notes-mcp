@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
-import { syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
+import { plainRichNote, syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
 // Keep the mutation implementation real; substitute only probes and dependencies.
 // NATIVE_APPEND_HTML_SUBSET stays real because descriptions use that constant.
 vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
@@ -41,6 +41,42 @@ function fixture() {
   };
 }
 describe("background capability boundaries", () => {
+  it("refuses an orphan placeholder through the registered table handler without dispatch", async () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const scopeText = "Unique project marker";
+    const rich = plainRichNote(`Title\n${scopeText}\n\ufffc`);
+    const snapshot = {
+      id,
+      title: "Title",
+      hash: `sha256:${"1".repeat(64)}`,
+      html: "",
+      rich,
+      checklist: [],
+    };
+    const deps = {
+      read: vi.fn(() => snapshot),
+      candidates: vi.fn(() => [id]),
+      run: vi.fn(),
+    };
+    vi.mocked(readRichNote).mockReturnValueOnce(rich);
+    vi.mocked(backgroundDependencies).mockReturnValueOnce(deps);
+    const result = await fixture()("create-table")[2]({
+      id,
+      scopeText,
+      expectedContentHash: snapshot.hash,
+      rows: [
+        ["one", "two"],
+        ["three", "four"],
+      ],
+    });
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { code: "validation_error", committed: false, indeterminate: false },
+    });
+    expect(deps.read).toHaveBeenCalledOnce();
+    expect(deps.candidates).not.toHaveBeenCalled();
+    expect(deps.run).not.toHaveBeenCalled();
+  });
   it.each(["create-checklist-item", "create-checklist-items"])(
     "returns an explicit no-write refusal from the registered %s handler",
     async (name) => {

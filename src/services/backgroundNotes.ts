@@ -428,6 +428,19 @@ export function assertChecklistEndAppendAvailable(rich: RichNote) {
     );
 }
 
+/** Missing native metadata is a definitive refusal while the bridge has not run. */
+function requireBackgroundPreflightMetadata(rich: RichNote) {
+  try {
+    requirePreservationMetadata(rich);
+  } catch (error) {
+    throw new CodedError(error instanceof Error ? error.message : String(error), {
+      code: "validation_error",
+      committed: false,
+      indeterminate: false,
+    });
+  }
+}
+
 /** Run one guarded native mutation and verify its outcome by exact-ID readback. */
 export function mutateBackground(
   request: BackgroundInput,
@@ -445,7 +458,7 @@ export function mutateBackground(
   const before = deps.read(request.id);
   if (before.hash !== request.expectedContentHash)
     throw new Error("Note revision changed; read it again");
-  requirePreservationMetadata(before.rich);
+  requireBackgroundPreflightMetadata(before.rich);
   if (!before.rich.text.includes(request.scopeText))
     throw new Error("Scope is absent from exact note");
   // The bridge's Find Notes step matches scopeText against the note's Body,
@@ -461,7 +474,7 @@ export function mutateBackground(
     throw new Error("Ambiguous note selection; nothing changed");
   const current = deps.read(request.id);
   if (current.hash !== before.hash) throw new Error("Note revision changed during preflight");
-  requirePreservationMetadata(current.rich);
+  requireBackgroundPreflightMetadata(current.rich);
   if (operation === "create-checklist-item") assertChecklistEndAppendAvailable(current.rich);
   let transportUncertain = false;
   let transportMessage = "";
