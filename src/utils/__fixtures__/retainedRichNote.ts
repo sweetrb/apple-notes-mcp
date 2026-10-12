@@ -15,15 +15,29 @@ const bytes = (field: number, value: Buffer | string) => {
 };
 
 /** Complete public-decoder snapshot, with no protected store or helper access. */
-export function plainRichNote(text: string): RichNote {
-  const run = Buffer.concat([varint(8), varint(text.length)]);
-  const note = bytes(2, bytes(3, Buffer.concat([bytes(2, text), bytes(5, run)])));
+function decodedRichNote(text: string, runs: Buffer[]): RichNote {
+  const note = bytes(
+    2,
+    bytes(3, Buffer.concat([bytes(2, text), ...runs.map((run) => bytes(5, run))]))
+  );
   return {
     ...parseRichNote(note),
     nativeTagObjectIds: {},
     objectData: [],
     nativeObjectDataComplete: true,
   };
+}
+
+export function plainRichNote(text: string): RichNote {
+  return decodedRichNote(text, [Buffer.concat([varint(8), varint(text.length)])]);
+}
+
+/** Decode retained highlight bytes separately from the newly appended plain text. */
+export function highlightedRichNote(text: string, highlightedLength = text.length): RichNote {
+  const runs = [Buffer.concat([varint(8), varint(highlightedLength), varint(14 * 8), varint(2)])];
+  if (text.length > highlightedLength)
+    runs.push(Buffer.concat([varint(8), varint(text.length - highlightedLength)]));
+  return decodedRichNote(text, runs);
 }
 
 export const plainSemantics = () => ({

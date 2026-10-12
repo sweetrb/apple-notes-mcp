@@ -347,16 +347,27 @@ export function assertPreserved(
   if (options.tagChange && !options.removeTag) {
     if (!nativeTagAdditionPreserved(before.rich, after.rich, [options.tagChange]))
       throw new Error("Native tag addition or retained content was not verified");
-  } else
-    assertRetainedRichContent(
-      before.rich,
-      after.rich,
-      options.tagChange
-        ? { kind: "remove-tag", tag: options.tagChange }
-        : options.append
-          ? { kind: "append" }
-          : { kind: "unchanged" }
-    );
+  } else {
+    try {
+      assertRetainedRichContent(
+        before.rich,
+        after.rich,
+        options.tagChange
+          ? { kind: "remove-tag", tag: options.tagChange }
+          : options.append
+            ? { kind: "append" }
+            : { kind: "unchanged" }
+      );
+    } catch (error) {
+      // Retain the public bridge's existing text-mismatch diagnosis.
+      if (
+        error instanceof Error &&
+        error.message === "Existing note text or whitespace was not preserved"
+      )
+        throw new Error("Existing note text was not preserved", { cause: error });
+      throw error;
+    }
+  }
   // The independent checklist reader must agree with the rich native snapshot.
   // Tag removal can shorten item text only through the explicitly mapped pill.
   for (const snapshot of [before, after])

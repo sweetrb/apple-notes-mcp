@@ -1,12 +1,19 @@
 ## [Unreleased]
 
-## [2.14.4] - 2026-10-08
+## [2.15.5] - 2026-10-12
 
 ### Fixed
 
 - Attachment and background write verification now requires complete native preservation metadata and checks retained text and whitespace, formatting, link ranges, checklist identities/state/ranges, and native object payloads and placement. End-appends and removal of mapped native tag pills have explicit allowed changes; known paragraph UUID regeneration retains the existing decoder policy.
 - Attachment readback failures after insertion starts now remain explicitly indeterminate, including read races and missing preservation metadata. Temporary-file cleanup cannot override that outcome or a verified receipt. Native tag additions also preserve retained zero-length formatting metadata.
 
+## [2.15.4] - 2026-10-12
+
+### Fixed
+
+- `add-native-tags` advertises uppercase Core Data store identifiers as valid,
+  matching its existing runtime validation. Fresh hashes and scope requirements
+  are unchanged.
 - Native tag readback accepts revision-consistent rich metadata even when the
   note cannot be represented completely as AppleScript HTML. Missing or
   inconsistent preservation metadata still refuses the write.
@@ -16,6 +23,79 @@
   or unsupported conversion ranges fail closed. A post-dispatch read failure
   reports `verification_failed` with an indeterminate outcome and keeps the
   Shortcut diagnosis, so callers read before retrying.
+
+## [2.15.1] - 2026-10-12
+
+### Fixed
+
+- Native HTML append verification now treats `<del>` as inline text. Notes
+  rewrites `one<del>two</del>three` as `one<strike>two</strike>three`, but the
+  verifier inserted spaces around `<del>` and reported the complete append
+  as indeterminate. Reproduced through Background Operations v5 on macOS
+  27.2. The shared comparator now agrees with that readback without changing
+  revision, identity, link, native object, checklist or formatting guards.
+  This fixes a demonstrated trigger related to #283; the trigger in the
+  original private-note reports has not been established.
+
+## [2.15.0] - 2026-10-09
+
+### Added
+
+- Opt-in permission broker (#220). `apple-notes-mcp setup --broker` builds
+  `~/Applications/Apple Notes MCP Broker.app` and installs the per-user
+  LaunchAgent `apple-notes-mcp.broker`. MCP clients relay stdio to a server
+  spawned by the broker, so Full Disk Access and Notes Automation belong to
+  that signed app. `--check` reports its state, `--uninstall` removes it, and
+  `--sign-identity` selects an existing signing identity. Multiple qualifying
+  identities require an explicit choice; ad-hoc signing warns that grants
+  must be renewed after rebuilding.
+- `doctor` and `get-capabilities` report whether the broker is in use and why
+  an installed broker was bypassed. Doctor names the broker app when advising
+  a brokered client about Full Disk Access. Per-tool permission failures also
+  identify the broker app when the request runs in a brokered session.
+- Native security regression harness (`pnpm run test:broker-security`) tests
+  direct socket requests and signed fixture bundles without accessing Notes
+  or granting permissions. CI runs it on macOS.
+
+### Security
+
+- Socket configuration accepts only an explicit list of numeric resource and
+  timing limits. Helper/code paths, shortcuts, private-content access,
+  unverified writes, unknown settings and loader variables cannot be selected
+  by a client. Brokered children skip user JSON configuration and cannot run
+  the separately installed public or private helpers.
+- The server entry and runtime configuration are sealed inside the signed app.
+  The broker validates its signature and hardened runtime at startup and
+  before each spawn, pins a canonical Node runtime by SHA-256, and refuses
+  changed code. Setup requires a standalone Node runtime with only system
+  dynamic-library dependencies. Clients match both the package version and
+  entry digest, so another installation cannot silently serve stale code.
+- Broker signing enables the hardened runtime without library-validation or
+  DYLD-injection exceptions. Node and server paths are no longer accepted in
+  LaunchAgent arguments. Child stderr travels back to its own client's stderr
+  over the existing socket, separate from MCP stdout; no caller-selected log
+  path is opened under the broker's permissions.
+- Documented the same-user trust boundary: the owner-only socket excludes
+  other users, but every process running as its owner can use the server's
+  Notes capabilities with the broker's grants. It does not authenticate MCP
+  hosts or isolate them from other applications owned by the same user.
+
+### Changed
+
+- Reinstall and uninstall confirm that launchd has removed the old service
+  before replacing or deleting installed files. Stop and cleanup failures are
+  reported; uninstall removes the legacy log and empty state directory while
+  preserving unrelated files.
+- Broker protocol 3 carries separate stdout, stderr and exit status with bounded
+  frames and backpressure. Broker diagnostics use macOS unified logging instead
+  of an unbounded shared file; child diagnostics return to the originating MCP
+  client.
+- Nothing changes unless `setup --broker` is run. Without an available,
+  matching broker the server runs in-process. `APPLE_NOTES_MCP_BROKER=off`
+  bypasses it for one client; uninstall stops the service for all clients.
+- Integration tests disable broker routing. Setting
+  `APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE=1` additionally skips Apple events and
+  note-creation fixtures while preserving pure path and MCP schema checks.
 
 ## [2.14.3] - 2026-10-08
 
@@ -249,9 +329,7 @@ Split out of #262 per the maintainer's review.
 - **`brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12, clearing GHSA-q2hr-2g5m-vwhr (medium) — dev toolchain only, not in the shipped bundle.** A further incomplete-fix variant of the same unbounded-expansion class as GHSA-mh99-v99m-4gvg. Per the advisory's reported ranges, only the 1.x and 5.x lines were vulnerable; the 2.x floor (2.1.4) is untouched. Reached via eslint → minimatch on both lines, so development scope only. `pnpm-workspace.yaml`'s two-sided override ranges are raised accordingly. Clears Dependabot alerts #33 and #32.
 
 ## [2.9.33] - 2026-09-30
-
 ### Changed
-
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.9.32] - 2026-09-29

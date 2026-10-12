@@ -109,8 +109,7 @@ describe("outputSchema contract (real server over stdio)", () => {
 
     for (const name of ["update-note", "append-to-note", "delete-note"]) {
       const schema = byName.get(name)?.inputSchema as
-        | { required?: string[]; properties?: Record<string, unknown> }
-        | undefined;
+        { required?: string[]; properties?: Record<string, unknown> } | undefined;
       expect(schema, `${name} must be registered`).toBeDefined();
       expect(schema?.required).toContain("id");
       expect(schema?.required).toContain("expectedContentHash");
@@ -119,16 +118,41 @@ describe("outputSchema contract (real server over stdio)", () => {
     }
 
     const move = byName.get("move-note")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(move?.required).toContain("id");
     expect(move?.properties).not.toHaveProperty("title");
 
     const batchDelete = byName.get("batch-delete-notes")?.inputSchema as
-      | { required?: string[]; properties?: Record<string, unknown> }
-      | undefined;
+      { required?: string[]; properties?: Record<string, unknown> } | undefined;
     expect(batchDelete?.required).toContain("notes");
     expect(batchDelete?.properties).not.toHaveProperty("ids");
+  });
+
+  it("keeps native tag mutations bound to an exact ID, fresh hash and bounded scope", async () => {
+    const { tools } = await client.listTools();
+    const schema = tools.find((tool) => tool.name === "add-native-tags")?.inputSchema;
+    expect(schema).toBeDefined();
+    const validate = new Ajv2020({ strict: false }).compile(schema!);
+    const request = {
+      id: "x-coredata://ABCDEF/ICNote/p12",
+      expectedContentHash: `sha256:${"a".repeat(64)}`,
+      scopeText: "Project scope marker",
+      tags: ["project"],
+    };
+    const accepted = validate(request);
+    expect(accepted, JSON.stringify(validate.errors)).toBe(true);
+    const withoutHash: Partial<typeof request> = { ...request };
+    delete withoutHash.expectedContentHash;
+    for (const invalid of [
+      withoutHash,
+      { ...request, id: "A note title" },
+      { ...request, expectedContentHash: "stale" },
+      { ...request, scopeText: "short" },
+      { ...request, tags: [] },
+      { ...request, tags: Array.from({ length: 101 }, () => "project") },
+    ]) {
+      expect(validate(invalid), JSON.stringify(invalid)).toBe(false);
+    }
   });
 
   it("every advertised schema declares JSON Schema 2020-12 and no draft-07 construct", async () => {
@@ -265,7 +289,8 @@ describe("outputSchema contract (real server over stdio)", () => {
     ).toEqual([]);
   });
 
-  it("diagnostic tools' real output validates against their outputSchema (when reachable)", async () => {
+  it("diagnostic tools' real output validates against their outputSchema (when reachable)", async (ctx) => {
+    if (process.env.APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE === "1") ctx.skip();
     // The SDK throws an "Output validation error" McpError when a success
     // result's structuredContent is missing or fails its schema — the only
     // failure we treat as a bug. A slow or unavailable backend (e.g. AppleScript

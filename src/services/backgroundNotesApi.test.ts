@@ -3,7 +3,11 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import type { AppleNotesManager } from "./appleNotesManager.js";
 import type { BackgroundSnapshot } from "./backgroundNotes.js";
-import { plainRichNote, syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
+import {
+  highlightedRichNote,
+  plainRichNote,
+  syntheticRichNote,
+} from "../utils/__fixtures__/retainedRichNote.js";
 
 const mock = vi.hoisted(() => ({
   status: vi.fn(() => ({ installed: true, identifier: "11111111-1111-4111-8111-111111111111" })),
@@ -168,6 +172,56 @@ describe("native append and tags", () => {
       })
     ).toMatchObject({ ok: true, contentHash: "h2" });
     expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+  });
+
+  describe("HTML append readback with adjacent del text (#283)", () => {
+    const content = "<div>one<del>two</del>three</div>";
+    const before = snapshot({
+      rich: highlightedRichNote(scopeText),
+    });
+    const appended = (html: string, text: string) =>
+      snapshot({
+        hash: "h2",
+        html: before.html + "<div><br></div>" + html,
+        rich: {
+          ...highlightedRichNote(scopeText + "\n\n" + text, scopeText.length),
+          revision: "r2",
+        },
+      });
+
+    it("verifies the complete append while preserving the existing protected formatting", () => {
+      const after = appended("<div>one<strike>two</strike>three</div>", "onetwothree");
+      expect(
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toMatchObject({ ok: true, contentHash: "h2" });
+      expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["missing struck text", "<div>onethree</div>", "onethree"],
+      ["changed struck text", "<div>one<strike>Two</strike>three</div>", "oneTwothree"],
+    ])("reports %s as indeterminate", (_label, html, text) => {
+      const after = appended(html, text);
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Appended text not verified/);
+      expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reports a changed prior body as indeterminate", () => {
+      const after = appended("<div>one<strike>two</strike>three</div>", "onetwothree");
+      after.html = after.html.replace(scopeText, "Changed project marker");
+      after.rich = {
+        ...highlightedRichNote(
+          after.rich.text.replace(scopeText, "Changed project marker"),
+          "Changed project marker".length
+        ),
+        revision: "r2",
+      };
+      expect(() =>
+        appendNative(managerFor([before, before, after]), { ...request, content, format: "html" })
+      ).toThrow(/^Operation outcome uncertain.*Existing note text was not preserved/);
+    });
   });
 
   describe("HTML append readback with named character references (#283)", () => {
