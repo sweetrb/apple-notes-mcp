@@ -3,12 +3,15 @@
  * (withErrorHandling and direct errorResponse returns) and by the native tool
  * modules, driven through their registered callbacks with a mocked manager.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<unknown>>());
 const manager = vi.hoisted(() => {
   const m = {
     getNoteById: vi.fn(),
+    getNoteLinkById: vi.fn(),
+    getNoteDetails: vi.fn(),
+    getNoteLink: vi.fn(),
     getNoteContentById: vi.fn(),
     listAccounts: vi.fn(),
     getFolderById: vi.fn(),
@@ -66,9 +69,34 @@ beforeAll(async () => {
   stdinOn.mockRestore();
 });
 afterAll(() => registered.clear());
+afterEach(() => vi.unstubAllEnvs());
 beforeEach(() => vi.resetAllMocks());
 
 describe("error codes through tool wrappers", () => {
+  it.each([
+    ["direct", "id"],
+    ["direct", "title"],
+    ["brokered", "id"],
+    ["brokered", "title"],
+  ])("names the FDA grant target in %s get-note-link failures by %s", async (mode, lookup) => {
+    const app = "/Users/test/Applications/Test Broker.app";
+    vi.stubEnv("APPLE_NOTES_MCP_BROKERED", mode === "brokered" ? "1" : "0");
+    vi.stubEnv("APPLE_NOTES_MCP_BROKER_APP", app);
+    const note = { id: ID, title: "Synthetic", passwordProtected: false };
+    manager.getNoteById.mockReturnValue(note);
+    manager.getNoteDetails.mockReturnValue(note);
+    manager.getNoteLinkById.mockReturnValue(null);
+    manager.getNoteLink.mockReturnValue(null);
+    const result = await call(
+      "get-note-link",
+      lookup === "id" ? { id: ID } : { title: note.title }
+    );
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe("full_disk_access_missing");
+    expect(result.content[0].text).toContain(mode === "brokered" ? app : process.execPath);
+    expect(result.content[0].text).not.toContain(mode === "brokered" ? process.execPath : app);
+  });
+
   it("adds not_found to a direct errorResponse without changing its text", async () => {
     manager.getNoteById.mockReturnValue(null);
     const r = await call("get-note-content", { id: ID });

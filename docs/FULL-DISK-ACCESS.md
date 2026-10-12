@@ -1,6 +1,6 @@
 # Full Disk Access and related permissions
 
-Apple Notes MCP uses separate macOS permissions for different operations. Connecting an MCP client does not grant them. This guide covers the released 2.14.3 server; use diagnostics from the client that actually runs it.
+Apple Notes MCP uses separate macOS permissions for different operations. Connecting an MCP client does not grant them. This guide covers the released 2.15.1 server; use diagnostics from the client that actually runs it.
 
 | Requirement | Enables |
 | --- | --- |
@@ -38,7 +38,7 @@ Use `get-capabilities` inside your MCP client first. It reports feature requirem
 For a non-prompting command-line permission report:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions --once --json --check
+npx -y apple-notes-mcp@2.15.1 setup --permissions --once --json --check
 ```
 
 Use the package version and launch context that match your client. A check run in Terminal reports Terminal's process context; it does not certify a server launched by Claude Desktop or another desktop client.
@@ -49,38 +49,85 @@ The MCP `doctor` tool checks Notes reachability, Automation, accounts, FDA, runt
 
 ## Grant access to the correct process
 
-1. Find the responsible process from diagnostics in the actual MCP client. For **Claude Desktop**, the server's **Node binary** needs FDA; the grant on Claude.app alone does not cover it. A terminal-launched server ordinarily uses the terminal app's permission; a server launched by VS Code uses that context. For other clients, confirm the reported process instead of assuming the app name is enough.
+1. Find the responsible process from diagnostics in the actual MCP client. For a **brokered session**, grant FDA to **Apple Notes MCP Broker.app**; `doctor` identifies whether the session uses the broker. For **Claude Desktop without the broker**, the server's **Node binary** needs FDA; the grant on Claude.app alone does not cover it. A terminal-launched server ordinarily uses the terminal app's permission; a server launched by VS Code uses that context. For other clients, confirm the reported process instead of assuming the app name is enough.
 2. Open **System Settings → Privacy & Security → Full Disk Access**.
 3. Click **+** and add the diagnosed app or Node executable. Press **⌘⇧G** in the file picker to enter an absolute path; **⌘⇧.** shows hidden files.
 4. Enable its toggle, then fully quit and relaunch the host application so it starts fresh processes.
 5. Re-run diagnostics inside that client. If FDA remains unavailable, verify the executable path and that the client was fully restarted before trying further changes.
 
+A client sandbox can separately prevent the server from launching or connecting to the broker's Unix socket. Privacy grants do not expand that sandbox; check the client's launch and socket-access diagnostics separately.
+
 FDA and Automation are independent. To check Automation from a terminal on the Mac, when you are ready for the first-use prompt:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions --once --probe-automation
+npx -y apple-notes-mcp@2.15.1 setup --permissions --once --probe-automation
 ```
 
 This sends one read-only Apple event. Accept the macOS prompt to allow the launching process to control Notes. `--check` and SSH sessions suppress this probe even when `--probe-automation` is present. `--open` can open the relevant System Settings panes; it does not change a permission.
+
+## Optional permission broker
+
+`apple-notes-mcp setup --broker` installs a signed app at
+`~/Applications/Apple Notes MCP Broker.app`. Grant Full Disk Access to that app
+and allow it to control Notes when macOS asks. Brokered sessions use its grants
+instead of those of the Node binary or MCP host that launched the client.
+Setup requires a standalone Node runtime linked only to system libraries; see
+the [runtime setup guide](NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
+
+**This trusts every process running as your macOS user.** While the broker is
+running, any such process can connect and use the server's Notes capabilities
+under the broker's Full Disk Access and Notes Automation grants. The socket's
+permissions and same-UID check exclude other users; they do not authenticate
+apps running as you. That is comparable trust exposure to granting Full Disk
+Access to Node. Use the broker only if you accept this trade-off.
+
+The broker runs a server sealed inside its signed app, verifies the bundle and
+the pinned Node executable before spawning, and accepts only a short allowlist
+of numeric limits and timeouts from clients. Code paths, helper paths, and
+safety overrides cannot be selected through a socket request, and brokered
+servers skip local JSON configuration files. External native
+helpers are unavailable in broker sessions; tools that require them need an
+in-process server. See [Permission broker](../README.md#permission-broker-opt-in)
+for the security design and signing caveats.
+
+The signature and hash checks reject changes detected at startup or before
+spawn. They do not provide OS isolation against a hostile, unsandboxed
+same-user process modifying the user-writable bundle or runtime after
+validation. Installed Shortcuts are user-managed trusted integrations; the
+broker does not authenticate their contents.
+
+After updating the package or replacing the broker's Node runtime, run
+`apple-notes-mcp setup --broker` again, restart your MCP clients, and check
+`doctor`. Rebuilding with an ad-hoc signature or changing the signing identity
+may require new macOS grants.
+
+To bypass the broker for one client, set `APPLE_NOTES_MCP_BROKER=off` in that
+client's environment. This does **not** stop the broker or prevent other
+same-user processes from using it. To remove that access, run
+`apple-notes-mcp setup --broker --uninstall`, then restart your clients. You can
+also revoke the broker's Full Disk Access and Notes Automation grants in System
+Settings.
 
 ## Complete the optional native setup
 
 For native operations, install the packaged workflows:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup
-npx -y apple-notes-mcp@2.14.3 setup --check
+npx -y apple-notes-mcp@2.15.1 setup
+npx -y apple-notes-mcp@2.15.1 setup --check
 ```
 
 Confirm **Add Shortcut** for each imported workflow. After installation or upgrade, run **Apple Notes MCP - Native Tags** and **Apple Notes MCP - Background Operations v5** once in the foreground in Shortcuts.app and choose **Always Allow** when asked. The optional **Create Markdown Note** bridge requires macOS 26+ and the documented input for its foreground run. Follow the [Shortcut setup instructions](../shortcuts/README.md).
 
 Installation checks cannot read Shortcut consent state. An unanswered prompt can stall background native writes while the bridge still reports installed. If a write times out or its outcome is uncertain, read the exact note before retrying; the change may already have landed.
 
+External public and private native helpers are unavailable in brokered sessions. Set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it before using tools that require them.
+
 For drawing decode or transcription, build the public helper locally with a current Swift toolchain and macOS SDK that expose the macOS 26 `SpeechAnalyzer` and `SpeechTranscriber` APIs. Having Command Line Tools installed does not alone prove that their SDK can build the helper; older SDK builds are unverified.
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --public-helper
-npx -y apple-notes-mcp@2.14.3 setup --public-helper --check
+npx -y apple-notes-mcp@2.15.1 setup --public-helper
+npx -y apple-notes-mcp@2.15.1 setup --public-helper --check
 ```
 
 The helper never requests Speech Recognition permission in the background. On older macOS, the recognition route requires an existing grant to the launching app; on macOS 26+, the server handles SpeechAnalyzer separately. A missing language model returns `asset_unavailable`; downloading it requires the explicit `downloadAssets` option. See [on-device transcription](../README.md#transcribe-note-audio) for the current route and permission contract.
@@ -90,7 +137,7 @@ The helper never requests Speech Recognition permission in the background. On ol
 - Without FDA, database-only tools return an access error. For simple searches, `search-notes` has an AppleScript fallback; this does not replace `query-notes`' structured query support.
 - Without database visibility, `get-sync-status` cannot establish pending uploads or active sync. Treat absent/zero database information as unknown, not proof that syncing is complete.
 - Smart Folder detection and native-object guards depend on their documented read paths. Do not infer safe destination or preservation behavior from an incomplete diagnostic.
-- If `doctor` reports FDA missing, use the per-feature requirements above. Version 2.14.3's diagnostic text still contains an overbroad statement that other tools are unaffected; the database-backed tools listed here also need FDA.
+- If `doctor` reports FDA missing, use the per-feature requirements above. Optional feature availability does not determine `doctor.healthy`, and its summary does not enumerate every database-backed guard.
 - If prompts recur after Node updates, check the exact executable path and signature. A version-manager path change or replacement of an ad-hoc-signed binary can invalidate its grants. A stable path and a Developer-ID-signed Node runtime reduce this problem; see [Node runtime and TCC permissions](NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
 
-The permission-broker proposal in [PR 276](https://github.com/sweetrb/apple-notes-mcp/pull/276) is separate from the 2.14.3 setup described here. Its proposed `setup --broker` flow is not a released prerequisite. Follow its eventual release documentation before adopting it.
+Broker installation remains optional. Use its [setup and migration instructions](../README.md#permission-broker-opt-in) when you choose it, and rerun setup after a package or runtime change. A broker fallback uses the in-process server's own permissions; inspect `doctor.broker` before choosing which process to grant.

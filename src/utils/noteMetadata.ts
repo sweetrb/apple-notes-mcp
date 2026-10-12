@@ -24,18 +24,14 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 
 const NOTES_DB_PATH = path.join(
   os.homedir(),
   "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 );
 
-const FDA_MESSAGE =
-  "Full Disk Access is required to read note metadata. " +
-  "In System Settings > Privacy & Security > Full Disk Access, grant access to the Node binary running this server " +
-  "(required under Claude Desktop) or the terminal that launches it, then fully quit and " +
-  `relaunch it. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL} — run the doctor tool to verify.`;
+const FDA_MESSAGE = "Full Disk Access is required to read note metadata.";
 
 /**
  * Read-only metadata for a single note. Every field is optional: a field is
@@ -139,7 +135,7 @@ export function getNoteMetadata(noteId: string): NoteMetadataResult {
   const pk = pkMatch[1];
 
   if (!fs.existsSync(NOTES_DB_PATH)) {
-    return { metadata: null, error: "no_fda", message: FDA_MESSAGE };
+    return { metadata: null, error: "no_fda", message: `${FDA_MESSAGE} ${fdaRemediation()}` };
   }
 
   try {
@@ -178,7 +174,7 @@ export function getNoteMetadata(noteId: string): NoteMetadataResult {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("authorization denied") || message.includes("unable to open database")) {
-      return { metadata: null, error: "no_fda", message: FDA_MESSAGE };
+      return { metadata: null, error: "no_fda", message: `${FDA_MESSAGE} ${fdaRemediation()}` };
     }
     console.error(`Failed to read note metadata: ${message}`);
     return { metadata: null, error: "query_error", message: "Failed to read note metadata." };

@@ -21,7 +21,7 @@ Beyond creating and editing notes, it manages folders and accounts, native tags,
 
 - [What is This?](#what-is-this) · [Setup on your Mac](#setup-on-your-mac) · [Requirements](#requirements) · [Features](#features)
 - [Tool Reference](#tool-reference): [notes](#note-operations), [folders](#folder-operations), [accounts](#account-operations), [batch](#batch-operations), [export, attachments, and media](#export-operations), [diagnostics](#diagnostics), [native background operations](#native-background-operations), [private helper](#private-helper-opt-in-unsupported-apple-api)
-- [Usage Patterns](#usage-patterns) · [Installation choices and upgrades](#installation-choices-and-upgrades) · [Server settings](#server-settings) · [Full Disk Access](docs/FULL-DISK-ACCESS.md) · [Public native helper](#public-native-helper)
+- [Usage Patterns](#usage-patterns) · [Installation choices and upgrades](#installation-choices-and-upgrades) · [Server settings](#server-settings) · [Full Disk Access](docs/FULL-DISK-ACCESS.md) · [Public native helper](#public-native-helper) · [Permission broker](#permission-broker-opt-in)
 - [Security and Privacy](#security-and-privacy) · [Known Limitations](#known-limitations) · [Troubleshooting](#troubleshooting) · [Recurring macOS permission prompts](#recurring-macos-permission-prompts) · [Development](#development)
 
 ## What is This?
@@ -42,11 +42,11 @@ The AI assistant communicates with this server, which then uses AppleScript to i
 
 Apple Notes MCP runs on the Mac that holds your Notes library. Your assistant starts a local MCP server over **stdio**, and the server uses AppleScript, signed Apple Shortcuts, and read-only database access. Choose one client setup below, then complete the macOS permissions and optional feature setup you need.
 
-**Version boundary:** these instructions describe the released v2.14.3 setup. The permission broker proposed in PR #276 is pending and is not part of this installation path. The released server does not install a persistent broker or Capability Host.
+**Version boundary:** these instructions describe v2.15.1, including the optional [permission broker](#permission-broker-opt-in). Normal client registration starts an in-process server unless a matching broker is already installed and answering. Broker installation is a separate opt-in step.
 
-Manual client entries, setup commands, and the source checkout below select v2.14.3. Run setup from the same release as the server your client actually launches. The Claude Code plugin bundles its server; the Codex plugin manifest launches an unpinned npm package even when its marketplace is pinned. For reproducible Codex setup, use the manual registration below instead of the plugin. When upgrading, update the selected version consistently in the client and setup commands.
+Manual client entries, setup commands, and the source checkout below select v2.15.1. Run setup from the same release as the server your client actually launches. The Claude Code plugin bundles its server; the Codex plugin manifest launches an unpinned npm package even when its marketplace is pinned. For reproducible Codex setup, use the manual registration below instead of the plugin. When upgrading, update the selected version consistently in the client and setup commands.
 
-**Do not run `apple-notes-mcp setup --broker` on v2.14.3.** This release does not reject unknown setup flags: that command falls through to Shortcut setup and can open import windows. Use only the released setup commands below.
+Run each setup target separately and use the exact options shown. Version 2.15.1 does not reject all unknown or mixed setup flags; a misspelled target can fall through to Shortcut setup and open import windows.
 
 ### Requirements
 
@@ -70,14 +70,14 @@ Use either a plugin or a manual MCP entry for the same client. Registering both 
 For the plugin, run these commands inside a Claude Code session:
 
 ```text
-/plugin marketplace add sweetrb/apple-notes-mcp#v2.14.3
+/plugin marketplace add sweetrb/apple-notes-mcp#v2.15.1
 /plugin install apple-notes@apple-notes-mcp
 ```
 
 The plugin bundles the server and the Apple Notes skill. For a manual MCP registration instead, run this in your terminal:
 
 ```bash
-claude mcp add --transport stdio --scope user apple-notes -- npx -y apple-notes-mcp@2.14.3
+claude mcp add --transport stdio --scope user apple-notes -- npx -y apple-notes-mcp@2.15.1
 ```
 
 Check the connection with `/mcp` in Claude Code. `claude mcp get apple-notes` inspects the manually registered server. Project-scoped `.mcp.json` entries require workspace/server approval and can override a user-scoped entry.
@@ -91,7 +91,7 @@ Open **Settings → Developer → Edit Config**. Merge the following server entr
   "mcpServers": {
     "apple-notes": {
       "command": "npx",
-      "args": ["-y", "apple-notes-mcp@2.14.3"]
+      "args": ["-y", "apple-notes-mcp@2.15.1"]
     }
   }
 }
@@ -104,14 +104,14 @@ Fully quit and reopen Claude Desktop. This `npx` route does not require a preced
 For the plugin and its Apple Notes skill:
 
 ```bash
-codex plugin marketplace add sweetrb/apple-notes-mcp --ref v2.14.3
+codex plugin marketplace add sweetrb/apple-notes-mcp --ref v2.15.1
 codex plugin add apple-notes@apple-notes-mcp
 ```
 
 For a manual MCP registration instead:
 
 ```bash
-codex mcp add apple-notes -- npx -y apple-notes-mcp@2.14.3
+codex mcp add apple-notes -- npx -y apple-notes-mcp@2.15.1
 ```
 
 The equivalent entry in `~/.codex/config.toml` is:
@@ -119,21 +119,21 @@ The equivalent entry in `~/.codex/config.toml` is:
 ```toml
 [mcp_servers.apple-notes]
 command = "npx"
-args = ["-y", "apple-notes-mcp@2.14.3"]
+args = ["-y", "apple-notes-mcp@2.15.1"]
 ```
 
-If `codex` is not on your terminal's `PATH`, use the desktop client's **Settings → MCP servers → Add server**: choose **STDIO**, enter `npx` with arguments `-y` and `apple-notes-mcp@2.14.3`, save, and restart the server.
+If `codex` is not on your terminal's `PATH`, use the desktop client's **Settings → MCP servers → Add server**: choose **STDIO**, enter `npx` with arguments `-y` and `apple-notes-mcp@2.15.1`, save, and restart the server.
 
 Restart the relevant local Codex session or client. Use `/mcp` in the CLI or the client's MCP settings to inspect the connection. `codex mcp list` lists manually configured servers. The desktop client, CLI, and IDE extension share the Codex configuration; select local execution on the Mac containing your Notes library.
 
-The plugin's server entry runs the published npm package through unpinned `npx`, despite the marketplace ref above. Its server may therefore differ from v2.14.3. Use the manual entry to pin the runtime for these instructions, or run setup from the release matching the plugin's actual server. This is a different distribution path from the Claude Code plugin's bundled server.
+The plugin's server entry runs the published npm package through unpinned `npx`, despite the marketplace ref above. Its server may therefore differ from v2.15.1. Use the manual entry to pin the runtime for these instructions, or run setup from the release matching the plugin's actual server. This is a different distribution path from the Claude Code plugin's bundled server.
 
 #### Hermes
 
 Register a local stdio server:
 
 ```bash
-hermes mcp add apple-notes --command npx --args -y apple-notes-mcp@2.14.3
+hermes mcp add apple-notes --command npx --args -y apple-notes-mcp@2.15.1
 ```
 
 Or merge this entry into `~/.hermes/config.yaml`:
@@ -142,20 +142,20 @@ Or merge this entry into `~/.hermes/config.yaml`:
 mcp_servers:
   apple-notes:
     command: npx
-    args: ["-y", "apple-notes-mcp@2.14.3"]
+    args: ["-y", "apple-notes-mcp@2.15.1"]
 ```
 
-Restart the Hermes session. This repository supplies an MCP configuration route for Hermes, not a Hermes plugin package.
+Restart the Hermes session. This repository supplies an MCP configuration route for Hermes; see its [CLI commands](https://hermes-agent.nousresearch.com/docs/reference/cli-commands#hermes-mcp) and [MCP configuration reference](https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference).
 
 #### Antigravity
 
-In the IDE, open **MCP Servers → Manage MCP Servers → View raw config**. Merge the same `mcpServers` JSON entry shown for Claude Desktop into the global `~/.gemini/config/mcp_config.json`, or use the workspace configuration at `.agents/mcp_config.json`. Refresh or restart the client so it loads the server.
+In the IDE, open **MCP Servers → Manage MCP Servers → View raw config**. Merge the same `mcpServers` JSON entry shown for Claude Desktop into the global `~/.gemini/config/mcp_config.json`, or use the workspace configuration at `.agents/mcp_config.json`. Refresh or restart the client so it loads the server. Google's [MCP guide](https://antigravity.google/docs/mcp) describes the current menu and configuration paths.
 
 The repository's `.antigravity-plugin/mcp_config.json` supplies an unpinned stdio server entry; the JSON above pins the audited release. Use `command` and `args`; this package does not provide a remote `serverUrl`.
 
 #### Other MCP clients and remote execution
 
-A local MCP client can use the command `npx` with arguments `-y` and `apple-notes-mcp@2.14.3`. Follow that client's stdio configuration format: JSON `mcpServers`, TOML, and YAML are not interchangeable.
+A local MCP client can use the command `npx` with arguments `-y` and `apple-notes-mcp@2.15.1`. Follow that client's stdio configuration format: JSON `mcpServers`, TOML, and YAML are not interchangeable.
 
 Apple Notes MCP has no built-in HTTP, SSE, WebSocket, or OAuth MCP endpoint. A cloud-only client cannot access your Mac's Notes library merely by installing the npm package in a Linux container or entering a URL. A separately managed transport bridge or client feature that delegates tool execution to your Mac needs its own configuration and security review; it is not part of this package's supported setup. GUI reveal and clipboard tools also need your logged-in desktop session.
 
@@ -175,24 +175,26 @@ In the configured client, ask it to run `get-capabilities` and then `doctor`. `g
 | Shortcut installation and consent | Native tag, checklist, table, pin, link, and append routes | Import the bridges and complete their foreground consent steps below. |
 | Public helper and, where required, Speech Recognition | Classic drawing decoding and on-device audio transcription | Build the optional helper; follow the permission result from `doctor` or the tool. |
 
-**Which process needs Full Disk Access?** Under Claude Desktop, use the exact **Node executable** printed by `doctor`; granting Claude.app alone does not reach the server in that launch path. For a terminal-launched client, the terminal app is normally the responsible app; for an editor-launched server, check that editor. Use the actual running client's diagnostics instead of assuming that all clients share grants.
+**Which process needs Full Disk Access?** For a brokered session, grant the signed **Apple Notes MCP Broker.app** access; `doctor` reports whether that session uses it. Without the broker, Claude Desktop needs the exact **Node executable** printed by `doctor`; granting Claude.app alone does not reach the server in that launch path. For a terminal-launched client, the terminal app is normally the responsible app; for an editor-launched server, check that editor. Use the actual running client's diagnostics instead of assuming that all clients share grants.
+
+Client sandbox access is a separate boundary. A sandboxed client must be able to launch the executable and reach its files; a brokered client also needs access to the broker's local Unix socket. Full Disk Access and Automation grants do not expand the client's sandbox. Diagnose a launch or socket-access refusal in the client before changing macOS privacy permissions.
 
 To inspect setup from a terminal without opening permission panes or requesting Automation access:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions --check --json
+npx -y apple-notes-mcp@2.15.1 setup --permissions --check --json
 ```
 
 The Automation result is intentionally unknown in this mode. When you are at the Mac and want to check it, this command sends a read-only Apple event and may show the macOS consent prompt:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions --once --probe-automation
+npx -y apple-notes-mcp@2.15.1 setup --permissions --once --probe-automation
 ```
 
 For an interactive checklist that also opens the relevant settings panes:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions --open --probe-automation
+npx -y apple-notes-mcp@2.15.1 setup --permissions --open --probe-automation
 ```
 
 The command checks permissions; it does not grant them. `--check` and SSH sessions suppress the Automation probe even when `--probe-automation` is supplied. Without the probe, exit status 0 does not establish Automation access.
@@ -204,7 +206,7 @@ Full Disk Access is optional if you only need operations that can safely run thr
 Run explicit setup on your Mac:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup
+npx -y apple-notes-mcp@2.15.1 setup
 ```
 
 Approve **Add Shortcut** for the missing signed workflows that macOS opens:
@@ -216,7 +218,7 @@ Approve **Add Shortcut** for the missing signed workflows that macOS opens:
 Then check installation:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --check
+npx -y apple-notes-mcp@2.15.1 setup --check
 ```
 
 The first two bridges determine this check's readiness; the optional Markdown bridge is reported separately. Keep only one installed copy of each named bridge. The server refuses duplicate bridge names.
@@ -231,11 +233,13 @@ These commands are separate from registering the MCP client. If `xcrun swiftc` o
 
 #### Public native helper
 
-Needed for `get-note-drawings` and `transcribe-note-audio`:
+<a id="public-native-helper"></a>
+
+Needed for `get-note-drawings` and `transcribe-note-audio`. Brokered sessions do not load external helpers; set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it before using these tools:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --public-helper
-npx -y apple-notes-mcp@2.14.3 setup --public-helper --check
+npx -y apple-notes-mcp@2.15.1 setup --public-helper
+npx -y apple-notes-mcp@2.15.1 setup --public-helper --check
 ```
 
 It compiles locally, signs ad hoc, verifies its handshake, and records source and binary checksums. The server refuses stale or modified helpers; rerun setup after a relevant package upgrade. This helper uses public Apple frameworks and does not open or write the Notes database. The server still needs Full Disk Access to read the drawing/audio assets it passes to the helper.
@@ -244,11 +248,11 @@ On older macOS versions, speech transcription needs Speech Recognition access fo
 
 #### Private helper setup
 
-Optional read-only NotesShared state inspection, disabled by default:
+Optional read-only NotesShared state inspection, disabled by default. Brokered sessions do not load this helper; set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it first:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --native-helper
-npx -y apple-notes-mcp@2.14.3 setup --native-helper --check
+npx -y apple-notes-mcp@2.15.1 setup --native-helper
+npx -y apple-notes-mcp@2.15.1 setup --native-helper --check
 ```
 
 To enable it, set the string environment value `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` for the server and restart the client. Inspect `native-helper-status` before using `native-note-state`. This released helper opens the store read-only and cannot provide deep native writes. Apple's private API may change with macOS updates; the remaining server features do not require this helper.
@@ -258,8 +262,8 @@ To enable it, set the string environment value `APPLE_NOTES_MCP_ENABLE_PRIVATE=1
 Optional graphical presentation of the checklist:
 
 ```bash
-npx -y apple-notes-mcp@2.14.3 setup --permissions-window
-npx -y apple-notes-mcp@2.14.3 setup --permissions --window
+npx -y apple-notes-mcp@2.15.1 setup --permissions-window
+npx -y apple-notes-mcp@2.15.1 setup --permissions --window
 ```
 
 It displays the command's checks and opens settings on request. It does not become the permission owner or replace the client process.
@@ -2876,7 +2880,7 @@ Private API can break on any macOS update; see
 [TECHNICAL_NOTES.md](TECHNICAL_NOTES.md#private-helper-notesshared) for the
 API surface, risks, and safety contract.
 
-Follow [Private helper setup](#private-helper-setup) to build and enable it. The server checks the helper's recorded source and binary SHA-256 before every call and refuses a missing, stale, or modified helper with a machine-readable `code`. Rerun matching-version setup after upgrading apple-notes-mcp.
+Brokered sessions do not load external native helpers. Set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it, then follow [Private helper setup](#private-helper-setup) to build and enable it. The server checks the helper's recorded source and binary SHA-256 before every call and refuses a missing, stale, or modified helper with a machine-readable `code`. Rerun matching-version setup after upgrading apple-notes-mcp.
 
 #### `native-helper-status`
 
@@ -2975,13 +2979,13 @@ AI: [calls create-note with title="Acme Corp", content="...", folder="Work/Clien
 
 ### Published package
 
-The examples above use `npx -y apple-notes-mcp@2.14.3`, so a separate global install is optional. To install a persistent command instead:
+The examples above use `npx -y apple-notes-mcp@2.15.1`, so a separate global install is optional. To install a persistent command instead:
 
 ```bash
-npm install -g apple-notes-mcp@2.14.3
+npm install -g apple-notes-mcp@2.15.1
 ```
 
-You can then run `apple-notes-mcp setup --check` and the other setup commands directly. An npm package version can be pinned in an `npx` argument, for example `apple-notes-mcp@2.14.3`, when you need a reproducible version. Keep client and setup commands on the same package version.
+You can then run `apple-notes-mcp setup --check` and the other setup commands directly. An npm package version can be pinned in an `npx` argument, for example `apple-notes-mcp@2.15.1`, when you need a reproducible version. Keep client and setup commands on the same package version.
 
 After an upgrade, restart the client, check Shortcuts, complete any renewed foreground Shortcut consent, and rebuild a helper if its source checksum changed. Do not use a permission reset as a routine upgrade step.
 
@@ -3012,7 +3016,7 @@ Confirm those files exist on your Mac. A Developer-ID-signed Node at a stable re
 ### Source checkout
 
 ```bash
-git clone --branch v2.14.3 https://github.com/sweetrb/apple-notes-mcp.git
+git clone --branch v2.15.1 https://github.com/sweetrb/apple-notes-mcp.git
 cd apple-notes-mcp
 ```
 
@@ -3045,9 +3049,11 @@ Use the client's server environment configuration for optional `APPLE_NOTES_MCP_
 
 An explicit nonempty environment value takes precedence over the file. Restart the server after changing settings. Put only non-secret server settings in this file. A settings file can configure the server but cannot grant macOS permissions, import a Shortcut, or install a native helper.
 
+For a brokered session, the client forwards only the broker's allowed numeric settings from this file. The brokered server skips JSON configuration files entirely; editing this file cannot enable helper paths or safety overrides in that server.
+
 ### Environment variables
 
-These optional settings control server behavior. They do not replace the [macOS permissions and component setup](#setup-on-your-mac). Set them in the client environment or the [server settings file](#server-settings).
+These optional settings control server behavior. They do not replace the [macOS permissions and component setup](#setup-on-your-mac). Set them in the client environment or the [server settings file](#server-settings). The broker accepts only an explicit allowlist of numeric limits and timeouts; code paths, helper paths, Shortcut overrides, and settings that relax safety checks do not carry over.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -3076,11 +3082,52 @@ These optional settings control server behavior. They do not replace the [macOS 
 | `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, [`analyze-svg`](#analyze-svg) read a `path`, and the Markdown template tools read a `templateFile`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
 
-## Separate direct CLI and future broker setup
+## Separate direct CLI setup
 
 NotesCTL is a separate direct CLI, not a dependency installed or launched by Apple Notes MCP. Its direct CLI requires Python 3.13 or newer; its installed signed Capability Host has its own protected runtime, signing, protocol, and macOS permission setup. If you separately use that tool, follow the documentation accompanying your authorized distribution. Its private/deep-write capabilities and permissions do not automatically become MCP tools or transfer to this server.
 
-PR #276 proposes an optional Apple Notes MCP permission broker to give the MCP process a stable permission owner. It remains pending as of October 8, 2026, and needs its own reviewed release and migration instructions. It is distinct from NotesCTL's Capability Host. Do not treat broker branch commands, a local broker installation, or a successful Capability Host check as prerequisites or proof of readiness for released Apple Notes MCP.
+The [Apple Notes MCP permission broker](#permission-broker-opt-in) is a separate optional component of this server. Its setup and grants do not install or validate the direct CLI's Capability Host, and a successful Capability Host check does not establish that the MCP client is ready.
+
+---
+
+## Permission broker (opt-in)
+
+Under Claude Desktop, macOS holds the Node binary responsible for Full Disk Access and Automation, so moving or replacing Node can require new grants ([#220](https://github.com/sweetrb/apple-notes-mcp/issues/220)). The permission broker moves both grants to one signed app at a fixed path.
+
+**Trust trade-off:** while the broker is running, every process running as your macOS user can connect and use the server's Notes capabilities under the broker's Full Disk Access and Notes Automation grants. The socket's ownership, file permissions, and `getpeereid` check exclude other users; they do **not** authenticate or distinguish apps running as you. Any such app can request the same Notes reads and writes as your MCP client. This is comparable trust exposure to granting Full Disk Access to a general-purpose Node binary. The broker consolidates permission management; it does not isolate Notes access between same-user apps. Enable it only if you accept that boundary.
+
+Run setup with a standalone Node runtime whose dynamic library dependencies are all under `/usr/lib/` or `/System/Library/`. Setup rejects runtimes linked to other locations, including common Homebrew Node builds, because pinning Node alone would not protect those libraries. The [dedicated Node instructions](docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md) show how to install an official runtime at a fixed path. To select it for setup, run `/path/to/node /path/to/apple-notes-mcp/build/index.js setup --broker`.
+
+```bash
+apple-notes-mcp setup --broker             # build, sign, install, and start the broker
+apple-notes-mcp setup --broker --check     # report whether it is installed and answering
+apple-notes-mcp setup --broker --uninstall # stop and remove it
+apple-notes-mcp setup --broker --sign-identity "Developer ID Application: You (TEAMID)"
+```
+
+Setup compiles `native/broker/apple-notes-mcp-broker.swift` into `~/Applications/Apple Notes MCP Broker.app`, copies the server into the bundle before signing with the hardened runtime, runs its `hello` handshake, and starts it as the per-user LaunchAgent `apple-notes-mcp.broker` (`~/Library/LaunchAgents/apple-notes-mcp.broker.plist`). Then add the app under **Privacy & Security > Full Disk Access**, and click **Allow** when macOS first asks whether "Apple Notes MCP Broker" may control Notes. Restart your MCP client afterwards and check `doctor`.
+
+How it works: the broker listens on a Unix socket in `~/Library/Application Support/apple-notes-mcp/broker/`, created `0600` inside a `0700` folder. For each client it starts the bundled server as its child, so macOS attributes the server's database reads and Apple events to the broker app. The `apple-notes-mcp` process your MCP client launches relays its stdin to that server and returns stdout and stderr to the corresponding client streams. Diagnostics stay separate from MCP responses. The broker never reads Notes itself.
+
+Child stderr is delivered only to its client and is not copied into a shared broker log. The broker's own lifecycle and connection diagnostics use macOS unified logging, whose storage and retention are managed by the operating system. To inspect them, run `log show --last 1h --predicate 'subsystem == "apple-notes-mcp.broker"'`; use `log stream` with the same predicate for live diagnostics. Direct command-line runs also report broker diagnostics on stderr.
+
+The broker verifies its app signature and sealed resources at startup and before spawning a server. Its signed configuration pins the Node executable's canonical path and SHA-256 digest, and the server entry point has a fixed location inside the signed bundle. Neither the LaunchAgent's arguments nor a socket request can select a Node binary or server entry point. Changes detected at startup or before spawn are refused until you run setup again. These are pre-spawn tamper checks: they do not make later filesystem reads atomic or provide OS isolation against a hostile, unsandboxed same-user process that can modify the user-writable bundle or runtime after validation.
+
+Only an explicit allowlist of harmless numeric limits and timeouts travels from a client to the broker. Code and helper paths, `NODE_OPTIONS`, Shortcut overrides, `APPLE_NOTES_MCP_ENABLE_PRIVATE`, `APPLE_NOTES_MCP_ALLOW_UNVERIFIED`, and `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` are not accepted over the socket. External public and private native helpers are unavailable in broker sessions; use an in-process server for tools that require them. These checks constrain the code and settings the broker executes, but do not authenticate same-user clients.
+
+Installed Shortcuts remain user-managed trusted integrations. The broker does not authenticate their contents; preventing a client from overriding a Shortcut's name does not verify the workflow installed under that name.
+
+The allowed settings are `APPLE_NOTES_MCP_BLOCKS_MAX_BYTES`, `APPLE_NOTES_MCP_EXPORT_MAX_BYTES`, `APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES`, `APPLE_NOTES_MCP_MAX_BUFFER`, `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES`, `APPLE_NOTES_MCP_MAX_RETRIES`, `APPLE_NOTES_MCP_PRIVATE_HELPER_TIMEOUT_MS`, `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS`, `APPLE_NOTES_MCP_RETRY_DELAY_MS`, and `APPLE_NOTES_MCP_TIMEOUT_MS`. Values must be decimal integers from 1 to 2,147,483,647; other keys or values are ignored. Helper timeouts have no effect while external helpers are disabled.
+
+Signing affects whether the grants survive a rebuild. Setup automatically selects an identity only when exactly one **Developer ID Application** or **Apple Development** identity qualifies. If more than one qualifies across those types, specify `--sign-identity`. Permission continuity depends on the app's designated code requirement and macOS permission state, not just its bundle identifier and team. In particular, do not assume an Apple Development grant will survive certificate renewal or a signing identity change. Without a suitable identity, setup signs ad hoc and warns that rebuilding may require you to grant permissions again. See [Node runtime and TCC permissions](docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md) for details.
+
+Nothing changes unless you run `setup --broker`. When the broker is absent, stale, or unavailable, the server runs in-process using that process's own permissions. `doctor` and `get-capabilities` report whether the session is brokered and, if not, why. After updating the package or replacing its Node runtime, run `setup --broker` again to install the matching server and runtime pin, then restart your MCP clients.
+
+Set `APPLE_NOTES_MCP_BROKER=off` in a client's environment to keep **that client** in-process. This does not stop the broker or remove other same-user processes' access to its socket. To remove that access, run `apple-notes-mcp setup --broker --uninstall` to stop and remove the broker; you can also revoke its Full Disk Access and Notes Automation grants in System Settings. Restart your MCP clients afterwards.
+
+Reinstall and uninstall wait for launchd to confirm that the old service is gone. If stopping it fails or its state cannot be confirmed, setup reports the failure and preserves the installed artifacts. Successful uninstall removes the app, LaunchAgent, manifest, socket and legacy broker log; it removes the state directory only when empty, preserving unrelated files. Removing the broker does not reset macOS permission grants.
+
+Install the package globally (`npm i -g apple-notes-mcp`) before running setup. `APPLE_NOTES_MCP_BROKER_DIR`, `APPLE_NOTES_MCP_BROKER_APP_DIR`, and `APPLE_NOTES_MCP_BROKER_AGENT_DIR` override the socket, app, and LaunchAgent folders, and `APPLE_NOTES_MCP_BROKER_SIGN_IDENTITY` the signing identity.
 
 ---
 
@@ -3130,6 +3177,8 @@ paragraph or note.
 
 - **Local Notes operations** - AppleScript, the packaged Shortcuts, read-only database access, and helpers run on your Mac. `transcribe-note-audio` uses on-device speech recognition; `downloadAssets: true` explicitly permits downloading missing speech models. Whatever your MCP client does with tool results is governed by that client.
 - **Permission required** - macOS will prompt for automation permission on first use.
+- **Optional broker trusts all same-user processes** - With the [permission broker](#permission-broker-opt-in) running, every process under your macOS user can use its Notes capabilities with the broker's Full Disk Access and Notes Automation grants. The socket checks exclude other users, but do not authenticate same-user apps. This is comparable trust exposure to granting Full Disk Access to Node. `APPLE_NOTES_MCP_BROKER=off` bypasses it for one client; `apple-notes-mcp setup --broker --uninstall` stops and removes the shared service.
+- **Broker checks have limits** - Signature and hash checks detect tampering present before spawn; they do not isolate the user-writable bundle and runtime from a hostile, unsandboxed same-user process modifying them after validation. Installed Shortcuts are user-managed trusted integrations whose contents the broker does not authenticate.
 - **Password-protected notes** - Notes with passwords cannot be read or modified via this server.
 - **No credential storage** - The server doesn't store any passwords or authentication tokens.
 
@@ -3321,4 +3370,6 @@ Part of a family of macOS MCP servers:
 
 ## Recurring macOS permission prompts
 
-If macOS keeps re-prompting for Full Disk Access or Automation for `node` (often after a `brew upgrade`), the cause is almost always an **ad-hoc-signed Node** (typically Homebrew's): its code signature (cdhash) changes on every update, so macOS TCC treats each new build as a brand-new binary and silently drops the grants you already made. The fix is to run this server under an official, **Developer-ID-signed Node at a stable path** — its signing identity stays the same across updates, so you grant the permission once and it persists. The `doctor` tool detects the ad-hoc-signature case and the full walkthrough is in [docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
+If macOS keeps re-prompting for Full Disk Access or Automation for `node` after a Node update, check its path and code signature with `doctor`. An **ad-hoc-signed Node** has no stable certificate identity, and version managers may also move the executable when they update it.
+
+You can opt in to the [permission broker](#permission-broker-opt-in) to put the grants on a signed app at a fixed path; review its same-user trust trade-off first. After a package or runtime update, run `setup --broker` again. Alternatively, keep the server in-process and use an official **Developer-ID-signed Node at a stable path**. Neither approach guarantees that grants survive a change in signing identity or macOS policy. The walkthrough and signing caveats are in [docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md](docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
