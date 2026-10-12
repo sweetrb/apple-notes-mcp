@@ -15,7 +15,7 @@ import {
 // Core Data key, resolved to the x-coredata id before the handler runs.
 const noteId = exactIdInput(
   "ICNote",
-  /^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i,
+  /^x-coredata:\/\/[0-9a-fA-F-]+\/ICNote\/p\d+$/i,
   NOTE_ID_MESSAGE
 );
 const revision = z.string().regex(/^sha256:[a-f0-9]{64}$/);

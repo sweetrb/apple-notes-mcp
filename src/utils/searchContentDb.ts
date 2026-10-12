@@ -14,6 +14,7 @@
  * @module utils/searchContentDb
  */
 
+import { fdaRemediation } from "@/utils/fullDiskAccess.js";
 import { matchLocations, type QueryNode } from "@/utils/noteQuery.js";
 import {
   countWords,
@@ -152,7 +153,7 @@ export function contentSearchFailureHint(
   if (!/timed out/i.test(message)) return message;
   const remedy =
     dbUnavailable === "no_fda"
-      ? " Grant Full Disk Access to the Node binary running this server (run the doctor tool for its path) so search-notes can search note bodies through the Notes database instead, which takes well under a second."
+      ? ` Full Disk Access lets search-notes search note bodies through the Notes database instead. ${fdaRemediation()}`
       : "";
   return (
     `${message} Body search through AppleScript scans every note body before the result limit applies, ` +

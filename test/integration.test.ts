@@ -12,6 +12,9 @@
  * where Notes.app has no signed-in account), so this suite is safe to run
  * anywhere. The schema/path-safety blocks need no Notes.app and always run.
  *
+ * Set APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE=1 to run only the pure checks
+ * without sending Apple events or creating fixture notes in a personal library.
+ *
  * Run via: npm run test:integration   (or npm run test:all for unit + integration)
  */
 
@@ -37,6 +40,7 @@ function deleteNote(id: string): "deleted" | "conflict" | "failed" {
 
 beforeAll(() => {
   mgr = new AppleNotesManager();
+  if (process.env.APPLE_NOTES_MCP_INTEGRATION_SKIP_LIVE === "1") return;
 
   let accounts: ReturnType<AppleNotesManager["listAccounts"]> = [];
   try {

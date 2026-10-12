@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Tests that load the server entry point must never reach a permission
+    // broker installed on the developer's Mac.
+    env: { APPLE_NOTES_MCP_BROKER: "off" },
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "json-summary"],
