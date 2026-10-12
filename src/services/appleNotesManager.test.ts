@@ -1413,6 +1413,82 @@ describe("AppleNotesManager", () => {
   // Get Note By ID
   // ---------------------------------------------------------------------------
 
+  describe("readNoteById", () => {
+    const id = "x-coredata://ABC123/ICNote/p100";
+
+    it("retains all successful metadata, including the password flag", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: [
+          "Locked note",
+          id,
+          "2026-10-12-10-20-0",
+          "2026-10-12-11-30-0",
+          "true",
+          "true",
+        ].join(F),
+      });
+      expect(manager.readNoteById(id)).toEqual({
+        note: {
+          id,
+          title: "Locked note",
+          content: "",
+          tags: [],
+          created: new Date(2026, 9, 12, 10, 20, 0),
+          modified: new Date(2026, 9, 12, 11, 30, 0),
+          shared: true,
+          passwordProtected: true,
+        },
+      });
+      expect(mockExecuteAppleScript).toHaveBeenCalledTimes(1);
+      expect(mockExecuteAppleScript.mock.calls[0][0]).not.toContain("get body");
+    });
+
+    it.each([
+      "Not authorized to send Apple events to Notes. (-1743)",
+      "Operation timed out after 30 seconds",
+      "Lost connection to Notes.app",
+      "spawnSync osascript EACCES",
+      "spawnSync osascript EACCES: Operation not permitted",
+      "Can't get note id",
+      "Note not found. The note may have been deleted or the ID is invalid.",
+    ])("preserves executor failure %j while the legacy getter stays nullable", (error) => {
+      mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error });
+      expect(manager.readNoteById(id)).toEqual({ note: null, error });
+      expect(manager.getNoteById(id)).toBeNull();
+    });
+
+    it.each([undefined, "", "  "])(
+      "supplies a diagnostic when the executor has no error: %j",
+      (error) => {
+        mockExecuteAppleScript.mockReturnValue({ success: false, output: "", error });
+        expect(manager.readNoteById(id)).toEqual({
+          note: null,
+          error: "AppleScript note metadata read failed",
+        });
+        expect(manager.getNoteById(id)).toBeNull();
+      }
+    );
+
+    it("reports malformed metadata without echoing its contents or claiming absence", () => {
+      mockExecuteAppleScript.mockReturnValue({
+        success: true,
+        output: 'Private "timed out -1743" note not found',
+      });
+      expect(manager.readNoteById(id)).toEqual({
+        note: null,
+        error: "Unexpected note metadata response",
+      });
+      expect(manager.getNoteById(id)).toBeNull();
+    });
+
+    it("preserves invalid-ID rejection before either metadata reader runs", () => {
+      expect(() => manager.readNoteById('invalid" id')).toThrow();
+      expect(() => manager.getNoteById('invalid" id')).toThrow();
+      expect(mockExecuteAppleScript).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getNoteById", () => {
     it("returns Note object with metadata for valid ID", () => {
       mockExecuteAppleScript.mockReturnValue({
