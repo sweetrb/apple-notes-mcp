@@ -128,6 +128,33 @@ describe("outputSchema contract (real server over stdio)", () => {
     expect(batchDelete?.properties).not.toHaveProperty("ids");
   });
 
+  it("keeps native tag mutations bound to an exact ID, fresh hash and bounded scope", async () => {
+    const { tools } = await client.listTools();
+    const schema = tools.find((tool) => tool.name === "add-native-tags")?.inputSchema;
+    expect(schema).toBeDefined();
+    const validate = new Ajv2020({ strict: false }).compile(schema!);
+    const request = {
+      id: "x-coredata://ABCDEF/ICNote/p12",
+      expectedContentHash: `sha256:${"a".repeat(64)}`,
+      scopeText: "Project scope marker",
+      tags: ["project"],
+    };
+    const accepted = validate(request);
+    expect(accepted, JSON.stringify(validate.errors)).toBe(true);
+    const withoutHash: Partial<typeof request> = { ...request };
+    delete withoutHash.expectedContentHash;
+    for (const invalid of [
+      withoutHash,
+      { ...request, id: "A note title" },
+      { ...request, expectedContentHash: "stale" },
+      { ...request, scopeText: "short" },
+      { ...request, tags: [] },
+      { ...request, tags: Array.from({ length: 101 }, () => "project") },
+    ]) {
+      expect(validate(invalid), JSON.stringify(invalid)).toBe(false);
+    }
+  });
+
   it("every advertised schema declares JSON Schema 2020-12 and no draft-07 construct", async () => {
     // MCP standardized on 2020-12 (SEP-834 / SEP-1613 / SEP-2106) and clients
     // now HARD-REJECT anything else: "JSON Schema declares an unsupported
