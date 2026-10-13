@@ -77,7 +77,7 @@ For the plugin, run these commands inside a Claude Code session:
 The plugin bundles the server and the Apple Notes skill. For a manual MCP registration instead, run this in your terminal:
 
 ```bash
-claude mcp add --transport stdio --scope user apple-notes -- npx -y apple-notes-mcp@2.15.1
+claude mcp add apple-notes -s user -- npx -y apple-notes-mcp@2.15.1
 ```
 
 Check the connection with `/mcp` in Claude Code. `claude mcp get apple-notes` inspects the manually registered server. Project-scoped `.mcp.json` entries require workspace/server approval and can override a user-scoped entry.
