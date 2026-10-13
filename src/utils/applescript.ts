@@ -263,6 +263,10 @@ export const PERMISSION_DENIED_PATTERN =
 /** The normalised text a permission failure is reported to callers as. */
 export const PERMISSION_DENIED_MESSAGE = `Permission denied. ${AUTOMATION_REMEDIATION}`;
 
+/** The normalised diagnostic for an exact note ID that Notes cannot retrieve. */
+export const NOTE_ID_NOT_FOUND_MESSAGE =
+  "Note not found. The note may have been deleted or the ID is invalid.";
+
 /**
  * Is this error a TCC/Automation refusal?
  *
@@ -318,7 +322,7 @@ const ERROR_MAPPINGS: Array<{ pattern: RegExp; message: string }> = [
   // Note not found by ID
   {
     pattern: /can't get note id/i,
-    message: "Note not found. The note may have been deleted or the ID is invalid.",
+    message: NOTE_ID_NOT_FOUND_MESSAGE,
   },
   // Folder not found
   {

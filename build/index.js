@@ -4010,11 +4010,11 @@ var require_fast_uri = __commonJS({
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
     var AUTHORITY_PREFIX = /^(?:[^#/:?]+:)?\/\/([^/?#]*)/;
     var AUTHORITY_INTRODUCER_REGION = /^(?:[^#/:?]+:)?([/\\\t\n\r]*)/;
-    function getParseError(parsed, matches) {
-      if (matches[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
+    function getParseError(parsed2, matches) {
+      if (matches[2] !== void 0 && parsed2.path && parsed2.path[0] !== "/") {
         return 'URI path must start with "/" when authority is present.';
       }
-      if (typeof parsed.port === "number" && (parsed.port < 0 || parsed.port > 65535)) {
+      if (typeof parsed2.port === "number" && (parsed2.port < 0 || parsed2.port > 65535)) {
         return "URI port is malformed.";
       }
       return void 0;
@@ -4037,12 +4037,12 @@ var require_fast_uri = __commonJS({
       const host = matches[4];
       return hasMalformedPercentEncoding(matches[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches[6]) || hasMalformedPercentEncoding(matches[7]) || hasMalformedPercentEncoding(matches[8]);
     }
-    function canonicalizeHost(parsed, options, schemeHandler, isIP) {
-      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
+    function canonicalizeHost(parsed2, options, schemeHandler, isIP) {
+      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed2.host && !isIPLiteral(parsed2.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed2.host)) {
         try {
-          parsed.host = new URL("http://" + parsed.host).hostname;
+          parsed2.host = new URL("http://" + parsed2.host).hostname;
         } catch (e) {
-          parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
+          parsed2.error = parsed2.error || "Host's domain name can not be converted to ASCII: " + e;
           return true;
         }
       }
@@ -4050,7 +4050,7 @@ var require_fast_uri = __commonJS({
     }
     function parseWithStatus(uri, opts) {
       const options = Object.assign({}, opts);
-      const parsed = {
+      const parsed2 = {
         scheme: void 0,
         userinfo: void 0,
         host: "",
@@ -4075,7 +4075,7 @@ var require_fast_uri = __commonJS({
       }
       const authorityMatch = uri.match(AUTHORITY_PREFIX);
       if (authorityMatch !== null && authorityMatch[1].indexOf("\\") !== -1) {
-        parsed.error = "URI authority must not contain a literal backslash.";
+        parsed2.error = "URI authority must not contain a literal backslash.";
         malformedAuthorityOrPort = true;
       }
       const introducerMatch = uri.match(AUTHORITY_INTRODUCER_REGION);
@@ -4084,105 +4084,105 @@ var require_fast_uri = __commonJS({
         const normalizedRegion = region.replace(/[\t\n\r]/g, "");
         if (normalizedRegion.length >= 2) {
           if (normalizedRegion.slice(0, 2) !== "//") {
-            parsed.error = parsed.error || "URI authority must not contain a literal backslash.";
+            parsed2.error = parsed2.error || "URI authority must not contain a literal backslash.";
             malformedAuthorityOrPort = true;
           } else if (region.length !== normalizedRegion.length) {
-            parsed.error = parsed.error || "URI authority introducer must not contain whitespace.";
+            parsed2.error = parsed2.error || "URI authority introducer must not contain whitespace.";
             malformedAuthorityOrPort = true;
           }
         }
       }
       const matches = uri.match(URI_PARSE);
       if (matches) {
-        parsed.scheme = matches[1];
-        parsed.userinfo = matches[3];
-        parsed.host = matches[4];
-        parsed.port = parseInt(matches[5], 10);
-        parsed.path = matches[6] || "";
-        parsed.query = matches[7];
-        parsed.fragment = matches[8];
-        if (parsed.scheme !== void 0) {
-          const decodedScheme = unescape(parsed.scheme);
+        parsed2.scheme = matches[1];
+        parsed2.userinfo = matches[3];
+        parsed2.host = matches[4];
+        parsed2.port = parseInt(matches[5], 10);
+        parsed2.path = matches[6] || "";
+        parsed2.query = matches[7];
+        parsed2.fragment = matches[8];
+        if (parsed2.scheme !== void 0) {
+          const decodedScheme = unescape(parsed2.scheme);
           if (VALID_SCHEME.test(decodedScheme)) {
-            parsed.scheme = decodedScheme.toLowerCase();
+            parsed2.scheme = decodedScheme.toLowerCase();
           } else {
-            parsed.error = parsed.error || MALFORMED_SCHEME_ERROR;
+            parsed2.error = parsed2.error || MALFORMED_SCHEME_ERROR;
             malformedScheme = true;
           }
         }
         malformedPercentEncoding = hasMalformedComponentPercentEncoding(matches);
         if (malformedPercentEncoding) {
-          parsed.error = parsed.error || "URI contains malformed percent-encoding.";
+          parsed2.error = parsed2.error || "URI contains malformed percent-encoding.";
         }
-        if (isNaN(parsed.port)) {
-          parsed.port = matches[5];
+        if (isNaN(parsed2.port)) {
+          parsed2.port = matches[5];
         }
-        const parseError = getParseError(parsed, matches);
+        const parseError = getParseError(parsed2, matches);
         if (parseError !== void 0) {
-          parsed.error = parsed.error || parseError;
+          parsed2.error = parsed2.error || parseError;
           malformedAuthorityOrPort = true;
         }
-        if (parsed.host) {
-          const ipv4result = isIPv4(parsed.host);
+        if (parsed2.host) {
+          const ipv4result = isIPv4(parsed2.host);
           if (ipv4result === false) {
-            const bracketedIPLiteral = isIPLiteral(parsed.host);
-            const hasIPLiteralBracket = parsed.host.indexOf("[") !== -1 || parsed.host.indexOf("]") !== -1;
-            const ipv6result = normalizeIPv6(parsed.host);
+            const bracketedIPLiteral = isIPLiteral(parsed2.host);
+            const hasIPLiteralBracket = parsed2.host.indexOf("[") !== -1 || parsed2.host.indexOf("]") !== -1;
+            const ipv6result = normalizeIPv6(parsed2.host);
             isIP = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
             malformedIPLiteral = hasIPLiteralBracket && (!bracketedIPLiteral || ipv6result.error === true);
-            parsed.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
+            parsed2.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
             if (malformedIPLiteral) {
-              parsed.error = parsed.error || "URI host is malformed.";
+              parsed2.error = parsed2.error || "URI host is malformed.";
               malformedAuthorityOrPort = true;
             }
           } else {
             isIP = true;
           }
         }
-        if (parsed.scheme === void 0 && parsed.userinfo === void 0 && parsed.host === void 0 && parsed.port === void 0 && parsed.query === void 0 && !parsed.path) {
-          parsed.reference = "same-document";
-        } else if (parsed.scheme === void 0) {
-          parsed.reference = "relative";
-        } else if (parsed.fragment === void 0) {
-          parsed.reference = "absolute";
+        if (parsed2.scheme === void 0 && parsed2.userinfo === void 0 && parsed2.host === void 0 && parsed2.port === void 0 && parsed2.query === void 0 && !parsed2.path) {
+          parsed2.reference = "same-document";
+        } else if (parsed2.scheme === void 0) {
+          parsed2.reference = "relative";
+        } else if (parsed2.fragment === void 0) {
+          parsed2.reference = "absolute";
         } else {
-          parsed.reference = "uri";
+          parsed2.reference = "uri";
         }
-        if (options.reference && options.reference !== "suffix" && options.reference !== parsed.reference) {
-          parsed.error = parsed.error || "URI is not a " + options.reference + " reference.";
+        if (options.reference && options.reference !== "suffix" && options.reference !== parsed2.reference) {
+          parsed2.error = parsed2.error || "URI is not a " + options.reference + " reference.";
         }
-        const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
+        const schemeHandler = getSchemeHandler(options.scheme || parsed2.scheme);
         if (!malformedIPLiteral) {
-          malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
+          malformedHost = canonicalizeHost(parsed2, options, schemeHandler, isIP);
         }
-        if (uri.indexOf("%") !== -1 && parsed.host !== void 0 && !malformedIPLiteral) {
-          let host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
+        if (uri.indexOf("%") !== -1 && parsed2.host !== void 0 && !malformedIPLiteral) {
+          let host = isIP ? parsed2.host : normalizePercentEncoding(parsed2.host, true);
           if (!isIP) {
             host = normalizePercentEncoding(host.toLowerCase());
           }
-          parsed.host = reescapeHostDelimiters(host, isIP);
+          parsed2.host = reescapeHostDelimiters(host, isIP);
         }
         if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
-          if (parsed.path) {
-            parsed.path = normalizePathEncoding(parsed.path);
+          if (parsed2.path) {
+            parsed2.path = normalizePathEncoding(parsed2.path);
           }
-          if (parsed.query) {
-            parsed.query = normalizeQueryFragmentEncoding(parsed.query);
+          if (parsed2.query) {
+            parsed2.query = normalizeQueryFragmentEncoding(parsed2.query);
           }
-          if (parsed.fragment) {
-            parsed.fragment = normalizeQueryFragmentEncoding(parsed.fragment);
+          if (parsed2.fragment) {
+            parsed2.fragment = normalizeQueryFragmentEncoding(parsed2.fragment);
           }
         }
         if (schemeHandler && schemeHandler.parse) {
-          schemeHandler.parse(parsed, options);
-          if (schemeHandler === SCHEMES.urn && parsed.nid === void 0) {
+          schemeHandler.parse(parsed2, options);
+          if (schemeHandler === SCHEMES.urn && parsed2.nid === void 0) {
             malformedSchemeSpecific = true;
           }
         }
       } else {
-        parsed.error = parsed.error || "URI can not be parsed.";
+        parsed2.error = parsed2.error || "URI can not be parsed.";
       }
-      return { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme };
+      return { parsed: parsed2, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme };
     }
     function parse3(uri, opts) {
       return parseWithStatus(uri, opts).parsed;
@@ -4191,9 +4191,9 @@ var require_fast_uri = __commonJS({
       return normalizeStringWithStatus(uri, opts).normalized;
     }
     function normalizeStringWithStatus(uri, opts) {
-      const { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = parseWithStatus(uri, opts);
+      const { parsed: parsed2, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = parseWithStatus(uri, opts);
       return {
-        normalized: malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? uri : serialize(parsed, opts),
+        normalized: malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? uri : serialize(parsed2, opts),
         malformedAuthorityOrPort,
         malformedPercentEncoding,
         malformedSchemeSpecific,
@@ -24510,8 +24510,130 @@ var require_turndown_cjs = __commonJS({
   }
 });
 
-// src/index.ts
-import { createRequire } from "module";
+// src/cliEntry.ts
+import { createRequire } from "node:module";
+
+// src/cli.ts
+var CLI_USAGE = `Usage: apple-notes-mcp [command]
+
+With no arguments, run the local MCP server over stdio.
+
+Commands:
+  setup [options]       Install or inspect Shortcuts and optional native helpers
+  templates [options]   Manage the local Markdown template editor (templates --help)
+  anchors [options]     Run the optional paragraph anchor resolver (anchors --help)
+  --help, -h            Show this help without running setup or the MCP server
+  --version, -v         Print the installed package version
+
+Run apple-notes-mcp setup --help for supported setup options.
+`;
+var SETUP_USAGE = `Usage: apple-notes-mcp setup [target] [options]
+
+Targets (choose at most one; default: packaged Shortcuts):
+  --public-helper       Build and install the public drawing/speech helper
+  --native-helper       Build and install the opt-in read-only private helper
+  --permissions-window Build and install the optional permission checklist window
+  --permissions         Check permissions; does not grant them
+  --broker              Build and install the opt-in permission broker
+
+Options for every target:
+  --check               Inspect only; do not install or import anything
+  --help, -h            Show this help without performing any checks
+
+Options only with --permissions:
+  --once                Print one report and exit
+  --json                Print the report as JSON
+  --open                Open System Settings panes for missing grants
+  --window              Show the checklist in the installed optional window
+  --probe-automation    Send a read-only Apple event (may show a consent prompt)
+
+Options only with --broker:
+  --uninstall           Remove the installed broker and LaunchAgent
+  --sign-identity <id>   Select an existing signing identity
+
+--check and SSH sessions suppress the Automation probe. Without an explicit
+--probe-automation, Automation is unverified. Helper installation requires
+Apple developer tools; setup never silently grants macOS permissions.
+`;
+var SETUP_TARGETS = /* @__PURE__ */ new Map([
+  ["--public-helper", "public-helper"],
+  ["--native-helper", "native-helper"],
+  ["--permissions-window", "permissions-window"],
+  ["--permissions", "permissions"],
+  ["--broker", "broker"]
+]);
+var PERMISSION_OPTIONS = /* @__PURE__ */ new Set([
+  "--once",
+  "--json",
+  "--open",
+  "--window",
+  "--probe-automation"
+]);
+function parseSetupArgs(args) {
+  let target = "shortcuts";
+  let selected = false;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--sign-identity") {
+      const identity = args[++index];
+      if (!identity?.trim() || identity.startsWith("-"))
+        throw new Error("--sign-identity requires a signing identity.");
+      continue;
+    }
+    const next = SETUP_TARGETS.get(arg);
+    if (next) {
+      if (selected && target !== next)
+        throw new Error("Choose only one setup target. Run each target separately.");
+      target = next;
+      selected = true;
+    } else if (!["--check", "--help", "-h"].includes(arg) && !PERMISSION_OPTIONS.has(arg) && arg !== "--uninstall") {
+      throw new Error(`Unknown setup option "${arg}".`);
+    }
+  }
+  if (args.some((arg) => arg === "--uninstall" || arg === "--sign-identity") && target !== "broker")
+    throw new Error("--uninstall and --sign-identity require setup --broker.");
+  for (const arg of args) {
+    if (PERMISSION_OPTIONS.has(arg) && target !== "permissions")
+      throw new Error(`${arg} requires setup --permissions.`);
+  }
+  if (args.includes("--help") || args.includes("-h")) return { kind: "help", topic: "setup" };
+  return { kind: "setup", target, args: [...args], checkOnly: args.includes("--check") };
+}
+function parseCliArgs(args) {
+  if (!args.length) return { kind: "mcp" };
+  const [command2, ...rest] = args;
+  if (command2 === "setup") return parseSetupArgs(rest);
+  if (command2 === "templates" || command2 === "anchors") return { kind: command2, args: rest };
+  if (["--help", "-h", "help", "--version", "-v"].includes(command2)) {
+    if (rest.length) throw new Error(`Unexpected argument "${rest[0]}" after ${command2}.`);
+    return command2 === "--version" || command2 === "-v" ? { kind: "version" } : { kind: "help", topic: "main" };
+  }
+  throw new Error(`Unknown command or option "${command2}".`);
+}
+
+// src/cliEntry.ts
+var parsed;
+try {
+  parsed = parseCliArgs(process.argv.slice(2));
+} catch (error2) {
+  const usage = process.argv[2] === "setup" ? SETUP_USAGE : CLI_USAGE;
+  process.stderr.write(`${error2.message}
+
+${usage}`);
+  process.exit(2);
+}
+var command = parsed;
+if (command.kind === "help") {
+  process.stdout.write(command.topic === "setup" ? SETUP_USAGE : CLI_USAGE);
+  process.exit(0);
+}
+var require2 = createRequire(import.meta.url);
+var { version } = require2("../package.json");
+if (command.kind === "version") {
+  process.stdout.write(`${version}
+`);
+  process.exit(0);
+}
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
@@ -29741,7 +29863,7 @@ var Doc = class {
 };
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/versions.js
-var version = {
+var version2 = {
   major: 4,
   minor: 0,
   patch: 0
@@ -29753,7 +29875,7 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   inst ?? (inst = {});
   inst._zod.def = def;
   inst._zod.bag = inst._zod.bag || {};
-  inst._zod.version = version;
+  inst._zod.version = version2;
   const checks = [...inst._zod.def.checks ?? []];
   if (inst._zod.traits.has("$ZodCheck")) {
     checks.unshift(inst);
@@ -36873,8 +36995,8 @@ var Protocol = class {
     const method = getMethodLiteral(requestSchema);
     this.assertRequestHandlerCapability(method);
     this._requestHandlers.set(method, (request, extra) => {
-      const parsed = parseWithCompat(requestSchema, request);
-      return Promise.resolve(handler(parsed, extra));
+      const parsed2 = parseWithCompat(requestSchema, request);
+      return Promise.resolve(handler(parsed2, extra));
     });
   }
   /**
@@ -36899,8 +37021,8 @@ var Protocol = class {
   setNotificationHandler(notificationSchema, handler) {
     const method = getMethodLiteral(notificationSchema);
     this._notificationHandlers.set(method, (notification) => {
-      const parsed = parseWithCompat(notificationSchema, notification);
-      return Promise.resolve(handler(parsed));
+      const parsed2 = parseWithCompat(notificationSchema, notification);
+      return Promise.resolve(handler(parsed2));
     });
   }
   /**
@@ -39096,6 +39218,7 @@ function sleep(ms) {
 }
 var PERMISSION_DENIED_PATTERN = /not author(?:i[sz])ed|not permitted|access.*denied|\(-1743\)/i;
 var PERMISSION_DENIED_MESSAGE = `Permission denied. ${AUTOMATION_REMEDIATION}`;
+var NOTE_ID_NOT_FOUND_MESSAGE = "Note not found. The note may have been deleted or the ID is invalid.";
 function isPermissionDenied(error2) {
   if (!error2) return false;
   return PERMISSION_DENIED_PATTERN.test(error2) || error2.includes(PERMISSION_DENIED_MESSAGE);
@@ -39128,7 +39251,7 @@ var ERROR_MAPPINGS = [
   // Note not found by ID
   {
     pattern: /can't get note id/i,
-    message: "Note not found. The note may have been deleted or the ID is invalid."
+    message: NOTE_ID_NOT_FOUND_MESSAGE
   },
   // Folder not found
   {
@@ -39727,9 +39850,9 @@ function runJsonQuery(sql, dbPath2) {
     console.error(`Identifier query failed: ${detail}`);
     throw new IdentifierResolutionError("query_error", "Failed to read the Notes database.");
   }
-  const parsed = JSON.parse(out || "{}");
-  const rows = typeof parsed.rows === "string" ? JSON.parse(parsed.rows) : parsed.rows;
-  return { store: parsed.store ?? null, rows: rows ?? [] };
+  const parsed2 = JSON.parse(out || "{}");
+  const rows = typeof parsed2.rows === "string" ? JSON.parse(parsed2.rows) : parsed2.rows;
+  return { store: parsed2.store ?? null, rows: rows ?? [] };
 }
 function coreDataId(store, entity3, pk) {
   return `x-coredata://${store}/${entity3}/p${pk}`;
@@ -41432,19 +41555,19 @@ function decodeSmartFolderQuery(raw, context = {}) {
   if (raw === null || raw.trim() === "") {
     return { match: null, filters: [], query: null, fullyDecoded: false };
   }
-  let parsed;
+  let parsed2;
   try {
-    parsed = JSON.parse(raw);
+    parsed2 = JSON.parse(raw);
   } catch {
     return { match: null, filters: [], query: raw, fullyDecoded: false };
   }
   const decoder = new Decoder(context);
-  const type = isClause(parsed) ? parsed.type : void 0;
+  const type = isClause(parsed2) ? parsed2.type : void 0;
   if (!isClause(type)) {
     return {
       match: null,
-      filters: [decoder.unknown(null, parsed, false)],
-      query: parsed,
+      filters: [decoder.unknown(null, parsed2, false)],
+      query: parsed2,
       fullyDecoded: false
     };
   }
@@ -43087,8 +43210,8 @@ function parseAppleScriptDate(appleScriptDate) {
   }
   const withoutPrefix = s.replace(/^date\s+/, "");
   const normalized2 = withoutPrefix.replace(" at ", " ");
-  const parsed = new Date(normalized2);
-  return isNaN(parsed.getTime()) ? /* @__PURE__ */ new Date() : parsed;
+  const parsed2 = new Date(normalized2);
+  return isNaN(parsed2.getTime()) ? /* @__PURE__ */ new Date() : parsed2;
 }
 function buildAppleScriptDateVar(date3, varName = "thresholdDate") {
   const year = date3.getFullYear();
@@ -43279,20 +43402,20 @@ function buildAccountResolution(account) {
     if ${AS_ACCOUNT_REF} is missing value then error "${ACCOUNT_RESOLUTION_ERROR} Account \\"${safeAccount}\\" not found"
   `;
 }
-function buildAccountScopedScript(scope2, command) {
+function buildAccountScopedScript(scope2, command2) {
   return `
     tell application "Notes"
       ${buildAccountResolution(scope2.account)}
       tell ${AS_ACCOUNT_REF}
-        ${command}
+        ${command2}
       end tell
     end tell
   `;
 }
-function buildAppLevelScript(command) {
+function buildAppLevelScript(command2) {
   return `
     tell application "Notes"
-      ${command}
+      ${command2}
     end tell
   `;
 }
@@ -43789,9 +43912,20 @@ var AppleNotesManager = class {
    * This method fetches the note and its metadata using this ID.
    *
    * @param id - CoreData URL identifier for the note
-   * @returns Note object with metadata, or null if not found
+   * @returns Note object with metadata, or null if the lookup fails
    */
   getNoteById(id2) {
+    return this.readNoteById(id2).note;
+  }
+  /**
+   * Reads exact-ID metadata while retaining the executor or parser failure.
+   * Unlike the legacy nullable getter, callers can distinguish a missing note
+   * from denied Automation, a timeout, or an unreadable metadata response.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The note, or the diagnostic that prevented its metadata read
+   */
+  readNoteById(id2) {
     const safeId = sanitizeId(id2);
     const getCommand = `
       set n to note id "${safeId}"
@@ -43805,22 +43939,27 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script);
     if (!result.success) {
       console.error(`Failed to get note with ID "${id2}":`, result.error);
-      return null;
+      return {
+        note: null,
+        error: result.error?.trim() ? result.error : "AppleScript note metadata read failed"
+      };
     }
-    const parsed = parseNotePropertiesOutput(result.output);
-    if (!parsed) {
-      return null;
+    const parsed2 = parseNotePropertiesOutput(result.output);
+    if (!parsed2) {
+      return { note: null, error: "Unexpected note metadata response" };
     }
     return {
-      id: parsed.id,
-      title: parsed.title,
-      content: "",
-      // Not fetched to keep response small
-      tags: [],
-      created: parsed.created,
-      modified: parsed.modified,
-      shared: parsed.shared,
-      passwordProtected: parsed.passwordProtected
+      note: {
+        id: parsed2.id,
+        title: parsed2.title,
+        content: "",
+        // Not fetched to keep response small
+        tags: [],
+        created: parsed2.created,
+        modified: parsed2.modified,
+        shared: parsed2.shared,
+        passwordProtected: parsed2.passwordProtected
+      }
     };
   }
   /**
@@ -43866,20 +44005,20 @@ var AppleNotesManager = class {
       console.error(`Failed to get details for note "${title}":`, result.error);
       return null;
     }
-    const parsed = parseNotePropertiesOutput(result.output);
-    if (!parsed) {
+    const parsed2 = parseNotePropertiesOutput(result.output);
+    if (!parsed2) {
       return null;
     }
     return {
-      id: parsed.id,
-      title: parsed.title,
+      id: parsed2.id,
+      title: parsed2.title,
       content: "",
       // Not fetched
       tags: [],
-      created: parsed.created,
-      modified: parsed.modified,
-      shared: parsed.shared,
-      passwordProtected: parsed.passwordProtected,
+      created: parsed2.created,
+      modified: parsed2.modified,
+      shared: parsed2.shared,
+      passwordProtected: parsed2.passwordProtected,
       account: this.reportedAccount(targetAccount)
     };
   }
@@ -44289,12 +44428,12 @@ var AppleNotesManager = class {
       const header = sepIdx === -1 ? body : body.slice(0, sepIdx);
       const totalCount = Number.parseInt(header.trim(), 10);
       const records2 = sepIdx === -1 ? "" : body.slice(sepIdx + 1);
-      const parsed = this.parseBulkListRecords(records2, safeLimit, {
+      const parsed2 = this.parseBulkListRecords(records2, safeLimit, {
         ids: trashIds2,
         include: includeRecentlyDeleted
       });
-      if (!Number.isNaN(totalCount) && (parsed.refs.length >= safeLimit || totalCount <= safeLimit)) {
-        return parsed;
+      if (!Number.isNaN(totalCount) && (parsed2.refs.length >= safeLimit || totalCount <= safeLimit)) {
+        return parsed2;
       }
     }
     const script = buildAccountScopedScript(
@@ -44498,9 +44637,9 @@ var AppleNotesManager = class {
     const parts = result.output.replace(/\n$/, "").split(FIELD_SEP);
     if (parts.length !== 7 || !parts[0] || !parts[2]) throw new Error("Incomplete folder metadata");
     const count = (value) => {
-      const parsed = Number(value.trim());
-      if (!Number.isInteger(parsed) || parsed < 0) throw new Error("Incomplete folder metadata");
-      return parsed;
+      const parsed2 = Number(value.trim());
+      if (!Number.isInteger(parsed2) || parsed2 < 0) throw new Error("Incomplete folder metadata");
+      return parsed2;
     };
     return {
       id: id2,
@@ -44881,12 +45020,12 @@ var AppleNotesManager = class {
    * @returns Default account and folder metadata
    */
   getDefaultLocation() {
-    const command = `
+    const command2 = `
       set aRef to default account
       set fRef to default folder of aRef
       return (id of aRef) & ${AS_FIELD_SEP} & (name of aRef) & ${AS_FIELD_SEP} & (upgraded of aRef as text) & ${AS_FIELD_SEP} & (id of fRef) & ${AS_FIELD_SEP} & (name of fRef) & ${AS_FIELD_SEP} & (shared of fRef as text)
     `;
-    const result = executeAppleScript(buildAppLevelScript(command));
+    const result = executeAppleScript(buildAppLevelScript(command2));
     if (!result.success) {
       throw new Error(`Failed to get default Notes location: ${result.error ?? "unknown error"}`);
     }
@@ -44917,7 +45056,7 @@ var AppleNotesManager = class {
    * @returns Array of selected notes, or an empty array when nothing is selected
    */
   getSelectedNotes() {
-    const command = `
+    const command2 = `
       set selectedNotes to selection
       set noteList to {}
       repeat with n in selectedNotes
@@ -44939,7 +45078,7 @@ var AppleNotesManager = class {
       set AppleScript's text item delimiters to ${AS_RECORD_SEP}
       return noteList as text
     `;
-    const result = executeAppleScript(buildAppLevelScript(command));
+    const result = executeAppleScript(buildAppLevelScript(command2));
     if (!result.success) {
       throw new Error(`Failed to get selected notes: ${result.error ?? "unknown error"}`);
     }
@@ -48479,7 +48618,7 @@ function describeMatchDetails(hit) {
 }
 
 // src/tools/doctor.ts
-import { spawnSync } from "child_process";
+import { spawnSync as spawnSync2 } from "child_process";
 
 // src/services/nativeTags.ts
 import { execFileSync as execFileSync15 } from "node:child_process";
@@ -49335,7 +49474,545 @@ ${request.content}`
 
 // src/services/capabilityMatrix.ts
 import { execFileSync as execFileSync17 } from "node:child_process";
-import { release } from "node:os";
+import { release as release2 } from "node:os";
+
+// src/services/publicHelper.ts
+import { spawn, spawnSync } from "node:child_process";
+import { createHash as createHash2 } from "node:crypto";
+import {
+  chmodSync,
+  existsSync as existsSync12,
+  mkdirSync as mkdirSync4,
+  mkdtempSync as mkdtempSync5,
+  readFileSync as readFileSync2,
+  renameSync,
+  rmSync as rmSync5,
+  writeFileSync as writeFileSync4
+} from "node:fs";
+import { homedir as homedir16, release } from "node:os";
+import { dirname as dirname4, join as join19, resolve as resolve3 } from "node:path";
+import { fileURLToPath } from "node:url";
+var PUBLIC_HELPER_PROTOCOL = 1;
+var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
+var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
+var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
+var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
+var PUBLIC_HELPER_MANIFEST = "manifest.json";
+var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
+var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
+  "hello",
+  "decode_drawing",
+  "transcribe",
+  "speech_status"
+]);
+var DEFAULT_TIMEOUT_MS2 = 3e4;
+var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
+var publicManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
+  builtAt: external_exports.string(),
+  osVersion: external_exports.string(),
+  compiler: external_exports.string()
+});
+function packageRoot(fromDir = dirname4(fileURLToPath(import.meta.url))) {
+  let dir = fromDir;
+  for (; ; ) {
+    const candidate = join19(dir, "package.json");
+    if (existsSync12(candidate)) {
+      try {
+        if (JSON.parse(readFileSync2(candidate, "utf8")).name === "apple-notes-mcp")
+          return dir;
+      } catch {
+      }
+    }
+    const parent = dirname4(dir);
+    if (parent === dir) return resolve3(fromDir, "..");
+    dir = parent;
+  }
+}
+function defaultPublicHelperDeps(overrides = {}) {
+  return {
+    env: process.env,
+    platform: process.platform,
+    sourcePath: join19(packageRoot(), PUBLIC_HELPER_SOURCE),
+    exists: existsSync12,
+    readFile: (path10) => readFileSync2(path10),
+    spawn: spawnSync,
+    spawnAsync: spawn,
+    ...overrides
+  };
+}
+function publicHelperInstallDir(env = process.env) {
+  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
+  if (override) return override;
+  return join19(homedir16(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
+}
+function sha256Hex(data) {
+  return createHash2("sha256").update(data).digest("hex");
+}
+function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
+  const installDir = publicHelperInstallDir(deps.env);
+  const binaryPath = join19(installDir, PUBLIC_HELPER_BINARY);
+  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
+  const fail = (reason, detail) => ({
+    ...base,
+    ready: false,
+    reason,
+    detail
+  });
+  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
+  if (!deps.exists(deps.sourcePath))
+    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
+  const manifestPath = join19(installDir, PUBLIC_HELPER_MANIFEST);
+  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
+    return fail(
+      "helper_not_installed",
+      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  let manifest;
+  try {
+    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
+  } catch {
+    return fail(
+      "helper_manifest_invalid",
+      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
+    );
+  }
+  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
+    return {
+      ...fail(
+        "helper_stale",
+        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
+      ),
+      manifest
+    };
+  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
+    return {
+      ...fail(
+        "helper_modified",
+        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
+      ),
+      manifest
+    };
+  return { ...base, manifest, ready: true, reason: null, detail: null };
+}
+var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+  "unsupported_platform",
+  "helper_not_installed",
+  "helper_stale",
+  "helper_modified",
+  "helper_manifest_invalid"
+]);
+var ENVELOPE_CODES = {
+  invalid_request: "validation_error",
+  attachment_not_found: "not_found"
+};
+var PublicHelperError = class extends CodedError {
+  constructor(code, message) {
+    super(message, {
+      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES[code] ?? "operation_failed",
+      helperCode: code
+    });
+    this.code = code;
+    this.name = "PublicHelperError";
+  }
+  code;
+};
+var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
+var publicHelloSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  protocolVersion: external_exports.number().int(),
+  sourceSha256: external_exports.string(),
+  actions: external_exports.array(external_exports.string())
+}).passthrough();
+function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const result = deps.spawn(binaryPath, [], {
+    input,
+    encoding: "utf8",
+    timeout,
+    killSignal: "SIGKILL",
+    maxBuffer: MAX_OUTPUT_BYTES2
+  });
+  const errno = result.error?.code;
+  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
+    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
+  if (result.error)
+    throw new PublicHelperError(
+      "helper_unreachable",
+      `Could not run the helper: ${result.error.message}`
+    );
+  return parseHelperOutput(result.status, String(result.stdout ?? ""));
+}
+async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
+  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
+  const { signal } = options;
+  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
+  if (signal?.aborted) throw aborted2();
+  return new Promise((resolvePromise, reject) => {
+    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
+      stdio: ["pipe", "pipe", "ignore"]
+    });
+    const chunks = [];
+    let size = 0;
+    let failure2 = null;
+    const stop = (error2) => {
+      failure2 ??= error2;
+      child2.kill("SIGKILL");
+    };
+    const timer = setTimeout(
+      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
+      timeout
+    );
+    const onAbort = () => stop(aborted2());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    child2.stdout?.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES2)
+        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
+      else chunks.push(chunk);
+    });
+    child2.on("error", (error2) => {
+      settle();
+      reject(
+        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
+      );
+    });
+    child2.on("close", (status, exitSignal) => {
+      settle();
+      if (failure2) return reject(failure2);
+      if (status === null && exitSignal)
+        return reject(
+          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
+        );
+      try {
+        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
+      } catch (error2) {
+        reject(error2);
+      }
+    });
+    child2.stdin?.on("error", () => {
+    });
+    child2.stdin?.end(input);
+  });
+}
+function prepareCall(action, fields, deps, options) {
+  if (!PUBLIC_HELPER_ACTIONS.has(action))
+    throw new PublicHelperError(
+      "unknown_action",
+      `"${action}" is not an action the server sends to the public helper.`
+    );
+  let binaryPath = options.binaryPath;
+  if (!binaryPath) {
+    const install = inspectPublicHelper(deps);
+    if (!install.ready)
+      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
+    binaryPath = install.binaryPath;
+  }
+  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
+  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
+  return { binaryPath, timeout, input };
+}
+function parseHelperOutput(status, stdout) {
+  let parsed2;
+  try {
+    parsed2 = JSON.parse(stdout.trim());
+  } catch {
+    throw new PublicHelperError(
+      "invalid_response",
+      `The helper exited with status ${status} and no JSON response.`
+    );
+  }
+  if (!parsed2 || typeof parsed2 !== "object" || Array.isArray(parsed2))
+    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
+  const object3 = parsed2;
+  if (status !== 0 || object3.status !== "ok") {
+    const error2 = errorSchema.safeParse(object3);
+    if (!error2.success)
+      throw new PublicHelperError(
+        "invalid_response",
+        `The helper failed with an unrecognized response (exit ${status}).`
+      );
+    throw new PublicHelperError(error2.data.code, error2.data.message);
+  }
+  return object3;
+}
+function defaultPublicHelperBuildDeps() {
+  return {
+    ...defaultPublicHelperDeps(),
+    osVersion: () => {
+      const r = spawnSync("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
+      return r.status === 0 ? r.stdout.trim() : `Darwin ${release()}`;
+    },
+    now: () => /* @__PURE__ */ new Date()
+  };
+}
+function sourceDigestSwift(sourceSha) {
+  return `let helperSourceSHA256 = "${sourceSha}"
+`;
+}
+var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
+function publicHelperInfoPlist() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>CFBundleIdentifier</key>",
+    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
+    "  <key>CFBundleName</key>",
+    "  <string>apple-notes-mcp public helper</string>",
+    "  <key>CFBundleInfoDictionaryVersion</key>",
+    "  <string>6.0</string>",
+    "</dict>",
+    "</plist>",
+    ""
+  ].join("\n");
+}
+function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
+  return [
+    "swiftc",
+    "-O",
+    "-parse-as-library",
+    "-framework",
+    "AppKit",
+    "-framework",
+    "PencilKit",
+    "-framework",
+    "AVFoundation",
+    "-framework",
+    "Speech",
+    "-Xlinker",
+    "-sectcreate",
+    "-Xlinker",
+    "__TEXT",
+    "-Xlinker",
+    "__info_plist",
+    "-Xlinker",
+    plistPath,
+    sourcePath,
+    digestPath,
+    "-o",
+    outputPath
+  ];
+}
+function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
+  const steps = [];
+  const done = (ok2) => ({
+    ok: ok2,
+    checkOnly,
+    steps,
+    installation: inspectPublicHelper(deps)
+  });
+  if (checkOnly) {
+    const installation2 = inspectPublicHelper(deps);
+    steps.push({
+      step: "inspect installed helper",
+      ok: installation2.ready,
+      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
+    });
+    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
+  }
+  if (deps.platform !== "darwin") {
+    steps.push({ step: "platform", ok: false, detail: "macOS only" });
+    return done(false);
+  }
+  if (!deps.exists(deps.sourcePath)) {
+    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
+    return done(false);
+  }
+  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
+  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
+  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
+  if (version3.status !== 0) {
+    steps.push({
+      step: "find compiler",
+      ok: false,
+      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
+    });
+    return done(false);
+  }
+  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
+  steps.push({ step: "find compiler", ok: true, detail: compiler });
+  const installDir = publicHelperInstallDir(deps.env);
+  mkdirSync4(installDir, { recursive: true, mode: 448 });
+  const staging = mkdtempSync5(join19(installDir, ".staging-"));
+  try {
+    const stagedBinary = join19(staging, PUBLIC_HELPER_BINARY);
+    const digestPath = join19(staging, "source-digest.swift");
+    const plistPath = join19(staging, "Info.plist");
+    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
+    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
+    const compile = deps.spawn(
+      "/usr/bin/xcrun",
+      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
+      { encoding: "utf8", timeout: 3e5 }
+    );
+    if (compile.status !== 0) {
+      steps.push({
+        step: "compile",
+        ok: false,
+        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
+      });
+      return done(false);
+    }
+    steps.push({ step: "compile", ok: true });
+    const sign = deps.spawn(
+      "/usr/bin/codesign",
+      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
+      { encoding: "utf8" }
+    );
+    if (sign.status !== 0) {
+      steps.push({
+        step: "ad-hoc sign",
+        ok: false,
+        detail: String(sign.stderr || "codesign failed")
+      });
+      return done(false);
+    }
+    steps.push({ step: "ad-hoc sign", ok: true });
+    let hello;
+    try {
+      hello = publicHelloSchema.parse(
+        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
+      );
+    } catch (error2) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: error2 instanceof Error ? error2.message : String(error2)
+      });
+      return done(false);
+    }
+    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
+      steps.push({
+        step: "handshake",
+        ok: false,
+        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
+      });
+      return done(false);
+    }
+    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
+    const manifest = {
+      schemaVersion: 1,
+      protocolVersion: hello.protocolVersion,
+      sourceSha256: sourceSha,
+      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
+      builtAt: deps.now().toISOString(),
+      osVersion: deps.osVersion(),
+      compiler
+    };
+    chmodSync(stagedBinary, 448);
+    renameSync(stagedBinary, join19(installDir, PUBLIC_HELPER_BINARY));
+    writeFileSync4(
+      join19(installDir, PUBLIC_HELPER_MANIFEST),
+      JSON.stringify(manifest, null, 2) + "\n",
+      { mode: 384 }
+    );
+    steps.push({ step: "install", ok: true, detail: installDir });
+  } finally {
+    rmSync5(staging, { recursive: true, force: true });
+  }
+  const installation = inspectPublicHelper(deps);
+  steps.push({
+    step: "verify installation",
+    ok: installation.ready,
+    detail: installation.ready ? void 0 : installation.detail ?? void 0
+  });
+  return { ok: installation.ready, checkOnly, steps, installation };
+}
+function formatPublicHelperBuild(report) {
+  const lines = ["Apple Notes MCP public native helper", ""];
+  for (const step of report.steps)
+    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
+  lines.push("");
+  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
+  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
+  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
+  return lines.join("\n");
+}
+
+// src/services/publicHelperStatus.ts
+var speechStatusSchema = external_exports.object({
+  status: external_exports.literal("ok"),
+  speechAuthorization: external_exports.enum(["authorized", "denied", "restricted", "notDetermined"]),
+  requiresGrant: external_exports.boolean()
+});
+function unprobedPublicHelperStatus() {
+  return {
+    ready: false,
+    reason: "not_probed",
+    detail: "The public native helper has not been checked.",
+    actions: [],
+    speech: { authorization: null, requiresGrant: null, verified: false, detail: "Not probed." }
+  };
+}
+function probePublicHelperStatus(deps = {
+  inspect: inspectPublicHelper,
+  call: (action) => callPublicHelper(action, {}, void 0, { timeoutMs: 3e3 })
+}) {
+  const result = unprobedPublicHelperStatus();
+  try {
+    const installed = deps.inspect();
+    if (!installed.ready) return { ...result, reason: installed.reason, detail: installed.detail };
+    const hello = publicHelloSchema.safeParse(deps.call("hello"));
+    if (!hello.success)
+      return {
+        ...result,
+        reason: "invalid_response",
+        detail: "The helper returned an invalid handshake."
+      };
+    if (hello.data.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.data.sourceSha256 !== installed.manifest?.sourceSha256)
+      return {
+        ...result,
+        reason: "helper_stale",
+        detail: "The helper handshake does not match the installed protocol and source."
+      };
+    result.actions = hello.data.actions;
+    const missing = ["decode_drawing", "transcribe", "speech_status"].filter(
+      (action) => !result.actions.includes(action)
+    );
+    if (missing.length)
+      return {
+        ...result,
+        reason: "helper_action_missing",
+        detail: `The helper does not advertise: ${missing.join(", ")}.`
+      };
+    result.ready = true;
+    result.reason = null;
+    result.detail = "Installed digests, protocol, and required actions verified; no drawing or audio was processed.";
+  } catch (error2) {
+    return {
+      ...result,
+      reason: "helper_unreachable",
+      detail: error2 instanceof Error ? error2.message : String(error2)
+    };
+  }
+  try {
+    const speech = speechStatusSchema.safeParse(deps.call("speech_status"));
+    if (!speech.success) {
+      result.speech.detail = "The helper returned an unknown or invalid Speech Recognition status.";
+    } else {
+      result.speech = {
+        authorization: speech.data.speechAuthorization,
+        requiresGrant: speech.data.requiresGrant,
+        verified: true,
+        detail: "Permission status only; locale support and model availability are checked when transcription is requested."
+      };
+    }
+  } catch (error2) {
+    result.speech.detail = error2 instanceof Error ? error2.message : String(error2);
+  }
+  return result;
+}
+
+// src/services/capabilityMatrix.ts
 var MACOS_SHORTCUTS_CLI = "12.0";
 var MACOS_MARKDOWN_IMPORT = "26.0";
 var FEATURES = [
@@ -49412,7 +50089,8 @@ var FEATURES = [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
-      { kind: "shortcut", name: backgroundShortcutName }
+      { kind: "shortcut", name: backgroundShortcutName },
+      { kind: "shortcut_consent" }
     ]
   },
   {
@@ -49424,7 +50102,8 @@ var FEATURES = [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
-      { kind: "shortcut", name: nativeTagsShortcutName }
+      { kind: "shortcut", name: nativeTagsShortcutName },
+      { kind: "shortcut_consent" }
     ]
   },
   {
@@ -49436,7 +50115,8 @@ var FEATURES = [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
-      { kind: "shortcut", name: markdownShortcutName }
+      { kind: "shortcut", name: markdownShortcutName },
+      { kind: "shortcut_consent" }
     ]
   },
   // Placeholders for features that need a native WRITE helper, which this
@@ -49473,11 +50153,30 @@ var FEATURES = [
     requirements: [{ kind: "full_disk_access" }]
   },
   {
-    name: "audioTranscription",
-    description: "Read the transcripts Notes stored for a note's audio recordings, or transcribe them on this Mac (transcribe-note-audio also needs the public helper built with setup --public-helper)",
-    tools: ["get-audio-transcripts", "transcribe-note-audio"],
+    name: "storedAudioTranscripts",
+    description: "Read transcripts Notes already stored for a note's audio recordings; no speech helper is needed",
+    tools: ["get-audio-transcripts"],
     minimumMacOSVersion: null,
     requirements: [{ kind: "full_disk_access" }]
+  },
+  {
+    name: "classicDrawingDecode",
+    description: "Decode classic PencilKit drawings with the verified public native helper",
+    tools: ["get-note-drawings"],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "full_disk_access" }, { kind: "public_native_helper" }]
+  },
+  {
+    name: "audioTranscription",
+    description: "Transcribe audio on this Mac with the verified public helper; locale and speech-model readiness are checked per request",
+    tools: ["transcribe-note-audio"],
+    minimumMacOSVersion: null,
+    requirements: [
+      { kind: "full_disk_access" },
+      { kind: "public_native_helper" },
+      { kind: "speech_recognition" },
+      { kind: "speech_locale_and_assets" }
+    ]
   },
   {
     name: "markdownTemplateLibrary",
@@ -49519,6 +50218,9 @@ function evaluateFeature(feature, env) {
       case "notes_automation":
         unverified.push(label);
         break;
+      case "shortcut_consent":
+        unverified.push(label);
+        break;
       case "full_disk_access":
         if (!env.fullDiskAccess) {
           missing.push(label);
@@ -49542,6 +50244,29 @@ function evaluateFeature(feature, env) {
         missing.push(label);
         failures.add("not_implemented");
         break;
+      case "public_native_helper":
+        if (!env.publicHelper || env.publicHelper.reason === "not_probed") {
+          unverified.push(label);
+          failures.add("public_helper_unverified");
+        } else if (!env.publicHelper.ready) {
+          missing.push(label);
+          failures.add("public_helper_unavailable");
+        }
+        break;
+      case "speech_recognition": {
+        const speech = env.publicHelper?.speech;
+        if (!speech?.verified || speech.authorization === null || speech.requiresGrant === null) {
+          unverified.push(label);
+          failures.add("speech_status_unverified");
+        } else if (speech.authorization === "denied" || speech.authorization === "restricted" || speech.requiresGrant && speech.authorization !== "authorized") {
+          missing.push(label);
+          failures.add("speech_permission_required");
+        }
+        break;
+      }
+      case "speech_locale_and_assets":
+        unverified.push(label);
+        break;
     }
   }
   let reason = null;
@@ -49552,6 +50277,10 @@ function evaluateFeature(feature, env) {
   else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
   else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
   else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  else if (failures.has("public_helper_unavailable")) reason = "public_helper_unavailable";
+  else if (failures.has("public_helper_unverified")) reason = "public_helper_unverified";
+  else if (failures.has("speech_permission_required")) reason = "speech_permission_required";
+  else if (failures.has("speech_status_unverified")) reason = "speech_status_unverified";
   return {
     description: feature.description,
     tools: feature.tools,
@@ -49571,7 +50300,8 @@ function evaluateFeatures(env, features = FEATURES) {
       macOSVersion: env.macOSVersion,
       darwinRelease: env.darwinRelease
     },
-    features: Object.fromEntries(features.map((f) => [f.name, evaluateFeature(f, env)]))
+    features: Object.fromEntries(features.map((f) => [f.name, evaluateFeature(f, env)])),
+    publicHelper: env.publicHelper ?? unprobedPublicHelperStatus()
   };
 }
 function readMacOSVersion() {
@@ -49601,9 +50331,10 @@ function probeCapabilityEnvironment() {
   return {
     platform,
     macOSVersion: readMacOSVersion(),
-    darwinRelease: release(),
+    darwinRelease: release2(),
     fullDiskAccess: isMac && hasFullDiskAccess(),
-    shortcutLines
+    shortcutLines,
+    publicHelper: isMac ? probePublicHelperStatus() : unprobedPublicHelperStatus()
   };
 }
 function getCapabilityMatrix(probe = probeCapabilityEnvironment) {
@@ -49616,7 +50347,7 @@ function formatCapabilityMatrix(matrix) {
   ];
   for (const [name, status] of Object.entries(matrix.features)) {
     lines.push(
-      status.available ? `  \u2713 ${name}: available${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}` : `  \u2717 ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}`
+      status.available ? `  \u2713 ${name}: available${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}` : `  \u2717 ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}`
     );
   }
   return lines.join("\n");
@@ -49651,7 +50382,7 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
   checks.push({
     name: "Full Disk Access",
     status: fda ? "ok" : "warn",
-    detail: fda ? "granted \u2014 the Notes database is readable (checklist state, note metadata, note links, sync detail)" : "not granted \u2014 get-checklist-state, get-note-metadata, and the checklist annotations in get-note-markdown won't work; get-note-link fails on macOS 26+ (macOS 12-15 falls back to AppleScript); get-sync-status still answers but cannot see pending uploads. Everything else is pure AppleScript and is unaffected. " + fdaRemediation()
+    detail: fda ? "granted \u2014 the Notes database is readable (queries, native structure, exports, mutation guards, and sync detail)" : "not granted \u2014 database-backed queries, native structure and checklist state, media and portable exports, and database-backed mutation guards/readback are unavailable. Whole-body updates cannot proceed when their safety metadata is unreadable. Basic AppleScript read/create paths may still work with Automation permission. get-note-link fails on macOS 26+ (macOS 12-15 has an AppleScript fallback); get-sync-status cannot verify pending uploads or active sync. " + fdaRemediation()
   });
   const consentReminder = "After install or upgrade, run each bridge Shortcut once in the foreground in Shortcuts.app and choose Always Allow: a background run cannot display a first-run consent prompt, so an unanswered one stalls that bridge's native writes until they time out while this check stays ok";
   try {
@@ -49680,7 +50411,21 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
   } catch {
     matrix = void 0;
   }
-  return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features } : { healthy, checks };
+  const publicHelper = matrix?.publicHelper ?? unprobedPublicHelperStatus();
+  checks.push({
+    name: "Public native helper",
+    status: publicHelper.ready ? "ok" : "warn",
+    detail: publicHelper.ready ? publicHelper.detail ?? "Installed helper handshake verified." : `${publicHelper.reason ?? "unknown"}: ${publicHelper.detail ?? "Could not verify helper readiness."} Classic drawing decode and on-device transcription need a current public helper; run apple-notes-mcp setup --public-helper --check.`
+  });
+  if (publicHelper.ready) {
+    const audio = matrix?.features.audioTranscription;
+    checks.push({
+      name: "On-device transcription",
+      status: audio?.available ? "ok" : "warn",
+      detail: audio ? `${audio.available ? "Prerequisites available" : audio.reason ?? "unverified"}. Unverified: ${audio.unverified.join(", ") || "none"}. ` + (publicHelper.speech.detail ?? "") : "Transcription prerequisites were not verified."
+    });
+  }
+  return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features, publicHelper } : { healthy, checks, publicHelper };
 }
 function markdownBridgeDetail() {
   const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
@@ -49693,7 +50438,7 @@ function markdownBridgeDetail() {
 function checkNodeRuntimeSignature() {
   const name = "Node runtime signature";
   try {
-    const r = spawnSync("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
+    const r = spawnSync2("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
     const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
     if (r.error || !out.trim()) {
       return {
@@ -49730,22 +50475,22 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync12, readFileSync as readFileSync2 } from "fs";
-import { join as join19 } from "path";
-import { homedir as homedir16 } from "os";
+import { existsSync as existsSync13, readFileSync as readFileSync3 } from "fs";
+import { join as join20 } from "path";
+import { homedir as homedir17 } from "os";
 function fileConfigPath(env = process.env) {
   const override = env.APPLE_NOTES_MCP_CONFIG_FILE;
   if (override && override.trim()) return override.trim();
-  return join19(homedir16(), "Library", "Application Support", "apple-notes-mcp", "config.json");
+  return join20(homedir17(), "Library", "Application Support", "apple-notes-mcp", "config.json");
 }
 function loadFileConfig(env = process.env, path10 = fileConfigPath(env)) {
   if (env.APPLE_NOTES_MCP_BROKERED === "1") return [];
   const applied = [];
   try {
-    if (!existsSync12(path10)) return applied;
-    const parsed = JSON.parse(readFileSync2(path10, "utf8"));
-    if (!parsed || typeof parsed !== "object") return applied;
-    for (const [k, v] of Object.entries(parsed)) {
+    if (!existsSync13(path10)) return applied;
+    const parsed2 = JSON.parse(readFileSync3(path10, "utf8"));
+    if (!parsed2 || typeof parsed2 !== "object") return applied;
+    for (const [k, v] of Object.entries(parsed2)) {
       if (typeof v !== "string") continue;
       if (env[k] === void 0 || env[k] === "") {
         env[k] = v;
@@ -50271,7 +51016,7 @@ function paragraphLink(note, selector) {
 }
 
 // src/utils/noteStructure.ts
-import { dirname as dirname4 } from "node:path";
+import { dirname as dirname5 } from "node:path";
 
 // src/utils/noteLinks.ts
 var NOTE_LINK_UTI = "com.apple.notes.inlinetextattachment.link";
@@ -50457,7 +51202,7 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH8, includeText 
       bodyError = error2.code;
     }
   const { rows: attachmentRows, bodyOrder } = readNoteAttachmentRows(id2, dbPath2);
-  const assets = assembleAttachmentAssets(attachmentRows, bodyOrder, dirname4(dbPath2));
+  const assets = assembleAttachmentAssets(attachmentRows, bodyOrder, dirname5(dbPath2));
   const roots = /* @__PURE__ */ new Map();
   const attachments = [];
   const pks = /* @__PURE__ */ new Map();
@@ -50599,7 +51344,7 @@ ${cause} ${remedy}`;
 }
 
 // src/utils/noteLinkInventory.ts
-import { dirname as dirname5 } from "node:path";
+import { dirname as dirname6 } from "node:path";
 var BODY_BATCH = 100;
 function matchFolder(folders, wanted, account) {
   const paths = folderPaths(folders);
@@ -50735,7 +51480,7 @@ function listNoteLinks(options = {}) {
       accountIdentifier: account?.identifier ?? null
     };
   };
-  const containerDir = dirname5(dbPath2);
+  const containerDir = dirname6(dbPath2);
   const previewEntries = /* @__PURE__ */ new Map();
   const previewFor = (identifier, account) => {
     const accountDir = identifier ? resolveAccountDir(containerDir, account) : null;
@@ -50929,7 +51674,7 @@ import {
   closeSync as closeSync4,
   constants as constants4,
   fstatSync as fstatSync4,
-  mkdirSync as mkdirSync4,
+  mkdirSync as mkdirSync5,
   openSync as openSync4,
   readdirSync as readdirSync3,
   readSync as readSync3,
@@ -50937,9 +51682,9 @@ import {
   statSync as statSync3,
   writeSync as writeSync3
 } from "node:fs";
-import { homedir as homedir17 } from "node:os";
-import { basename as basename3, extname as extname3, join as join20, relative as relative3, resolve as resolve3, sep as sep3 } from "node:path";
-var NOTES_CONTAINER = join20(homedir17(), "Library/Group Containers/group.com.apple.notes");
+import { homedir as homedir18 } from "node:os";
+import { basename as basename3, extname as extname3, join as join21, relative as relative3, resolve as resolve4, sep as sep3 } from "node:path";
+var NOTES_CONTAINER = join21(homedir18(), "Library/Group Containers/group.com.apple.notes");
 var MAX_EMBED_BYTES = 10 * 1024 * 1024;
 var MAX_EMBED_TOTAL_BYTES = 256 * 1024 * 1024;
 var MAX_DIRECTORY_ENTRIES = 2e4;
@@ -50995,11 +51740,11 @@ var AssetLocator = class {
   constructor(container = NOTES_CONTAINER) {
     let accountsRoot = "";
     try {
-      accountsRoot = realpathSync3.native(join20(container, "Accounts"));
+      accountsRoot = realpathSync3.native(join21(container, "Accounts"));
     } catch {
     }
     this.accounts = accountsRoot ? listDirectory(accountsRoot, 1e3).flatMap((name) => {
-      const dir = safeComponent2(name) && confine(join20(accountsRoot, name), accountsRoot);
+      const dir = safeComponent2(name) && confine(join21(accountsRoot, name), accountsRoot);
       return dir && isDirectory2(dir) ? [dir] : [];
     }) : [];
   }
@@ -51073,8 +51818,8 @@ var AssetLocator = class {
     if (!mediaId || !filename) return void 0;
     const generation = safeComponent2(source.mediaGeneration);
     const candidates = [
-      ...generation ? [join20(account, "Media", mediaId, generation, filename)] : [],
-      join20(account, "Media", mediaId, filename)
+      ...generation ? [join21(account, "Media", mediaId, generation, filename)] : [],
+      join21(account, "Media", mediaId, filename)
     ];
     for (const candidate of candidates) {
       const path10 = confine(candidate, account);
@@ -51088,7 +51833,7 @@ var AssetLocator = class {
    * somewhere else.
    */
   fallback(account, dir, id2, generation, names) {
-    const base = join20(account, dir, id2);
+    const base = join21(account, dir, id2);
     const gen = safeComponent2(generation);
     const generations = [
       ...gen ? [gen] : [],
@@ -51097,7 +51842,7 @@ var AssetLocator = class {
     ];
     for (const g of generations)
       for (const name of names) {
-        const path10 = confine(g ? join20(base, g, name) : join20(base, name), account);
+        const path10 = confine(g ? join21(base, g, name) : join21(base, name), account);
         if (path10 && isFile(path10)) return { path: path10, stale: Boolean(gen) && g !== gen };
       }
     return void 0;
@@ -51107,7 +51852,7 @@ var AssetLocator = class {
     let index = this.previewIndex.get(account);
     if (!index) {
       index = /* @__PURE__ */ new Map();
-      for (const name of listDirectory(join20(account, "Previews"), MAX_DIRECTORY_ENTRIES)) {
+      for (const name of listDirectory(join21(account, "Previews"), MAX_DIRECTORY_ENTRIES)) {
         const key = name.slice(0, 36).toUpperCase();
         const entries3 = index.get(key) ?? [];
         entries3.push(name);
@@ -51120,7 +51865,7 @@ var AssetLocator = class {
       return !ext || IMAGE_EXTENSIONS.has(ext) || /^\.\d+$/.test(ext);
     }).sort((a, b) => previewArea(b) - previewArea(a) || a.localeCompare(b));
     for (const name of entries2) {
-      const entry = confine(join20(account, "Previews", name), account);
+      const entry = confine(join21(account, "Previews", name), account);
       if (!entry) continue;
       const file = isFile(entry) ? entry : this.bundleImage(entry, account);
       if (file) return { path: file, name: "preview", role: "preview" };
@@ -51131,12 +51876,12 @@ var AssetLocator = class {
   bundleImage(bundle, account) {
     const found = [];
     for (const child2 of listDirectory(bundle, MAX_BUNDLE_ENTRIES2)) {
-      const path10 = confine(join20(bundle, child2), account);
+      const path10 = confine(join21(bundle, child2), account);
       if (!path10) continue;
       if (isFile(path10)) found.push(path10);
       else
         for (const grandchild of listDirectory(path10, MAX_BUNDLE_ENTRIES2)) {
-          const inner = confine(join20(path10, grandchild), account);
+          const inner = confine(join21(path10, grandchild), account);
           if (inner && isFile(inner)) found.push(inner);
         }
     }
@@ -51197,11 +51942,11 @@ function canonicalForm(abs) {
   for (; ; ) {
     try {
       const real = realpathSync3.native(current);
-      return rest ? join20(real, rest) : real;
+      return rest ? join21(real, rest) : real;
     } catch {
-      const parent = resolve3(current, "..");
+      const parent = resolve4(current, "..");
       if (parent === current) return abs;
-      rest = rest ? join20(basename3(current), rest) : basename3(current);
+      rest = rest ? join21(basename3(current), rest) : basename3(current);
       current = parent;
     }
   }
@@ -51209,7 +51954,7 @@ function canonicalForm(abs) {
 function assertExportPath(p, container = NOTES_CONTAINER) {
   const abs = assertSafeSavePath(p);
   const within = (path10, root) => path10 === root || path10.startsWith(root + sep3);
-  const roots = [resolve3(container), canonicalForm(resolve3(container))];
+  const roots = [resolve4(container), canonicalForm(resolve4(container))];
   const forms = [abs, canonicalForm(abs)];
   if (forms.some((form) => roots.some((root) => within(form, root))))
     throw new Error("Refusing to write inside the Notes library container.");
@@ -51315,7 +52060,7 @@ var SidecarWriter = class {
       if (!this.created) {
         try {
           assertExportPath(this.dir);
-          mkdirSync4(this.dir, { recursive: true });
+          mkdirSync5(this.dir, { recursive: true });
         } catch (error2) {
           this.directoryError = directoryFailure(this.dir, error2);
           return { error: this.directoryError };
@@ -51328,7 +52073,7 @@ var SidecarWriter = class {
       let target;
       let out;
       for (let n = 1; n <= 1e3 && out === void 0; n++) {
-        target = join20(this.dir, n === 1 ? safe2 : `${stem}-${n}${ext}`);
+        target = join21(this.dir, n === 1 ? safe2 : `${stem}-${n}${ext}`);
         try {
           out = openSync4(target, CREATE_FLAGS, 420);
         } catch (error2) {
@@ -51987,468 +52732,6 @@ function drawingToSvg(strokes, fallback) {
   return parts.join("\n");
 }
 
-// src/services/publicHelper.ts
-import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { createHash as createHash2 } from "node:crypto";
-import {
-  chmodSync,
-  existsSync as existsSync13,
-  mkdirSync as mkdirSync5,
-  mkdtempSync as mkdtempSync5,
-  readFileSync as readFileSync3,
-  renameSync,
-  rmSync as rmSync5,
-  writeFileSync as writeFileSync4
-} from "node:fs";
-import { homedir as homedir18, release as release2 } from "node:os";
-import { dirname as dirname6, join as join21, resolve as resolve4 } from "node:path";
-import { fileURLToPath } from "node:url";
-var PUBLIC_HELPER_PROTOCOL = 1;
-var PUBLIC_HELPER_DIR_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_DIR";
-var PUBLIC_HELPER_TIMEOUT_ENV = "APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS";
-var PUBLIC_HELPER_BINARY = "apple-notes-public-helper";
-var PUBLIC_HELPER_SOURCE = "native/public-helper/apple-notes-public-helper.swift";
-var PUBLIC_HELPER_MANIFEST = "manifest.json";
-var PUBLIC_HELPER_SETUP_COMMAND = "apple-notes-mcp setup --public-helper";
-var PUBLIC_HELPER_ACTIONS = /* @__PURE__ */ new Set([
-  "hello",
-  "decode_drawing",
-  "transcribe",
-  "speech_status"
-]);
-var DEFAULT_TIMEOUT_MS2 = 3e4;
-var MAX_OUTPUT_BYTES2 = 256 * 1024 * 1024;
-var publicManifestSchema = external_exports.object({
-  schemaVersion: external_exports.literal(1),
-  protocolVersion: external_exports.number().int(),
-  sourceSha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
-  binarySha256: external_exports.string().regex(/^[a-f0-9]{64}$/),
-  builtAt: external_exports.string(),
-  osVersion: external_exports.string(),
-  compiler: external_exports.string()
-});
-function packageRoot(fromDir = dirname6(fileURLToPath(import.meta.url))) {
-  let dir = fromDir;
-  for (; ; ) {
-    const candidate = join21(dir, "package.json");
-    if (existsSync13(candidate)) {
-      try {
-        if (JSON.parse(readFileSync3(candidate, "utf8")).name === "apple-notes-mcp")
-          return dir;
-      } catch {
-      }
-    }
-    const parent = dirname6(dir);
-    if (parent === dir) return resolve4(fromDir, "..");
-    dir = parent;
-  }
-}
-function defaultPublicHelperDeps(overrides = {}) {
-  return {
-    env: process.env,
-    platform: process.platform,
-    sourcePath: join21(packageRoot(), PUBLIC_HELPER_SOURCE),
-    exists: existsSync13,
-    readFile: (path10) => readFileSync3(path10),
-    spawn: spawnSync2,
-    spawnAsync: spawn,
-    ...overrides
-  };
-}
-function publicHelperInstallDir(env = process.env) {
-  const override = env[PUBLIC_HELPER_DIR_ENV]?.trim();
-  if (override) return override;
-  return join21(homedir18(), "Library", "Application Support", "apple-notes-mcp", "public-helper");
-}
-function sha256Hex(data) {
-  return createHash2("sha256").update(data).digest("hex");
-}
-function inspectPublicHelper(deps = defaultPublicHelperDeps()) {
-  const installDir = publicHelperInstallDir(deps.env);
-  const binaryPath = join21(installDir, PUBLIC_HELPER_BINARY);
-  const base = { installDir, binaryPath, sourcePath: deps.sourcePath, manifest: null };
-  const fail = (reason, detail) => ({
-    ...base,
-    ready: false,
-    reason,
-    detail
-  });
-  if (deps.platform !== "darwin") return fail("unsupported_platform", "macOS only");
-  if (!deps.exists(deps.sourcePath))
-    return fail("helper_not_installed", `Packaged helper source is missing: ${deps.sourcePath}`);
-  const manifestPath = join21(installDir, PUBLIC_HELPER_MANIFEST);
-  if (!deps.exists(binaryPath) || !deps.exists(manifestPath))
-    return fail(
-      "helper_not_installed",
-      `The public native helper is not built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
-    );
-  let manifest;
-  try {
-    manifest = publicManifestSchema.parse(JSON.parse(deps.readFile(manifestPath).toString("utf8")));
-  } catch {
-    return fail(
-      "helper_manifest_invalid",
-      `The helper manifest is unreadable. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\`.`
-    );
-  }
-  if (manifest.sourceSha256 !== sha256Hex(deps.readFile(deps.sourcePath)) || manifest.protocolVersion !== PUBLIC_HELPER_PROTOCOL)
-    return {
-      ...fail(
-        "helper_stale",
-        `The installed helper was built from a different source than this apple-notes-mcp version ships. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` again.`
-      ),
-      manifest
-    };
-  if (sha256Hex(deps.readFile(binaryPath)) !== manifest.binarySha256)
-    return {
-      ...fail(
-        "helper_modified",
-        `The helper binary no longer matches the checksum recorded when it was built. Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to rebuild it.`
-      ),
-      manifest
-    };
-  return { ...base, manifest, ready: true, reason: null, detail: null };
-}
-var UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
-  "unsupported_platform",
-  "helper_not_installed",
-  "helper_stale",
-  "helper_modified",
-  "helper_manifest_invalid"
-]);
-var ENVELOPE_CODES = {
-  invalid_request: "validation_error",
-  attachment_not_found: "not_found"
-};
-var PublicHelperError = class extends CodedError {
-  constructor(code, message) {
-    super(message, {
-      code: UNAVAILABLE_CODES.has(code) ? "unsupported" : ENVELOPE_CODES[code] ?? "operation_failed",
-      helperCode: code
-    });
-    this.code = code;
-    this.name = "PublicHelperError";
-  }
-  code;
-};
-var errorSchema = external_exports.object({ status: external_exports.literal("error"), code: external_exports.string(), message: external_exports.string() });
-var publicHelloSchema = external_exports.object({
-  status: external_exports.literal("ok"),
-  protocolVersion: external_exports.number().int(),
-  sourceSha256: external_exports.string(),
-  actions: external_exports.array(external_exports.string())
-}).passthrough();
-function callPublicHelper(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
-  const result = deps.spawn(binaryPath, [], {
-    input,
-    encoding: "utf8",
-    timeout,
-    killSignal: "SIGKILL",
-    maxBuffer: MAX_OUTPUT_BYTES2
-  });
-  const errno = result.error?.code;
-  if (errno === "ETIMEDOUT" || result.signal && result.status === null)
-    throw new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`);
-  if (result.error)
-    throw new PublicHelperError(
-      "helper_unreachable",
-      `Could not run the helper: ${result.error.message}`
-    );
-  return parseHelperOutput(result.status, String(result.stdout ?? ""));
-}
-async function callPublicHelperAsync(action, fields = {}, deps = defaultPublicHelperDeps(), options = {}) {
-  const { binaryPath, timeout, input } = prepareCall(action, fields, deps, options);
-  const { signal } = options;
-  const aborted2 = () => new PublicHelperError("aborted", "The request was cancelled; the helper was stopped.");
-  if (signal?.aborted) throw aborted2();
-  return new Promise((resolvePromise, reject) => {
-    const child2 = (deps.spawnAsync ?? spawn)(binaryPath, [], {
-      stdio: ["pipe", "pipe", "ignore"]
-    });
-    const chunks = [];
-    let size = 0;
-    let failure2 = null;
-    const stop = (error2) => {
-      failure2 ??= error2;
-      child2.kill("SIGKILL");
-    };
-    const timer = setTimeout(
-      () => stop(new PublicHelperError("timeout", `The helper did not answer within ${timeout} ms.`)),
-      timeout
-    );
-    const onAbort = () => stop(aborted2());
-    signal?.addEventListener("abort", onAbort, { once: true });
-    const settle = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
-    };
-    child2.stdout?.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES2)
-        stop(new PublicHelperError("invalid_response", "The helper response is too large."));
-      else chunks.push(chunk);
-    });
-    child2.on("error", (error2) => {
-      settle();
-      reject(
-        failure2 ?? new PublicHelperError("helper_unreachable", `Could not run the helper: ${error2.message}`)
-      );
-    });
-    child2.on("close", (status, exitSignal) => {
-      settle();
-      if (failure2) return reject(failure2);
-      if (status === null && exitSignal)
-        return reject(
-          new PublicHelperError("helper_crashed", `The helper stopped on signal ${exitSignal}.`)
-        );
-      try {
-        resolvePromise(parseHelperOutput(status, Buffer.concat(chunks).toString("utf8")));
-      } catch (error2) {
-        reject(error2);
-      }
-    });
-    child2.stdin?.on("error", () => {
-    });
-    child2.stdin?.end(input);
-  });
-}
-function prepareCall(action, fields, deps, options) {
-  if (!PUBLIC_HELPER_ACTIONS.has(action))
-    throw new PublicHelperError(
-      "unknown_action",
-      `"${action}" is not an action the server sends to the public helper.`
-    );
-  let binaryPath = options.binaryPath;
-  if (!binaryPath) {
-    const install = inspectPublicHelper(deps);
-    if (!install.ready)
-      throw new PublicHelperError(install.reason ?? "helper_not_installed", install.detail ?? "");
-    binaryPath = install.binaryPath;
-  }
-  const timeout = options.timeoutMs || Number.parseInt(deps.env[PUBLIC_HELPER_TIMEOUT_ENV] || "", 10) || DEFAULT_TIMEOUT_MS2;
-  const input = JSON.stringify({ protocol: PUBLIC_HELPER_PROTOCOL, action, ...fields });
-  return { binaryPath, timeout, input };
-}
-function parseHelperOutput(status, stdout) {
-  let parsed;
-  try {
-    parsed = JSON.parse(stdout.trim());
-  } catch {
-    throw new PublicHelperError(
-      "invalid_response",
-      `The helper exited with status ${status} and no JSON response.`
-    );
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new PublicHelperError("invalid_response", "The helper response is not a JSON object.");
-  const object3 = parsed;
-  if (status !== 0 || object3.status !== "ok") {
-    const error2 = errorSchema.safeParse(object3);
-    if (!error2.success)
-      throw new PublicHelperError(
-        "invalid_response",
-        `The helper failed with an unrecognized response (exit ${status}).`
-      );
-    throw new PublicHelperError(error2.data.code, error2.data.message);
-  }
-  return object3;
-}
-function defaultPublicHelperBuildDeps() {
-  return {
-    ...defaultPublicHelperDeps(),
-    osVersion: () => {
-      const r = spawnSync2("/usr/bin/sw_vers", ["-productVersion"], { encoding: "utf8" });
-      return r.status === 0 ? r.stdout.trim() : `Darwin ${release2()}`;
-    },
-    now: () => /* @__PURE__ */ new Date()
-  };
-}
-function sourceDigestSwift(sourceSha) {
-  return `let helperSourceSHA256 = "${sourceSha}"
-`;
-}
-var PUBLIC_HELPER_BUNDLE_ID = "apple-notes-mcp.public-helper";
-function publicHelperInfoPlist() {
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
-    '<plist version="1.0">',
-    "<dict>",
-    "  <key>CFBundleIdentifier</key>",
-    `  <string>${PUBLIC_HELPER_BUNDLE_ID}</string>`,
-    "  <key>CFBundleName</key>",
-    "  <string>apple-notes-mcp public helper</string>",
-    "  <key>CFBundleInfoDictionaryVersion</key>",
-    "  <string>6.0</string>",
-    "</dict>",
-    "</plist>",
-    ""
-  ].join("\n");
-}
-function publicHelperCompileArguments(sourcePath, digestPath, plistPath, outputPath) {
-  return [
-    "swiftc",
-    "-O",
-    "-parse-as-library",
-    "-framework",
-    "AppKit",
-    "-framework",
-    "PencilKit",
-    "-framework",
-    "AVFoundation",
-    "-framework",
-    "Speech",
-    "-Xlinker",
-    "-sectcreate",
-    "-Xlinker",
-    "__TEXT",
-    "-Xlinker",
-    "__info_plist",
-    "-Xlinker",
-    plistPath,
-    sourcePath,
-    digestPath,
-    "-o",
-    outputPath
-  ];
-}
-function buildPublicHelper(checkOnly, deps = defaultPublicHelperBuildDeps()) {
-  const steps = [];
-  const done = (ok2) => ({
-    ok: ok2,
-    checkOnly,
-    steps,
-    installation: inspectPublicHelper(deps)
-  });
-  if (checkOnly) {
-    const installation2 = inspectPublicHelper(deps);
-    steps.push({
-      step: "inspect installed helper",
-      ok: installation2.ready,
-      detail: installation2.ready ? installation2.binaryPath : installation2.detail ?? void 0
-    });
-    return { ok: installation2.ready, checkOnly, steps, installation: installation2 };
-  }
-  if (deps.platform !== "darwin") {
-    steps.push({ step: "platform", ok: false, detail: "macOS only" });
-    return done(false);
-  }
-  if (!deps.exists(deps.sourcePath)) {
-    steps.push({ step: "locate source", ok: false, detail: deps.sourcePath });
-    return done(false);
-  }
-  const sourceSha = sha256Hex(deps.readFile(deps.sourcePath));
-  steps.push({ step: "locate source", ok: true, detail: `sha256 ${sourceSha}` });
-  const version3 = deps.spawn("/usr/bin/xcrun", ["swiftc", "--version"], { encoding: "utf8" });
-  if (version3.status !== 0) {
-    steps.push({
-      step: "find compiler",
-      ok: false,
-      detail: "No Swift compiler found. Install the Command Line Tools with `xcode-select --install`."
-    });
-    return done(false);
-  }
-  const compiler = String(version3.stdout || version3.stderr || "").split("\n").find((line) => line.includes("Swift version"))?.trim() || "swiftc";
-  steps.push({ step: "find compiler", ok: true, detail: compiler });
-  const installDir = publicHelperInstallDir(deps.env);
-  mkdirSync5(installDir, { recursive: true, mode: 448 });
-  const staging = mkdtempSync5(join21(installDir, ".staging-"));
-  try {
-    const stagedBinary = join21(staging, PUBLIC_HELPER_BINARY);
-    const digestPath = join21(staging, "source-digest.swift");
-    const plistPath = join21(staging, "Info.plist");
-    writeFileSync4(digestPath, sourceDigestSwift(sourceSha), { mode: 384 });
-    writeFileSync4(plistPath, publicHelperInfoPlist(), { mode: 384 });
-    const compile = deps.spawn(
-      "/usr/bin/xcrun",
-      publicHelperCompileArguments(deps.sourcePath, digestPath, plistPath, stagedBinary),
-      { encoding: "utf8", timeout: 3e5 }
-    );
-    if (compile.status !== 0) {
-      steps.push({
-        step: "compile",
-        ok: false,
-        detail: String(compile.stderr || compile.error?.message || "swiftc failed").slice(0, 4e3)
-      });
-      return done(false);
-    }
-    steps.push({ step: "compile", ok: true });
-    const sign = deps.spawn(
-      "/usr/bin/codesign",
-      ["--force", "--sign", "-", "--identifier", PUBLIC_HELPER_BUNDLE_ID, stagedBinary],
-      { encoding: "utf8" }
-    );
-    if (sign.status !== 0) {
-      steps.push({
-        step: "ad-hoc sign",
-        ok: false,
-        detail: String(sign.stderr || "codesign failed")
-      });
-      return done(false);
-    }
-    steps.push({ step: "ad-hoc sign", ok: true });
-    let hello;
-    try {
-      hello = publicHelloSchema.parse(
-        callPublicHelper("hello", {}, deps, { binaryPath: stagedBinary })
-      );
-    } catch (error2) {
-      steps.push({
-        step: "handshake",
-        ok: false,
-        detail: error2 instanceof Error ? error2.message : String(error2)
-      });
-      return done(false);
-    }
-    if (hello.protocolVersion !== PUBLIC_HELPER_PROTOCOL || hello.sourceSha256 !== sourceSha) {
-      steps.push({
-        step: "handshake",
-        ok: false,
-        detail: `helper reported protocol ${hello.protocolVersion}, source ${hello.sourceSha256}`
-      });
-      return done(false);
-    }
-    steps.push({ step: "handshake", ok: true, detail: `actions: ${hello.actions.join(", ")}` });
-    const manifest = {
-      schemaVersion: 1,
-      protocolVersion: hello.protocolVersion,
-      sourceSha256: sourceSha,
-      binarySha256: sha256Hex(deps.readFile(stagedBinary)),
-      builtAt: deps.now().toISOString(),
-      osVersion: deps.osVersion(),
-      compiler
-    };
-    chmodSync(stagedBinary, 448);
-    renameSync(stagedBinary, join21(installDir, PUBLIC_HELPER_BINARY));
-    writeFileSync4(
-      join21(installDir, PUBLIC_HELPER_MANIFEST),
-      JSON.stringify(manifest, null, 2) + "\n",
-      { mode: 384 }
-    );
-    steps.push({ step: "install", ok: true, detail: installDir });
-  } finally {
-    rmSync5(staging, { recursive: true, force: true });
-  }
-  const installation = inspectPublicHelper(deps);
-  steps.push({
-    step: "verify installation",
-    ok: installation.ready,
-    detail: installation.ready ? void 0 : installation.detail ?? void 0
-  });
-  return { ok: installation.ready, checkOnly, steps, installation };
-}
-function formatPublicHelperBuild(report) {
-  const lines = ["Apple Notes MCP public native helper", ""];
-  for (const step of report.steps)
-    lines.push(`${step.ok ? "\u2713" : "\u2717"} ${step.step}${step.detail ? `: ${step.detail}` : ""}`);
-  lines.push("");
-  if (report.ok) lines.push(`Installed at ${report.installation.binaryPath}.`);
-  else if (report.checkOnly) lines.push(`Run \`${PUBLIC_HELPER_SETUP_COMMAND}\` to build it.`);
-  else lines.push("The helper was not installed. Fix the failed step above and run setup again.");
-  return lines.join("\n");
-}
-
 // src/services/noteDrawings.ts
 var bounds = external_exports.object({ x: external_exports.number(), y: external_exports.number(), width: external_exports.number(), height: external_exports.number() });
 var strokeSchema = external_exports.object({
@@ -52500,10 +52783,10 @@ function decodeRow(row, format, includePoints, deps) {
       { dataBase64: row.data.toString("base64"), includePoints: needPoints },
       deps
     );
-    const parsed = decodedDrawingSchema.safeParse(raw);
-    if (!parsed.success)
+    const parsed2 = decodedDrawingSchema.safeParse(raw);
+    if (!parsed2.success)
       return { ...base, code: "invalid_response", message: "Unexpected helper response." };
-    decoded = parsed.data;
+    decoded = parsed2.data;
   } catch (error2) {
     const code = error2 instanceof PublicHelperError ? error2.code : "internal_error";
     return { ...base, code, message: error2 instanceof Error ? error2.message : String(error2) };
@@ -53026,18 +53309,18 @@ function readExportNote(id2, { dbPath: dbPath2 = NOTES_DB_PATH11 } = {}) {
     `.parameter set @pk ${pk}`,
     attachmentQuery(objectColumns(dbPath2))
   ]);
-  let parsed;
+  let parsed2;
   try {
-    parsed = JSON.parse(output);
+    parsed2 = JSON.parse(output);
   } catch {
     throw new NoteBlocksError("query-failed", "Unexpected Notes database response");
   }
-  const rows = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  const rows = Array.isArray(parsed2.attachments) ? parsed2.attachments : [];
   const { byId, ordered } = buildAttachments(rows);
   const firstLine = doc.blocks.find((block) => block.text.trim())?.text.trim() ?? "";
   return {
     id: id2,
-    title: text(parsed.title) ?? firstLine,
+    title: text(parsed2.title) ?? firstLine,
     doc,
     attachments: byId,
     ordered
@@ -53529,9 +53812,9 @@ function parseTemplate(text2) {
     throw new TemplateValidationError([
       { path: "$", message: `template is ${bytes} bytes; the limit is ${MAX_TEMPLATE_BYTES}` }
     ]);
-  let parsed;
+  let parsed2;
   try {
-    parsed = JSON.parse(text2);
+    parsed2 = JSON.parse(text2);
   } catch (error2) {
     const at = jsonErrorLocation(text2, error2.message);
     throw new TemplateValidationError([
@@ -53541,7 +53824,7 @@ function parseTemplate(text2) {
       }
     ]);
   }
-  return validateTemplate(parsed);
+  return validateTemplate(parsed2);
 }
 function resolveTemplate(template, name) {
   if (template === STANDARD) return merge2(void 0, STANDARD, name);
@@ -53560,15 +53843,15 @@ function merge2(base, template, name) {
 var plainValue = (text2) => ({ md: text2, raw: text2 });
 function fillPlaceholders(text2, values) {
   return text2.replace(TOKEN, (token, body) => {
-    const parsed = TOKEN_BODY.exec(body);
-    const raw = parsed ? values[parsed[1]] : void 0;
+    const parsed2 = TOKEN_BODY.exec(body);
+    const raw = parsed2 ? values[parsed2[1]] : void 0;
     const value = typeof raw === "string" ? plainValue(raw) : raw;
-    if (parsed?.[2] === "yaml") {
+    if (parsed2?.[2] === "yaml") {
       if (!value) return "null";
       return JSON.stringify(value.list ?? value.raw);
     }
     if (!value) return "";
-    return parsed?.[2] === "raw" ? value.raw : value.md;
+    return parsed2?.[2] === "raw" ? value.raw : value.md;
   });
 }
 function ruleUses(rule, name) {
@@ -53606,9 +53889,9 @@ var KIND_RULES = {
 var IMAGE_URL_EXTENSIONS = /\.(?:apng|avif|bmp|gif|heic|heif|ico|jfif|jpe?g|jxl|png|svgz?|tiff?|webp)$/i;
 function isImageUrl(url) {
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    let path10 = parsed.pathname;
+    const parsed2 = new URL(url);
+    if (parsed2.protocol !== "http:" && parsed2.protocol !== "https:") return false;
+    let path10 = parsed2.pathname;
     try {
       path10 = decodeURIComponent(path10);
     } catch {
@@ -56561,7 +56844,7 @@ function parsePathData(d) {
   let lastCubic = null;
   let lastQuad = null;
   let curved = false;
-  let command = "";
+  let command2 = "";
   const result = (error2) => ({ subpaths, error: error2, curved });
   const lineTo = (to) => {
     current.segments.push({ kind: "L", to });
@@ -56569,9 +56852,9 @@ function parsePathData(d) {
   };
   while (!s.done()) {
     const next = s.peek();
-    if (/[a-zA-Z]/.test(next)) command = s.take();
-    else if (!command || command === "z" || command === "Z") return result(true);
-    const rel = command === command.toLowerCase();
+    if (/[a-zA-Z]/.test(next)) command2 = s.take();
+    else if (!command2 || command2 === "z" || command2 === "Z") return result(true);
+    const rel = command2 === command2.toLowerCase();
     const base = rel ? pen : [0, 0];
     const num2 = () => s.number();
     const pt = () => {
@@ -56579,7 +56862,7 @@ function parsePathData(d) {
       const y = x === null ? null : num2();
       return x === null || y === null ? null : [x + base[0], y + base[1]];
     };
-    const upper = command.toUpperCase();
+    const upper = command2.toUpperCase();
     if (!current && upper !== "M") return result(true);
     let cubicCtrl = null;
     let quadCtrl = null;
@@ -56591,7 +56874,7 @@ function parsePathData(d) {
         subpaths.push(current);
         pen = p;
         start = p;
-        command = rel ? "l" : "L";
+        command2 = rel ? "l" : "L";
         break;
       }
       case "L": {
@@ -57865,22 +58148,22 @@ var Analyzer = class {
       case "path": {
         const d = attr(el, "d");
         if (d === void 0 || !d.trim()) return null;
-        const parsed = parsePathData(d);
-        const segs = parsed.subpaths.reduce((s, p) => s + p.segments.length, 0);
+        const parsed2 = parsePathData(d);
+        const segs = parsed2.subpaths.reduce((s, p) => s + p.segments.length, 0);
         this.pathSegments += segs;
         if (this.pathSegments > SVG_LIMITS.maxPathSegments)
           throw new SvgError(
             "svg_complexity_limit",
             `More than ${SVG_LIMITS.maxPathSegments} path segments`
           );
-        if (parsed.error)
+        if (parsed2.error)
           this.issue(
             "path_data_error",
             "drop-content",
             ctx.location,
             "Path data has an error; the part after it is dropped"
           );
-        return { subpaths: parsed.subpaths, fillable: true };
+        return { subpaths: parsed2.subpaths, fillable: true };
       }
       case "rect": {
         const x = len("x", pw) ?? 0;
@@ -59922,9 +60205,9 @@ async function transcribeTake(take, ctx) {
       text: ""
     };
   }
-  const parsed = helperTranscriptSchema.safeParse(raw);
-  if (!parsed.success) return failed("invalid_response", "Unexpected helper response.");
-  const { transcript, complete, stopReason, engine, durationSeconds } = parsed.data;
+  const parsed2 = helperTranscriptSchema.safeParse(raw);
+  if (!parsed2.success) return failed("invalid_response", "Unexpected helper response.");
+  const { transcript, complete, stopReason, engine, durationSeconds } = parsed2.data;
   const text2 = transcript.trim();
   return {
     take: {
@@ -60298,18 +60581,18 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
       `The helper was terminated by ${result.signal} before it answered.`
     );
   const stdout = String(result.stdout ?? "").trim();
-  let parsed;
+  let parsed2;
   try {
-    parsed = JSON.parse(stdout);
+    parsed2 = JSON.parse(stdout);
   } catch {
     throw new PrivateHelperError(
       "invalid_response",
       `The helper exited with status ${result.status} and no JSON response.`
     );
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+  if (!parsed2 || typeof parsed2 !== "object" || Array.isArray(parsed2))
     throw new PrivateHelperError("invalid_response", "The helper response is not a JSON object");
-  const object3 = parsed;
+  const object3 = parsed2;
   if (result.status !== 0 || object3.status === "error") {
     const error2 = errorSchema2.safeParse(object3);
     if (!error2.success)
@@ -60324,13 +60607,13 @@ function callPrivateHelper(action, fields = {}, deps = defaultDeps2(), options =
   return object3;
 }
 function parseOrThrow(schema, value) {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success)
+  const parsed2 = schema.safeParse(value);
+  if (!parsed2.success)
     throw new PrivateHelperError(
       "invalid_response",
-      `Unexpected helper response: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
+      `Unexpected helper response: ${parsed2.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`
     );
-  return parsed.data;
+  return parsed2.data;
 }
 var UUID2 = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 function assertNoteIdentifier(identifier) {
@@ -61196,24 +61479,24 @@ function buildPermissionsWindow(checkOnly, deps = defaultPermissionsWindowDeps()
       timeout: 1e4,
       killSignal: "SIGKILL"
     });
-    let parsed = null;
+    let parsed2 = null;
     try {
-      parsed = helloSchema2.parse(JSON.parse(String(hello.stdout ?? "").trim()));
+      parsed2 = helloSchema2.parse(JSON.parse(String(hello.stdout ?? "").trim()));
     } catch {
-      parsed = null;
+      parsed2 = null;
     }
-    if (!parsed || parsed.protocolVersion !== PERMISSIONS_WINDOW_PROTOCOL || parsed.sourceSha256 !== sourceSha) {
+    if (!parsed2 || parsed2.protocolVersion !== PERMISSIONS_WINDOW_PROTOCOL || parsed2.sourceSha256 !== sourceSha) {
       steps.push({
         step: "handshake",
         ok: false,
-        detail: parsed ? `window reported protocol ${parsed.protocolVersion}, source ${parsed.sourceSha256}` : `no valid hello (exit ${hello.status})`
+        detail: parsed2 ? `window reported protocol ${parsed2.protocolVersion}, source ${parsed2.sourceSha256}` : `no valid hello (exit ${hello.status})`
       });
       return finish();
     }
     steps.push({ step: "handshake", ok: true });
     const manifest = {
       schemaVersion: 1,
-      protocolVersion: parsed.protocolVersion,
+      protocolVersion: parsed2.protocolVersion,
       sourceSha256: sourceSha,
       binarySha256: sha256Hex(deps.readFile(stagedBinary)),
       builtAt: deps.now().toISOString(),
@@ -62084,15 +62367,15 @@ async function readEditorJson(req) {
       throw new EditorHttpError(413, "too-large", "Request body too large.");
     chunks.push(chunk);
   }
-  let parsed;
+  let parsed2;
   try {
-    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    parsed2 = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
     throw new EditorHttpError(400, "bad-request", "Request body is not valid JSON.");
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+  if (!parsed2 || typeof parsed2 !== "object" || Array.isArray(parsed2))
     throw new EditorHttpError(400, "bad-request", "Request body must be a JSON object.");
-  return parsed;
+  return parsed2;
 }
 var editorStringField = (body, key) => {
   const value = body[key];
@@ -62319,8 +62602,8 @@ Every request needs the per-run token in the printed URL. Press Ctrl-C to stop.
 `;
 function parseTemplatesArgs(argv) {
   if (argv.length === 0 || argv.includes("--help") || argv.includes("-h")) return "help";
-  const [command, ...rest] = argv;
-  if (command !== "edit") throw new Error(`Unknown templates command "${command}".`);
+  const [command2, ...rest] = argv;
+  if (command2 !== "edit") throw new Error(`Unknown templates command "${command2}".`);
   const args = {
     idleMinutes: DEFAULT_EDITOR_IDLE_MS / 6e4,
     tailnet: false
@@ -62947,17 +63230,17 @@ var AnchorRegistry = class _AnchorRegistry {
       closeSync9(fd);
     }
     if (text2.trim() === "") return [];
-    let parsed;
+    let parsed2;
     try {
-      parsed = JSON.parse(text2);
+      parsed2 = JSON.parse(text2);
     } catch {
       throw new AnchorRegistryError(
         "corrupt-registry",
         `${this.path} is not valid JSON; it was left unchanged. Move it aside to start a new registry.`
       );
     }
-    const anchors = parsed?.anchors;
-    if (parsed?.version !== 1 || !Array.isArray(anchors) || !anchors.every(isAnchor))
+    const anchors = parsed2?.anchors;
+    if (parsed2?.version !== 1 || !Array.isArray(anchors) || !anchors.every(isAnchor))
       throw new AnchorRegistryError(
         "corrupt-registry",
         `${this.path} is not a version 1 anchor registry; it was left unchanged.`
@@ -63183,25 +63466,23 @@ function registryLookup(registry2 = new AnchorRegistry(), dbPath2) {
 
 // src/index.ts
 loadFileConfig();
-var require2 = createRequire(import.meta.url);
-var { version: version2 } = require2("../package.json");
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
-  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+if (command.kind === "setup" && command.target === "public-helper") {
+  const report = buildPublicHelper(command.checkOnly);
   process.stdout.write(formatPublicHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
-  const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
+if (command.kind === "setup" && command.target === "native-helper") {
+  const report = buildPrivateHelper(command.checkOnly);
   process.stdout.write(formatHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions-window")) {
-  const report = buildPermissionsWindow(process.argv.slice(3).includes("--check"));
+if (command.kind === "setup" && command.target === "permissions-window") {
+  const report = buildPermissionsWindow(command.checkOnly);
   process.stdout.write(formatPermissionsWindowBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions")) {
-  const args = process.argv.slice(3);
+if (command.kind === "setup" && command.target === "permissions") {
+  const args = command.args;
   const options = parsePermissionsArgs(args);
   const cli = defaultPermissionsCliDeps(options);
   let code;
@@ -63221,22 +63502,22 @@ if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions
   cli.close();
   process.exit(code);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--broker")) {
-  const report = await setupBroker(parseBrokerArgs(process.argv.slice(3)));
+if (command.kind === "setup" && command.target === "broker") {
+  const report = await setupBroker(parseBrokerArgs(command.args));
   process.stdout.write(formatBrokerSetup(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup") {
-  const report = setupShortcuts(process.argv.slice(3).includes("--check"));
+if (command.kind === "setup") {
+  const report = setupShortcuts(command.checkOnly);
   process.stdout.write(formatShortcutSetup(report) + "\n");
   process.exit(report.ready || !report.checkOnly ? 0 : 1);
 }
-if (process.argv[2] === "templates") {
-  process.exit(await runTemplatesCommand(process.argv.slice(3)));
+if (command.kind === "templates") {
+  process.exit(await runTemplatesCommand(command.args));
 }
-if (process.argv[2] === "anchors") {
+if (command.kind === "anchors") {
   process.exit(
-    await runAnchorsCli(process.argv.slice(3), { resolve: registryLookup(new AnchorRegistry()) })
+    await runAnchorsCli(command.args, { resolve: registryLookup(new AnchorRegistry()) })
   );
 }
 if (await startBrokerProxy()) {
@@ -63245,7 +63526,7 @@ if (await startBrokerProxy()) {
 }
 var server = new McpServer({
   name: "apple-notes",
-  version: version2,
+  version,
   description: "MCP server for managing Apple Notes - create, search, update, and organize notes"
 });
 installSdkErrorCodes(server);
@@ -63886,9 +64167,10 @@ registerTool(
   },
   withErrorHandling(({ id: id2, title, account }) => {
     if (id2) {
-      const note2 = notesManager.getNoteById(id2);
+      const { note: note2, error: metadataError } = notesManager.readNoteById(id2);
       if (!note2) {
-        return notFoundResponse(`Note with ID "${id2}" not found`);
+        const message = `Failed to read metadata of note with ID "${id2}": ${metadataError}`;
+        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE ? notFoundResponse(message) : errorResponse(message);
       }
       if (note2.passwordProtected) {
         return errorResponse(
@@ -65665,6 +65947,7 @@ registerTool(
       checks: external_exports.array(external_exports.object({}).passthrough()).optional(),
       runtimeOS: external_exports.object({}).passthrough().optional(),
       features: external_exports.record(external_exports.string(), external_exports.object({}).passthrough()).optional(),
+      publicHelper: external_exports.object({}).passthrough().optional(),
       broker: external_exports.object({}).passthrough().optional()
     }
   },

@@ -20,7 +20,9 @@
  * @see https://modelcontextprotocol.io
  */
 
-import { createRequire } from "module";
+// Keep this first: ESM evaluates it before the runtime dependency graph.
+// Help, version, and invalid arguments exit without initializing that graph.
+import { command, version } from "./cliEntry.js";
 import {
   McpServer,
   type RegisteredTool,
@@ -35,6 +37,7 @@ import {
   exportMaxResponseBytes,
 } from "@/services/appleNotesManager.js";
 import { getSyncStatus, withSyncAwarenessSync } from "@/utils/syncDetection.js";
+import { NOTE_ID_NOT_FOUND_MESSAGE } from "@/utils/applescript.js";
 import { getChecklistItems, hasFullDiskAccess } from "@/utils/checklistParser.js";
 import { getNoteMetadata } from "@/utils/noteMetadata.js";
 import {
@@ -224,31 +227,27 @@ import { ANCHOR_ID_PATTERN, DEFAULT_MIN_CONFIDENCE } from "@/utils/paragraphAnch
 // Lets users configure the server when the host app strips the MCP env block.
 loadFileConfig();
 
-// Read version from package.json to keep it in sync
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json") as { version: string };
-
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--public-helper")) {
+if (command.kind === "setup" && command.target === "public-helper") {
   // Compile the public native helper (PencilKit) from the packaged source.
-  const report = buildPublicHelper(process.argv.slice(3).includes("--check"));
+  const report = buildPublicHelper(command.checkOnly);
   process.stdout.write(formatPublicHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--native-helper")) {
+if (command.kind === "setup" && command.target === "native-helper") {
   // Opt-in private helper: compiled locally from the packaged source (#181).
-  const report = buildPrivateHelper(process.argv.slice(3).includes("--check"));
+  const report = buildPrivateHelper(command.checkOnly);
   process.stdout.write(formatHelperBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions-window")) {
+if (command.kind === "setup" && command.target === "permissions-window") {
   // Optional checklist window, compiled locally like the public helper.
-  const report = buildPermissionsWindow(process.argv.slice(3).includes("--check"));
+  const report = buildPermissionsWindow(command.checkOnly);
   process.stdout.write(formatPermissionsWindowBuild(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions")) {
+if (command.kind === "setup" && command.target === "permissions") {
   // Guided permissions check; opens System Settings panes only with --open.
-  const args = process.argv.slice(3);
+  const args = command.args;
   const options = parsePermissionsArgs(args);
   const cli = defaultPermissionsCliDeps(options);
   let code: number;
@@ -266,25 +265,25 @@ if (process.argv[2] === "setup" && process.argv.slice(3).includes("--permissions
   cli.close();
   process.exit(code);
 }
-if (process.argv[2] === "setup" && process.argv.slice(3).includes("--broker")) {
+if (command.kind === "setup" && command.target === "broker") {
   // Opt-in permission broker (#220): a signed LaunchAgent app that owns the grants.
-  const report = await setupBroker(parseBrokerArgs(process.argv.slice(3)));
+  const report = await setupBroker(parseBrokerArgs(command.args));
   process.stdout.write(formatBrokerSetup(report) + "\n");
   process.exit(report.ok ? 0 : 1);
 }
-if (process.argv[2] === "setup") {
-  const report = setupShortcuts(process.argv.slice(3).includes("--check"));
+if (command.kind === "setup") {
+  const report = setupShortcuts(command.checkOnly);
   process.stdout.write(formatShortcutSetup(report) + "\n");
   process.exit(report.ready || !report.checkOnly ? 0 : 1);
 }
-if (process.argv[2] === "templates") {
+if (command.kind === "templates") {
   // Local template editor (templates edit): a token-gated web page on loopback.
-  process.exit(await runTemplatesCommand(process.argv.slice(3)));
+  process.exit(await runTemplatesCommand(command.args));
 }
-if (process.argv[2] === "anchors") {
+if (command.kind === "anchors") {
   // Opt-in paragraph anchor resolver (loopback by default, token-gated).
   process.exit(
-    await runAnchorsCli(process.argv.slice(3), { resolve: registryLookup(new AnchorRegistry()) })
+    await runAnchorsCli(command.args, { resolve: registryLookup(new AnchorRegistry()) })
   );
 }
 // With an installed, answering permission broker (#220), this process only
@@ -1381,9 +1380,14 @@ registerTool(
     // Prefer ID-based lookup if provided
     if (id) {
       // Check for password protection first for better error message
-      const note = notesManager.getNoteById(id);
+      const { note, error: metadataError } = notesManager.readNoteById(id);
       if (!note) {
-        return notFoundResponse(`Note with ID "${id}" not found`);
+        const message = `Failed to read metadata of note with ID "${id}": ${metadataError}`;
+        // The executor's exact missing-ID diagnostic contains "may have been",
+        // which otherwise matches the shared uncertain-write classification.
+        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE
+          ? notFoundResponse(message)
+          : errorResponse(message);
       }
       if (note.passwordProtected) {
         return errorResponse(
@@ -3770,6 +3774,7 @@ registerTool(
       checks: z.array(z.object({}).passthrough()).optional(),
       runtimeOS: z.object({}).passthrough().optional(),
       features: z.record(z.string(), z.object({}).passthrough()).optional(),
+      publicHelper: z.object({}).passthrough().optional(),
       broker: z.object({}).passthrough().optional(),
     },
   },

@@ -12,6 +12,7 @@ const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<u
 const manager = vi.hoisted(() => ({
   createNote: vi.fn(),
   getNoteById: vi.fn(),
+  readNoteById: vi.fn(),
   getNoteContentById: vi.fn(),
   readNoteBodyById: vi.fn(),
   listAttachmentsById: vi.fn(),
@@ -98,6 +99,7 @@ afterAll(() => registered.clear());
 beforeEach(() => {
   vi.clearAllMocks();
   manager.getNoteById.mockReturnValue({ id: ID, title: "Groceries", shared: false });
+  manager.readNoteById.mockReturnValue({ note: { id: ID, title: "Groceries", shared: false } });
   manager.readNoteBodyById.mockReturnValue({ body: OLD_BODY });
   manager.getNoteContentById.mockReturnValue(OLD_BODY);
   manager.listAttachmentsById.mockReturnValue([]);

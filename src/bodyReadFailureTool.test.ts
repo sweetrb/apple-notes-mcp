@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const registered = vi.hoisted(() => new Map<string, (args: unknown) => Promise<unknown>>());
 const manager = vi.hoisted(() => ({
   getNoteById: vi.fn(),
+  readNoteById: vi.fn(),
   readNoteBodyById: vi.fn(),
   deleteNoteByIdIfUnchanged: vi.fn(),
 }));
@@ -62,6 +63,7 @@ afterAll(() => registered.clear());
 beforeEach(() => {
   vi.resetAllMocks();
   manager.getNoteById.mockReturnValue({ id: ID, title: "Big scan" });
+  manager.readNoteById.mockReturnValue({ note: { id: ID, title: "Big scan" } });
   manager.readNoteBodyById.mockReturnValue({ body: "", error: TIMEOUT });
   readNoteStructure.mockReturnValue({
     attachments: [{ filename: "scan.tiff", fileSize: 36 * 1024 * 1024 }],

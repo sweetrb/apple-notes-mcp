@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [2.15.2] - 2026-10-12
+
+### Fixed
+
+- Preserve initial exact-ID note metadata read errors in `get-note-content`.
+  Automation refusals, timeouts and malformed metadata are reported with their
+  diagnostics instead of being collapsed into a missing-note result. The
+  legacy nullable metadata getter and title-based lookup retain their behavior.
+- Validate command-line arguments before loading configuration or initializing
+  the MCP runtime. Unknown commands and setup flags fail with usage instead of
+  importing Shortcuts; help and version commands exit without setup side effects.
+  Preserve the shipped broker setup target and require its uninstall/signing
+  options to select that target with a nonempty signing identity.
+- Capability and doctor reports now distinguish stored transcripts from new
+  transcription and classic drawing decode, verify public-helper integrity and
+  status with bounded non-prompting calls, and retain unknown Shortcut consent
+  and language/model readiness as unverified requirements. Full Disk Access
+  guidance includes native verification and guarded mutations.
+
 ## [2.15.1] - 2026-10-12
 
 ### Fixed

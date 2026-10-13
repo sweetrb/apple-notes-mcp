@@ -13,9 +13,10 @@
  * version, one `SELECT 1` against the Notes database for Full Disk Access, and
  * one `shortcuts list` for every bridge. It never opens Notes.app, never sends
  * Notes an Apple event, never runs a Shortcut, and never mutates anything. The
- * one requirement it cannot check under that rule, the Automation permission
- * for Notes.app, is reported in `unverified` instead of being guessed at;
- * `doctor` and `health-check` confirm it by contacting Notes.
+ * public helper gets only bounded `hello` / `speech_status` calls. Automation
+ * permission, Shortcut first-run consent, and per-language speech assets stay
+ * `unverified` instead of being guessed at or triggering a prompt/download.
+ * `doctor` and `health-check` confirm Automation by contacting Notes.
  *
  * @module services/capabilityMatrix
  */
@@ -24,6 +25,11 @@ import { release } from "node:os";
 import { hasFullDiskAccess } from "../utils/checklistParser.js";
 import { listInstalledShortcuts, nativeTagsShortcutName, resolveShortcut } from "./nativeTags.js";
 import { backgroundShortcutName, markdownShortcutName } from "./backgroundNotes.js";
+import {
+  probePublicHelperStatus,
+  unprobedPublicHelperStatus,
+  type PublicHelperStatus,
+} from "./publicHelperStatus.js";
 
 /**
  * A requirement a feature can declare. `shortcut` requirements are resolved by
@@ -34,6 +40,12 @@ export type Requirement =
   | { kind: "full_disk_access" }
   | { kind: "shortcuts_cli" }
   | { kind: "shortcut"; name: () => string }
+  /** Installation does not reveal whether the user answered first-run consent. */
+  | { kind: "shortcut_consent" }
+  | { kind: "public_native_helper" }
+  | { kind: "speech_recognition" }
+  /** Locale/model readiness is only known for an actual transcription request. */
+  | { kind: "speech_locale_and_assets" }
   /**
    * A native helper that can WRITE to Notes. None ships: the opt-in private
    * helper (native-helper-status) is read-only, and write support was
@@ -53,6 +65,10 @@ export type Requirement =
  * - `full_disk_access_missing`: the Notes database is not readable by this process.
  * - `shortcuts_unavailable`: the `shortcuts` command could not be run.
  * - `shortcut_not_installed`: a bridge Shortcut is missing or installed more than once.
+ * - `public_helper_unavailable`: installed helper integrity or handshake failed.
+ * - `public_helper_unverified`: helper readiness was not inspected.
+ * - `speech_permission_required`: the speech route needs access or has an explicit refusal.
+ * - `speech_status_unverified`: the non-prompting speech status probe did not succeed.
  */
 export type CapabilityReason =
   | "unsupported_platform"
@@ -61,7 +77,11 @@ export type CapabilityReason =
   | `requires_macos_${number}`
   | "full_disk_access_missing"
   | "shortcuts_unavailable"
-  | "shortcut_not_installed";
+  | "shortcut_not_installed"
+  | "public_helper_unavailable"
+  | "public_helper_unverified"
+  | "speech_permission_required"
+  | "speech_status_unverified";
 
 /** One feature group. Register a new feature by adding one of these to FEATURES. */
 export interface FeatureDefinition {
@@ -87,7 +107,7 @@ export interface FeatureStatus {
   requirements: string[];
   /** Requirements that were checked and are not met. */
   missing: string[];
-  /** Requirements this read-only probe cannot check without contacting Notes.app. */
+  /** Requirements not verified by this diagnostic (for example Automation or speech assets). */
   unverified: string[];
   reason: CapabilityReason | null;
 }
@@ -102,6 +122,8 @@ export interface CapabilityEnvironment {
   fullDiskAccess: boolean;
   /** `shortcuts list --show-identifiers` lines, or null when the command failed. */
   shortcutLines: string[] | null;
+  /** Absent only for injected/older probes; absence must never imply helper readiness. */
+  publicHelper?: PublicHelperStatus;
 }
 
 /** The runtime OS block reported beside the matrix. */
@@ -114,6 +136,7 @@ export interface RuntimeOS {
 export interface CapabilityMatrix {
   runtimeOS: RuntimeOS;
   features: Record<string, FeatureStatus>;
+  publicHelper?: PublicHelperStatus;
 }
 
 const MACOS_SHORTCUTS_CLI = "12.0";
@@ -201,6 +224,7 @@ export const FEATURES: FeatureDefinition[] = [
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
       { kind: "shortcut", name: backgroundShortcutName },
+      { kind: "shortcut_consent" },
     ],
   },
   {
@@ -213,6 +237,7 @@ export const FEATURES: FeatureDefinition[] = [
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
       { kind: "shortcut", name: nativeTagsShortcutName },
+      { kind: "shortcut_consent" },
     ],
   },
   {
@@ -226,6 +251,7 @@ export const FEATURES: FeatureDefinition[] = [
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
       { kind: "shortcut", name: markdownShortcutName },
+      { kind: "shortcut_consent" },
     ],
   },
   // Placeholders for features that need a native WRITE helper, which this
@@ -264,12 +290,32 @@ export const FEATURES: FeatureDefinition[] = [
     requirements: [{ kind: "full_disk_access" }],
   },
   {
-    name: "audioTranscription",
+    name: "storedAudioTranscripts",
     description:
-      "Read the transcripts Notes stored for a note's audio recordings, or transcribe them on this Mac (transcribe-note-audio also needs the public helper built with setup --public-helper)",
-    tools: ["get-audio-transcripts", "transcribe-note-audio"],
+      "Read transcripts Notes already stored for a note's audio recordings; no speech helper is needed",
+    tools: ["get-audio-transcripts"],
     minimumMacOSVersion: null,
     requirements: [{ kind: "full_disk_access" }],
+  },
+  {
+    name: "classicDrawingDecode",
+    description: "Decode classic PencilKit drawings with the verified public native helper",
+    tools: ["get-note-drawings"],
+    minimumMacOSVersion: null,
+    requirements: [{ kind: "full_disk_access" }, { kind: "public_native_helper" }],
+  },
+  {
+    name: "audioTranscription",
+    description:
+      "Transcribe audio on this Mac with the verified public helper; locale and speech-model readiness are checked per request",
+    tools: ["transcribe-note-audio"],
+    minimumMacOSVersion: null,
+    requirements: [
+      { kind: "full_disk_access" },
+      { kind: "public_native_helper" },
+      { kind: "speech_recognition" },
+      { kind: "speech_locale_and_assets" },
+    ],
   },
   {
     name: "markdownTemplateLibrary",
@@ -327,6 +373,10 @@ export function evaluateFeature(
         // Checking the Automation grant means sending Notes an Apple event.
         unverified.push(label);
         break;
+      case "shortcut_consent":
+        // `shortcuts list` reports installation, never first-run access consent.
+        unverified.push(label);
+        break;
       case "full_disk_access":
         if (!env.fullDiskAccess) {
           missing.push(label);
@@ -351,6 +401,33 @@ export function evaluateFeature(
         missing.push(label);
         failures.add("not_implemented");
         break;
+      case "public_native_helper":
+        if (!env.publicHelper || env.publicHelper.reason === "not_probed") {
+          unverified.push(label);
+          failures.add("public_helper_unverified");
+        } else if (!env.publicHelper.ready) {
+          missing.push(label);
+          failures.add("public_helper_unavailable");
+        }
+        break;
+      case "speech_recognition": {
+        const speech = env.publicHelper?.speech;
+        if (!speech?.verified || speech.authorization === null || speech.requiresGrant === null) {
+          unverified.push(label);
+          failures.add("speech_status_unverified");
+        } else if (
+          speech.authorization === "denied" ||
+          speech.authorization === "restricted" ||
+          (speech.requiresGrant && speech.authorization !== "authorized")
+        ) {
+          missing.push(label);
+          failures.add("speech_permission_required");
+        }
+        break;
+      }
+      case "speech_locale_and_assets":
+        unverified.push(label);
+        break;
     }
   }
 
@@ -362,6 +439,10 @@ export function evaluateFeature(
   else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
   else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
   else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  else if (failures.has("public_helper_unavailable")) reason = "public_helper_unavailable";
+  else if (failures.has("public_helper_unverified")) reason = "public_helper_unverified";
+  else if (failures.has("speech_permission_required")) reason = "speech_permission_required";
+  else if (failures.has("speech_status_unverified")) reason = "speech_status_unverified";
 
   return {
     description: feature.description,
@@ -388,6 +469,7 @@ export function evaluateFeatures(
       darwinRelease: env.darwinRelease,
     },
     features: Object.fromEntries(features.map((f) => [f.name, evaluateFeature(f, env)])),
+    publicHelper: env.publicHelper ?? unprobedPublicHelperStatus(),
   };
 }
 
@@ -427,6 +509,7 @@ export function probeCapabilityEnvironment(): CapabilityEnvironment {
     darwinRelease: release(),
     fullDiskAccess: isMac && hasFullDiskAccess(),
     shortcutLines,
+    publicHelper: isMac ? probePublicHelperStatus() : unprobedPublicHelperStatus(),
   };
 }
 
@@ -447,7 +530,7 @@ export function formatCapabilityMatrix(matrix: CapabilityMatrix): string {
     lines.push(
       status.available
         ? `  ✓ ${name}: available${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}`
-        : `  ✗ ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}`
+        : `  ✗ ${name}: ${status.reason}${status.missing.length ? ` (missing: ${status.missing.join(", ")})` : ""}${status.unverified.length ? ` (unverified: ${status.unverified.join(", ")})` : ""}`
     );
   }
   return lines.join("\n");

@@ -1731,9 +1731,21 @@ export class AppleNotesManager {
    * This method fetches the note and its metadata using this ID.
    *
    * @param id - CoreData URL identifier for the note
-   * @returns Note object with metadata, or null if not found
+   * @returns Note object with metadata, or null if the lookup fails
    */
   getNoteById(id: string): Note | null {
+    return this.readNoteById(id).note;
+  }
+
+  /**
+   * Reads exact-ID metadata while retaining the executor or parser failure.
+   * Unlike the legacy nullable getter, callers can distinguish a missing note
+   * from denied Automation, a timeout, or an unreadable metadata response.
+   *
+   * @param id - CoreData URL identifier for the note
+   * @returns The note, or the diagnostic that prevented its metadata read
+   */
+  readNoteById(id: string): { note: Note; error?: never } | { note: null; error: string } {
     const safeId = sanitizeId(id);
     // Note IDs work at the application level, not scoped to account
     const getCommand = `
@@ -1749,24 +1761,29 @@ export class AppleNotesManager {
 
     if (!result.success) {
       console.error(`Failed to get note with ID "${id}":`, result.error);
-      return null;
+      return {
+        note: null,
+        error: result.error?.trim() ? result.error : "AppleScript note metadata read failed",
+      };
     }
 
     // Parse the AppleScript output using the shared helper
     const parsed = parseNotePropertiesOutput(result.output);
     if (!parsed) {
-      return null;
+      return { note: null, error: "Unexpected note metadata response" };
     }
 
     return {
-      id: parsed.id,
-      title: parsed.title,
-      content: "", // Not fetched to keep response small
-      tags: [],
-      created: parsed.created,
-      modified: parsed.modified,
-      shared: parsed.shared,
-      passwordProtected: parsed.passwordProtected,
+      note: {
+        id: parsed.id,
+        title: parsed.title,
+        content: "", // Not fetched to keep response small
+        tags: [],
+        created: parsed.created,
+        modified: parsed.modified,
+        shared: parsed.shared,
+        passwordProtected: parsed.passwordProtected,
+      },
     };
   }
 
