@@ -3,6 +3,10 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RichNote } from "../utils/noteRichText.js";
+import {
+  requirePreservationMetadata,
+  assertZeroLengthFormatting,
+} from "../utils/richContentPreservation.js";
 import { shortcutConsentHint } from "./shortcutConsent.js";
 import { CodedError } from "../utils/errorCodes.js";
 
@@ -48,116 +52,6 @@ export interface NativeTagDependencies {
 
 const TAG_OBJECT_TYPE = "com.apple.notes.inlinetextattachment.hashtag";
 type PreservedSpan = { before: number; after: number; length: number };
-
-/** Refuse a write when the decoder cannot account for every native range and style. */
-function requirePreservationMetadata(rich: RichNote) {
-  const unavailable = () => {
-    throw new Error("Native object, checklist or formatting preservation metadata is unavailable");
-  };
-  const { objects, objectData, checklistItems, styleRuns, nativeTagObjectIds } = rich;
-  if (
-    !objects ||
-    !objectData ||
-    !checklistItems ||
-    !styleRuns ||
-    !nativeTagObjectIds ||
-    rich.nativeObjectDataComplete !== true
-  )
-    return unavailable();
-  const ids = new Set(rich.nativeObjectIds);
-  if (
-    ids.size !== rich.nativeObjectIds.length ||
-    objects.length !== ids.size ||
-    objectData.length !== ids.size ||
-    new Set(objects.map((o) => o.id)).size !== ids.size ||
-    new Set(objectData.map((o) => o.id)).size !== ids.size ||
-    rich.hasNativeObjects !== Boolean(ids.size) ||
-    rich.hasChecklist !== Boolean(checklistItems.length)
-  )
-    return unavailable();
-  let objectEnd = 0;
-  for (const object of objects) {
-    const data = objectData.find((row) => row.id === object.id);
-    if (
-      !ids.has(object.id) ||
-      !Number.isInteger(object.start) ||
-      !Number.isInteger(object.length) ||
-      object.start < objectEnd ||
-      object.length < 1 ||
-      object.start + object.length > rich.text.length ||
-      !data ||
-      data.type !== object.type ||
-      !Number.isInteger(data.pk) ||
-      !/^[0-9a-f]*$/iu.test(data.mergeable) ||
-      (data.view !== null && !Number.isInteger(data.view)) ||
-      !Object.hasOwn(data, "altText") ||
-      (data.altText !== null && typeof data.altText !== "string")
-    )
-      return unavailable();
-    objectEnd = object.start + object.length;
-  }
-  const mappedIds = new Set<string>();
-  if (
-    new Set(rich.nativeTags).size !== rich.nativeTags.length ||
-    Object.keys(nativeTagObjectIds).length !== rich.nativeTags.length
-  )
-    return unavailable();
-  for (const [tag, tagIds] of Object.entries(nativeTagObjectIds)) {
-    if (!rich.nativeTags.includes(tag) || !tagIds.length) return unavailable();
-    for (const id of tagIds) {
-      if (
-        mappedIds.has(id) ||
-        !objects.some((o) => o.id === id && o.type === TAG_OBJECT_TYPE) ||
-        objectData.find((o) => o.id === id)?.altText?.replace(/^#/, "") !== tag
-      )
-        return unavailable();
-      mappedIds.add(id);
-    }
-  }
-  if (objects.some((o) => o.type === TAG_OBJECT_TYPE && !mappedIds.has(o.id))) return unavailable();
-  if (new Set(checklistItems.map((item) => item.id)).size !== checklistItems.length)
-    return unavailable();
-  for (const item of checklistItems) {
-    const end = item.start + item.text.length;
-    if (
-      !item.id ||
-      !Number.isInteger(item.start) ||
-      item.start < 0 ||
-      end > rich.text.length ||
-      rich.text.slice(item.start, end) !== item.text ||
-      (end < rich.text.length && rich.text[end] !== "\n")
-    )
-      return unavailable();
-  }
-  let position = 0;
-  for (const run of styleRuns) {
-    if (
-      run.start !== position ||
-      !Number.isInteger(run.length) ||
-      run.length < 0 ||
-      typeof run.signature !== "string" ||
-      run.nativeSemantics?.complete !== true ||
-      (run.length === 0 &&
-        (run.nativeSemantics.unknown ||
-          run.nativeSemantics.structuredParagraph ||
-          run.nativeSemantics.links ||
-          run.nativeSemantics.objects.length > 0))
-    )
-      return unavailable();
-    position += run.length;
-  }
-  if (position !== rich.text.length) return unavailable();
-  for (const link of rich.links)
-    if (
-      !Number.isInteger(link.start) ||
-      !Number.isInteger(link.length) ||
-      link.start < 0 ||
-      link.length < 1 ||
-      link.start + link.length > rich.text.length ||
-      rich.text.slice(link.start, link.start + link.length) !== link.text
-    )
-      return unavailable();
-}
 
 /** Converted literals may carry visual styles, but no other native semantics. */
 function plainNativeRange(rich: RichNote, start: number, length: number) {
@@ -265,6 +159,11 @@ function preservesAddedSemantics(before: RichNote, after: RichNote, spans: Prese
 
 /** Check exact native data, checklist/link ranges and formatting through retained text spans. */
 function preservesNativeContent(before: RichNote, after: RichNote, spans: PreservedSpan[]) {
+  try {
+    assertZeroLengthFormatting(before, after, spans);
+  } catch {
+    return false;
+  }
   const rangeStart = (start: number, length: number) => {
     const span = spans.find((s) => start >= s.before && start + length <= s.before + s.length);
     return span && span.after + start - span.before;
@@ -349,6 +248,26 @@ function preservesNativeContent(before: RichNote, after: RichNote, spans: Preser
   return true;
 }
 
+/** Reuse the tag-addition contract for existing background tag replacement calls. */
+export function nativeTagAdditionPreserved(before: RichNote, after: RichNote, tags: string[]) {
+  requirePreservationMetadata(before);
+  requirePreservationMetadata(after);
+  const missing = tags.filter((tag) => !before.nativeTags.includes(tag));
+  const allTags = [...new Set([...before.nativeTags, ...tags])];
+  const spans = preservedTextSpans(before, after, missing);
+  return (
+    after.nativeTags.length === allTags.length &&
+    allTags.every((tag) => after.nativeTags.includes(tag)) &&
+    before.nativeObjectIds.every((id) => after.nativeObjectIds.includes(id)) &&
+    before.hasChecklist === after.hasChecklist &&
+    Boolean(
+      spans &&
+      preservesAddedSemantics(before, after, spans) &&
+      preservesNativeContent(before, after, spans)
+    )
+  );
+}
+
 /** The installed Shortcut repeats the scoped search and refuses non-unique results. */
 export function addNativeTags(request: NativeTagRequest, deps: NativeTagDependencies) {
   if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(request.id))
@@ -404,18 +323,7 @@ export function addNativeTags(request: NativeTagRequest, deps: NativeTagDependen
     // Override classifications such as revision_conflict or permission_denied.
     throw verificationFailure(error instanceof Error ? error.message : String(error));
   }
-  const allTags = [...new Set([...before.rich.nativeTags, ...tags])];
-  const spans = preservedTextSpans(before.rich, after.rich, missing);
-  if (
-    after.title !== before.title ||
-    after.rich.nativeTags.length !== allTags.length ||
-    allTags.some((tag) => !after.rich.nativeTags.includes(tag)) ||
-    before.rich.nativeObjectIds.some((id) => !after.rich.nativeObjectIds.includes(id)) ||
-    before.rich.hasChecklist !== after.rich.hasChecklist ||
-    !spans ||
-    !preservesAddedSemantics(before.rich, after.rich, spans) ||
-    !preservesNativeContent(before.rich, after.rich, spans)
-  ) {
+  if (after.title !== before.title || !nativeTagAdditionPreserved(before.rich, after.rich, tags)) {
     // Keep the transport diagnosis: it names the Shortcut and the first-run
     // consent fix, and used to be dropped right when it mattered (#172).
     throw verificationFailure();

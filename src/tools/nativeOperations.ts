@@ -351,7 +351,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   );
   tool(
     "create-checklist-item",
-    "Use when: appending one real unchecked Notes checklist item.\nReturns: the created checklist identity after exact-note readback.\nDo not use when: plain text is sufficient or more than one item is requested.\nSafety: preserves existing text, links, native objects, checklist identities, and formatting.",
+    "Use when: appending one real unchecked Notes checklist item.\nReturns: the created checklist identity after exact-note readback.\nDo not use when: plain text is sufficient or more than one item is requested.\nSafety: preserves existing text, links, native objects, checklist identities, and formatting. If a checklist already exists, requires one contiguous group at the end of the note; otherwise refuses before running the bridge.",
     {
       ...common,
       text: z
@@ -379,7 +379,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
   );
   tool(
     "create-checklist-items",
-    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
+    "Use when: appending several real unchecked Notes checklist items to one note, in order.\nReturns: each landed item's native identity and text, the final order check, and the new revision; on a stop, which items landed, the item whose outcome is uncertain, and the items not attempted.\nDo not use when: one item is enough (create-checklist-item) or plain text is sufficient.\nSafety: runs the verified single-item bridge once per item, chaining each verified revision into the next; requires any existing checklist to be one contiguous group at the end of the note before dispatch. Checks after every item that exactly one new unchecked item with that text and a new identity appeared and that earlier items kept theirs, and stops at the first uncertain result without retrying. Each item takes a few seconds, so a full batch can run about a minute; if the call times out on the client side, read the note before retrying and send only items that are not present.",
     {
       ...common,
       items: z

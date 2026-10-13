@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
-// Partial mock: only the two bridge probes are stubbed. NATIVE_APPEND_HTML_SUBSET
-// must stay the real constant, because the tool description is generated from it.
+import { plainRichNote, syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
+// Keep the mutation implementation real; substitute only probes and dependencies.
+// NATIVE_APPEND_HTML_SUBSET stays real because descriptions use that constant.
 vi.mock(import("../services/backgroundNotes.js"), async (importOriginal) => ({
   ...(await importOriginal()),
   backgroundStatus: vi.fn(() => ({ installed: false, shortcut: "Background Operations" })),
   nativeTagBridgeStatus: vi.fn(() => ({ installed: false })),
   markdownNoteStatus: vi.fn(() => ({ installed: false })),
+  backgroundDependencies: vi.fn(),
+}));
+vi.mock(import("../utils/noteRichText.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  readRichNote: vi.fn(),
 }));
 // The matrix probe spawns sw_vers, sqlite3, and shortcuts; keep these tests hermetic.
 vi.mock(import("../services/capabilityMatrix.js"), async (importOriginal) => ({
@@ -18,7 +24,12 @@ vi.mock(import("../services/capabilityMatrix.js"), async (importOriginal) => ({
   })),
 }));
 import { registerNativeOperations, requireValidated } from "./nativeOperations.js";
-import { backgroundStatus, markdownNoteStatus } from "../services/backgroundNotes.js";
+import { readRichNote } from "../utils/noteRichText.js";
+import {
+  backgroundDependencies,
+  backgroundStatus,
+  markdownNoteStatus,
+} from "../services/backgroundNotes.js";
 afterEach(() => vi.unstubAllEnvs());
 function fixture() {
   const registerTool = vi.fn();
@@ -30,6 +41,89 @@ function fixture() {
   };
 }
 describe("background capability boundaries", () => {
+  it("refuses an orphan placeholder through the registered table handler without dispatch", async () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const scopeText = "Unique project marker";
+    const rich = plainRichNote(`Title\n${scopeText}\n\ufffc`);
+    const snapshot = {
+      id,
+      title: "Title",
+      hash: `sha256:${"1".repeat(64)}`,
+      html: "",
+      rich,
+      checklist: [],
+    };
+    const deps = {
+      read: vi.fn(() => snapshot),
+      candidates: vi.fn(() => [id]),
+      run: vi.fn(),
+    };
+    vi.mocked(readRichNote).mockReturnValueOnce(rich);
+    vi.mocked(backgroundDependencies).mockReturnValueOnce(deps);
+    const result = await fixture()("create-table")[2]({
+      id,
+      scopeText,
+      expectedContentHash: snapshot.hash,
+      rows: [
+        ["one", "two"],
+        ["three", "four"],
+      ],
+    });
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { code: "validation_error", committed: false, indeterminate: false },
+    });
+    expect(deps.read).toHaveBeenCalledOnce();
+    expect(deps.candidates).not.toHaveBeenCalled();
+    expect(deps.run).not.toHaveBeenCalled();
+  });
+  it.each(["create-checklist-item", "create-checklist-items"])(
+    "returns an explicit no-write refusal from the registered %s handler",
+    async (name) => {
+      const id = "x-coredata://ABC/ICNote/p1";
+      const scopeText = "Unique project marker";
+      const prefix = `Title\n${scopeText}\n`;
+      const rich = syntheticRichNote(`${prefix}task\n\ufffc`, {
+        items: [{ id: "1".padStart(32, "0"), text: "task", start: prefix.length, done: false }],
+        objects: [
+          { id: "table", type: "com.apple.notes.table", start: prefix.length + 5, length: 1 },
+        ],
+      });
+      const snapshot = {
+        id,
+        title: "Title",
+        hash: `sha256:${"1".repeat(64)}`,
+        html: "",
+        rich,
+        checklist: [{ text: "task", done: false }],
+      };
+      const deps = {
+        read: vi.fn(() => snapshot),
+        candidates: vi.fn(() => [id]),
+        run: vi.fn(),
+      };
+      vi.mocked(backgroundDependencies).mockReturnValueOnce(deps);
+      if (name === "create-checklist-items") vi.mocked(readRichNote).mockReturnValueOnce(rich);
+      const result = await fixture()(name)[2]({
+        id,
+        scopeText,
+        expectedContentHash: snapshot.hash,
+        ...(name === "create-checklist-item" ? { text: "new" } : { items: ["new", "next"] }),
+      });
+      expect(result).toMatchObject({
+        isError: true,
+        structuredContent: { code: "validation_error", committed: false, indeterminate: false },
+      });
+      expect(deps.read).toHaveBeenCalledTimes(2);
+      expect(deps.run).not.toHaveBeenCalled();
+      if (name === "create-checklist-items")
+        expect(result.structuredContent).toMatchObject({
+          landed: [],
+          stoppedAt: { index: 0, outcome: "not-written" },
+          notAttempted: ["next"],
+        });
+    }
+  );
   it("requires both bridges for tag replacement, but only the background bridge for removal", async () => {
     vi.mocked(backgroundStatus).mockReturnValueOnce({
       installed: true,

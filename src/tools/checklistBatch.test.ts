@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 import type { BackgroundDependencies, BackgroundSnapshot } from "../services/backgroundNotes.js";
+import { syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
 import type { RichNote } from "../utils/noteRichText.js";
 import {
   appendChecklistItems,
@@ -26,20 +27,20 @@ function simulatedNote(
   let items = (options.initial ?? []).map((text, i) => ({ id: `old-${i}`, text, done: false }));
   let revision = 0;
   let runs = 0;
-  const rich = (): RichNote =>
-    ({
-      text: `Title\n${scopeText}\n${items.map((item) => item.text).join("\n")}`,
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: items.length > 0,
-      hasChecklist: items.length > 0,
-      revision: `r${revision}`,
-      objects: [],
-      checklistItems: items.map((item, i) => ({ ...item, start: 100 + i * 10 })),
-      styleRuns: [],
-      objectData: [],
-    }) as unknown as RichNote;
+  const rich = (): RichNote => {
+    const text = `Title\n${scopeText}\n${items.map((item) => item.text).join("\n")}`;
+    let start = `Title\n${scopeText}\n`.length;
+    const nativeItems = items.map((item) => {
+      const current = {
+        ...item,
+        id: Buffer.from(item.id).toString("hex").padEnd(32, "0").slice(0, 32),
+        start,
+      };
+      start += item.text.length + 1;
+      return current;
+    });
+    return { ...syntheticRichNote(text, { items: nativeItems }), revision: `r${revision}` };
+  };
   const snapshot = (): BackgroundSnapshot => ({
     id,
     title: "Title",
@@ -262,7 +263,7 @@ describe("appendChecklistItems outcome reporting (#201)", () => {
       if (++calls === 4)
         rich.checklistItems = rich.checklistItems!.map((item) => ({
           ...item,
-          start: item.id.startsWith("old") ? 1000 : item.start,
+          start: item.text === "kept" ? 1000 : item.start,
         }));
       return rich;
     };

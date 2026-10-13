@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { renderMarkdown } from "../utils/appendMarkdown.js";
 import type { RichNote } from "../utils/noteRichText.js";
 import type { CodedError } from "../utils/errorCodes.js";
+import { classifyError } from "../utils/errorCodes.js";
+import {
+  plainRichNote,
+  plainSemantics,
+  syntheticRichNote,
+} from "../utils/__fixtures__/retainedRichNote.js";
 import {
   assertPreserved,
   assertAppendedHtmlLinks,
@@ -13,6 +19,7 @@ import {
   mutateBackground,
   validateAppendContent,
   textBelowTitle,
+  assertChecklistEndAppendAvailable,
   NATIVE_APPEND_ELEMENTS,
   NATIVE_APPEND_HTML_SUBSET,
   type BackgroundSnapshot,
@@ -26,15 +33,7 @@ function snapshot(): BackgroundSnapshot {
     html: "<div>Unique project marker</div>",
     pinned: false,
     checklist: [],
-    rich: {
-      text: "Unique project marker",
-      links: [],
-      nativeTags: [],
-      nativeObjectIds: [],
-      hasNativeObjects: false,
-      hasChecklist: false,
-      revision: "r1",
-    },
+    rich: plainRichNote("Unique project marker"),
   };
 }
 const request = { id: noteId, expectedContentHash: "h1", scopeText: "Unique project marker" };
@@ -57,7 +56,163 @@ const pinVerify = (before: BackgroundSnapshot, after: BackgroundSnapshot) => {
   assertPreserved(before, after);
   if (!after.pinned) throw new Error("pin missing");
 };
+describe("checklist end-append preflight", () => {
+  const item = (text: string, start: number, index: number) => ({
+    id: String(index).padStart(32, "0"),
+    text,
+    start,
+    done: false,
+  });
+  const prefix = "Title\nUnique project marker\n";
+  const group = "alpha 🧭\nbeta";
+  const items = [item("alpha 🧭", prefix.length, 1), item("beta", prefix.length + 9, 2)];
+  const base = prefix + group;
+  const rich = (tail = "") => syntheticRichNote(base + tail, { items });
+  const state = (value: RichNote): BackgroundSnapshot => ({
+    ...snapshot(),
+    title: "Title",
+    rich: value,
+    checklist: value.checklistItems!.map(({ text, done }) => ({ text, done })),
+  });
+
+  it.each(["", "\n"])("accepts one terminal decoded group with suffix %j", (tail) => {
+    expect(() => assertChecklistEndAppendAvailable(rich(tail))).not.toThrow();
+  });
+  it("accepts notes without a checklist", () => {
+    expect(() => assertChecklistEndAppendAvailable(plainRichNote(prefix))).not.toThrow();
+  });
+  it.each(["\nordinary text", "\n\n", "\n "])(
+    "refuses text or blank paragraphs after an existing group %j",
+    (tail) => {
+      expect(() => assertChecklistEndAppendAvailable(rich(tail))).toThrow(/end of the note/);
+    }
+  );
+  it("refuses the decoded checklist/table/append/attachment shape before dispatch", () => {
+    const text = `${base}\n\ufffc\nappended text\n\ufffc`;
+    const value = syntheticRichNote(text, {
+      items,
+      objects: [
+        { id: "table", type: "com.apple.notes.table", start: base.length + 1, length: 1 },
+        { id: "image", type: "public.png", start: text.length - 1, length: 1 },
+      ],
+    });
+    const before = state(value);
+    const deps = {
+      read: vi.fn(() => before),
+      candidates: vi.fn(() => [noteId]),
+      run: vi.fn(),
+    };
+    const verify = vi.fn();
+    let error: unknown;
+    try {
+      mutateBackground(request, "create-checklist-item", { text: "new" }, verify, deps);
+    } catch (failure) {
+      error = failure;
+    }
+    expect(classifyError((error as Error).message, error)).toEqual({
+      code: "validation_error",
+      committed: false,
+      indeterminate: false,
+    });
+    expect(deps.read).toHaveBeenCalledTimes(2);
+    expect(deps.candidates).toHaveBeenCalledOnce();
+    expect(deps.run).not.toHaveBeenCalled();
+    expect(verify).not.toHaveBeenCalled();
+  });
+  it("refuses separate groups even when the last group is terminal", () => {
+    const text = `${base}\nseparating text\nlast`;
+    const value = syntheticRichNote(text, {
+      items: [...items, item("last", text.length - 4, 3)],
+    });
+    expect(() => assertChecklistEndAppendAvailable(value)).toThrow(/groups are separate/);
+  });
+  it("refuses a malformed midline checklist range", () => {
+    const value = rich();
+    value.checklistItems = [item("ta", base.length - 2, 1)];
+    expect(() => assertChecklistEndAppendAvailable(value)).toThrow(/end of the note/);
+  });
+  it("checks the fresh second snapshot before dispatch", () => {
+    const before = state(rich());
+    const current = state(rich("\ntext"));
+    const deps = {
+      read: vi.fn().mockReturnValueOnce(before).mockReturnValue(current),
+      candidates: vi.fn(() => [noteId]),
+      run: vi.fn(),
+    };
+    expect(() =>
+      mutateBackground(request, "create-checklist-item", { text: "new" }, vi.fn(), deps)
+    ).toThrow(/end of the note/);
+    expect(deps.read).toHaveBeenCalledTimes(2);
+    expect(deps.run).not.toHaveBeenCalled();
+  });
+  it.each(["", "\n"])("strictly verifies a terminal-list append with suffix %j", (tail) => {
+    const before = state(rich(tail));
+    const text = `${base}\nnew`;
+    const after = {
+      ...state(syntheticRichNote(text, { items: [...items, item("new", base.length + 1, 3)] })),
+      hash: "h2",
+    };
+    const deps = {
+      read: vi.fn().mockReturnValueOnce(before).mockReturnValueOnce(before).mockReturnValue(after),
+      candidates: vi.fn(() => [noteId]),
+      run: vi.fn(),
+    };
+    expect(
+      mutateBackground(
+        request,
+        "create-checklist-item",
+        { text: "new" },
+        (oldState, newState) => assertPreserved(oldState, newState, { append: true }),
+        deps
+      )
+    ).toMatchObject({ ok: true, contentHash: "h2" });
+    expect(deps.run).toHaveBeenCalledOnce();
+  });
+});
 describe("background note mutation boundaries", () => {
+  it("refuses missing preservation evidence before calling the bridge", () => {
+    const f = fixture();
+    delete f.before.rich.styleRuns;
+    expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
+      /metadata/
+    );
+    expect(f.deps.run).not.toHaveBeenCalled();
+  });
+  it("retains readback uncertainty when preservation evidence disappears after dispatch", () => {
+    const f = fixture();
+    delete f.after.rich.styleRuns;
+    let failure: unknown;
+    try {
+      mutateBackground(request, "set-pinned", {}, pinVerify, f.deps);
+    } catch (error) {
+      failure = error;
+    }
+    expect(f.deps.run).toHaveBeenCalledTimes(1);
+    expect(classifyError((failure as Error).message, failure)).toMatchObject({
+      code: "verification_failed",
+      indeterminate: true,
+    });
+  });
+  it("keeps an orphan placeholder discovered after dispatch indeterminate", () => {
+    const f = fixture();
+    f.after.rich = plainRichNote(f.before.rich.text + "\n\ufffc");
+    let failure: unknown;
+    try {
+      mutateBackground(
+        request,
+        "append-html",
+        {},
+        (before, after) => assertPreserved(before, after, { append: true }),
+        f.deps
+      );
+    } catch (error) {
+      failure = error;
+    }
+    const outcome = classifyError((failure as Error).message, failure);
+    expect(f.deps.run).toHaveBeenCalledOnce();
+    expect(outcome).toMatchObject({ code: "verification_failed", indeterminate: true });
+    expect(outcome).not.toHaveProperty("committed", false);
+  });
   it("verifies appended text from Notes HTML when native tags replace rich-text ranges", () => {
     expect(() =>
       assertAppendedVisibleText(
@@ -257,7 +412,7 @@ describe("background note mutation boundaries", () => {
   it("rejects a scope marker found only in the title line (#248)", () => {
     const f = fixture();
     f.before.title = "Garden planning ideas";
-    f.before.rich.text = "Garden planning ideas\nUnique project marker";
+    f.before.rich = plainRichNote("Garden planning ideas\nUnique project marker");
     expect(() =>
       mutateBackground(
         { ...request, scopeText: "Garden planning ideas" },
@@ -413,25 +568,44 @@ describe("heading readback", () => {
 });
 
 describe("preservation verification", () => {
-  it("allows Notes to normalize formatting of an object placeholder without changing visible text styles", () => {
+  it("rejects retained object-placeholder formatting normalization as unverified", () => {
     const before = snapshot(),
       after = snapshot();
-    before.rich.text = after.rich.text = "Text\n\ufffc";
+    const object = { id: "retained", type: "file", start: 4, length: 2 };
+    const objectSemantics = () => ({
+      ...plainSemantics(),
+      objects: [{ id: object.id, type: object.type }],
+    });
+    before.rich = syntheticRichNote("Text\n\ufffc", { objects: [object] });
+    after.rich = syntheticRichNote("Text\n\ufffc", { objects: [object] });
     before.rich.styleRuns = [
-      { start: 0, length: 4, signature: "bold" },
-      { start: 4, length: 2, signature: "old object paragraph" },
+      { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
+      {
+        start: 4,
+        length: 2,
+        signature: "old object paragraph",
+        nativeSemantics: objectSemantics(),
+      },
     ];
     after.rich.styleRuns = [
-      { start: 0, length: 4, signature: "bold" },
-      { start: 4, length: 2, signature: "normalized object paragraph" },
+      { start: 0, length: 4, signature: "bold", nativeSemantics: plainSemantics() },
+      {
+        start: 4,
+        length: 2,
+        signature: "normalized object paragraph",
+        nativeSemantics: objectSemantics(),
+      },
     ];
-    expect(() => assertPreserved(before, after, { append: true })).not.toThrow();
+    expect(() => assertPreserved(before, after, { append: true })).toThrow(/formatting/);
     after.rich.styleRuns[0].signature = "plain";
     expect(() => assertPreserved(before, after, { append: true })).toThrow(/formatting/);
   });
   it("rejects a checklist recreated with identical text but a different native ID", () => {
     const before = snapshot(),
       after = snapshot();
+    before.rich = plainRichNote("Item");
+    after.rich = plainRichNote("Item");
+    before.rich.hasChecklist = after.rich.hasChecklist = true;
     before.rich.checklistItems = [{ id: "original", text: "Item", done: false, start: 0 }];
     after.rich.checklistItems = [{ id: "replacement", text: "Item", done: false, start: 0 }];
     expect(() => assertPreserved(before, after, { append: true })).toThrow(/identity/);
@@ -439,14 +613,14 @@ describe("preservation verification", () => {
   it("rejects text edits hidden behind a successful pin or append", () => {
     const a = snapshot(),
       b = snapshot();
-    b.rich.text = "Changed project marker";
+    b.rich = plainRichNote("Changed project marker");
     expect(() => assertPreserved(a, b, { append: true })).toThrow(/text/);
   });
   it("rejects loss of existing native objects", () => {
     const a = snapshot(),
       b = snapshot();
     a.rich.nativeObjectIds = ["table-id"];
-    expect(() => assertPreserved(a, b, { append: true })).toThrow(/object/);
+    expect(() => assertPreserved(a, b, { append: true })).toThrow(/object|metadata/);
   });
   it("rejects a changed checklist state with identical visible text", () => {
     const a = snapshot(),
@@ -465,17 +639,23 @@ describe("preservation verification", () => {
   it("rejects rich formatting changes even when text and links are unchanged", () => {
     const a = snapshot(),
       b = snapshot();
-    a.rich.styleRuns = [{ start: 0, length: 21, signature: "bold" }];
-    b.rich.styleRuns = [{ start: 0, length: 21, signature: "plain" }];
+    a.rich.styleRuns = [
+      { start: 0, length: 21, signature: "bold", nativeSemantics: plainSemantics() },
+    ];
+    b.rich.styleRuns = [
+      { start: 0, length: 21, signature: "plain", nativeSemantics: plainSemantics() },
+    ];
     expect(() => assertPreserved(a, b, { append: true })).toThrow(/formatting/);
   });
   it("accepts equivalent split attribute runs", () => {
     const a = snapshot(),
       b = snapshot();
-    a.rich.styleRuns = [{ start: 0, length: 21, signature: "bold" }];
+    a.rich.styleRuns = [
+      { start: 0, length: 21, signature: "bold", nativeSemantics: plainSemantics() },
+    ];
     b.rich.styleRuns = [
-      { start: 0, length: 6, signature: "bold" },
-      { start: 6, length: 15, signature: "bold" },
+      { start: 0, length: 6, signature: "bold", nativeSemantics: plainSemantics() },
+      { start: 6, length: 15, signature: "bold", nativeSemantics: plainSemantics() },
     ];
     expect(() => assertPreserved(a, b, { append: true })).not.toThrow();
   });
