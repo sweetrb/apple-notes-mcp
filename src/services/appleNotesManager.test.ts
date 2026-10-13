@@ -4038,6 +4038,8 @@ describe("AppleNotesManager", () => {
         id: "x-coredata://ABC00000-0000-0000-0000-000000000099/ICNote/p404",
         success: false,
         error: "Note not found",
+        committed: false,
+        indeterminate: false,
       });
     });
 
@@ -4046,7 +4048,13 @@ describe("AppleNotesManager", () => {
 
       const results = manager.batchMoveNotes([ID1], "Archive");
 
-      expect(results[0]).toEqual({ id: ID1, success: false, error: "Note is password-protected" });
+      expect(results[0]).toEqual({
+        id: ID1,
+        success: false,
+        error: "Note is password-protected",
+        committed: false,
+        indeterminate: false,
+      });
     });
 
     it("maps a per-item move failure to 'Move failed'", () => {
@@ -4058,7 +4066,12 @@ describe("AppleNotesManager", () => {
       const results = manager.batchMoveNotes([ID1, ID2], "Archive");
 
       expect(results[0]).toEqual({ id: ID1, success: true });
-      expect(results[1]).toEqual({ id: ID2, success: false, error: "Move failed" });
+      expect(results[1]).toEqual({
+        id: ID2,
+        success: false,
+        error: "Move failed",
+        indeterminate: true,
+      });
     });
 
     it("reports a move whose destination folder cannot be verified", () => {
@@ -4073,6 +4086,7 @@ describe("AppleNotesManager", () => {
         id: ID1,
         success: false,
         error: "Destination folder verification failed",
+        indeterminate: true,
       });
     });
   });
@@ -4740,11 +4754,15 @@ describe("AppleNotesManager", () => {
         id: "x-coredata://ABC123/ICFolder/p50",
         success: false,
         error: expect.stringContaining("Invalid note ID format"),
+        committed: false,
+        indeterminate: false,
       });
       expect(results[1]).toEqual({
         id: "temp-1704067200000-0",
         success: false,
         error: expect.stringContaining("Invalid note ID format"),
+        committed: false,
+        indeterminate: false,
       });
     });
   });

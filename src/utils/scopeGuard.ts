@@ -138,6 +138,8 @@ export function parseScopeFailure(output: string): string | null {
 }
 
 /** User-facing message for a failed scope precondition. */
-export function scopeConflictMessage(reason: string): string {
-  return `Scope guard failed: ${reason}. Nothing was changed; read the note's current folder and review before retrying.`;
+export function scopeConflictMessage(reason: string, operation?: "batch-move"): string {
+  const refusal =
+    operation === "batch-move" ? "This note's move was refused" : "Nothing was changed";
+  return `Scope guard failed: ${reason}. ${refusal}; read the note's current folder and review before retrying.`;
 }

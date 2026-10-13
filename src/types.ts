@@ -11,6 +11,8 @@
  * @module types
  */
 
+import type { ScopeGuard } from "./utils/scopeGuard.js";
+
 // =============================================================================
 // Apple Notes Data Models
 // =============================================================================
@@ -532,6 +534,27 @@ export interface MoveNoteParams {
 
   /** Account containing the note (defaults to iCloud) */
   account?: string;
+}
+
+/** Shared folder preconditions apply separately to every note in the batch. */
+export interface BatchMoveNotesParams extends ScopeGuard {
+  /** Exact CoreData note IDs after the tool's identifier resolution */
+  ids: string[];
+  /** Existing destination folder name or nested path */
+  folder: string;
+  /** Account containing the destination (defaults to Notes.app's default account) */
+  account?: string;
+}
+
+/** Per-ID batch move outcome; certainty is set at the manager's outcome source. */
+export interface BatchMoveResult {
+  id: string;
+  success: boolean;
+  error?: string;
+  /** false only when this item's move was refused before dispatch */
+  committed?: false;
+  /** true when dispatch/readback or the whole script did not establish the outcome */
+  indeterminate?: boolean;
 }
 
 // =============================================================================
