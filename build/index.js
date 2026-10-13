@@ -24535,8 +24535,9 @@ Targets (choose at most one; default: packaged Shortcuts):
   --permissions-window Build and install the optional permission checklist window
   --permissions         Check permissions; does not grant them
   --broker              Build and install the opt-in permission broker
+  --gemini-spark        Print the macOS Local MCP guide; no setup effects
 
-Options for every target:
+Options for installation and permission targets:
   --check               Inspect only; do not install or import anything
   --help, -h            Show this help without performing any checks
 
@@ -24546,6 +24547,9 @@ Options only with --permissions:
   --open                Open System Settings panes for missing grants
   --window              Show the checklist in the installed optional window
   --probe-automation    Send a read-only Apple event (may show a consent prompt)
+
+Options only with --gemini-spark:
+  --help, -h            Print the guide without connecting a client
 
 Options only with --broker:
   --uninstall           Remove the installed broker and LaunchAgent
@@ -24560,7 +24564,8 @@ var SETUP_TARGETS = /* @__PURE__ */ new Map([
   ["--native-helper", "native-helper"],
   ["--permissions-window", "permissions-window"],
   ["--permissions", "permissions"],
-  ["--broker", "broker"]
+  ["--broker", "broker"],
+  ["--gemini-spark", "gemini-spark"]
 ]);
 var PERMISSION_OPTIONS = /* @__PURE__ */ new Set([
   "--once",
@@ -24590,6 +24595,13 @@ function parseSetupArgs(args) {
       throw new Error(`Unknown setup option "${arg}".`);
     }
   }
+  if (target === "gemini-spark") {
+    if (args.filter((arg) => arg === "--gemini-spark").length !== 1 || args.some((arg) => !["--gemini-spark", "--help", "-h"].includes(arg)) || args.filter((arg) => arg === "--help" || arg === "-h").length > 1)
+      throw new Error(
+        "The Gemini Spark print-only guide cannot be combined with other setup options."
+      );
+    return { kind: "setup", target, args: [...args], checkOnly: false };
+  }
   if (args.some((arg) => arg === "--uninstall" || arg === "--sign-identity") && target !== "broker")
     throw new Error("--uninstall and --sign-identity require setup --broker.");
   for (const arg of args) {
@@ -24611,6 +24623,33 @@ function parseCliArgs(args) {
   throw new Error(`Unknown command or option "${command2}".`);
 }
 
+// src/setupGeminiSpark.ts
+var GEMINI_SPARK_LOCAL_MCP = {
+  serverName: "Apple Notes",
+  description: "Read, search, create, edit, organize, and export Apple Notes on this Mac.",
+  command: "npx -y apple-notes-mcp"
+};
+function formatGeminiSparkSetup() {
+  return [
+    "Gemini Spark on macOS: Local MCP",
+    "Requires a Gemini macOS build with Local MCP in Connected Apps > + Custom.",
+    "Select Local MCP and enter:",
+    "",
+    `Server Name: ${GEMINI_SPARK_LOCAL_MCP.serverName}`,
+    `Description: ${GEMINI_SPARK_LOCAL_MCP.description}`,
+    `Command: ${GEMINI_SPARK_LOCAL_MCP.command}`,
+    "",
+    "Keep Sandbox settings at Default initially. If startup fails, inspect Show Logs",
+    "and review the specific launcher or filesystem access it needs.",
+    "Sandbox access and macOS Automation / Full Disk Access are separate permissions.",
+    "Click Next, review the tools and permissions, and complete the connection yourself.",
+    "Verify tool discovery with get-capabilities in Gemini; use doctor for Notes diagnostics.",
+    "",
+    "This command only prints instructions; a successful exit does not verify a connection.",
+    "Cloud MCP needs a hosted MCP URL. This server provides local stdio only."
+  ].join("\n");
+}
+
 // src/cliEntry.ts
 var parsed;
 try {
@@ -24623,6 +24662,11 @@ ${usage}`);
   process.exit(2);
 }
 var command = parsed;
+if (command.kind === "setup" && command.target === "gemini-spark") {
+  process.stdout.write(`${formatGeminiSparkSetup()}
+`);
+  process.exit(0);
+}
 if (command.kind === "help") {
   process.stdout.write(command.topic === "setup" ? SETUP_USAGE : CLI_USAGE);
   process.exit(0);

@@ -8,7 +8,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const entryPath = fileURLToPath(new URL("./index.ts", import.meta.url));
 const sourceDir = dirname(entryPath);
-const pureModules = new Set([entryPath, join(sourceDir, "cli.ts"), join(sourceDir, "cliEntry.ts")]);
+const pureModules = new Set([
+  entryPath,
+  join(sourceDir, "cli.ts"),
+  join(sourceDir, "cliEntry.ts"),
+  join(sourceDir, "setupGeminiSpark.ts"),
+]);
 const runtimeSentinel = "RUNTIME_MODULE_EVALUATED";
 let fixtureDir: string;
 let bundlePath: string;
@@ -79,6 +84,17 @@ describe("bundled CLI exits before runtime initialization", () => {
     expect(result.stderr).toBe("");
   });
 
+  it.each([["--gemini-spark"], ["--gemini-spark", "--help"], ["--gemini-spark", "-h"]])(
+    "prints the Gemini Spark guide before evaluating runtime modules: %j",
+    (...args) => {
+      const result = run(["setup", ...args]);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Gemini Spark on macOS: Local MCP");
+      expect(result.stderr).toBe("");
+    }
+  );
+
   it.each(["--version", "-v"])("prints %s without reading user configuration", (arg) => {
     const result = run([arg]);
     expect(result.status).toBe(0);
@@ -89,6 +105,9 @@ describe("bundled CLI exits before runtime initialization", () => {
   it.each([
     ["setup", "--broker", "--sign-identity"],
     ["setup", "--broker", "--permissions"],
+    ["setup", "--gemini-spark", "--broker"],
+    ["setup", "--gemini-spark", "--check"],
+    ["setup", "--gemini-spark", "--permissions"],
     ["setup", "--uninstall"],
     ["setup", "--public-helper", "--native-helper"],
     ["setup", "--open"],

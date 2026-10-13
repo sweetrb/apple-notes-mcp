@@ -4,7 +4,13 @@
  * a helper, open System Settings, or connect an MCP transport.
  */
 export type SetupTarget =
-  "shortcuts" | "public-helper" | "native-helper" | "permissions-window" | "permissions" | "broker";
+  | "shortcuts"
+  | "public-helper"
+  | "native-helper"
+  | "permissions-window"
+  | "permissions"
+  | "broker"
+  | "gemini-spark";
 
 export type CliCommand =
   | { kind: "mcp" }
@@ -35,8 +41,9 @@ Targets (choose at most one; default: packaged Shortcuts):
   --permissions-window Build and install the optional permission checklist window
   --permissions         Check permissions; does not grant them
   --broker              Build and install the opt-in permission broker
+  --gemini-spark        Print the macOS Local MCP guide; no setup effects
 
-Options for every target:
+Options for installation and permission targets:
   --check               Inspect only; do not install or import anything
   --help, -h            Show this help without performing any checks
 
@@ -46,6 +53,9 @@ Options only with --permissions:
   --open                Open System Settings panes for missing grants
   --window              Show the checklist in the installed optional window
   --probe-automation    Send a read-only Apple event (may show a consent prompt)
+
+Options only with --gemini-spark:
+  --help, -h            Print the guide without connecting a client
 
 Options only with --broker:
   --uninstall           Remove the installed broker and LaunchAgent
@@ -62,6 +72,7 @@ const SETUP_TARGETS = new Map<string, SetupTarget>([
   ["--permissions-window", "permissions-window"],
   ["--permissions", "permissions"],
   ["--broker", "broker"],
+  ["--gemini-spark", "gemini-spark"],
 ]);
 const PERMISSION_OPTIONS = new Set([
   "--once",
@@ -96,6 +107,17 @@ export function parseSetupArgs(args: readonly string[]): CliCommand {
     ) {
       throw new Error(`Unknown setup option "${arg}".`);
     }
+  }
+  if (target === "gemini-spark") {
+    if (
+      args.filter((arg) => arg === "--gemini-spark").length !== 1 ||
+      args.some((arg) => !["--gemini-spark", "--help", "-h"].includes(arg)) ||
+      args.filter((arg) => arg === "--help" || arg === "-h").length > 1
+    )
+      throw new Error(
+        "The Gemini Spark print-only guide cannot be combined with other setup options."
+      );
+    return { kind: "setup", target, args: [...args], checkOnly: false };
   }
   if (args.some((arg) => arg === "--uninstall" || arg === "--sign-identity") && target !== "broker")
     throw new Error("--uninstall and --sign-identity require setup --broker.");

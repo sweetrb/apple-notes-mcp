@@ -113,6 +113,47 @@ describe("CLI routing before effects", () => {
     );
   });
 
+  it.each([["--gemini-spark"], ["--gemini-spark", "--help"], ["--gemini-spark", "-h"]])(
+    "routes the Gemini Spark guide %j before runtime setup",
+    (...args) => {
+      expect(parseCliArgs(["setup", ...args])).toEqual({
+        kind: "setup",
+        target: "gemini-spark",
+        args,
+        checkOnly: false,
+      });
+    }
+  );
+
+  it.each([
+    "--check",
+    "--json",
+    "--open",
+    "--once",
+    "--window",
+    "--probe-automation",
+    "--uninstall",
+  ])("refuses %s with the Gemini Spark guide", (arg) => {
+    expect(() => parseCliArgs(["setup", "--gemini-spark", arg])).toThrow("cannot be combined");
+  });
+
+  it("rejects mixed and duplicate Gemini Spark options", () => {
+    for (const target of [
+      "--broker",
+      "--public-helper",
+      "--native-helper",
+      "--permissions",
+      "--permissions-window",
+    ])
+      expect(() => parseCliArgs(["setup", "--gemini-spark", target])).toThrow("one setup target");
+    for (const args of [
+      ["--gemini-spark", "--gemini-spark"],
+      ["--gemini-spark", "--help", "-h"],
+      ["--gemini-spark", "--sign-identity", "Test"],
+    ])
+      expect(() => parseCliArgs(["setup", ...args])).toThrow("cannot be combined");
+  });
+
   it.each(["templates", "anchors"])("preserves the %s parser's complete arguments", (kind) => {
     expect(parseCliArgs([kind, "edit", "name", "--port", "8080"])).toEqual({
       kind,
@@ -129,6 +170,7 @@ describe("CLI routing before effects", () => {
     expect(CLI_USAGE).toContain("stdio");
     expect(SETUP_USAGE).toContain("--probe-automation");
     expect(SETUP_USAGE).toContain("--broker");
+    expect(SETUP_USAGE).toContain("--gemini-spark");
     expect(SETUP_USAGE).toContain("--sign-identity <id>");
   });
 });

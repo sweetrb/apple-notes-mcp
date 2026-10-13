@@ -4,6 +4,7 @@
  */
 import { createRequire } from "node:module";
 import { CLI_USAGE, SETUP_USAGE, parseCliArgs, type CliCommand } from "./cli.js";
+import { formatGeminiSparkSetup } from "./setupGeminiSpark.js";
 
 let parsed: CliCommand;
 try {
@@ -14,6 +15,11 @@ try {
   process.exit(2);
 }
 export const command = parsed;
+
+if (command.kind === "setup" && command.target === "gemini-spark") {
+  process.stdout.write(`${formatGeminiSparkSetup()}\n`);
+  process.exit(0);
+}
 
 if (command.kind === "help") {
   process.stdout.write(command.topic === "setup" ? SETUP_USAGE : CLI_USAGE);
