@@ -67,6 +67,10 @@ jobs:
       - name: Run tests with coverage
         run: pnpm run test:coverage
 
+      - name: Verify read-only checklist helper with synthetic native fixtures
+        if: matrix.node-version == 22
+        run: node scripts/test-private-checklist.mjs
+
       - name: Test broker host classification and fixture evidence
         if: matrix.node-version == 22
         run: node --test scripts/broker-host-capability.test.mjs scripts/broker-fixture-files.test.mjs
