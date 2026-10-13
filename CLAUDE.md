@@ -262,7 +262,8 @@ This works in: `create-note` (folder param), `create-folder`, `search-notes`, `l
 
 ### get-note-tables
 - Requires the note ID; reads the NoteStore database read-only (Full Disk Access)
-- Returns every native table in body order as GitHub-flavored Markdown (`markdown`, first row as header) and as JSON (`tables[].rows`, `rowIds`, `columnIds`)
+- Returns a page of whole native tables in body order as GitHub-flavored Markdown (`markdown`, first row as header) and as JSON (`tables[].rows`, `rowIds`, `columnIds`). While `page.hasMore` is true, repeat with `offset: page.nextOffset` and the same `limit` and `maxBytes`
+- The full response defaults to a 4 MiB budget (maximum 8 MiB) and 500 tables. A table that cannot fit alone has `contentOmitted: true`, a reason and no rows; its offset advances. Retry that table's original offset with a larger `maxBytes` or export it to a file
 - A note with no tables succeeds with an empty `tables` list; it is not an error
 - **Check `tableCellsComplete`.** When false, an undecodable cell is `null` in `rows`, listed in `incompleteCells`, and shown as `[undecoded cell]` in Markdown; a table that cannot be decoded at all has `complete: false`, a `reason`, and no rows. Never fill those cells in
 - Cell text only: links and styling inside cells are not rendered

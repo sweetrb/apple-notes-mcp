@@ -235,11 +235,16 @@ User: "Show me my shopping list"
 Action: Search by title if needed, then use get-note-content with the exact ID
 ```
 
-For a note's tables, use `get-note-tables` with the note ID. It returns each
-table as Markdown and as JSON rows. When `tableCellsComplete` is false, some
-cells could not be decoded: they are `null` in `rows` and shown as
-`[undecoded cell]` in Markdown. Report that to the user rather than filling
-them in.
+For a note's tables, use `get-note-tables` with the note ID. It returns a page
+of whole tables as Markdown and JSON rows. While `page.hasMore` is true,
+repeat with `offset: page.nextOffset` and the same `limit` and `maxBytes`.
+The full response defaults to 4 MiB (maximum 8 MiB) and 500 tables. An
+oversized table has `contentOmitted: true`, a reason and no rows; the next
+offset advances past it. Retry its original offset with a larger `maxBytes`
+or export the note to a file. When `tableCellsComplete` is false, check each
+entry's reason: undecodable cells are `null` in `rows` and shown as
+`[undecoded cell]` in Markdown. Report missing content rather than filling
+it in.
 
 Use titles for discovery only. Mutations require the exact note ID; update,
 append, and delete also require the `contentHash` returned by

@@ -1194,6 +1194,8 @@ export interface NoteTable {
   incompleteCells?: Array<{ row: number; column: number; reason: string }>;
   /** GitHub-flavored Markdown rendering; the first row is the header row */
   markdown?: string;
+  /** True when response paging returned metadata only because this table exceeds the byte budget. */
+  contentOmitted?: boolean;
 }
 
 /**
