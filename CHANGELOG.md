@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.15.3] - 2026-10-13
+
+### Added
+
+- `native-checklist-state` reads exact native todo identifiers and checked state
+  through the existing opt-in read-only helper, with contiguous, consistent,
+  and multi-line flags for ambiguous runs. The helper's `read_checklist` action
+  preserves read-only stores and disabled migration. Private note reads resolve
+  exact Core Data IDs directly from the database after helper readiness checks,
+  without an AppleScript fallback.
+
 ## [2.15.2] - 2026-10-12
 
 ### Fixed
@@ -324,7 +335,9 @@ Split out of #262 per the maintainer's review.
 - **`brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12, clearing GHSA-q2hr-2g5m-vwhr (medium) — dev toolchain only, not in the shipped bundle.** A further incomplete-fix variant of the same unbounded-expansion class as GHSA-mh99-v99m-4gvg. Per the advisory's reported ranges, only the 1.x and 5.x lines were vulnerable; the 2.x floor (2.1.4) is untouched. Reached via eslint → minimatch on both lines, so development scope only. `pnpm-workspace.yaml`'s two-sided override ranges are raised accordingly. Clears Dependabot alerts #33 and #32.
 
 ## [2.9.33] - 2026-09-30
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.9.32] - 2026-09-29
