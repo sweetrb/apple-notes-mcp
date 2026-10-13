@@ -26,9 +26,7 @@ function runBuiltGuide(args: string[]) {
 describe("Gemini Spark Local MCP setup guide", () => {
   it("keeps the README's exact form fields and command aligned with the guide", () => {
     const readme = readFileSync(resolve(__dirname, "../README.md"), "utf8");
-    const section = readme
-      .split("### Using Gemini Spark on macOS (Local MCP)\n")[1]
-      .split("\n### ")[0];
+    const section = readme.split("#### Gemini Spark (macOS Local MCP)\n")[1].split("\n#### ")[0];
     for (const value of Object.values(GEMINI_SPARK_LOCAL_MCP)) {
       expect(formatGeminiSparkSetup()).toContain(value);
       expect(section).toContain(value);
