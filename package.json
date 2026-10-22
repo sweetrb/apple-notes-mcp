@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.15.9",
+  "version": "2.15.10",
   "packageManager": "pnpm@11.9.0",
   "description": "MCP server for Apple Notes - read, search, create, edit, organize, and export notes on macOS via Claude and other AI assistants",
   "type": "module",
@@ -96,6 +96,7 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.51.0",
+    "vite": ">=7.3.7 <8",
     "vitest": "^4.1.11"
   },
   "volta": {

@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.15.10] - 2026-10-22
+### Changed
+- Raised the `vite` security floor to `>=7.3.7 <8`, closing 5 open Dependabot alerts
+  (GHSA-587h-7wmj-h5pm, GHSA-rq7h-c2jc-7f22, GHSA-r825-w8mm-5pxw, GHSA-698v-4r3x-3vcv,
+  GHSA-9jrq-w75r-8gcw). `vite` reaches this tree only as a peerDependency of
+  `vitest`/`@vitest/mocker`, which a `pnpm-workspace.yaml` override cannot move (confirmed
+  stale at 7.3.6 through `pnpm install`/`--force`/`pnpm dedupe`); added as an explicit
+  `>=7.3.7 <8` devDependency range instead, which resolves correctly. Dev-only; not in the
+  shipped bundle.
+
 ## [2.15.9] - 2026-10-14
 ### Changed
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
