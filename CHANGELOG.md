@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [2.15.11] - 2026-10-23
+### Security
+- **Upgrade Zod to `^4.6.6`** (locks 4.6.7) to address GHSA-mrhx-c7xc-m3w5 (high: memory
+  exhaustion validating oversized constrained collections). The advertised `tools/list`
+  contract is unchanged: a new `installSchemaContracts` seam keeps closed (strip) and open
+  (passthrough) objects advertised exactly as under Zod 3, integer parameters keep the full
+  integer domain (`integerNumber()`, no new safe-integer bounds), and one-argument
+  `z.record(X)` becomes `z.record(z.string(), X)`. Approach ported from apple-mail-mcp
+  #326/#327 (@jjoanna2-debug).
+- **`ip-address` floor raised to `>=10.7.4 <11`** for GHSA-rxp7-6hxx-x8q5 (moderate). Reached
+  only via `@modelcontextprotocol/sdk` → `express-rate-limit`; not in the shipped bundle.
+
 ## [2.15.10] - 2026-10-22
 ### Changed
 - Raised the `vite` security floor to `>=7.3.7 <8`, closing 5 open Dependabot alerts

@@ -74,7 +74,13 @@ overrides:
   # (medium), fixed in 10.5.1 -- the lockfile had settled on 10.4.0, still
   # vulnerable under the old caret floor. Two-sided range, never an exact pin,
   # for the reason recorded on fast-uri above.
-  ip-address: ">=10.5.1 <11"
+  #
+  # Raised from >=10.5.1 <11 to >=10.7.4 <11 on 2026-10-23 for
+  # GHSA-rxp7-6hxx-x8q5 (moderate, Address6 matches a zone identifier),
+  # range <= 10.7.3, fixed in 10.7.4 (published 2026-10-11, past the 7-day
+  # minimumReleaseAge soak). Same reachability as above -- not in the shipped
+  # bundle. Mirrors apple-mail-mcp 2.20.28. Two-sided range, never an exact pin.
+  ip-address: ">=10.7.4 <11"
   # GHSA-fxqj-rqcc-2cmp (moderate): incomplete fix of GHSA-6g55-p6wh-862q.
   # Dev-only (vitest -> vite -> postcss); not in the shipped bundle.
   postcss: ^8.5.23

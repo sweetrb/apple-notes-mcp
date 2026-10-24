@@ -316,7 +316,7 @@ export type PrivateNoteState = z.infer<typeof noteStateSchema>;
 
 export const checklistItemSchema = z.object({
   todoIdentifier: z.string().regex(/^[a-f0-9]{32}$/),
-  uuid: z.string().uuid(),
+  uuid: z.guid(),
   index: z.number().int().nonnegative(),
   done: z.boolean(),
   text: z.string(),
@@ -332,7 +332,7 @@ export const checklistItemSchema = z.object({
 export const checklistStateSchema = z
   .object({
     status: z.literal("ok"),
-    identifier: z.string().uuid(),
+    identifier: z.guid(),
     revision: z.string().regex(/^r1:[a-f0-9]{64}$/),
     items: z.array(checklistItemSchema),
     total: z.number().int().nonnegative(),

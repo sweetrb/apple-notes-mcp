@@ -166,6 +166,7 @@ import {
 } from "@/services/notesExport.js";
 import { BUILTIN_TEMPLATE_NAMES } from "@/utils/markdownTemplate.js";
 import { installStructuredText } from "@/utils/structuredText.js";
+import { installSchemaContracts, integerNumber } from "@/utils/toolRegistration.js";
 import { registerDirectOperations } from "@/tools/directOperations.js";
 import { registerFolderDelete } from "@/tools/folderDelete.js";
 import { registerMarkdownTemplates } from "@/tools/markdownTemplates.js";
@@ -318,6 +319,9 @@ installSdkErrorCodes(server);
 // Clients that pass the model only text content (Claude Desktop) still see
 // every structuredContent field, including the revision tokens (#264).
 installStructuredText(server);
+// Keep the advertised tool schemas identical to the Zod 3 era (closed strip
+// objects, open passthrough objects) under Zod 4. See @/utils/toolRegistration.js.
+installSchemaContracts(server);
 
 /**
  * Singleton instance of the Apple Notes manager.
@@ -574,9 +578,7 @@ function scopeFrom(args: {
   };
 }
 
-const timeoutSecondsInput = z
-  .number()
-  .int()
+const timeoutSecondsInput = integerNumber()
   .min(CALL_TIMEOUT_SECONDS.min)
   .max(CALL_TIMEOUT_SECONDS.max)
   .optional()
@@ -1061,9 +1063,7 @@ registerTool(
         .describe(
           "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for searching only recent notes in large collections."
         ),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .positive()
         .optional()
         .describe(
@@ -1245,18 +1245,14 @@ registerTool(
         .describe(
           'Boolean query expression, e.g. `folder:"Work Projects" has:checklist -checklist:done`'
         ),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .positive()
         .max(QUERY_RESULTS.MAX)
         .optional()
         .describe(
           `Maximum notes to return (default ${QUERY_RESULTS.DEFAULT}, max ${QUERY_RESULTS.MAX}). The response reports how many matched in total.`
         ),
-      scanLimit: z
-        .number()
-        .int()
+      scanLimit: integerNumber()
         .positive()
         .max(QUERY_SCAN.MAX)
         .optional()
@@ -1813,10 +1809,10 @@ registerTool(
     outputSchema: {
       id: z.string().optional(),
       contentHash: z.string().optional(),
-      objects: z.array(z.record(z.unknown())).optional(),
-      checklistItems: z.array(z.record(z.unknown())).optional(),
+      objects: z.array(z.record(z.string(), z.unknown())).optional(),
+      checklistItems: z.array(z.record(z.string(), z.unknown())).optional(),
       nativeTags: z.array(z.string()).optional(),
-      tables: z.array(z.record(z.unknown())).optional(),
+      tables: z.array(z.record(z.string(), z.unknown())).optional(),
       tableCellsComplete: z.boolean().optional(),
     },
     annotations: { readOnlyHint: true },
@@ -1881,23 +1877,17 @@ registerTool(
       "Use when: reading the native tables in one exact note as data or Markdown.\nReturns: one page of whole tables in body order as GitHub-flavored Markdown (first row as header) plus JSON rows with stable row/column ids, tableCellsComplete, and page info. Default limit 500 and maxBytes 4 MiB; while page.hasMore is true, call again with offset set to page.nextOffset. The byte budget includes the full serialized tool response, including repeated Markdown.\nDo not use when: you need the whole note (get-note-markdown / get-note-content) or native object ranges and checklist ids (get-native-objects).\nSafety: read-only; reads the NoteStore database and requires Full Disk Access. A cell that cannot be decoded is null in rows, listed in incompleteCells, and marked [undecoded cell] in Markdown; it is never guessed. A table larger than an empty page returns metadata only with complete: false and contentOmitted: true; increase maxBytes (max 8 MiB) or export the note to a file. Cell text only: links and styling inside cells are not rendered.",
     inputSchema: {
       id: noteIdInput,
-      offset: z
-        .number()
-        .int()
+      offset: integerNumber()
         .min(0)
         .max(Number.MAX_SAFE_INTEGER)
         .optional()
         .describe("Zero-based position of the first table (default 0); use page.nextOffset"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(MAX_TABLES_PER_PAGE)
         .optional()
         .describe(`Maximum tables to return (default and max ${MAX_TABLES_PER_PAGE})`),
-      maxBytes: z
-        .number()
-        .int()
+      maxBytes: integerNumber()
         .min(MIN_TABLE_RESPONSE_BYTES)
         .max(MAX_TABLE_RESPONSE_BYTES)
         .optional()
@@ -1907,11 +1897,11 @@ registerTool(
     },
     outputSchema: {
       id: z.string().optional(),
-      tables: z.array(z.record(z.unknown())).optional(),
+      tables: z.array(z.record(z.string(), z.unknown())).optional(),
       tableCount: z.number().optional(),
       tableCellsComplete: z.boolean().optional(),
       markdown: z.string().optional(),
-      page: z.record(z.unknown()).optional(),
+      page: z.record(z.string(), z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
@@ -1940,15 +1930,11 @@ registerTool(
       "Use when: you need a note's structure, not just its text: paragraph styles (title, heading, subheading, body, monospaced, bulleted/dashed/numbered list, checklist with done state), indent, alignment, block quote, inline formatting (bold, italic, underline, strikethrough, superscript, subscript, color, highlight, links) and attachment positions, by exact id.\nReturns: one page of blocks in body order (default 500, stopped early under APPLE_NOTES_MCP_BLOCKS_MAX_BYTES, default 4 MB), whole-note summary counts, undecodedFields, and page info; while page.hasMore is true, call again with offset set to page.nextOffset. Offsets and lengths count UTF-16 code units.\nDo not use when: you want the editable HTML body (get-note-content) or Markdown (get-note-markdown).\nSafety: read-only; decodes the NoteStore database directly and requires Full Disk Access. Password-protected notes are refused. Link URLs are returned as stored; linkSafe is false for schemes other than http(s), notes, applenotes and mailto.",
     inputSchema: {
       id: noteIdInput,
-      offset: z
-        .number()
-        .int()
+      offset: integerNumber()
         .min(0)
         .optional()
         .describe("Index of the first block to return (default 0); use page.nextOffset"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(5000)
         .optional()
@@ -1957,10 +1943,10 @@ registerTool(
     outputSchema: {
       id: z.string().optional(),
       textLength: z.number().optional(),
-      blocks: z.array(z.record(z.unknown())).optional(),
-      page: z.record(z.unknown()).optional(),
-      summary: z.record(z.unknown()).optional(),
-      undecodedFields: z.record(z.unknown()).optional(),
+      blocks: z.array(z.record(z.string(), z.unknown())).optional(),
+      page: z.record(z.string(), z.unknown()).optional(),
+      summary: z.record(z.string(), z.unknown()).optional(),
+      undecodedFields: z.record(z.string(), z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
@@ -2025,15 +2011,11 @@ registerTool(
         .boolean()
         .optional()
         .describe("Return only paragraphs that have a direct url (default false)"),
-      offset: z
-        .number()
-        .int()
+      offset: integerNumber()
         .min(0)
         .optional()
         .describe("Index of the first paragraph to return (default 0); use page.nextOffset"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(5000)
         .optional()
@@ -2043,9 +2025,9 @@ registerTool(
     outputSchema: {
       id: z.string().optional(),
       identifier: z.string().nullable().optional(),
-      counts: z.record(z.unknown()).optional(),
-      paragraphs: z.array(z.record(z.unknown())).optional(),
-      page: z.record(z.unknown()).optional(),
+      counts: z.record(z.string(), z.unknown()).optional(),
+      paragraphs: z.array(z.record(z.string(), z.unknown())).optional(),
+      page: z.record(z.string(), z.unknown()).optional(),
       anchorsRecorded: z.number().optional(),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -2104,15 +2086,11 @@ registerTool(
         .max(MAX.CONTENT)
         .optional()
         .describe("The whole paragraph text, compared the same way"),
-      blockIndex: z
-        .number()
-        .int()
+      blockIndex: integerNumber()
         .min(0)
         .optional()
         .describe("The paragraph's blockIndex from list-note-paragraphs"),
-      occurrence: z
-        .number()
-        .int()
+      occurrence: integerNumber()
         .min(1)
         .optional()
         .describe("Which match to use (1-based) when contains or match hits several paragraphs"),
@@ -2127,7 +2105,7 @@ registerTool(
       url: z.string().optional(),
       id: z.string().optional(),
       identifier: z.string().nullable().optional(),
-      paragraph: z.record(z.unknown()).optional(),
+      paragraph: z.record(z.string(), z.unknown()).optional(),
       anchorId: z.string().optional(),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -2182,21 +2160,17 @@ registerTool(
         .optional()
         .describe("Snippet of the paragraph; give one of contains, match, blockIndex"),
       match: z.string().min(1).max(MAX.CONTENT).optional().describe("The whole paragraph text"),
-      blockIndex: z
-        .number()
-        .int()
+      blockIndex: integerNumber()
         .min(0)
         .optional()
         .describe("The paragraph's blockIndex from list-note-paragraphs"),
-      occurrence: z
-        .number()
-        .int()
+      occurrence: integerNumber()
         .min(1)
         .optional()
         .describe("Which match to use (1-based) when contains or match hits several paragraphs"),
     },
     outputSchema: {
-      anchor: z.record(z.unknown()).optional(),
+      anchor: z.record(z.string(), z.unknown()).optional(),
       created: z.boolean().optional(),
       url: z.string().optional(),
     },
@@ -2241,8 +2215,8 @@ registerTool(
       needsReminting: z.boolean().optional(),
       method: z.string().optional(),
       confidence: z.number().optional(),
-      match: z.record(z.unknown()).optional(),
-      changes: z.record(z.unknown()).optional(),
+      match: z.record(z.string(), z.unknown()).optional(),
+      changes: z.record(z.string(), z.unknown()).optional(),
       candidates: z.number().optional(),
       noteId: z.string().optional(),
       message: z.string().optional(),
@@ -2269,20 +2243,18 @@ registerTool(
       noteIdentifier: noteIdentifierInput.describe(
         "Only anchors in the note with this Notes UUID (its identifier)"
       ),
-      offset: z.number().int().min(0).optional().describe("First anchor to return (default 0)"),
-      limit: z
-        .number()
-        .int()
+      offset: integerNumber().min(0).optional().describe("First anchor to return (default 0)"),
+      limit: integerNumber()
         .min(1)
         .max(1000)
         .optional()
         .describe("Maximum anchors to return (default 100, max 1000)"),
     },
     outputSchema: {
-      anchors: z.array(z.record(z.unknown())).optional(),
+      anchors: z.array(z.record(z.string(), z.unknown())).optional(),
       total: z.number().optional(),
       registry: z.string().optional(),
-      page: z.record(z.unknown()).optional(),
+      page: z.record(z.string(), z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
@@ -2313,7 +2285,7 @@ registerTool(
     description:
       "Use when: inspecting one recorded anchor as stored.\nReturns: the stored anchor record.\nDo not use when: you need the paragraph's current location or link (resolve-paragraph-anchor).\nSafety: read-only; reads only the local anchor registry, never Notes.",
     inputSchema: { anchorId: anchorIdInput },
-    outputSchema: { anchor: z.record(z.unknown()).optional() },
+    outputSchema: { anchor: z.record(z.string(), z.unknown()).optional() },
     annotations: { readOnlyHint: true },
   },
   withErrorHandling(({ anchorId }) => {
@@ -2359,7 +2331,7 @@ registerTool(
     outputSchema: {
       dryRun: z.boolean().optional(),
       examined: z.number().optional(),
-      stale: z.array(z.record(z.unknown())).optional(),
+      stale: z.array(z.record(z.string(), z.unknown())).optional(),
       removed: z.array(z.string()).optional(),
     },
     annotations: { readOnlyHint: false, destructiveHint: true },
@@ -2411,18 +2383,18 @@ registerTool(
       textLength: z.number().nullable().optional(),
       wordCount: z.number().nullable().optional(),
       charCount: z.number().nullable().optional(),
-      blockSummary: z.record(z.unknown()).nullable().optional(),
-      links: z.array(z.record(z.unknown())).optional(),
-      linkCounts: z.record(z.unknown()).optional(),
+      blockSummary: z.record(z.string(), z.unknown()).nullable().optional(),
+      links: z.array(z.record(z.string(), z.unknown())).optional(),
+      linkCounts: z.record(z.string(), z.unknown()).optional(),
       linksComplete: z.boolean().optional(),
       tags: z.array(z.string()).optional(),
-      attachments: z.array(z.record(z.unknown())).optional(),
+      attachments: z.array(z.record(z.string(), z.unknown())).optional(),
       attachmentCount: z.number().optional(),
       checklistTotal: z.number().nullable().optional(),
       checklistDone: z.number().nullable().optional(),
       hasDrawing: z.boolean().optional(),
-      firstImage: z.record(z.unknown()).nullable().optional(),
-      undecodedFields: z.record(z.unknown()).optional(),
+      firstImage: z.record(z.string(), z.unknown()).nullable().optional(),
+      undecodedFields: z.record(z.string(), z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
@@ -2475,28 +2447,24 @@ registerTool(
         .max(4)
         .optional()
         .describe("Only these link kinds"),
-      offset: z
-        .number()
-        .int()
+      offset: integerNumber()
         .min(0)
         .optional()
         .describe("Index of the first link to return (default 0); use page.nextOffset"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(2000)
         .optional()
         .describe("Maximum links to return (default 200, max 2000)"),
     },
     outputSchema: {
-      scope: z.record(z.unknown()).optional(),
+      scope: z.record(z.string(), z.unknown()).optional(),
       inlineIncluded: z.boolean().optional(),
       notesInScope: z.number().optional(),
       notesWithoutBody: z.number().optional(),
-      counts: z.record(z.unknown()).optional(),
-      links: z.array(z.record(z.unknown())).optional(),
-      page: z.record(z.unknown()).optional(),
+      counts: z.record(z.string(), z.unknown()).optional(),
+      links: z.array(z.record(z.string(), z.unknown())).optional(),
+      page: z.record(z.string(), z.unknown()).optional(),
     },
     annotations: { readOnlyHint: true },
   },
@@ -2541,16 +2509,16 @@ registerTool(
         .describe("Folder to list tags in. Omit for the account-wide inventory with counts."),
     },
     outputSchema: {
-      tags: z.record(z.array(z.string())).optional(),
+      tags: z.record(z.string(), z.array(z.string())).optional(),
       complete: z.boolean().optional(),
-      errors: z.record(z.string()).optional(),
+      errors: z.record(z.string(), z.string()).optional(),
       inventory: z
         .array(
           z
             .object({
               tag: z.string(),
               noteCount: z.number(),
-              accounts: z.record(z.number()),
+              accounts: z.record(z.string(), z.number()),
               spellings: z.array(z.string()).optional(),
             })
             .passthrough()
@@ -3285,7 +3253,7 @@ registerTool(
         .describe(
           "ISO 8601 date string to filter notes modified on or after this date (e.g., '2025-01-01'). Useful for listing only recent notes in large collections."
         ),
-      limit: z.number().int().positive().optional().describe("Maximum number of notes to return"),
+      limit: integerNumber().positive().optional().describe("Maximum number of notes to return"),
       includeRecentlyDeleted: z
         .boolean()
         .optional()
@@ -3468,9 +3436,7 @@ registerTool(
         .describe(
           "Also list the notes Notes.app currently shows in each smart folder (default false)"
         ),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(500)
         .optional()
@@ -4495,17 +4461,13 @@ registerTool(
     description:
       "Use when: exporting notes as structured JSON for backup, migration, or bulk processing.\nReturns: one page of notes (default 50) with metadata, HTML content, and plaintext, grouped by account and folder, plus page info; while page.hasMore is true, call again with offset set to page.nextOffset.\nDo not use when: you need one note (get-note-content) or only titles and ids (list-notes).\nNote: a page stops early to stay under the response size limit (APPLE_NOTES_MCP_EXPORT_MAX_BYTES, default 8 MB), and a note too large on its own comes back with strippedImages or contentOmitted set. Read-only.",
     inputSchema: {
-      offset: z
-        .number()
-        .int()
+      offset: integerNumber()
         .min(0)
         .optional()
         .describe(
           "0-based position to start from, counting notes in account, folder, note order (default 0). Pass the previous page's page.nextOffset."
         ),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .positive()
         .max(500)
         .optional()
@@ -4679,9 +4641,7 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe("Account holding the folder (defaults to Notes.app's default account)"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(MAX_FOLDER_EXPORT_LIMIT)
         .optional()
@@ -4690,9 +4650,7 @@ registerTool(
         ),
       outputPath: exportPathInput("File to create for the Markdown"),
       assetsDir: exportPathInput("Directory that receives copies of attachment files"),
-      wrap: z
-        .number()
-        .int()
+      wrap: integerNumber()
         .min(0)
         .max(1000)
         .optional()
@@ -4794,9 +4752,7 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe("Account holding the folder (defaults to Notes.app's default account)"),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(MAX_FOLDER_EXPORT_LIMIT)
         .optional()
@@ -4941,9 +4897,7 @@ registerTool(
         .describe(
           "Also return word-level segments (text, start and duration in seconds, speaker). Default false."
         ),
-      maxSegments: z
-        .number()
-        .int()
+      maxSegments: integerNumber()
         .min(1)
         .max(MAX_SEGMENTS_LIMIT)
         .optional()
@@ -5042,9 +4996,7 @@ registerTool(
         .max(MAX.ACCOUNT)
         .optional()
         .describe("Only this account (exact or unique-prefix name). Omit for every account."),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(SPECIAL_LIMIT.MAX)
         .optional()
@@ -5177,9 +5129,7 @@ registerTool(
         .describe(
           "Let macOS download the language's on-device speech model if it is missing (default false: returns asset_unavailable at once)"
         ),
-      maxSeconds: z
-        .number()
-        .int()
+      maxSeconds: integerNumber()
         .min(TRANSCRIBE_MAX_SECONDS.min)
         .max(TRANSCRIBE_MAX_SECONDS.max)
         .optional()
@@ -5248,9 +5198,7 @@ registerTool(
         .describe(
           "Return notes after this point, oldest first: a modifiedCheckpoint cursor from a row or nextSince, or an ISO 8601 date (local midnight) or date-time (local unless it has an offset), meaning modified strictly after it"
         ),
-      limit: z
-        .number()
-        .int()
+      limit: integerNumber()
         .min(1)
         .max(RECENT_LIMIT.MAX)
         .optional()

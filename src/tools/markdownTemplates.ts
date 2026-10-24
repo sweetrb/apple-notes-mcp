@@ -54,7 +54,7 @@ const nameInput = z
   .max(64)
   .describe("Template name: a built-in (standard-markdown, obsidian) or a saved template's name");
 const templateInput = z
-  .union([z.record(z.unknown()), z.string().max(MAX_TEMPLATE_BYTES)])
+  .union([z.record(z.string(), z.unknown()), z.string().max(MAX_TEMPLATE_BYTES)])
   .optional()
   .describe("The template itself, as a JSON object or JSON text (schemaVersion 1)");
 const templateFileInput = z
