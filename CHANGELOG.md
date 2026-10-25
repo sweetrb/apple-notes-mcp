@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.15.12] - 2026-10-24
+### Fixed
+- **Native Markdown append now uses Notes' own "Interpret as Markdown" parser** (#308,
+  @thelancehaun). The Background Operations bridge's `append-markdown` branch pre-rendered
+  the text with Shortcuts' Make Rich Text from Markdown, which on macOS 27.0.1 could drop
+  every heading and bold in an append that also contained a block quote. It now hands
+  Append to Note the plain Markdown with `interpretAsMarkdown`, the same parser the Create
+  Markdown Note bridge already uses. The bridge keeps its name (v5) and probe marker, so
+  nothing breaks for existing installs. **Re-add the signed shortcut and run it once in
+  the foreground to pick up the fix**; an older install keeps the previous behaviour.
+
 ## [2.15.11] - 2026-10-23
 ### Security
 - **Upgrade Zod to `^4.6.6`** (locks 4.6.7) to address GHSA-mrhx-c7xc-m3w5 (high: memory

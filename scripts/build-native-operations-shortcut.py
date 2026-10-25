@@ -20,15 +20,20 @@ def native(identifier, label, **params):
         params['OpenWhenRun'] = False
     return b.native(identifier, label, **params)
 
-def append(label, source):
+def append(label, source, markdown=False):
     # Native editor serialization on macOS 26: legacy parameter keys remain,
     # but WFInput must be a text-token string, not a bare action-output token.
     # A bare token prompted for text; modern text/entity keys prompted for both.
+    # markdown=True hands Notes the plain Markdown with "Interpret as Markdown",
+    # the parser the Create Markdown Note bridge already uses (#308): Shortcuts'
+    # Make Rich Text from Markdown dropped every heading and bold in an append
+    # that also contained one block quote (macOS 27.0.1).
+    extra = {'interpretAsMarkdown': True} if markdown else {}
     return action('is.workflow.actions.appendnote',label,
                   WFInput=text_token(output(source)),WFNote=output('target'),
                   AppIntentDescriptor={'AppIntentIdentifier':'AppendToNoteLinkAction',
                                        'BundleIdentifier':'com.apple.Notes',
-                                       'TeamIdentifier':'0000000000','Name':'Notes'})
+                                       'TeamIdentifier':'0000000000','Name':'Notes'}, **extra)
 
 def condition(label, source, value, mode=4):
     return action('is.workflow.actions.conditional', label, GroupingIdentifier=uid(label+'-group'), WFControlFlowMode=0,
@@ -57,7 +62,7 @@ def close_select(label):
     return [end(label+'-exact-body'),end(label+'-exact-name'),end(label+'-one')]
 
 def build():
-    a=[action('is.workflow.actions.comment','background-about',WFCommentActionText='Background Notes MCP bridge v5. Native-editor typed append input; native create actions have OpenWhenRun disabled; pin operations use fixed enum values. Exact title and literal body scope checked after unique search. MCP validates IDs, revisions and readback. No UI actions, database writes, shell scripts, network or arbitrary action execution.'),
+    a=[action('is.workflow.actions.comment','background-about',WFCommentActionText='Background Notes MCP bridge v5. Native-editor typed append input; Markdown append uses the Notes Interpret as Markdown parser; native create actions have OpenWhenRun disabled; pin operations use fixed enum values. Exact title and literal body scope checked after unique search. MCP validates IDs, revisions and readback. No UI actions, database writes, shell scripts, network or arbitrary action execution.'),
        action('is.workflow.actions.detect.dictionary','request',WFInput=token({'Type':'ExtensionInput'}))]
     for k in ['operation','title','scopeText','text','objectId','objectName','change','otherTitle','otherScope','tag','size']:
         a.append(action('is.workflow.actions.getvalueforkey',k+'-value',WFInput=output('request'),WFDictionaryKey=k,WFGetDictionaryValueType='Value'))
@@ -68,7 +73,7 @@ def build():
     ops = {
       'probe':[action('is.workflow.actions.gettext','probe-ready',WFTextActionText='APPLE_NOTES_BACKGROUND_V5_READY')],
       'append-text':[append('append-text-result','text')],
-      'append-markdown':[action('is.workflow.actions.getrichtextfrommarkdown','markdown-rich',WFInput=output('text')),append('append-md-result','markdown-rich')],
+      'append-markdown':[append('append-md-result','text',markdown=True)],
       'create-checklist-item':[native('CreateChecklistItemLinkAction','checklist-created',noteEntity=output('target'),name=text_token(output('text')))],
       'append-html':[action('is.workflow.actions.getrichtextfromhtml','html-rich',WFHTML=output('text')),append('append-html-result','html-rich')],
       'set-pinned':[condition('pin-add',output('change'),'add'),native('PinNotesLinkAction','pinned',entities=output('target'),operation='add'),end('pin-add'),

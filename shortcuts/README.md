@@ -31,7 +31,9 @@ success and verifies that existing content survived.
 
 `Apple Notes MCP - Background Operations v5.shortcut` performs native append,
 checklist and table creation, pin state changes, link insertion, and tag removal.
-Its allowlist rejects unknown operations. It uses exact title plus distinctive
+Markdown append hands Notes the plain text with "Interpret as Markdown" (Notes' own
+parser, as the Create Markdown Note bridge does) rather than pre-rendering it in
+Shortcuts (#308). Its allowlist rejects unknown operations. It uses exact title plus distinctive
 existing scope text, and the server verifies the note revision and preserved
 rich content before accepting any result.
 

@@ -26,6 +26,22 @@ class BridgeTests(unittest.TestCase):
             if name == 'com.apple.Notes.PinNotesLinkAction':
                 self.assertIn(p['operation'], ['add', 'remove'])
 
+    def test_markdown_append_uses_notes_parser(self):
+        # #308: the markdown branch hands Notes plain text with Interpret as
+        # Markdown instead of pre-rendering through Make Rich Text from Markdown.
+        actions = bridge.build()['WFWorkflowActions']
+        names = [a['WFWorkflowActionIdentifier'] for a in actions]
+        self.assertNotIn('is.workflow.actions.getrichtextfrommarkdown', names)
+        appends = {a['WFWorkflowActionParameters']['UUID']: a['WFWorkflowActionParameters']
+                   for a in actions if a['WFWorkflowActionIdentifier'] == 'is.workflow.actions.appendnote'}
+        md = appends[bridge.uid('append-md-result')]
+        self.assertIs(md['interpretAsMarkdown'], True)
+        text_uuid = next(a['WFWorkflowActionParameters']['UUID'] for a in actions
+                         if a['WFWorkflowActionParameters'].get('UUID') == bridge.uid('text'))
+        self.assertEqual(md['WFInput']['Value']['attachmentsByRange']['{0, 1}']['OutputUUID'], text_uuid)
+        for label in ['append-text-result', 'append-html-result']:
+            self.assertNotIn('interpretAsMarkdown', appends[bridge.uid(label)])
+
     def test_native_text_parameters_are_text_tokens(self):
         for action in bridge.build()['WFWorkflowActions']:
             name = action['WFWorkflowActionIdentifier']
@@ -49,7 +65,7 @@ class BridgeTests(unittest.TestCase):
 
     def test_no_ui_or_arbitrary_execution_actions(self):
         allowed = {'comment', 'detect.dictionary', 'getvalueforkey', 'gettext', 'filter.notes',
-                   'count', 'conditional', 'getrichtextfrommarkdown', 'getrichtextfromhtml', 'output', 'appendnote'}
+                   'count', 'conditional', 'getrichtextfromhtml', 'output', 'appendnote'}
         native = {'AppendToNoteLinkAction', 'CreateChecklistItemLinkAction', 'PinNotesLinkAction',
                   'CreateTagLinkAction', 'AddTagsToNotesLinkAction', 'RemoveTagsFromNotesLinkAction'}
         for action in bridge.build()['WFWorkflowActions']:

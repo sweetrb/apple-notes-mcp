@@ -591,7 +591,8 @@ export function appendNative(
     throw new Error("Use create-table for verified native table insertion");
   validateAppendContent(request.content, request.format);
   // Markdown is sent to the bridge's dedicated "append-markdown" branch, which
-  // runs Shortcuts' native Markdown-to-rich-text action, instead of being
+  // appends the plain Markdown with Notes' own "Interpret as Markdown" parser
+  // (the one the Create Markdown Note bridge uses; #308), instead of being
   // converted to our own HTML subset and routed through "append-html" first.
   // Notes' HTML importer (the "append-html" path) only distinguishes two
   // heading levels and silently renders `<h3>` the same as `<h2>` — Heading,
