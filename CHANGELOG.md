@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [2.15.13] - 2026-10-27
+### Security
+- **`fast-uri` floor raised to `>=3.1.9 <4`**, closing 4 open Dependabot alerts
+  (#42, low, GHSA-333x-w4r6-6crp; #43, medium, GHSA-wjr9-j795-jxcr; #44, low,
+  GHSA-xhq7-xmqj-769h; #45, medium, GHSA-w74x-v6f9-j3xg), all fixed in 3.1.9.
+  Reached via `@modelcontextprotocol/sdk` → `ajv`; IS in the shipped bundle.
+  Two-sided range, never an exact pin. Deferred for the 7-day
+  `minimumReleaseAge` soak, which cleared 2026-10-26T23:06Z.
+
 ## [2.15.12] - 2026-10-24
 ### Fixed
 - **Native Markdown append now uses Notes' own "Interpret as Markdown" parser** (#308,

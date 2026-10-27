@@ -63,7 +63,13 @@ overrides:
   #
   # Raised from >=3.1.6 <4 to >=3.1.7 <4 on 2026-09-29 for GHSA-58mr-gqgx-xq4g
   # (high), fixed in 3.1.7. Still two-sided, still capped below 4.x.
-  fast-uri: ">=3.1.7 <4"
+  #
+  # Raised from >=3.1.7 <4 to >=3.1.9 <4 on 2026-10-27 after the 7-day
+  # minimumReleaseAge soak on 3.1.9 cleared 2026-10-26T23:06Z, closing Dependabot
+  # #42 (low, GHSA-333x-w4r6-6crp), #43 (medium, GHSA-wjr9-j795-jxcr), #44 (low,
+  # GHSA-xhq7-xmqj-769h) and #45 (medium, GHSA-w74x-v6f9-j3xg), all fixed in
+  # 3.1.9. Still two-sided, still capped below 4.x.
+  fast-uri: ">=3.1.9 <4"
   # GHSA-mwp4-54f8-5fhr (high, leading-zero octets decoded as decimal -> SSRF /
   # trust-boundary bypass) plus GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg.
   # Reached via @modelcontextprotocol/sdk -> express-rate-limit, which caps
