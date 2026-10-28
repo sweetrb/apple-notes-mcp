@@ -137,4 +137,7 @@ overrides:
   # for the 7-day minimumReleaseAge soak on 6.16.0 (published 2026-08-29); the
   # soak cleared naturally by 2026-09-06. Two-sided range, never an exact pin,
   # for the reason recorded on fast-uri above.
-  qs: ">=6.16.0 <7"
+  # 2026-10-28: GHSA-6pq8-jhm2-2vcw (medium, qs.stringify arrayFormat 'comma' DoS),
+  # vulnerable <= 6.16.0, fixed in 6.16.1 (published 2026-10-14T22:06Z, past the
+  # 7-day soak). Floor raised from 6.16.0.
+  qs: ">=6.16.1 <7"
