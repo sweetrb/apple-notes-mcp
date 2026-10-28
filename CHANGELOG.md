@@ -1,7 +1,19 @@
 ## [Unreleased]
 
-## [2.15.13] - 2026-10-27
+## [2.15.14] - 2026-10-28
+
 ### Security
+
+- **`qs` floor raised to 6.16.1** for GHSA-6pq8-jhm2-2vcw (medium: `qs.stringify` with
+  `arrayFormat: 'comma'` throws an uncaught TypeError on array elements carrying a
+  non-callable own `toString`). Reached through `@modelcontextprotocol/sdk` → express, the
+  HTTP transport this stdio server never enters, so exposure is near-zero. 6.16.1 was
+  published 2026-10-14, past the 7-day `minimumReleaseAge` soak. Clears the `pnpm audit` finding; Dependabot has not raised an alert for it here yet.
+
+## [2.15.13] - 2026-10-27
+
+### Security
+
 - **`fast-uri` floor raised to `>=3.1.9 <4`**, closing 4 open Dependabot alerts
   (#42, low, GHSA-333x-w4r6-6crp; #43, medium, GHSA-wjr9-j795-jxcr; #44, low,
   GHSA-xhq7-xmqj-769h; #45, medium, GHSA-w74x-v6f9-j3xg), all fixed in 3.1.9.
@@ -10,7 +22,9 @@
   `minimumReleaseAge` soak, which cleared 2026-10-26T23:06Z.
 
 ## [2.15.12] - 2026-10-24
+
 ### Fixed
+
 - **Native Markdown append now uses Notes' own "Interpret as Markdown" parser** (#308,
   @thelancehaun). The Background Operations bridge's `append-markdown` branch pre-rendered
   the text with Shortcuts' Make Rich Text from Markdown, which on macOS 27.0.1 could drop
@@ -21,7 +35,9 @@
   the foreground to pick up the fix**; an older install keeps the previous behaviour.
 
 ## [2.15.11] - 2026-10-23
+
 ### Security
+
 - **Upgrade Zod to `^4.6.6`** (locks 4.6.7) to address GHSA-mrhx-c7xc-m3w5 (high: memory
   exhaustion validating oversized constrained collections). The advertised `tools/list`
   contract is unchanged: a new `installSchemaContracts` seam keeps closed (strip) and open
@@ -33,7 +49,9 @@
   only via `@modelcontextprotocol/sdk` → `express-rate-limit`; not in the shipped bundle.
 
 ## [2.15.10] - 2026-10-22
+
 ### Changed
+
 - Raised the `vite` security floor to `>=7.3.7 <8`, closing 5 open Dependabot alerts
   (GHSA-587h-7wmj-h5pm, GHSA-rq7h-c2jc-7f22, GHSA-r825-w8mm-5pxw, GHSA-698v-4r3x-3vcv,
   GHSA-9jrq-w75r-8gcw). `vite` reaches this tree only as a peerDependency of
@@ -43,7 +61,9 @@
   shipped bundle.
 
 ## [2.15.9] - 2026-10-14
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.15.8] - 2026-10-13
