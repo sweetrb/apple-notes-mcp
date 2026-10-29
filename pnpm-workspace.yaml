@@ -25,7 +25,18 @@ minimumReleaseAge: 10080
 # fully patched releases. Keep the overrides until the SDK's ranges move past
 # these security fixes.
 overrides:
-  "@hono/node-server": 2.0.10
+  # GHSA-rmxm-3fg6-px4f (moderate, serveStatic double-decode), fixed in 2.1.3
+  # (published 2026-09-29, past the 7-day minimumReleaseAge soak). Reached via
+  # @modelcontextprotocol/sdk; the HTTP path is never entered by this stdio
+  # server. This was an exact pin (2.0.10), which is a CEILING, not a floor --
+  # see fast-uri below. Two-sided range, never an exact pin.
+  "@hono/node-server": ">=2.1.3 <3"
+  # GHSA-27r3-jxmh-p828 (high), fixed in 2.4.0 (published 2026-10-22T11:39Z; the
+  # 7-day minimumReleaseAge soak cleared 2026-10-29T11:40Z, no
+  # minimumReleaseAgeExclude carve-out). Reached via @modelcontextprotocol/sdk ->
+  # express -> body-parser, the HTTP transport this stdio server never enters.
+  # Two-sided range, never an exact pin, for the reason recorded on fast-uri below.
+  body-parser: ">=2.4.0 <3"
   # GHSA-mh99-v99m-4gvg / CVE-2026-14257 (high): unbounded brace expansion.
   # Dev toolchain only -- brace-expansion is not in the shipped bundle -- but
   # three separate majors are reachable here (eslint -> minimatch@3 -> v1,
