@@ -653,6 +653,92 @@ describe("executeAppleScript", () => {
       expect(mockExecFileSync).toHaveBeenCalledTimes(2);
     });
 
+    describe("a retry after a timeout never replaces the timeout (#316)", () => {
+      it("keeps Notes' AppleEvent timeout when the retry reports the note missing", () => {
+        let callCount = 0;
+        mockExecFileSync.mockImplementation(() => {
+          callCount++;
+          throw new Error(
+            callCount === 1
+              ? "execution error: Notes got an error: AppleEvent timed out. (-1712)"
+              : 'execution error: Notes got an error: Can\'t get note id "x-coredata://S/ICNote/p1". (-1728)'
+          );
+        });
+
+        const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+        expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/^Notes got an error: AppleEvent timed out\./);
+        expect(result.error).toContain("A retry then failed: Note not found.");
+        // The exact missing-ID diagnostic must not survive as the whole error,
+        // or a caller would report a definitive not_found.
+        expect(result.error).not.toBe(
+          "Note not found. The note may have been deleted or the ID is invalid."
+        );
+      });
+
+      it("keeps the runner's own process timeout the same way", () => {
+        let callCount = 0;
+        mockExecFileSync.mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) throw makeTimeoutError();
+          throw new Error('execution error: Can\'t get note id "x". (-1728)');
+        });
+
+        const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+        expect(result.error).toMatch(/^Operation timed out after \d+ seconds\./);
+        expect(result.error).toContain("A retry then failed:");
+      });
+
+      it("reports a retry that also timed out as the timeout alone", () => {
+        mockExecFileSync.mockImplementation(() => {
+          throw new Error("execution error: Notes got an error: AppleEvent timed out. (-1712)");
+        });
+
+        const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+        expect(result.error).toBe("Notes got an error: AppleEvent timed out.");
+      });
+
+      it("leaves a non-timeout first failure's retry error unchanged", () => {
+        let callCount = 0;
+        mockExecFileSync.mockImplementation(() => {
+          callCount++;
+          throw new Error(
+            callCount === 1
+              ? "Notes.app is not responding"
+              : 'execution error: Can\'t get note id "x". (-1728)'
+          );
+        });
+
+        const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+        expect(result.error).toBe(
+          "Note not found. The note may have been deleted or the ID is invalid."
+        );
+      });
+
+      it("does not read a quoted note title as a timeout", () => {
+        let callCount = 0;
+        mockExecFileSync.mockImplementation(() => {
+          callCount++;
+          throw new Error(
+            callCount === 1
+              ? "Notes.app is not responding"
+              : 'execution error: Can\'t get note "Meeting timed out". (-1728)'
+          );
+        });
+
+        const result = executeAppleScript("test", { maxRetries: 2, retryDelayMs: 1 });
+
+        expect(result.error).toBe(
+          'Note "Meeting timed out" not found. Verify the title is exact (case-sensitive).'
+        );
+      });
+    });
+
     it("retries on 'connection invalid' errors", () => {
       let callCount = 0;
       mockExecFileSync.mockImplementation(() => {

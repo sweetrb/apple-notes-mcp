@@ -54466,6 +54466,7 @@ var RETRYABLE_ERROR_PATTERNS = [
   /busy/i,
   /changed during listing/i
 ];
+var TIMED_OUT_PATTERN = /timed? out|\(-1712\)/i;
 function isRetryableError(errorMessage) {
   return RETRYABLE_ERROR_PATTERNS.some((pattern2) => pattern2.test(errorMessage));
 }
@@ -54594,6 +54595,7 @@ function executeAppleScript(script, options = {}) {
     maxRetries
   });
   let lastError = null;
+  let timeoutDiagnostic;
   const startTime = Date.now();
   const deadline = startTime + timeoutMs;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -54652,10 +54654,12 @@ function executeAppleScript(script, options = {}) {
         errorMessage,
         rawError: rawError?.substring(0, 500)
       });
+      const attemptTimedOut = isTimeout || TIMED_OUT_PATTERN.test(stripQuoted(errorMessage));
+      if (attemptTimedOut) timeoutDiagnostic ??= errorMessage;
       lastError = {
         success: false,
         output: "",
-        error: errorMessage
+        error: timeoutDiagnostic && !attemptTimedOut ? `${timeoutDiagnostic} A retry then failed: ${errorMessage}` : errorMessage
       };
       const canRetry = isTimeout || isRetryableError(errorMessage);
       const hasAttemptsLeft = attempt < maxRetries;
@@ -67196,6 +67200,42 @@ function readNoteStructure(id2, { dbPath: dbPath2 = NOTES_DB_PATH8, includeText 
   };
 }
 
+// src/utils/notePresence.ts
+var NOTE_ID3 = /^x-coredata:\/\/([0-9A-Fa-f-]+)\/ICNote\/p(\d+)$/;
+function readNotePresence(id2, dbPath2 = NOTES_DB_PATH8) {
+  const match = NOTE_ID3.exec(id2);
+  if (!match) return null;
+  const [, store, pk] = match;
+  try {
+    const columns = readColumns(dbPath2);
+    const c = (alias, name) => col(columns, alias, name);
+    const sql = `SELECT json_object(
+        'store', (SELECT Z_UUID FROM Z_METADATA LIMIT 1),
+        'isNote', n.Z_ENT = ${entity("ICNote")},
+        'live', ${notTombstonedSql(columns, "n")},
+        'title', ${c("n", "ZTITLE1")},
+        'locked', ${c("n", "ZISPASSWORDPROTECTED")},
+        'encrypted', (SELECT d.ZCRYPTOINITIALIZATIONVECTOR IS NOT NULL FROM ZICNOTEDATA d WHERE d.ZNOTE = n.Z_PK),
+        'inTrash', CASE WHEN f.Z_PK IS NULL THEN 0 ELSE ${trashFolderSql(columns, "f")} END)
+      FROM ZICCLOUDSYNCINGOBJECT n
+      LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON f.Z_PK = ${c("n", "ZFOLDER")}
+      WHERE n.Z_PK = @pk;`;
+    const [row] = parseJsonLines(
+      runReadOnlySql(dbPath2, sql, { pk: { int: Number(pk) } })
+    );
+    if (!row || typeof row.store !== "string" || row.store.toUpperCase() !== store.toUpperCase())
+      return null;
+    if (row.isNote !== 1 || row.live !== 1) return null;
+    return {
+      title: typeof row.title === "string" ? row.title : null,
+      locked: row.locked === 1 || row.encrypted === 1,
+      inRecentlyDeleted: row.inTrash === 1
+    };
+  } catch {
+    return null;
+  }
+}
+
 // src/utils/bodyReadFailure.ts
 var LARGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 var OUTPUT_OVERFLOW = /Notes\.app returned more than [\d.]+ (?:MB|bytes) of output/;
@@ -67229,6 +67269,11 @@ function describeBodyReadFailure(title, error62, attachments) {
     return `${base}
 
 ${cause2} ${remedy2}`;
+  }
+  if (attachments && attachments.length === 0) {
+    return `${base}
+
+The note has no attachments, so its size is not the cause: Notes.app was most likely busy (for example, syncing iCloud) and did not answer in time. Retry in a moment, or with a longer timeoutSeconds (up to 120). get-note-structure reads the note from the NoteStore database without Notes.app.`;
   }
   const cause = large.length > 0 ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.` : "Notes.app returns images inside the note body as base64, so a note with a very large image can take longer to read than the timeout allows.";
   const remedy = "Retry with a longer timeoutSeconds (up to 120) or raise APPLE_NOTES_MCP_TIMEOUT_MS. If it still fails, delete or shrink the attachment in Notes.app; delete-note needs a successful read to verify the note first.";
@@ -79607,6 +79652,12 @@ function bodyReadFailureMessage(id2, title, error62) {
   }
   return describeBodyReadFailure(title, error62, attachments);
 }
+function isExactIdNotFound(error62) {
+  return error62 === NOTE_ID_NOT_FOUND_MESSAGE || error62 !== void 0 && /^Can[’']t get note id\b/i.test(error62);
+}
+function storedNoteUnresolvedMessage(id2, title, error62) {
+  return `Failed to read content of note "${title}" (ID "${id2}"): Notes.app did not resolve the ID (${error62}), but the NoteStore database holds this note, so it is not reported as not found. Notes.app may be busy, for example syncing iCloud. Retry in a moment; get-note-structure reads the note from the database without Notes.app.`;
+}
 var NOT_DELETED_MESSAGE = "Notes.app accepted the delete, but the note is still in its original folder, so it was not moved to Recently Deleted. Nothing was deleted; read the note again before retrying.";
 function deleteUnverifiedMessage(title, id2) {
   return `Notes.app accepted the delete for note "${title}", but its original folder could not be re-read to confirm the note left it. The outcome is uncertain; read exact ID ${id2} before retrying.`;
@@ -80098,19 +80149,36 @@ registerTool(
   },
   withErrorHandling(({ id: id2, title, account }) => {
     if (id2) {
-      const { note: note2, error: metadataError } = notesManager.readNoteById(id2);
-      if (!note2) {
-        const message = `Failed to read metadata of note with ID "${id2}": ${metadataError}`;
-        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE ? notFoundResponse(message) : errorResponse(message);
-      }
-      if (note2.passwordProtected) {
-        return errorResponse(
-          `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
-        );
+      const stored = readNotePresence(id2);
+      let noteTitle;
+      if (stored && stored.title !== null) {
+        if (stored.locked) {
+          return errorResponse(
+            `Note "${stored.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+          );
+        }
+        noteTitle = stored.title;
+      } else {
+        const { note: note2, error: metadataError } = notesManager.readNoteById(id2);
+        if (!note2) {
+          const message = `Failed to read metadata of note with ID "${id2}": ${metadataError}`;
+          return metadataError === NOTE_ID_NOT_FOUND_MESSAGE ? notFoundResponse(message) : errorResponse(message);
+        }
+        if (note2.passwordProtected) {
+          return errorResponse(
+            `Note "${note2.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+          );
+        }
+        noteTitle = note2.title;
       }
       const { body: rawContent2, error: readError2 } = notesManager.readNoteBodyById(id2);
       if (!rawContent2) {
-        return errorResponse(bodyReadFailureMessage(id2, note2.title, readError2));
+        if (isExactIdNotFound(readError2)) {
+          if (!stored) return notFoundResponse(bodyReadFailureMessage(id2, noteTitle, readError2));
+          const message = storedNoteUnresolvedMessage(id2, noteTitle, readError2);
+          return errorResponse(message, new CodedError(message, { code: "notes_unavailable" }));
+        }
+        return errorResponse(bodyReadFailureMessage(id2, noteTitle, readError2));
       }
       const rich2 = enrichNoteRead(id2, rawContent2);
       const stripped2 = stripLargeInlineImages(rich2.content);
@@ -80120,7 +80188,7 @@ registerTool(
       return successResponse(warning2 ? content2 + warning2 : content2, {
         id: id2,
         ...noteIdentifiers(id2),
-        title: note2.title,
+        title: noteTitle,
         content: content2,
         contentHash: richContentHash(rawContent2, rich2),
         links: rich2.links,

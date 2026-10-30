@@ -143,10 +143,10 @@ Off unless the user built it (`apple-notes-mcp setup --native-helper`) and set
 `readNoteState` or `readChecklist` feature is `available`. The helper is
 read-only: write support was deliberately deferred by the maintainer.
 
-| Tool                   | Purpose                                                                   |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `native-helper-status` | Report opt-in, build, and live-probe state with a reason code (read-only) |
-| `native-note-state`    | Read a note's native state and `revision` change token (read-only)        |
+| Tool                     | Purpose                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `native-helper-status`   | Report opt-in, build, and live-probe state with a reason code (read-only)                                        |
+| `native-note-state`      | Read a note's native state and `revision` change token (read-only)                                               |
 | `native-checklist-state` | Read exact native todo identities/state and `contiguous`, `consistent`, `spansLines` ambiguity flags (read-only) |
 
 ## Usage Patterns
@@ -458,6 +458,7 @@ If your client shows only text, not `structuredContent`, every result that has i
 - **"Permission denied"**: User needs to grant automation permission in System Settings > Privacy & Security > Automation. The user can run `apple-notes-mcp setup --permissions --open --probe-automation` in their terminal to check every grant and open each missing pane
 - **Native write times out or reports an uncertain outcome** ("Shortcuts timed out waiting for …", "Operation outcome uncertain", "readback was not verified"): do not retry. Read the exact note first — the write may have landed. If it did not, the named bridge Shortcut is likely waiting on a first-run consent prompt that a background run cannot display; ask the user to run that Shortcut once in the foreground in Shortcuts.app and choose Always Allow (once per bridge, after install or upgrade), then retry
 - **Slow Notes.app**: `create-note`, `update-note`, `append-to-note`, `delete-note`, and `move-note` accept `timeoutSeconds` (1–120) for each automation step of that call. A timed-out write is uncertain; read the exact note before retrying
+- **Read times out, or Notes.app cannot resolve an id the database holds**: `timeout_indeterminate` and `notes_unavailable` from `get-note-content` mean Notes.app was busy (often iCloud sync), not that the note is gone; only `not_found` means that. Retry after a moment, or read the note with `get-note-structure`, which does not go through Notes.app
 - **Read times out on a note with a large image**: Notes.app returns images inside the body as base64, so a multi-megabyte image can outlast the read timeout, which also blocks `delete-note`. The error names the large attachments when Full Disk Access is granted. Retry `get-note-content` (and then `delete-note`) with a larger `timeoutSeconds`; if it still fails, have the user remove the image or delete the note in Notes.app
 - **"Notes.app accepted the delete, but the note is still in its original folder"**: nothing was deleted. Read the note again before retrying
 - **"Notes.app returned more than … of output"**: a size limit, not a timeout, so retrying will not help. Note bodies embed inline images as base64; body reads accept up to 512 MB, and other calls follow `APPLE_NOTES_MCP_MAX_BUFFER` (64 MB default). A note with a large image can still be read and deleted by id
