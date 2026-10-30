@@ -1,5 +1,31 @@
 ## [Unreleased]
 
+## [2.15.16] - 2026-10-29
+
+### Fixed
+
+- **`get-note-content` by exact id no longer reports a note that exists as `not_found`
+  when Notes.app is slow (#316).** Root cause: the AppleScript runner retries a timed-out
+  call, and when the retry then failed differently (Notes.app, still busy with the
+  abandoned event, answering "Can't get note id") that second error replaced the timeout,
+  so a 30-second AppleEvent timeout came back as a definitive `not_found`. The runner now
+  keeps the first timeout's diagnostic and appends the retry's error ("… A retry then
+  failed: …"), so the result stays `timeout_indeterminate` for every tool, not just this
+  one.
+- **`get-note-content` by id reads existence and the password flag from the NoteStore
+  database** (the same exact-ID read `get-note-structure` makes) when it holds the note, and
+  skips the AppleScript metadata step that timed out in #316. That leaves one Notes.app
+  round trip (the body) instead of two. Without Full Disk Access, or for a note not yet saved
+  to the database, the AppleScript metadata read runs as before. Content and `contentHash`
+  still come from the AppleScript body, so hashes stay compatible with every write guard.
+- **A body read that Notes.app answers with "not found" is checked against the database:**
+  when the store still holds the live note, the result is `notes_unavailable` (Notes.app
+  busy, retry), not `not_found`; when it does not, the result is `not_found` (it was
+  previously misclassified as `verification_failed`).
+- **A body-read timeout on a note with no attachments no longer blames a large image.** The
+  error says Notes.app was most likely busy, suggests a retry or a longer `timeoutSeconds`,
+  and points to `get-note-structure` for a read that does not need Notes.app.
+
 ## [2.15.15] - 2026-10-29
 
 ### Security

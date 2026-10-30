@@ -154,6 +154,7 @@ import {
   type NoteParagraph,
 } from "@/utils/noteParagraphs.js";
 import { describeNoteStructure, readNoteStructure } from "@/utils/noteStructure.js";
+import { readNotePresence } from "@/utils/notePresence.js";
 import { classifyBodyReadError, describeBodyReadFailure } from "@/utils/bodyReadFailure.js";
 import { describeLinkInventory, listNoteLinks } from "@/utils/noteLinkInventory.js";
 import { MAX_LINK_LABEL_LENGTH, MAX_LINK_URL_LENGTH } from "@/utils/linkInsert.js";
@@ -632,6 +633,27 @@ function bodyReadFailureMessage(id: string, title: string, error: string | undef
     }
   }
   return describeBodyReadFailure(title, error, attachments);
+}
+
+/** Is this read error Notes.app's own "this exact ID does not resolve"? */
+function isExactIdNotFound(error: string | undefined): boolean {
+  return (
+    error === NOTE_ID_NOT_FOUND_MESSAGE ||
+    (error !== undefined && /^Can[’']t get note id\b/i.test(error))
+  );
+}
+
+/**
+ * Notes.app could not resolve an exact ID that the NoteStore database holds
+ * as a live note (#316). Not a definitive not_found: Notes.app is most likely
+ * busy, for example syncing iCloud.
+ */
+function storedNoteUnresolvedMessage(id: string, title: string, error: string | undefined): string {
+  return (
+    `Failed to read content of note "${title}" (ID "${id}"): Notes.app did not resolve the ID (${error}), ` +
+    "but the NoteStore database holds this note, so it is not reported as not found. " +
+    "Notes.app may be busy, for example syncing iCloud. Retry in a moment; get-note-structure reads the note from the database without Notes.app."
+  );
 }
 
 /** Notes.app accepted a delete event but the note stayed in its folder. */
@@ -1384,24 +1406,52 @@ registerTool(
   withErrorHandling(({ id, title, account }) => {
     // Prefer ID-based lookup if provided
     if (id) {
-      // Check for password protection first for better error message
-      const { note, error: metadataError } = notesManager.readNoteById(id);
-      if (!note) {
-        const message = `Failed to read metadata of note with ID "${id}": ${metadataError}`;
-        // The executor's exact missing-ID diagnostic contains "may have been",
-        // which otherwise matches the shared uncertain-write classification.
-        return metadataError === NOTE_ID_NOT_FOUND_MESSAGE
-          ? notFoundResponse(message)
-          : errorResponse(message);
-      }
-      if (note.passwordProtected) {
-        return errorResponse(
-          `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
-        );
+      // Existence and the password flag come from the NoteStore database when
+      // it holds the note, the same exact-ID read get-note-structure makes, so
+      // the read costs Notes.app one Apple Event round trip (the body) instead
+      // of two. The AppleScript metadata step is what timed out, and once
+      // reported a note those native reads found as missing, while Notes.app
+      // was busy (#316). Without the database (no Full Disk Access, or a note
+      // not yet saved there) the AppleScript metadata read runs as before.
+      const stored = readNotePresence(id);
+      let noteTitle: string;
+      if (stored && stored.title !== null) {
+        if (stored.locked) {
+          return errorResponse(
+            `Note "${stored.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+          );
+        }
+        noteTitle = stored.title;
+      } else {
+        // Check for password protection first for better error message
+        const { note, error: metadataError } = notesManager.readNoteById(id);
+        if (!note) {
+          const message = `Failed to read metadata of note with ID "${id}": ${metadataError}`;
+          // The executor's exact missing-ID diagnostic contains "may have been",
+          // which otherwise matches the shared uncertain-write classification.
+          // A timeout keeps its own code: the runner never lets a retry's
+          // "not found" replace an earlier timeout's diagnostic (#316).
+          return metadataError === NOTE_ID_NOT_FOUND_MESSAGE
+            ? notFoundResponse(message)
+            : errorResponse(message);
+        }
+        if (note.passwordProtected) {
+          return errorResponse(
+            `Note "${note.title}" is password-protected and cannot be read. Unlock it in Notes.app first.`
+          );
+        }
+        noteTitle = note.title;
       }
       const { body: rawContent, error: readError } = notesManager.readNoteBodyById(id);
       if (!rawContent) {
-        return errorResponse(bodyReadFailureMessage(id, note.title, readError));
+        if (isExactIdNotFound(readError)) {
+          // Notes.app said the ID does not resolve. That is definitive only
+          // when the database does not hold the note either.
+          if (!stored) return notFoundResponse(bodyReadFailureMessage(id, noteTitle, readError));
+          const message = storedNoteUnresolvedMessage(id, noteTitle, readError);
+          return errorResponse(message, new CodedError(message, { code: "notes_unavailable" }));
+        }
+        return errorResponse(bodyReadFailureMessage(id, noteTitle, readError));
       }
       // Cap inline base64 images so an image-heavy note cannot produce a
       // response large enough to blow the client's MCP message limit.
@@ -1413,7 +1463,7 @@ registerTool(
       return successResponse(warning ? content + warning : content, {
         id,
         ...noteIdentifiers(id),
-        title: note.title,
+        title: noteTitle,
         content,
         contentHash: richContentHash(rawContent, rich),
         links: rich.links,

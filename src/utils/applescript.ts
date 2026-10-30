@@ -216,6 +216,13 @@ const RETRYABLE_ERROR_PATTERNS = [
 ];
 
 /**
+ * An attempt that ran out of time: the runner's own process timeout, or Notes'
+ * "AppleEvent timed out" (-1712) when the in-script `with timeout` fires first.
+ * Tested against unquoted text, so a note titled "Meeting timed out" is not one.
+ */
+const TIMED_OUT_PATTERN = /timed? out|\(-1712\)/i;
+
+/**
  * Checks if an error message indicates a transient failure that should be retried.
  *
  * @param errorMessage - The error message to check
@@ -496,6 +503,12 @@ export function executeAppleScript(
   });
 
   let lastError: AppleScriptResult | null = null;
+  // The first timeout's diagnostic, kept once an attempt times out. A retry
+  // that then fails differently (for example "Can't get note id" while
+  // Notes.app is still busy with the abandoned event) must not replace it: the
+  // caller would read a definitive answer where the real outcome is a timeout
+  // (#316).
+  let timeoutDiagnostic: string | undefined;
   const startTime = Date.now();
   const deadline = startTime + timeoutMs;
 
@@ -577,10 +590,15 @@ export function executeAppleScript(
         rawError: rawError?.substring(0, 500),
       });
 
+      const attemptTimedOut = isTimeout || TIMED_OUT_PATTERN.test(stripQuoted(errorMessage));
+      if (attemptTimedOut) timeoutDiagnostic ??= errorMessage;
       lastError = {
         success: false,
         output: "",
-        error: errorMessage,
+        error:
+          timeoutDiagnostic && !attemptTimedOut
+            ? `${timeoutDiagnostic} A retry then failed: ${errorMessage}`
+            : errorMessage,
       };
 
       // Check if we should retry

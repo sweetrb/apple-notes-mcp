@@ -728,6 +728,8 @@ Retrieves the full content of a specific note.
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended as it's unique and avoids issues with duplicate titles.
 
+**Busy Notes.app:** with an `id` and Full Disk Access, the note's existence and password flag are read from the NoteStore database (as `get-note-structure` does), so only the body read goes through Notes.app. A timeout is always reported as `timeout_indeterminate`, never as `not_found`, even when an automatic retry then fails differently; and when Notes.app cannot resolve an id the database still holds, the error is `notes_unavailable`. Retry in a moment, or use `get-note-structure` for a read that does not need Notes.app.
+
 **Large images:** Notes.app returns images inside the body as base64, so a note holding a very large image (tens of MB) can take longer to read than the timeout allows. When the read times out or overflows the output buffer, the error says so and, with Full Disk Access, names the attachments of 5 MB or more. Retry with a larger `timeoutSeconds`; `delete-note` accepts the same argument, and it needs a successful read to verify the note before deleting it.
 
 **Example - Using ID (recommended):**

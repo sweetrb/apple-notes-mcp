@@ -38,6 +38,15 @@ const CASES = [
     text: "Metadata read may have been interrupted",
     indeterminate: true,
   },
+  {
+    // #316: the first attempt hits Notes' AppleEvent timeout and the retry
+    // reports the ID missing. The timeout must survive as the result.
+    name: "timeout-then-missing",
+    code: "timeout_indeterminate",
+    text: "AppleEvent timed out",
+    indeterminate: true,
+    attempts: 2,
+  },
   { name: "protected", code: "unsupported", text: "password-protected" },
   { name: "launcher", code: "operation_failed", text: "spawnSync osascript EACCES" },
 ];
@@ -57,6 +66,11 @@ const responses = {
   uncertain: "execution error: Metadata read may have been interrupted",
 };
 const mode = process.env.FIXTURE_CASE;
+const attempt = fs.readFileSync(process.env.FIXTURE_CALLS, "utf8").trim().split("\\n").length;
+if (mode === "timeout-then-missing") {
+  process.stderr.write(attempt === 1 ? "execution error: Notes got an error: AppleEvent timed out. (-1712)" : responses.missing);
+  process.exit(1);
+}
 if (mode === "timeout") { setTimeout(() => process.exit(0), 3000); }
 else if (mode === "malformed") { process.stdout.write('Private "timed out -1743" note not found'); }
 else if (mode === "protected") { process.stdout.write(["timed out -1743", process.env.FIXTURE_ID, "2026-10-12-10-20-0", "2026-10-12-11-30-0", "false", "true"].join("\\x1f")); }
@@ -84,8 +98,9 @@ describe("built server retains initial metadata diagnostics", () => {
             PATH: fixture,
             APPLE_NOTES_MCP_BROKER: "off",
             APPLE_NOTES_MCP_CONFIG_FILE: config,
-            APPLE_NOTES_MCP_MAX_RETRIES: "1",
-            APPLE_NOTES_MCP_TIMEOUT_MS: "1000",
+            APPLE_NOTES_MCP_MAX_RETRIES: String(test.attempts ?? 1),
+            APPLE_NOTES_MCP_TIMEOUT_MS: test.attempts ? "10000" : "1000",
+            APPLE_NOTES_MCP_RETRY_DELAY_MS: "1",
             FIXTURE_CASE: test.name,
             FIXTURE_CALLS: calls,
             FIXTURE_ID: ID,
@@ -110,7 +125,7 @@ describe("built server retains initial metadata diagnostics", () => {
               .trim()
               .split("\n")
               .map((line) => JSON.parse(line))
-          ).toEqual([{ metadataOnly: true }]);
+          ).toEqual(Array(test.attempts ?? 1).fill({ metadataOnly: true }));
         }
       } finally {
         await client.close();

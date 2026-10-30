@@ -95,6 +95,15 @@ describe("describeBodyReadFailure", () => {
     expect(text).not.toContain("Retry with a longer");
   });
 
+  it("does not blame an image when the note has no attachments (#316)", () => {
+    const text = describeBodyReadFailure("Test", TIMEOUT, []);
+    expect(text).toContain("no attachments");
+    expect(text).toContain("busy");
+    expect(text).toContain("get-note-structure");
+    expect(text).not.toContain("shrink");
+    expect(text).not.toContain("base64");
+  });
+
   it("keeps other failures to the plain message", () => {
     expect(describeBodyReadFailure("Test", "Not found: note id x", [])).toBe(
       'Failed to read content of note "Test": Not found: note id x'

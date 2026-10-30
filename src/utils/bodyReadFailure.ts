@@ -91,6 +91,14 @@ export function describeBodyReadFailure(
       "Retrying, or a longer timeoutSeconds, will not help. Remove or shrink the attachment in Notes.app, or delete the note there; delete-note needs a successful read to verify the note first.";
     return `${base}\n\n${cause} ${remedy}`;
   }
+  if (attachments && attachments.length === 0) {
+    // No attachment to blame (#316): the note's size is not the cause, so
+    // telling the caller to shrink an image would send them the wrong way.
+    return (
+      `${base}\n\nThe note has no attachments, so its size is not the cause: Notes.app was most likely busy (for example, syncing iCloud) and did not answer in time. ` +
+      "Retry in a moment, or with a longer timeoutSeconds (up to 120). get-note-structure reads the note from the NoteStore database without Notes.app."
+    );
+  }
   const cause =
     large.length > 0
       ? `${holds}Notes.app returns images inside the note body as base64, so a large image makes the body too big to read in time.`
