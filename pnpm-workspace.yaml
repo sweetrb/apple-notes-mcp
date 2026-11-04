@@ -25,6 +25,17 @@ minimumReleaseAge: 10080
 # fully patched releases. Keep the overrides until the SDK's ranges move past
 # these security fixes.
 overrides:
+  # GHSA-g3hv-75wg-m249 (moderate, ReDoS via globparts amplification), fixed in
+  # 11.0.1 (published 2026-10-27T22:26Z; the 7-day minimumReleaseAge soak cleared
+  # 2026-11-03, no minimumReleaseAgeExclude carve-out). Dev-only: reached via
+  # eslint -> @eslint/config-array / @eslint/eslintrc (minimatch 3) and
+  # @typescript-eslint/typescript-estree (minimatch 10); not in the shipped bundle.
+  # Both majors are floored independently, two-sided, and verified live: lint,
+  # typecheck and tests pass on minimatch 11 (3 -> 11 works because eslint only
+  # calls minimatch through its CJS interop). Never an exact pin, for the reason
+  # recorded on fast-uri above.
+  "minimatch@>=3.0.0 <4": ">=11.0.1 <12"
+  "minimatch@>=10.0.0 <11": ">=11.0.1 <12"
   # GHSA-rmxm-3fg6-px4f (moderate, serveStatic double-decode), fixed in 2.1.3
   # (published 2026-09-29, past the 7-day minimumReleaseAge soak). Reached via
   # @modelcontextprotocol/sdk; the HTTP path is never entered by this stdio
