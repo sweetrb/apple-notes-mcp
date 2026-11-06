@@ -52,6 +52,7 @@ describe("direct Notes operations", () => {
       getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
       getNoteContentById: vi.fn(() => "existing"),
       listAttachmentsById: vi.fn(),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(),
     };
     const registerTool = vi.fn();
@@ -101,6 +102,7 @@ describe("direct Notes operations", () => {
         .fn()
         .mockReturnValueOnce([{ id: "existing" }])
         .mockReturnValue([{ id: "existing" }, { id: attachmentId }, { id: attachmentId }]),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(() => attachmentId),
       saveAttachmentById: savesAs(valid ? bytes : Buffer.from("wrong")),
     };
@@ -116,6 +118,48 @@ describe("direct Notes operations", () => {
     if (valid) expect(result.structuredContent).toMatchObject({ ok: true, attachmentId });
     else expect(result).toMatchObject({ isError: true });
   });
+
+  it.each([1, 2])(
+    "reports an attachment Notes still lists %i time(s) after insertion (#321)",
+    async (copies) => {
+      const id = "x-coredata://ABC/ICNote/p1";
+      const attachmentId = "x-coredata://ABC/ICAttachment/p3";
+      const bytes = Buffer.from("png bytes");
+      const directory = mkdtempSync(join(tmpdir(), "direct-operation-dup-test-"));
+      directories.push(directory);
+      const path = join(directory, "photo.png");
+      writeFileSync(path, bytes);
+      rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
+      rich.read.mockReturnValue({ ...plainRichNote("existing"), revision: "rich" });
+      rich.hash.mockReturnValue("revision");
+      const manager = {
+        getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
+        getNoteContentById: vi.fn(() => "existing"),
+        listAttachmentsById: vi
+          .fn()
+          .mockReturnValueOnce([])
+          .mockReturnValue([{ id: attachmentId, name: "photo.png" }]),
+        countAttachmentEntriesById: vi.fn(() => copies),
+        addAttachmentById: vi.fn(() => attachmentId),
+        saveAttachmentById: savesAs(bytes),
+      };
+      const registerTool = vi.fn();
+      registerDirectOperations(
+        { registerTool } as unknown as McpServer,
+        manager as unknown as AppleNotesManager
+      );
+      const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
+      const result = await handler({ id, expectedContentHash: "revision", path });
+      expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+      expect(manager.countAttachmentEntriesById).toHaveBeenCalledWith(id, attachmentId);
+      if (copies === 1) expect(result.structuredContent).toMatchObject({ ok: true, attachmentId });
+      else {
+        expect(result).toMatchObject({ isError: true });
+        expect(JSON.stringify(result)).toContain("2 times");
+        expect(JSON.stringify(result)).toContain("do not attach the file again");
+      }
+    }
+  );
 
   it("verifies a file over the 25 MiB base64 fetch cap (#243)", async () => {
     const id = "x-coredata://ABC/ICNote/p1";
@@ -135,6 +179,7 @@ describe("direct Notes operations", () => {
         .fn()
         .mockReturnValueOnce([])
         .mockReturnValue([{ id: attachmentId, name: "large.png" }]),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(() => attachmentId),
       saveAttachmentById: savesAs(bytes),
       // The capped base64 path must not be used for verification.
@@ -173,6 +218,7 @@ describe("direct Notes operations", () => {
         .fn()
         .mockReturnValueOnce([])
         .mockReturnValue([{ id: attachmentId, name: "large.png" }]),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(() => attachmentId),
       saveAttachmentById: savesAs(bytes.subarray(1)),
     };
@@ -211,6 +257,7 @@ describe("attachment filename override and create-then-attach", () => {
         .fn()
         .mockReturnValueOnce([])
         .mockReturnValue([{ id: attachmentId, name: reportedName }]),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(() => attachmentId),
       saveAttachmentById: savesAs(bytes),
     };
@@ -779,6 +826,7 @@ describe("add-attachment verifies through NoteStore when AppleScript lists nothi
       getNoteContentById: vi.fn(() => "existing"),
       // Notes' AppleScript on macOS 27 never lists the PDF.
       listAttachmentsById: vi.fn(() => []),
+      countAttachmentEntriesById: vi.fn(() => 1),
       addAttachmentById: vi.fn(() => returnedId),
       saveAttachmentById: vi.fn(),
       getAttachmentAssetsById: vi.fn(stored),

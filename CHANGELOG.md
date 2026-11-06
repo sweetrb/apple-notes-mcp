@@ -1,7 +1,28 @@
 ## [Unreleased]
 
+## [2.15.18] - 2026-11-06
+
+### Fixed
+
+- **`add-attachment` (and `create-note-with-attachment`, `add-attachment-from-pasteboard`)
+  no longer leaves the file in the note twice (#321).** Notes.app's AppleScript
+  `make new attachment` writes the new attachment into the note body twice: one
+  attachment object, two body references, so Notes shows the image or file twice. Every
+  form of the command does it (verified on macOS 27.2). The tool now deletes the extra
+  entries by index in the same AppleScript call, which removes only their body
+  references and keeps the attachment and its file, then checks that Notes lists the
+  attachment once. #197 (2.8.41) read the doubled listing as an enumeration glitch and
+  de-duplicated it, which hid this.
+- **A duplicate the tool cannot remove is reported, not passed as success.** Notes on
+  macOS 27 does not list PDF attachments, so a PDF's extra copy is out of AppleScript's
+  reach. The NoteStore body decoder now counts every attachment reference, and when the
+  database shows a new attachment more than once the tool returns an error naming it, so
+  the agent asks the user to delete the extra copy instead of attaching again.
+
 ## [2.15.17] - 2026-11-04
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.15.16] - 2026-10-29

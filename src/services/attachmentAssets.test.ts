@@ -26,7 +26,11 @@ const assets = { orderSource: "body" as const, attachments: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readNoteAttachmentRows).mockReturnValue({ rows: [], bodyOrder: ["X"] });
+  vi.mocked(readNoteAttachmentRows).mockReturnValue({
+    rows: [],
+    bodyOrder: ["X"],
+    bodyRefs: ["X"],
+  });
   vi.mocked(assembleAttachmentAssets).mockReturnValue(assets);
 });
 
@@ -35,7 +39,7 @@ describe("attachment asset manager methods", () => {
     const manager = new AppleNotesManager();
     expect(manager.getAttachmentAssetsById(NOTE)).toBe(assets);
     expect(readNoteAttachmentRows).toHaveBeenCalledWith(NOTE);
-    expect(assembleAttachmentAssets).toHaveBeenCalledWith([], ["X"]);
+    expect(assembleAttachmentAssets).toHaveBeenCalledWith([], ["X"], undefined, ["X"]);
   });
 
   it("selects the first image from the assembled attachments", () => {

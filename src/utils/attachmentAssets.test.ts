@@ -30,6 +30,7 @@ import {
   assetPathsFor,
   attachmentCoreDataId,
   attachmentOrderFromNoteData,
+  attachmentRunsFromNoteData,
   buildAttachmentRowsSql,
   classifyAttachmentKind,
   collisionName,
@@ -360,6 +361,34 @@ describe("row parsing and body order", () => {
     expect(attachmentOrderFromNoteData(gzipSync(Buffer.from([8, 1])).toString("hex"))).toBeNull();
     const dup = noteBody(["a", "A", "b"]).toString("hex");
     expect(attachmentOrderFromNoteData(dup)).toEqual(["a", "b"]);
+  });
+
+  it("counts every body reference, so a doubled attachment shows twice (#321)", () => {
+    const doubled = noteBody(["a", "a", "b"]).toString("hex");
+    expect(attachmentRunsFromNoteData(doubled)).toEqual(["a", "a", "b"]);
+    expect(attachmentOrderFromNoteData(doubled)).toEqual(["a", "b"]);
+    expect(attachmentRunsFromNoteData(undefined)).toBeNull();
+    const row = {
+      pk: 1,
+      identifier: "a",
+      uti: "public.png",
+      parentPk: null,
+      filename: null,
+      mediaIdentifier: null,
+      mediaFilename: null,
+      mediaGeneration: null,
+      fallbackImageGeneration: null,
+      fallbackPdfGeneration: null,
+      accountIdentifier: null,
+    };
+    const assets = assembleAttachmentAssets(
+      [row, { ...row, pk: 2, identifier: "b" }],
+      ["a", "b"],
+      undefined,
+      ["a", "A", "b"]
+    );
+    expect(assets.attachments[0].bodyReferences).toBe(2);
+    expect(assets.attachments[1]).not.toHaveProperty("bodyReferences");
   });
 
   it("parses note ids and forms AppleScript attachment ids", () => {

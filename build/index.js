@@ -57554,24 +57554,34 @@ function parseAttachmentRows(json3) {
   }
   return rows.sort((a, b) => a.pk - b.pk);
 }
-function attachmentOrderFromNoteData(hex5) {
+function attachmentRunsFromNoteData(hex5) {
   if (!hex5 || !/^[0-9a-f]+$/i.test(hex5)) return null;
   try {
     const data = gunzipSync5(Buffer.from(hex5, "hex"), { maxOutputLength: MAX_BODY_BYTES });
     const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
     const body = wrapper && embeddedMessage(getField(wrapper, 3));
     if (!body) return null;
-    const ids = [];
+    const refs = [];
     for (const run of getFields(body, 5)) {
       const fields = embeddedMessage(run);
       const info = fields && embeddedMessage(getField(fields, 12));
       const id2 = info && stringValue(getField(info, 1));
-      if (id2 && !ids.some((seen) => seen.toLowerCase() === id2.toLowerCase())) ids.push(id2);
+      if (!id2) continue;
+      const length = varintValue(getField(fields, 1)) ?? 1;
+      for (let i = 0; i < Math.min(Math.max(length, 1), 64); i++) refs.push(id2);
     }
-    return ids;
+    return refs;
   } catch {
     return null;
   }
+}
+function attachmentOrderFromNoteData(hex5) {
+  const refs = attachmentRunsFromNoteData(hex5);
+  if (!refs) return null;
+  const ids = [];
+  for (const id2 of refs)
+    if (!ids.some((seen) => seen.toLowerCase() === id2.toLowerCase())) ids.push(id2);
+  return ids;
 }
 function readNoteAttachmentRows(noteId3, dbPath2 = join9(NOTES_CONTAINER_DIR, "NoteStore.sqlite")) {
   const { pk } = parseNoteId2(noteId3);
@@ -57596,7 +57606,8 @@ function readNoteAttachmentRows(noteId3, dbPath2 = join9(NOTES_CONTAINER_DIR, "N
   } catch {
     throw new AttachmentStoreError("Attachment rows could not be parsed", "query_error");
   }
-  return { rows, bodyOrder: attachmentOrderFromNoteData(lines[2]?.trim()) };
+  const bodyRefs = attachmentRunsFromNoteData(lines[2]?.trim());
+  return { rows, bodyOrder: attachmentOrderFromNoteData(lines[2]?.trim()), bodyRefs };
 }
 function safeComponent(value) {
   if (typeof value !== "string" || !value || value.length > 255) return null;
@@ -57759,13 +57770,16 @@ function assetPathsFor(accountDir, row, onStale) {
     add(file2);
   return found;
 }
-function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTAINER_DIR) {
+function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTAINER_DIR, bodyRefs = null) {
   const rows = allRows.filter((r) => !r.parentDeleted);
   const byPk = new Map(rows.map((r) => [r.pk, r]));
   const roots = rows.filter((r) => r.parentPk === null || !byPk.has(r.parentPk));
   const bodyIndex = /* @__PURE__ */ new Map();
   (bodyOrder ?? []).forEach((id2, index) => bodyIndex.set(id2.toLowerCase(), index));
   const indexOf = (r) => bodyIndex.get(r.identifier.toLowerCase()) ?? null;
+  const refCount = /* @__PURE__ */ new Map();
+  for (const id2 of bodyRefs ?? [])
+    refCount.set(id2.toLowerCase(), (refCount.get(id2.toLowerCase()) ?? 0) + 1);
   const inBody = roots.filter((r) => indexOf(r) !== null);
   const orderSource = inBody.length > 0 ? "body" : "creation";
   const orderedRoots = [
@@ -57799,6 +57813,7 @@ function assembleAttachmentAssets(allRows, bodyOrder, containerDir = NOTES_CONTA
       parentIdentifier: parent?.identifier ?? null,
       filename: row.filename ?? row.mediaFilename,
       bodyIndex: parent ? null : indexOf(row),
+      ...!parent && (refCount.get(row.identifier.toLowerCase()) ?? 0) > 1 ? { bodyReferences: refCount.get(row.identifier.toLowerCase()) } : {},
       assetPaths,
       ...fallbackStale ? { fallbackStale: true } : {},
       previewPath,
@@ -60091,7 +60106,17 @@ var AppleNotesManager = class {
     if (!result.success) throw new Error(result.error || "Could not check folder existence");
     return result.output.trim() === "true";
   }
-  /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
+  /**
+   * Insert one file into an unchanged exact note and return Notes' attachment ID.
+   *
+   * Notes.app's `make new attachment` writes the new attachment into the note
+   * body twice (#321): one attachment object, two body references, so the file
+   * shows twice. Every form of the command does it (`at n`, `at end of
+   * attachments of n`, `tell n to make`, an alias), and `every attachment of n`
+   * then lists the same id twice. Deleting the extra entries by index removes
+   * only their body references; the attachment object and its file stay. The
+   * cleanup runs in the same AppleScript so no other edit can interleave.
+   */
   addAttachmentById(id2, expectedBody, filePath) {
     if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id2))
       throw new Error("Exact note ID required");
@@ -60103,13 +60128,43 @@ var AppleNotesManager = class {
         if body of n is not ${quote(expectedBody)} and body of n is not (${quote(expectedBody)} & linefeed) then error "Note changed before attachment insertion"
       end considering
       set a to make new attachment at n with data (POSIX file ${quote(filePath)})
-      return id of a
+      set newId to id of a
+      set hits to {}
+      set attachmentIds to id of every attachment of n
+      repeat with i from 1 to count of attachmentIds
+        if item i of attachmentIds is newId then set end of hits to i
+      end repeat
+      repeat with j from (count of hits) to 2 by -1
+        delete attachment (item j of hits) of n
+      end repeat
+      return newId
     end tell`);
     if (!result.success)
       throw new Error(
         result.error || "Attachment insertion outcome uncertain; read note before retrying"
       );
     return result.output.trim();
+  }
+  /**
+   * How many entries Notes' `every attachment` holds for one attachment id
+   * (#321). Read-only. Notes on macOS 27 does not list PDF attachments, so a PDF
+   * counts 0 here; the NoteStore database is the check for those.
+   */
+  countAttachmentEntriesById(noteId3, attachmentId) {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICAttachment\/p\d+$/i.test(attachmentId))
+      throw new Error("Exact attachment ID required");
+    const result = executeAppleScript(`tell application "Notes"
+      set attachmentIds to id of every attachment of note id "${sanitizeId(noteId3)}"
+      set hits to 0
+      repeat with i from 1 to count of attachmentIds
+        if item i of attachmentIds is "${attachmentId}" then set hits to hits + 1
+      end repeat
+      return hits as text
+    end tell`);
+    if (!result.success) throw new Error(result.error || "Could not count attachment entries");
+    const hits = Number(result.output.trim());
+    if (!Number.isInteger(hits) || hits < 0) throw new Error("Unexpected attachment count");
+    return hits;
   }
   /**
    * Lists all folders in an account with full hierarchical paths.
@@ -61124,8 +61179,8 @@ var AppleNotesManager = class {
    * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
    */
   getAttachmentAssetsById(noteId3) {
-    const { rows, bodyOrder } = readNoteAttachmentRows(noteId3);
-    return assembleAttachmentAssets(rows, bodyOrder);
+    const { rows, bodyOrder, bodyRefs } = readNoteAttachmentRows(noteId3);
+    return assembleAttachmentAssets(rows, bodyOrder, void 0, bodyRefs);
   }
   /**
    * The note's lead visual: the first image in body order (even when its asset
@@ -71262,7 +71317,7 @@ function registerDirectOperations(server2, manager) {
   };
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, removes the duplicate copy Notes.app's AppleScript inserts (#321), and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain. A PDF that Notes shows twice cannot be cleaned up and is reported as an error: delete the extra copy in Notes.app.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
@@ -71401,6 +71456,7 @@ function attachmentName(path10, filename) {
   return filename;
 }
 var UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
+var duplicated = (attachmentId, copies) => `Notes.app put new attachment ${attachmentId} into this note ${copies} times and the extra ${copies === 2 ? "copy" : "copies"} could not be removed automatically; ask the user to delete the extra ${copies === 2 ? "copy" : "copies"} in Notes.app, and do not attach the file again`;
 var pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 var sha256 = (data) => createHash4("sha256").update(data).digest("hex");
 function storedAttachmentIds(manager, id2) {
@@ -71456,6 +71512,7 @@ function storedInsertion(manager, id2, before, bytes, name, returnedId) {
     throw new Error(
       `Notes' database shows new attachment ${attachmentId} on this note, but the note body does not reference it; read the exact note and do not attach the file again`
     );
+  if ((row.bodyReferences ?? 1) > 1) throw new Error(duplicated(attachmentId, row.bodyReferences));
   const expected = sha256(bytes);
   const matches = row.assetPaths.some((path10) => fileMatches(path10, bytes.length, expected));
   if (!matches)
@@ -71506,6 +71563,8 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
       const saved = manager.saveAttachmentById(id2, attachmentId, verifyPath);
       if (!saved.success || !fileMatches(saved.savedPath ?? verifyPath, bytes.length, sha256(bytes)))
         throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+      const copies = manager.countAttachmentEntriesById(id2, attachmentId);
+      if (copies > 1) throw new Error(duplicated(attachmentId, copies));
     } else {
       const stored = inserted.length === 0 && beforeStored ? storedInsertion(manager, id2, beforeStored, bytes, name, returnedId) : null;
       if (!stored)
