@@ -222,7 +222,7 @@ export function registerDirectOperations(server: McpServer, manager: AppleNotesM
 
   tool(
     "add-attachment",
-    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain.",
+    "Use when: adding one local file to an exact note without replacing its body.\nReturns: the new attachment id, byte count, attachment name, and post-write content hash after exact byte verification.\nDo not use when: reading or exporting an existing attachment.\nSafety: reads only a regular file in home, temp or /Volumes, refusing hidden paths (~/.ssh, .env) and ~/Library outside iCloud Drive and CloudStorage unless the server sets APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS=1; requires a fresh rich revision, copies at most 64 MiB through a private temporary file, never retries insertion, removes the duplicate copy Notes.app's AppleScript inserts (#321), and verifies existing content plus fetched bytes. On macOS 27 Notes' AppleScript does not list PDF attachments; with Full Disk Access the new attachment is verified through the read-only NoteStore database instead (verifiedBy: database), otherwise the outcome is reported as uncertain. A PDF that Notes shows twice cannot be cleaned up and is reported as an error: delete the extra copy in Notes.app.",
     { id: noteId, expectedContentHash: revision, ...attachmentInput },
     (args) => attachFile(manager, args)
   );
@@ -403,6 +403,15 @@ export function attachmentName(path: string, filename?: string): string {
 }
 
 const UNCERTAIN = "Attachment insertion outcome uncertain; read the exact note before retrying";
+
+/**
+ * Notes.app's AppleScript insertion places the new attachment in the body
+ * twice (#321). addAttachmentById removes the extra entry when AppleScript
+ * lists it; this reports one it could not remove (a PDF, which macOS 27 does
+ * not list), so the caller neither retries nor reports a clean insert.
+ */
+const duplicated = (attachmentId: string, copies: number) =>
+  `Notes.app put new attachment ${attachmentId} into this note ${copies} times and the extra ${copies === 2 ? "copy" : "copies"} could not be removed automatically; ask the user to delete the extra ${copies === 2 ? "copy" : "copies"} in Notes.app, and do not attach the file again`;
 const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const sha256 = (data: Buffer) => createHash("sha256").update(data).digest("hex");
 
@@ -501,6 +510,7 @@ function storedInsertion(
     throw new Error(
       `Notes' database shows new attachment ${attachmentId} on this note, but the note body does not reference it; read the exact note and do not attach the file again`
     );
+  if ((row.bodyReferences ?? 1) > 1) throw new Error(duplicated(attachmentId, row.bodyReferences!));
   const expected = sha256(bytes);
   const matches = row.assetPaths.some((path) => fileMatches(path, bytes.length, expected));
   if (!matches)
@@ -578,6 +588,8 @@ function attachFile(
         !fileMatches(saved.savedPath ?? verifyPath, bytes.length, sha256(bytes))
       )
         throw new Error("Attachment bytes were not verified; read the exact note before retrying");
+      const copies = manager.countAttachmentEntriesById(id, attachmentId);
+      if (copies > 1) throw new Error(duplicated(attachmentId, copies));
     } else {
       // AppleScript saw nothing usable. On macOS 27 it never lists a PDF
       // attachment, so check the read-only NoteStore database instead.

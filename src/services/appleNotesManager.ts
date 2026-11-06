@@ -2754,7 +2754,17 @@ export class AppleNotesManager {
     return result.output.trim() === "true";
   }
 
-  /** Insert one file into an unchanged exact note and return Notes' attachment ID. */
+  /**
+   * Insert one file into an unchanged exact note and return Notes' attachment ID.
+   *
+   * Notes.app's `make new attachment` writes the new attachment into the note
+   * body twice (#321): one attachment object, two body references, so the file
+   * shows twice. Every form of the command does it (`at n`, `at end of
+   * attachments of n`, `tell n to make`, an alias), and `every attachment of n`
+   * then lists the same id twice. Deleting the extra entries by index removes
+   * only their body references; the attachment object and its file stay. The
+   * cleanup runs in the same AppleScript so no other edit can interleave.
+   */
   addAttachmentById(id: string, expectedBody: string, filePath: string) {
     if (!/^x-coredata:\/\/[0-9a-f-]+\/ICNote\/p\d+$/i.test(id))
       throw new Error("Exact note ID required");
@@ -2766,13 +2776,44 @@ export class AppleNotesManager {
         if body of n is not ${quote(expectedBody)} and body of n is not (${quote(expectedBody)} & linefeed) then error "Note changed before attachment insertion"
       end considering
       set a to make new attachment at n with data (POSIX file ${quote(filePath)})
-      return id of a
+      set newId to id of a
+      set hits to {}
+      set attachmentIds to id of every attachment of n
+      repeat with i from 1 to count of attachmentIds
+        if item i of attachmentIds is newId then set end of hits to i
+      end repeat
+      repeat with j from (count of hits) to 2 by -1
+        delete attachment (item j of hits) of n
+      end repeat
+      return newId
     end tell`);
     if (!result.success)
       throw new Error(
         result.error || "Attachment insertion outcome uncertain; read note before retrying"
       );
     return result.output.trim();
+  }
+
+  /**
+   * How many entries Notes' `every attachment` holds for one attachment id
+   * (#321). Read-only. Notes on macOS 27 does not list PDF attachments, so a PDF
+   * counts 0 here; the NoteStore database is the check for those.
+   */
+  countAttachmentEntriesById(noteId: string, attachmentId: string): number {
+    if (!/^x-coredata:\/\/[0-9a-f-]+\/ICAttachment\/p\d+$/i.test(attachmentId))
+      throw new Error("Exact attachment ID required");
+    const result = executeAppleScript(`tell application "Notes"
+      set attachmentIds to id of every attachment of note id "${sanitizeId(noteId)}"
+      set hits to 0
+      repeat with i from 1 to count of attachmentIds
+        if item i of attachmentIds is "${attachmentId}" then set hits to hits + 1
+      end repeat
+      return hits as text
+    end tell`);
+    if (!result.success) throw new Error(result.error || "Could not count attachment entries");
+    const hits = Number(result.output.trim());
+    if (!Number.isInteger(hits) || hits < 0) throw new Error("Unexpected attachment count");
+    return hits;
   }
 
   /**
@@ -4021,8 +4062,8 @@ export class AppleNotesManager {
    * @throws AttachmentStoreError (`no_fda`, `invalid_id`, `not_found`, `query_error`)
    */
   getAttachmentAssetsById(noteId: string): NoteAttachmentAssets {
-    const { rows, bodyOrder } = readNoteAttachmentRows(noteId);
-    return assembleAttachmentAssets(rows, bodyOrder);
+    const { rows, bodyOrder, bodyRefs } = readNoteAttachmentRows(noteId);
+    return assembleAttachmentAssets(rows, bodyOrder, undefined, bodyRefs);
   }
 
   /**

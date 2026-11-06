@@ -2444,6 +2444,13 @@ after it finishes. The result carries `verifiedBy: "database"`. Without Full
 Disk Access a PDF attach reports "insertion outcome uncertain"; read the note
 before retrying, because the attachment was probably created.
 
+Notes.app's AppleScript insertion places every new attachment in the note body
+twice (#321): one attachment, shown two times. The tool removes the extra copy
+in the same AppleScript call and checks that the note lists the attachment once.
+A PDF on macOS 27 cannot be listed, so its extra copy cannot be removed; when the
+database shows the PDF twice, the tool returns an error naming the attachment.
+Delete the extra copy in Notes.app and do not attach the file again.
+
 ---
 
 #### `create-note-with-attachment`

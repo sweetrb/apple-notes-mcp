@@ -46,7 +46,14 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { assertSafeSavePath } from "./attachmentFs.js";
-import { decodeMessage, embeddedMessage, getField, getFields, stringValue } from "./protobuf.js";
+import {
+  decodeMessage,
+  embeddedMessage,
+  getField,
+  getFields,
+  stringValue,
+  varintValue,
+} from "./protobuf.js";
 
 /** The Notes group container (read-only for this module). */
 export const NOTES_CONTAINER_DIR = join(
@@ -87,6 +94,11 @@ export interface AttachmentAssetRecord {
   filename: string | null;
   /** Zero-based position among the body's attachments; null when not in the body. */
   bodyIndex: number | null;
+  /**
+   * How many times the body shows this attachment, set only when more than
+   * once: Notes.app's AppleScript insertion writes it twice (#321).
+   */
+  bodyReferences?: number;
   /** The attachment's own files (media asset, fallback image or PDF), best first. */
   assetPaths: string[];
   /**
@@ -352,35 +364,53 @@ export function parseAttachmentRows(json: string): AttachmentRow[] {
 }
 
 /**
- * The attachment identifiers in body order, from the gzipped note protobuf
- * (Document.2 -> Version.3 -> String.5 attribute runs -> field 12 attachment
- * info -> field 1 identifier). Returns null when the body cannot be decoded.
+ * Every attachment reference in the note body, in order and with repeats, from
+ * the gzipped note protobuf (Document.2 -> Version.3 -> String.5 attribute runs
+ * -> field 12 attachment info -> field 1 identifier). An attachment the body
+ * shows twice appears twice (#321). Returns null when the body cannot be decoded.
  */
-export function attachmentOrderFromNoteData(hex: string | undefined): string[] | null {
+export function attachmentRunsFromNoteData(hex: string | undefined): string[] | null {
   if (!hex || !/^[0-9a-f]+$/i.test(hex)) return null;
   try {
     const data = gunzipSync(Buffer.from(hex, "hex"), { maxOutputLength: MAX_BODY_BYTES });
     const wrapper = embeddedMessage(getField(decodeMessage(data), 2));
     const body = wrapper && embeddedMessage(getField(wrapper, 3));
     if (!body) return null;
-    const ids: string[] = [];
+    const refs: string[] = [];
     for (const run of getFields(body, 5)) {
       const fields = embeddedMessage(run);
       const info = fields && embeddedMessage(getField(fields, 12));
       const id = info && stringValue(getField(info, 1));
-      if (id && !ids.some((seen) => seen.toLowerCase() === id.toLowerCase())) ids.push(id);
+      if (!id) continue;
+      // Adjacent references with identical attributes can share one run, so a
+      // run's length is how many attachment characters it covers.
+      const length = varintValue(getField(fields!, 1)) ?? 1;
+      for (let i = 0; i < Math.min(Math.max(length, 1), 64); i++) refs.push(id);
     }
-    return ids;
+    return refs;
   } catch {
     return null;
   }
+}
+
+/**
+ * The attachment identifiers the note body references, in body order, each
+ * once. Null when the body does not decode.
+ */
+export function attachmentOrderFromNoteData(hex: string | undefined): string[] | null {
+  const refs = attachmentRunsFromNoteData(hex);
+  if (!refs) return null;
+  const ids: string[] = [];
+  for (const id of refs)
+    if (!ids.some((seen) => seen.toLowerCase() === id.toLowerCase())) ids.push(id);
+  return ids;
 }
 
 /** Read one note's attachment rows and body order. */
 export function readNoteAttachmentRows(
   noteId: string,
   dbPath: string = join(NOTES_CONTAINER_DIR, "NoteStore.sqlite")
-): { rows: AttachmentRow[]; bodyOrder: string[] | null } {
+): { rows: AttachmentRow[]; bodyOrder: string[] | null; bodyRefs: string[] | null } {
   const { pk } = parseNoteId(noteId);
   const columnList = runSqlite(
     dbPath,
@@ -403,7 +433,8 @@ export function readNoteAttachmentRows(
   } catch {
     throw new AttachmentStoreError("Attachment rows could not be parsed", "query_error");
   }
-  return { rows, bodyOrder: attachmentOrderFromNoteData(lines[2]?.trim()) };
+  const bodyRefs = attachmentRunsFromNoteData(lines[2]?.trim());
+  return { rows, bodyOrder: attachmentOrderFromNoteData(lines[2]?.trim()), bodyRefs };
 }
 
 // -----------------------------------------------------------------------------
@@ -650,7 +681,8 @@ export function assetPathsFor(
 export function assembleAttachmentAssets(
   allRows: AttachmentRow[],
   bodyOrder: string[] | null,
-  containerDir: string = NOTES_CONTAINER_DIR
+  containerDir: string = NOTES_CONTAINER_DIR,
+  bodyRefs: string[] | null = null
 ): NoteAttachmentAssets {
   // A child of a container Notes has marked for deletion is gone with it; it
   // must not surface as a top-level attachment of its own.
@@ -660,6 +692,9 @@ export function assembleAttachmentAssets(
   const bodyIndex = new Map<string, number>();
   (bodyOrder ?? []).forEach((id, index) => bodyIndex.set(id.toLowerCase(), index));
   const indexOf = (r: AttachmentRow) => bodyIndex.get(r.identifier.toLowerCase()) ?? null;
+  const refCount = new Map<string, number>();
+  for (const id of bodyRefs ?? [])
+    refCount.set(id.toLowerCase(), (refCount.get(id.toLowerCase()) ?? 0) + 1);
   const inBody = roots.filter((r) => indexOf(r) !== null);
   const orderSource: "body" | "creation" = inBody.length > 0 ? "body" : "creation";
   const orderedRoots = [
@@ -694,6 +729,9 @@ export function assembleAttachmentAssets(
       parentIdentifier: parent?.identifier ?? null,
       filename: row.filename ?? row.mediaFilename,
       bodyIndex: parent ? null : indexOf(row),
+      ...(!parent && (refCount.get(row.identifier.toLowerCase()) ?? 0) > 1
+        ? { bodyReferences: refCount.get(row.identifier.toLowerCase())! }
+        : {}),
       assetPaths,
       ...(fallbackStale ? { fallbackStale: true as const } : {}),
       previewPath,
