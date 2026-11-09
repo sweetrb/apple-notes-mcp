@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatShortcutSetup, OPTIONAL_BRIDGE_NOTE, setupShortcuts } from "./setupShortcuts.js";
 
-const MARKDOWN = "Create Markdown Note";
+const MARKDOWN = "Notes MCP Markdown";
 
 describe("Shortcut setup", () => {
   it("does not open anything when all bridges are installed", () => {
@@ -50,12 +50,10 @@ describe("Shortcut setup", () => {
     expect(report.ready).toBe(true);
     expect(open).not.toHaveBeenCalled();
     expect(report.items.filter((item) => item.optional).map((item) => item.name)).toEqual([
-      "Apple Notes MCP - Create Markdown Note",
+      "Notes MCP Markdown",
     ]);
     const text = formatShortcutSetup(report);
-    expect(text).toContain(
-      `✗ Apple Notes MCP - Create Markdown Note: not installed ${OPTIONAL_BRIDGE_NOTE}`
-    );
+    expect(text).toContain(`✗ Notes MCP Markdown: not installed ${OPTIONAL_BRIDGE_NOTE}`);
     expect(OPTIONAL_BRIDGE_NOTE).toBe(
       "(optional — needed only for create-note format: markdown, macOS 26+)"
     );
@@ -67,8 +65,8 @@ describe("Shortcut setup", () => {
     const report = setupShortcuts(true, {
       status: (shortcut) => ({
         shortcut,
-        installed: !shortcut.includes("Native Tags"),
-        identifier: shortcut.includes("Native Tags") ? undefined : "id",
+        installed: !shortcut.includes("Notes MCP Tags"),
+        identifier: shortcut.includes("Notes MCP Tags") ? undefined : "id",
       }),
       exists: () => true,
       open: vi.fn(() => ({ ok: true })),
@@ -76,7 +74,7 @@ describe("Shortcut setup", () => {
     });
     expect(report.ready).toBe(false);
     expect(formatShortcutSetup(report)).toContain(
-      `✓ Apple Notes MCP - Create Markdown Note (id) ${OPTIONAL_BRIDGE_NOTE}`
+      `✓ Notes MCP Markdown (id) ${OPTIONAL_BRIDGE_NOTE}`
     );
   });
 
@@ -98,16 +96,16 @@ describe("Shortcut setup", () => {
     const report = setupShortcuts(false, {
       status: (shortcut) => ({
         shortcut,
-        installed: !shortcut.includes("Background Operations"),
-        identifier: shortcut.includes("Background Operations") ? undefined : "native-id",
+        installed: !shortcut.includes("Notes MCP Background"),
+        identifier: shortcut.includes("Notes MCP Background") ? undefined : "native-id",
       }),
       exists: () => true,
       open,
       baseDirectory: "/bundle/shortcuts",
     });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toMatch(/Background Operations v6\.shortcut$/);
-    expect(report.items.find((item) => item.opened)?.name).toContain("Background Operations");
+    expect(open.mock.calls[0][0]).toMatch(/Notes MCP Background v6\.shortcut$/);
+    expect(report.items.find((item) => item.opened)?.name).toContain("Notes MCP Background");
     expect(formatShortcutSetup(report)).toContain("confirm “Add Shortcut”");
   });
 
@@ -125,10 +123,10 @@ describe("Shortcut setup", () => {
       osRelease: () => "25.0.0",
     });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toMatch(/Create Markdown Note\.shortcut$/);
+    expect(open.mock.calls[0][0]).toMatch(/Notes MCP Markdown\.shortcut$/);
     expect(report.ready).toBe(true);
     expect(formatShortcutSetup(report)).toContain(
-      `→ Apple Notes MCP - Create Markdown Note: confirm “Add Shortcut” in macOS ${OPTIONAL_BRIDGE_NOTE}`
+      `→ Notes MCP Markdown: confirm “Add Shortcut” in macOS ${OPTIONAL_BRIDGE_NOTE}`
     );
   });
 
@@ -137,8 +135,8 @@ describe("Shortcut setup", () => {
     const report = setupShortcuts(false, {
       status: (shortcut) => ({
         shortcut,
-        installed: shortcut.includes("Native Tags"),
-        identifier: shortcut.includes("Native Tags") ? "id" : undefined,
+        installed: shortcut.includes("Notes MCP Tags"),
+        identifier: shortcut.includes("Notes MCP Tags") ? "id" : undefined,
       }),
       exists: () => true,
       open,
@@ -146,7 +144,7 @@ describe("Shortcut setup", () => {
       osRelease: () => "24.6.0",
     });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toMatch(/Background Operations v6\.shortcut$/);
+    expect(open.mock.calls[0][0]).toMatch(/Notes MCP Background v6\.shortcut$/);
     const markdown = report.items.find((item) => item.optional);
     expect(markdown).toMatchObject({
       installed: false,
@@ -156,7 +154,7 @@ describe("Shortcut setup", () => {
     expect(markdown?.error).toBeUndefined();
     expect(report.ready).toBe(false);
     expect(formatShortcutSetup(report)).toContain(
-      `– Apple Notes MCP - Create Markdown Note: skipped, requires macOS 26 or later (this Mac reports Darwin 24.6.0) ${OPTIONAL_BRIDGE_NOTE}`
+      `– Notes MCP Markdown: skipped, requires macOS 26 or later (this Mac reports Darwin 24.6.0) ${OPTIONAL_BRIDGE_NOTE}`
     );
   });
 });

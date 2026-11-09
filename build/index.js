@@ -64262,7 +64262,7 @@ function shortcutConsentHint(shortcut) {
 }
 
 // src/services/nativeTags.ts
-var NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
+var NATIVE_TAGS_SHORTCUT = "Notes MCP Tags";
 function normalizeNativeTags(tags) {
   if (!tags.length || tags.length > 100) throw new Error("Provide between 1 and 100 tags");
   return [
@@ -64478,8 +64478,20 @@ function listInstalledShortcuts() {
   }).split(/\r?\n/u);
 }
 var nativeTagsShortcutName = () => process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
+var LEGACY_SHORTCUT_NAMES = {
+  "Notes MCP Tags": ["Apple Notes MCP - Native Tags"],
+  "Notes MCP Background v6": ["Apple Notes MCP - Background Operations v6"],
+  "Notes MCP Markdown": ["Apple Notes MCP - Create Markdown Note"]
+};
 function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
-  return resolveShortcut(listInstalledShortcuts(), shortcut);
+  const lines = listInstalledShortcuts();
+  const current = resolveShortcut(lines, shortcut);
+  if (current.installed || lines.some((line) => line.startsWith(`${shortcut} (`))) return current;
+  for (const legacy of LEGACY_SHORTCUT_NAMES[shortcut] ?? []) {
+    const found = resolveShortcut(lines, legacy);
+    if (found.installed) return found;
+  }
+  return current;
 }
 function resolveShortcut(lines, shortcut) {
   const matches = lines.flatMap((line) => {
@@ -64720,11 +64732,11 @@ function comparableVisibleText(html) {
 
 // src/services/backgroundNotes.ts
 var capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v6";
+var BACKGROUND_SHORTCUT = "Notes MCP Background v6";
 var backgroundShortcutName = () => process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
 var backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 var nativeTagBridgeStatus = () => nativeTagsStatus();
-var MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
+var MARKDOWN_NOTE_SHORTCUT = "Notes MCP Markdown";
 var markdownShortcutName = () => process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;
 var markdownNoteStatus = () => nativeTagsStatus(markdownShortcutName());
 function readBackgroundSnapshot(manager, id2) {
@@ -75680,7 +75692,7 @@ function registerNativeOperations(server2, manager) {
       } catch {
         bridge = {
           installed: false,
-          shortcut: "Apple Notes MCP - Background Operations v6",
+          shortcut: "Notes MCP Background v6",
           error: "Shortcuts helper unavailable"
         };
       }
@@ -75961,14 +75973,14 @@ import { fileURLToPath as fileURLToPath2 } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
 var shortcutFiles = [
-  { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
+  { name: NATIVE_TAGS_SHORTCUT, file: "Notes MCP Tags.shortcut" },
   {
     name: BACKGROUND_SHORTCUT,
-    file: "Apple Notes MCP - Background Operations v6.shortcut"
+    file: "Notes MCP Background v6.shortcut"
   },
   {
     name: MARKDOWN_NOTE_SHORTCUT,
-    file: "Apple Notes MCP - Create Markdown Note.shortcut",
+    file: "Notes MCP Markdown.shortcut",
     optional: true
   }
 ];

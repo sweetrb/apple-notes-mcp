@@ -31,9 +31,9 @@ import {
 
 const mockExec = vi.mocked(execFileSync);
 
-const BG = "Apple Notes MCP - Background Operations v6";
-const TAGS = "Apple Notes MCP - Native Tags";
-const MD = "Apple Notes MCP - Create Markdown Note";
+const BG = "Notes MCP Background v6";
+const TAGS = "Notes MCP Tags";
+const MD = "Notes MCP Markdown";
 const line = (name: string, n: number) => `${name} (00000000-0000-0000-0000-00000000000${n})`;
 const readyHelper = (): PublicHelperStatus => ({
   ready: true,

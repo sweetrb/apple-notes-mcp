@@ -1,19 +1,24 @@
 # Native Tags bridge
 
-`Apple Notes MCP - Native Tags.shortcut` adds actual native Apple Notes tags.
+`Notes MCP Tags.shortcut` adds actual native Apple Notes tags.
 It contains no note contents or credentials. The unsigned source is committed
 beside it and can be regenerated with:
 
 ```sh
 python3 scripts/build-native-tags-shortcut.py
 shortcuts sign --mode anyone \
-  --input "shortcuts/Apple Notes MCP - Native Tags.unsigned.shortcut" \
-  --output "shortcuts/Apple Notes MCP - Native Tags.shortcut"
+  --input "shortcuts/Notes MCP Tags.unsigned.shortcut" \
+  --output "shortcuts/Notes MCP Tags.shortcut"
 ```
 
 Open the signed file and confirm **Add Shortcut** once. macOS may also request
 Notes access on first execution. The `shortcuts` CLI can run an installed
 workflow but cannot silently import one.
+
+The bridge names are short so Shortcuts.app shows each one whole on its tile.
+Bridges installed under the pre-2.16.1 names (`Apple Notes MCP - Native Tags`,
+`Apple Notes MCP - Background Operations v6`, `Apple Notes MCP - Create Markdown Note`)
+are still found when nothing is installed under the current name.
 
 After install and after every upgrade, run each bridge once in the foreground in
 Shortcuts.app and choose **Always Allow** when it asks for permission. The
@@ -29,7 +34,7 @@ success and verifies that existing content survived.
 
 ## Background Operations bridge
 
-`Apple Notes MCP - Background Operations v6.shortcut` performs native append,
+`Notes MCP Background v6.shortcut` performs native append,
 checklist and table creation, pin state changes, link insertion, tag removal, and
 file attachment. Its input is the JSON request, optionally followed by one file:
 `add-file` hands that file to Notes' Add File to Note action, which inserts it into
@@ -49,8 +54,8 @@ Regenerate and test the unsigned source with:
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-operations-shortcut.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-native-operations-shortcut.py
 shortcuts sign --mode anyone \
-  --input "shortcuts/Apple Notes MCP - Background Operations v6.unsigned.shortcut" \
-  --output "shortcuts/Apple Notes MCP - Background Operations v6.shortcut"
+  --input "shortcuts/Notes MCP Background v6.unsigned.shortcut" \
+  --output "shortcuts/Notes MCP Background v6.shortcut"
 ```
 
 Open the signed file and confirm **Add Shortcut** once, then run it once in the
@@ -60,7 +65,7 @@ installed UUID and refuses duplicates.
 
 ## Create Markdown Note bridge
 
-`Apple Notes MCP - Create Markdown Note.shortcut` creates one note with Notes'
+`Notes MCP Markdown.shortcut` creates one note with Notes'
 Create Note action and "Interpret as Markdown" (macOS 26+, iCloud accounts only)
 in the iCloud default folder. It is optional: only `create-note` with
 `format: "markdown"` uses it, and neither `setup --check`'s readiness nor
@@ -75,8 +80,8 @@ Regenerate and test the unsigned source with:
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-markdown-note-shortcut.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-markdown-note-shortcut.py
 shortcuts sign --mode anyone \
-  --input "shortcuts/Apple Notes MCP - Create Markdown Note.unsigned.shortcut" \
-  --output "shortcuts/Apple Notes MCP - Create Markdown Note.shortcut"
+  --input "shortcuts/Notes MCP Markdown.unsigned.shortcut" \
+  --output "shortcuts/Notes MCP Markdown.shortcut"
 ```
 
 Open the signed file and confirm **Add Shortcut** once. Then run it once in the

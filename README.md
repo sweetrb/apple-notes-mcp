@@ -235,9 +235,15 @@ npx -y apple-notes-mcp@2.15.1 setup
 
 Approve **Add Shortcut** for the missing signed workflows that macOS opens:
 
-- `Apple Notes MCP - Native Tags`
-- `Apple Notes MCP - Background Operations v6`
-- `Apple Notes MCP - Create Markdown Note`, offered only on macOS 26 or newer and optional for native Markdown creation
+- `Notes MCP Tags`
+- `Notes MCP Background v6`
+- `Notes MCP Markdown`, offered only on macOS 26 or newer and optional for native Markdown creation
+
+Releases before 2.16.1 installed these as `Apple Notes MCP - Native Tags`,
+`Apple Notes MCP - Background Operations v6` and `Apple Notes MCP - Create Markdown Note`.
+Those still work. To switch to the short names, run `setup` after deleting the old ones
+in Shortcuts.app. Delete `Apple Notes MCP - Background Operations v5` in any case; the
+server no longer uses it.
 
 Then check installation:
 
@@ -479,7 +485,7 @@ Creates a new note in Apple Notes.
 
 `format: "markdown"` creates the note with Notes' own Markdown importer (the
 Create Note action's "Interpret as Markdown" option, macOS 26+), run through the
-packaged `Apple Notes MCP - Create Markdown Note` Shortcut. `#`, `##` and `###`
+packaged `Notes MCP Markdown` Shortcut. `#`, `##` and `###`
 become real Title, Heading and Subheading styles, and the note starts with the
 title line, with no seed line.
 
@@ -2444,7 +2450,7 @@ after it finishes. The result carries `verifiedBy: "database"`. Without Full
 Disk Access a PDF attach reports "insertion outcome uncertain"; read the note
 before retrying, because the attachment was probably created.
 
-When the `Apple Notes MCP - Background Operations v6` bridge is installed, the
+When the `Notes MCP Background v6` bridge is installed, the
 tool inserts the file with Notes' own Add File to Note action, which places it
 in the note body once, and the result carries `insertedBy: "shortcut"`. The
 bridge finds the note by its exact title plus one line of its text that no other
@@ -3198,9 +3204,9 @@ These optional settings control server behavior. They do not replace the [macOS 
 | `APPLE_NOTES_MCP_PRIVATE_STORE` | unset | Testing only: points the helper at a **copy** of `NoteStore.sqlite`. The helper refuses a path that resolves to the live store. |
 | `APPLE_NOTES_MCP_PUBLIC_HELPER_DIR` | `~/Library/Application Support/apple-notes-mcp/public-helper` | Where `setup --public-helper` installs the [public native helper](#public-native-helper) and its checksum manifest. |
 | `APPLE_NOTES_MCP_PUBLIC_HELPER_TIMEOUT_MS` | `30000` (30 s) | Per-call timeout for the public native helper (`get-note-drawings`, `transcribe-note-audio`). |
-| `APPLE_NOTES_MCP_TAGS_SHORTCUT` | `Apple Notes MCP - Native Tags` | Name or UUID of the installed Native Tags bridge to run. `setup` still installs and checks the default name. |
-| `APPLE_NOTES_MCP_BACKGROUND_SHORTCUT` | `Apple Notes MCP - Background Operations v6` | Name or UUID of the installed Background Operations bridge to run. `setup` still installs and checks the default name. |
-| `APPLE_NOTES_MCP_MARKDOWN_SHORTCUT` | `Apple Notes MCP - Create Markdown Note` | Name or UUID of the installed Create Markdown Note bridge to run. `setup` still installs and checks the default name. |
+| `APPLE_NOTES_MCP_TAGS_SHORTCUT` | `Notes MCP Tags` | Name or UUID of the installed Native Tags bridge to run. `setup` still installs and checks the default name. |
+| `APPLE_NOTES_MCP_BACKGROUND_SHORTCUT` | `Notes MCP Background v6` | Name or UUID of the installed Background Operations bridge to run. `setup` still installs and checks the default name. |
+| `APPLE_NOTES_MCP_MARKDOWN_SHORTCUT` | `Notes MCP Markdown` | Name or UUID of the installed Create Markdown Note bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_PASTEBOARD_NAME` | unset | Testing only: makes [`add-attachment-from-pasteboard`](#add-attachment-from-pasteboard) read a private named pasteboard instead of the general clipboard. |
 | `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, [`analyze-svg`](#analyze-svg) read a `path`, and the Markdown template tools read a `templateFile`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
 | `DEBUG` / `VERBOSE` | unset | Set either to enable verbose diagnostic logging to stderr. |
@@ -3392,7 +3398,7 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 ### Native writes time out or report an uncertain outcome
 - Symptom: `add-native-tags`, `set-note-pinned`, `append-native` or another native write fails with "Shortcuts timed out waiting for …", "Operation outcome uncertain" or "readback was not verified", while `doctor` and `get-capabilities` report the bridges installed
 - Common cause, especially right after install or upgrade: the bridge Shortcut is waiting on a first-run consent prompt. The server runs it in the background, where Shortcuts cannot display that prompt, so the run stalls until it times out
-- Fix: open Shortcuts.app, run the Shortcut the error names (`Apple Notes MCP - Native Tags`, `Apple Notes MCP - Background Operations v6` or `Apple Notes MCP - Create Markdown Note`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
+- Fix: open Shortcuts.app, run the Shortcut the error names (`Notes MCP Tags`, `Notes MCP Background v6` or `Notes MCP Markdown`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
 - Read the exact note before retrying — the write may have landed
 
 ### "Note not found"

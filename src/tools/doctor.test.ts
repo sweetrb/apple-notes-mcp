@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/utils/checklistParser.js", () => ({ hasFullDiskAccess: vi.fn(() => true) }));
 vi.mock("@/services/nativeTags.js", () => ({
-  NATIVE_TAGS_SHORTCUT: "Apple Notes MCP - Native Tags",
-  nativeTagsShortcutName: () => "Apple Notes MCP - Native Tags",
+  NATIVE_TAGS_SHORTCUT: "Notes MCP Tags",
+  nativeTagsShortcutName: () => "Notes MCP Tags",
   listInstalledShortcuts: vi.fn(() => []),
   resolveShortcut: vi.fn(),
   nativeTagsStatus: vi.fn((shortcut: string) => ({
@@ -13,10 +13,10 @@ vi.mock("@/services/nativeTags.js", () => ({
   })),
 }));
 vi.mock("@/services/backgroundNotes.js", () => ({
-  BACKGROUND_SHORTCUT: "Apple Notes MCP - Background Operations v6",
-  MARKDOWN_NOTE_SHORTCUT: "Apple Notes MCP - Create Markdown Note",
-  backgroundShortcutName: () => "Apple Notes MCP - Background Operations v6",
-  markdownShortcutName: () => "Apple Notes MCP - Create Markdown Note",
+  BACKGROUND_SHORTCUT: "Notes MCP Background v6",
+  MARKDOWN_NOTE_SHORTCUT: "Notes MCP Markdown",
+  backgroundShortcutName: () => "Notes MCP Background v6",
+  markdownShortcutName: () => "Notes MCP Markdown",
 }));
 const { matrix } = vi.hoisted(() => ({
   matrix: {
@@ -248,17 +248,15 @@ describe("runDoctor (#22)", () => {
     expect(check?.detail).toMatch(/once in the foreground in Shortcuts\.app.*Always Allow/);
     expect(check?.detail).toMatch(/first-run consent prompt/);
     expect(check?.detail).toMatch(/^both native-write bridges are installed\./);
-    expect(check?.detail).toContain(
-      "Optional Apple Notes MCP - Create Markdown Note bridge: installed"
-    );
+    expect(check?.detail).toContain("Optional Notes MCP Markdown bridge: installed");
   });
 
   // #172 review — the Markdown bridge serves one optional create-note format and
   // cannot run before macOS 26, so its absence must not degrade the check.
-  it("stays ok when only the optional Create Markdown Note bridge is missing", () => {
+  it("stays ok when only the optional Notes MCP Markdown bridge is missing", () => {
     vi.mocked(nativeTagsStatus).mockImplementation((shortcut?: string) => ({
       shortcut: shortcut!,
-      installed: !shortcut!.includes("Create Markdown Note"),
+      installed: !shortcut!.includes("Notes MCP Markdown"),
       identifier: shortcut,
     }));
     try {
@@ -267,7 +265,7 @@ describe("runDoctor (#22)", () => {
       expect(check).toMatchObject({ status: "ok" });
       expect(check?.detail).toMatch(/^both native-write bridges are installed\./);
       expect(check?.detail).toMatch(
-        /Optional Apple Notes MCP - Create Markdown Note bridge: not installed \(needed only for create-note format: "markdown" on macOS 26\+/
+        /Optional Notes MCP Markdown bridge: not installed \(needed only for create-note format: "markdown" on macOS 26\+/
       );
       expect(check?.detail).not.toMatch(/missing:/);
       expect(check?.detail).toMatch(/once in the foreground in Shortcuts\.app.*Always Allow/);
@@ -292,7 +290,7 @@ describe("runDoctor (#22)", () => {
       (item) => item.name === "Native write Shortcuts"
     );
     expect(check).toMatchObject({ status: "ok" });
-    expect(check?.detail).toMatch(/Create Markdown Note bridge: could not inspect/);
+    expect(check?.detail).toMatch(/Notes MCP Markdown bridge: could not inspect/);
   });
 
   it("warns for a missing required bridge but does not list the optional one as missing", () => {
@@ -305,7 +303,7 @@ describe("runDoctor (#22)", () => {
     );
     expect(check).toMatchObject({ status: "warn" });
     expect(check?.detail).toMatch(/^missing: Native Tags\. Run apple-notes-mcp setup/);
-    expect(check?.detail).toContain("Create Markdown Note bridge: not installed");
+    expect(check?.detail).toContain("Notes MCP Markdown bridge: not installed");
   });
 });
 

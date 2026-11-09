@@ -8,7 +8,7 @@ spec = importlib.util.spec_from_file_location('tags', Path(__file__).with_name('
 b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b)
 action, native, output, token, text_token, uid = b.action, b.native, b.output, b.token, b.text_token, b.uid
-NAME = 'Apple Notes MCP - Background Operations v6'
+NAME = 'Notes MCP Background v6'
 
 def uid(label):
     return str(uuid5(NAMESPACE_URL, 'apple-notes-mcp/background/v6/' + label)).upper()

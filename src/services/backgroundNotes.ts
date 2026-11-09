@@ -37,7 +37,7 @@ import { CodedError } from "../utils/errorCodes.js";
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v6";
+export const BACKGROUND_SHORTCUT = "Notes MCP Background v6";
 /** The configured background-operations bridge name (env override or default). */
 export const backgroundShortcutName = () =>
   process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
@@ -45,7 +45,7 @@ export const backgroundShortcutName = () =>
 export const backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 /** Report whether the dedicated native-tag bridge is installed uniquely. */
 export const nativeTagBridgeStatus = () => nativeTagsStatus();
-export const MARKDOWN_NOTE_SHORTCUT = "Apple Notes MCP - Create Markdown Note";
+export const MARKDOWN_NOTE_SHORTCUT = "Notes MCP Markdown";
 /** The configured create-from-Markdown bridge name (env override or default). */
 export const markdownShortcutName = () =>
   process.env.APPLE_NOTES_MCP_MARKDOWN_SHORTCUT || MARKDOWN_NOTE_SHORTCUT;

@@ -504,7 +504,7 @@ describe("create-note Markdown bridge (#172)", () => {
       contentHash: "h-created",
       verified: true,
     });
-    expect(mock.status).toHaveBeenCalledWith("Apple Notes MCP - Create Markdown Note");
+    expect(mock.status).toHaveBeenCalledWith("Notes MCP Markdown");
     expect(vi.mocked(execFileSync).mock.calls[0][1]).toEqual(
       expect.arrayContaining(["run", "11111111-1111-4111-8111-111111111111"])
     );
@@ -631,7 +631,7 @@ describe("create-note Markdown bridge (#172)", () => {
     mock.status.mockReturnValue({
       installed: true,
       identifier: "11111111-1111-4111-8111-111111111111",
-      shortcut: "Apple Notes MCP - Create Markdown Note",
+      shortcut: "Notes MCP Markdown",
     } as never);
     vi.mocked(execFileSync).mockImplementation(() => {
       throw Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
@@ -642,7 +642,7 @@ describe("create-note Markdown bridge (#172)", () => {
         content,
       })
     ).toThrow(
-      /search for the title before any retry: no new note was found in the default folder; Shortcuts timed out waiting for the "Apple Notes MCP - Create Markdown Note" Shortcut\. This may be an unanswered first-run Shortcuts consent prompt.*run "Apple Notes MCP - Create Markdown Note" once in the foreground in Shortcuts\.app and choose Always Allow/
+      /search for the title before any retry: no new note was found in the default folder; Shortcuts timed out waiting for the "Notes MCP Markdown" Shortcut\. This may be an unanswered first-run Shortcuts consent prompt.*run "Notes MCP Markdown" once in the foreground in Shortcuts\.app and choose Always Allow/
     );
     vi.mocked(execFileSync).mockReturnValue("");
     const other = "x-coredata://ABCDEF/ICNote/p3";

@@ -45,7 +45,7 @@ beforeEach(() => {
   // No Background Operations bridge unless a test installs one.
   bridge.status.mockReturnValue({
     installed: false,
-    shortcut: "Apple Notes MCP - Background Operations v6",
+    shortcut: "Notes MCP Background v6",
   });
 });
 afterEach(() => {
@@ -185,7 +185,7 @@ describe("direct Notes operations", () => {
     const bytes = Buffer.from("png bytes");
     const installed = {
       installed: true,
-      shortcut: "Apple Notes MCP - Background Operations v6",
+      shortcut: "Notes MCP Background v6",
       identifier: "BRIDGE-UUID",
     };
     function setup() {

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>WFWorkflowName</key>
-	<string>Apple Notes MCP - Background Operations v6</string>
+	<string>Notes MCP Background v6</string>
 	<key>WFWorkflowActions</key>
 	<array>
 		<dict>

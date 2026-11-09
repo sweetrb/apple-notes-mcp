@@ -8,7 +8,7 @@ spec = importlib.util.spec_from_file_location('tags', Path(__file__).with_name('
 b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b)
 action, output, token, text_token = b.action, b.output, b.token, b.text_token
-NAME = 'Apple Notes MCP - Create Markdown Note'
+NAME = 'Notes MCP Markdown'
 # The iCloud account's default "Notes" folder. Notes only interprets Markdown in iCloud accounts.
 DEFAULT_FOLDER = 'applenotes:folder/DefaultFolder-CloudKit'
 

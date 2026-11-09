@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, openSync, readFileSync } from "node:fs";
-import { BACKGROUND_SHORTCUT, runBackgroundShortcut } from "./backgroundNotes.js";
+import {
+  BACKGROUND_SHORTCUT,
+  backgroundStatus,
+  markdownNoteStatus,
+  runBackgroundShortcut,
+} from "./backgroundNotes.js";
+import { nativeTagsStatus } from "./nativeTags.js";
 
 vi.mock("node:child_process", () => ({ execFileSync: vi.fn() }));
 const shortcutId = "11111111-1111-4111-8111-111111111111";
@@ -76,6 +82,41 @@ describe("background transport", () => {
     expect(runArgs.slice(0, 3)).toEqual(["run", shortcutId, "--input-path"]);
     expect(String(runArgs[3])).toMatch(/request\.json$/);
     expect(runArgs.slice(4)).toEqual(["--input-path", "/tmp/x/report.pdf"]);
+  });
+  // 2.16.1 shortened the bridge names; bridges installed under the old ones keep working.
+  describe("accepts a bridge installed under its pre-2.16.1 name", () => {
+    const legacyId = "22222222-2222-4222-8222-222222222222";
+    const list = (text: string) =>
+      vi
+        .mocked(execFileSync)
+        .mockImplementation((_file, args) => (args?.[0] === "list" ? text : ""));
+    it.each([
+      [() => backgroundStatus(), "Apple Notes MCP - Background Operations v6"],
+      [() => markdownNoteStatus(), "Apple Notes MCP - Create Markdown Note"],
+      [() => nativeTagsStatus(), "Apple Notes MCP - Native Tags"],
+    ])("resolves the legacy name %#", (status, legacy) => {
+      list(`${legacy} (${legacyId})\nGet Location (${shortcutId})\n`);
+      expect(status()).toEqual({ shortcut: legacy, installed: true, identifier: legacyId });
+    });
+    it("prefers the current name when both are installed", () => {
+      list(
+        `Apple Notes MCP - Background Operations v6 (${legacyId})\n${BACKGROUND_SHORTCUT} (${shortcutId})\n`
+      );
+      expect(backgroundStatus()).toMatchObject({
+        shortcut: BACKGROUND_SHORTCUT,
+        identifier: shortcutId,
+      });
+    });
+    it("reports duplicates under the current name instead of falling back", () => {
+      list(
+        `${BACKGROUND_SHORTCUT} (${shortcutId})\n${BACKGROUND_SHORTCUT} (${legacyId})\nApple Notes MCP - Background Operations v6 (33333333-3333-4333-8333-333333333333)\n`
+      );
+      expect(backgroundStatus()).toMatchObject({ shortcut: BACKGROUND_SHORTCUT, installed: false });
+    });
+    it("never accepts the incompatible v5 bridge", () => {
+      list(`Apple Notes MCP - Background Operations v5 (${legacyId})\n`);
+      expect(backgroundStatus()).toMatchObject({ installed: false });
+    });
   });
   // #164 — a stalled run used to report a bare "Shortcuts timed out", naming
   // nothing for the caller to go and approve in Shortcuts.app.
