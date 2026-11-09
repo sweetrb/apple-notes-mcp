@@ -45,7 +45,7 @@ const shortcutFiles = [
   { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
   {
     name: BACKGROUND_SHORTCUT,
-    file: "Apple Notes MCP - Background Operations v5.shortcut",
+    file: "Apple Notes MCP - Background Operations v6.shortcut",
   },
   {
     name: MARKDOWN_NOTE_SHORTCUT,

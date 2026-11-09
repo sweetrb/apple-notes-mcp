@@ -106,7 +106,7 @@ describe("Shortcut setup", () => {
       baseDirectory: "/bundle/shortcuts",
     });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toMatch(/Background Operations v5\.shortcut$/);
+    expect(open.mock.calls[0][0]).toMatch(/Background Operations v6\.shortcut$/);
     expect(report.items.find((item) => item.opened)?.name).toContain("Background Operations");
     expect(formatShortcutSetup(report)).toContain("confirm “Add Shortcut”");
   });
@@ -146,7 +146,7 @@ describe("Shortcut setup", () => {
       osRelease: () => "24.6.0",
     });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toMatch(/Background Operations v5\.shortcut$/);
+    expect(open.mock.calls[0][0]).toMatch(/Background Operations v6\.shortcut$/);
     const markdown = report.items.find((item) => item.optional);
     expect(markdown).toMatchObject({
       installed: false,

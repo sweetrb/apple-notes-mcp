@@ -47,8 +47,8 @@ function fixture(t) {
   write("native/broker/apple-notes-mcp-broker.swift");
   write("shortcuts/Existing signed.shortcut");
   write("shortcuts/Existing unsigned.unsigned.shortcut");
-  write("shortcuts/Apple Notes MCP - Background Operations v5.shortcut");
-  write("shortcuts/Apple Notes MCP - Background Operations v5.unsigned.shortcut");
+  write("shortcuts/Apple Notes MCP - Background Operations v6.shortcut");
+  write("shortcuts/Apple Notes MCP - Background Operations v6.unsigned.shortcut");
   write("native/README.md");
   write("shortcuts/README.md");
   const commit = () => {
@@ -95,8 +95,8 @@ for (const path of [
   "shortcuts/Existing signed.shortcut",
   "shortcuts/Existing unsigned.unsigned.shortcut",
   "shortcuts/New shortcut.shortcut",
-  "shortcuts/Apple Notes MCP - Background Operations v5.shortcut",
-  "shortcuts/Apple Notes MCP - Background Operations v5.unsigned.shortcut",
+  "shortcuts/Apple Notes MCP - Background Operations v6.shortcut",
+  "shortcuts/Apple Notes MCP - Background Operations v6.unsigned.shortcut",
   "native/helper/new\nline.h",
   "build/index.js",
   "build/__tests__/runtime.js",

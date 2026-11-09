@@ -64,16 +64,41 @@ class BridgeTests(unittest.TestCase):
                 self.assertEqual(producers[source], 'is.workflow.actions.gettext')
 
     def test_no_ui_or_arbitrary_execution_actions(self):
-        allowed = {'comment', 'detect.dictionary', 'getvalueforkey', 'gettext', 'filter.notes',
+        allowed = {'comment', 'getitemfromlist', 'detect.dictionary', 'getvalueforkey', 'gettext', 'filter.notes',
                    'count', 'conditional', 'getrichtextfromhtml', 'output', 'appendnote'}
         native = {'AppendToNoteLinkAction', 'CreateChecklistItemLinkAction', 'PinNotesLinkAction',
-                  'CreateTagLinkAction', 'AddTagsToNotesLinkAction', 'RemoveTagsFromNotesLinkAction'}
+                  'CreateTagLinkAction', 'AddTagsToNotesLinkAction', 'RemoveTagsFromNotesLinkAction',
+                  'AddFileAttachmentLinkAction'}
         for action in bridge.build()['WFWorkflowActions']:
             name = action['WFWorkflowActionIdentifier']
             self.assertTrue(name in {'is.workflow.actions.'+x for x in allowed} |
                             {'com.apple.Notes.'+x for x in native}, name)
             if name.startswith('com.apple.Notes.'):
                 self.assertFalse(action['WFWorkflowActionParameters']['ShowWhenRun'])
+
+    def test_add_file_takes_the_input_file_itself(self):
+        # #321: the attachment is the last Shortcut Input item, never a file the
+        # bridge built (Notes' Add File refused a Base64 Decode + Set Name output).
+        actions = bridge.build()['WFWorkflowActions']
+        by_uuid = {a['WFWorkflowActionParameters']['UUID']: a for a in actions}
+        added = [a['WFWorkflowActionParameters'] for a in actions
+                 if a['WFWorkflowActionIdentifier'] == 'com.apple.Notes.AddFileAttachmentLinkAction']
+        self.assertEqual(len(added), 1)
+        source = by_uuid[added[0]['file']['Value']['OutputUUID']]['WFWorkflowActionParameters']
+        self.assertEqual(source['WFItemSpecifier'], 'Last Item')
+        self.assertEqual(source['WFInput']['Value'], {'Type': 'ExtensionInput'})
+        self.assertEqual(added[0]['note']['Value']['OutputUUID'], bridge.uid('target'))
+        names = {a['WFWorkflowActionIdentifier'] for a in actions}
+        self.assertNotIn('is.workflow.actions.base64encode', names)
+        self.assertNotIn('is.workflow.actions.setitemname', names)
+
+    def test_request_is_the_first_input_item(self):
+        actions = bridge.build()['WFWorkflowActions']
+        request = next(a['WFWorkflowActionParameters'] for a in actions
+                       if a['WFWorkflowActionIdentifier'] == 'is.workflow.actions.detect.dictionary')
+        first = next(a['WFWorkflowActionParameters'] for a in actions
+                     if a['WFWorkflowActionParameters']['UUID'] == request['WFInput']['Value']['OutputUUID'])
+        self.assertEqual(first['WFItemSpecifier'], 'First Item')
 
 if __name__ == '__main__':
     unittest.main()

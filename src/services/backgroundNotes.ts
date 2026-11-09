@@ -37,7 +37,7 @@ import { CodedError } from "../utils/errorCodes.js";
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+export const BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v6";
 /** The configured background-operations bridge name (env override or default). */
 export const backgroundShortcutName = () =>
   process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
@@ -58,7 +58,8 @@ export type BackgroundOperation =
   | "create-checklist-item"
   | "set-pinned"
   | "add-tag"
-  | "remove-tag";
+  | "remove-tag"
+  | "add-file";
 export interface BackgroundInput {
   id: string;
   expectedContentHash: string;
@@ -237,10 +238,15 @@ export function validateAppendContent(
 export const BRIDGE_REFUSED =
   "refused the request without running it: its Find Notes step did not find exactly one note with this exact title whose body contains the scope text. Notes search can lag behind a note created or edited moments ago, so wait a minute and retry, or pass a longer, more distinctive scopeText";
 
-/** Invoke an installed bridge (by default Background Operations) with a private temporary JSON request. */
+/**
+ * Invoke an installed bridge (by default Background Operations) with a private
+ * temporary JSON request. `attachment` is a file passed as the bridge's second
+ * input, which its add-file operation hands to Notes' own Add File to Note.
+ */
 export function runBackgroundShortcut(
   input: Record<string, string>,
-  status: ReturnType<typeof nativeTagsStatus> = backgroundStatus()
+  status: ReturnType<typeof nativeTagsStatus> = backgroundStatus(),
+  attachment?: string
 ) {
   if (!status.installed)
     throw Object.assign(
@@ -275,7 +281,13 @@ export function runBackgroundShortcut(
     try {
       output = execFileSync(
         "/usr/bin/shortcuts",
-        ["run", status.identifier!, "--input-path", file],
+        [
+          "run",
+          status.identifier!,
+          "--input-path",
+          file,
+          ...(attachment ? ["--input-path", attachment] : []),
+        ],
         {
           encoding: "utf8",
           timeout: callTimeoutMs() ?? 60000,

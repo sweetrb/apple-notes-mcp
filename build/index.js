@@ -64720,7 +64720,7 @@ function comparableVisibleText(html) {
 
 // src/services/backgroundNotes.ts
 var capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v5";
+var BACKGROUND_SHORTCUT = "Apple Notes MCP - Background Operations v6";
 var backgroundShortcutName = () => process.env.APPLE_NOTES_MCP_BACKGROUND_SHORTCUT || BACKGROUND_SHORTCUT;
 var backgroundStatus = () => nativeTagsStatus(backgroundShortcutName());
 var nativeTagBridgeStatus = () => nativeTagsStatus();
@@ -64825,7 +64825,7 @@ function validateAppendContent(content, format, options = {}) {
   }
 }
 var BRIDGE_REFUSED = "refused the request without running it: its Find Notes step did not find exactly one note with this exact title whose body contains the scope text. Notes search can lag behind a note created or edited moments ago, so wait a minute and retry, or pass a longer, more distinctive scopeText";
-function runBackgroundShortcut(input2, status = backgroundStatus()) {
+function runBackgroundShortcut(input2, status = backgroundStatus(), attachment) {
   if (!status.installed)
     throw Object.assign(
       new Error(
@@ -64858,7 +64858,13 @@ function runBackgroundShortcut(input2, status = backgroundStatus()) {
     try {
       output2 = execFileSync16(
         "/usr/bin/shortcuts",
-        ["run", status.identifier, "--input-path", file2],
+        [
+          "run",
+          status.identifier,
+          "--input-path",
+          file2,
+          ...attachment ? ["--input-path", attachment] : []
+        ],
         {
           encoding: "utf8",
           timeout: callTimeoutMs() ?? 6e4,
@@ -71521,6 +71527,45 @@ function storedInsertion(manager, id2, before, bytes, name, returnedId) {
     );
   return { attachmentId, name: row.filename };
 }
+function bridgeScope(manager, note) {
+  const lines = [
+    ...new Set(
+      textBelowTitle(note.rich.text, note.title).split("\n").map((line) => line.replace(/\uFFFC/g, "").trim()).filter((line) => line.length >= 3 && line.length <= 200)
+    )
+  ].sort((a, b) => b.length - a.length);
+  const { candidates } = backgroundDependencies(manager);
+  for (const line of lines.slice(0, 3)) {
+    const found = candidates(note.title, line);
+    if (found.length === 1 && found[0] === note.id) return line;
+  }
+  return null;
+}
+function attachThroughBridge(manager, note, file2) {
+  let status;
+  try {
+    status = backgroundStatus();
+  } catch {
+    return "skipped";
+  }
+  if (!status.installed) return "skipped";
+  let scope2;
+  try {
+    scope2 = bridgeScope(manager, note);
+  } catch {
+    return "skipped";
+  }
+  if (!scope2) return "skipped";
+  try {
+    runBackgroundShortcut(
+      { operation: "add-file", title: note.title, scopeText: scope2 },
+      status,
+      file2
+    );
+    return "inserted";
+  } catch (error62) {
+    return error62?.refused ? "skipped" : "uncertain";
+  }
+}
 function attachFile(manager, args, checked, progress = { insertionStarted: false }) {
   const { id: id2, expectedContentHash, path: path10 } = args;
   const name = attachmentName(path10, args.filename);
@@ -71537,11 +71582,14 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
     let returnedId;
     let transportUncertain = false;
     progress.insertionStarted = true;
-    try {
-      returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
-    } catch {
-      transportUncertain = true;
-    }
+    const bridge = attachThroughBridge(manager, before, temporaryFile);
+    if (bridge === "uncertain") transportUncertain = true;
+    else if (bridge === "skipped")
+      try {
+        returnedId = manager.addAttachmentById(id2, before.body, temporaryFile);
+      } catch {
+        transportUncertain = true;
+      }
     const after = readSnapshot(manager, id2);
     assertExistingContentPreserved(before, after);
     const readInserted = () => [...new Map(manager.listAttachmentsById(id2).map((item) => [item.id, item])).values()].filter(
@@ -71590,6 +71638,7 @@ function attachFile(manager, args, checked, progress = { insertionStarted: false
       bytes: bytes.length,
       name: reportedName,
       ...verifiedBy === "database" ? { verifiedBy } : {},
+      insertedBy: bridge === "skipped" ? "applescript" : "shortcut",
       ...args.filename === void 0 ? {} : {
         filenameVerified: nameVerified,
         ...nameVerified ? {} : {
@@ -75631,7 +75680,7 @@ function registerNativeOperations(server2, manager) {
       } catch {
         bridge = {
           installed: false,
-          shortcut: "Apple Notes MCP - Background Operations v5",
+          shortcut: "Apple Notes MCP - Background Operations v6",
           error: "Shortcuts helper unavailable"
         };
       }
@@ -75915,7 +75964,7 @@ var shortcutFiles = [
   { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
   {
     name: BACKGROUND_SHORTCUT,
-    file: "Apple Notes MCP - Background Operations v5.shortcut"
+    file: "Apple Notes MCP - Background Operations v6.shortcut"
   },
   {
     name: MARKDOWN_NOTE_SHORTCUT,

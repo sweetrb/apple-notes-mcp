@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppleNotesManager } from "../services/appleNotesManager.js";
 
@@ -18,6 +18,17 @@ vi.mock("../utils/pasteboardFreeze.js", async (original) => ({
   ...(await original<typeof import("../utils/pasteboardFreeze.js")>()),
   freezePasteboard: pasteboard.freeze,
 }));
+const bridge = vi.hoisted(() => ({
+  status: vi.fn(),
+  run: vi.fn(),
+  candidates: vi.fn(),
+}));
+vi.mock("../services/backgroundNotes.js", async (original) => ({
+  ...(await original<typeof import("../services/backgroundNotes.js")>()),
+  backgroundStatus: bridge.status,
+  runBackgroundShortcut: bridge.run,
+  backgroundDependencies: () => ({ candidates: bridge.candidates }),
+}));
 import { registerDirectOperations } from "./directOperations.js";
 import { plainRichNote, syntheticRichNote } from "../utils/__fixtures__/retainedRichNote.js";
 import { PasteboardError } from "../utils/pasteboardFreeze.js";
@@ -30,6 +41,13 @@ const savesAs = (content: Buffer) =>
     writeFileSync(dest, content);
     return { success: true, savedPath: dest };
   });
+beforeEach(() => {
+  // No Background Operations bridge unless a test installs one.
+  bridge.status.mockReturnValue({
+    installed: false,
+    shortcut: "Apple Notes MCP - Background Operations v6",
+  });
+});
 afterEach(() => {
   vi.resetAllMocks();
   while (directories.length) rmSync(directories.pop()!, { recursive: true, force: true });
@@ -160,6 +178,108 @@ describe("direct Notes operations", () => {
       }
     }
   );
+
+  describe("inserts through the Background Operations bridge when it is installed (#321)", () => {
+    const id = "x-coredata://ABC/ICNote/p1";
+    const attachmentId = "x-coredata://ABC/ICAttachment/p3";
+    const bytes = Buffer.from("png bytes");
+    const installed = {
+      installed: true,
+      shortcut: "Apple Notes MCP - Background Operations v6",
+      identifier: "BRIDGE-UUID",
+    };
+    function setup() {
+      const directory = mkdtempSync(join(tmpdir(), "direct-operation-bridge-test-"));
+      directories.push(directory);
+      const path = join(directory, "photo.png");
+      writeFileSync(path, bytes);
+      rich.enrich.mockReturnValue({ complete: true, revision: "rich" });
+      rich.read.mockReturnValue({
+        ...plainRichNote("Example\nshort\na distinctive line"),
+        revision: "rich",
+      });
+      rich.hash.mockReturnValue("revision");
+      const manager = {
+        getNoteById: vi.fn(() => ({ id, title: "Example", passwordProtected: false })),
+        getNoteContentById: vi.fn(() => "existing"),
+        listAttachmentsById: vi
+          .fn()
+          .mockReturnValueOnce([])
+          .mockReturnValue([{ id: attachmentId, name: "photo.png" }]),
+        countAttachmentEntriesById: vi.fn(() => 1),
+        addAttachmentById: vi.fn(() => attachmentId),
+        saveAttachmentById: savesAs(bytes),
+      };
+      const registerTool = vi.fn();
+      registerDirectOperations(
+        { registerTool } as unknown as McpServer,
+        manager as unknown as AppleNotesManager
+      );
+      const handler = registerTool.mock.calls.find((call) => call[0] === "add-attachment")![2];
+      return { manager, run: () => handler({ id, expectedContentHash: "revision", path }) };
+    }
+
+    it("hands the file to add-file with the longest unique line as scope, never AppleScript", async () => {
+      bridge.status.mockReturnValue(installed);
+      bridge.candidates.mockReturnValue([id]);
+      const { manager, run } = setup();
+      const result = await run();
+      expect(bridge.candidates).toHaveBeenCalledWith("Example", "a distinctive line");
+      expect(bridge.run).toHaveBeenCalledTimes(1);
+      const [input, status, file] = bridge.run.mock.calls[0];
+      expect(input).toEqual({
+        operation: "add-file",
+        title: "Example",
+        scopeText: "a distinctive line",
+      });
+      expect(status).toBe(installed);
+      expect(basename(file)).toBe("photo.png");
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        attachmentId,
+        insertedBy: "shortcut",
+      });
+    });
+
+    it("falls back to AppleScript when the bridge's Find Notes refuses", async () => {
+      bridge.status.mockReturnValue(installed);
+      bridge.candidates.mockReturnValue([id]);
+      bridge.run.mockImplementation(() => {
+        throw Object.assign(new Error("refused"), { refused: true });
+      });
+      const { manager, run } = setup();
+      const result = await run();
+      expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+      expect(result.structuredContent).toMatchObject({ ok: true, insertedBy: "applescript" });
+    });
+
+    it("falls back to AppleScript when no line names only this note", async () => {
+      bridge.status.mockReturnValue(installed);
+      bridge.candidates.mockReturnValue([id, "x-coredata://ABC/ICNote/p9"]);
+      const { manager, run } = setup();
+      await run();
+      expect(bridge.run).not.toHaveBeenCalled();
+      expect(manager.addAttachmentById).toHaveBeenCalledTimes(1);
+    });
+
+    it("never inserts again with AppleScript after a bridge run that failed midway", async () => {
+      bridge.status.mockReturnValue(installed);
+      bridge.candidates.mockReturnValue([id]);
+      bridge.run.mockImplementation(() => {
+        throw Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
+      });
+      const { manager, run } = setup();
+      const result = await run();
+      expect(manager.addAttachmentById).not.toHaveBeenCalled();
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        attachmentId,
+        insertedBy: "shortcut",
+        transportWarning: expect.any(String),
+      });
+    });
+  });
 
   it("verifies a file over the 25 MiB base64 fetch cap (#243)", async () => {
     const id = "x-coredata://ABC/ICNote/p1";

@@ -60,7 +60,7 @@ const CASES: Array<[string, ErrorEnvelope]> = [
   ],
   // shortcut_not_installed
   [
-    'Install the supplied "Apple Notes MCP - Background Operations v5" Shortcut once; Shortcuts must list it exactly once',
+    'Install the supplied "Apple Notes MCP - Background Operations v6" Shortcut once; Shortcuts must list it exactly once',
     { code: "shortcut_not_installed" },
   ],
   [

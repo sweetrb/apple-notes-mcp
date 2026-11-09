@@ -43,7 +43,7 @@ describe("background transport", () => {
   });
   // #248 — a bridge that ran nothing ends in "…_REFUSED" and exits 0.
   it("turns a REFUSED bridge output into a refusal error, and accepts DONE", () => {
-    let output = "APPLE_NOTES_BACKGROUND_V5_REFUSED\n";
+    let output = "APPLE_NOTES_BACKGROUND_V6_REFUSED\n";
     vi.mocked(execFileSync).mockImplementation((_file, args) =>
       args?.[0] === "list" ? `${BACKGROUND_SHORTCUT} (${shortcutId})\n` : output
     );
@@ -54,7 +54,7 @@ describe("background transport", () => {
         message: expect.stringMatching(/Find Notes step did not find exactly one note/),
       })
     );
-    output = "APPLE_NOTES_BACKGROUND_V5_DONE\n";
+    output = "APPLE_NOTES_BACKGROUND_V6_DONE\n";
     expect(() => runBackgroundShortcut({ operation: "append-html", text: "x" })).not.toThrow();
   });
   it("refuses to run without an exact installed bridge, naming the Shortcut to install", () => {
@@ -63,6 +63,19 @@ describe("background transport", () => {
       new RegExp(`Install the supplied "${BACKGROUND_SHORTCUT}" Shortcut`)
     );
     expect(vi.mocked(execFileSync).mock.calls.every((call) => call[1]?.[0] === "list")).toBe(true);
+  });
+  // #321 — add-file passes the attachment as the bridge's second input.
+  it("passes an attachment as a second input after the request", () => {
+    let runArgs: readonly string[] = [];
+    vi.mocked(execFileSync).mockImplementation((_file, args) => {
+      if (args?.[0] === "list") return `${BACKGROUND_SHORTCUT} (${shortcutId})\n`;
+      runArgs = args ?? [];
+      return "APPLE_NOTES_BACKGROUND_V6_DONE\n";
+    });
+    runBackgroundShortcut({ operation: "add-file" }, undefined, "/tmp/x/report.pdf");
+    expect(runArgs.slice(0, 3)).toEqual(["run", shortcutId, "--input-path"]);
+    expect(String(runArgs[3])).toMatch(/request\.json$/);
+    expect(runArgs.slice(4)).toEqual(["--input-path", "/tmp/x/report.pdf"]);
   });
   // #164 — a stalled run used to report a bare "Shortcuts timed out", naming
   // nothing for the caller to go and approve in Shortcuts.app.

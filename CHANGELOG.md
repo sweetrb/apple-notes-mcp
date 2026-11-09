@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [2.16.0] - 2026-11-09
+
+### Fixed
+
+- **A PDF attached with `add-attachment` (and `create-note-with-attachment`,
+  `add-attachment-from-pasteboard`) now goes into the note once (#321).** 2.15.18 removed
+  AppleScript's duplicate body reference for files Notes lists, but Notes on macOS 27
+  never lists a PDF, so a PDF still appeared twice. The tool now inserts every file with
+  Notes' own Add File to Note action through the Background Operations bridge, which
+  writes one body reference (verified on macOS 27.2 for PDF and PNG). The result carries
+  `insertedBy: "shortcut"`. Without the bridge, or when no line of the note's text
+  identifies it uniquely, the tool falls back to the AppleScript path and its duplicate
+  handling (`insertedBy: "applescript"`).
+
+### Changed
+
+- **Background Operations bridge v6 replaces v5.** Its input is the JSON request,
+  optionally followed by one file, and it adds the `add-file` operation. Run `setup`
+  to install it, run it once in the foreground in Shortcuts.app and choose **Always
+  Allow**, then delete `Apple Notes MCP - Background Operations v5` from Shortcuts.app.
+  The other operations behave as in v5.
+
 ## [2.15.18] - 2026-11-06
 
 ### Fixed
