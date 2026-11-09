@@ -173,7 +173,7 @@ describe("native Notes tags", () => {
   it("surfaces the transport diagnosis when readback fails after a stalled run", () => {
     const failed = fixture();
     failed.deps.run.mockImplementation(() => {
-      throw new Error('run "Apple Notes MCP - Native Tags" once in the foreground');
+      throw new Error('run "Notes MCP Tags" once in the foreground');
     });
     failed.after.rich.nativeTags = [];
     // One invocation: the fixture's preflight reads are single-use.
@@ -184,7 +184,7 @@ describe("native Notes tags", () => {
       message = (error as Error).message;
     }
     expect(message).toMatch(/did not complete cleanly.*not verified/);
-    expect(message).toMatch(/run "Apple Notes MCP - Native Tags" once in the foreground/);
+    expect(message).toMatch(/run "Notes MCP Tags" once in the foreground/);
     const clean = fixture();
     clean.after.rich.nativeTags = [];
     expect(() => addNativeTags(request, clean.deps)).toThrow(/^Shortcuts ran, but/);

@@ -10,7 +10,7 @@ import {
 import { shortcutConsentHint } from "./shortcutConsent.js";
 import { CodedError } from "../utils/errorCodes.js";
 
-export const NATIVE_TAGS_SHORTCUT = "Apple Notes MCP - Native Tags";
+export const NATIVE_TAGS_SHORTCUT = "Notes MCP Tags";
 
 /** Normalize, validate, and deduplicate native tag names supplied by a client. */
 export function normalizeNativeTags(tags: string[]): string[] {
@@ -355,9 +355,32 @@ export function listInstalledShortcuts(): string[] {
 export const nativeTagsShortcutName = () =>
   process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
 
-/** Resolve exactly one installed Native Tags Shortcut by name or UUID. */
+/**
+ * Names earlier releases installed each bridge under. 2.16.1 shortened them so
+ * Shortcuts.app shows the whole name on a tile; a bridge installed under its old
+ * name keeps working, so the rename costs no reinstall.
+ */
+export const LEGACY_SHORTCUT_NAMES: Readonly<Record<string, readonly string[]>> = {
+  "Notes MCP Tags": ["Apple Notes MCP - Native Tags"],
+  "Notes MCP Background v6": ["Apple Notes MCP - Background Operations v6"],
+  "Notes MCP Markdown": ["Apple Notes MCP - Create Markdown Note"],
+};
+
+/**
+ * Resolve exactly one installed bridge Shortcut by name or UUID. When nothing
+ * is installed under the current name, a bridge under one of its legacy names
+ * counts, and the status names it as installed. Duplicates under the current
+ * name stay a failure rather than falling back.
+ */
 export function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
-  return resolveShortcut(listInstalledShortcuts(), shortcut);
+  const lines = listInstalledShortcuts();
+  const current = resolveShortcut(lines, shortcut);
+  if (current.installed || lines.some((line) => line.startsWith(`${shortcut} (`))) return current;
+  for (const legacy of LEGACY_SHORTCUT_NAMES[shortcut] ?? []) {
+    const found = resolveShortcut(lines, legacy);
+    if (found.installed) return found;
+  }
+  return current;
 }
 
 /**

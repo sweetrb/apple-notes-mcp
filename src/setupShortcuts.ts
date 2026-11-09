@@ -42,14 +42,14 @@ export const OPTIONAL_BRIDGE_NOTE =
 const MARKDOWN_MIN_DARWIN_MAJOR = 25;
 
 const shortcutFiles = [
-  { name: NATIVE_TAGS_SHORTCUT, file: "Apple Notes MCP - Native Tags.shortcut" },
+  { name: NATIVE_TAGS_SHORTCUT, file: "Notes MCP Tags.shortcut" },
   {
     name: BACKGROUND_SHORTCUT,
-    file: "Apple Notes MCP - Background Operations v6.shortcut",
+    file: "Notes MCP Background v6.shortcut",
   },
   {
     name: MARKDOWN_NOTE_SHORTCUT,
-    file: "Apple Notes MCP - Create Markdown Note.shortcut",
+    file: "Notes MCP Markdown.shortcut",
     optional: true,
   },
 ];

@@ -267,7 +267,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
       } catch {
         bridge = {
           installed: false,
-          shortcut: "Apple Notes MCP - Background Operations v6",
+          shortcut: "Notes MCP Background v6",
           error: "Shortcuts helper unavailable",
         };
       }

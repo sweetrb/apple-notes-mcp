@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.16.1] - 2026-11-09
+
+### Changed
+
+- **The Shortcut bridges have short names: `Notes MCP Tags`, `Notes MCP Background v6`
+  and `Notes MCP Markdown`.** The old names were cut off on Shortcuts.app's tiles, so v5
+  and v6 of the background bridge looked identical. A bridge installed under its old
+  name (`Apple Notes MCP - Native Tags`, `Apple Notes MCP - Background Operations v6`,
+  `Apple Notes MCP - Create Markdown Note`) keeps working when nothing is installed under
+  the new one, so this needs no reinstall. The incompatible v5 bridge is never used.
+
 ## [2.16.0] - 2026-11-09
 
 ### Fixed

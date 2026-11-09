@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>WFWorkflowName</key>
-	<string>Apple Notes MCP - Native Tags</string>
+	<string>Notes MCP Tags</string>
 	<key>WFWorkflowActions</key>
 	<array>
 		<dict>

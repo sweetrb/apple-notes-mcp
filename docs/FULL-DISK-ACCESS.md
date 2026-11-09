@@ -117,7 +117,7 @@ npx -y apple-notes-mcp@2.15.1 setup
 npx -y apple-notes-mcp@2.15.1 setup --check
 ```
 
-Confirm **Add Shortcut** for each imported workflow. After installation or upgrade, run **Apple Notes MCP - Native Tags** and **Apple Notes MCP - Background Operations v6** once in the foreground in Shortcuts.app and choose **Always Allow** when asked. The optional **Create Markdown Note** bridge requires macOS 26+ and the documented input for its foreground run. Follow the [Shortcut setup instructions](../shortcuts/README.md).
+Confirm **Add Shortcut** for each imported workflow. After installation or upgrade, run **Notes MCP Tags** and **Notes MCP Background v6** once in the foreground in Shortcuts.app and choose **Always Allow** when asked. The optional **Create Markdown Note** bridge requires macOS 26+ and the documented input for its foreground run. Follow the [Shortcut setup instructions](../shortcuts/README.md).
 
 Installation checks cannot read Shortcut consent state. An unanswered prompt can stall background native writes while the bridge still reports installed. If a write times out or its outcome is uncertain, read the exact note before retrying; the change may already have landed.
 

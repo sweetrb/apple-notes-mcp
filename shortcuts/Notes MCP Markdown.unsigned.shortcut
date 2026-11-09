@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>WFWorkflowName</key>
-	<string>Apple Notes MCP - Create Markdown Note</string>
+	<string>Notes MCP Markdown</string>
 	<key>WFWorkflowActions</key>
 	<array>
 		<dict>

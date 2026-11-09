@@ -24,21 +24,21 @@ const bridges = (installed: boolean, error?: string): ShortcutSetupReport => ({
   checkOnly: true,
   items: [
     {
-      name: "Apple Notes MCP - Native Tags",
+      name: "Notes MCP Tags",
       installed,
       file: "/x/tags.shortcut",
       opened: false,
       ...(error ? { error } : {}),
     },
     {
-      name: "Apple Notes MCP - Background Operations v6",
+      name: "Notes MCP Background v6",
       installed,
       file: "/x/bg.shortcut",
       opened: false,
       ...(error ? { error } : {}),
     },
     {
-      name: "Apple Notes MCP - Create Markdown Note",
+      name: "Notes MCP Markdown",
       installed: false,
       file: "/x/md.shortcut",
       opened: false,

@@ -348,11 +348,11 @@ describe("background note mutation boundaries", () => {
     f.deps.run.mockImplementation(() => {
       throw Object.assign(new Error("timeout"), {
         code: "ETIMEDOUT",
-        shortcut: "Apple Notes MCP - Background Operations v6",
+        shortcut: "Notes MCP Background v6",
       });
     });
     expect(() => mutateBackground(request, "set-pinned", {}, pinVerify, f.deps)).toThrow(
-      /Shortcuts timed out waiting for the "Apple Notes MCP - Background Operations v6" Shortcut/
+      /Shortcuts timed out waiting for the "Notes MCP Background v6" Shortcut/
     );
   });
   // #172 item 5 — a headless run cannot display Shortcuts' first-run consent
@@ -363,7 +363,7 @@ describe("background note mutation boundaries", () => {
     f.deps.run.mockImplementation(() => {
       throw Object.assign(new Error("timeout"), {
         code: "ETIMEDOUT",
-        shortcut: "Apple Notes MCP - Background Operations v6",
+        shortcut: "Notes MCP Background v6",
       });
     });
     // One invocation: the fixture's preflight reads are single-use.
@@ -376,7 +376,7 @@ describe("background note mutation boundaries", () => {
     expect(message).toMatch(/^Operation outcome uncertain/);
     expect(message).toMatch(/first-run Shortcuts consent prompt/);
     expect(message).toMatch(
-      /run "Apple Notes MCP - Background Operations v6" once in the foreground in Shortcuts\.app and choose Always Allow/
+      /run "Notes MCP Background v6" once in the foreground in Shortcuts\.app and choose Always Allow/
     );
   });
   it("keeps the consent hint when the timed-out Shortcut is unnamed", () => {
@@ -477,12 +477,12 @@ describe("bridge refusal and failure reporting (#248)", () => {
     f.deps.run.mockImplementation(() => {
       throw Object.assign(new Error(BRIDGE_REFUSED), {
         refused: true,
-        shortcut: "Apple Notes MCP - Background Operations v6",
+        shortcut: "Notes MCP Background v6",
       });
     });
     const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
     expect(r.message).toMatch(
-      /^The "Apple Notes MCP - Background Operations v6" Shortcut refused the request without running it: its Find Notes step/
+      /^The "Notes MCP Background v6" Shortcut refused the request without running it: its Find Notes step/
     );
     expect(r.message).toMatch(/nothing was written/);
     expect(r.message).not.toMatch(/uncertain/);
@@ -500,7 +500,7 @@ describe("bridge refusal and failure reporting (#248)", () => {
         status: 1,
         signal: null,
         stderr: 'Error: The action "Find Notes" could not run because an unknown error occurred.',
-        shortcut: "Apple Notes MCP - Background Operations v6",
+        shortcut: "Notes MCP Background v6",
       });
     });
     const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));
@@ -512,9 +512,9 @@ describe("bridge refusal and failure reporting (#248)", () => {
     f.deps.run.mockImplementation(() => {
       throw Object.assign(
         new Error(
-          'Install the supplied "Apple Notes MCP - Background Operations v6" Shortcut once; Shortcuts must list it exactly once'
+          'Install the supplied "Notes MCP Background v6" Shortcut once; Shortcuts must list it exactly once'
         ),
-        { notInstalled: true, shortcut: "Apple Notes MCP - Background Operations v6" }
+        { notInstalled: true, shortcut: "Notes MCP Background v6" }
       );
     });
     const r = envelope(() => mutateBackground(request, "append-html", {}, pinVerify, f.deps));

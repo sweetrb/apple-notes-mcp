@@ -148,7 +148,7 @@ describe("background capability boundaries", () => {
     });
     vi.mocked(markdownNoteStatus).mockReturnValueOnce({
       installed: true,
-      shortcut: "Apple Notes MCP - Create Markdown Note",
+      shortcut: "Notes MCP Markdown",
     });
     const installed = await fixture()("get-capabilities")[2]({});
     expect(installed.structuredContent.bridge.installed).toBe(false);
@@ -177,7 +177,7 @@ describe("background capability boundaries", () => {
     });
     vi.mocked(markdownNoteStatus).mockReturnValueOnce({
       installed: true,
-      shortcut: "Apple Notes MCP - Create Markdown Note",
+      shortcut: "Notes MCP Markdown",
     });
     const r = await fixture()("get-capabilities")[2]({});
     expect(r.structuredContent.operations["create-note-markdown-blocks"]).toMatchObject({
@@ -189,7 +189,7 @@ describe("background capability boundaries", () => {
   it("reports live-verified native creation as available with v6 installed", async () => {
     vi.mocked(backgroundStatus).mockReturnValueOnce({
       installed: true,
-      shortcut: "Apple Notes MCP - Background Operations v6",
+      shortcut: "Notes MCP Background v6",
     });
     const r = await fixture()("get-capabilities")[2]({});
     expect(r.structuredContent.operations["append-native"]).toMatchObject({

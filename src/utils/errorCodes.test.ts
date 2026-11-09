@@ -60,11 +60,11 @@ const CASES: Array<[string, ErrorEnvelope]> = [
   ],
   // shortcut_not_installed
   [
-    'Install the supplied "Apple Notes MCP - Background Operations v6" Shortcut once; Shortcuts must list it exactly once',
+    'Install the supplied "Notes MCP Background v6" Shortcut once; Shortcuts must list it exactly once',
     { code: "shortcut_not_installed" },
   ],
   [
-    "Import the supplied Apple Notes MCP - Native Tags.shortcut in Shortcuts first",
+    "Import the supplied Notes MCP Tags.shortcut in Shortcuts first",
     { code: "shortcut_not_installed" },
   ],
   // timeout_indeterminate

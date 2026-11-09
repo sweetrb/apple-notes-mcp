@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid5, NAMESPACE_URL
 
 ROOT = Path(__file__).resolve().parents[1]
-NAME = "Apple Notes MCP - Native Tags"
+NAME = "Notes MCP Tags"
 
 
 def uid(label):
