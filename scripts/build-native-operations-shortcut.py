@@ -8,10 +8,10 @@ spec = importlib.util.spec_from_file_location('tags', Path(__file__).with_name('
 b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b)
 action, native, output, token, text_token, uid = b.action, b.native, b.output, b.token, b.text_token, b.uid
-NAME = 'Apple Notes MCP - Background Operations v5'
+NAME = 'Apple Notes MCP - Background Operations v6'
 
 def uid(label):
-    return str(uuid5(NAMESPACE_URL, 'apple-notes-mcp/background/v5/' + label)).upper()
+    return str(uuid5(NAMESPACE_URL, 'apple-notes-mcp/background/v6/' + label)).upper()
 
 b.uid = uid
 
@@ -62,8 +62,14 @@ def close_select(label):
     return [end(label+'-exact-body'),end(label+'-exact-name'),end(label+'-one')]
 
 def build():
-    a=[action('is.workflow.actions.comment','background-about',WFCommentActionText='Background Notes MCP bridge v5. Native-editor typed append input; Markdown append uses the Notes Interpret as Markdown parser; native create actions have OpenWhenRun disabled; pin operations use fixed enum values. Exact title and literal body scope checked after unique search. MCP validates IDs, revisions and readback. No UI actions, database writes, shell scripts, network or arbitrary action execution.'),
-       action('is.workflow.actions.detect.dictionary','request',WFInput=token({'Type':'ExtensionInput'}))]
+    a=[action('is.workflow.actions.comment','background-about',WFCommentActionText='Background Notes MCP bridge v6. Input is the JSON request, optionally followed by ONE file that add-file hands to the Notes Add File to Note action (a single body reference; AppleScript inserts two, #321). Native-editor typed append input; Markdown append uses the Notes Interpret as Markdown parser; native create actions have OpenWhenRun disabled; pin operations use fixed enum values. Exact title and literal body scope checked after unique search. MCP validates IDs, revisions and readback. No UI actions, database writes, shell scripts, network or arbitrary action execution.'),
+       # Shortcut Input is the request file, or [request, attachment] for add-file.
+       # The attachment must stay the input file itself: Notes' Add File action
+       # refused a file produced by Base64 Decode + Set Name ("Which file?"
+       # prompt, macOS 27.2), but accepts a list item of the input.
+       action('is.workflow.actions.getitemfromlist','request-file',WFInput=token({'Type':'ExtensionInput'}),WFItemSpecifier='First Item'),
+       action('is.workflow.actions.getitemfromlist','attachment',WFInput=token({'Type':'ExtensionInput'}),WFItemSpecifier='Last Item'),
+       action('is.workflow.actions.detect.dictionary','request',WFInput=output('request-file'))]
     for k in ['operation','title','scopeText','text','objectId','objectName','change','otherTitle','otherScope','tag','size']:
         a.append(action('is.workflow.actions.getvalueforkey',k+'-value',WFInput=output('request'),WFDictionaryKey=k,WFGetDictionaryValueType='Value'))
         # Dictionary Value is an untyped Content Item. Conditional Action cannot
@@ -71,7 +77,7 @@ def build():
         a.append(action('is.workflow.actions.gettext',k,WFTextActionText=text_token(output(k+'-value'))))
     a += select('target','title','scopeText')
     ops = {
-      'probe':[action('is.workflow.actions.gettext','probe-ready',WFTextActionText='APPLE_NOTES_BACKGROUND_V5_READY')],
+      'probe':[action('is.workflow.actions.gettext','probe-ready',WFTextActionText='APPLE_NOTES_BACKGROUND_V6_READY')],
       'append-text':[append('append-text-result','text')],
       'append-markdown':[append('append-md-result','text',markdown=True)],
       'create-checklist-item':[native('CreateChecklistItemLinkAction','checklist-created',noteEntity=output('target'),name=text_token(output('text')))],
@@ -79,16 +85,17 @@ def build():
       'set-pinned':[condition('pin-add',output('change'),'add'),native('PinNotesLinkAction','pinned',entities=output('target'),operation='add'),end('pin-add'),
                     condition('pin-remove',output('change'),'remove'),native('PinNotesLinkAction','unpinned',entities=output('target'),operation='remove'),end('pin-remove')],
       'add-tag':[native('CreateTagLinkAction','tag-resolved',name=text_token(output('tag'))),native('AddTagsToNotesLinkAction','tag-added',notes=output('target'),tags=output('tag-resolved'))],
+      'add-file':[native('AddFileAttachmentLinkAction','file-added',file=output('attachment'),note=output('target'))],
       'remove-tag':[native('CreateTagLinkAction','remove-tag-resolved',name=text_token(output('tag'))),native('RemoveTagsFromNotesLinkAction','tag-removed',notes=output('target'),tags=output('remove-tag-resolved'))],
     }
     for op, steps in ops.items():
         label='op-'+op
         a.append(condition(label,output('operation'),op)); a += steps
-        a.append(action('is.workflow.actions.gettext',label+'-ok',WFTextActionText='APPLE_NOTES_BACKGROUND_V5_READY' if op == 'probe' else 'APPLE_NOTES_BACKGROUND_V5_DONE'))
+        a.append(action('is.workflow.actions.gettext',label+'-ok',WFTextActionText='APPLE_NOTES_BACKGROUND_V6_READY' if op == 'probe' else 'APPLE_NOTES_BACKGROUND_V6_DONE'))
         a.append(action('is.workflow.actions.output',label+'-output',WFOutput=text_token(output(label+'-ok'))))
         a.append(end(label))
     a += close_select('target')
-    a += [action('is.workflow.actions.gettext','refused',WFTextActionText='APPLE_NOTES_BACKGROUND_V5_REFUSED'),action('is.workflow.actions.output','refused-output',WFOutput=text_token(output('refused')))]
+    a += [action('is.workflow.actions.gettext','refused',WFTextActionText='APPLE_NOTES_BACKGROUND_V6_REFUSED'),action('is.workflow.actions.output','refused-output',WFOutput=text_token(output('refused')))]
     w=b.build();w.update(WFWorkflowName=NAME,WFWorkflowActions=a)
     return w
 

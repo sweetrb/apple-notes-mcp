@@ -29,8 +29,14 @@ success and verifies that existing content survived.
 
 ## Background Operations bridge
 
-`Apple Notes MCP - Background Operations v5.shortcut` performs native append,
-checklist and table creation, pin state changes, link insertion, and tag removal.
+`Apple Notes MCP - Background Operations v6.shortcut` performs native append,
+checklist and table creation, pin state changes, link insertion, tag removal, and
+file attachment. Its input is the JSON request, optionally followed by one file:
+`add-file` hands that file to Notes' Add File to Note action, which inserts it into
+the note body once, where AppleScript's `make new attachment` inserts it twice (#321).
+The file must be the input itself: Add File refused a file the workflow built with
+Base64 Decode and Set Name. v6 replaces v5; delete `Apple Notes MCP - Background
+Operations v5` from Shortcuts.app after installing v6.
 Markdown append hands Notes the plain text with "Interpret as Markdown" (Notes' own
 parser, as the Create Markdown Note bridge does) rather than pre-rendering it in
 Shortcuts (#308). Its allowlist rejects unknown operations. It uses exact title plus distinctive
@@ -43,8 +49,8 @@ Regenerate and test the unsigned source with:
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-operations-shortcut.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build-native-operations-shortcut.py
 shortcuts sign --mode anyone \
-  --input "shortcuts/Apple Notes MCP - Background Operations v5.unsigned.shortcut" \
-  --output "shortcuts/Apple Notes MCP - Background Operations v5.shortcut"
+  --input "shortcuts/Apple Notes MCP - Background Operations v6.unsigned.shortcut" \
+  --output "shortcuts/Apple Notes MCP - Background Operations v6.shortcut"
 ```
 
 Open the signed file and confirm **Add Shortcut** once, then run it once in the

@@ -42,6 +42,12 @@ import {
 } from "../utils/pasteboardFreeze.js";
 import type { PasteboardAttachmentSource } from "../types.js";
 import {
+  backgroundDependencies,
+  backgroundStatus,
+  runBackgroundShortcut,
+  textBelowTitle,
+} from "../services/backgroundNotes.js";
+import {
   assertRetainedRichContent,
   requirePreservationMetadata,
 } from "../utils/richContentPreservation.js";
@@ -521,6 +527,70 @@ function storedInsertion(
 }
 
 /**
+ * A line of the note's own text that, with its title, finds only this note:
+ * the Background Operations bridge's Find Notes key. Longer lines are tried
+ * first; null when no line is unique, so the caller uses AppleScript instead.
+ */
+function bridgeScope(manager: AppleNotesManager, note: Snapshot): string | null {
+  const lines = [
+    ...new Set(
+      textBelowTitle(note.rich.text, note.title)
+        .split("\n")
+        .map((line) => line.replace(/\uFFFC/g, "").trim())
+        .filter((line) => line.length >= 3 && line.length <= 200)
+    ),
+  ].sort((a, b) => b.length - a.length);
+  const { candidates } = backgroundDependencies(manager);
+  for (const line of lines.slice(0, 3)) {
+    const found = candidates(note.title, line);
+    if (found.length === 1 && found[0] === note.id) return line;
+  }
+  return null;
+}
+
+/**
+ * Insert the file with Notes' own Add File to Note, through the Background
+ * Operations bridge, which writes the attachment into the body once.
+ * AppleScript's make new attachment writes it twice, and on macOS 27 cannot
+ * remove the extra copy of a PDF (#321).
+ *
+ * "skipped" means nothing ran (bridge not installed, no unique scope line, or
+ * the bridge's own Find Notes refused), so AppleScript may insert instead.
+ * "uncertain" means the run failed after it may have inserted, so the caller
+ * must verify and never insert a second time.
+ */
+function attachThroughBridge(
+  manager: AppleNotesManager,
+  note: Snapshot,
+  file: string
+): "inserted" | "skipped" | "uncertain" {
+  let status: ReturnType<typeof backgroundStatus>;
+  try {
+    status = backgroundStatus();
+  } catch {
+    return "skipped";
+  }
+  if (!status.installed) return "skipped";
+  let scope: string | null;
+  try {
+    scope = bridgeScope(manager, note);
+  } catch {
+    return "skipped";
+  }
+  if (!scope) return "skipped";
+  try {
+    runBackgroundShortcut(
+      { operation: "add-file", title: note.title, scopeText: scope },
+      status,
+      file
+    );
+    return "inserted";
+  } catch (error) {
+    return (error as { refused?: boolean })?.refused ? "skipped" : "uncertain";
+  }
+}
+
+/**
  * Insert one verified local file into an exact, unchanged note.
  *
  * `checked` is a snapshot the caller already read and compared with
@@ -551,11 +621,14 @@ function attachFile(
     let transportUncertain = false;
     // From here on a failure may leave the attachment in the note.
     progress.insertionStarted = true;
-    try {
-      returnedId = manager.addAttachmentById(id, before.body, temporaryFile);
-    } catch {
-      transportUncertain = true;
-    }
+    const bridge = attachThroughBridge(manager, before, temporaryFile);
+    if (bridge === "uncertain") transportUncertain = true;
+    else if (bridge === "skipped")
+      try {
+        returnedId = manager.addAttachmentById(id, before.body, temporaryFile);
+      } catch {
+        transportUncertain = true;
+      }
     const after = readSnapshot(manager, id);
     assertExistingContentPreserved(before, after);
     const readInserted = () =>
@@ -625,6 +698,7 @@ function attachFile(
       bytes: bytes.length,
       name: reportedName,
       ...(verifiedBy === "database" ? { verifiedBy } : {}),
+      insertedBy: bridge === "skipped" ? "applescript" : "shortcut",
       ...(args.filename === undefined
         ? {}
         : {

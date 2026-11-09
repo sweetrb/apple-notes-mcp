@@ -31,7 +31,7 @@ const bridges = (installed: boolean, error?: string): ShortcutSetupReport => ({
       ...(error ? { error } : {}),
     },
     {
-      name: "Apple Notes MCP - Background Operations v5",
+      name: "Apple Notes MCP - Background Operations v6",
       installed,
       file: "/x/bg.shortcut",
       opened: false,

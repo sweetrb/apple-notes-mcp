@@ -13,9 +13,9 @@ vi.mock("@/services/nativeTags.js", () => ({
   })),
 }));
 vi.mock("@/services/backgroundNotes.js", () => ({
-  BACKGROUND_SHORTCUT: "Apple Notes MCP - Background Operations v5",
+  BACKGROUND_SHORTCUT: "Apple Notes MCP - Background Operations v6",
   MARKDOWN_NOTE_SHORTCUT: "Apple Notes MCP - Create Markdown Note",
-  backgroundShortcutName: () => "Apple Notes MCP - Background Operations v5",
+  backgroundShortcutName: () => "Apple Notes MCP - Background Operations v6",
   markdownShortcutName: () => "Apple Notes MCP - Create Markdown Note",
 }));
 const { matrix } = vi.hoisted(() => ({

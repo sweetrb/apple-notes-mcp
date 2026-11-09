@@ -186,10 +186,10 @@ describe("background capability boundaries", () => {
     });
     expect(() => requireValidated("create-note-markdown-blocks")).not.toThrow();
   });
-  it("reports live-verified native creation as available with v5 installed", async () => {
+  it("reports live-verified native creation as available with v6 installed", async () => {
     vi.mocked(backgroundStatus).mockReturnValueOnce({
       installed: true,
-      shortcut: "Apple Notes MCP - Background Operations v5",
+      shortcut: "Apple Notes MCP - Background Operations v6",
     });
     const r = await fixture()("get-capabilities")[2]({});
     expect(r.structuredContent.operations["append-native"]).toMatchObject({
