@@ -54847,7 +54847,7 @@ function fdaRemediation(execPath = process.execPath, env = process.env) {
   if (env.APPLE_NOTES_MCP_BROKERED === "1")
     return `This server runs under the permission broker, so the grant belongs to the broker app, not to Node or the MCP host. In System Settings > Privacy & Security > Full Disk Access, click + and add ${env.APPLE_NOTES_MCP_BROKER_APP || join(homedir(), "Applications", "Apple Notes MCP Broker.app")} (press Cmd+Shift+G in the file picker to paste the path), turn it on, and re-run doctor. Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
   const versioned = /\/(\.nvm|\.fnm|\.volta|\.asdf|\.local\/share\/mise|\.nodenv|n\/versions)\//.test(execPath);
-  return `In System Settings > Privacy & Security > Full Disk Access, click + and add the Node binary running this server: ${execPath} (press Cmd+Shift+G in the file picker to paste the path). Under Claude Desktop that entry is required: Claude Desktop launches servers as their own responsible process, so a grant on Claude.app does not reach them. When the server runs from a terminal (Terminal, iTerm2) or an editor, granting that app is enough. Then fully quit (Cmd+Q) and relaunch the host app and re-run doctor; if it still reports not granted, restart the Mac. ` + (versioned ? "This Node lives under a version manager, so the path changes with each Node version and the grant has to be added again after switching; pointing the MCP config at one fixed Node path avoids that. " : "") + `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
+  return `macOS never asks for Full Disk Access; it has to be added by hand. In System Settings > Privacy & Security > Full Disk Access (on macOS 12: System Preferences > Security & Privacy > Privacy > Full Disk Access, unlocked first), click + and add the Node binary running this server: ${execPath} (press Cmd+Shift+G in the file picker to paste the path). Add that exact path: a different node, such as another install or the one a shell's \`which node\` finds, is a different binary to macOS. Under Claude Desktop that entry is required: Claude Desktop launches servers as their own responsible process, so a grant on Claude.app does not reach them. When the server runs from a terminal (Terminal, iTerm2) or an editor, granting that app is enough. Most other desktop clients stay responsible for the servers they start, so grant the client app itself as well. Then fully quit (Cmd+Q) and relaunch the host app and re-run doctor; if it still reports not granted, restart the Mac. ` + (versioned ? "This Node lives under a version manager, so the path changes with each Node version and the grant has to be added again after switching; pointing the MCP config at one fixed Node path avoids that. " : "") + `Setup guide: ${FULL_DISK_ACCESS_GUIDE_URL}`;
 }
 
 // src/utils/checklistRuns.ts
@@ -64469,13 +64469,23 @@ function addNativeTags(request, deps) {
     } : {}
   };
 }
+function isUnsupportedShortcutsOption(error62) {
+  const stderr = String(error62?.stderr ?? "");
+  return /unknown option|unexpected argument|unrecognized option/iu.test(stderr);
+}
 function listInstalledShortcuts() {
-  return execFileSync15("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
+  const list = (args) => execFileSync15("/usr/bin/shortcuts", ["list", ...args], {
     encoding: "utf8",
     timeout: 15e3,
     maxBuffer: 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"]
   }).split(/\r?\n/u);
+  try {
+    return list(["--show-identifiers"]);
+  } catch (error62) {
+    if (!isUnsupportedShortcutsOption(error62)) throw error62;
+    return list([]);
+  }
 }
 var nativeTagsShortcutName = () => process.env.APPLE_NOTES_MCP_TAGS_SHORTCUT || NATIVE_TAGS_SHORTCUT;
 var LEGACY_SHORTCUT_NAMES = {
@@ -64486,7 +64496,8 @@ var LEGACY_SHORTCUT_NAMES = {
 function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
   const lines = listInstalledShortcuts();
   const current = resolveShortcut(lines, shortcut);
-  if (current.installed || lines.some((line) => line.startsWith(`${shortcut} (`))) return current;
+  if (current.installed || lines.some((line) => line === shortcut || line.startsWith(`${shortcut} (`)))
+    return current;
   for (const legacy of LEGACY_SHORTCUT_NAMES[shortcut] ?? []) {
     const found = resolveShortcut(lines, legacy);
     if (found.installed) return found;
@@ -64496,7 +64507,8 @@ function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
 function resolveShortcut(lines, shortcut) {
   const matches = lines.flatMap((line) => {
     const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
-    return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()) ? [{ name: match[1], identifier: match[2] }] : [];
+    if (!match) return line !== "" && line === shortcut ? [{ name: line, identifier: line }] : [];
+    return match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase() ? [{ name: match[1], identifier: match[2] }] : [];
   });
   return {
     shortcut,
@@ -65801,6 +65813,7 @@ function probePublicHelperStatus(deps = {
 
 // src/services/capabilityMatrix.ts
 var MACOS_SHORTCUTS_CLI = "12.0";
+var MACOS_NOTES_APP_INTENTS = "13.0";
 var MACOS_MARKDOWN_IMPORT = "26.0";
 var FEATURES = [
   {
@@ -65871,7 +65884,7 @@ var FEATURES = [
       "set-note-pinned",
       "remove-native-tags"
     ],
-    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    minimumMacOSVersion: MACOS_NOTES_APP_INTENTS,
     requirements: [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
@@ -65884,7 +65897,7 @@ var FEATURES = [
     name: "nativeTagsBridge",
     description: "Add real Notes tags through the Native Tags bridge",
     tools: ["add-native-tags", "replace-native-tag"],
-    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    minimumMacOSVersion: MACOS_NOTES_APP_INTENTS,
     requirements: [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
@@ -76989,9 +77002,11 @@ function settingsUrl(pane, macOSVersion) {
   const base = legacy ? "x-apple.systempreferences:com.apple.preference.security" : "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension";
   return `${base}?${PANE_ANCHORS[pane].anchor}`;
 }
+var LEGACY_PRIVACY = "System Preferences > Security & Privacy > Privacy";
 function paneFields(pane, macOSVersion) {
+  const legacy = macOSVersion !== null && compareVersions(macOSVersion, "13.0") < 0;
   return {
-    settingsPane: `${PRIVACY} > ${PANE_ANCHORS[pane].label}`,
+    settingsPane: `${legacy ? LEGACY_PRIVACY : PRIVACY} > ${PANE_ANCHORS[pane].label}`,
     settingsUrl: settingsUrl(pane, macOSVersion)
   };
 }

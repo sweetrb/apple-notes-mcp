@@ -27,6 +27,40 @@ describe("Shortcuts native-tag transport", () => {
     expect(nativeTagsStatus().installed).toBe(false);
     expect(nativeTagsStatus(shortcutId)).toMatchObject({ installed: true, identifier: shortcutId });
   });
+  // #325: macOS 12's `shortcuts list` has no --show-identifiers.
+  it("falls back to bare names when shortcuts rejects --show-identifiers", () => {
+    vi.mocked(execFileSync).mockImplementation((_file, args) => {
+      if (args?.[0] === "list" && args.includes("--show-identifiers"))
+        throw Object.assign(new Error("Command failed"), {
+          stderr: "Error: Unknown option '--show-identifiers'\nUsage: shortcuts list\n",
+        });
+      if (args?.[0] === "list") return `Other\n${NATIVE_TAGS_SHORTCUT}\n`;
+      expect(args?.slice(0, 3)).toEqual(["run", NATIVE_TAGS_SHORTCUT, "--input-path"]);
+      return "";
+    });
+    expect(nativeTagsStatus()).toMatchObject({
+      installed: true,
+      identifier: NATIVE_TAGS_SHORTCUT,
+    });
+    runNativeTagsShortcut({ title: "Title", scopeText: "Project example", tags: ["tag"] });
+    expect(vi.mocked(execFileSync).mock.calls.some((call) => call[1]?.[0] === "run")).toBe(true);
+  });
+  it("still refuses duplicate bare names and does not retry other list failures", () => {
+    vi.mocked(execFileSync).mockImplementation((_file, args) => {
+      if (args?.includes("--show-identifiers"))
+        throw Object.assign(new Error("Command failed"), { stderr: "Unknown option" });
+      return `${NATIVE_TAGS_SHORTCUT}\n${NATIVE_TAGS_SHORTCUT}\n`;
+    });
+    expect(nativeTagsStatus().installed).toBe(false);
+    vi.mocked(execFileSync).mockReset();
+    vi.mocked(execFileSync).mockImplementation(() => {
+      throw Object.assign(new Error("Command failed: shortcuts list --show-identifiers"), {
+        stderr: "Couldn't communicate with a helper application.",
+      });
+    });
+    expect(() => nativeTagsStatus()).toThrow(/Command failed/);
+    expect(vi.mocked(execFileSync)).toHaveBeenCalledTimes(1);
+  });
   it("passes text as JSON in a private temporary file, never shell code, and removes it", () => {
     const input = { title: '$(do-not-run) "title"', scopeText: "Project example", tags: ["дроп"] };
     let path = "";

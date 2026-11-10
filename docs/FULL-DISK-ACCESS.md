@@ -49,8 +49,10 @@ The MCP `doctor` tool checks Notes reachability, Automation, accounts, FDA, runt
 
 ## Grant access to the correct process
 
-1. Find the responsible process from diagnostics in the actual MCP client. For a **brokered session**, grant FDA to **Apple Notes MCP Broker.app**; `doctor` identifies whether the session uses the broker. For **Claude Desktop without the broker**, the server's **Node binary** needs FDA; the grant on Claude.app alone does not cover it. A terminal-launched server ordinarily uses the terminal app's permission; a server launched by VS Code uses that context. For other clients, confirm the reported process instead of assuming the app name is enough.
-2. Open **System Settings → Privacy & Security → Full Disk Access**.
+macOS never shows a prompt for Full Disk Access, on any release. Nothing will ask for it: add the entry yourself as below.
+
+1. Find the responsible process from diagnostics in the actual MCP client. For a **brokered session**, grant FDA to **Apple Notes MCP Broker.app**; `doctor` identifies whether the session uses the broker. For **Claude Desktop without the broker**, the server's **Node binary** needs FDA; the grant on Claude.app alone does not cover it. A terminal-launched server ordinarily uses the terminal app's permission; a server launched by VS Code uses that context. Most other desktop clients stay responsible for the servers they launch, so grant the client app itself; if `doctor` still reports no access, also add the Node path it prints. Add that exact path: a Node found another way (`which node` in a shell, another install, a Homebrew symlink) can be a different binary to macOS.
+2. Open **System Settings → Privacy & Security → Full Disk Access**. On macOS 12 it is **System Preferences → Security & Privacy → Privacy → Full Disk Access**; click the lock to make changes.
 3. Click **+** and add the diagnosed app or Node executable. Press **⌘⇧G** in the file picker to enter an absolute path; **⌘⇧.** shows hidden files.
 4. Enable its toggle, then fully quit and relaunch the host application so it starts fresh processes.
 5. Re-run diagnostics inside that client. If FDA remains unavailable, verify the executable path and that the client was fully restarted before trying further changes.
@@ -123,7 +125,7 @@ Installation checks cannot read Shortcut consent state. An unanswered prompt can
 
 External public and private native helpers are unavailable in brokered sessions. Set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it before using tools that require them.
 
-For drawing decode or transcription, build the public helper locally with a current Swift toolchain and macOS SDK that expose the macOS 26 `SpeechAnalyzer` and `SpeechTranscriber` APIs. Having Command Line Tools installed does not alone prove that their SDK can build the helper; older SDK builds are unverified.
+For drawing decode or transcription, build the public helper locally. A macOS 26 or newer SDK compiles in its `SpeechAnalyzer` route; an older SDK builds it with the `SFSpeechRecognizer` route only, which needs a Speech Recognition grant on every release.
 
 ```bash
 npx -y apple-notes-mcp@2.15.1 setup --public-helper

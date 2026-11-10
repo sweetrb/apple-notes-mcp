@@ -120,7 +120,7 @@ export interface CapabilityEnvironment {
   /** Darwin kernel release (`os.release()`), for diagnostics only. */
   darwinRelease: string;
   fullDiskAccess: boolean;
-  /** `shortcuts list --show-identifiers` lines, or null when the command failed. */
+  /** `shortcuts list --show-identifiers` lines (bare names on macOS 12), or null when the command failed. */
   shortcutLines: string[] | null;
   /** Absent only for injected/older probes; absence must never imply helper readiness. */
   publicHelper?: PublicHelperStatus;
@@ -140,6 +140,14 @@ export interface CapabilityMatrix {
 }
 
 const MACOS_SHORTCUTS_CLI = "12.0";
+/**
+ * The Tags and Background Operations bridges call Notes' App Intents actions
+ * (`com.apple.Notes.*LinkAction`), and macOS 12 has no App Intents, so those
+ * bridges cannot run before macOS 13 even though the `shortcuts` command can
+ * list them (#325). Whether every one of those actions exists on 13-15 is
+ * unverified.
+ */
+const MACOS_NOTES_APP_INTENTS = "13.0";
 const MACOS_MARKDOWN_IMPORT = "26.0";
 
 /**
@@ -218,7 +226,7 @@ export const FEATURES: FeatureDefinition[] = [
       "set-note-pinned",
       "remove-native-tags",
     ],
-    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    minimumMacOSVersion: MACOS_NOTES_APP_INTENTS,
     requirements: [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },
@@ -231,7 +239,7 @@ export const FEATURES: FeatureDefinition[] = [
     name: "nativeTagsBridge",
     description: "Add real Notes tags through the Native Tags bridge",
     tools: ["add-native-tags", "replace-native-tag"],
-    minimumMacOSVersion: MACOS_SHORTCUTS_CLI,
+    minimumMacOSVersion: MACOS_NOTES_APP_INTENTS,
     requirements: [
       { kind: "notes_automation" },
       { kind: "full_disk_access" },

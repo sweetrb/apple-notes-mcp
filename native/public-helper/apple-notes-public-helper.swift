@@ -26,6 +26,9 @@
 //   xcrun swiftc -O -parse-as-library -framework AppKit -framework PencilKit \
 //     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist \
 //     apple-notes-public-helper.swift source-digest.swift -o apple-notes-public-helper
+//
+// A macOS 26 or newer SDK compiles in the SpeechAnalyzer route; an older SDK
+// builds the same helper with the SFSpeechRecognizer route only (#325).
 
 import AVFoundation
 import AppKit
@@ -410,6 +413,14 @@ func speechFailure(_ error: Error, requireGrant: Bool) -> HelperFailure {
     return HelperFailure(code: "transcription_failed", message: error.localizedDescription)
 }
 
+// SpeechAnalyzer and SpeechTranscriber exist only in the macOS 26 SDK (Speech
+// 3500 and later). `@available` cannot hide a type the SDK does not declare, so
+// the macOS 26 route is compiled only when the SDK has it (#325). The outer
+// compiler check keeps a pre-5.8 Swift, which cannot parse `_version:`, from
+// reading the inner condition. Without it the helper still builds and
+// transcribes through SFSpeechRecognizer on every macOS.
+#if compiler(>=6.2)
+#if canImport(Speech, _version: 3500)
 /// Makes sure the locale's on-device model is installed. A download starts only
 /// when the caller opted in: otherwise a missing model is `asset_unavailable` at once.
 @available(macOS 26, *)
@@ -523,6 +534,36 @@ func transcribeWithAnalyzer(
     return response
 }
 
+/// The macOS 26 SpeechAnalyzer route, or nil when this Mac predates it.
+func transcribeWithAnalyzerIfAvailable(
+    file: AVAudioFile, localeID: String, deadline: Double, allowDownload: Bool
+) async throws -> [String: Any]? {
+    if #available(macOS 26, *) {
+        return try await transcribeWithAnalyzer(
+            file: file, localeID: localeID, deadline: deadline, allowDownload: allowDownload
+        )
+    }
+    return nil
+}
+
+/// Whether transcription here runs through SpeechAnalyzer, which needs no grant.
+func speechAnalyzerAvailable() -> Bool {
+    if #available(macOS 26, *) { return true }
+    return false
+}
+#else
+func transcribeWithAnalyzerIfAvailable(
+    file: AVAudioFile, localeID: String, deadline: Double, allowDownload: Bool
+) async throws -> [String: Any]? { nil }
+func speechAnalyzerAvailable() -> Bool { false }
+#endif
+#else
+func transcribeWithAnalyzerIfAvailable(
+    file: AVAudioFile, localeID: String, deadline: Double, allowDownload: Bool
+) async throws -> [String: Any]? { nil }
+func speechAnalyzerAvailable() -> Bool { false }
+#endif
+
 /// Pre-macOS 26 path: SFSpeechRecognizer, forced on-device. It needs a Speech
 /// Recognition grant, which is checked here and never requested.
 func transcribeWithRecognizer(url: URL, localeID: String, deadline: Double) async throws -> [String: Any] {
@@ -602,11 +643,11 @@ func transcribe(_ request: [String: Any]) async throws -> [String: Any] {
     }
     let duration = file.fileFormat.sampleRate > 0 ? Double(file.length) / file.fileFormat.sampleRate : 0
     var response: [String: Any]
-    if #available(macOS 26, *) {
-        response = try await transcribeWithAnalyzer(
-            file: file, localeID: localeID, deadline: deadline,
-            allowDownload: request["downloadAssets"] as? Bool ?? false
-        )
+    if let analyzed = try await transcribeWithAnalyzerIfAvailable(
+        file: file, localeID: localeID, deadline: deadline,
+        allowDownload: request["downloadAssets"] as? Bool ?? false
+    ) {
+        response = analyzed
     } else {
         response = try await transcribeWithRecognizer(url: url, localeID: localeID, deadline: deadline)
     }
@@ -617,10 +658,10 @@ func transcribe(_ request: [String: Any]) async throws -> [String: Any] {
 
 /// Reports what `transcribe` would find, without asking for access. On
 /// macOS 26+ SpeechAnalyzer needs no grant, so only an explicit refusal
-/// blocks it; earlier releases use the legacy recognizer, which needs one.
+/// blocks it; earlier releases, and a helper built with a pre-26 SDK, use the
+/// legacy recognizer, which needs one.
 func speechStatus() -> [String: Any] {
-    var requiresGrant = true
-    if #available(macOS 26, *) { requiresGrant = false }
+    let requiresGrant = !speechAnalyzerAvailable()
     return [
         "status": "ok",
         "speechAuthorization": authorizationName(SFSpeechRecognizer.authorizationStatus()),
