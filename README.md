@@ -19,7 +19,7 @@ Beyond creating and editing notes, it manages folders and accounts, native tags,
 
 ## Contents
 
-- [What is This?](#what-is-this) · [Setup on your Mac](#setup-on-your-mac) · [Requirements](#requirements) · [Features](#features)
+- [What is This?](#what-is-this) · [Setup on your Mac](#setup-on-your-mac) · [Requirements](#requirements) · [macOS compatibility](#macos-compatibility) · [Features](#features)
 - [Tool Reference](#tool-reference): [notes](#note-operations), [folders](#folder-operations), [accounts](#account-operations), [batch](#batch-operations), [export, attachments, and media](#export-operations), [diagnostics](#diagnostics), [native background operations](#native-background-operations), [private helper](#private-helper-opt-in-unsupported-apple-api)
 - [Usage Patterns](#usage-patterns) · [Installation choices and upgrades](#installation-choices-and-upgrades) · [Server settings](#server-settings) · [Full Disk Access](docs/FULL-DISK-ACCESS.md) · [Public native helper](#public-native-helper) · [Permission broker](#permission-broker-opt-in)
 - [Security and Privacy](#security-and-privacy) · [Known Limitations](#known-limitations) · [Troubleshooting](#troubleshooting) · [Recurring macOS permission prompts](#recurring-macos-permission-prompts) · [Development](#development)
@@ -55,7 +55,28 @@ Run each setup target separately and use the exact options shown. Version 2.15.1
 - A client that can launch a local stdio MCP server on this Mac. The configurations below cover Claude Code, Claude Desktop, Codex, Hermes, and Antigravity.
 - Automation permission to control Notes.app for AppleScript operations. Database-backed operations also need Full Disk Access for the process macOS holds responsible for the server.
 - Apple Shortcuts for native writes such as native tags, checklists, tables, pinning, and rich append. The optional native Markdown creation route needs macOS 26 or newer and an iCloud account.
-- An Apple developer toolchain only if you choose to build an optional native helper or permissions window. The public helper needs a current Swift toolchain and macOS SDK that expose the macOS 26 speech APIs; older SDK compatibility is unverified.
+- An Apple developer toolchain only if you choose to build an optional native helper or permissions window. The public helper builds with older SDKs too; only a macOS 26 or newer SDK compiles in its `SpeechAnalyzer` route (see [macOS compatibility](#macos-compatibility)).
+
+### macOS compatibility
+
+What works depends on the macOS release. `get-capabilities` reports this for the Mac it runs on (`features.<name>.minimumMacOSVersion`, `osSupported`, and a `reason` such as `requires_macos_13`), so check it there rather than relying on this table alone. The server is developed and tested on current macOS; rows for older releases come from each feature's declared minimum and Apple's API availability, not from testing on those releases.
+
+| Feature | macOS 12 | macOS 13–15 | macOS 26 and later |
+|---|---|---|---|
+| AppleScript core: create, read, search, update, move and delete notes and folders (`applescriptCore`) | Yes | Yes | Yes |
+| Notes database reads with Full Disk Access: queries, structure, checklist state, exports, attachments (`fullDiskAccessReads`) | Yes | Yes | Yes |
+| `get-note-link` without Full Disk Access | Yes, AppleScript fallback | Yes, AppleScript fallback | No, needs Full Disk Access |
+| Listing bridge Shortcuts (`doctor`, `setup --check`, `shortcutsBridges`) | Yes, by name (12's `shortcuts list` cannot show identifiers) | Yes | Yes |
+| Native Tags and Background Operations bridges: native tags, checklists, tables, pinning, note links, `append-native` (`nativeTagsBridge`, `backgroundOperationsBridge`) | No: they call Notes App Intents actions, which macOS 12 does not have | Minimum declared; untested | Yes |
+| Markdown note creation through the Markdown bridge (`markdownNoteBridge`) | No | No | Yes, iCloud account only |
+| Public native helper build (`setup --public-helper`) | Builds with the SDK that release's Xcode or Command Line Tools provide; not tested on macOS 12 itself | Builds | Builds |
+| Classic drawing decode (`get-note-drawings`, needs the helper and Full Disk Access) | Yes | Yes | Yes |
+| On-device transcription (`transcribe-note-audio`, needs the helper and Full Disk Access) | `SFSpeechRecognizer`: needs a Speech Recognition grant for the app that launches the server, and an on-device model for the locale | Same as macOS 12 | `SpeechAnalyzer`, no grant needed, when the helper was built with a macOS 26 or newer SDK; otherwise as on macOS 12 |
+| Stored audio transcripts (`get-audio-transcripts`) | With Full Disk Access | With Full Disk Access | With Full Disk Access |
+
+The public helper compiles its `SpeechAnalyzer` route only when the SDK provides it. With an older SDK the same helper builds without it and transcribes through `SFSpeechRecognizer` on every release, even on macOS 26 and later. Node.js 20 or newer is required everywhere.
+
+On macOS 12 the privacy panes are under **System Preferences → Security & Privacy → Privacy**, not System Settings. macOS never prompts for Full Disk Access on any release: nothing will ask, and you add the app or executable yourself (see [which process needs it](#full-disk-access)).
 
 Python is **not** an Apple Notes MCP runtime dependency. The package includes its compiled JavaScript server and signed Shortcut files. Python is used by developer scripts that regenerate those workflows, not by normal installation or MCP tool calls.
 
@@ -195,11 +216,11 @@ In the configured client, ask it to run `get-capabilities` and then `doctor`. `g
 | Access or component | What it enables | How to complete it |
 |---|---|---|
 | Automation of Notes.app | AppleScript reads and writes | Allow the macOS prompt for the responsible app to control Notes. Inspect **Privacy & Security → Automation** if access was denied. |
-| Full Disk Access | Database reads, rich-content inspection and safety checks, query tools, native object reads, and database-backed exports | Add the responsible executable/app under **Privacy & Security → Full Disk Access**, fully quit and relaunch the host, then rerun `doctor`. |
+| Full Disk Access | Database reads, rich-content inspection and safety checks, query tools, native object reads, and database-backed exports | macOS never prompts for it. Add the responsible executable/app under **Privacy & Security → Full Disk Access** (macOS 12: **System Preferences → Security & Privacy → Privacy**), fully quit and relaunch the host, then rerun `doctor`. |
 | Shortcut installation and consent | Native tag, checklist, table, pin, link, and append routes | Import the bridges and complete their foreground consent steps below. |
 | Public helper and, where required, Speech Recognition | Classic drawing decoding and on-device audio transcription | Build the optional helper; follow the permission result from `doctor` or the tool. |
 
-**Which process needs Full Disk Access?** For a brokered session, grant the signed **Apple Notes MCP Broker.app** access; `doctor` reports whether that session uses it. Without the broker, Claude Desktop needs the exact **Node executable** printed by `doctor`; granting Claude.app alone does not reach the server in that launch path. For a terminal-launched client, the terminal app is normally the responsible app; for an editor-launched server, check that editor. Use the actual running client's diagnostics instead of assuming that all clients share grants.
+**Which process needs Full Disk Access?** macOS never shows a Full Disk Access prompt, so nothing will ask; you add the entry yourself. For a brokered session, grant the signed **Apple Notes MCP Broker.app** access; `doctor` reports whether that session uses it. Without the broker, Claude Desktop needs the exact **Node executable** printed by `doctor`; granting Claude.app alone does not reach the server in that launch path. Add that exact path: a Node found some other way (`which node` in a shell, another install, or a Homebrew symlink) can be a different binary. For a terminal-launched client, the terminal app is normally the responsible app; for an editor-launched server, check that editor. Most other desktop clients stay responsible for the servers they launch, so grant the client app itself (and the Node path from `doctor` if that alone does not work). Use the actual running client's diagnostics instead of assuming that all clients share grants.
 
 Client sandbox access is a separate boundary. A sandboxed client must be able to launch the executable and reach its files; a brokered client also needs access to the broker's local Unix socket. Full Disk Access and Automation grants do not expand the client's sandbox. Diagnose a launch or socket-access refusal in the client before changing macOS privacy permissions.
 
@@ -259,7 +280,7 @@ An installed bridge is not proof of consent: `shortcuts list`, `setup --check`, 
 
 ### 4. Build optional helpers
 
-These commands are separate from registering the MCP client. If `xcrun swiftc` or `clang` is unavailable, install Apple's Command Line Tools with `xcode-select --install` before building a helper. The public helper's source references `SpeechAnalyzer` and `SpeechTranscriber`, so its build needs a current Swift toolchain and macOS SDK exposing those macOS 26 APIs. Runtime availability checks do not establish compatibility with an older SDK; builds with older SDKs are unverified.
+These commands are separate from registering the MCP client. If `xcrun swiftc` or `clang` is unavailable, install Apple's Command Line Tools with `xcode-select --install` before building a helper. The public helper compiles its macOS 26 `SpeechAnalyzer`/`SpeechTranscriber` route only when the SDK declares those APIs; with an older SDK it builds with the `SFSpeechRecognizer` route only. A build against the macOS 15.4 SDK targeting macOS 12 compiles; running it on macOS 12 itself is untested.
 
 #### Public native helper
 
@@ -3391,7 +3412,7 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 
 ### "Permission denied"
 - macOS needs automation permission
-- Go to System Settings > Privacy & Security > Automation
+- Go to System Settings > Privacy & Security > Automation (macOS 12: System Preferences > Security & Privacy > Privacy > Automation)
 - Ensure your terminal/Claude has permission to control Notes
 - Follow the [permissions check](#permissions-check) from the client that launches the server; an Automation probe can prompt, and a terminal result does not establish another client's grants.
 

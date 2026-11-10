@@ -186,6 +186,13 @@ describe("runDoctor (#22)", () => {
     expect(msg).not.toMatch(/version manager/);
   });
 
+  it("fdaRemediation says macOS never prompts and names the macOS 12 pane and other clients (#325)", () => {
+    const msg = fdaRemediation("/opt/node/bin/node");
+    expect(msg).toMatch(/never asks for Full Disk Access/);
+    expect(msg).toMatch(/System Preferences > Security & Privacy > Privacy > Full Disk Access/);
+    expect(msg).toMatch(/grant the client app itself/);
+  });
+
   it("fdaRemediation warns that a version-manager Node path changes per version (#220)", () => {
     const msg = fdaRemediation("/Users/x/.nvm/versions/node/v24.11.1/bin/node");
     expect(msg).toMatch(/version manager/);

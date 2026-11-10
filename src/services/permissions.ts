@@ -122,9 +122,13 @@ export function settingsUrl(pane: SettingsPane, macOSVersion: string | null): st
   return `${base}?${PANE_ANCHORS[pane].anchor}`;
 }
 
+/** Before macOS 13 the same panes live in System Preferences (#325). */
+const LEGACY_PRIVACY = "System Preferences > Security & Privacy > Privacy";
+
 function paneFields(pane: SettingsPane, macOSVersion: string | null) {
+  const legacy = macOSVersion !== null && compareVersions(macOSVersion, "13.0") < 0;
   return {
-    settingsPane: `${PRIVACY} > ${PANE_ANCHORS[pane].label}`,
+    settingsPane: `${legacy ? LEGACY_PRIVACY : PRIVACY} > ${PANE_ANCHORS[pane].label}`,
     settingsUrl: settingsUrl(pane, macOSVersion),
   };
 }

@@ -341,14 +341,36 @@ export function addNativeTags(request: NativeTagRequest, deps: NativeTagDependen
   };
 }
 
-/** List installed Shortcuts as `Name (UUID)` lines. Read-only; never runs a Shortcut. */
+/**
+ * True when `shortcuts` rejected an option rather than failing to list. macOS
+ * 12's `shortcuts list` has no `--show-identifiers` (#325).
+ */
+export function isUnsupportedShortcutsOption(error: unknown): boolean {
+  // stderr only: execFileSync's message repeats the command line, flag included.
+  const stderr = String((error as { stderr?: unknown } | null)?.stderr ?? "");
+  return /unknown option|unexpected argument|unrecognized option/iu.test(stderr);
+}
+
+/**
+ * List installed Shortcuts as `Name (UUID)` lines. Read-only; never runs a
+ * Shortcut. Where `shortcuts list` cannot show identifiers (macOS 12), the
+ * lines are bare names, which {@link resolveShortcut} matches exactly and
+ * `shortcuts run` accepts in place of a UUID.
+ */
 export function listInstalledShortcuts(): string[] {
-  return execFileSync("/usr/bin/shortcuts", ["list", "--show-identifiers"], {
-    encoding: "utf8",
-    timeout: 15000,
-    maxBuffer: 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"],
-  }).split(/\r?\n/u);
+  const list = (args: string[]) =>
+    execFileSync("/usr/bin/shortcuts", ["list", ...args], {
+      encoding: "utf8",
+      timeout: 15000,
+      maxBuffer: 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).split(/\r?\n/u);
+  try {
+    return list(["--show-identifiers"]);
+  } catch (error) {
+    if (!isUnsupportedShortcutsOption(error)) throw error;
+    return list([]);
+  }
 }
 
 /** The configured Native Tags bridge name (env override or default). */
@@ -375,7 +397,11 @@ export const LEGACY_SHORTCUT_NAMES: Readonly<Record<string, readonly string[]>> 
 export function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
   const lines = listInstalledShortcuts();
   const current = resolveShortcut(lines, shortcut);
-  if (current.installed || lines.some((line) => line.startsWith(`${shortcut} (`))) return current;
+  if (
+    current.installed ||
+    lines.some((line) => line === shortcut || line.startsWith(`${shortcut} (`))
+  )
+    return current;
   for (const legacy of LEGACY_SHORTCUT_NAMES[shortcut] ?? []) {
     const found = resolveShortcut(lines, legacy);
     if (found.installed) return found;
@@ -385,12 +411,15 @@ export function nativeTagsStatus(shortcut = nativeTagsShortcutName()) {
 
 /**
  * Resolve one Shortcut by exact name or UUID against `shortcuts list
- * --show-identifiers` output. Installed means exactly one match.
+ * --show-identifiers` output. Installed means exactly one match. A bare-name
+ * line (macOS 12, which cannot show identifiers) matches by exact name only,
+ * and the name stands in for the identifier.
  */
 export function resolveShortcut(lines: string[], shortcut: string) {
   const matches = lines.flatMap((line) => {
     const match = /^(.*) \(([0-9A-Fa-f-]{36})\)$/.exec(line);
-    return match && (match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase())
+    if (!match) return line !== "" && line === shortcut ? [{ name: line, identifier: line }] : [];
+    return match[1] === shortcut || match[2].toLowerCase() === shortcut.toLowerCase()
       ? [{ name: match[1], identifier: match[2] }]
       : [];
   });

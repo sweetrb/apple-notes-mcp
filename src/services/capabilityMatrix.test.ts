@@ -354,6 +354,23 @@ describe("evaluateFeature", () => {
   });
 });
 
+describe("macOS 12 (#325)", () => {
+  it("keeps the shortcuts CLI and core reads but puts the App Intents bridges at macOS 13", () => {
+    const m = evaluateFeatures(env({ macOSVersion: "12.7.6", shortcutLines: [BG, TAGS] }));
+    expect(m.features.applescriptCore.available).toBe(true);
+    expect(m.features.fullDiskAccessReads.available).toBe(true);
+    expect(m.features.shortcutsBridges.available).toBe(true);
+    for (const name of ["backgroundOperationsBridge", "nativeTagsBridge"])
+      expect(m.features[name]).toMatchObject({
+        available: false,
+        osSupported: false,
+        minimumMacOSVersion: "13.0",
+        reason: "requires_macos_13",
+      });
+    expect(m.features.markdownNoteBridge.reason).toBe("requires_macos_26");
+  });
+});
+
 describe("compareVersions", () => {
   it("compares numerically, padding missing segments", () => {
     expect(compareVersions("26.0", "26")).toBe(0);

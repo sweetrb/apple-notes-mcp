@@ -117,6 +117,13 @@ describe("checkPermissions", () => {
     expect(fda.fix).toContain("/usr/local/bin/node");
   });
 
+  it("names the System Preferences pane before macOS 13 (#325)", () => {
+    const report = withProbe(probes({ fullDiskAccess: () => false, macOSVersion: () => "12.7.6" }));
+    expect(item(report, "fullDiskAccess").settingsPane).toBe(
+      "System Preferences > Security & Privacy > Privacy > Full Disk Access"
+    );
+  });
+
   it.each([false, "throws"] as const)(
     "uses the supplied broker environment when the FDA probe returns %s",
     (result) => {

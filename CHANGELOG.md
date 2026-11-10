@@ -1,5 +1,36 @@
 ## [Unreleased]
 
+## [2.16.2] - 2026-11-10
+
+### Fixed
+
+- **`doctor` and `setup --check` can inspect the Shortcut bridges on macOS 12 (#325).**
+  macOS 12's `shortcuts list` has no `--show-identifiers`, so the inspection failed with
+  an unknown-option error. When `shortcuts` rejects that option, the server now lists by
+  name and runs a bridge by its exact name, which `shortcuts run` accepts. Duplicate
+  names are still refused; other `shortcuts` failures are not retried.
+- **The public native helper builds with SDKs older than macOS 26 (#325).** Its
+  `SpeechAnalyzer`/`SpeechTranscriber` route is now compiled only when the SDK declares
+  those APIs (`#if canImport(Speech, _version: 3500)` inside `#if compiler(>=6.2)`);
+  `@available` could not hide types an older SDK lacks. Without them the helper
+  transcribes through `SFSpeechRecognizer`, and `speech_status` reports that it needs a
+  grant even on macOS 26. Verified by compiling against the macOS 15.4, 26 and 27.2 SDKs
+  targeting macOS 12; not run on macOS 12.
+- **`get-capabilities` puts the Native Tags and Background Operations bridges at macOS 13
+  (#325).** Both call Notes' App Intents actions, which macOS 12 does not have; they
+  reported a 12.0 floor. On macOS 12 they now report `requires_macos_13`.
+- **Full Disk Access guidance fits macOS 12 and clients other than Claude Desktop (#325).**
+  The message now says macOS never prompts for Full Disk Access, names the macOS 12
+  System Preferences pane, says to add the exact Node path `doctor` prints, and says most
+  desktop clients other than Claude Desktop need the grant on the client app itself.
+  `setup --permissions` names the System Preferences pane before macOS 13.
+
+### Documentation
+
+- **README has a macOS compatibility table (#325):** what works on macOS 12, 13–15 and
+  26+, from each feature's declared minimum. `docs/FULL-DISK-ACCESS.md` covers the
+  missing prompt, the macOS 12 pane, and the helper's older-SDK build.
+
 ## [2.16.1] - 2026-11-09
 
 ### Changed
