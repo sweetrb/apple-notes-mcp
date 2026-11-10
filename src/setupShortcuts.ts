@@ -41,6 +41,13 @@ export const OPTIONAL_BRIDGE_NOTE =
 /** Darwin 25 is macOS 26, the first release whose Create Note action interprets Markdown. */
 const MARKDOWN_MIN_DARWIN_MAJOR = 25;
 
+/**
+ * Darwin 22 is macOS 13. The Tags and Background bridges call Notes' App
+ * Intents actions, which macOS 12 does not have, so they could never run there
+ * (#325; get-capabilities reports `requires_macos_13`).
+ */
+const APP_INTENTS_MIN_DARWIN_MAJOR = 22;
+
 const shortcutFiles = [
   { name: NATIVE_TAGS_SHORTCUT, file: "Notes MCP Tags.shortcut" },
   {
@@ -88,7 +95,12 @@ export function setupShortcuts(
     }
     let opened = false;
     let skipped: string | undefined;
-    if (!installed && !checkOnly) {
+    // The required bridges cannot run before macOS 13 (#325): never open them
+    // there, and say so in check-only mode too, so --check does not send the
+    // user to a setup run that could not help.
+    if (!installed && !optional && !(darwinMajor >= APP_INTENTS_MIN_DARWIN_MAJOR))
+      skipped = `requires_macos_13: requires macOS 13 or later (this Mac reports Darwin ${osRelease})`;
+    else if (!installed && !checkOnly) {
       // Before macOS 26 Notes cannot interpret Markdown, so the optional bridge
       // could never run; don't open an Add Shortcut dialog for it.
       if (optional && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
@@ -128,6 +140,10 @@ export function formatShortcutSetup(report: ShortcutSetupReport): string {
   }
   lines.push("");
   if (report.ready) lines.push("Both required Shortcut bridges are installed.");
+  else if (report.items.some((item) => !item.optional && item.skipped))
+    lines.push(
+      "This macOS cannot run the native-write bridges; native tags, checklists, tables, pinning and append-native need macOS 13 or later."
+    );
   else if (report.checkOnly) lines.push("Run `apple-notes-mcp setup` to open missing workflows.");
   else
     lines.push(

@@ -75985,6 +75985,7 @@ import { dirname as dirname8, resolve as resolve8 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var OPTIONAL_BRIDGE_NOTE = "(optional \u2014 needed only for create-note format: markdown, macOS 26+)";
 var MARKDOWN_MIN_DARWIN_MAJOR = 25;
+var APP_INTENTS_MIN_DARWIN_MAJOR = 22;
 var shortcutFiles = [
   { name: NATIVE_TAGS_SHORTCUT, file: "Notes MCP Tags.shortcut" },
   {
@@ -76021,7 +76022,9 @@ function setupShortcuts(checkOnly, dependencies = {}) {
     }
     let opened = false;
     let skipped;
-    if (!installed && !checkOnly) {
+    if (!installed && !optional2 && !(darwinMajor >= APP_INTENTS_MIN_DARWIN_MAJOR))
+      skipped = `requires_macos_13: requires macOS 13 or later (this Mac reports Darwin ${osRelease})`;
+    else if (!installed && !checkOnly) {
       if (optional2 && !(darwinMajor >= MARKDOWN_MIN_DARWIN_MAJOR))
         skipped = `requires macOS 26 or later (this Mac reports Darwin ${osRelease})`;
       else if (!exists(path10)) error62 = `Packaged Shortcut is missing: ${path10}`;
@@ -76055,6 +76058,10 @@ function formatShortcutSetup(report) {
   }
   lines.push("");
   if (report.ready) lines.push("Both required Shortcut bridges are installed.");
+  else if (report.items.some((item) => !item.optional && item.skipped))
+    lines.push(
+      "This macOS cannot run the native-write bridges; native tags, checklists, tables, pinning and append-native need macOS 13 or later."
+    );
   else if (report.checkOnly) lines.push("Run `apple-notes-mcp setup` to open missing workflows.");
   else
     lines.push(

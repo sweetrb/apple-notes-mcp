@@ -74,6 +74,8 @@ What works depends on the macOS release. `get-capabilities` reports this for the
 | On-device transcription (`transcribe-note-audio`, needs the helper and Full Disk Access) | `SFSpeechRecognizer`: needs a Speech Recognition grant for the app that launches the server, and an on-device model for the locale | Same as macOS 12 | `SpeechAnalyzer`, no grant needed, when the helper was built with a macOS 26 or newer SDK; otherwise as on macOS 12 |
 | Stored audio transcripts (`get-audio-transcripts`) | With Full Disk Access | With Full Disk Access | With Full Disk Access |
 
+Before macOS 13, `setup` does not open the Tags or Background bridge for import, and `setup` and `setup --check` report both as skipped with `requires_macos_13`.
+
 The public helper compiles its `SpeechAnalyzer` route only when the SDK provides it. With an older SDK the same helper builds without it and transcribes through `SFSpeechRecognizer` on every release, even on macOS 26 and later. Node.js 20 or newer is required everywhere.
 
 On macOS 12 the privacy panes are under **System Preferences → Security & Privacy → Privacy**, not System Settings. macOS never prompts for Full Disk Access on any release: nothing will ask, and you add the app or executable yourself (see [which process needs it](#full-disk-access)).
