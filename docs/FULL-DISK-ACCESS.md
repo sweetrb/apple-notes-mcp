@@ -38,7 +38,7 @@ Use `get-capabilities` inside your MCP client first. It reports feature requirem
 For a non-prompting command-line permission report:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions --once --json --check
+npx -y apple-notes-mcp@latest setup --permissions --once --json --check
 ```
 
 Use the package version and launch context that match your client. A check run in Terminal reports Terminal's process context; it does not certify a server launched by Claude Desktop or another desktop client.
@@ -62,7 +62,7 @@ A client sandbox can separately prevent the server from launching or connecting 
 FDA and Automation are independent. To check Automation from a terminal on the Mac, when you are ready for the first-use prompt:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions --once --probe-automation
+npx -y apple-notes-mcp@latest setup --permissions --once --probe-automation
 ```
 
 This sends one read-only Apple event. Accept the macOS prompt to allow the launching process to control Notes. `--check` and SSH sessions suppress this probe even when `--probe-automation` is present. `--open` can open the relevant System Settings panes; it does not change a permission.
@@ -115,8 +115,8 @@ Settings.
 For native operations, install the packaged workflows:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup
-npx -y apple-notes-mcp@2.15.1 setup --check
+npx -y apple-notes-mcp@latest setup
+npx -y apple-notes-mcp@latest setup --check
 ```
 
 Confirm **Add Shortcut** for each imported workflow. After installation or upgrade, run **Notes MCP Tags** and **Notes MCP Background v6** once in the foreground in Shortcuts.app and choose **Always Allow** when asked. The optional **Create Markdown Note** bridge requires macOS 26+ and the documented input for its foreground run. Follow the [Shortcut setup instructions](../shortcuts/README.md).
@@ -128,8 +128,8 @@ External public and private native helpers are unavailable in brokered sessions.
 For drawing decode or transcription, build the public helper locally. A macOS 26 or newer SDK compiles in its `SpeechAnalyzer` route; an older SDK builds it with the `SFSpeechRecognizer` route only, which needs a Speech Recognition grant on every release.
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --public-helper
-npx -y apple-notes-mcp@2.15.1 setup --public-helper --check
+npx -y apple-notes-mcp@latest setup --public-helper
+npx -y apple-notes-mcp@latest setup --public-helper --check
 ```
 
 The helper never requests Speech Recognition permission in the background. On older macOS, the recognition route requires an existing grant to the launching app; on macOS 26+, the server handles SpeechAnalyzer separately. A missing language model returns `asset_unavailable`; downloading it requires the explicit `downloadAssets` option. See [on-device transcription](../README.md#transcribe-note-audio) for the current route and permission contract.

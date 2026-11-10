@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.16.4] - 2026-11-10
+
+### Documentation
+
+- **Install examples now use `apple-notes-mcp@latest` instead of a pinned 2.15.1 (#328).**
+  The README and `docs/FULL-DISK-ACCESS.md` pinned every `npx` and `npm install`
+  example to 2.15.1, and nothing updated the pin, so anyone following them got a
+  release that predates the macOS 12 fixes in 2.16.2 (#325). The section on pinning
+  now uses an `X.Y.Z` placeholder, and a test fails CI if an exact version appears in
+  the README, CLAUDE.md or `docs/` again. Thanks @Calorion.
+
 ## [2.16.3] - 2026-11-10
 
 ### Fixed
