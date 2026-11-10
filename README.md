@@ -100,7 +100,7 @@ For the plugin, run these commands inside a Claude Code session:
 The plugin bundles the server and the Apple Notes skill. For a manual MCP registration instead, run this in your terminal:
 
 ```bash
-claude mcp add apple-notes -s user -- npx -y apple-notes-mcp@2.15.1
+claude mcp add apple-notes -s user -- npx -y apple-notes-mcp@latest
 ```
 
 Check the connection with `/mcp` in Claude Code. `claude mcp get apple-notes` inspects the manually registered server. Project-scoped `.mcp.json` entries require workspace/server approval and can override a user-scoped entry.
@@ -114,7 +114,7 @@ Open **Settings → Developer → Edit Config**. Merge the following server entr
   "mcpServers": {
     "apple-notes": {
       "command": "npx",
-      "args": ["-y", "apple-notes-mcp@2.15.1"]
+      "args": ["-y", "apple-notes-mcp@latest"]
     }
   }
 }
@@ -134,7 +134,7 @@ codex plugin add apple-notes@apple-notes-mcp
 For a manual MCP registration instead:
 
 ```bash
-codex mcp add apple-notes -- npx -y apple-notes-mcp@2.15.1
+codex mcp add apple-notes -- npx -y apple-notes-mcp@latest
 ```
 
 The equivalent entry in `~/.codex/config.toml` is:
@@ -142,10 +142,10 @@ The equivalent entry in `~/.codex/config.toml` is:
 ```toml
 [mcp_servers.apple-notes]
 command = "npx"
-args = ["-y", "apple-notes-mcp@2.15.1"]
+args = ["-y", "apple-notes-mcp@latest"]
 ```
 
-If `codex` is not on your terminal's `PATH`, use the desktop client's **Settings → MCP servers → Add server**: choose **STDIO**, enter `npx` with arguments `-y` and `apple-notes-mcp@2.15.1`, save, and restart the server.
+If `codex` is not on your terminal's `PATH`, use the desktop client's **Settings → MCP servers → Add server**: choose **STDIO**, enter `npx` with arguments `-y` and `apple-notes-mcp@latest`, save, and restart the server.
 
 Restart the relevant local Codex session or client. Use `/mcp` in the CLI or the client's MCP settings to inspect the connection. `codex mcp list` lists manually configured servers. The desktop client, CLI, and IDE extension share the Codex configuration; select local execution on the Mac containing your Notes library.
 
@@ -156,7 +156,7 @@ The plugin's server entry runs the published npm package through unpinned `npx`,
 Register a local stdio server:
 
 ```bash
-hermes mcp add apple-notes --command npx --args -y apple-notes-mcp@2.15.1
+hermes mcp add apple-notes --command npx --args -y apple-notes-mcp@latest
 ```
 
 Or merge this entry into `~/.hermes/config.yaml`:
@@ -165,7 +165,7 @@ Or merge this entry into `~/.hermes/config.yaml`:
 mcp_servers:
   apple-notes:
     command: npx
-    args: ["-y", "apple-notes-mcp@2.15.1"]
+    args: ["-y", "apple-notes-mcp@latest"]
 ```
 
 Restart the Hermes session. This repository supplies an MCP configuration route for Hermes; see its [CLI commands](https://hermes-agent.nousresearch.com/docs/reference/cli-commands#hermes-mcp) and [MCP configuration reference](https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference).
@@ -184,7 +184,7 @@ In Gemini macOS builds that offer **Local MCP**, open **Connected Apps**, click 
 |-------|-------|
 | Server Name | Apple Notes |
 | Description | Read, search, create, edit, organize, and export Apple Notes on this Mac. |
-| Command | `npx -y apple-notes-mcp@2.15.1` |
+| Command | `npx -y apple-notes-mcp@latest` |
 
 You can print these instructions from the installed server:
 
@@ -202,7 +202,7 @@ This integration uses the Mac app's Local MCP command interface and the server's
 
 #### Other MCP clients and remote execution
 
-A local MCP client can use the command `npx` with arguments `-y` and `apple-notes-mcp@2.15.1`. Follow that client's stdio configuration format: JSON `mcpServers`, TOML, and YAML are not interchangeable.
+A local MCP client can use the command `npx` with arguments `-y` and `apple-notes-mcp@latest`. Follow that client's stdio configuration format: JSON `mcpServers`, TOML, and YAML are not interchangeable.
 
 Apple Notes MCP has no built-in HTTP, SSE, WebSocket, or OAuth MCP endpoint. A cloud-only client cannot access your Mac's Notes library merely by installing the npm package in a Linux container or entering a URL. A separately managed transport bridge or client feature that delegates tool execution to your Mac needs its own configuration and security review; it is not part of this package's supported setup. GUI reveal and clipboard tools also need your logged-in desktop session.
 
@@ -229,19 +229,19 @@ Client sandbox access is a separate boundary. A sandboxed client must be able to
 To inspect setup from a terminal without opening permission panes or requesting Automation access:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions --check --json
+npx -y apple-notes-mcp@latest setup --permissions --check --json
 ```
 
 The Automation result is intentionally unknown in this mode. When you are at the Mac and want to check it, this command sends a read-only Apple event and may show the macOS consent prompt:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions --once --probe-automation
+npx -y apple-notes-mcp@latest setup --permissions --once --probe-automation
 ```
 
 For an interactive checklist that also opens the relevant settings panes:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions --open --probe-automation
+npx -y apple-notes-mcp@latest setup --permissions --open --probe-automation
 ```
 
 The command checks permissions; it does not grant them. `--check` and SSH sessions suppress the Automation probe even when `--probe-automation` is supplied. Without the probe, exit status 0 does not establish Automation access.
@@ -253,7 +253,7 @@ Full Disk Access is optional if you only need operations that can safely run thr
 Run explicit setup on your Mac:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup
+npx -y apple-notes-mcp@latest setup
 ```
 
 Approve **Add Shortcut** for the missing signed workflows that macOS opens:
@@ -271,7 +271,7 @@ server no longer uses it.
 Then check installation:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --check
+npx -y apple-notes-mcp@latest setup --check
 ```
 
 The first two bridges determine this check's readiness; the optional Markdown bridge is reported separately. Keep only one installed copy of each named bridge. The server refuses duplicate bridge names.
@@ -291,8 +291,8 @@ These commands are separate from registering the MCP client. If `xcrun swiftc` o
 Needed for `get-note-drawings` and `transcribe-note-audio`. Brokered sessions do not load external helpers; set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it before using these tools:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --public-helper
-npx -y apple-notes-mcp@2.15.1 setup --public-helper --check
+npx -y apple-notes-mcp@latest setup --public-helper
+npx -y apple-notes-mcp@latest setup --public-helper --check
 ```
 
 It compiles locally, signs ad hoc, verifies its handshake, and records source and binary checksums. The server refuses stale or modified helpers; rerun setup after a relevant package upgrade. This helper uses public Apple frameworks and does not open or write the Notes database. The server still needs Full Disk Access to read the drawing/audio assets it passes to the helper.
@@ -304,8 +304,8 @@ On older macOS versions, speech transcription needs Speech Recognition access fo
 Optional read-only NotesShared state inspection, disabled by default. Brokered sessions do not load this helper; set `APPLE_NOTES_MCP_BROKER=off` for this client and restart it first:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --native-helper
-npx -y apple-notes-mcp@2.15.1 setup --native-helper --check
+npx -y apple-notes-mcp@latest setup --native-helper
+npx -y apple-notes-mcp@latest setup --native-helper --check
 ```
 
 To enable it, set the string environment value `APPLE_NOTES_MCP_ENABLE_PRIVATE=1` for the server and restart the client. Inspect `native-helper-status` before using `native-note-state`. This released helper opens the store read-only and cannot provide deep native writes. Apple's private API may change with macOS updates; the remaining server features do not require this helper.
@@ -315,8 +315,8 @@ To enable it, set the string environment value `APPLE_NOTES_MCP_ENABLE_PRIVATE=1
 Optional graphical presentation of the checklist:
 
 ```bash
-npx -y apple-notes-mcp@2.15.1 setup --permissions-window
-npx -y apple-notes-mcp@2.15.1 setup --permissions --window
+npx -y apple-notes-mcp@latest setup --permissions-window
+npx -y apple-notes-mcp@latest setup --permissions --window
 ```
 
 It displays the command's checks and opens settings on request. It does not become the permission owner or replace the client process.
@@ -3131,13 +3131,13 @@ AI: [calls create-note with title="Acme Corp", content="...", folder="Work/Clien
 
 ### Published package
 
-The examples above use `npx -y apple-notes-mcp@2.15.1`, so a separate global install is optional. To install a persistent command instead:
+The examples above use `npx -y apple-notes-mcp@latest`, so a separate global install is optional. To install a persistent command instead:
 
 ```bash
-npm install -g apple-notes-mcp@2.15.1
+npm install -g apple-notes-mcp@latest
 ```
 
-You can then run `apple-notes-mcp setup --check` and the other setup commands directly. An npm package version can be pinned in an `npx` argument, for example `apple-notes-mcp@2.15.1`, when you need a reproducible version. Keep client and setup commands on the same package version.
+You can then run `apple-notes-mcp setup --check` and the other setup commands directly. `@latest` makes `npx` check npm for a newer release each time the client starts the server. To hold a reproducible version instead, pin one in the `npx` argument, for example `apple-notes-mcp@X.Y.Z` with a version from the [CHANGELOG](CHANGELOG.md), and update the pin yourself when you upgrade. Keep client and setup commands on the same package version.
 
 After an upgrade, restart the client, check Shortcuts, complete any renewed foreground Shortcut consent, and rebuild a helper if its source checksum changed. Do not use a permission reset as a routine upgrade step.
 
