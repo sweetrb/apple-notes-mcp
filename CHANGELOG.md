@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.16.3] - 2026-11-10
+
+### Fixed
+
+- **`setup` no longer opens the Tags and Background bridges before macOS 13 (#325).**
+  Both call Notes' App Intents actions, which macOS 12 does not have, so importing them
+  there could never work. Like the Markdown bridge before macOS 26, `setup` now leaves
+  them unopened, and `setup` and `setup --check` report each as skipped with
+  `requires_macos_13` instead of sending you to install them.
+
 ## [2.16.2] - 2026-11-10
 
 ### Fixed

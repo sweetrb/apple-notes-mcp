@@ -27,6 +27,7 @@ describe("Shortcut setup", () => {
       exists: () => true,
       open,
       baseDirectory: "/bundle/shortcuts",
+      osRelease: () => "25.0.0",
     });
     expect(report.ready).toBe(false);
     expect(report.items.every((item) => !item.opened)).toBe(true);
@@ -102,6 +103,7 @@ describe("Shortcut setup", () => {
       exists: () => true,
       open,
       baseDirectory: "/bundle/shortcuts",
+      osRelease: () => "25.0.0",
     });
     expect(open).toHaveBeenCalledTimes(1);
     expect(open.mock.calls[0][0]).toMatch(/Notes MCP Background v6\.shortcut$/);
@@ -128,6 +130,64 @@ describe("Shortcut setup", () => {
     expect(formatShortcutSetup(report)).toContain(
       `→ Notes MCP Markdown: confirm “Add Shortcut” in macOS ${OPTIONAL_BRIDGE_NOTE}`
     );
+  });
+
+  // #325: the Tags and Background bridges need Notes App Intents (macOS 13+).
+  it("skips the required bridges before macOS 13 without opening anything", () => {
+    const open = vi.fn(() => ({ ok: true }));
+    const report = setupShortcuts(false, {
+      status: (shortcut) => ({ shortcut, installed: false, identifier: undefined }),
+      exists: () => true,
+      open,
+      baseDirectory: "/bundle/shortcuts",
+      osRelease: () => "21.6.0",
+    });
+    expect(open).not.toHaveBeenCalled();
+    const required = report.items.filter((item) => !item.optional);
+    expect(required.map((item) => item.name)).toEqual([
+      "Notes MCP Tags",
+      "Notes MCP Background v6",
+    ]);
+    for (const item of required)
+      expect(item).toMatchObject({
+        installed: false,
+        opened: false,
+        skipped: "requires_macos_13: requires macOS 13 or later (this Mac reports Darwin 21.6.0)",
+      });
+    expect(report.items.find((item) => item.optional)?.skipped).toMatch(/macOS 26/);
+    expect(report.ready).toBe(false);
+    const text = formatShortcutSetup(report);
+    expect(text).toContain(
+      "– Notes MCP Tags: skipped, requires_macos_13: requires macOS 13 or later (this Mac reports Darwin 21.6.0)"
+    );
+    expect(text).toContain("need macOS 13 or later");
+    expect(text).not.toContain("confirm “Add Shortcut”");
+  });
+
+  it("check-only mode before macOS 13 reports the bridges as unsupported, not as setup work", () => {
+    const report = setupShortcuts(true, {
+      status: (shortcut) => ({ shortcut, installed: false, identifier: undefined }),
+      exists: () => true,
+      open: vi.fn(() => ({ ok: true })),
+      baseDirectory: "/bundle/shortcuts",
+      osRelease: () => "21.6.0",
+    });
+    expect(
+      report.items.filter((item) => item.skipped?.startsWith("requires_macos_13"))
+    ).toHaveLength(2);
+    expect(formatShortcutSetup(report)).not.toContain("to open missing workflows");
+  });
+
+  it("opens the required bridges on macOS 13", () => {
+    const open = vi.fn(() => ({ ok: true }));
+    setupShortcuts(false, {
+      status: (shortcut) => ({ shortcut, installed: false, identifier: undefined }),
+      exists: () => true,
+      open,
+      baseDirectory: "/bundle/shortcuts",
+      osRelease: () => "22.1.0",
+    });
+    expect(open).toHaveBeenCalledTimes(2);
   });
 
   it("skips a missing optional bridge before macOS 26 and still opens required ones", () => {
