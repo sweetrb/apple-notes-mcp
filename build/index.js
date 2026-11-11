@@ -66154,7 +66154,7 @@ function formatCapabilityMatrix(matrix) {
 }
 
 // src/tools/doctor.ts
-function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
+function runDoctor(manager, capabilityMatrix = getCapabilityMatrix, version3) {
   const checks = [];
   const hc = manager.healthCheck();
   for (const c of hc.checks) {
@@ -66225,7 +66225,8 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix) {
       detail: audio ? `${audio.available ? "Prerequisites available" : audio.reason ?? "unverified"}. Unverified: ${audio.unverified.join(", ") || "none"}. ` + (publicHelper.speech.detail ?? "") : "Transcription prerequisites were not verified."
     });
   }
-  return matrix ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features, publicHelper } : { healthy, checks, publicHelper };
+  const base = { ...version3 ? { version: version3 } : {}, healthy, checks, publicHelper };
+  return matrix ? { ...base, runtimeOS: matrix.runtimeOS, features: matrix.features } : base;
 }
 function markdownBridgeDetail() {
   const purpose = 'needed only for create-note format: "markdown" on macOS 26+';
@@ -66267,7 +66268,8 @@ function checkNodeRuntimeSignature() {
 }
 function formatDoctorReport(r) {
   const icon = (s) => s === "ok" ? "\u2705" : s === "warn" ? "\u26A0\uFE0F " : "\u274C";
-  const lines = [`\u{1FA7A} apple-notes-mcp doctor \u2014 ${r.healthy ? "healthy" : "ISSUES FOUND"}`, ""];
+  const lines = r.version ? [`apple-notes-mcp ${r.version}`] : [];
+  lines.push(`\u{1FA7A} apple-notes-mcp doctor \u2014 ${r.healthy ? "healthy" : "ISSUES FOUND"}`, "");
   for (const c of r.checks) lines.push(`${icon(c.status)} ${c.name}: ${c.detail}`);
   if (r.runtimeOS && r.features)
     lines.push("", formatCapabilityMatrix({ runtimeOS: r.runtimeOS, features: r.features }));
@@ -82092,6 +82094,7 @@ registerTool(
     description: "Use when: diagnosing setup problems (Notes.app automation permission, account state, Full Disk Access) with actionable guidance.\nReturns: a detailed report plus structured fields, including runtimeOS and the same OS-version-aware features matrix as get-capabilities.\nDo not use when: you just need a quick pass/fail (health-check).\nRead-only.",
     inputSchema: {},
     outputSchema: {
+      version: external_exports.string().optional(),
       healthy: external_exports.boolean().optional(),
       checks: external_exports.array(external_exports.object({}).passthrough()).optional(),
       runtimeOS: external_exports.object({}).passthrough().optional(),
@@ -82101,7 +82104,7 @@ registerTool(
     }
   },
   withErrorHandling(() => {
-    const report = runDoctor(notesManager);
+    const report = runDoctor(notesManager, void 0, version);
     const broker = brokerStatus();
     return successResponse(`${formatDoctorReport(report)}
 

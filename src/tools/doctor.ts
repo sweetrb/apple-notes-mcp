@@ -32,6 +32,8 @@ export interface DoctorCheck {
   detail: string;
 }
 export interface DoctorReport {
+  /** The running server's package version, so a pasted report says which build made it. */
+  version?: string;
   healthy: boolean;
   checks: DoctorCheck[];
   /** OS-version-aware feature matrix; absent only if probing it threw. */
@@ -42,7 +44,8 @@ export interface DoctorReport {
 
 export function runDoctor(
   manager: AppleNotesManager,
-  capabilityMatrix: () => CapabilityMatrix = getCapabilityMatrix
+  capabilityMatrix: () => CapabilityMatrix = getCapabilityMatrix,
+  version?: string
 ): DoctorReport {
   const checks: DoctorCheck[] = [];
 
@@ -156,9 +159,8 @@ export function runDoctor(
         : "Transcription prerequisites were not verified.",
     });
   }
-  return matrix
-    ? { healthy, checks, runtimeOS: matrix.runtimeOS, features: matrix.features, publicHelper }
-    : { healthy, checks, publicHelper };
+  const base = { ...(version ? { version } : {}), healthy, checks, publicHelper };
+  return matrix ? { ...base, runtimeOS: matrix.runtimeOS, features: matrix.features } : base;
 }
 
 /**
@@ -222,7 +224,8 @@ export function checkNodeRuntimeSignature(): DoctorCheck {
 /** Render a DoctorReport as readable text. */
 export function formatDoctorReport(r: DoctorReport): string {
   const icon = (s: CheckStatus): string => (s === "ok" ? "✅" : s === "warn" ? "⚠️ " : "❌");
-  const lines = [`🩺 apple-notes-mcp doctor — ${r.healthy ? "healthy" : "ISSUES FOUND"}`, ""];
+  const lines = r.version ? [`apple-notes-mcp ${r.version}`] : [];
+  lines.push(`🩺 apple-notes-mcp doctor — ${r.healthy ? "healthy" : "ISSUES FOUND"}`, "");
   for (const c of r.checks) lines.push(`${icon(c.status)} ${c.name}: ${c.detail}`);
   if (r.runtimeOS && r.features)
     lines.push("", formatCapabilityMatrix({ runtimeOS: r.runtimeOS, features: r.features }));
