@@ -356,7 +356,7 @@ Keep the server's revision and scope checks enabled. Updates, appends, and delet
 | **Notes.app UI State** | Reveal a note, folder, account, or attachment in Notes.app, or read the current Notes.app selection |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
-| **Diagnostics** | `health-check` plus a richer `doctor` (reachability, automation permission, accounts, Full Disk Access), sync status, statistics, and `get-capabilities` for the Shortcut bridges |
+| **Diagnostics** | `health-check` plus a richer `doctor` (server version, reachability, automation permission, accounts, Full Disk Access), sync status, statistics, and `get-capabilities` for the Shortcut bridges |
 
 Read/list/get tools also return **structured JSON** (`structuredContent`) alongside the text, so agents can consume results without parsing prose.
 

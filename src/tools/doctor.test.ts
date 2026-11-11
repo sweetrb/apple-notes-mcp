@@ -369,3 +369,17 @@ describe("checkNodeRuntimeSignature", () => {
     expect(c.detail).toMatch(/could not inspect/);
   });
 });
+
+describe("doctor version line", () => {
+  it("prints the server version as the first line and in the structured report", () => {
+    const r = runDoctor(fakeMgr(), undefined, "9.8.7");
+    expect(r.version).toBe("9.8.7");
+    expect(formatDoctorReport(r).split("\n")[0]).toBe("apple-notes-mcp 9.8.7");
+  });
+
+  it("omits the line when no version is supplied", () => {
+    const r = runDoctor(fakeMgr());
+    expect(r.version).toBeUndefined();
+    expect(formatDoctorReport(r).split("\n")[0]).toMatch(/^🩺 apple-notes-mcp doctor/);
+  });
+});

@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [2.16.5] - 2026-11-11
+
+### Changed
+
+- **`doctor` now starts its report with the server version (#325).** The first line is
+  `apple-notes-mcp X.Y.Z`, taken from the same `package.json` version the server reports
+  to MCP clients and `--version`, so a pasted report says which release produced it. The
+  structured result carries the same value as `version`.
+
 ## [2.16.4] - 2026-11-10
 
 ### Documentation
