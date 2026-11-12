@@ -93,7 +93,7 @@ describe("executeAppleScript", () => {
       executeAppleScript('get note "Rob\'s Notes"');
 
       // osascript is called directly with "-" (read script from stdin)
-      expect(mockExecFileSync.mock.calls[0][0]).toBe("osascript");
+      expect(mockExecFileSync.mock.calls[0][0]).toBe("/usr/bin/osascript");
       expect(mockExecFileSync.mock.calls[0][1]).toEqual(["-"]);
       // The script goes over stdin verbatim: no shell, so no shell escaping
       expect(scriptInput()).toContain("Rob's Notes");

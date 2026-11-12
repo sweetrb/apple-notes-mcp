@@ -16,6 +16,7 @@
 
 import { execFileSync } from "child_process";
 import { callTimeoutMs } from "@/utils/callTimeout.js";
+import { osascriptPath } from "@/utils/systemBinaries.js";
 
 /**
  * Output cap for osascript (JXA). Mirrors the AppleScript executor — Node's 1 MB
@@ -121,7 +122,7 @@ export function executeJXA(script: string, options: JXAOptions = {}): JXAResult 
     // osascript is invoked directly (no /bin/sh) and reads the script from
     // stdin, so no shell escaping is needed and script size isn't bounded by
     // the kernel's argv limit.
-    const output = execFileSync("osascript", ["-l", "JavaScript", "-"], {
+    const output = execFileSync(osascriptPath(), ["-l", "JavaScript", "-"], {
       input: script.trim(),
       encoding: "utf8",
       timeout: timeoutMs,

@@ -449,7 +449,7 @@ describe("readAudioTranscripts (sqlite3 fixture store)", () => {
     `;
     const sqlFile = join(dir, "setup.sql");
     writeFileSync(sqlFile, sql);
-    execFileSync("sqlite3", [dbPath, `.read ${sqlFile}`]);
+    execFileSync("/usr/bin/sqlite3", [dbPath, `.read ${sqlFile}`]);
   });
 
   afterAll(() => {
@@ -554,7 +554,7 @@ describe("readAudioTranscripts (sqlite3 fixture store)", () => {
 
   it("reports missing required columns on an unknown schema", () => {
     const other = join(dir, "other.sqlite");
-    execFileSync("sqlite3", [other, "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER);"]);
+    execFileSync("/usr/bin/sqlite3", [other, "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER);"]);
     expect(() => readAudioTranscripts(noteId(10), { dbPath: other })).toThrow(/lacks/);
   });
 

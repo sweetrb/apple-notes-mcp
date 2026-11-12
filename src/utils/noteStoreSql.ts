@@ -102,7 +102,7 @@ export function runReadOnlySql(
   }
   args.push(dbPath, sql);
   try {
-    return execFileSync("sqlite3", args, {
+    return execFileSync("/usr/bin/sqlite3", args, {
       encoding: "utf8",
       timeout: 30000,
       maxBuffer: 512 * 1024 * 1024,

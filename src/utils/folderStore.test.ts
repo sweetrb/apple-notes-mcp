@@ -25,7 +25,7 @@ let missingColumnDb: string;
 let noPrimaryKeyDb: string;
 
 const sql = (path: string, statements: string) =>
-  execFileSync("sqlite3", [path, statements], { encoding: "utf8" });
+  execFileSync("/usr/bin/sqlite3", [path, statements], { encoding: "utf8" });
 
 const ALL_COLUMNS = [...REQUIRED_FOLDER_COLUMNS, "ZSMARTFOLDERQUERYJSON"];
 

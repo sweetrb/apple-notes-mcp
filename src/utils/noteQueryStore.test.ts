@@ -168,7 +168,7 @@ function createStore(
       ([note, data], i) => `INSERT INTO ZICNOTEDATA VALUES (${i + 1}, ${note}, ${sqlString(data)});`
     ),
   ].join("\n");
-  execFileSync("sqlite3", [path], { input: sql, stdio: ["pipe", "pipe", "pipe"] });
+  execFileSync("/usr/bin/sqlite3", [path], { input: sql, stdio: ["pipe", "pipe", "pipe"] });
 }
 
 const meeting = segments([
@@ -633,7 +633,9 @@ describe("readNoteTexts and buildNoteTextsSql", () => {
         const sql = buildNoteTextsSql(columns, keys);
         expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ATTACH|PRAGMA)\b/i);
         expect(() =>
-          execFileSync("sqlite3", ["-readonly", path, sql], { stdio: ["pipe", "pipe", "pipe"] })
+          execFileSync("/usr/bin/sqlite3", ["-readonly", path, sql], {
+            stdio: ["pipe", "pipe", "pipe"],
+          })
         ).not.toThrow();
       }
     }
@@ -725,7 +727,9 @@ describe("buildScanSql", () => {
         for (const includeDeleted of [false, true]) {
           const sql = buildScanSql(all, { scanLimit: 5, includeDeleted, withBodies, withTags });
           expect(() =>
-            execFileSync("sqlite3", ["-readonly", full, sql], { stdio: ["pipe", "pipe", "pipe"] })
+            execFileSync("/usr/bin/sqlite3", ["-readonly", full, sql], {
+              stdio: ["pipe", "pipe", "pipe"],
+            })
           ).not.toThrow();
         }
   });

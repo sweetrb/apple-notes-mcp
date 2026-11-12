@@ -48,7 +48,7 @@ const CASES = [
     attempts: 2,
   },
   { name: "protected", code: "unsupported", text: "password-protected" },
-  { name: "launcher", code: "operation_failed", text: "spawnSync osascript EACCES" },
+  { name: "launcher", code: "operation_failed", text: "osascript EACCES" },
 ];
 
 const FIXTURE = `#!/usr/bin/env node
@@ -96,6 +96,7 @@ describe("built server retains initial metadata diagnostics", () => {
           args: [resolve(__dirname, "../build/index.js")],
           env: {
             PATH: fixture,
+            APPLE_NOTES_MCP_TEST_OSASCRIPT: executable,
             APPLE_NOTES_MCP_BROKER: "off",
             APPLE_NOTES_MCP_CONFIG_FILE: config,
             APPLE_NOTES_MCP_MAX_RETRIES: String(test.attempts ?? 1),

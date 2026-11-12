@@ -306,7 +306,7 @@ const REQUIRED_COLUMNS = [
 ];
 
 function runSqlite(dbPath: string, sql: string): string {
-  return execFileSync("sqlite3", ["-readonly", dbPath, sql], {
+  return execFileSync("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
     encoding: "utf8",
     timeout: 10000,
     maxBuffer: 256 * 1024 * 1024,

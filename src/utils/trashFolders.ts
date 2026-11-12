@@ -40,7 +40,7 @@ export function clearTrashFolderCache(): void {
 }
 
 function query(dbPath: string, sql: string): string {
-  return execFileSync("sqlite3", ["-readonly", dbPath, sql], {
+  return execFileSync("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
     encoding: "utf8",
     timeout: 5000,
     stdio: ["pipe", "pipe", "pipe"],

@@ -35,7 +35,7 @@ let db: string;
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "note-store-sql-"));
   db = join(dir, "store.sqlite");
-  execFileSync("sqlite3", [db], {
+  execFileSync("/usr/bin/sqlite3", [db], {
     input: [
       "CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER PRIMARY KEY, Z_NAME TEXT);",
       "INSERT INTO Z_PRIMARYKEY VALUES (7, 'ICAccount'), (8, 'ICFolder');",
@@ -151,7 +151,7 @@ describe("schema helpers", () => {
   });
 
   it("reads store context with fallbacks for missing columns", () => {
-    execFileSync("sqlite3", [db, "INSERT INTO Z_METADATA VALUES ('STORE');"]);
+    execFileSync("/usr/bin/sqlite3", [db, "INSERT INTO Z_METADATA VALUES ('STORE');"]);
     const context = readStoreContext(db, readColumns(db));
     expect(context.uuid).toBe("STORE");
     expect(context.accounts).toEqual([{ pk: 1, name: "", identifier: null }]);
@@ -171,7 +171,7 @@ describe("schema helpers", () => {
 
   it("fails without a store identifier", () => {
     const empty = join(dir, "empty.sqlite");
-    execFileSync("sqlite3", [
+    execFileSync("/usr/bin/sqlite3", [
       empty,
       "CREATE TABLE Z_PRIMARYKEY (Z_ENT, Z_NAME); CREATE TABLE Z_METADATA (Z_UUID); CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT);",
     ]);

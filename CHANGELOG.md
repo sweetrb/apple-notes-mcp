@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2.16.8] - 2026-11-12
+### Security
+- **System tools are spawned by absolute path.** `sqlite3`, `osascript` and `codesign` were
+  run by bare name and resolved through the server's `PATH`, so a writable directory early
+  in `PATH` could substitute its own copy and see every query and script the server runs.
+  They now run from `/usr/bin`, like the server's other tools already did, and a source-scan
+  regression test fails on any new bare-name spawn. The end-to-end tests that inject a fake
+  `osascript` use the explicit `APPLE_NOTES_MCP_TEST_OSASCRIPT` setting instead of `PATH`.
+
+Reported by Huỳnh Quang Thái (@thaihuynhquang), finding 3 of the report fixed in 2.16.7.
+
 ## [2.16.7] - 2026-11-12
 
 ### Security

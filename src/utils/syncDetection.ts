@@ -136,7 +136,7 @@ export function getSyncStatus(useCache = true): SyncStatus {
     // (checklistParser.ts, noteMetadata.ts). The values here aren't user-controlled,
     // but argv form avoids shell quoting/interpolation entirely.
     const result = execFileSync(
-      "sqlite3",
+      "/usr/bin/sqlite3",
       ["-readonly", NOTES_DB_PATH, query.replace(/\n/g, " ")],
       {
         encoding: "utf8",

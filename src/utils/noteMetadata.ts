@@ -95,7 +95,7 @@ const COLUMN_MAP: Array<{ key: keyof NoteMetadata; column: string; type: "bool" 
  * key, which callers constrain to digits before it reaches here.
  */
 function runSqlite(query: string): string {
-  return execFileSync("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
+  return execFileSync("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH, query], {
     encoding: "utf8",
     timeout: 5000,
     stdio: ["pipe", "pipe", "pipe"],

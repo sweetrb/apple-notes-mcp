@@ -47,7 +47,7 @@ vi.mock(import("child_process"), async (importOriginal) => {
   const original = await importOriginal();
   const execFileSync = ((file: string, args: string[], options: unknown) => {
     const sql = Array.isArray(args) ? String(args[args.length - 1]) : "";
-    if (file === "sqlite3" && args?.[0] === "-readonly" && sql.includes("Z_METADATA")) {
+    if (file === "/usr/bin/sqlite3" && args?.[0] === "-readonly" && sql.includes("Z_METADATA")) {
       sqlite.calls.push(sql);
       if (sqlite.mode === "no_fda") throw new Error("Error: unable to open database file");
       const entity = /Z_NAME = '(\w+)'/.exec(sql)?.[1];

@@ -188,7 +188,7 @@ function markdownBridgeDetail(): string {
 export function checkNodeRuntimeSignature(): DoctorCheck {
   const name = "Node runtime signature";
   try {
-    const r = spawnSync("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
+    const r = spawnSync("/usr/bin/codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
     // codesign writes its details to stderr.
     const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
     if (r.error || !out.trim()) {
