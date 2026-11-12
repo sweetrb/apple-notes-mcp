@@ -23921,9 +23921,9 @@ var require_lib = __commonJS({
   }
 });
 
-// node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js
+// node_modules/.pnpm/turndown@7.2.5/node_modules/turndown/lib/turndown.cjs.js
 var require_turndown_cjs = __commonJS({
-  "node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/lib/turndown.cjs.js"(exports, module) {
+  "node_modules/.pnpm/turndown@7.2.5/node_modules/turndown/lib/turndown.cjs.js"(exports, module) {
     "use strict";
     function extend2(destination) {
       for (var i = 1; i < arguments.length; i++) {
@@ -24533,31 +24533,35 @@ var require_turndown_cjs = __commonJS({
         } else if (node2.nodeType === 1) {
           replacement = replacementForNode.call(self, node2);
         }
-        return join35(output2, replacement);
-      }, "");
+        join35(output2, replacement);
+        return output2;
+      }, []);
     }
     function postProcess(output2) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output2 = join35(output2, rule.append(self.options));
+          join35(output2, rule.append(self.options));
         }
       });
-      return output2.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
+      return output2.join("").replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
     }
     function replacementForNode(node2) {
       var rule = this.rules.forNode(node2);
-      var content = process3.call(this, node2);
+      var content = process3.call(this, node2).join("");
       var whitespace = node2.flankingWhitespace;
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node2, this.options) + whitespace.trailing;
     }
     function join35(output2, replacement) {
-      var s1 = trimTrailingNewlines(output2);
+      var tail = output2.pop() || "";
+      var s1 = trimTrailingNewlines(tail);
       var s2 = trimLeadingNewlines(replacement);
-      var nls = Math.max(output2.length - s1.length, replacement.length - s2.length);
+      var nls = Math.max(tail.length - s1.length, replacement.length - s2.length);
       var separator = "\n\n".substring(0, nls);
-      return s1 + separator + s2;
+      if (s1) output2.push(s1);
+      if (separator) output2.push(separator);
+      if (s2) output2.push(s2);
     }
     function canConvert(input2) {
       return input2 != null && (typeof input2 === "string" || input2.nodeType && (input2.nodeType === 1 || input2.nodeType === 9 || input2.nodeType === 11));
