@@ -259,7 +259,7 @@ describe("assertSafeSavePath — Notes library container (#208)", () => {
     if (box) rmSync(box, { recursive: true, force: true });
   });
   function setup() {
-    box = realpathSync(mkdtempSync(join(homedir(), ".anatt-deny-")));
+    box = realpathSync(mkdtempSync(join(homedir(), "anatt-deny-")));
     container = join(box, "Group Containers", "group.com.apple.notes");
     mkdirSync(join(container, "Accounts"), { recursive: true });
   }

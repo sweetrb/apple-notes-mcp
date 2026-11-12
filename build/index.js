@@ -57197,11 +57197,11 @@ function deepestExistingAncestor(abs) {
     current = parent;
   }
 }
-function ensureParentDir(abs, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
-  assertSafeSavePath(abs, roots, denied);
+function ensureParentDir(abs, roots = allowedSaveRoots(), denied = deniedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_SAVE_ENV] === "1") {
+  assertSafeSavePath(abs, roots, denied, allowPrivate);
   mkdirSync(dirname(abs), { recursive: true });
 }
-function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRoots()) {
+function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRoots(), allowPrivate = process.env[ALLOW_PRIVATE_SAVE_ENV] === "1") {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
   const abs = resolve(p);
@@ -57235,8 +57235,16 @@ function assertSafeSavePath(p, roots = allowedSaveRoots(), denied = deniedSaveRo
   if ([abs, canonicalDest].some((form) => isWithinRoots(form.toLowerCase(), deniedForms))) {
     throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
+  if (!allowPrivate) {
+    const reason = privateSaveReason(abs, roots) ?? privateSaveReason(canonicalDest, canonicalRoots(roots));
+    if (reason)
+      throw new Error(
+        `Refusing to write "${abs}": it is in ${reason}, which can hold startup files, credentials or app data. Choose a regular folder, or set ${ALLOW_PRIVATE_SAVE_ENV}=1 for the server to allow it.`
+      );
+  }
   return abs;
 }
+var ALLOW_PRIVATE_SAVE_ENV = "APPLE_NOTES_MCP_ALLOW_PRIVATE_SAVE_PATHS";
 var DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 function maxAttachmentBytes(env = process.env) {
   const raw = env.APPLE_NOTES_MCP_MAX_ATTACHMENT_BYTES;
@@ -57291,6 +57299,9 @@ function privateContentReason(p, roots) {
   const containing = roots.map((r) => r.endsWith(sep) ? r.slice(0, -1) : r).filter((r) => isWithinRoots(p, [r])).sort((a, b) => b.length - a.length)[0];
   const below = containing === void 0 ? p : relative(containing, p);
   if (below.split(sep).some((part) => part.startsWith("."))) return "a hidden file or directory";
+  return libraryReason(p);
+}
+function libraryReason(p) {
   const home = resolve(homedir8());
   const libraries = [
     join8(home, "Library"),
@@ -57299,6 +57310,9 @@ function privateContentReason(p, roots) {
   if (!isWithinRoots(p, libraries)) return null;
   const cloudDocuments = libraries.flatMap((l) => CLOUD_DOCUMENT_DIRS.map((d) => join8(l, d)));
   return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
+}
+function privateSaveReason(p, roots) {
+  return privateContentReason(p, roots);
 }
 var CLOUD_DOCUMENT_DIRS = ["Mobile Documents", "CloudStorage"];
 function readAllowedFile(p, maxBytes, options = {}) {
@@ -58512,6 +58526,11 @@ function fitExportNoteToBudget(note, maxBytes) {
   if (estimateExportNoteBytes(withoutHtml) <= maxBytes) return withoutHtml;
   return { ...withoutHtml, plaintext: "" };
 }
+function redactedError(error62, ...privateTexts) {
+  let message = error62 ?? "";
+  for (const text2 of privateTexts) if (text2) message = message.split(text2).join("[redacted]");
+  return message;
+}
 function executeMutationAppleScript(script) {
   return executeAppleScript(script, { maxRetries: 1 });
 }
@@ -59016,19 +59035,22 @@ var AppleNotesManager = class {
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
       if (folder) throwIfSmartFolderDestination(result.error, folder);
-      console.error(`Failed to create note "${title}":`, result.error);
+      console.error(
+        "Failed to create note:",
+        redactedError(result.error, title, ...folder ? [folder, ...splitFolderPath(folder)] : [])
+      );
       return null;
     }
     const rawOutput = result.output.trim();
     const noteId3 = extractCoreDataId(rawOutput, "note") || rawOutput;
     if (!noteId3) {
-      console.error(`Created note "${title}" but Notes.app returned no canonical note ID`);
+      console.error("Created a note but Notes.app returned no canonical note ID");
       return null;
     }
     try {
       sanitizeNoteId(noteId3);
     } catch {
-      console.error(`Created note "${title}" but Notes.app returned an invalid note ID`);
+      console.error("Created a note but Notes.app returned an invalid note ID");
       return null;
     }
     const now = /* @__PURE__ */ new Date();
@@ -59191,7 +59213,7 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script, { maxBufferBytes: noteBodyMaxBuffer() });
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get content of note "${title}":`, result.error);
+      console.error("Failed to get note content by title:", redactedError(result.error, title));
       return "";
     }
     return result.output;
@@ -59252,7 +59274,7 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get plaintext of note "${title}":`, result.error);
+      console.error("Failed to get note plaintext by title:", redactedError(result.error, title));
       return "";
     }
     return result.output;
@@ -59379,7 +59401,7 @@ var AppleNotesManager = class {
     const result = executeAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get details for note "${title}":`, result.error);
+      console.error("Failed to get note details by title:", redactedError(result.error, title));
       return null;
     }
     const parsed2 = parseNotePropertiesOutput(result.output);
@@ -59915,7 +59937,10 @@ var AppleNotesManager = class {
       );
       const result = executeAppleScript(script);
       if (!result.success) {
-        console.error(`Failed to list shared notes for ${account.name}:`, result.error);
+        console.error(
+          "Failed to list shared notes for an account:",
+          redactedError(result.error, account.name)
+        );
         continue;
       }
       const output2 = result.output.trim();
@@ -60254,7 +60279,7 @@ var AppleNotesManager = class {
     const targetAccount = this.resolveAccount(account);
     const parts = splitFolderPath(name);
     if (parts.length === 0) {
-      console.error(`Invalid folder name: "${name}"`);
+      console.error("Invalid folder name: the path has no segments");
       return null;
     }
     const smart = { rootOnly: true, excludeFolderIds: this.smartFolderIds() };
@@ -60284,7 +60309,7 @@ var AppleNotesManager = class {
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
         throwIfSmartFolderDestination(result.error, name);
-        console.error(`Failed to create folder "${name}":`, result.error);
+        console.error("Failed to create folder:", redactedError(result.error, name, ...parts));
         return null;
       }
     }
@@ -60328,7 +60353,10 @@ var AppleNotesManager = class {
     const result = executeMutationAppleScript(script);
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to delete folder "${name}":`, result.error);
+      console.error(
+        "Failed to delete folder:",
+        redactedError(result.error, name, ...splitFolderPath(name))
+      );
       return false;
     }
     return true;

@@ -151,9 +151,10 @@ function deepestExistingAncestor(abs: string): string {
 export function ensureParentDir(
   abs: string,
   roots: string[] = allowedSaveRoots(),
-  denied: string[] = deniedSaveRoots()
+  denied: string[] = deniedSaveRoots(),
+  allowPrivate = process.env[ALLOW_PRIVATE_SAVE_ENV] === "1"
 ): void {
-  assertSafeSavePath(abs, roots, denied);
+  assertSafeSavePath(abs, roots, denied, allowPrivate);
   mkdirSync(dirname(abs), { recursive: true });
 }
 
@@ -177,6 +178,12 @@ export function ensureParentDir(
  * canonical form of each denied root, so neither a symlink nor a respelled
  * segment can reach inside it.
  *
+ * Finally, unless `allowPrivate` (default {@link ALLOW_PRIVATE_SAVE_ENV}), the
+ * destination must not be a private location as {@link privateSaveReason}
+ * defines it (`~/.zshenv`, `~/.ssh/authorized_keys`, `~/Library/LaunchAgents`).
+ * Those hold startup files, credentials and auto-run agents, so an attachment
+ * from a shared note must not be planted there.
+ *
  * The returned path is the caller's own spelling (`resolve(p)`), not the
  * canonical one, so `/tmp/x` still writes to `/tmp/x` — validated to be the same
  * file as the canonical `/private/tmp/x`.
@@ -184,7 +191,8 @@ export function ensureParentDir(
 export function assertSafeSavePath(
   p: string,
   roots: string[] = allowedSaveRoots(),
-  denied: string[] = deniedSaveRoots()
+  denied: string[] = deniedSaveRoots(),
+  allowPrivate = process.env[ALLOW_PRIVATE_SAVE_ENV] === "1"
 ): string {
   if (!p || !p.trim()) throw new Error("A destination path is required.");
   if (!isAbsolute(p)) throw new Error(`Destination path must be absolute: "${p}"`);
@@ -226,8 +234,26 @@ export function assertSafeSavePath(
     throw new Error(`Refusing to write inside the Notes library container: "${abs}"`);
   }
 
+  if (!allowPrivate) {
+    const reason =
+      privateSaveReason(abs, roots) ?? privateSaveReason(canonicalDest, canonicalRoots(roots));
+    if (reason)
+      throw new Error(
+        `Refusing to write "${abs}": it is in ${reason}, which can hold startup files, ` +
+          `credentials or app data. Choose a regular folder, or set ${ALLOW_PRIVATE_SAVE_ENV}=1 ` +
+          `for the server to allow it.`
+      );
+  }
+
   return abs;
 }
+
+/**
+ * Setting this to `1` lets {@link assertSafeSavePath} write to hidden paths and
+ * `~/Library` too. Off by default: those hold startup files, credentials and
+ * auto-run agents.
+ */
+export const ALLOW_PRIVATE_SAVE_ENV = "APPLE_NOTES_MCP_ALLOW_PRIVATE_SAVE_PATHS";
 
 /**
  * Default upper bound on an attachment that `fetch-attachment` will base64-encode
@@ -346,6 +372,11 @@ export function privateContentReason(p: string, roots: string[]): string | null 
     .sort((a, b) => b.length - a.length)[0];
   const below = containing === undefined ? p : relative(containing, p);
   if (below.split(sep).some((part) => part.startsWith("."))) return "a hidden file or directory";
+  return libraryReason(p);
+}
+
+/** "~/Library" when `p` is in `~/Library` outside iCloud Drive and CloudStorage, else null. */
+function libraryReason(p: string): string | null {
   const home = resolve(homedir());
   const libraries = [
     join(home, "Library"),
@@ -356,6 +387,21 @@ export function privateContentReason(p: string, roots: string[]): string | null 
   // OneDrive, ...) live under ~/Library but hold the user's documents.
   const cloudDocuments = libraries.flatMap((l) => CLOUD_DOCUMENT_DIRS.map((d) => join(l, d)));
   return isWithinRoots(p, cloudDocuments) ? null : "~/Library";
+}
+
+/**
+ * Why `p` is a private location a write should not reach, or null.
+ *
+ * The same rule as {@link privateContentReason}: any hidden component below the
+ * containing root (a dotfile such as `~/.zshenv` or `.env`, or anything inside a
+ * hidden directory such as `~/.ssh`, `.git/hooks`, `.claude` or `~/.zshrc.d`),
+ * or `~/Library` outside iCloud Drive and CloudStorage (`~/Library/LaunchAgents`).
+ * Shells, editors, git and agents load files from hidden directories on their
+ * own, and no fixed list of them is complete, so every hidden directory is
+ * refused. `roots` must be in the same spelling as `p`.
+ */
+export function privateSaveReason(p: string, roots: string[]): string | null {
+  return privateContentReason(p, roots);
 }
 
 /** Folders under `~/Library` that hold user documents, not app data. */

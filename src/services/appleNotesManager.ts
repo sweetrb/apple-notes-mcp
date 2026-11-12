@@ -256,6 +256,17 @@ function fitExportNoteToBudget(note: ExportedNote, maxBytes: number): ExportedNo
  * before osascript lost the response; retrying can create duplicates or report
  * a successful delete/move as a failure on the second attempt.
  */
+/**
+ * An AppleScript error message with every occurrence of `privateTexts` (note
+ * titles, folder names, account names) replaced, so a failure log written to
+ * stderr, which MCP hosts persist to disk, does not carry them.
+ */
+function redactedError(error: string | undefined, ...privateTexts: string[]): string {
+  let message = error ?? "";
+  for (const text of privateTexts) if (text) message = message.split(text).join("[redacted]");
+  return message;
+}
+
 function executeMutationAppleScript(script: string) {
   return executeAppleScript(script, { maxRetries: 1 });
 }
@@ -1393,7 +1404,10 @@ export class AppleNotesManager {
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
       if (folder) throwIfSmartFolderDestination(result.error, folder);
-      console.error(`Failed to create note "${title}":`, result.error);
+      console.error(
+        "Failed to create note:",
+        redactedError(result.error, title, ...(folder ? [folder, ...splitFolderPath(folder)] : []))
+      );
       return null;
     }
 
@@ -1410,13 +1424,13 @@ export class AppleNotesManager {
       // The note may exist even when AppleScript returned an unexpected object
       // specifier. Fail closed instead of handing out a synthetic or unverified
       // identity that a later mutation could mis-target.
-      console.error(`Created note "${title}" but Notes.app returned no canonical note ID`);
+      console.error("Created a note but Notes.app returned no canonical note ID");
       return null;
     }
     try {
       sanitizeNoteId(noteId);
     } catch {
-      console.error(`Created note "${title}" but Notes.app returned an invalid note ID`);
+      console.error("Created a note but Notes.app returned an invalid note ID");
       return null;
     }
 
@@ -1620,7 +1634,7 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get content of note "${title}":`, result.error);
+      console.error("Failed to get note content by title:", redactedError(result.error, title));
       return "";
     }
 
@@ -1692,7 +1706,7 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get plaintext of note "${title}":`, result.error);
+      console.error("Failed to get note plaintext by title:", redactedError(result.error, title));
       return "";
     }
 
@@ -1836,7 +1850,7 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to get details for note "${title}":`, result.error);
+      console.error("Failed to get note details by title:", redactedError(result.error, title));
       return null;
     }
 
@@ -2535,7 +2549,10 @@ export class AppleNotesManager {
       const result = executeAppleScript(script);
 
       if (!result.success) {
-        console.error(`Failed to list shared notes for ${account.name}:`, result.error);
+        console.error(
+          "Failed to list shared notes for an account:",
+          redactedError(result.error, account.name)
+        );
         continue;
       }
 
@@ -2919,7 +2936,7 @@ export class AppleNotesManager {
     const parts = splitFolderPath(name);
 
     if (parts.length === 0) {
-      console.error(`Invalid folder name: "${name}"`);
+      console.error("Invalid folder name: the path has no segments");
       return null;
     }
 
@@ -2971,7 +2988,7 @@ export class AppleNotesManager {
       if (!result.success) {
         throwIfAccountResolutionFailed(result.error);
         throwIfSmartFolderDestination(result.error, name);
-        console.error(`Failed to create folder "${name}":`, result.error);
+        console.error("Failed to create folder:", redactedError(result.error, name, ...parts));
         return null;
       }
     }
@@ -3034,7 +3051,10 @@ export class AppleNotesManager {
 
     if (!result.success) {
       throwIfAccountResolutionFailed(result.error);
-      console.error(`Failed to delete folder "${name}":`, result.error);
+      console.error(
+        "Failed to delete folder:",
+        redactedError(result.error, name, ...splitFolderPath(name))
+      );
       return false;
     }
 
