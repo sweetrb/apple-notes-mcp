@@ -1,7 +1,29 @@
 ## [Unreleased]
 
+## [2.16.7] - 2026-11-12
+
+### Security
+
+- **Write destinations no longer reach private locations** ([GHSA-j663-w4cg-r8h8](https://github.com/sweetrb/apple-notes-mcp/security/advisories/GHSA-j663-w4cg-r8h8)).
+  `save-attachment`, `export-attachments`, `export-paper-image` and the `outputPath` /
+  `assetsDir` of `export-notes-markdown` and `export-notes-html` checked only the Notes
+  data folder, so a prompt-injected client could save an attachment from a shared note as
+  `~/Library/LaunchAgents/*.plist`, `~/.zshenv` or a project's `.git/hooks/*`, which macOS,
+  the shell or git then runs. Writes now refuse the same places reads already refuse: any
+  hidden file or directory below the allowed root, at any depth and in any letter case, and
+  `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Set
+  `APPLE_NOTES_MCP_ALLOW_PRIVATE_SAVE_PATHS=1` to opt out.
+- Failure logs no longer carry note titles, folder names or account names. MCP hosts
+  persist stderr (Claude Desktop writes it under `~/Library/Logs/Claude`), so those values
+  ended up in plain log files; they are now left out of the message and redacted from
+  AppleScript error text.
+
+Reported, with the fix and its regression tests, by Huỳnh Quang Thái (@thaihuynhquang).
+
 ## [2.16.6] - 2026-11-11
+
 ### Changed
+
 - Dependency bump via Dependabot; committed bundle rebuilt. (automated)
 
 ## [2.16.5] - 2026-11-11
