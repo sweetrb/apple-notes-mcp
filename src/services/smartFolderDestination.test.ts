@@ -49,7 +49,7 @@ beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "smart-destination-"));
   fixture.db = join(dir, "NoteStore.sqlite");
   const query = '{"entity":"note","type":{"and":[{"deleted":false},{"or":[{"pinned":true}]}]}}';
-  execFileSync("sqlite3", [
+  execFileSync("/usr/bin/sqlite3", [
     fixture.db,
     `CREATE TABLE Z_METADATA (Z_VERSION INTEGER, Z_UUID VARCHAR, Z_PLIST BLOB);
      CREATE TABLE Z_PRIMARYKEY (Z_ENT INTEGER, Z_NAME VARCHAR, Z_SUPER INTEGER, Z_MAX INTEGER);

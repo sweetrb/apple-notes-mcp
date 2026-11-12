@@ -178,7 +178,7 @@ beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "note-recent-"));
   db = join(dir, "store.sqlite");
   bigDb = join(dir, "big.sqlite");
-  execFileSync("sqlite3", [bigDb], {
+  execFileSync("/usr/bin/sqlite3", [bigDb], {
     input: [
       ...baseStatements(),
       `INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZNAME) VALUES (1, ${ENT.account}, 'iCloud');`,
@@ -201,7 +201,7 @@ beforeAll(() => {
     }),
     ...BODIES.map((b) => `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (${b.note}, X'${b.hex}');`),
   ];
-  execFileSync("sqlite3", [db], { input: statements.join("\n") });
+  execFileSync("/usr/bin/sqlite3", [db], { input: statements.join("\n") });
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 

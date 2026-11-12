@@ -12,6 +12,7 @@ import { constants as bufferConstants } from "node:buffer";
 import type { AppleScriptResult, AppleScriptOptions } from "@/types.js";
 import { AUTOMATION_REMEDIATION } from "@/utils/docsUrls.js";
 import { callTimeoutMs } from "@/utils/callTimeout.js";
+import { osascriptPath } from "@/utils/systemBinaries.js";
 
 /**
  * Default execution timeout for AppleScript commands in milliseconds.
@@ -526,7 +527,7 @@ export function executeAppleScript(
       // script from stdin: a shell-escaping bug can never become shell
       // execution, and a huge generated script (large note bodies) can't
       // blow the kernel's argv size limit the old `-e '<script>'` form had.
-      const output = execFileSync("osascript", ["-"], {
+      const output = execFileSync(osascriptPath(), ["-"], {
         input: preparedScript,
         encoding: "utf8",
         timeout: attemptTimeoutMs,

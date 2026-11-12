@@ -45,6 +45,7 @@ import { basename, extname, join } from "node:path";
 import { envPositiveNumber } from "./applescript.js";
 import { callTimeoutMs } from "./callTimeout.js";
 import { CodedError, type ErrorCode } from "./errorCodes.js";
+import { osascriptPath } from "@/utils/systemBinaries.js";
 
 /**
  * Testing aid: read this named pasteboard (NSPasteboard(name:)) instead of the
@@ -293,7 +294,7 @@ export function pasteboardTimeoutMs(): number {
 }
 
 function defaultRunJxa(args: string[]): string {
-  return execFileSync("osascript", ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
+  return execFileSync(osascriptPath(), ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
     encoding: "utf8",
     timeout: pasteboardTimeoutMs(),
     maxBuffer: 1024 * 1024,

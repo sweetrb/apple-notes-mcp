@@ -80,7 +80,7 @@ export function hasFullDiskAccess(): boolean {
   try {
     if (!fs.existsSync(NOTES_DB_PATH)) return false;
     // Try to open the database with a simple query
-    execFileSync("sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
+    execFileSync("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
       encoding: "utf8",
       timeout: 3000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -114,7 +114,7 @@ function queryNoteData(noteId: string): { hex: string | null; error?: "no_fda" |
   const query = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
 
   try {
-    const result = execFileSync("sqlite3", ["-readonly", NOTES_DB_PATH, query], {
+    const result = execFileSync("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH, query], {
       encoding: "utf8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],

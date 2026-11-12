@@ -154,7 +154,7 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
   it("works without a generation column and reports missing required columns", () => {
     const old = createNoteStoreFixture([{ pk: 1, ent: "ICNote" }]);
     try {
-      execFileSync("sqlite3", [
+      execFileSync("/usr/bin/sqlite3", [
         old.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT DROP COLUMN ZGENERATION1;" +
           "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZNOTE, ZTYPEUTI, ZIDENTIFIER, ZMEDIA, ZMARKEDFORDELETION) VALUES (5, 5, 1, 'public.mp3', 'A', 6, 0);" +
@@ -163,7 +163,7 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
       // This note has no account link, so every account folder is probed in order.
       const [asset] = readAudioAssets(noteId(1), { dbPath: old.dbPath, containerDir: container });
       expect(asset.takes[0].path).toBe(otherAccountVoice);
-      execFileSync("sqlite3", [
+      execFileSync("/usr/bin/sqlite3", [
         old.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT ADD COLUMN ZGENERATION VARCHAR;",
       ]);
@@ -171,7 +171,7 @@ describe("readAudioAssets (real sqlite3, fixture database)", () => {
         readAudioAssets(noteId(1), { dbPath: old.dbPath, containerDir: container })
       ).toHaveLength(1);
       expect(audioRowsSql(new Set(), "ZGENERATION")).toContain("m.ZGENERATION,");
-      execFileSync("sqlite3", [
+      execFileSync("/usr/bin/sqlite3", [
         old.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT DROP COLUMN ZFILENAME;",
       ]);

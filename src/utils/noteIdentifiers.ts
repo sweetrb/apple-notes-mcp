@@ -220,7 +220,7 @@ function runJsonQuery<Row>(sql: string, dbPath: string): QueryResult<Row> {
     throw new IdentifierResolutionError("no_fda", `${NO_FDA_MESSAGE} ${fdaRemediation()}`);
   let out: string;
   try {
-    out = execFileSync("sqlite3", ["-readonly", dbPath, sql], {
+    out = execFileSync("/usr/bin/sqlite3", ["-readonly", dbPath, sql], {
       encoding: "utf8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],

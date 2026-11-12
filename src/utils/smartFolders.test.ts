@@ -236,7 +236,7 @@ describe("decodeSmartFolderQuery", () => {
 describe("readSmartFolders against a fixture NoteStore", () => {
   let dir: string;
   let db: string;
-  const sql = (statements: string) => execFileSync("sqlite3", [db, statements]);
+  const sql = (statements: string) => execFileSync("/usr/bin/sqlite3", [db, statements]);
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), "smart-folders-"));
@@ -311,7 +311,7 @@ describe("readSmartFolders against a fixture NoteStore", () => {
 
   it("reports an unsupported schema instead of failing on missing columns", () => {
     const old = join(dir, "Old.sqlite");
-    execFileSync("sqlite3", [
+    execFileSync("/usr/bin/sqlite3", [
       old,
       "CREATE TABLE ZICCLOUDSYNCINGOBJECT (Z_PK INTEGER, Z_ENT INTEGER);",
     ]);

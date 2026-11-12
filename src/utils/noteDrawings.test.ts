@@ -106,7 +106,7 @@ describe("readDrawingRows (real sqlite3, fixture database)", () => {
   it("falls back to ZMERGEABLEDATA on older schemas and fails clearly without either column", () => {
     const dir = createNoteStoreFixture([]);
     try {
-      execFileSync("sqlite3", [
+      execFileSync("/usr/bin/sqlite3", [
         dir.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT RENAME COLUMN ZMERGEABLEDATA1 TO ZMERGEABLEDATA;" +
           "INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, Z_ENT, ZISPASSWORDPROTECTED) VALUES (1, 12, 0);" +
@@ -115,7 +115,7 @@ describe("readDrawingRows (real sqlite3, fixture database)", () => {
       ]);
       const rows = readDrawingRows(noteId(1), dir.dbPath);
       expect(rows.map((r) => r.data?.toString("hex"))).toEqual(["0a0b"]);
-      execFileSync("sqlite3", [
+      execFileSync("/usr/bin/sqlite3", [
         dir.dbPath,
         "ALTER TABLE ZICCLOUDSYNCINGOBJECT RENAME COLUMN ZMERGEABLEDATA TO ZOTHER;",
       ]);

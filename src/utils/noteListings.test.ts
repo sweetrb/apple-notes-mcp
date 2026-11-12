@@ -125,7 +125,7 @@ function buildStore(dir: string, name: string, columns: string[], rows: Row[], b
       `INSERT INTO ZICNOTEDATA (ZNOTE, ZDATA) VALUES (${body.note}, X'${body.hex as string}');`
     );
   }
-  execFileSync("sqlite3", [file], { input: statements.join("\n") });
+  execFileSync("/usr/bin/sqlite3", [file], { input: statements.join("\n") });
   return file;
 }
 

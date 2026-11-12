@@ -54410,6 +54410,11 @@ function callTimeoutMs() {
   return scope.getStore();
 }
 
+// src/utils/systemBinaries.ts
+function osascriptPath() {
+  return process.env.APPLE_NOTES_MCP_TEST_OSASCRIPT || "/usr/bin/osascript";
+}
+
 // src/utils/applescript.ts
 var DEFAULT_TIMEOUT_MS = 3e4;
 var DEFAULT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
@@ -54616,7 +54621,7 @@ function executeAppleScript(script, options = {}) {
     const preparedScript = wrapWithTimeout(script.trim(), attemptTimeoutMs);
     const attemptStart = Date.now();
     try {
-      const output2 = execFileSync("osascript", ["-"], {
+      const output2 = execFileSync(osascriptPath(), ["-"], {
         input: preparedScript,
         encoding: "utf8",
         timeout: attemptTimeoutMs,
@@ -54872,7 +54877,7 @@ var NOTES_DB_PATH = path.join(
 function hasFullDiskAccess() {
   try {
     if (!fs.existsSync(NOTES_DB_PATH)) return false;
-    execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
+    execFileSync2("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH, "SELECT 1;"], {
       encoding: "utf8",
       timeout: 3e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -54891,7 +54896,7 @@ function queryNoteData(noteId3) {
   const pk = pkMatch[1];
   const query2 = `SELECT hex(nd.ZDATA) FROM ZICNOTEDATA nd JOIN ZICCLOUDSYNCINGOBJECT n ON nd.ZNOTE = n.Z_PK WHERE n.Z_PK = ${pk};`;
   try {
-    const result = execFileSync2("sqlite3", ["-readonly", NOTES_DB_PATH, query2], {
+    const result = execFileSync2("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH, query2], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -55110,7 +55115,7 @@ function runJsonQuery(sql, dbPath2) {
     throw new IdentifierResolutionError("no_fda", `${NO_FDA_MESSAGE} ${fdaRemediation()}`);
   let out;
   try {
-    out = execFileSync3("sqlite3", ["-readonly", dbPath2, sql], {
+    out = execFileSync3("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
       encoding: "utf8",
       timeout: 5e3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -56346,7 +56351,7 @@ var REQUIRED_COLUMNS = [
   "ZIDENTIFIER"
 ];
 function runSqlite(dbPath2, sql) {
-  return execFileSync5("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync5("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 1e4,
     maxBuffer: 256 * 1024 * 1024,
@@ -57049,7 +57054,7 @@ function buildSmartFolders(output2) {
   );
 }
 function runSqlite2(dbPath2, sql) {
-  return execFileSync6("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync6("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 5e3,
     maxBuffer: 16 * 1024 * 1024,
@@ -57095,7 +57100,7 @@ var RECENTLY_DELETED_FOLDER_NAME = "Recently Deleted";
 var CACHE_TTL_MS = 5 * 60 * 1e3;
 var cache = null;
 function query(dbPath2, sql) {
-  return execFileSync7("sqlite3", ["-readonly", dbPath2, sql], {
+  return execFileSync7("/usr/bin/sqlite3", ["-readonly", dbPath2, sql], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -61729,7 +61734,7 @@ function getSyncStatus(useCache = true) {
       );
     `;
     const result = execFileSync10(
-      "sqlite3",
+      "/usr/bin/sqlite3",
       ["-readonly", NOTES_DB_PATH6, query2.replace(/\n/g, " ")],
       {
         encoding: "utf8",
@@ -61808,7 +61813,7 @@ var COLUMN_MAP = [
   { key: "smartFolderQuery", column: "ZSMARTFOLDERQUERYJSON", type: "text" }
 ];
 function runSqlite5(query2) {
-  return execFileSync11("sqlite3", ["-readonly", NOTES_DB_PATH7, query2], {
+  return execFileSync11("/usr/bin/sqlite3", ["-readonly", NOTES_DB_PATH7, query2], {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]
@@ -61935,7 +61940,7 @@ function runReadOnlySql(dbPath2, sql, params = {}) {
   }
   args.push(dbPath2, sql);
   try {
-    return execFileSync12("sqlite3", args, {
+    return execFileSync12("/usr/bin/sqlite3", args, {
       encoding: "utf8",
       timeout: 3e4,
       maxBuffer: 512 * 1024 * 1024,
@@ -63727,7 +63732,7 @@ function buildScanSql(available, options) {
   ].join(" ");
 }
 function runSqlite6(dbPath2, query2) {
-  return execFileSync14("sqlite3", ["-readonly", dbPath2, query2], {
+  return execFileSync14("/usr/bin/sqlite3", ["-readonly", dbPath2, query2], {
     encoding: "utf8",
     timeout: 3e4,
     maxBuffer: 512 * 1024 * 1024,
@@ -66271,7 +66276,7 @@ function markdownBridgeDetail() {
 function checkNodeRuntimeSignature() {
   const name = "Node runtime signature";
   try {
-    const r = spawnSync2("codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
+    const r = spawnSync2("/usr/bin/codesign", ["-dvvv", process.execPath], { encoding: "utf8" });
     const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
     if (r.error || !out.trim()) {
       return {
@@ -71184,7 +71189,7 @@ function pasteboardTimeoutMs() {
   return callTimeoutMs() ?? envPositiveNumber("APPLE_NOTES_MCP_TIMEOUT_MS") ?? 3e4;
 }
 function defaultRunJxa(args) {
-  return execFileSync19("osascript", ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
+  return execFileSync19(osascriptPath(), ["-l", "JavaScript", "-e", PASTEBOARD_FREEZE_JXA, ...args], {
     encoding: "utf8",
     timeout: pasteboardTimeoutMs(),
     maxBuffer: 1024 * 1024,
@@ -71792,7 +71797,7 @@ function runSqlite7(dbPath2, sql, pk) {
   const args = ["-readonly"];
   if (pk !== void 0) args.push("-cmd", `.parameter set @pk ${pk}`);
   args.push(dbPath2, sql);
-  return execFileSync20("sqlite3", args, {
+  return execFileSync20("/usr/bin/sqlite3", args, {
     encoding: "utf8",
     timeout: 5e3,
     stdio: ["pipe", "pipe", "pipe"]

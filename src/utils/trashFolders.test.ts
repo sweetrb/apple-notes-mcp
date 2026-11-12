@@ -13,7 +13,7 @@ let dir: string;
 
 function makeDb(name: string, sql: string): string {
   const db = join(dir, name);
-  execFileSync("sqlite3", [db, sql]);
+  execFileSync("/usr/bin/sqlite3", [db, sql]);
   return db;
 }
 
@@ -98,7 +98,7 @@ describe("readTrashFolderIds", () => {
       INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (3, 15, 1);`
     );
     expect(readTrashFolderIds(db)).toEqual(["x-coredata://DDDD-4444/ICFolder/p3"]);
-    execFileSync("sqlite3", [db, "INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (8, 15, 1);"]);
+    execFileSync("/usr/bin/sqlite3", [db, "INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES (8, 15, 1);"]);
     expect(readTrashFolderIds(db)).toHaveLength(1);
     clearTrashFolderCache();
     expect(readTrashFolderIds(db)).toHaveLength(2);

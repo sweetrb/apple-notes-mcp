@@ -291,7 +291,7 @@ describe("getChecklistItems", () => {
     getChecklistItems("x-coredata://12345-ABCDE/ICNote/p42");
 
     expect(mockExecSync).toHaveBeenCalledWith(
-      "sqlite3",
+      "/usr/bin/sqlite3",
       expect.arrayContaining([expect.stringContaining("Z_PK = 42")]),
       expect.any(Object)
     );

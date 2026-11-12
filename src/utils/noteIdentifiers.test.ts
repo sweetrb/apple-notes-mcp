@@ -72,7 +72,7 @@ function createStore(path: string) {
     "CREATE UNIQUE INDEX Z_ICCloudSyncingObject_UNIQUE_identifier ON ZICCLOUDSYNCINGOBJECT (ZIDENTIFIER);",
     `INSERT INTO ZICCLOUDSYNCINGOBJECT VALUES ${OBJECTS.join(", ")};`,
   ].join("\n");
-  execFileSync("sqlite3", [path], { input: sql, stdio: ["pipe", "pipe", "pipe"] });
+  execFileSync("/usr/bin/sqlite3", [path], { input: sql, stdio: ["pipe", "pipe", "pipe"] });
 }
 
 beforeAll(() => {
@@ -119,14 +119,22 @@ describe("SQL builders", () => {
 
   it("compile against a real sqlite3 store for every entity", () => {
     for (const entity of ["ICNote", "ICFolder", "ICAccount"] as const) {
-      const out = execFileSync("sqlite3", ["-readonly", db, buildLookupSql(entity, ["3"])], {
-        encoding: "utf8",
-      });
+      const out = execFileSync(
+        "/usr/bin/sqlite3",
+        ["-readonly", db, buildLookupSql(entity, ["3"])],
+        {
+          encoding: "utf8",
+        }
+      );
       expect(JSON.parse(out).store).toBe(STORE);
     }
-    const out = execFileSync("sqlite3", ["-readonly", db, buildResolveSql("ICNote", [], [])], {
-      encoding: "utf8",
-    });
+    const out = execFileSync(
+      "/usr/bin/sqlite3",
+      ["-readonly", db, buildResolveSql("ICNote", [], [])],
+      {
+        encoding: "utf8",
+      }
+    );
     expect(JSON.parse(out).rows).toEqual([]);
   });
 });

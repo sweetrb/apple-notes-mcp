@@ -323,7 +323,7 @@ export function buildScanSql(available: ReadonlySet<string>, options: ScanSqlOpt
  * means no shell: the path's spaces and the SQL are passed verbatim.
  */
 function runSqlite(dbPath: string, query: string): string {
-  return execFileSync("sqlite3", ["-readonly", dbPath, query], {
+  return execFileSync("/usr/bin/sqlite3", ["-readonly", dbPath, query], {
     encoding: "utf8",
     timeout: 30000,
     maxBuffer: 512 * 1024 * 1024,

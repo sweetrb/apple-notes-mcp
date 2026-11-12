@@ -76,7 +76,7 @@ describe("executeJXA", () => {
     expect(result.success).toBe(true);
     expect(result.output).toBe("test output");
     expect(mockExecFileSync).toHaveBeenCalledWith(
-      "osascript",
+      "/usr/bin/osascript",
       ["-l", "JavaScript", "-"],
       expect.objectContaining({ input: "JSON.stringify({test: true})" })
     );

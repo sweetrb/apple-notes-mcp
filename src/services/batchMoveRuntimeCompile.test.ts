@@ -43,7 +43,7 @@ describe("batch move scripts compile through the real execution wrapper", () => 
     const dir = mkdtempSync(join(tmpdir(), "batch-runtime-compile-"));
     try {
       exec.mockImplementation((file, args, options) => {
-        expect(file).toBe("osascript");
+        expect(file).toBe("/usr/bin/osascript");
         expect(args).toEqual(["-"]);
         const input = (options as { input: string }).input;
         expect(input).toMatch(/^with timeout of 25 seconds\n/);

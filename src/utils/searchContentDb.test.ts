@@ -153,7 +153,7 @@ beforeAll(() => {
       ([note, data], i) => `INSERT INTO ZICNOTEDATA VALUES (${i + 1}, ${note}, ${sql(data)});`
     ),
   ].join("\n");
-  execFileSync("sqlite3", [db], { input: script, stdio: ["pipe", "pipe", "pipe"] });
+  execFileSync("/usr/bin/sqlite3", [db], { input: script, stdio: ["pipe", "pipe", "pipe"] });
 });
 
 afterAll(() => {

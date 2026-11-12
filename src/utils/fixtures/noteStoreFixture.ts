@@ -74,6 +74,6 @@ export function createNoteStoreFixture(rows: FixtureRow[]): {
         ");"
     ),
   ];
-  execFileSync("sqlite3", [dbPath, statements.join("\n")], { stdio: "pipe" });
+  execFileSync("/usr/bin/sqlite3", [dbPath, statements.join("\n")], { stdio: "pipe" });
   return { dbPath, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }

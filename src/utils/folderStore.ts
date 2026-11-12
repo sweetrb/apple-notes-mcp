@@ -130,7 +130,7 @@ function runSqlite(dbPath: string, sql: string, pk?: number): string {
   const args = ["-readonly"];
   if (pk !== undefined) args.push("-cmd", `.parameter set @pk ${pk}`);
   args.push(dbPath, sql);
-  return execFileSync("sqlite3", args, {
+  return execFileSync("/usr/bin/sqlite3", args, {
     encoding: "utf8",
     timeout: 5000,
     stdio: ["pipe", "pipe", "pipe"],
