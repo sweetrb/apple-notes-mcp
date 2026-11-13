@@ -41,7 +41,15 @@ overrides:
   # @modelcontextprotocol/sdk; the HTTP path is never entered by this stdio
   # server. This was an exact pin (2.0.10), which is a CEILING, not a floor --
   # see fast-uri below. Two-sided range, never an exact pin.
-  "@hono/node-server": ">=2.1.3 <3"
+  #
+  # Raised from >=2.1.3 <3 to >=2.1.6 <3 on 2026-11-13 for Dependabot #47
+  # (moderate, GHSA-jpvv-r467-5p4w -- backslash in the request path parsed as a
+  # path separator, bypassing reverse-proxy path ACLs) and #48 (moderate,
+  # GHSA-qv5m-9pm6-hqp3 -- unhandled ECONNRESET during an async WebSocket upgrade
+  # crashes the process), both fixed in 2.1.6 (published 2026-11-02; the 7-day
+  # minimumReleaseAge soak cleared 2026-11-09, no minimumReleaseAgeExclude
+  # carve-out). Same reachability as above -- not in the shipped bundle.
+  "@hono/node-server": ">=2.1.6 <3"
   # GHSA-27r3-jxmh-p828 (high), fixed in 2.4.0 (published 2026-10-22T11:39Z; the
   # 7-day minimumReleaseAge soak cleared 2026-10-29T11:40Z, no
   # minimumReleaseAgeExclude carve-out). Reached via @modelcontextprotocol/sdk ->
@@ -137,7 +145,19 @@ overrides:
   # alerted on this repo (an alert-rollout timing artifact — only apple-numbers-mcp
   # got the alerts), but the identical vulnerable version was carried here.
   # Caret range, never an exact pin, for the reason recorded on fast-uri above.
-  hono: ^4.13.5
+  #
+  # Raised from ^4.13.5 to >=4.13.16 <5 on 2026-11-13 for five advisories, all
+  # fixed in 4.13.16 (published 2026-11-01; the 7-day minimumReleaseAge soak
+  # cleared 2026-11-08, no minimumReleaseAgeExclude carve-out):
+  # GHSA-4m76-xfj5-7975 (moderate, mount() forwards a path that bypasses
+  # middleware scoped inside the mount prefix), GHSA-h7mg-cq63-vhpq (moderate,
+  # RegExpRouter skips wildcard middleware), GHSA-46wx-v44x-9hh2 (moderate, csrf()
+  # ignores text/ping hyperlink-auditing requests), GHSA-4h7h-rv7c-7m2v (moderate,
+  # validator('form') skips multipart/form-data with extra parameters) and
+  # GHSA-3gg2-335m-rxc6 (low, css helper HTML injection). The lockfile had
+  # settled on 4.13.14 under the old caret floor. Same reachability as above --
+  # not in the shipped bundle. Two-sided per-major range, never an exact pin.
+  hono: ">=4.13.16 <5"
   # GHSA-5p4m-2wfm-xmqj (high): quadratic CPU consumption resolving !!omap,
   # fixed in 4.3.1 — the CVE-2026-59870 fix was never backported to the 3.x line.
   # Reached as eslint -> js-yaml, so development scope, and absent from the
