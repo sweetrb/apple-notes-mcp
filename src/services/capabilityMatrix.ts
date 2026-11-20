@@ -11,7 +11,8 @@
  *
  * The probe is deliberately cheap and side-effect free: `sw_vers` for the macOS
  * version, one `SELECT 1` against the Notes database for Full Disk Access, and
- * one `shortcuts list` for every bridge. It never opens Notes.app, never sends
+ * one `shortcuts list` for every bridge, and one read of Notes' App Intents
+ * metadata file for the Markdown bridge (#337). It never opens Notes.app, never sends
  * Notes an Apple event, never runs a Shortcut, and never mutates anything. The
  * public helper gets only bounded `hello` / `speech_status` calls. Automation
  * permission, Shortcut first-run consent, and per-language speech assets stay
@@ -25,6 +26,7 @@ import { release } from "node:os";
 import { hasFullDiskAccess } from "../utils/checklistParser.js";
 import { listInstalledShortcuts, nativeTagsShortcutName, resolveShortcut } from "./nativeTags.js";
 import { backgroundShortcutName, markdownShortcutName } from "./backgroundNotes.js";
+import { notesMarkdownSupport, type NotesMarkdownSupport } from "./notesMarkdownIntents.js";
 import {
   probePublicHelperStatus,
   unprobedPublicHelperStatus,
@@ -47,6 +49,11 @@ export type Requirement =
   /** Locale/model readiness is only known for an actual transcription request. */
   | { kind: "speech_locale_and_assets" }
   /**
+   * Notes' Create Note action accepts "Interpret as Markdown" (#337). Only a
+   * positive "listed without the parameter" fails it; unknown never does.
+   */
+  | { kind: "notes_markdown_import" }
+  /**
    * A native helper that can WRITE to Notes. None ships: the opt-in private
    * helper (native-helper-status) is read-only, and write support was
    * deliberately deferred by the maintainer (#181, #204). Always unmet.
@@ -65,6 +72,8 @@ export type Requirement =
  * - `full_disk_access_missing`: the Notes database is not readable by this process.
  * - `shortcuts_unavailable`: the `shortcuts` command could not be run.
  * - `shortcut_not_installed`: a bridge Shortcut is missing or installed more than once.
+ * - `notes_markdown_import_missing`: Notes' Create Note action has no "Interpret as Markdown"
+ *   option on this build, so the Markdown bridge would save literal Markdown (#337).
  * - `public_helper_unavailable`: installed helper integrity or handshake failed.
  * - `public_helper_unverified`: helper readiness was not inspected.
  * - `speech_permission_required`: the speech route needs access or has an explicit refusal.
@@ -78,6 +87,7 @@ export type CapabilityReason =
   | "full_disk_access_missing"
   | "shortcuts_unavailable"
   | "shortcut_not_installed"
+  | "notes_markdown_import_missing"
   | "public_helper_unavailable"
   | "public_helper_unverified"
   | "speech_permission_required"
@@ -124,6 +134,8 @@ export interface CapabilityEnvironment {
   shortcutLines: string[] | null;
   /** Absent only for injected/older probes; absence must never imply helper readiness. */
   publicHelper?: PublicHelperStatus;
+  /** Notes' App Intents Markdown support (#337); absence is treated as unknown, never as missing. */
+  notesMarkdown?: NotesMarkdownSupport;
 }
 
 /** The runtime OS block reported beside the matrix. */
@@ -260,6 +272,7 @@ export const FEATURES: FeatureDefinition[] = [
       { kind: "shortcuts_cli" },
       { kind: "shortcut", name: markdownShortcutName },
       { kind: "shortcut_consent" },
+      { kind: "notes_markdown_import" },
     ],
   },
   // Placeholders for features that need a native WRITE helper, which this
@@ -436,6 +449,12 @@ export function evaluateFeature(
       case "speech_locale_and_assets":
         unverified.push(label);
         break;
+      case "notes_markdown_import":
+        if (env.notesMarkdown?.createInterpretsMarkdown === false) {
+          missing.push(label);
+          failures.add("notes_markdown_import_missing");
+        } else if (env.notesMarkdown?.createInterpretsMarkdown !== true) unverified.push(label);
+        break;
     }
   }
 
@@ -447,6 +466,7 @@ export function evaluateFeature(
   else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
   else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
   else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  else if (failures.has("notes_markdown_import_missing")) reason = "notes_markdown_import_missing";
   else if (failures.has("public_helper_unavailable")) reason = "public_helper_unavailable";
   else if (failures.has("public_helper_unverified")) reason = "public_helper_unverified";
   else if (failures.has("speech_permission_required")) reason = "speech_permission_required";
@@ -518,6 +538,7 @@ export function probeCapabilityEnvironment(): CapabilityEnvironment {
     fullDiskAccess: isMac && hasFullDiskAccess(),
     shortcutLines,
     publicHelper: isMac ? probePublicHelperStatus() : unprobedPublicHelperStatus(),
+    notesMarkdown: isMac ? notesMarkdownSupport() : undefined,
   };
 }
 

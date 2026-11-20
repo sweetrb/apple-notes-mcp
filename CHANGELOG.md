@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [2.16.10] - 2026-11-20
+
+### Fixed
+
+- **`doctor`'s feature matrix no longer reports the Markdown bridge available on Notes
+  builds without "Interpret as Markdown" (#337).** 2.16.9 withdrew `create-note-markdown`
+  in `get-capabilities`, but the OS feature matrix that `doctor` and `get-capabilities`
+  both print still said `markdownNoteBridge.available: true` with no reason. The
+  matrix now reads the same Notes App Intents metadata and reports the bridge
+  unavailable with reason `notes_markdown_import_missing` when Create Note positively
+  lacks the option; when that is unknown (unreadable metadata, detection turned off)
+  the requirement is listed under `unverified` and availability is unchanged.
+
+### Documentation
+
+- `shortcuts/README.md` now records the styles that actually land on macOS 26.6.2
+  (#337): the `create-note` HTML route renders `#`, `##` and `###` as bold body text,
+  and `append-native` Markdown renders `##` as Title and `###` as Heading, so nothing
+  reaches Subheading on either path. It also notes the one cold-start
+  `timeout_indeterminate` seen on the first `append-html` after installing.
+
+Measured on an affected build by Andy Manettas (@AndyManettas).
+
 ## [2.16.9] - 2026-11-20
 
 ### Fixed

@@ -16,6 +16,7 @@ vi.mock("./publicHelperStatus.js", async (importOriginal) => ({
 import { execFileSync } from "node:child_process";
 import { hasFullDiskAccess } from "../utils/checklistParser.js";
 import { probePublicHelperStatus, type PublicHelperStatus } from "./publicHelperStatus.js";
+import type { NotesMarkdownSupport } from "./notesMarkdownIntents.js";
 import {
   FEATURES,
   compareVersions,
@@ -48,6 +49,13 @@ const readyHelper = (): PublicHelperStatus => ({
   },
 });
 
+const markdownSupport = (create: boolean | null): NotesMarkdownSupport => ({
+  createInterpretsMarkdown: create,
+  appendInterpretsMarkdown: create,
+  dedicatedMarkdownActions:
+    create === false ? ["CreateNoteFromMarkdownLinkAction", "AppendMarkdownToNoteLinkAction"] : [],
+});
+
 function env(over: Partial<CapabilityEnvironment> = {}): CapabilityEnvironment {
   return {
     platform: "darwin",
@@ -56,6 +64,7 @@ function env(over: Partial<CapabilityEnvironment> = {}): CapabilityEnvironment {
     fullDiskAccess: true,
     shortcutLines: [line(BG, 1), line(TAGS, 2), line(MD, 3), "Unrelated (not-a-uuid)"],
     publicHelper: readyHelper(),
+    notesMarkdown: markdownSupport(true),
     ...over,
   };
 }
@@ -351,6 +360,44 @@ describe("evaluateFeature", () => {
         env({ fullDiskAccess: false, shortcutLines: [] })
       ).reason
     ).toBe("full_disk_access_missing");
+  });
+});
+
+describe("Notes builds without Interpret as Markdown (#337)", () => {
+  it("withdraws the Markdown bridge when Create Note lacks the option, as get-capabilities does", () => {
+    const s = evaluateFeature(
+      feature("markdownNoteBridge"),
+      env({ notesMarkdown: markdownSupport(false) })
+    );
+    expect(s).toMatchObject({
+      available: false,
+      osSupported: true,
+      reason: "notes_markdown_import_missing",
+      missing: ["notes_markdown_import"],
+    });
+  });
+
+  it("leaves the Markdown bridge available, with the import unverified, when support is unknown", () => {
+    for (const notesMarkdown of [markdownSupport(null), undefined]) {
+      const s = evaluateFeature(feature("markdownNoteBridge"), env({ notesMarkdown }));
+      expect(s).toMatchObject({ available: true, reason: null, missing: [] });
+      expect(s.unverified).toContain("notes_markdown_import");
+    }
+  });
+
+  it("does not touch the other bridges", () => {
+    const m = evaluateFeatures(env({ notesMarkdown: markdownSupport(false) }));
+    for (const name of ["backgroundOperationsBridge", "nativeTagsBridge"])
+      expect(m.features[name]).toMatchObject({ available: true, reason: null });
+  });
+
+  it("ranks a missing bridge Shortcut ahead of the missing import option", () => {
+    const s = evaluateFeature(
+      feature("markdownNoteBridge"),
+      env({ notesMarkdown: markdownSupport(false), shortcutLines: [line(BG, 1)] })
+    );
+    expect(s.reason).toBe("shortcut_not_installed");
+    expect(s.missing).toEqual([`shortcut:${MD}`, "notes_markdown_import"]);
   });
 });
 

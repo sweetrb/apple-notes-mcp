@@ -622,8 +622,9 @@ export function appendNative(
   // A Notes build whose Append to Note action has no "Interpret as Markdown"
   // option (macOS 26.6.2 / Notes 4.13, #337) would save the Markdown as
   // literal text. Send our HTML rendering through "append-html" instead — the
-  // same branch format "html" uses — so headings, bold and links still land;
-  // level-3 headings render as Heading there, not Subheading (#172).
+  // same branch format "html" uses — so headings, bold and links still land.
+  // On 26.6.2 that importer renders `<h2>` as Title and `<h3>` as Heading, so
+  // nothing reaches Subheading (measured on #337; on macOS 27 both are Heading, #172).
   const markdownViaHtml =
     markdownHtml !== null && markdownSupport().appendInterpretsMarkdown === false;
   // As before #173, the rendering must pass the same check direct HTML does.
