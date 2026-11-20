@@ -33439,9 +33439,9 @@ var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
 function isRecursive(inst, stack, resolve11) {
-  const cached2 = recursive.get(inst);
-  if (cached2 !== void 0)
-    return cached2 ? PROVEN : NONE;
+  const cached3 = recursive.get(inst);
+  if (cached3 !== void 0)
+    return cached3 ? PROVEN : NONE;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
@@ -45416,15 +45416,15 @@ function visit(schema, fnOrHandlers) {
   };
   const cache2 = /* @__PURE__ */ new Map();
   function run(s) {
-    const cached2 = cache2.get(s);
-    if (cached2 === RESOLVING) {
+    const cached3 = cache2.get(s);
+    if (cached3 === RESOLVING) {
       return new $ZodLazy({
         type: "lazy",
         getter: () => cache2.get(s)
       });
     }
-    if (cached2 !== void 0)
-      return cached2;
+    if (cached3 !== void 0)
+      return cached3;
     cache2.set(s, RESOLVING);
     const inner = mapInner(s);
     const mapped = fn(inner, inner !== s);
@@ -63814,8 +63814,8 @@ function resolveFolders(rows) {
   const byPk = new Map(rows.map((row) => [row.pk, row]));
   const resolved = /* @__PURE__ */ new Map();
   const resolve11 = (pk, seen) => {
-    const cached2 = resolved.get(pk);
-    if (cached2) return cached2;
+    const cached3 = resolved.get(pk);
+    if (cached3) return cached3;
     const row = byPk.get(pk);
     if (!row || seen.has(pk)) return void 0;
     seen.add(pk);
@@ -64779,6 +64779,80 @@ function comparableVisibleText(html) {
   ).replace(/\s+/g, " ").trim();
 }
 
+// src/services/notesMarkdownIntents.ts
+import { readFileSync as readFileSync2 } from "node:fs";
+var NOTES_ACTIONS_METADATA = "/System/Applications/Notes.app/Contents/Resources/Metadata.appintents/extract.actionsdata";
+var DEDICATED_ACTIONS = ["CreateNoteFromMarkdownLinkAction", "AppendMarkdownToNoteLinkAction"];
+function parameterNames(action) {
+  if (!action || typeof action !== "object") return null;
+  const parameters = action.parameters;
+  if (!Array.isArray(parameters)) return null;
+  return parameters.map((p) => p && typeof p === "object" ? p.name : void 0).filter((name) => typeof name === "string");
+}
+function parseNotesMarkdownSupport(raw) {
+  let actions;
+  try {
+    const parsed2 = JSON.parse(raw);
+    if (!parsed2 || typeof parsed2.actions !== "object" || parsed2.actions === null)
+      throw new Error("no actions table");
+    actions = parsed2.actions;
+  } catch (error62) {
+    return {
+      createInterpretsMarkdown: null,
+      appendInterpretsMarkdown: null,
+      dedicatedMarkdownActions: [],
+      error: `could not parse Notes App Intents metadata: ${error62 instanceof Error ? error62.message : String(error62)}`
+    };
+  }
+  const interprets = (identifier) => {
+    const names = parameterNames(actions[identifier]);
+    return names === null ? null : names.includes("interpretAsMarkdown");
+  };
+  return {
+    createInterpretsMarkdown: interprets("CreateNoteLinkAction"),
+    appendInterpretsMarkdown: interprets("AppendToNoteLinkAction"),
+    dedicatedMarkdownActions: DEDICATED_ACTIONS.filter((id2) => id2 in actions)
+  };
+}
+var cached2;
+function notesMarkdownSupport(read) {
+  if (!read && cached2) return cached2;
+  const reader = read ?? (() => readFileSync2(NOTES_ACTIONS_METADATA, "utf8"));
+  let result;
+  if (!read && process.env.APPLE_NOTES_MCP_IGNORE_NOTES_INTENTS === "1")
+    result = {
+      createInterpretsMarkdown: null,
+      appendInterpretsMarkdown: null,
+      dedicatedMarkdownActions: [],
+      error: "detection disabled by APPLE_NOTES_MCP_IGNORE_NOTES_INTENTS=1"
+    };
+  else {
+    try {
+      result = parseNotesMarkdownSupport(reader());
+    } catch (error62) {
+      result = {
+        createInterpretsMarkdown: null,
+        appendInterpretsMarkdown: null,
+        dedicatedMarkdownActions: [],
+        error: `could not read ${NOTES_ACTIONS_METADATA}: ${error62 instanceof Error ? error62.message : String(error62)}`
+      };
+    }
+  }
+  if (!read) cached2 = result;
+  return result;
+}
+var MARKDOWN_INTENT_WORKAROUND = 'This Notes build has no "Interpret as Markdown" option on its Create Note / Append to Note actions (it offers separate Markdown actions instead), so the Markdown bridges would save the Markdown as literal text (#337). Use markdownRoute: "html" for create-note and format: "html" (or format: "markdown", which this server then routes through the HTML importer) for append-native.';
+function describeNotesMarkdownSupport(support) {
+  if (support.createInterpretsMarkdown !== false && support.appendInterpretsMarkdown !== false)
+    return null;
+  const affected = [
+    support.createInterpretsMarkdown === false ? 'create-note format "markdown" now defaults to markdownRoute "html"' : null,
+    support.appendInterpretsMarkdown === false ? 'append-native format "markdown" is sent through the HTML importer' : null
+  ].filter(Boolean);
+  const dedicated = support.dedicatedMarkdownActions.length ? ` Dedicated actions present: ${support.dedicatedMarkdownActions.join(", ")}.` : "";
+  return `${MARKDOWN_INTENT_WORKAROUND} Until a bridge built on the dedicated actions ships, ${affected.join(" and ")}.${dedicated}`;
+}
+
 // src/services/backgroundNotes.ts
 var capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 var BACKGROUND_SHORTCUT = "Notes MCP Background v6";
@@ -65107,13 +65181,15 @@ function assertAppendedVisibleText(beforeHtml, afterHtml, expected) {
   const wanted = expected.replace(/\s+/gu, " ").trim();
   if (!suffix || !suffix.includes(wanted)) throw new Error("Appended text not verified");
 }
-function appendNative(manager, request) {
+function appendNative(manager, request, markdownSupport = notesMarkdownSupport) {
   if (request.format === "html" && /<\/?\s*(?:table|thead|tbody|tr|td|th)\b/i.test(request.content))
     throw new Error("Use create-table for verified native table insertion");
   validateAppendContent(request.content, request.format);
   const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
-  const op = request.format === "plaintext" ? "append-text" : request.format === "markdown" ? "append-markdown" : "append-html";
-  const text2 = request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
+  const markdownViaHtml = markdownHtml !== null && markdownSupport().appendInterpretsMarkdown === false;
+  if (markdownViaHtml) validateAppendContent(markdownHtml, "html");
+  const op = request.format === "plaintext" ? "append-text" : request.format === "markdown" && !markdownViaHtml ? "append-markdown" : "append-html";
+  const text2 = request.format === "html" ? "<div><br></div>" + request.content : markdownViaHtml ? "<div><br></div>" + markdownHtml : "\n\n" + request.content;
   return mutateBackground(
     request,
     op,
@@ -65190,8 +65266,14 @@ function assertMarkdownBlocks(rich, expected) {
   if ((rich.objects || []).filter((o) => o.type === DIVIDER_UTI).length !== expected.dividers)
     throw new Error("Dividers not verified");
 }
-function createMarkdownNote(manager, request, run = runBackgroundShortcut) {
+function createMarkdownNote(manager, request, run = runBackgroundShortcut, markdownSupport = notesMarkdownSupport) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
+  if (markdownSupport().createInterpretsMarkdown === false && process.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1")
+    throw new CodedError(`${MARKDOWN_INTENT_WORKAROUND} Nothing was created`, {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false
+    });
   validateAppendContent(request.content, "markdown", { blocks: true });
   const { html: bodyHtml, expect: blockExpectations } = renderMarkdown(request.content, {
     blocks: true
@@ -65320,7 +65402,7 @@ import {
   existsSync as existsSync12,
   mkdirSync as mkdirSync4,
   mkdtempSync as mkdtempSync5,
-  readFileSync as readFileSync2,
+  readFileSync as readFileSync3,
   renameSync,
   rmSync as rmSync5,
   writeFileSync as writeFileSync4
@@ -65358,7 +65440,7 @@ function packageRoot(fromDir = dirname4(fileURLToPath(import.meta.url))) {
     const candidate = join19(dir, "package.json");
     if (existsSync12(candidate)) {
       try {
-        if (JSON.parse(readFileSync2(candidate, "utf8")).name === "apple-notes-mcp")
+        if (JSON.parse(readFileSync3(candidate, "utf8")).name === "apple-notes-mcp")
           return dir;
       } catch {
       }
@@ -65374,7 +65456,7 @@ function defaultPublicHelperDeps(overrides = {}) {
     platform: process.platform,
     sourcePath: join19(packageRoot(), PUBLIC_HELPER_SOURCE),
     exists: existsSync12,
-    readFile: (path10) => readFileSync2(path10),
+    readFile: (path10) => readFileSync3(path10),
     spawn: spawnSync,
     spawnAsync: spawn,
     ...overrides
@@ -66191,7 +66273,7 @@ function formatCapabilityMatrix(matrix) {
 }
 
 // src/tools/doctor.ts
-function runDoctor(manager, capabilityMatrix = getCapabilityMatrix, version3) {
+function runDoctor(manager, capabilityMatrix = getCapabilityMatrix, version3, markdownSupport = notesMarkdownSupport) {
   const checks = [];
   const hc = manager.healthCheck();
   for (const c of hc.checks) {
@@ -66240,6 +66322,8 @@ function runDoctor(manager, capabilityMatrix = getCapabilityMatrix, version3) {
       detail: `could not inspect Shortcuts: ${String(error62)}. Run apple-notes-mcp setup --check`
     });
   }
+  const markdownCheck = notesMarkdownCheck(markdownSupport());
+  if (markdownCheck) checks.push(markdownCheck);
   checks.push(checkNodeRuntimeSignature());
   const healthy = !checks.some((c) => c.status === "fail");
   let matrix;
@@ -66272,6 +66356,18 @@ function markdownBridgeDetail() {
   } catch (error62) {
     return `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: could not inspect (${purpose}): ${String(error62)}.`;
   }
+}
+function notesMarkdownCheck(support) {
+  const name = "Notes Markdown import";
+  const warning = describeNotesMarkdownSupport(support);
+  if (warning) return { name, status: "warn", detail: warning };
+  if (support.createInterpretsMarkdown && support.appendInterpretsMarkdown)
+    return {
+      name,
+      status: "ok",
+      detail: `Notes' Create Note and Append to Note actions accept "Interpret as Markdown", which the Markdown bridges use`
+    };
+  return null;
 }
 function checkNodeRuntimeSignature() {
   const name = "Node runtime signature";
@@ -66314,7 +66410,7 @@ function formatDoctorReport(r) {
 }
 
 // src/services/fileConfig.ts
-import { existsSync as existsSync13, readFileSync as readFileSync3 } from "fs";
+import { existsSync as existsSync13, readFileSync as readFileSync4 } from "fs";
 import { join as join20 } from "path";
 import { homedir as homedir17 } from "os";
 function fileConfigPath(env = process.env) {
@@ -66327,7 +66423,7 @@ function loadFileConfig(env = process.env, path10 = fileConfigPath(env)) {
   const applied = [];
   try {
     if (!existsSync13(path10)) return applied;
-    const parsed2 = JSON.parse(readFileSync3(path10, "utf8"));
+    const parsed2 = JSON.parse(readFileSync4(path10, "utf8"));
     if (!parsed2 || typeof parsed2 !== "object") return applied;
     for (const [k, v] of Object.entries(parsed2)) {
       if (typeof v !== "string") continue;
@@ -71036,7 +71132,7 @@ import {
   fstatSync as fstatSync6,
   mkdtempSync as mkdtempSync6,
   openSync as openSync6,
-  readFileSync as readFileSync4,
+  readFileSync as readFileSync5,
   rmSync as rmSync6,
   statSync as statSync4,
   writeFileSync as writeFileSync5
@@ -71212,7 +71308,7 @@ function readRegularFile(path10) {
     const stat = fstatSync6(descriptor);
     if (!stat.isFile() || stat.size === 0 || stat.size > MAX_PASTEBOARD_BYTES)
       throw new PasteboardError("file_unreadable", MESSAGES.file_unreadable);
-    return readFileSync4(descriptor);
+    return readFileSync5(descriptor);
   } finally {
     closeSync6(descriptor);
   }
@@ -71256,7 +71352,7 @@ function freezePasteboard(options = {}) {
     const label = PASTEBOARD_DATA_TYPES.find((t) => t.type === reply.type)?.label ?? "item";
     const filename = `Pasted ${label}${extname6(reply.path)}`;
     const path10 = join25(directory, filename);
-    writeFileSync5(path10, readFileSync4(reply.path), { mode: 384 });
+    writeFileSync5(path10, readFileSync5(reply.path), { mode: 384 });
     rmSync6(reply.path, { force: true });
     return { kind: "data", type: reply.type, path: path10, filename, bytes: statSync4(path10).size, cleanup };
   } catch (error62) {
@@ -74686,7 +74782,7 @@ import {
   lstatSync as lstatSync6,
   mkdirSync as mkdirSync9,
   mkdtempSync as mkdtempSync8,
-  readFileSync as readFileSync5,
+  readFileSync as readFileSync6,
   realpathSync as realpathSync4,
   renameSync as renameSync3,
   rmdirSync,
@@ -74863,7 +74959,7 @@ function defaultBrokerDeps(overrides = {}) {
   const root = packageRoot();
   let packageVersion = "0.0.0";
   try {
-    packageVersion = JSON.parse(readFileSync5(join29(root, "package.json"), "utf8")).version ?? packageVersion;
+    packageVersion = JSON.parse(readFileSync6(join29(root, "package.json"), "utf8")).version ?? packageVersion;
   } catch {
   }
   return {
@@ -74875,7 +74971,7 @@ function defaultBrokerDeps(overrides = {}) {
     packageVersion,
     uid: process.getuid?.() ?? -1,
     exists: existsSync14,
-    readFile: (path10) => readFileSync5(path10),
+    readFile: (path10) => readFileSync6(path10),
     realpath: (path10) => realpathSync4(path10),
     removePath: rmSync8,
     removeEmptyDirectory: (path10) => rmdirSync(path10),
@@ -75770,10 +75866,13 @@ function registerNativeOperations(server2, manager) {
       } catch {
       }
       const installed = (name) => name.startsWith("create-note-markdown") ? markdownBridgeInstalled : bridge.installed;
+      const notesMarkdown = notesMarkdownSupport();
+      const markdownIntentMissing = (name) => name.startsWith("create-note-markdown") && notesMarkdown.createInterpretsMarkdown === false;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
         markdownNoteBridgeInstalled: markdownBridgeInstalled,
+        notesMarkdownIntents: notesMarkdown,
         mode: "background-only",
         operations: Object.fromEntries(
           native.map((name) => [
@@ -75781,8 +75880,8 @@ function registerNativeOperations(server2, manager) {
             {
               implemented: true,
               verified: VERIFIED_BACKGROUND.has(name),
-              available: VERIFIED_BACKGROUND.has(name) && installed(name) && (name !== "replace-native-tag" || tagBridgeInstalled),
-              reason: !VERIFIED_BACKGROUND.has(name) ? UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || "Live validation pending; install the shortcut and complete the isolated acceptance tests" : !installed(name) ? "Run apple-notes-mcp setup and approve Add Shortcut in macOS" : name === "replace-native-tag" && !tagBridgeInstalled ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase" : void 0
+              available: VERIFIED_BACKGROUND.has(name) && installed(name) && !markdownIntentMissing(name) && (name !== "replace-native-tag" || tagBridgeInstalled),
+              reason: !VERIFIED_BACKGROUND.has(name) ? UNAVAILABLE[name] || LIVE_VALIDATION_BLOCKERS[name] || "Live validation pending; install the shortcut and complete the isolated acceptance tests" : !installed(name) ? "Run apple-notes-mcp setup and approve Add Shortcut in macOS" : markdownIntentMissing(name) ? MARKDOWN_INTENT_WORKAROUND : name === "replace-native-tag" && !tagBridgeInstalled ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase" : void 0
             }
           ])
         ),
@@ -76084,7 +76183,15 @@ function setupShortcuts(checkOnly, dependencies = {}) {
       ...error62 ? { error: error62 } : {}
     };
   });
-  return { ready: items.every((item) => item.optional || item.installed), checkOnly, items };
+  const markdownWarning = describeNotesMarkdownSupport(
+    (dependencies.markdownSupport || notesMarkdownSupport)()
+  );
+  return {
+    ready: items.every((item) => item.optional || item.installed),
+    checkOnly,
+    items,
+    ...markdownWarning ? { markdownWarning } : {}
+  };
 }
 function formatShortcutSetup(report) {
   const lines = ["Apple Notes MCP Shortcut setup", ""];
@@ -76106,6 +76213,7 @@ function formatShortcutSetup(report) {
     lines.push(
       "After approving the macOS dialogs, run `apple-notes-mcp setup --check` or the MCP doctor tool."
     );
+  if (report.markdownWarning) lines.push(`\u26A0 ${report.markdownWarning}`);
   lines.push(
     "After install or upgrade, run each bridge once in the foreground in Shortcuts.app and choose Always Allow; a background run cannot display a first-run consent prompt and stalls until it times out."
   );
@@ -76439,7 +76547,7 @@ import { join as join32 } from "node:path";
 // src/services/privateHelper.ts
 import { spawnSync as spawnSync5 } from "node:child_process";
 import { createHash as createHash7 } from "node:crypto";
-import { existsSync as existsSync16, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync16, readFileSync as readFileSync7 } from "node:fs";
 import { homedir as homedir23 } from "node:os";
 import { dirname as dirname9, join as join31, resolve as resolve9 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
@@ -76473,7 +76581,7 @@ function packageRoot2(fromDir = dirname9(fileURLToPath3(import.meta.url))) {
     const candidate = join31(dir, "package.json");
     if (existsSync16(candidate)) {
       try {
-        const pkg = JSON.parse(readFileSync6(candidate, "utf8"));
+        const pkg = JSON.parse(readFileSync7(candidate, "utf8"));
         if (pkg.name === "apple-notes-mcp") return dir;
       } catch {
       }
@@ -76489,7 +76597,7 @@ function defaultDeps2(overrides = {}) {
     platform: process.platform,
     sourcePath: join31(packageRoot2(), HELPER_SOURCE_RELATIVE),
     exists: existsSync16,
-    readFile: (path10) => readFileSync6(path10),
+    readFile: (path10) => readFileSync7(path10),
     spawn: spawnSync5,
     ...overrides
   };
@@ -77440,7 +77548,7 @@ import {
   existsSync as existsSync18,
   mkdirSync as mkdirSync11,
   mkdtempSync as mkdtempSync10,
-  readFileSync as readFileSync7,
+  readFileSync as readFileSync8,
   renameSync as renameSync5,
   rmSync as rmSync10,
   writeFileSync as writeFileSync9
@@ -77469,7 +77577,7 @@ function defaultPermissionsWindowDeps(overrides = {}) {
     platform: process.platform,
     sourcePath: join33(packageRoot(), PERMISSIONS_WINDOW_SOURCE),
     exists: existsSync18,
-    readFile: (path10) => readFileSync7(path10),
+    readFile: (path10) => readFileSync8(path10),
     spawn: spawnSync8,
     now: () => /* @__PURE__ */ new Date(),
     ...overrides
@@ -79964,8 +80072,8 @@ registerTool(
       format: external_exports.enum(["plaintext", "html", "markdown"]).optional().default("plaintext").describe(
         "Content format: 'plaintext' (default), 'html' for rich formatting, or 'markdown'. Markdown whose first line is exactly `# <title>` (same case and spacing) has that line and one blank line after it removed, since the title is supplied separately."
       ),
-      markdownRoute: external_exports.enum(["shortcut", "html"]).optional().default("shortcut").describe(
-        "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible \u2610 / \u2611 character \u2014 not native, checkable checklist items \u2014 refusing block quotes, fenced code and inline code, and keeping a `---` line as literal text."
+      markdownRoute: external_exports.enum(["shortcut", "html"]).optional().describe(
+        "How format 'markdown' is imported. When omitted, 'shortcut' \u2014 or 'html' when this Mac's Notes has no 'Interpret as Markdown' option on its Create Note action (macOS 26.6.2 / Notes 4.13, #337), where the Shortcut would save literal Markdown; the response's markdownRoute says which ran, and an explicit 'shortcut' is refused there. 'shortcut' uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible \u2610 / \u2611 character \u2014 not native, checkable checklist items \u2014 refusing block quotes, fenced code and inline code, and keeping a `---` line as literal text."
       ),
       tags: external_exports.array(external_exports.string().max(MAX.TAG)).max(MAX.TAGS).optional().describe(
         "Returned-only metadata \u2014 NOT written to Notes.app. Apple Notes tags can't be set via AppleScript, so any values passed here are echoed back in the response but do not appear on the created note. Use #hashtags in the body for searchable text; this does not create native tag objects. Native tags need the Notes Shortcuts action. Refused with format 'markdown': add tags afterwards with add-native-tags."
@@ -79987,7 +80095,8 @@ registerTool(
       contentHash: external_exports.string().optional(),
       verified: external_exports.boolean().optional(),
       strippedDuplicateTitle: external_exports.boolean().optional(),
-      taskItemsRendered: external_exports.number().optional()
+      taskItemsRendered: external_exports.number().optional(),
+      markdownRoute: external_exports.string().optional()
     }
   },
   withErrorHandling((params) => {
@@ -79995,7 +80104,7 @@ registerTool(
       title,
       contentPath,
       format = "plaintext",
-      markdownRoute = "shortcut",
+      markdownRoute: requestedRoute,
       tags = [],
       folder,
       account
@@ -80003,8 +80112,10 @@ registerTool(
     if (params.content === void 0 === (contentPath === void 0))
       return errorResponse("Provide exactly one of content or contentPath");
     let content = params.content ?? readAllowedTextFile(contentPath, MAX_CONTENT_FILE_BYTES);
-    if (format !== "markdown" && markdownRoute !== "shortcut")
+    if (format !== "markdown" && requestedRoute === "html")
       return errorResponse('markdownRoute applies to format "markdown" only');
+    const autoHtmlRoute = format === "markdown" && requestedRoute === void 0 && notesMarkdownSupport().createInterpretsMarkdown === false;
+    const markdownRoute = requestedRoute ?? (autoHtmlRoute ? "html" : "shortcut");
     let strippedDuplicateTitle = false;
     if (format === "markdown") {
       const stripped = stripDuplicateTitleHeading(content, title);
@@ -80018,7 +80129,15 @@ registerTool(
     const titleNote = strippedDuplicateTitle ? { strippedDuplicateTitle: true } : {};
     if (format === "markdown" && markdownRoute === "html") {
       const taskItemsRendered = countTaskItems(content);
-      const html = appendMarkdownHtml(content, { taskGlyphs: true });
+      let html;
+      try {
+        html = appendMarkdownHtml(content, { taskGlyphs: true });
+      } catch (error62) {
+        if (!autoHtmlRoute) throw error62;
+        throw new Error(
+          `${error62 instanceof Error ? error62.message : String(error62)}. create-note used markdownRoute "html" because ${MARKDOWN_INTENT_WORKAROUND} Nothing was created`
+        );
+      }
       const note2 = notesManager.createNote(title, html, tags, folder, account, "html");
       if (!note2)
         return errorResponse(
@@ -80030,8 +80149,9 @@ registerTool(
           `A note may have been created, but its exact ID could not be verified. Do not retry automatically. Returned ID: ${note2.id}`
         );
       const glyphNote = taskItemsRendered ? ` ${taskItemsRendered} task item(s) were rendered as visible \u2610 / \u2611 text, not native checklist items.` : "";
+      const routeNote = autoHtmlRoute ? ' Created through markdownRoute "html": this Notes build has no "Interpret as Markdown" option on its Create Note action (#337).' : "";
       return successResponse(
-        `Note created from Markdown: "${note2.title}" [id: ${note2.id}]${glyphNote}`,
+        `Note created from Markdown: "${note2.title}" [id: ${note2.id}]${glyphNote}${routeNote}`,
         {
           ok: true,
           id: note2.id,
@@ -80041,6 +80161,7 @@ registerTool(
           contentHash: richContentHash(createdBody2, enrichNoteRead(note2.id, createdBody2)),
           verified: true,
           taskItemsRendered,
+          markdownRoute: "html",
           ...titleNote
         }
       );
@@ -80059,6 +80180,7 @@ registerTool(
       const result = createMarkdownNote(notesManager, { title, content, folder });
       return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, {
         ...result,
+        markdownRoute: "shortcut",
         ...titleNote
       });
     }

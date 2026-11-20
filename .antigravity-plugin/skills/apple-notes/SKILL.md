@@ -371,6 +371,12 @@ Use HTML for predictable rich notes. Apple Notes normalizes HTML internally, but
   AppleScript HTML, no real Heading styles, and `- [ ]` / `- [x]` task items
   become list rows with a visible ☐ / ☑ character (text, not a checkable
   checklist; say so to the user).
+- If the response's `markdownRoute` is `"html"` although you did not ask for it,
+  this Mac's Notes has no "Interpret as Markdown" option on its Create Note
+  action (macOS 26.6.2 / Notes 4.13), so the server used the HTML route; tell
+  the user headings are not real Heading styles. `append-native` Markdown goes
+  through the HTML importer there too (`###` becomes Heading). Do not retry with
+  `markdownRoute: "shortcut"`: it is refused on that build.
 - To import a Markdown or text file, pass its absolute path as `contentPath`
   instead of `content` (UTF-8, at most 1 MiB, inside home, temp, or `/Volumes`;
   hidden paths such as `~/.ssh` and anything in `~/Library` are refused, except

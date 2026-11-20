@@ -34,6 +34,11 @@ import {
 import { comparableVisibleText } from "../utils/noteRevision.js";
 import { callTimeoutMs } from "../utils/callTimeout.js";
 import { CodedError } from "../utils/errorCodes.js";
+import {
+  MARKDOWN_INTENT_WORKAROUND,
+  notesMarkdownSupport,
+  type NotesMarkdownSupport,
+} from "./notesMarkdownIntents.js";
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -593,7 +598,8 @@ export function assertAppendedVisibleText(beforeHtml: string, afterHtml: string,
 /** Append plaintext, bounded Markdown, or semantic HTML through the native bridge. */
 export function appendNative(
   manager: AppleNotesManager,
-  request: BackgroundInput & { content: string; format: "plaintext" | "html" | "markdown" }
+  request: BackgroundInput & { content: string; format: "plaintext" | "html" | "markdown" },
+  markdownSupport: () => NotesMarkdownSupport = notesMarkdownSupport
 ): ReturnType<typeof mutateBackground> {
   // Checked before validateAppendContent (and not just the general unsupported-
   // element error that would now fire there, since table elements were removed
@@ -613,14 +619,27 @@ export function appendNative(
   // Markdown subset and to compute the expected visible text/links for
   // readback verification; its HTML is no longer sent to Notes.
   const markdownHtml = request.format === "markdown" ? appendMarkdownHtml(request.content) : null;
+  // A Notes build whose Append to Note action has no "Interpret as Markdown"
+  // option (macOS 26.6.2 / Notes 4.13, #337) would save the Markdown as
+  // literal text. Send our HTML rendering through "append-html" instead — the
+  // same branch format "html" uses — so headings, bold and links still land;
+  // level-3 headings render as Heading there, not Subheading (#172).
+  const markdownViaHtml =
+    markdownHtml !== null && markdownSupport().appendInterpretsMarkdown === false;
+  // As before #173, the rendering must pass the same check direct HTML does.
+  if (markdownViaHtml) validateAppendContent(markdownHtml, "html");
   const op =
     request.format === "plaintext"
       ? "append-text"
-      : request.format === "markdown"
+      : request.format === "markdown" && !markdownViaHtml
         ? "append-markdown"
         : "append-html";
   const text =
-    request.format === "html" ? "<div><br></div>" + request.content : "\n\n" + request.content;
+    request.format === "html"
+      ? "<div><br></div>" + request.content
+      : markdownViaHtml
+        ? "<div><br></div>" + markdownHtml
+        : "\n\n" + request.content;
   return mutateBackground(
     request,
     op,
@@ -745,9 +764,21 @@ export function createMarkdownNote(
   run: (
     input: Record<string, string>,
     status: ReturnType<typeof nativeTagsStatus>
-  ) => void = runBackgroundShortcut
+  ) => void = runBackgroundShortcut,
+  markdownSupport: () => NotesMarkdownSupport = notesMarkdownSupport
 ) {
   if (/[\r\n\0]/u.test(request.title)) throw new Error("A Markdown note title must be one line");
+  // The bridge's Create Note action would save literal Markdown on this Notes
+  // build (#337); refuse before anything is created.
+  if (
+    markdownSupport().createInterpretsMarkdown === false &&
+    process.env.APPLE_NOTES_MCP_ALLOW_UNVERIFIED !== "1"
+  )
+    throw new CodedError(`${MARKDOWN_INTENT_WORKAROUND} Nothing was created`, {
+      code: "unsupported",
+      committed: false,
+      indeterminate: false,
+    });
   validateAppendContent(request.content, "markdown", { blocks: true });
   const { html: bodyHtml, expect: blockExpectations } = renderMarkdown(request.content, {
     blocks: true,

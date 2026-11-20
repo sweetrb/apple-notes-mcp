@@ -53,6 +53,17 @@ vi.mock(import("@/services/backgroundNotes.js"), async (importOriginal) => ({
   ...(await importOriginal()),
   createMarkdownNote: vi.fn(),
 }));
+const markdownSupport = vi.hoisted(() =>
+  vi.fn(() => ({
+    createInterpretsMarkdown: null as boolean | null,
+    appendInterpretsMarkdown: null as boolean | null,
+    dedicatedMarkdownActions: [] as string[],
+  }))
+);
+vi.mock(import("@/services/notesMarkdownIntents.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  notesMarkdownSupport: markdownSupport,
+}));
 vi.mock(import("@/tools/nativeOperations.js"), async (importOriginal) => ({
   ...(await importOriginal()),
   requireValidated: vi.fn(),
@@ -184,7 +195,7 @@ describe("create-note format markdown (#172)", () => {
     expect(response.content[0].text).toBe(
       'Note created from Markdown: "Plan" [id: x-coredata://ABCDEF/ICNote/p2]'
     );
-    expect(response.structuredContent).toEqual(result);
+    expect(response.structuredContent).toEqual({ ...result, markdownRoute: "shortcut" });
     expect(manager.createNote).not.toHaveBeenCalled();
   });
 
@@ -308,6 +319,67 @@ describe("create-note Markdown title heading and HTML route", () => {
     const response = await createNote({ title: "Plan", content: "# Plan\n", format: "markdown" });
     expect(response.content[0].text).toMatch(/only the title heading/);
     expect(createMarkdownNote).not.toHaveBeenCalled();
+  });
+
+  describe("on a Notes build without Interpret as Markdown (#337)", () => {
+    const noInterpret = {
+      createInterpretsMarkdown: false,
+      appendInterpretsMarkdown: false,
+      dedicatedMarkdownActions: ["CreateNoteFromMarkdownLinkAction"],
+    };
+
+    it("falls back to the html route when markdownRoute is omitted", async () => {
+      markdownSupport.mockReturnValueOnce(noInterpret);
+      created();
+      const response = await createNote({
+        title: "Plan",
+        content: "## Goals\n- plain",
+        format: "markdown",
+      });
+      expect(response.isError).toBeUndefined();
+      expect(createMarkdownNote).not.toHaveBeenCalled();
+      expect(requireValidated).not.toHaveBeenCalled();
+      expect(manager.createNote).toHaveBeenCalledWith(
+        "Plan",
+        "<h2>Goals</h2><ul><li>plain</li></ul>",
+        [],
+        undefined,
+        undefined,
+        "html"
+      );
+      expect(response.structuredContent).toMatchObject({ ok: true, markdownRoute: "html" });
+      expect(response.content[0].text).toMatch(/markdownRoute "html".*#337/);
+    });
+
+    it("explains the fallback when the html route refuses a construct", async () => {
+      markdownSupport.mockReturnValueOnce(noInterpret);
+      const response = await createNote({
+        title: "Plan",
+        content: "> quoted",
+        format: "markdown",
+      });
+      expect(response.isError).toBe(true);
+      expect(response.content[0].text).toMatch(/used markdownRoute "html" because.*#337/s);
+      expect(manager.createNote).not.toHaveBeenCalled();
+    });
+
+    it("leaves an explicit shortcut route to the bridge's own refusal", async () => {
+      markdownSupport.mockReturnValueOnce(noInterpret);
+      vi.mocked(createMarkdownNote).mockReturnValueOnce({
+        ok: true,
+        id: "x-coredata://ABCDEF/ICNote/p2",
+        title: "Plan",
+        verified: true,
+      } as never);
+      await createNote({
+        title: "Plan",
+        content: "## Goals",
+        format: "markdown",
+        markdownRoute: "shortcut",
+      });
+      expect(createMarkdownNote).toHaveBeenCalled();
+      expect(manager.createNote).not.toHaveBeenCalled();
+    });
   });
 
   it("creates through AppleScript HTML with visible task glyphs on the html route", async () => {

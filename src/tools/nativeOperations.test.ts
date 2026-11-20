@@ -23,6 +23,17 @@ vi.mock(import("../services/capabilityMatrix.js"), async (importOriginal) => ({
     features: {},
   })),
 }));
+const markdownSupport = vi.hoisted(() =>
+  vi.fn(() => ({
+    createInterpretsMarkdown: null as boolean | null,
+    appendInterpretsMarkdown: null as boolean | null,
+    dedicatedMarkdownActions: [] as string[],
+  }))
+);
+vi.mock(import("../services/notesMarkdownIntents.js"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  notesMarkdownSupport: markdownSupport,
+}));
 import { registerNativeOperations, requireValidated } from "./nativeOperations.js";
 import { readRichNote } from "../utils/noteRichText.js";
 import {
@@ -158,6 +169,31 @@ describe("background capability boundaries", () => {
       available: true,
     });
     expect(installed.structuredContent.operations["append-native"].available).toBe(false);
+  });
+  it("withdraws Markdown note creation, not append-native, when Notes cannot interpret Markdown (#337)", async () => {
+    vi.mocked(backgroundStatus).mockReturnValueOnce({
+      installed: true,
+      shortcut: "Background Operations",
+    });
+    vi.mocked(markdownNoteStatus).mockReturnValueOnce({
+      installed: true,
+      shortcut: "Notes MCP Markdown",
+    });
+    markdownSupport.mockReturnValueOnce({
+      createInterpretsMarkdown: false,
+      appendInterpretsMarkdown: false,
+      dedicatedMarkdownActions: [
+        "CreateNoteFromMarkdownLinkAction",
+        "AppendMarkdownToNoteLinkAction",
+      ],
+    });
+    const r = await fixture()("get-capabilities")[2]({});
+    expect(r.structuredContent.operations["create-note-markdown"]).toMatchObject({
+      available: false,
+      reason: expect.stringMatching(/markdownRoute: "html"/),
+    });
+    expect(r.structuredContent.operations["append-native"].available).toBe(true);
+    expect(r.structuredContent.notesMarkdownIntents.createInterpretsMarkdown).toBe(false);
   });
   it("discloses missing setup and rejected native actions separately", async () => {
     const get = fixture();

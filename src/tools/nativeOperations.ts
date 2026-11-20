@@ -19,6 +19,10 @@ import {
 } from "../services/backgroundNotes.js";
 import { normalizeNativeTags } from "../services/nativeTags.js";
 import { getCapabilityMatrix } from "../services/capabilityMatrix.js";
+import {
+  MARKDOWN_INTENT_WORKAROUND,
+  notesMarkdownSupport,
+} from "../services/notesMarkdownIntents.js";
 import { parseNoteTable } from "../utils/noteTables.js";
 import { readRichNote, type RichNote } from "../utils/noteRichText.js";
 
@@ -297,10 +301,17 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
       // create-note's Markdown format runs on its own bridge; the rest share Background Operations.
       const installed = (name: string) =>
         name.startsWith("create-note-markdown") ? markdownBridgeInstalled : bridge.installed;
+      // Installed is not enough when Notes' Create Note action ignores
+      // "Interpret as Markdown" (#337); append-native routes Markdown through
+      // HTML there, so only the create-note bridge is withdrawn.
+      const notesMarkdown = notesMarkdownSupport();
+      const markdownIntentMissing = (name: string) =>
+        name.startsWith("create-note-markdown") && notesMarkdown.createInterpretsMarkdown === false;
       return {
         bridge,
         nativeTagBridgeInstalled: tagBridgeInstalled,
         markdownNoteBridgeInstalled: markdownBridgeInstalled,
+        notesMarkdownIntents: notesMarkdown,
         mode: "background-only",
         operations: Object.fromEntries(
           native.map((name) => [
@@ -311,6 +322,7 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
               available:
                 VERIFIED_BACKGROUND.has(name) &&
                 installed(name) &&
+                !markdownIntentMissing(name) &&
                 (name !== "replace-native-tag" || tagBridgeInstalled),
               reason: !VERIFIED_BACKGROUND.has(name)
                 ? (UNAVAILABLE as Record<string, string>)[name] ||
@@ -318,9 +330,11 @@ export function registerNativeOperations(server: McpServer, manager: AppleNotesM
                   "Live validation pending; install the shortcut and complete the isolated acceptance tests"
                 : !installed(name)
                   ? "Run apple-notes-mcp setup and approve Add Shortcut in macOS"
-                  : name === "replace-native-tag" && !tagBridgeInstalled
-                    ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase"
-                    : undefined,
+                  : markdownIntentMissing(name)
+                    ? MARKDOWN_INTENT_WORKAROUND
+                    : name === "replace-native-tag" && !tagBridgeInstalled
+                      ? "Run apple-notes-mcp setup to install the Native Tags bridge for the addition phase"
+                      : undefined,
             },
           ])
         ),

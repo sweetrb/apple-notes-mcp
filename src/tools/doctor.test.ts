@@ -383,3 +383,37 @@ describe("doctor version line", () => {
     expect(formatDoctorReport(r).split("\n")[0]).toMatch(/^🩺 apple-notes-mcp doctor/);
   });
 });
+
+describe("doctor Notes Markdown import (#337)", () => {
+  const find = (r: ReturnType<typeof runDoctor>) =>
+    r.checks.find((c) => c.name === "Notes Markdown import");
+
+  it("warns, without failing, when Notes cannot interpret Markdown", () => {
+    const r = runDoctor(fakeMgr(), undefined, undefined, () => ({
+      createInterpretsMarkdown: false,
+      appendInterpretsMarkdown: false,
+      dedicatedMarkdownActions: [
+        "CreateNoteFromMarkdownLinkAction",
+        "AppendMarkdownToNoteLinkAction",
+      ],
+    }));
+    expect(find(r)).toMatchObject({ status: "warn" });
+    expect(find(r)!.detail).toMatch(/markdownRoute: "html"/);
+    expect(r.healthy).toBe(true);
+  });
+
+  it("is ok when both actions take Interpret as Markdown, and absent when unknown", () => {
+    const ok = runDoctor(fakeMgr(), undefined, undefined, () => ({
+      createInterpretsMarkdown: true,
+      appendInterpretsMarkdown: true,
+      dedicatedMarkdownActions: [],
+    }));
+    expect(find(ok)).toMatchObject({ status: "ok" });
+    const unknown = runDoctor(fakeMgr(), undefined, undefined, () => ({
+      createInterpretsMarkdown: null,
+      appendInterpretsMarkdown: null,
+      dedicatedMarkdownActions: [],
+    }));
+    expect(find(unknown)).toBeUndefined();
+  });
+});

@@ -218,3 +218,42 @@ describe("Shortcut setup", () => {
     );
   });
 });
+
+describe("Shortcut setup and Notes Markdown intents (#337)", () => {
+  const base = {
+    status: (shortcut: string) => ({ shortcut, installed: true, identifier: `id-${shortcut}` }),
+    exists: () => true,
+    open: vi.fn(() => ({ ok: true })),
+    baseDirectory: "/bundle/shortcuts",
+  };
+
+  it("warns in --check when Notes cannot interpret Markdown, without changing readiness", () => {
+    const report = setupShortcuts(true, {
+      ...base,
+      markdownSupport: () => ({
+        createInterpretsMarkdown: false,
+        appendInterpretsMarkdown: false,
+        dedicatedMarkdownActions: [
+          "CreateNoteFromMarkdownLinkAction",
+          "AppendMarkdownToNoteLinkAction",
+        ],
+      }),
+    });
+    expect(report.ready).toBe(true);
+    expect(report.markdownWarning).toMatch(/markdownRoute: "html"/);
+    expect(formatShortcutSetup(report)).toMatch(/⚠ .*#337/);
+  });
+
+  it("says nothing when the metadata is unknown", () => {
+    const report = setupShortcuts(true, {
+      ...base,
+      markdownSupport: () => ({
+        createInterpretsMarkdown: null,
+        appendInterpretsMarkdown: null,
+        dedicatedMarkdownActions: [],
+      }),
+    });
+    expect(report).not.toHaveProperty("markdownWarning");
+    expect(formatShortcutSetup(report)).not.toMatch(/#337/);
+  });
+});
