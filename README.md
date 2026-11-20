@@ -2864,6 +2864,7 @@ Each entry carries `available`, `osSupported`, `minimumMacOSVersion`,
 | `full_disk_access_missing` | The Notes database is not readable by this process |
 | `shortcuts_unavailable` | The `shortcuts` command could not be run |
 | `shortcut_not_installed` | A bridge Shortcut is missing or installed more than once |
+| `notes_markdown_import_missing` | Notes' Create Note action has no "Interpret as Markdown" option on this build, so `markdownNoteBridge` is unavailable ([#337](shortcuts/README.md#notes-builds-without-interpret-as-markdown-337)) |
 
 The probe never opens Notes.app or runs a Shortcut, so the Automation
 permission for Notes.app appears under `unverified` rather than being guessed;

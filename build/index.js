@@ -66035,7 +66035,8 @@ var FEATURES = [
       { kind: "full_disk_access" },
       { kind: "shortcuts_cli" },
       { kind: "shortcut", name: markdownShortcutName },
-      { kind: "shortcut_consent" }
+      { kind: "shortcut_consent" },
+      { kind: "notes_markdown_import" }
     ]
   },
   // Placeholders for features that need a native WRITE helper, which this
@@ -66186,6 +66187,12 @@ function evaluateFeature(feature, env) {
       case "speech_locale_and_assets":
         unverified.push(label);
         break;
+      case "notes_markdown_import":
+        if (env.notesMarkdown?.createInterpretsMarkdown === false) {
+          missing.push(label);
+          failures.add("notes_markdown_import_missing");
+        } else if (env.notesMarkdown?.createInterpretsMarkdown !== true) unverified.push(label);
+        break;
     }
   }
   let reason = null;
@@ -66196,6 +66203,7 @@ function evaluateFeature(feature, env) {
   else if (failures.has("full_disk_access_missing")) reason = "full_disk_access_missing";
   else if (failures.has("shortcuts_unavailable")) reason = "shortcuts_unavailable";
   else if (failures.has("shortcut_not_installed")) reason = "shortcut_not_installed";
+  else if (failures.has("notes_markdown_import_missing")) reason = "notes_markdown_import_missing";
   else if (failures.has("public_helper_unavailable")) reason = "public_helper_unavailable";
   else if (failures.has("public_helper_unverified")) reason = "public_helper_unverified";
   else if (failures.has("speech_permission_required")) reason = "speech_permission_required";
@@ -66253,7 +66261,8 @@ function probeCapabilityEnvironment() {
     darwinRelease: release2(),
     fullDiskAccess: isMac && hasFullDiskAccess(),
     shortcutLines,
-    publicHelper: isMac ? probePublicHelperStatus() : unprobedPublicHelperStatus()
+    publicHelper: isMac ? probePublicHelperStatus() : unprobedPublicHelperStatus(),
+    notesMarkdown: isMac ? notesMarkdownSupport() : void 0
   };
 }
 function getCapabilityMatrix(probe = probeCapabilityEnvironment) {

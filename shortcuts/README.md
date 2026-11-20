@@ -83,11 +83,29 @@ a plain file read that never contacts Notes) and, when the option is missing:
 - `create-note` with `format: "markdown"` and no `markdownRoute` uses
   `markdownRoute: "html"`; an explicit `markdownRoute: "shortcut"` is refused
   before anything is created, and `get-capabilities` reports
-  `create-note-markdown` unavailable.
+  `create-note-markdown` unavailable. `doctor`'s and `get-capabilities`' feature
+  matrix report `markdownNoteBridge` unavailable with reason
+  `notes_markdown_import_missing`.
 - `append-native` with `format: "markdown"` sends the server's HTML rendering
-  through the bridge's `append-html` branch, the same one `format: "html"` uses,
-  so `###` renders as Heading rather than Subheading.
+  through the bridge's `append-html` branch, the same one `format: "html"` uses.
 - `doctor` and `setup --check` say so.
+
+What lands, as read back on macOS 26.6.2 (Notes 4.13) with `list-note-paragraphs`
+and `get-note-blocks`:
+
+| Markdown        | `create-note` (html route) | `append-native` (`append-html`) |
+| --------------- | -------------------------- | ------------------------------- |
+| title line, `#` | Body, bold                 | not tested                      |
+| `##`            | Body, bold                 | Title                           |
+| `###`           | Body, bold                 | Heading                         |
+| `- ` items      | Bulleted                   | Bulleted                        |
+| `**bold**`      | Bold                       | Bold                            |
+
+Nothing reaches Subheading on either path, and the append mapping is one level
+higher than on macOS 27 builds, where `<h2>` and `<h3>` both render as Heading
+(#172). The first `append-html` after installing the bridge once returned
+`timeout_indeterminate` with nothing appended; read the note back before
+retrying, as for any indeterminate result.
 
 A bridge built on the dedicated actions has not shipped yet: it has to be built
 and signed in Shortcuts.app on such a release. Set
