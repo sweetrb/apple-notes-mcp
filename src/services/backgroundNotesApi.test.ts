@@ -355,6 +355,60 @@ describe("native append and tags", () => {
     expect(written.text).not.toContain("<h3>");
   });
 
+  it("routes Markdown through append-html when Notes cannot interpret Markdown (#337)", () => {
+    // macOS 26.6.2 / Notes 4.13: Append to Note has no "Interpret as Markdown",
+    // so the append-markdown branch would save literal Markdown.
+    const noInterpret = () => ({
+      createInterpretsMarkdown: false,
+      appendInterpretsMarkdown: false,
+      dedicatedMarkdownActions: ["AppendMarkdownToNoteLinkAction"],
+    });
+    const before = snapshot();
+    const after = snapshot({
+      hash: "h2",
+      html: `<div>${scopeText}</div><div><br></div><h2>Added</h2>`,
+      rich: { ...plainRichNote(`${scopeText}\nAdded`), revision: "r2" },
+    });
+    expect(
+      appendNative(
+        managerFor([before, before, after]),
+        { ...request, content: "## Added", format: "markdown" },
+        noInterpret
+      )
+    ).toMatchObject({ ok: true });
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.at(-1)?.[1])) as {
+      operation: string;
+      text: string;
+    };
+    expect(written.operation).toBe("append-html");
+    expect(written.text).toMatch(/^<div><br><\/div>/);
+    expect(written.text).toContain("Added");
+    expect(written.text).not.toContain("## Added");
+  });
+
+  it("keeps append-markdown when the Notes metadata is unknown (#337)", () => {
+    const unknown = () => ({
+      createInterpretsMarkdown: null,
+      appendInterpretsMarkdown: null,
+      dedicatedMarkdownActions: [],
+    });
+    const before = snapshot();
+    const after = snapshot({
+      hash: "h2",
+      html: `<div>${scopeText}</div><div><br></div><h2>Added</h2>`,
+      rich: { ...plainRichNote(`${scopeText}\nAdded`), revision: "r2" },
+    });
+    appendNative(
+      managerFor([before, before, after]),
+      { ...request, content: "## Added", format: "markdown" },
+      unknown
+    );
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.at(-1)?.[1])) as {
+      operation: string;
+    };
+    expect(written.operation).toBe("append-markdown");
+  });
+
   it("refuses Markdown that Notes would rewrite before reading or writing the note", () => {
     const manager = managerFor([snapshot()]);
     expect(() =>
@@ -517,6 +571,30 @@ describe("create-note Markdown bridge (#172)", () => {
     expect(manager.moveNoteById).toHaveBeenCalledWith(created, "Work", "iCloud");
     // Only accounts with a default folder can receive the note, so only those are checked.
     expect(manager.assertNotSmartFolderDestination.mock.calls).toEqual([["Work", "iCloud"]]);
+  });
+
+  it("refuses before creating anything when Notes cannot interpret Markdown (#337)", () => {
+    const manager = markdownManager([[existing], [existing, created]]);
+    const run = vi.fn();
+    let thrown: unknown;
+    try {
+      createMarkdownNote(
+        manager as unknown as AppleNotesManager,
+        { title: "Plan", content: "## Goals" },
+        run,
+        () => ({
+          createInterpretsMarkdown: false,
+          appendInterpretsMarkdown: false,
+          dedicatedMarkdownActions: ["CreateNoteFromMarkdownLinkAction"],
+        })
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(String(thrown)).toMatch(/markdownRoute: "html".*Nothing was created/s);
+    expect(thrown).toMatchObject({ envelope: { code: "unsupported", committed: false } });
+    expect(run).not.toHaveBeenCalled();
+    expect(manager.listNoteRefs).not.toHaveBeenCalled();
   });
 
   it("refuses a smart-folder destination before the bridge creates anything", () => {

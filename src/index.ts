@@ -191,6 +191,10 @@ import {
   createMarkdownNote,
   NATIVE_APPEND_HTML_SUBSET,
 } from "@/services/backgroundNotes.js";
+import {
+  MARKDOWN_INTENT_WORKAROUND,
+  notesMarkdownSupport,
+} from "@/services/notesMarkdownIntents.js";
 import { formatShortcutSetup, setupShortcuts } from "@/setupShortcuts.js";
 import { buildPublicHelper, formatPublicHelperBuild } from "@/services/publicHelper.js";
 import { fitNoteDrawings, formatNoteDrawings, getNoteDrawings } from "@/services/noteDrawings.js";
@@ -903,9 +907,8 @@ registerTool(
       markdownRoute: z
         .enum(["shortcut", "html"])
         .optional()
-        .default("shortcut")
         .describe(
-          "How format 'markdown' is imported. 'shortcut' (default) uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible ☐ / ☑ character — not native, checkable checklist items — refusing block quotes, fenced code and inline code, and keeping a `---` line as literal text."
+          "How format 'markdown' is imported. When omitted, 'shortcut' — or 'html' when this Mac's Notes has no 'Interpret as Markdown' option on its Create Note action (macOS 26.6.2 / Notes 4.13, #337), where the Shortcut would save literal Markdown; the response's markdownRoute says which ran, and an explicit 'shortcut' is refused there. 'shortcut' uses the Create Markdown Note Shortcut for real Title/Heading/Subheading styles (iCloud only, no tags; see get-capabilities). 'html' is the fallback when that Shortcut is not installed or the note is outside iCloud: it converts the same bounded Markdown subset to HTML and creates the note through AppleScript in any account, rendering `- [ ]` / `- [x]` task items as ordinary list rows that start with a visible ☐ / ☑ character — not native, checkable checklist items — refusing block quotes, fenced code and inline code, and keeping a `---` line as literal text."
         ),
       tags: z
         .array(z.string().max(MAX.TAG))
@@ -940,6 +943,7 @@ registerTool(
       verified: z.boolean().optional(),
       strippedDuplicateTitle: z.boolean().optional(),
       taskItemsRendered: z.number().optional(),
+      markdownRoute: z.string().optional(),
     },
   },
   withErrorHandling((params) => {
@@ -947,7 +951,7 @@ registerTool(
       title,
       contentPath,
       format = "plaintext",
-      markdownRoute = "shortcut",
+      markdownRoute: requestedRoute,
       tags = [],
       folder,
       account,
@@ -956,8 +960,15 @@ registerTool(
       return errorResponse("Provide exactly one of content or contentPath");
     let content =
       params.content ?? readAllowedTextFile(contentPath as string, MAX_CONTENT_FILE_BYTES);
-    if (format !== "markdown" && markdownRoute !== "shortcut")
+    if (format !== "markdown" && requestedRoute === "html")
       return errorResponse('markdownRoute applies to format "markdown" only');
+    // An omitted route falls back to HTML only on positive evidence that the
+    // bridge's Create Note action cannot interpret Markdown here (#337).
+    const autoHtmlRoute =
+      format === "markdown" &&
+      requestedRoute === undefined &&
+      notesMarkdownSupport().createInterpretsMarkdown === false;
+    const markdownRoute = requestedRoute ?? (autoHtmlRoute ? "html" : "shortcut");
     let strippedDuplicateTitle = false;
     if (format === "markdown") {
       const stripped = stripDuplicateTitleHeading(content, title);
@@ -971,7 +982,16 @@ registerTool(
     const titleNote = strippedDuplicateTitle ? { strippedDuplicateTitle: true } : {};
     if (format === "markdown" && markdownRoute === "html") {
       const taskItemsRendered = countTaskItems(content);
-      const html = appendMarkdownHtml(content, { taskGlyphs: true });
+      let html: string;
+      try {
+        html = appendMarkdownHtml(content, { taskGlyphs: true });
+      } catch (error) {
+        if (!autoHtmlRoute) throw error;
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}. ` +
+            `create-note used markdownRoute "html" because ${MARKDOWN_INTENT_WORKAROUND} Nothing was created`
+        );
+      }
       const note = notesManager.createNote(title, html, tags, folder, account, "html");
       if (!note)
         return errorResponse(
@@ -985,8 +1005,11 @@ registerTool(
       const glyphNote = taskItemsRendered
         ? ` ${taskItemsRendered} task item(s) were rendered as visible ☐ / ☑ text, not native checklist items.`
         : "";
+      const routeNote = autoHtmlRoute
+        ? ' Created through markdownRoute "html": this Notes build has no "Interpret as Markdown" option on its Create Note action (#337).'
+        : "";
       return successResponse(
-        `Note created from Markdown: "${note.title}" [id: ${note.id}]${glyphNote}`,
+        `Note created from Markdown: "${note.title}" [id: ${note.id}]${glyphNote}${routeNote}`,
         {
           ok: true,
           id: note.id,
@@ -996,6 +1019,7 @@ registerTool(
           contentHash: richContentHash(createdBody, enrichNoteRead(note.id, createdBody)),
           verified: true,
           taskItemsRendered,
+          markdownRoute: "html",
           ...titleNote,
         }
       );
@@ -1018,6 +1042,7 @@ registerTool(
       const result = createMarkdownNote(notesManager, { title, content, folder });
       return successResponse(`Note created from Markdown: "${title}" [id: ${result.id}]`, {
         ...result,
+        markdownRoute: "shortcut",
         ...titleNote,
       });
     }

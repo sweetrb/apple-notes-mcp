@@ -21,6 +21,11 @@ import {
   type CapabilityMatrix,
 } from "@/services/capabilityMatrix.js";
 import {
+  describeNotesMarkdownSupport,
+  notesMarkdownSupport,
+  type NotesMarkdownSupport,
+} from "@/services/notesMarkdownIntents.js";
+import {
   unprobedPublicHelperStatus,
   type PublicHelperStatus,
 } from "@/services/publicHelperStatus.js";
@@ -45,7 +50,8 @@ export interface DoctorReport {
 export function runDoctor(
   manager: AppleNotesManager,
   capabilityMatrix: () => CapabilityMatrix = getCapabilityMatrix,
-  version?: string
+  version?: string,
+  markdownSupport: () => NotesMarkdownSupport = notesMarkdownSupport
 ): DoctorReport {
   const checks: DoctorCheck[] = [];
 
@@ -124,6 +130,13 @@ export function runDoctor(
     });
   }
 
+  // 4b. Whether Notes' own Create Note / Append to Note actions still take
+  // "Interpret as Markdown", which the Markdown bridges depend on (#337). Read
+  // from the App Intents metadata Notes ships; reported only when known, and
+  // never fatal: the server routes Markdown through HTML when it is missing.
+  const markdownCheck = notesMarkdownCheck(markdownSupport());
+  if (markdownCheck) checks.push(markdownCheck);
+
   // 5. Node runtime code signature. An ad-hoc signed Node (typically Homebrew's)
   // gets a new cdhash on every update, so macOS TCC treats it as a brand-new
   // binary and silently drops its Automation / Full Disk Access grants — the
@@ -178,6 +191,21 @@ function markdownBridgeDetail(): string {
   } catch (error) {
     return `Optional ${MARKDOWN_NOTE_SHORTCUT} bridge: could not inspect (${purpose}): ${String(error)}.`;
   }
+}
+
+/** The doctor check for Notes' Markdown intents, or null when they could not be read. */
+export function notesMarkdownCheck(support: NotesMarkdownSupport): DoctorCheck | null {
+  const name = "Notes Markdown import";
+  const warning = describeNotesMarkdownSupport(support);
+  if (warning) return { name, status: "warn", detail: warning };
+  if (support.createInterpretsMarkdown && support.appendInterpretsMarkdown)
+    return {
+      name,
+      status: "ok",
+      detail:
+        'Notes\' Create Note and Append to Note actions accept "Interpret as Markdown", which the Markdown bridges use',
+    };
+  return null;
 }
 
 /**

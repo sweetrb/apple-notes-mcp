@@ -463,7 +463,7 @@ Creates a new note in Apple Notes.
 | `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. **The folder must already exist** — create it first with [`create-folder`](#create-folder). A smart folder is refused (see [`move-note`](#move-note)). Defaults to account root |
 | `account` | string | No | Account name (defaults to Notes.app's default account; matched exactly or by a *unique* prefix — an ambiguous prefix is refused). Must be an account Notes.app already has configured — see [`list-accounts`](#list-accounts) |
 | `format` | string | No | Content format: `"plaintext"` (default), `"html"`, or `"markdown"`. In all formats, the title is automatically prepended as the note's title line. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities. `"markdown"` produces real Title/Heading/Subheading styles through a Shortcut; see [Markdown notes](#markdown-notes) |
-| `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. See [Markdown through HTML](#markdown-through-html) |
+| `markdownRoute` | string | No | With `format: "markdown"` only: `"shortcut"` (default) or `"html"`. When omitted on a Notes build whose Create Note action has no "Interpret as Markdown" option (macOS 26.6.2 / Notes 4.13), the server uses `"html"` and an explicit `"shortcut"` is refused; the response's `markdownRoute` says which route ran. See [Markdown through HTML](#markdown-through-html) |
 | `timeoutSeconds` | number | No | Whole seconds, 1–120, for each Notes.app automation step this call runs; overrides `APPLE_NOTES_MCP_TIMEOUT_MS` for this call only. A timed-out write is uncertain, not failed: read the note by id before any retry. Also accepted by `get-note-content`, `update-note`, `append-to-note`, `delete-note` and `move-note` |
 
 **Example (with inline textual hashtags):**
@@ -589,7 +589,12 @@ title line, with no seed line.
 ##### Markdown through HTML
 
 `markdownRoute: "html"` imports the same bounded Markdown subset without the
-Shortcut: the server converts it to HTML and creates the note through AppleScript,
+Shortcut. It is also the default on a Notes build whose Create Note action has
+no "Interpret as Markdown" option, such as macOS 26.6.2 (Notes 4.13), where the
+Shortcut would save the Markdown as literal text; the server detects that from
+Notes' App Intents metadata, `doctor` and `setup --check` warn about it, and
+[`shortcuts/README.md`](https://github.com/sweetrb/apple-notes-mcp/blob/main/shortcuts/README.md#notes-builds-without-interpret-as-markdown-337)
+has the detail (#337). The server converts it to HTML and creates the note through AppleScript,
 like `format: "html"`. It works in any account, accepts `tags`, and needs no
 Shortcut, but headings get the plain bold styling described in the known
 limitation above rather than real Heading and Subheading styles.
@@ -2877,7 +2882,11 @@ subset as `format: "html"`'s Markdown-shaped content (`#`/`##`/`###` headings,
 flat lists, emphasis, and inline links) but is sent through Notes' own native
 Markdown importer rather than converted to HTML first, so `#`/`##`/`###`
 produce real Title/Heading/Subheading — Notes' HTML importer only
-distinguishes two heading levels and renders `###` the same as `##`. Markdown
+distinguishes two heading levels and renders `###` the same as `##`. On a Notes
+build whose Append to Note action has no "Interpret as Markdown" option (macOS
+26.6.2 / Notes 4.13, #337), where the bridge would append literal Markdown, the
+server sends its HTML rendering through the HTML importer instead, so `###`
+renders as Heading there. Markdown
 that the importer would rewrite, so the appended text could not be verified, is
 refused before anything is written; the list is under
 [Markdown notes](#markdown-notes). A
@@ -3230,6 +3239,7 @@ These optional settings control server behavior. They do not replace the [macOS 
 | `APPLE_NOTES_MCP_TAGS_SHORTCUT` | `Notes MCP Tags` | Name or UUID of the installed Native Tags bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_BACKGROUND_SHORTCUT` | `Notes MCP Background v6` | Name or UUID of the installed Background Operations bridge to run. `setup` still installs and checks the default name. |
 | `APPLE_NOTES_MCP_MARKDOWN_SHORTCUT` | `Notes MCP Markdown` | Name or UUID of the installed Create Markdown Note bridge to run. `setup` still installs and checks the default name. |
+| `APPLE_NOTES_MCP_IGNORE_NOTES_INTENTS` | unset | Set to `1` to stop the server reading Notes' App Intents metadata to detect a Notes build without "Interpret as Markdown" (#337). The Markdown routes then behave as if the option were present. |
 | `APPLE_NOTES_MCP_PASTEBOARD_NAME` | unset | Testing only: makes [`add-attachment-from-pasteboard`](#add-attachment-from-pasteboard) read a private named pasteboard instead of the general clipboard. |
 | `APPLE_NOTES_MCP_ALLOW_PRIVATE_CONTENT_PATHS` | unset | Set to `1` to let `create-note` read a [`contentPath`](#create-note), [`add-attachment`](#add-attachment) and [`create-note-with-attachment`](#create-note-with-attachment) attach a `path`, [`analyze-svg`](#analyze-svg) read a `path`, and the Markdown template tools read a `templateFile`, inside a hidden directory or file (such as `~/.config`) or `~/Library` outside iCloud Drive and `~/Library/CloudStorage`. Off by default because those places hold keys, tokens and app data. |
 | `APPLE_NOTES_MCP_ALLOW_PRIVATE_SAVE_PATHS` | unset | Set to `1` to let `save-attachment`, `export-attachments`, `export-paper-image` and the Markdown/HTML exports write a hidden file or anywhere inside a hidden directory (such as `~/.zshenv`, `.env`, `~/.ssh`, `.git/hooks` or `.claude`, at any depth), or in `~/Library` outside iCloud Drive and `~/Library/CloudStorage` (such as `~/Library/LaunchAgents`). Off by default because those places hold shell startup files, credentials and auto-run agents, so an attachment from a shared note must not land there. |
@@ -3424,6 +3434,11 @@ In a JSON string literal the two characters `\\` denote **one** literal backslas
 - Common cause, especially right after install or upgrade: the bridge Shortcut is waiting on a first-run consent prompt. The server runs it in the background, where Shortcuts cannot display that prompt, so the run stalls until it times out
 - Fix: open Shortcuts.app, run the Shortcut the error names (`Notes MCP Tags`, `Notes MCP Background v6` or `Notes MCP Markdown`) once in the foreground and choose **Always Allow**. Each bridge needs this once; quitting or relaunching Shortcuts.app or Notes.app does not clear it
 - Read the exact note before retrying — the write may have landed
+
+### Markdown lands as literal `#` and `**` text
+- Symptom: `create-note` or `append-native` with `format: "markdown"` reports "Note text not verified" or "Appended text not verified", and the note shows the Markdown characters as plain text
+- Cause: this Notes build's Create Note and Append to Note actions have no "Interpret as Markdown" option (macOS 26.6.2 / Notes 4.13, #337). Since 2.16.9 the server detects it, routes both through HTML and says so in `doctor`
+- Workaround on older releases: `markdownRoute: "html"` for `create-note`, `format: "html"` for `append-native`
 
 ### "Note not found"
 - Note titles must match exactly (case-sensitive)

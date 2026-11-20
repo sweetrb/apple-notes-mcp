@@ -8,7 +8,9 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     // Tests that load the server entry point must never reach a permission
     // broker installed on the developer's Mac.
-    env: { APPLE_NOTES_MCP_BROKER: "off" },
+    // Nor may they depend on the host's Notes build (#337): tests that cover the
+    // Notes Markdown-intent detection inject its metadata explicitly.
+    env: { APPLE_NOTES_MCP_BROKER: "off", APPLE_NOTES_MCP_IGNORE_NOTES_INTENTS: "1" },
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "json-summary"],

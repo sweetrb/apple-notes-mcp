@@ -5,6 +5,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NATIVE_TAGS_SHORTCUT, nativeTagsStatus } from "./services/nativeTags.js";
 import { BACKGROUND_SHORTCUT, MARKDOWN_NOTE_SHORTCUT } from "./services/backgroundNotes.js";
+import {
+  describeNotesMarkdownSupport,
+  notesMarkdownSupport,
+  type NotesMarkdownSupport,
+} from "./services/notesMarkdownIntents.js";
 
 export interface ShortcutSetupItem {
   name: string;
@@ -23,6 +28,8 @@ export interface ShortcutSetupReport {
   ready: boolean;
   checkOnly: boolean;
   items: ShortcutSetupItem[];
+  /** Set when this Notes build cannot interpret Markdown in the bridges' actions (#337). */
+  markdownWarning?: string;
 }
 
 interface SetupDependencies {
@@ -32,6 +39,7 @@ interface SetupDependencies {
   baseDirectory?: string;
   /** Darwin kernel release, as `os.release()` reports it. */
   osRelease?: () => string;
+  markdownSupport?: () => NotesMarkdownSupport;
 }
 
 /** Shown beside the Create Markdown Note bridge, which readiness never depends on. */
@@ -125,7 +133,15 @@ export function setupShortcuts(
   });
   // Readiness is the two required bridges only (#172 review): the Markdown
   // bridge serves one optional create-note format and cannot install before macOS 26.
-  return { ready: items.every((item) => item.optional || item.installed), checkOnly, items };
+  const markdownWarning = describeNotesMarkdownSupport(
+    (dependencies.markdownSupport || notesMarkdownSupport)()
+  );
+  return {
+    ready: items.every((item) => item.optional || item.installed),
+    checkOnly,
+    items,
+    ...(markdownWarning ? { markdownWarning } : {}),
+  };
 }
 
 /** Render a concise terminal summary for Shortcut setup or check-only mode. */
@@ -149,6 +165,7 @@ export function formatShortcutSetup(report: ShortcutSetupReport): string {
     lines.push(
       "After approving the macOS dialogs, run `apple-notes-mcp setup --check` or the MCP doctor tool."
     );
+  if (report.markdownWarning) lines.push(`⚠ ${report.markdownWarning}`);
   // Installed is not consented (#172): the server's background runs cannot
   // display Shortcuts' first-run consent prompt, and nothing can detect it.
   lines.push(

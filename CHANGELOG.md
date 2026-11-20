@@ -1,5 +1,40 @@
 ## [Unreleased]
 
+## [2.16.9] - 2026-11-20
+
+### Fixed
+
+- **Markdown no longer lands as literal text on Notes builds without "Interpret as
+  Markdown" (#337).** On macOS 26.6.2 (Notes 4.13) Notes' generic Create Note and
+  Append to Note actions have no `interpretAsMarkdown` parameter (Markdown has its own
+  Create Note from Markdown and Append Markdown to Note actions there), so both
+  Markdown bridges saved `#`, `##` and `**` as plain text and the readback reported
+  the write unverified. macOS 27.2 builds that also report Notes 4.13 still have the
+  parameter, so the server now reads Notes' App Intents metadata
+  (`Notes.app/Contents/Resources/Metadata.appintents/extract.actionsdata`, a plain
+  file read that never contacts Notes) and, only when it positively shows the
+  parameter missing:
+  - `create-note` with `format: "markdown"` and no `markdownRoute` uses the
+    `"html"` route, and says so in the response (`markdownRoute: "html"` in the
+    structured result); an explicit `markdownRoute: "shortcut"` is refused before
+    anything is created, and `get-capabilities` reports `create-note-markdown`
+    unavailable with the reason;
+  - `append-native` with `format: "markdown"` sends the server's HTML rendering
+    through the bridge's existing `append-html` branch, as `format: "html"` does
+    (`###` renders as Heading there, not Subheading);
+  - `doctor` adds a "Notes Markdown import" warning and `setup --check` prints it.
+  An unreadable file or unlisted action changes nothing. Set
+  `APPLE_NOTES_MCP_IGNORE_NOTES_INTENTS=1` to turn the detection off. A bridge
+  built on the dedicated Markdown actions has not shipped yet: it has to be built
+  and signed in Shortcuts.app on an affected release. This was not verified
+  against a live affected Notes build.
+- **The Markdown bridge's first-run link in `shortcuts/README.md` used the
+  pre-2.16.1 name** (`Apple Notes MCP - Create Markdown Note`), so it did not find
+  the bridge `setup` installs as `Notes MCP Markdown`.
+
+Reported, with the `extract.actionsdata` diagnosis and the intent table, by Andy
+Manettas (@AndyManettas).
+
 ## [2.16.8] - 2026-11-12
 ### Security
 - **System tools are spawned by absolute path.** `sqlite3`, `osascript` and `codesign` were
