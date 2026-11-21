@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [2.16.11] - 2026-11-21
+
+### Documentation
+
+- `shortcuts/README.md` no longer says the macOS 26.6.2 `append-native` heading mapping is
+  "one level higher than macOS 27" (#337). Re-measured: it is relative to each appended
+  fragment, so the highest heading level becomes Title and every deeper level becomes
+  Heading, and Subheading is unreachable. The earlier "`##` lands as Title" held only
+  when `##` was the top level in that append. The `create-note` HTML-route row is
+  unchanged.
+
+Measured by Andy Manettas (@AndyManettas).
+
 ## [2.16.10] - 2026-11-20
 
 ### Fixed
