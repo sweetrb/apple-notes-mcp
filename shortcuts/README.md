@@ -93,17 +93,21 @@ a plain file read that never contacts Notes) and, when the option is missing:
 What lands, as read back on macOS 26.6.2 (Notes 4.13) with `list-note-paragraphs`
 and `get-note-blocks`:
 
-| Markdown        | `create-note` (html route) | `append-native` (`append-html`) |
-| --------------- | -------------------------- | ------------------------------- |
-| title line, `#` | Body, bold                 | not tested                      |
-| `##`            | Body, bold                 | Title                           |
-| `###`           | Body, bold                 | Heading                         |
-| `- ` items      | Bulleted                   | Bulleted                        |
-| `**bold**`      | Bold                       | Bold                            |
+| Markdown      | `create-note` (html route) | `append-native` (`append-html`)                    |
+| ------------- | -------------------------- | -------------------------------------------------- |
+| any `#`-level | Body, bold                 | relative to the fragment: Title or Heading (below) |
+| `- ` items    | Bulleted                   | Bulleted                                           |
+| `**bold**`    | Bold                       | Bold                                               |
 
-Nothing reaches Subheading on either path, and the append mapping is one level
-higher than on macOS 27 builds, where `<h2>` and `<h3>` both render as Heading
-(#172). The first `append-html` after installing the bridge once returned
+On `append-native` the heading mapping is **relative to each appended fragment**,
+not a fixed per-level one: the highest heading level in the fragment becomes Title
+and every deeper level becomes Heading (`#`, `##`, `###` land as Title, Heading,
+Heading; `##`, `###` as Title, Heading; `###` alone as Title). Nothing reaches
+Subheading on either path, so no fixed remapping on our side can make heading
+levels predictable here; that needs the dedicated `AppendMarkdownToNoteLinkAction`.
+`<h4>` and deeper are refused by the server before anything is written, so those
+levels are unmeasured. macOS 27 builds, where `<h2>` and `<h3>` both render as
+Heading (#172), may follow the same rule. The first `append-html` after installing the bridge once returned
 `timeout_indeterminate` with nothing appended; read the note back before
 retrying, as for any indeterminate result.
 
